@@ -51,7 +51,7 @@ let intervalId = null
 
 async function fetchStatus() {
   try {
-    const res = await fetch('/api/library/enrichment/status', {
+    const res = await fetch('/api/tracks/enrichment/status', {
       headers: library.authHeaders
     })
     if (res.ok) {
