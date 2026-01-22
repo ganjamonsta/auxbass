@@ -59,4 +59,5 @@ export const playlistsApi = {
 export const playerApi = {
   getStreamUrl: (trackId) => api.get(`/player/stream/${trackId}`),
   getBatchUrls: (trackIds) => api.post('/player/stream/batch', trackIds),
+  recordPlay: (trackId) => api.post(`/player/play/${trackId}`),
 }

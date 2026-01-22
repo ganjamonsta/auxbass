@@ -1,12 +1,15 @@
 """
 TG Player API - Player Router
-Handles audio streaming URLs
+Handles audio streaming with secure proxy (token never exposed to browser)
 """
 from typing import Optional
 import time
+import hashlib
+import secrets
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,27 +29,58 @@ from .auth import get_current_user, TelegramUser
 router = APIRouter()
 settings = get_settings()
 
-# Simple in-memory cache for file URLs (production: use Redis)
-_url_cache: dict[str, tuple[str, float]] = {}
-URL_CACHE_TTL = 3000  # 50 minutes (Telegram URLs valid for ~1 hour)
+# Cache for Telegram file paths (not full URLs!)
+_file_path_cache: dict[str, tuple[str, float]] = {}
+FILE_PATH_CACHE_TTL = 3000  # 50 minutes
+
+# Secure token cache: maps temporary token -> (track_id, user_id, expires)
+_stream_tokens: dict[str, tuple[int, int, float]] = {}
+STREAM_TOKEN_TTL = 300  # 5 minutes for token validity
 
 
 class StreamUrlResponse(BaseModel):
-    url: str
-    expires_at: int  # Unix timestamp
+    url: str  # Now returns proxy URL, not Telegram URL
+    expires_at: int
     track_id: int
 
 
-async def get_telegram_file_url(file_id: str) -> Optional[str]:
+def generate_stream_token(track_id: int, user_id: int) -> str:
+    """Generate a secure temporary token for streaming"""
+    token = secrets.token_urlsafe(32)
+    expires = time.time() + STREAM_TOKEN_TTL
+    _stream_tokens[token] = (track_id, user_id, expires)
+    
+    # Cleanup old tokens
+    now = time.time()
+    expired = [k for k, v in _stream_tokens.items() if v[2] < now]
+    for k in expired:
+        del _stream_tokens[k]
+    
+    return token
+
+
+def validate_stream_token(token: str) -> Optional[tuple[int, int]]:
+    """Validate token and return (track_id, user_id) or None"""
+    if token not in _stream_tokens:
+        return None
+    
+    track_id, user_id, expires = _stream_tokens[token]
+    if time.time() > expires:
+        del _stream_tokens[token]
+        return None
+    
+    return (track_id, user_id)
+
+
+async def get_telegram_file_path(file_id: str) -> Optional[str]:
     """
-    Get download URL for Telegram file.
-    Uses Bot API getFile method.
+    Get file path from Telegram (not full URL).
     """
-    # Check cache first
-    if file_id in _url_cache:
-        url, expires = _url_cache[file_id]
+    # Check cache
+    if file_id in _file_path_cache:
+        file_path, expires = _file_path_cache[file_id]
         if time.time() < expires:
-            return url
+            return file_path
     
     # Call Telegram API
     api_url = f"https://api.telegram.org/bot{settings.bot_token}/getFile"
@@ -65,24 +99,23 @@ async def get_telegram_file_url(file_id: str) -> Optional[str]:
             if not file_path:
                 return None
             
-            # Construct download URL
-            download_url = f"https://api.telegram.org/file/bot{settings.bot_token}/{file_path}"
+            # Cache the file path
+            _file_path_cache[file_id] = (file_path, time.time() + FILE_PATH_CACHE_TTL)
             
-            # Cache the URL
-            _url_cache[file_id] = (download_url, time.time() + URL_CACHE_TTL)
-            
-            return download_url
+            return file_path
 
 
 @router.get("/stream/{track_id}", response_model=StreamUrlResponse)
 async def get_stream_url(
     track_id: int,
+    request: Request,
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Get streaming URL for a track.
-    Returns a temporary URL that can be used directly in <audio> element.
+    Get secure proxy URL for streaming a track.
+    Returns a temporary token-based URL that proxies through our server.
+    Bot token is NEVER exposed to the client.
     """
     # Get track
     track = await db.scalar(
@@ -95,34 +128,92 @@ async def get_stream_url(
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
     
-    # Get Telegram file URL
-    url = await get_telegram_file_url(track.file_id)
+    # Verify file is accessible (pre-cache the path)
+    file_path = await get_telegram_file_path(track.file_id)
     
-    if not url:
+    if not file_path:
         raise HTTPException(
             status_code=503,
-            detail="Could not get file URL from Telegram. File might be too large (>20MB) or unavailable."
+            detail="Could not get file from Telegram. File might be too large (>20MB) or unavailable."
         )
     
-    # Calculate expiration (50 minutes from now to be safe)
-    expires_at = int(time.time()) + URL_CACHE_TTL
+    # Generate secure temporary token
+    token = generate_stream_token(track_id, user.id)
+    
+    # Build proxy URL (relative to current host)
+    base_url = str(request.base_url).rstrip('/')
+    proxy_url = f"{base_url}/api/player/audio/{token}"
+    
+    expires_at = int(time.time()) + STREAM_TOKEN_TTL
     
     return StreamUrlResponse(
-        url=url,
+        url=proxy_url,
         expires_at=expires_at,
         track_id=track_id,
+    )
+
+
+@router.get("/audio/{token}")
+async def stream_audio(token: str, db: AsyncSession = Depends(get_db)):
+    """
+    Secure audio proxy endpoint.
+    Streams audio through our server - bot token never exposed to client.
+    """
+    # Validate token
+    token_data = validate_stream_token(token)
+    if not token_data:
+        raise HTTPException(status_code=401, detail="Invalid or expired stream token")
+    
+    track_id, user_id = token_data
+    
+    # Get track
+    track = await db.scalar(
+        select(Track).where(
+            Track.id == track_id,
+            Track.user_id == user_id
+        )
+    )
+    
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    
+    # Get file path from Telegram
+    file_path = await get_telegram_file_path(track.file_id)
+    if not file_path:
+        raise HTTPException(status_code=503, detail="File unavailable")
+    
+    # Stream from Telegram through our proxy
+    telegram_url = f"https://api.telegram.org/file/bot{settings.bot_token}/{file_path}"
+    
+    async def stream_generator():
+        async with aiohttp.ClientSession() as session:
+            async with session.get(telegram_url) as resp:
+                async for chunk in resp.content.iter_chunked(64 * 1024):  # 64KB chunks
+                    yield chunk
+    
+    # Determine content type
+    content_type = track.mime_type or "audio/mpeg"
+    
+    return StreamingResponse(
+        stream_generator(),
+        media_type=content_type,
+        headers={
+            "Accept-Ranges": "bytes",
+            "Content-Disposition": f'inline; filename="{track.title or "audio"}.mp3"',
+            "Cache-Control": "private, max-age=300",  # Cache 5 min on client
+        }
     )
 
 
 @router.post("/stream/batch")
 async def get_batch_stream_urls(
     track_ids: list[int],
+    request: Request,
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Get streaming URLs for multiple tracks at once.
-    Useful for preloading playlist.
+    Get secure proxy URLs for multiple tracks at once.
     """
     if len(track_ids) > 50:
         raise HTTPException(status_code=400, detail="Maximum 50 tracks per request")
@@ -136,9 +227,9 @@ async def get_batch_stream_urls(
     )
     tracks = {t.id: t for t in result.scalars().all()}
     
-    # Get URLs
+    base_url = str(request.base_url).rstrip('/')
     urls = []
-    expires_at = int(time.time()) + URL_CACHE_TTL
+    expires_at = int(time.time()) + STREAM_TOKEN_TTL
     
     for track_id in track_ids:
         track = tracks.get(track_id)
@@ -150,12 +241,46 @@ async def get_batch_stream_urls(
             })
             continue
         
-        url = await get_telegram_file_url(track.file_id)
+        token = generate_stream_token(track_id, user.id)
         urls.append({
             "track_id": track_id,
-            "url": url,
-            "expires_at": expires_at if url else None,
-            "error": None if url else "Could not get URL"
+            "url": f"{base_url}/api/player/audio/{token}",
+            "expires_at": expires_at,
+            "error": None
         })
     
     return {"urls": urls}
+
+
+@router.post("/play/{track_id}")
+async def record_play(
+    track_id: int,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Record that a track was fully played.
+    Increments play_count for statistics.
+    """
+    # Get track
+    track = await db.scalar(
+        select(Track).where(
+            Track.id == track_id,
+            Track.user_id == user.id
+        )
+    )
+    
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    
+    # Increment play count
+    track.play_count = (track.play_count or 0) + 1
+    track.last_played_at = datetime.utcnow()
+    
+    await db.commit()
+    
+    return {
+        "success": True,
+        "track_id": track_id,
+        "play_count": track.play_count
+    }

@@ -1,6 +1,7 @@
 """
 TG Player API - Tracks Router
 """
+import re
 from typing import Optional, List
 from datetime import datetime
 
@@ -20,6 +21,17 @@ from .auth import get_current_user, TelegramUser
 
 
 router = APIRouter()
+
+
+def sanitize_input(value: str) -> str:
+    """Sanitize input to prevent SQL injection"""
+    if not value:
+        return ""
+    # Remove dangerous characters
+    value = re.sub(r'[;\'"\\]', '', value)
+    # Escape % and _ for LIKE queries
+    value = value.replace('%', r'\%').replace('_', r'\_')
+    return value[:200].strip()
 
 
 # Pydantic models
@@ -76,25 +88,31 @@ async def get_tracks(
     query = select(Track).where(Track.user_id == user.id)
     count_query = select(func.count(Track.id)).where(Track.user_id == user.id)
     
-    # Apply search filter
+    # Apply search filter (sanitized)
     if search:
-        search_filter = or_(
-            Track.title.ilike(f"%{search}%"),
-            Track.artist.ilike(f"%{search}%"),
-            Track.album.ilike(f"%{search}%"),
-        )
-        query = query.where(search_filter)
-        count_query = count_query.where(search_filter)
+        safe_search = sanitize_input(search)
+        if safe_search:
+            search_filter = or_(
+                Track.title.ilike(f"%{safe_search}%"),
+                Track.artist.ilike(f"%{safe_search}%"),
+                Track.album.ilike(f"%{safe_search}%"),
+            )
+            query = query.where(search_filter)
+            count_query = count_query.where(search_filter)
     
-    # Apply artist filter
+    # Apply artist filter (sanitized)
     if artist:
-        query = query.where(Track.artist.ilike(f"%{artist}%"))
-        count_query = count_query.where(Track.artist.ilike(f"%{artist}%"))
+        safe_artist = sanitize_input(artist)
+        if safe_artist:
+            query = query.where(Track.artist.ilike(f"%{safe_artist}%"))
+            count_query = count_query.where(Track.artist.ilike(f"%{safe_artist}%"))
     
-    # Apply genre filter
+    # Apply genre filter (sanitized)
     if genre:
-        query = query.where(Track.genre.ilike(f"%{genre}%"))
-        count_query = count_query.where(Track.genre.ilike(f"%{genre}%"))
+        safe_genre = sanitize_input(genre)
+        if safe_genre:
+            query = query.where(Track.genre.ilike(f"%{safe_genre}%"))
+            count_query = count_query.where(Track.genre.ilike(f"%{safe_genre}%"))
     
     # Get total count
     total = await db.scalar(count_query)

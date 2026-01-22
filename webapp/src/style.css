@@ -5,6 +5,17 @@
 :root {
   --tg-viewport-height: 100vh;
   --tg-viewport-stable-height: 100vh;
+  
+  /* Spotify-inspired theme */
+  --spotify-green: #1DB954;
+  --spotify-green-dark: #1aa34a;
+  --spotify-black: #121212;
+  --spotify-gray-dark: #181818;
+  --spotify-gray: #282828;
+  --spotify-gray-light: #404040;
+  --spotify-text: #ffffff;
+  --spotify-text-secondary: #b3b3b3;
+  --spotify-text-muted: #727272;
 }
 
 * {
@@ -20,10 +31,20 @@ html, body {
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-  background-color: var(--tg-theme-bg-color, #ffffff);
-  color: var(--tg-theme-text-color, #000000);
+  background-color: var(--spotify-black);
+  color: var(--spotify-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Override Telegram theme with Spotify colors */
+body.spotify-theme {
+  --tg-theme-bg-color: var(--spotify-black);
+  --tg-theme-secondary-bg-color: var(--spotify-gray);
+  --tg-theme-text-color: var(--spotify-text);
+  --tg-theme-hint-color: var(--spotify-text-secondary);
+  --tg-theme-button-color: var(--spotify-green);
+  --tg-theme-button-text-color: #000000;
 }
 
 #app {
@@ -31,6 +52,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background-color: var(--spotify-black);
 }
 
 /* Custom scrollbar */
@@ -43,7 +65,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--tg-theme-hint-color, #ccc);
+  background: var(--spotify-gray-light);
   border-radius: 2px;
 }
 
@@ -51,6 +73,12 @@ body {
 .no-select {
   -webkit-user-select: none;
   user-select: none;
+}
+
+/* Touch feedback */
+.touch-active:active {
+  transform: scale(0.98);
+  opacity: 0.9;
 }
 
 /* Animation utilities */
@@ -66,10 +94,23 @@ body {
 
 .slide-up-enter-active,
 .slide-up-leave-active {
-  transition: transform 0.3s ease;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .slide-up-enter-from,
 .slide-up-leave-to {
   transform: translateY(100%);
+}
+
+/* One UI style large header */
+.oneui-header {
+  padding: 60px 24px 16px;
+  background: linear-gradient(180deg, var(--spotify-gray-dark) 0%, var(--spotify-black) 100%);
+}
+
+.oneui-header h1 {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--spotify-text);
 }

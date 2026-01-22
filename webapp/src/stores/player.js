@@ -197,12 +197,30 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   // Handle track end
-  const handleEnded = () => {
+  const handleEnded = async () => {
+    // Record play completion
+    if (currentTrack.value) {
+      try {
+        await playerApi.recordPlay(currentTrack.value.id)
+      } catch (e) {
+        console.error('Failed to record play:', e)
+      }
+    }
+    
     if (repeat.value === 'one') {
       seek(0)
       audio.value.play()
     } else {
       next()
+    }
+  }
+
+  // Play from queue by index (relative to current)
+  const playFromQueue = async (relativeIndex) => {
+    const targetIndex = queueIndex.value + 1 + relativeIndex
+    if (targetIndex >= 0 && targetIndex < queue.value.length) {
+      queueIndex.value = targetIndex
+      await play(queue.value[targetIndex])
     }
   }
 
@@ -293,6 +311,7 @@ export const usePlayerStore = defineStore('player', () => {
     addToQueue,
     toggleShuffle,
     toggleRepeat,
+    playFromQueue,
     stop,
   }
 })

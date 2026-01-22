@@ -53,6 +53,10 @@ class Track(Base):
     file_size: Mapped[Optional[int]] = mapped_column(Integer)
     mime_type: Mapped[Optional[str]] = mapped_column(String(50))
     
+    # Listening statistics
+    play_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_played_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
