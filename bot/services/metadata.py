@@ -1,39 +1,40 @@
 """
 TG Player - Metadata Enrichment Service
-Uses MusicBrainz (free, no API key) for metadata lookup
+Uses Deezer API (free, no API key) for metadata and cover art
 """
 import asyncio
 import logging
 import re
+import time
 from typing import Optional, Dict
 import aiohttp
 
 logger = logging.getLogger(__name__)
 
-# MusicBrainz API settings
-MB_BASE_URL = "https://musicbrainz.org/ws/2"
-MB_COVER_URL = "https://coverartarchive.org"
-USER_AGENT = "TGPlayer/1.0 (https://github.com/tg-player)"
-
 
 class MetadataService:
     """Service for fetching additional metadata from external sources"""
     
+    DEEZER_API = "https://api.deezer.com"
+    
+    USER_AGENT = "TGPlayer/1.0 (https://github.com/ganjamonsta/tg_player)"
+    
     def __init__(self):
         self._session: Optional[aiohttp.ClientSession] = None
-        self._rate_limit_delay = 1.0  # MusicBrainz requires 1 request per second
         self._last_request_time = 0
+        self._rate_limit_delay = 0.25  # Deezer: ~50 req/5sec = 0.1s, we use 0.25 to be safe
     
     async def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
+            timeout = aiohttp.ClientTimeout(total=10)
             self._session = aiohttp.ClientSession(
-                headers={"User-Agent": USER_AGENT}
+                timeout=timeout,
+                headers={"User-Agent": self.USER_AGENT}
             )
         return self._session
     
     async def _rate_limit(self):
-        """Enforce rate limiting for MusicBrainz API"""
-        import time
+        """Enforce rate limiting"""
         now = time.time()
         elapsed = now - self._last_request_time
         if elapsed < self._rate_limit_delay:
@@ -46,15 +47,17 @@ class MetadataService:
     
     def _clean_string(self, s: str) -> str:
         """Clean string for search query"""
+        if not s:
+            return ""
         # Remove feat., ft., etc.
         s = re.sub(r'\s*[\(\[].*?[\)\]]', '', s)
         s = re.sub(r'\s*(feat\.?|ft\.?|vs\.?)\s+.*', '', s, flags=re.IGNORECASE)
         return s.strip()
     
-    async def search_recording(self, title: str, artist: str) -> Optional[Dict]:
+    async def search_deezer(self, title: str, artist: str) -> Optional[Dict]:
         """
-        Search MusicBrainz for a recording
-        Returns: dict with release_id, artist, title, album, etc.
+        Search Deezer for track info
+        Returns: dict with artist, title, album, genre, cover_url
         """
         if not title and not artist:
             return None
@@ -62,125 +65,107 @@ class MetadataService:
         await self._rate_limit()
         session = await self._get_session()
         
-        # Build search query
-        query_parts = []
-        if title:
-            clean_title = self._clean_string(title)
-            query_parts.append(f'recording:"{clean_title}"')
-        if artist:
-            clean_artist = self._clean_string(artist)
-            query_parts.append(f'artist:"{clean_artist}"')
-        
-        query = " AND ".join(query_parts)
+        clean_title = self._clean_string(title)
+        clean_artist = self._clean_string(artist)
         
         try:
-            url = f"{MB_BASE_URL}/recording"
-            params = {
-                "query": query,
-                "fmt": "json",
-                "limit": 1
-            }
+            # Try specific search first
+            query = f'track:"{clean_title}" artist:"{clean_artist}"'
             
-            async with session.get(url, params=params) as resp:
+            async with session.get(
+                f"{self.DEEZER_API}/search",
+                params={"q": query, "limit": 1}
+            ) as resp:
                 if resp.status != 200:
-                    logger.warning(f"MusicBrainz search failed: {resp.status}")
+                    logger.warning(f"Deezer search failed: {resp.status}")
                     return None
                 
                 data = await resp.json()
-                recordings = data.get("recordings", [])
                 
-                if not recordings:
+                # If no results, try simpler search
+                if not data.get("data"):
+                    await self._rate_limit()
+                    async with session.get(
+                        f"{self.DEEZER_API}/search",
+                        params={"q": f"{clean_artist} {clean_title}", "limit": 1}
+                    ) as resp2:
+                        if resp2.status == 200:
+                            data = await resp2.json()
+                
+                if not data.get("data"):
                     return None
                 
-                rec = recordings[0]
+                track = data["data"][0]
+                album = track.get("album", {})
+                artist_data = track.get("artist", {})
+                
                 result = {
-                    "mb_recording_id": rec.get("id"),
-                    "title": rec.get("title"),
-                    "artist": rec.get("artist-credit", [{}])[0].get("name") if rec.get("artist-credit") else None,
+                    "title": track.get("title"),
+                    "artist": artist_data.get("name"),
+                    "album": album.get("title"),
+                    "cover_url": album.get("cover_big") or album.get("cover_medium") or album.get("cover"),
+                    "deezer_id": track.get("id"),
+                    "album_id": album.get("id"),
                 }
                 
-                # Get release info (album)
-                releases = rec.get("releases", [])
-                if releases:
-                    release = releases[0]
-                    result["album"] = release.get("title")
-                    result["release_id"] = release.get("id")
+                # Try to get genre from album
+                if album.get("id"):
+                    genre = await self._get_album_genre(album["id"])
+                    if genre:
+                        result["genre"] = genre
                 
                 return result
                 
+        except asyncio.TimeoutError:
+            logger.error("Deezer search timeout")
+            return None
         except Exception as e:
-            logger.error(f"MusicBrainz search error: {e}")
+            logger.error(f"Deezer search error: {e}")
             return None
     
-    async def get_cover_art(self, release_id: str) -> Optional[str]:
-        """
-        Get cover art URL from Cover Art Archive
-        Returns: URL to front cover image
-        """
-        if not release_id:
-            return None
-        
+    async def _get_album_genre(self, album_id: int) -> Optional[str]:
+        """Get genre from Deezer album details"""
         await self._rate_limit()
         session = await self._get_session()
         
         try:
-            url = f"{MB_COVER_URL}/release/{release_id}"
-            
-            async with session.get(url, allow_redirects=False) as resp:
-                if resp.status == 307:
-                    # Has cover art, get front
-                    return f"{MB_COVER_URL}/release/{release_id}/front-250"
-                elif resp.status == 200:
-                    data = await resp.json()
-                    images = data.get("images", [])
-                    for img in images:
-                        if img.get("front"):
-                            thumbnails = img.get("thumbnails", {})
-                            return thumbnails.get("250") or thumbnails.get("small") or img.get("image")
-                    # Return first image if no front
-                    if images:
-                        return images[0].get("thumbnails", {}).get("250") or images[0].get("image")
+            async with session.get(f"{self.DEEZER_API}/album/{album_id}") as resp:
+                if resp.status != 200:
+                    return None
                 
+                data = await resp.json()
+                genres = data.get("genres", {}).get("data", [])
+                
+                if genres:
+                    return genres[0].get("name")
                 return None
                 
-        except Exception as e:
-            logger.error(f"Cover art fetch error: {e}")
+        except Exception:
             return None
     
     async def enrich_track(self, title: str, artist: str) -> Dict:
         """
-        Full enrichment: search recording and get cover art
-        Returns: dict with enriched metadata
+        Main method to enrich track metadata
+        Returns dict with enriched data and 'enriched' flag
         """
         result = {
             "enriched": False,
             "title": title,
             "artist": artist,
-            "album": None,
-            "genre": None,
-            "cover_url": None,
         }
         
-        # Search for recording
-        recording = await self.search_recording(title, artist)
-        if not recording:
-            return result
+        # Try Deezer
+        deezer_data = await self.search_deezer(title, artist)
         
-        result["enriched"] = True
-        
-        # Update with found data (only if original is empty)
-        if not title and recording.get("title"):
-            result["title"] = recording["title"]
-        if not artist and recording.get("artist"):
-            result["artist"] = recording["artist"]
-        if recording.get("album"):
-            result["album"] = recording["album"]
-        
-        # Get cover art
-        if recording.get("release_id"):
-            cover = await self.get_cover_art(recording["release_id"])
-            if cover:
-                result["cover_url"] = cover
+        if deezer_data:
+            result["enriched"] = True
+            result["album"] = deezer_data.get("album")
+            result["genre"] = deezer_data.get("genre")
+            result["cover_url"] = deezer_data.get("cover_url")
+            result["source"] = "deezer"
+            logger.info(f"Enriched from Deezer: {title} - {artist}")
+        else:
+            logger.debug(f"No Deezer data for: {title} - {artist}")
         
         return result
 
