@@ -80,6 +80,7 @@ logs/
 webapp/node_modules/
 webapp/dist/
 webapp/.vite/
+node_modules/
 
 # OS
 .DS_Store
@@ -89,3 +90,31 @@ Thumbs.db
 local/
 tmp/
 temp/
+
+# Database files (SQLite)
+database/*.db
+database/*.sqlite
+database/*.sqlite3
+data/
+
+# Package locks (optional, can remove if you want to track)
+# webapp/package-lock.json
+
+# Build artifacts
+*.pyc
+.mypy_cache/
+.ruff_cache/
+
+# Telegram bot session files
+*.session
+*.session-journal
+
+# FRP config with secrets
+frpc.ini
+frps.ini
+
+# SSL certificates
+*.pem
+*.key
+*.crt
+*.cer
