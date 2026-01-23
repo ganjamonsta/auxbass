@@ -113,31 +113,17 @@ const coverInitials = computed(() => {
 
 <style scoped>
 .mini-player {
-  position: fixed;
-  bottom: 64px; /* Above tab bar */
-  left: 8px;
-  right: 8px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 12px;
+  margin: 8px;
   padding: 8px 12px;
   background: var(--spotify-gray);
   border-radius: 8px;
   cursor: pointer;
   z-index: 60;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-/* Cover scrollbar behind mini-player */
-.mini-player::before {
-  content: '';
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  bottom: -64px;
-  width: 16px;
-  background: linear-gradient(to right, transparent, var(--spotify-gray-dark) 50%);
-  pointer-events: none;
 }
 
 .mini-progress {

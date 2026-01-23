@@ -498,6 +498,19 @@
       </div>
     </main>
 
+    <!-- Mini Player (above tab bar in flex layout) -->
+    <MiniPlayer 
+      v-if="player.currentTrack && currentView === 'library'"
+      :track="player.currentTrack"
+      :isPlaying="player.isPlaying"
+      :loading="player.loading"
+      :progress="player.progress"
+      :duration="player.duration"
+      @toggle="player.toggle()"
+      @next="player.next()"
+      @expand="showFullPlayer = true"
+    />
+
     <!-- Bottom Tab Bar (One UI style) -->
     <nav v-if="currentView === 'library'" class="tab-bar">
       <button 
@@ -537,19 +550,6 @@
         <span>Артисты</span>
       </button>
     </nav>
-
-    <!-- Mini Player -->
-    <MiniPlayer 
-      v-if="player.currentTrack"
-      :track="player.currentTrack"
-      :isPlaying="player.isPlaying"
-      :loading="player.loading"
-      :progress="player.progress"
-      :duration="player.duration"
-      @toggle="player.toggle()"
-      @next="player.next()"
-      @expand="showFullPlayer = true"
-    />
 
     <!-- Full Player Modal with swipe -->
     <Transition name="slide-up">
@@ -1174,13 +1174,7 @@ onMounted(async () => {
   min-height: 0;  /* Allow flex shrinking for proper overflow */
   overflow-y: auto;
   overflow-x: hidden;  /* Prevent horizontal scrollbar */
-  padding-bottom: 140px; /* Space for mini player + tab bar */
   position: relative;
-}
-
-/* Hide scrollbar in the area under fixed elements */
-.content::-webkit-scrollbar-track {
-  margin-bottom: 140px;
 }
 
 /* Pull to refresh */
@@ -1852,28 +1846,12 @@ onMounted(async () => {
 
 /* Bottom Tab Bar */
 .tab-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  flex-shrink: 0;
   display: flex;
   background: var(--spotify-gray-dark);
   border-top: 1px solid var(--spotify-gray);
   padding: 8px 0 max(8px, env(safe-area-inset-bottom));
   z-index: 50;
-}
-
-/* Clip scrollbar at tab-bar area - creates visual boundary */
-.app::after {
-  content: '';
-  position: fixed;
-  bottom: 0;
-  right: 0;
-  width: 8px;
-  height: 140px;
-  background: var(--spotify-gray-dark);
-  z-index: 49;
-  pointer-events: none;
 }
 
 .tab-item {
