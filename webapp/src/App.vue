@@ -535,8 +535,10 @@
               :key="`liked-${track.id}`"
               :track="track"
               :isPlaying="player.currentTrack?.id === track.id && player.isPlaying"
+              :isLiked="true"
               @click="playTrack(track)"
               @menu="showTrackMenu(track)"
+              @like="toggleLike(track.id)"
             />
           </div>
         </div>

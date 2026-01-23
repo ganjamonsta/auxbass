@@ -316,9 +316,11 @@ export const useLibraryStore = defineStore('library', () => {
 
   // Check if track is liked
   const isTrackLiked = (trackId) => {
+    // First check likedTracks array (source of truth)
+    if (likedTracks.value.some(t => t.id === trackId)) return true
+    // Fallback to track's is_liked property
     const track = tracks.value.find(t => t.id === trackId)
-    if (track && track.is_liked !== undefined) return track.is_liked
-    return likedTracks.value.some(t => t.id === trackId)
+    return track?.is_liked === true
   }
 
   // Get unavailable tracks count
