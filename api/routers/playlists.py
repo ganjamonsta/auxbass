@@ -43,6 +43,8 @@ class PlaylistUpdate(BaseModel):
 class PlaylistResponse(PlaylistBase):
     id: int
     is_public: bool
+    is_auto_album: bool = False
+    cover_url: Optional[str] = None
     share_code: Optional[str]
     track_count: int = 0
     total_duration: int = 0
@@ -97,6 +99,8 @@ async def get_playlists(
             name=playlist.name,
             description=playlist.description,
             is_public=playlist.is_public,
+            is_auto_album=playlist.is_auto_album,
+            cover_url=playlist.cover_url,
             share_code=playlist.share_code,
             track_count=track_count,
             total_duration=total_duration,
@@ -367,3 +371,120 @@ async def share_playlist(
         "share_code": playlist.share_code,
         "share_url": f"https://t.me/your_bot?start=playlist_{playlist.share_code}"
     }
+
+
+# ============ Auto-Albums ============
+
+@router.get("/albums", response_model=List[PlaylistResponse])
+async def get_albums(
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get user's auto-generated album playlists"""
+    result = await db.execute(
+        select(Playlist)
+        .where(
+            Playlist.user_id == user.id,
+            Playlist.is_auto_album == True
+        )
+        .order_by(Playlist.name)
+    )
+    playlists = result.scalars().all()
+    
+    response = []
+    for playlist in playlists:
+        count_result = await db.execute(
+            select(func.count(PlaylistTrack.id))
+            .where(PlaylistTrack.playlist_id == playlist.id)
+        )
+        track_count = count_result.scalar() or 0
+        
+        duration_result = await db.execute(
+            select(func.sum(Track.duration))
+            .join(PlaylistTrack, PlaylistTrack.track_id == Track.id)
+            .where(PlaylistTrack.playlist_id == playlist.id)
+        )
+        total_duration = duration_result.scalar() or 0
+        
+        response.append(PlaylistResponse(
+            id=playlist.id,
+            name=playlist.name,
+            description=playlist.description,
+            is_public=playlist.is_public,
+            is_auto_album=playlist.is_auto_album,
+            cover_url=playlist.cover_url,
+            share_code=playlist.share_code,
+            track_count=track_count,
+            total_duration=total_duration,
+            created_at=playlist.created_at,
+        ))
+    
+    return response
+
+
+class AlbumCandidateResponse(BaseModel):
+    artist: str
+    album: str
+    track_count: int
+    total_duration: int
+    cover_url: Optional[str] = None
+    has_playlist: bool = False
+
+
+@router.get("/albums/candidates", response_model=List[AlbumCandidateResponse])
+async def get_album_candidates(
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get potential albums that can be auto-assembled"""
+    # Import here to avoid circular imports
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from bot.services.albums import album_service
+    
+    candidates = await album_service.get_album_candidates(user.id)
+    
+    # Check which ones already have playlists
+    response = []
+    for c in candidates:
+        existing = await album_service.check_existing_album_playlist(
+            user.id, c["artist"], c["album"], c.get("deezer_album_id")
+        )
+        response.append(AlbumCandidateResponse(
+            artist=c["artist"],
+            album=c["album"],
+            track_count=c["track_count"],
+            total_duration=c["total_duration"],
+            cover_url=c.get("cover_url"),
+            has_playlist=existing is not None
+        ))
+    
+    return response
+
+
+class AssembleAlbumsResponse(BaseModel):
+    created: int
+    updated: int
+    skipped: int
+    albums: List[dict]
+
+
+@router.post("/albums/assemble", response_model=AssembleAlbumsResponse)
+async def assemble_albums(
+    user: TelegramUser = Depends(get_current_user),
+):
+    """Manually trigger album assembly for user"""
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from bot.services.albums import album_service
+    
+    stats = await album_service.assemble_albums_for_user(user.id)
+    
+    return AssembleAlbumsResponse(
+        created=stats["created"],
+        updated=stats["updated"],
+        skipped=stats["skipped"],
+        albums=stats["albums"]
+    )

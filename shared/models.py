@@ -46,6 +46,9 @@ class Track(Base):
     duration: Mapped[Optional[int]] = mapped_column(Integer)  # seconds
     cover_url: Mapped[Optional[str]] = mapped_column(String(500))  # Album cover URL
     
+    # Deezer album ID for auto-album creation
+    deezer_album_id: Mapped[Optional[int]] = mapped_column(Integer)
+    
     # Enrichment status: pending, processing, completed, failed
     enrichment_status: Mapped[Optional[str]] = mapped_column(String(20), default="pending")
     
@@ -88,7 +91,10 @@ class Playlist(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text)
     cover_file_id: Mapped[Optional[str]] = mapped_column(String(255))
+    cover_url: Mapped[Optional[str]] = mapped_column(String(500))  # Album cover from Deezer
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_auto_album: Mapped[bool] = mapped_column(Boolean, default=False)  # Auto-created album
+    deezer_album_id: Mapped[Optional[int]] = mapped_column(Integer)  # Deezer album ID
     share_code: Mapped[Optional[str]] = mapped_column(String(50), unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

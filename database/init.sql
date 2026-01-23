@@ -24,6 +24,9 @@ CREATE TABLE IF NOT EXISTS tracks (
     album VARCHAR(255),
     genre VARCHAR(100),
     duration INTEGER,
+    cover_url VARCHAR(500),
+    deezer_album_id INTEGER,
+    enrichment_status VARCHAR(20) DEFAULT 'pending',
     
     -- Telegram данные
     file_size INTEGER,
@@ -44,7 +47,10 @@ CREATE TABLE IF NOT EXISTS playlists (
     name VARCHAR(255) NOT NULL,
     description TEXT,
     cover_file_id VARCHAR(255),
+    cover_url VARCHAR(500),
     is_public BOOLEAN DEFAULT FALSE,
+    is_auto_album BOOLEAN DEFAULT FALSE,
+    deezer_album_id INTEGER,
     share_code VARCHAR(50) UNIQUE,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
@@ -65,6 +71,7 @@ CREATE INDEX IF NOT EXISTS idx_tracks_user_id ON tracks(user_id);
 CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist);
 CREATE INDEX IF NOT EXISTS idx_tracks_title ON tracks(title);
 CREATE INDEX IF NOT EXISTS idx_tracks_genre ON tracks(genre);
+CREATE INDEX IF NOT EXISTS idx_tracks_deezer_album_id ON tracks(deezer_album_id);
 CREATE INDEX IF NOT EXISTS idx_playlists_user_id ON playlists(user_id);
 CREATE INDEX IF NOT EXISTS idx_playlist_tracks_playlist_id ON playlist_tracks(playlist_id);
 

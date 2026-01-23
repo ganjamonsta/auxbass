@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from shared.database import get_session
 from shared.models import Track
 from .metadata import metadata_service
+from .albums import album_service
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,8 @@ class EnrichmentWorker:
     def __init__(self):
         self.running = False
         self._task: Optional[asyncio.Task] = None
+        self._enrichment_count = 0  # Count enrichments for album assembly trigger
+        self._album_assembly_threshold = 5  # Assemble albums every N enrichments
         self.stats = {
             "pending": 0,
             "processing": 0,
@@ -57,6 +60,11 @@ class EnrichmentWorker:
         while self.running:
             try:
                 had_work = await self._process_pending_tracks()
+                
+                # Trigger album assembly periodically after enrichments
+                if self._enrichment_count >= self._album_assembly_threshold:
+                    await self._assemble_albums()
+                    self._enrichment_count = 0
                 
                 # Adaptive interval: if there was work, check again soon
                 if had_work:
@@ -107,6 +115,8 @@ class EnrichmentWorker:
                             track.genre = enriched["genre"]
                         if enriched.get("cover_url"):
                             track.cover_url = enriched["cover_url"]
+                        if enriched.get("album_id"):
+                            track.deezer_album_id = enriched["album_id"]
                         
                         track.enrichment_status = "completed"
                         logger.info(f"Enriched: {track.title} - {track.artist}")
@@ -121,7 +131,40 @@ class EnrichmentWorker:
             # Run all enrichments concurrently
             await asyncio.gather(*[enrich_one(t) for t in tracks], return_exceptions=True)
             
+            # Count successful enrichments for album assembly trigger
+            self._enrichment_count += len(tracks)
+            
             return True
+    
+    async def _assemble_albums(self):
+        """Trigger album assembly for all users with enriched tracks"""
+        try:
+            async with get_session() as session:
+                # Get distinct user IDs with completed enrichment
+                from sqlalchemy import distinct
+                result = await session.execute(
+                    select(distinct(Track.user_id))
+                    .where(
+                        Track.enrichment_status == "completed",
+                        Track.album.isnot(None),
+                        Track.album != ""
+                    )
+                )
+                user_ids = [row[0] for row in result.all()]
+            
+            for user_id in user_ids:
+                try:
+                    stats = await album_service.assemble_albums_for_user(user_id)
+                    if stats["created"] or stats["updated"]:
+                        logger.info(
+                            f"Album assembly for user {user_id}: "
+                            f"created={stats['created']}, updated={stats['updated']}"
+                        )
+                except Exception as e:
+                    logger.error(f"Album assembly failed for user {user_id}: {e}")
+                    
+        except Exception as e:
+            logger.error(f"Album assembly error: {e}")
     
     async def get_stats(self) -> dict:
         """Get current enrichment statistics"""
