@@ -1637,7 +1637,7 @@ onMounted(async () => {
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  padding: 12px 0;
+  padding: 12px 16px;
 }
 
 .horizontal-scroll::-webkit-scrollbar {
@@ -1645,8 +1645,7 @@ onMounted(async () => {
 }
 
 .scroll-spacer {
-  flex-shrink: 0;
-  width: 16px;
+  display: none;
 }
 
 /* Feed Cards */
