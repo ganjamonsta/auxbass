@@ -26,6 +26,9 @@ export const useLibraryStore = defineStore('library', () => {
   const recentUploads = ref([])
   const popularTracks = ref([])
   const globalStats = ref(null)
+  const topUsers = ref([])
+  const selectedUser = ref(null)
+  const selectedUserTracks = ref([])
 
   // Initialize
   const init = async () => {
@@ -442,6 +445,38 @@ export const useLibraryStore = defineStore('library', () => {
   const isInLibrary = (trackId) => {
     return tracks.value.some(t => t.id === trackId)
   }
+  
+  // Fetch top users
+  const fetchTopUsers = async () => {
+    try {
+      const response = await tracksApi.getTopUsers(20)
+      topUsers.value = response.data
+      return response.data
+    } catch (error) {
+      console.error('Failed to fetch top users:', error)
+      return []
+    }
+  }
+  
+  // Fetch tracks by specific user
+  const fetchUserTracks = async (userId) => {
+    try {
+      const user = topUsers.value.find(u => u.id === userId)
+      selectedUser.value = user || { id: userId }
+      const response = await tracksApi.getUserTracks(userId, 50)
+      selectedUserTracks.value = response.data
+      return response.data
+    } catch (error) {
+      console.error('Failed to fetch user tracks:', error)
+      return []
+    }
+  }
+  
+  // Clear selected user
+  const clearSelectedUser = () => {
+    selectedUser.value = null
+    selectedUserTracks.value = []
+  }
 
   return {
     // My library
@@ -465,6 +500,9 @@ export const useLibraryStore = defineStore('library', () => {
     recentUploads,
     popularTracks,
     globalStats,
+    topUsers,
+    selectedUser,
+    selectedUserTracks,
     
     // Methods
     init,
@@ -496,6 +534,9 @@ export const useLibraryStore = defineStore('library', () => {
     fetchRecentUploads,
     fetchPopularTracks,
     fetchGlobalStats,
+    fetchTopUsers,
+    fetchUserTracks,
+    clearSelectedUser,
     addToLibrary,
     removeFromLibrary,
     isInLibrary,

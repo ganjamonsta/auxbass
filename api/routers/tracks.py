@@ -396,6 +396,83 @@ async def get_global_stats(
     }
 
 
+class UserStatsResponse(BaseModel):
+    """User statistics for the global library"""
+    id: int
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    track_count: int = 0
+    total_plays: int = 0
+    
+    class Config:
+        from_attributes = True
+
+
+@router.get("/global/users", response_model=List[UserStatsResponse])
+async def get_top_users(
+    limit: int = Query(20, ge=1, le=50),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get top users by upload count with their stats"""
+    # Get users with their track counts and total plays
+    result = await db.execute(
+        select(
+            User,
+            func.count(Track.id).label("track_count"),
+            func.coalesce(func.sum(Track.play_count), 0).label("total_plays")
+        )
+        .join(Track, Track.user_id == User.id)
+        .where(Track.is_public == True)
+        .group_by(User.id)
+        .order_by(func.count(Track.id).desc())
+        .limit(limit)
+    )
+    
+    users = []
+    for row in result.all():
+        user_obj = row[0]
+        users.append(UserStatsResponse(
+            id=user_obj.id,
+            username=user_obj.username,
+            first_name=user_obj.first_name,
+            track_count=row[1],
+            total_plays=row[2],
+        ))
+    
+    return users
+
+
+@router.get("/global/users/{user_id}/tracks", response_model=List[TrackResponse])
+async def get_user_tracks(
+    user_id: int,
+    limit: int = Query(50, ge=1, le=100),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get tracks uploaded by a specific user"""
+    result = await db.execute(
+        select(Track)
+        .options(selectinload(Track.uploader))
+        .where(Track.user_id == user_id)
+        .where(Track.is_public == True)
+        .order_by(Track.created_at.desc())
+        .limit(limit)
+    )
+    tracks = result.scalars().all()
+    
+    # Get user's library status for these tracks
+    track_ids = [t.id for t in tracks]
+    lib_result = await db.execute(
+        select(UserLibrary)
+        .where(UserLibrary.user_id == user.id)
+        .where(UserLibrary.track_id.in_(track_ids))
+    )
+    user_lib = {lib.track_id: lib for lib in lib_result.scalars().all()}
+    
+    return [track_to_response(t, user_lib.get(t.id), user.id) for t in tracks]
+
+
 # ============== LIBRARY MANAGEMENT ==============
 
 @router.post("/{track_id}/add-to-library")

@@ -81,8 +81,93 @@
       </div>
     </div>
 
-    <!-- All Global Tracks -->
-    <div class="feed-section">
+    <!-- Top Users Section -->
+    <div v-if="library.topUsers.length > 0" class="feed-section">
+      <h2 class="feed-section-title">👥 Пользователи</h2>
+      <div class="horizontal-scroll">
+        <div class="scroll-spacer"></div>
+        <div 
+          v-for="user in library.topUsers" 
+          :key="user.id"
+          class="feed-card user-card"
+          @click="openUserProfile(user)"
+        >
+          <div class="user-avatar" :style="getAvatarStyle(user)">
+            <span class="avatar-letter">{{ getInitials(user) }}</span>
+          </div>
+          <div class="feed-card-title">{{ user.first_name || user.username || 'User' }}</div>
+          <div class="feed-card-subtitle">{{ user.track_count }} треков</div>
+          <div class="feed-card-meta">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+            {{ formatPlays(user.total_plays) }}
+          </div>
+        </div>
+        <div class="scroll-spacer"></div>
+      </div>
+    </div>
+
+    <!-- User Profile View (when selected) -->
+    <div v-if="library.selectedUser" class="user-profile-view">
+      <div class="user-profile-header">
+        <button class="back-btn" @click="library.clearSelectedUser()">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+          </svg>
+        </button>
+        <div class="user-avatar-large" :style="getAvatarStyle(library.selectedUser)">
+          <span class="avatar-letter-large">{{ getInitials(library.selectedUser) }}</span>
+        </div>
+        <div class="user-profile-info">
+          <h2>{{ library.selectedUser.first_name || library.selectedUser.username || 'User' }}</h2>
+          <p v-if="library.selectedUser.username">@{{ library.selectedUser.username }}</p>
+          <p class="user-stats">
+            {{ library.selectedUser.track_count || library.selectedUserTracks.length }} треков • 
+            {{ formatPlays(library.selectedUser.total_plays || 0) }} прослушиваний
+          </p>
+        </div>
+      </div>
+      <div class="user-tracks-list">
+        <div 
+          v-for="track in library.selectedUserTracks" 
+          :key="track.id"
+          class="global-track-item"
+          @click="$emit('play', track, library.selectedUserTracks)"
+        >
+          <div class="track-cover" :style="getCoverStyle(track)">
+            <img v-if="track.cover_url" :src="track.cover_url" alt="" />
+            <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+            </svg>
+          </div>
+          <div class="track-info">
+            <span class="track-title">{{ track.title || 'Без названия' }}</span>
+            <span class="track-artist">{{ track.artist || 'Неизвестный' }}</span>
+          </div>
+          <div class="track-actions">
+            <button 
+              v-if="!track.in_library"
+              class="add-btn"
+              @click.stop="addToLibrary(track)"
+              title="Добавить в библиотеку"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+              </svg>
+            </button>
+            <span v-else class="in-library-icon" title="В вашей библиотеке">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+              </svg>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- All Global Tracks (hidden when user profile is open) -->
+    <div v-if="!library.selectedUser" class="feed-section">
       <div class="section-header">
         <h2 class="feed-section-title">🌍 Вся музыка</h2>
         <button class="load-all-btn" @click="loadGlobalTracks">
@@ -195,6 +280,31 @@ const addToLibrary = async (track) => {
   }
 }
 
+// Get user initials
+const getInitials = (user) => {
+  if (user.first_name) {
+    return user.first_name.charAt(0).toUpperCase()
+  }
+  if (user.username) {
+    return user.username.charAt(0).toUpperCase()
+  }
+  return 'U'
+}
+
+// Get avatar gradient style
+const getAvatarStyle = (user) => {
+  const hue = ((user.id || 0) * 137) % 360
+  return {
+    background: `linear-gradient(135deg, hsl(${hue}, 70%, 45%), hsl(${(hue + 40) % 360}, 70%, 35%))`
+  }
+}
+
+// Open user profile
+const openUserProfile = async (user) => {
+  telegram?.HapticFeedback?.impactOccurred?.('light')
+  await library.fetchUserTracks(user.id)
+}
+
 // Load initial data
 onMounted(async () => {
   if (!library.recentUploads.length) {
@@ -202,6 +312,9 @@ onMounted(async () => {
   }
   if (!library.popularTracks.length) {
     await library.fetchPopularTracks()
+  }
+  if (!library.topUsers.length) {
+    await library.fetchTopUsers()
   }
 })
 </script>
@@ -510,5 +623,102 @@ onMounted(async () => {
   text-align: center;
   padding: 32px 16px;
   color: var(--text-secondary, #b3b3b3);
+}
+
+/* User Cards */
+.user-card {
+  text-align: center;
+}
+
+.user-avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 8px;
+}
+
+.avatar-letter {
+  font-size: 40px;
+  font-weight: 600;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* User Profile View */
+.user-profile-view {
+  padding: 0 16px;
+}
+
+.user-profile-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  margin-bottom: 16px;
+}
+
+.back-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--surface-elevated, #282828);
+  color: var(--text-primary, #fff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.user-avatar-large {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.avatar-letter-large {
+  font-size: 28px;
+  font-weight: 600;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.user-profile-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.user-profile-info h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary, #fff);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-profile-info p {
+  font-size: 13px;
+  color: var(--text-secondary, #b3b3b3);
+  margin: 2px 0 0;
+}
+
+.user-stats {
+  font-size: 12px !important;
+  color: var(--text-tertiary, #666) !important;
+}
+
+.user-tracks-list {
+  padding-bottom: 20px;
 }
 </style>

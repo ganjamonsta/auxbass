@@ -58,6 +58,8 @@ export const tracksApi = {
   getRecentUploads: (limit = 20) => api.get('/tracks/global/recent', { params: { limit } }),
   getPopular: (limit = 20) => api.get('/tracks/global/popular', { params: { limit } }),
   getGlobalStats: () => api.get('/tracks/global/stats'),
+  getTopUsers: (limit = 20) => api.get('/tracks/global/users', { params: { limit } }),
+  getUserTracks: (userId, limit = 50) => api.get(`/tracks/global/users/${userId}/tracks`, { params: { limit } }),
   
   // Library management
   addToLibrary: (trackId) => api.post(`/tracks/${trackId}/add-to-library`),
