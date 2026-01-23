@@ -1637,7 +1637,7 @@ onMounted(async () => {
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  padding: 12px 16px;
+  padding: 12px 0;
 }
 
 .horizontal-scroll::-webkit-scrollbar {
@@ -1645,7 +1645,18 @@ onMounted(async () => {
 }
 
 .scroll-spacer {
-  display: none;
+  flex-shrink: 0;
+  width: 4px;
+  min-width: 4px;
+}
+
+/* First and last card margins */
+.horizontal-scroll > .feed-card:first-of-type {
+  margin-left: 16px;
+}
+
+.horizontal-scroll > .feed-card:last-of-type {
+  margin-right: 16px;
 }
 
 /* Feed Cards */
