@@ -1,61 +1,63 @@
 <template>
   <div class="mini-player" @click="$emit('expand')">
-    <!-- Progress bar at top -->
-    <div class="mini-progress">
-      <div class="mini-progress-buffered" :style="{ width: bufferedPercent + '%' }"></div>
-      <div class="mini-progress-fill" :style="{ width: progressPercent + '%' }"></div>
-    </div>
-    
-    <!-- Equalizer visualization -->
-    <div class="equalizer" :class="{ active: isPlaying && !loading }">
-      <div class="eq-bar" v-for="i in 32" :key="i" :style="{ '--i': i }"></div>
-    </div>
-    
-    <!-- Cover -->
-    <div class="mini-cover" :style="coverStyle">
-      <img 
-        v-if="track.cover_url" 
-        :src="track.cover_url" 
-        alt=""
-        class="cover-image"
-      />
-      <span v-else class="cover-text">{{ coverInitials }}</span>
+    <!-- LCD Screen Frame -->
+    <div class="lcd-frame">
+      <!-- Scanlines overlay -->
+      <div class="scanlines"></div>
       
-      <!-- Loading Overlay -->
-      <div v-if="loading" class="mini-loading-overlay">
-        <svg class="mini-spinner" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <circle cx="12" cy="12" r="10" stroke-width="3" stroke-opacity="0.3"/>
-          <path d="M12 2a10 10 0 0 1 10 10" stroke-width="3" stroke-linecap="round"/>
-        </svg>
+      <!-- LCD Content -->
+      <div class="lcd-content">
+        <!-- Cover (small) -->
+        <div class="lcd-cover" :style="coverStyle">
+          <img 
+            v-if="track.cover_url" 
+            :src="track.cover_url" 
+            alt=""
+            class="cover-image"
+          />
+          <span v-else class="cover-text">{{ coverInitials }}</span>
+        </div>
+        
+        <!-- Track info with marquee effect -->
+        <div class="lcd-info">
+          <div class="lcd-title" :class="{ marquee: shouldMarquee }">
+            <span>{{ track.title || 'NO TRACK' }}</span>
+          </div>
+          <div class="lcd-artist">{{ track.artist || '---' }}</div>
+          <div class="lcd-time">{{ formatTime(progress) }} / {{ formatTime(duration || track.duration) }}</div>
+        </div>
+        
+        <!-- Playback indicator -->
+        <div class="lcd-status">
+          <div v-if="loading" class="status-loading">LOAD</div>
+          <div v-else-if="isPlaying" class="status-play">
+            <span class="blink">▶</span> PLAY
+          </div>
+          <div v-else class="status-pause">▮▮ STOP</div>
+        </div>
+      </div>
+      
+      <!-- Progress bar (LED style) -->
+      <div class="led-progress">
+        <div class="led-bar" v-for="i in 20" :key="i" :class="{ active: (i / 20) * 100 <= progressPercent, buffered: (i / 20) * 100 <= bufferedPercent }"></div>
       </div>
     </div>
     
-    <!-- Info -->
-    <div class="mini-info">
-      <div class="mini-title">{{ track.title || 'Без названия' }}</div>
-      <div class="mini-artist">{{ track.artist || 'Неизвестный' }}</div>
+    <!-- Physical buttons (outside LCD) -->
+    <div class="physical-buttons">
+      <button class="retro-btn" @click.stop="$emit('toggle')">
+        <svg v-if="loading" class="spinner" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <circle cx="12" cy="12" r="10" stroke-width="3" stroke-opacity="0.3"/>
+          <path d="M12 2a10 10 0 0 1 10 10" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+        <span v-else-if="isPlaying">▮▮</span>
+        <span v-else>▶</span>
+      </button>
+      
+      <button class="retro-btn" @click.stop="$emit('next')">
+        ▶▶
+      </button>
     </div>
-    
-    <!-- Controls -->
-    <button class="mini-btn" @click.stop="$emit('toggle')">
-      <!-- Loading spinner -->
-      <svg v-if="loading" class="spinner" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <circle cx="12" cy="12" r="10" stroke-width="2" stroke-opacity="0.3"/>
-        <path d="M12 2a10 10 0 0 1 10 10" stroke-width="2" stroke-linecap="round"/>
-      </svg>
-      <svg v-else-if="isPlaying" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-      </svg>
-      <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M8 5v14l11-7z"/>
-      </svg>
-    </button>
-    
-    <button class="mini-btn" @click.stop="$emit('next')">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
-      </svg>
-    </button>
   </div>
 </template>
 
@@ -133,254 +135,274 @@ const coverInitials = computed(() => {
   }
   return title.substring(0, 2).toUpperCase()
 })
+
+const shouldMarquee = computed(() => {
+  return (props.track?.title?.length || 0) > 18
+})
+
+const formatTime = (seconds) => {
+  if (!seconds) return '0:00'
+  const mins = Math.floor(seconds / 60)
+  const secs = Math.floor(seconds % 60)
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
 </script>
 
 <style scoped>
+/* Retro LCD Player Styles */
+@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
 .mini-player {
-  flex-shrink: 0;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 16px 16px 8px; /* More margin for shadows */
-  padding: 10px 14px;
-  background: var(--neu-bg);
-  border-radius: 16px;
+  align-items: stretch;
+  gap: 10px;
+  margin: 12px 12px 8px;
+  padding: 10px;
+  background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+  border-radius: 12px;
   cursor: pointer;
   z-index: 60;
-  /* Active Neumorphism */
   box-shadow: 
-    6px 6px 12px var(--neu-shadow-dark),
-    -3px -3px 8px var(--neu-shadow-light);
-  border: 1px solid rgba(255, 255, 255, 0.02);
-  
-  position: relative;  /* For absolute positioned children */
-  overflow: hidden;
-  transition: transform 0.15s;
+    8px 8px 16px rgba(0, 0, 0, 0.5),
+    -4px -4px 10px rgba(60, 60, 60, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border: 2px solid #333;
+  position: relative;
 }
 
-.mini-player:active {
-  transform: scale(0.98);
-}
-
-.mini-progress {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: var(--spotify-gray-dark);
-}
-
-.mini-progress-fill {
-  height: 100%;
-  background: var(--spotify-green);
-  transition: width 0.1s linear;
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 2;
-}
-
-.mini-progress-buffered {
-  height: 100%;
-  background: rgba(255, 255, 255, 0.4);
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 1;
-  transition: width 0.2s linear;
-}
-
-.equalizer {
-  position: absolute;
-  transition: width 0.2s linear;
-}
-
-/* Equalizer visualization */
-.equalizer {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 32px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  padding: 0 8px;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.equalizer.active {
-  opacity: 0.5;
-}
-
-.eq-bar {
+/* LCD Screen Frame */
+.lcd-frame {
   flex: 1;
-  margin: 0 1px;
-  height: 3px;
-  background: linear-gradient(to top, var(--spotify-green), rgba(29, 185, 84, 0.4));
-  border-radius: 2px 2px 0 0;
-  transform-origin: bottom;
-  will-change: transform;
+  background: #0a1a12;
+  border-radius: 6px;
+  padding: 8px 10px;
+  position: relative;
+  overflow: hidden;
+  border: 2px solid #1a2a1f;
+  box-shadow: 
+    inset 0 0 20px rgba(0, 0, 0, 0.8),
+    inset 0 0 3px rgba(0, 255, 100, 0.1);
 }
 
-.equalizer.active .eq-bar {
-  animation: eq-wave calc(0.4s + var(--i) * 0.02s) ease-in-out infinite;
-  animation-delay: calc(var(--i) * 0.05s);
+/* Scanlines effect */
+.scanlines {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.15) 2px,
+    rgba(0, 0, 0, 0.15) 4px
+  );
+  pointer-events: none;
+  z-index: 10;
 }
 
-/* Create wave-like pattern with different heights */
-.equalizer.active .eq-bar:nth-child(4n+1) {
-  animation-name: eq-wave-high;
-  animation-duration: calc(0.6s + var(--i) * 0.015s);
+/* LCD Content */
+.lcd-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
 }
 
-.equalizer.active .eq-bar:nth-child(4n+2) {
-  animation-name: eq-wave-mid;
-  animation-duration: calc(0.5s + var(--i) * 0.02s);
-}
-
-.equalizer.active .eq-bar:nth-child(4n+3) {
-  animation-name: eq-wave-low;
-  animation-duration: calc(0.45s + var(--i) * 0.025s);
-}
-
-.equalizer.active .eq-bar:nth-child(4n) {
-  animation-name: eq-wave-mid2;
-  animation-duration: calc(0.55s + var(--i) * 0.018s);
-}
-
-@keyframes eq-wave-high {
-  0%, 100% { transform: scaleY(1); }
-  15% { transform: scaleY(6); }
-  35% { transform: scaleY(3); }
-  50% { transform: scaleY(8); }
-  70% { transform: scaleY(4); }
-  85% { transform: scaleY(2); }
-}
-
-@keyframes eq-wave-mid {
-  0%, 100% { transform: scaleY(1); }
-  20% { transform: scaleY(4); }
-  40% { transform: scaleY(7); }
-  60% { transform: scaleY(3); }
-  80% { transform: scaleY(5); }
-}
-
-@keyframes eq-wave-low {
-  0%, 100% { transform: scaleY(1); }
-  25% { transform: scaleY(3); }
-  50% { transform: scaleY(5); }
-  75% { transform: scaleY(2); }
-}
-
-@keyframes eq-wave-mid2 {
-  0%, 100% { transform: scaleY(1); }
-  10% { transform: scaleY(5); }
-  30% { transform: scaleY(2); }
-  55% { transform: scaleY(6); }
-  75% { transform: scaleY(3); }
-  90% { transform: scaleY(4); }
-}
-
-.mini-cover {
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
+/* Cover in LCD */
+.lcd-cover {
+  width: 42px;
+  height: 42px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   overflow: hidden;
-  position: relative;
-  box-shadow: 
-    4px 4px 8px var(--neu-shadow-dark),
-    -2px -2px 5px var(--neu-shadow-light);
+  border: 1px solid rgba(0, 255, 100, 0.3);
+  box-shadow: 0 0 8px rgba(0, 255, 100, 0.2);
 }
 
-.cover-image {
+.lcd-cover .cover-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  filter: brightness(0.9) contrast(1.1);
 }
 
-.logo-overlay { /* Unused? remove or ignore */ }
-
-.mini-loading-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
+.lcd-cover .cover-text {
+  font-family: 'VT323', monospace;
+  font-size: 18px;
+  color: #00ff66;
+  text-shadow: 0 0 8px rgba(0, 255, 100, 0.8);
 }
 
-.mini-spinner {
-  color: white;
-  animation: spin 1s linear infinite;
-  width: 20px;
-  height: 20px;
-}
-
-.cover-text {
-  font-size: 16px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.mini-info {
+/* LCD Info */
+.lcd-info {
   flex: 1;
   min-width: 0;
+  font-family: 'VT323', monospace;
 }
 
-.mini-title {
+.lcd-title {
+  font-size: 18px;
+  color: #00ff66;
+  text-shadow: 
+    0 0 10px rgba(0, 255, 100, 0.8),
+    0 0 20px rgba(0, 255, 100, 0.4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.lcd-title.marquee span {
+  display: inline-block;
+  animation: marquee 8s linear infinite;
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.lcd-artist {
   font-size: 14px;
-  font-weight: 600;
+  color: #00cc55;
+  text-shadow: 0 0 6px rgba(0, 200, 80, 0.6);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--spotify-text);
-}
-
-.mini-artist {
-  font-size: 12px;
-  color: var(--spotify-text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  opacity: 0.8;
   margin-top: 2px;
 }
 
-.mini-btn {
-  width: 42px;
-  height: 42px;
+.lcd-time {
+  font-size: 12px;
+  color: #00aa44;
+  text-shadow: 0 0 4px rgba(0, 170, 68, 0.5);
+  margin-top: 4px;
+  letter-spacing: 2px;
+}
+
+/* Status indicator */
+.lcd-status {
+  font-family: 'VT323', monospace;
+  font-size: 12px;
+  color: #00ff66;
+  text-shadow: 0 0 8px rgba(0, 255, 100, 0.8);
+  white-space: nowrap;
+  text-align: right;
+  min-width: 50px;
+}
+
+.status-play {
+  color: #00ff66;
+}
+
+.status-pause {
+  color: #ffaa00;
+  text-shadow: 0 0 8px rgba(255, 170, 0, 0.8);
+}
+
+.status-loading {
+  color: #ff6600;
+  text-shadow: 0 0 8px rgba(255, 100, 0, 0.8);
+  animation: blink 0.5s infinite;
+}
+
+.blink {
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0.3; }
+}
+
+/* LED Progress Bar */
+.led-progress {
+  display: flex;
+  gap: 2px;
+  margin-top: 8px;
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 3px;
+}
+
+.led-bar {
+  flex: 1;
+  height: 4px;
+  background: #0a2a15;
+  border-radius: 1px;
+  transition: background 0.1s, box-shadow 0.1s;
+}
+
+.led-bar.buffered {
+  background: #1a3a25;
+}
+
+.led-bar.active {
+  background: #00ff66;
+  box-shadow: 0 0 4px rgba(0, 255, 100, 0.8);
+}
+
+.led-bar.active:nth-child(n+15) {
+  background: #ffcc00;
+  box-shadow: 0 0 4px rgba(255, 200, 0, 0.8);
+}
+
+.led-bar.active:nth-child(n+18) {
+  background: #ff4400;
+  box-shadow: 0 0 4px rgba(255, 68, 0, 0.8);
+}
+
+/* Physical Buttons */
+.physical-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.retro-btn {
+  width: 44px;
+  height: 32px;
   border: none;
-  background: var(--neu-bg);
-  border-radius: 50%;
+  background: linear-gradient(180deg, #3a3a3a 0%, #2a2a2a 50%, #1a1a1a 100%);
+  border-radius: 6px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--spotify-text);
+  color: #aaa;
+  font-family: 'VT323', monospace;
+  font-size: 14px;
+  letter-spacing: -1px;
   flex-shrink: 0;
-  transition: all 0.15s ease;
+  transition: all 0.1s ease;
   box-shadow: 
-    4px 4px 8px var(--neu-shadow-dark),
-    -2px -2px 5px var(--neu-shadow-light);
+    2px 2px 4px rgba(0, 0, 0, 0.5),
+    -1px -1px 2px rgba(80, 80, 80, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  border: 1px solid #444;
 }
 
-.mini-btn:active {
-  transform: scale(0.95);
+.retro-btn:active {
+  transform: translateY(1px);
   box-shadow: 
-    inset 2px 2px 5px var(--neu-shadow-dark),
-    inset -1px -1px 3px var(--neu-shadow-light);
+    1px 1px 2px rgba(0, 0, 0, 0.5),
+    inset 0 2px 4px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 50%, #0a0a0a 100%);
+}
+
+.retro-btn:first-child:active {
+  color: #00ff66;
+  text-shadow: 0 0 8px rgba(0, 255, 100, 0.8);
 }
 
 .spinner {
   animation: spin 1s linear infinite;
+  color: #ff6600;
 }
 
 @keyframes spin {
