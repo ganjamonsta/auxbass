@@ -586,18 +586,24 @@ async def get_artists(
             .where(Track.artist.isnot(None))
         )
     
-    # Split and count
+    # Split and count with case-insensitive grouping
     artist_counts = {}
+    artist_canonical = {}  # Maps lowercase -> canonical (most common) case
+    
     for (artist_str,) in result.all():
         artists = re.split(r'\s*[,&]\s*|\s+(?:feat\.?|ft\.?|x|vs\.?)\s+', artist_str, flags=re.IGNORECASE)
         for artist in artists:
             artist = artist.strip()
             if artist:
-                artist_counts[artist] = artist_counts.get(artist, 0) + 1
+                lower_name = artist.lower()
+                # Track canonical form (first seen or most popular capitalization)
+                if lower_name not in artist_canonical:
+                    artist_canonical[lower_name] = artist
+                artist_counts[lower_name] = artist_counts.get(lower_name, 0) + 1
     
     sorted_artists = sorted(artist_counts.items(), key=lambda x: (-x[1], x[0]))
     
-    return [{"artist": name, "count": count, "image_url": None} for name, count in sorted_artists]
+    return [{"artist": artist_canonical[name], "count": count, "image_url": None} for name, count in sorted_artists]
 
 
 async def fetch_artist_image(artist_name: str) -> Optional[str]:

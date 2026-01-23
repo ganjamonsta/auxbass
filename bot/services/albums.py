@@ -229,10 +229,20 @@ class AlbumAssemblyService:
         self,
         playlist: Playlist,
         tracks: List[Track],
-        deezer_album_id: Optional[int] = None
+        deezer_album_id: Optional[int] = None,
+        cover_url: Optional[str] = None
     ) -> bool:
-        """Update existing album playlist with new tracks"""
+        """Update existing album playlist with new tracks and cover"""
         async with get_session() as session:
+            # Attach playlist to this session
+            playlist = await session.merge(playlist)
+            
+            # Update cover if not set and we have one
+            cover_updated = False
+            if cover_url and not playlist.cover_url:
+                playlist.cover_url = cover_url
+                cover_updated = True
+            
             # Get existing track IDs in playlist
             result = await session.execute(
                 select(PlaylistTrack.track_id)
@@ -243,8 +253,13 @@ class AlbumAssemblyService:
             # Find new tracks
             new_tracks = [t for t in tracks if t.id not in existing_track_ids]
             
-            if not new_tracks:
+            if not new_tracks and not cover_updated:
                 return False
+            
+            if not new_tracks:
+                # Only cover was updated
+                await session.commit()
+                return True
             
             # Get max position
             result = await session.execute(
@@ -303,7 +318,7 @@ class AlbumAssemblyService:
             if existing:
                 # Update existing playlist
                 updated = await self.update_album_playlist(
-                    existing, tracks, deezer_album_id
+                    existing, tracks, deezer_album_id, cover_url
                 )
                 if updated:
                     stats["updated"] += 1
