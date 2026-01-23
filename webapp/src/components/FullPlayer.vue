@@ -159,22 +159,49 @@
       <div v-if="showQueue" class="mini-queue">
         <div class="queue-header">
           <span>Очередь</span>
+          <span class="queue-hint">← свайп для удаления</span>
           <button @click="showQueue = false" class="close-queue">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
             </svg>
           </button>
         </div>
-        <div class="queue-list">
+        <div class="queue-list" ref="queueListRef">
           <div 
             v-for="(t, idx) in upcomingQueue" 
-            :key="`q-${idx}`"
+            :key="`q-${t.id}-${idx}`"
             class="queue-item"
+            :class="{ 
+              swiping: swipingQueueIndex === idx,
+              'swipe-delete': swipeDeleteProgress > 0.5 && swipingQueueIndex === idx,
+              dragging: draggingIndex === idx,
+              'drag-over': dragOverIndex === idx && draggingIndex !== idx
+            }"
+            :style="getQueueItemStyle(idx)"
+            draggable="true"
+            @dragstart="onDragStart($event, idx)"
+            @dragover="onDragOver($event, idx)"
+            @dragend="onDragEnd"
+            @drop="onDrop($event, idx)"
+            @touchstart="onQueueTouchStart($event, idx)"
+            @touchmove="onQueueTouchMove($event, idx)"
+            @touchend="onQueueTouchEnd($event, idx)"
+            @click="$emit('playFromQueue', idx)"
           >
+            <div class="drag-handle">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M11 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm-2-8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+              </svg>
+            </div>
             <span class="queue-num">{{ idx + 1 }}</span>
             <div class="queue-info">
               <span class="queue-title">{{ t.title || 'Без названия' }}</span>
               <span class="queue-artist">{{ t.artist || 'Неизвестный' }}</span>
+            </div>
+            <div class="delete-indicator">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+              </svg>
             </div>
           </div>
           <div v-if="!upcomingQueue.length" class="queue-empty">
@@ -232,11 +259,14 @@ const emit = defineEmits([
   'toggleMute',
   'toggleShuffle',
   'toggleRepeat',
+  'removeFromQueue',
+  'moveInQueue',
+  'playFromQueue',
 ])
 
 const telegram = inject('telegram')
 
-// Swipe handling
+// Swipe handling for cover
 const playerRef = ref(null)
 const touchStart = ref({ x: 0, y: 0 })
 const touchCurrent = ref({ x: 0, y: 0 })
@@ -244,7 +274,17 @@ const isSwiping = ref(false)
 const swipeDirection = ref(null)
 const showQueue = ref(false)
 
+// Queue interaction state
+const queueListRef = ref(null)
+const swipingQueueIndex = ref(-1)
+const swipeStartX = ref(0)
+const swipeCurrentX = ref(0)
+const swipeDeleteProgress = ref(0)
+const draggingIndex = ref(-1)
+const dragOverIndex = ref(-1)
+
 const SWIPE_THRESHOLD = 80
+const QUEUE_SWIPE_DELETE_THRESHOLD = 100
 
 const onTouchStart = (e) => {
   const touch = e.touches[0]
@@ -333,6 +373,87 @@ const upcomingQueue = computed(() => {
   if (!props.queue.length || props.queueIndex < 0) return []
   return props.queue.slice(props.queueIndex + 1, props.queueIndex + 6)
 })
+
+// Queue item swipe handling (for touch devices)
+const onQueueTouchStart = (e, idx) => {
+  swipingQueueIndex.value = idx
+  swipeStartX.value = e.touches[0].clientX
+  swipeCurrentX.value = e.touches[0].clientX
+  swipeDeleteProgress.value = 0
+}
+
+const onQueueTouchMove = (e, idx) => {
+  if (swipingQueueIndex.value !== idx) return
+  
+  swipeCurrentX.value = e.touches[0].clientX
+  const deltaX = swipeStartX.value - swipeCurrentX.value
+  
+  // Only allow left swipe (positive deltaX)
+  if (deltaX > 0) {
+    e.preventDefault()
+    swipeDeleteProgress.value = Math.min(1, deltaX / QUEUE_SWIPE_DELETE_THRESHOLD)
+  }
+}
+
+const onQueueTouchEnd = (e, idx) => {
+  if (swipingQueueIndex.value !== idx) return
+  
+  const deltaX = swipeStartX.value - swipeCurrentX.value
+  
+  if (deltaX > QUEUE_SWIPE_DELETE_THRESHOLD) {
+    // Delete the item
+    telegram?.HapticFeedback?.impactOccurred?.('medium')
+    emit('removeFromQueue', idx)
+  }
+  
+  // Reset state
+  swipingQueueIndex.value = -1
+  swipeStartX.value = 0
+  swipeCurrentX.value = 0
+  swipeDeleteProgress.value = 0
+}
+
+const getQueueItemStyle = (idx) => {
+  if (swipingQueueIndex.value === idx && swipeDeleteProgress.value > 0) {
+    const translateX = -(swipeDeleteProgress.value * QUEUE_SWIPE_DELETE_THRESHOLD)
+    return {
+      transform: `translateX(${translateX}px)`,
+      transition: 'none'
+    }
+  }
+  return {}
+}
+
+// Drag and drop for reordering
+const onDragStart = (e, idx) => {
+  draggingIndex.value = idx
+  e.dataTransfer.effectAllowed = 'move'
+  e.dataTransfer.setData('text/plain', idx.toString())
+}
+
+const onDragOver = (e, idx) => {
+  e.preventDefault()
+  e.dataTransfer.dropEffect = 'move'
+  dragOverIndex.value = idx
+}
+
+const onDragEnd = () => {
+  draggingIndex.value = -1
+  dragOverIndex.value = -1
+}
+
+const onDrop = (e, toIdx) => {
+  e.preventDefault()
+  const fromIdx = parseInt(e.dataTransfer.getData('text/plain'))
+  
+  if (fromIdx !== toIdx) {
+    telegram?.HapticFeedback?.impactOccurred?.('light')
+    emit('moveInQueue', fromIdx, toIdx)
+  }
+  
+  draggingIndex.value = -1
+  dragOverIndex.value = -1
+}
 
 const formatTime = (seconds) => {
   if (!seconds || isNaN(seconds)) return '0:00'
@@ -507,6 +628,8 @@ const formatTime = (seconds) => {
 .progress-container {
   margin-bottom: 12px;
   flex-shrink: 0;
+  position: relative;
+  z-index: 10;
 }
 
 .slider-wrapper {
@@ -649,6 +772,8 @@ const formatTime = (seconds) => {
   padding: 0 24px;
   margin-top: auto;
   flex-shrink: 0;
+  position: relative;
+  z-index: 10;
 }
 
 .volume-btn {
@@ -692,9 +817,27 @@ const formatTime = (seconds) => {
   background: var(--spotify-gray);
   border-radius: 16px 16px 0 0;
   padding: 16px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
   max-height: 50%;
   overflow-y: auto;
+  overflow-y: overlay;
   overflow-x: hidden;
+  z-index: 200;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.mini-queue::-webkit-scrollbar {
+  width: 6px;
+  background: transparent;
+}
+
+.mini-queue::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mini-queue::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
 }
 
 .queue-header {
@@ -703,6 +846,12 @@ const formatTime = (seconds) => {
   align-items: center;
   margin-bottom: 12px;
   font-weight: 600;
+}
+
+.queue-hint {
+  font-size: 11px;
+  color: var(--spotify-text-muted);
+  font-weight: 400;
 }
 
 .close-queue {
@@ -717,24 +866,71 @@ const formatTime = (seconds) => {
   cursor: pointer;
 }
 
+.queue-list {
+  overflow: hidden;
+}
+
 .queue-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 0;
+  gap: 8px;
+  padding: 10px 8px;
   border-bottom: 1px solid var(--spotify-gray-dark);
+  cursor: pointer;
+  position: relative;
+  background: var(--spotify-gray);
+  transition: transform 0.2s ease, background 0.2s ease;
+  user-select: none;
+  touch-action: pan-y;
+}
+
+.queue-item:active {
+  background: var(--spotify-gray-dark);
+}
+
+.queue-item.swiping {
+  transition: none;
+}
+
+.queue-item.swipe-delete {
+  background: rgba(229, 57, 53, 0.2);
+}
+
+.queue-item.dragging {
+  opacity: 0.5;
+  background: var(--spotify-gray-dark);
+}
+
+.queue-item.drag-over {
+  border-top: 2px solid var(--spotify-green);
+}
+
+.drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--spotify-text-muted);
+  cursor: grab;
+  padding: 4px;
+  flex-shrink: 0;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
 }
 
 .queue-num {
-  width: 24px;
+  width: 20px;
   text-align: center;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--spotify-text-muted);
+  flex-shrink: 0;
 }
 
 .queue-info {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 .queue-title {
@@ -749,6 +945,26 @@ const formatTime = (seconds) => {
   display: block;
   font-size: 12px;
   color: var(--spotify-text-muted);
+}
+
+.delete-indicator {
+  position: absolute;
+  right: -40px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #e53935;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.queue-item.swiping .delete-indicator {
+  opacity: 1;
+  right: 8px;
 }
 
 .queue-empty {

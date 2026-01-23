@@ -137,7 +137,22 @@ const handleSubmit = async () => {
   max-width: 400px;
   max-height: 90vh;
   overflow-y: auto;
+  overflow-y: overlay;
   overflow-x: hidden;
+}
+
+.modal::-webkit-scrollbar {
+  width: 6px;
+  background: transparent;
+}
+
+.modal::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
 }
 
 .modal-header {

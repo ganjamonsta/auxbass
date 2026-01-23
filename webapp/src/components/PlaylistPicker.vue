@@ -132,8 +132,23 @@ const handleSelect = async (playlist) => {
 .playlist-list {
   max-height: calc(70vh - 70px);
   overflow-y: auto;
+  overflow-y: overlay;
   overflow-x: hidden;
   padding: 8px;
+}
+
+.playlist-list::-webkit-scrollbar {
+  width: 6px;
+  background: transparent;
+}
+
+.playlist-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.playlist-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
 }
 
 .create-first {

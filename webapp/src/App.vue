@@ -590,6 +590,9 @@
         @toggleMute="player.toggleMute()"
         @toggleShuffle="player.toggleShuffle()"
         @toggleRepeat="player.toggleRepeat()"
+        @removeFromQueue="player.removeFromQueue($event)"
+        @moveInQueue="(from, to) => player.moveInQueue(from, to)"
+        @playFromQueue="player.playFromQueue($event)"
       />
     </Transition>
 
@@ -1272,10 +1275,11 @@ onMounted(async () => {
   position: relative;
 }
 
-/* Content scrollbar - fully transparent track */
+/* Content scrollbar - overlay style */
 .content::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
   background: transparent;
+  position: absolute;
 }
 
 .content::-webkit-scrollbar-track {
@@ -1283,8 +1287,12 @@ onMounted(async () => {
 }
 
 .content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+.content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
 }
 
 /* Pull to refresh */

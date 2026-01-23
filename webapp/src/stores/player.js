@@ -779,6 +779,26 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
+  // Remove from queue (by index relative to upcoming queue, i.e., after current track)
+  const removeFromQueue = (relativeIndex) => {
+    const targetIndex = queueIndex.value + 1 + relativeIndex
+    if (targetIndex > queueIndex.value && targetIndex < queue.value.length) {
+      queue.value.splice(targetIndex, 1)
+    }
+  }
+
+  // Move item in queue (reorder)
+  const moveInQueue = (fromRelativeIndex, toRelativeIndex) => {
+    const fromIndex = queueIndex.value + 1 + fromRelativeIndex
+    const toIndex = queueIndex.value + 1 + toRelativeIndex
+    
+    if (fromIndex > queueIndex.value && fromIndex < queue.value.length &&
+        toIndex > queueIndex.value && toIndex <= queue.value.length) {
+      const [item] = queue.value.splice(fromIndex, 1)
+      queue.value.splice(toIndex > fromIndex ? toIndex - 1 : toIndex, 0, item)
+    }
+  }
+
   // Stop
   const stop = () => {
     if (audio.value) {
@@ -814,6 +834,8 @@ export const usePlayerStore = defineStore('player', () => {
     toggleMute,
     playNext,
     addToQueue,
+    removeFromQueue,
+    moveInQueue,
     toggleShuffle,
     toggleRepeat,
     playFromQueue,
