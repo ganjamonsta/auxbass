@@ -550,12 +550,21 @@
       <!-- Playlist view -->
       <div v-if="currentView === 'playlist'" class="playlist-view">
         <div class="playlist-header-section">
-          <div class="playlist-cover">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+          <!-- Album cover or track collage -->
+          <div class="playlist-cover" :class="{ 'has-cover': currentPlaylist?.cover_url || playlistCollageCovers.length > 0 }">
+            <!-- Single album cover -->
+            <img v-if="currentPlaylist?.cover_url" :src="currentPlaylist.cover_url" alt="" class="cover-image" />
+            <!-- 4-track collage for regular playlists -->
+            <div v-else-if="playlistCollageCovers.length > 0" class="cover-collage">
+              <img v-for="(cover, i) in playlistCollageCovers" :key="i" :src="cover" alt="" class="collage-img" />
+            </div>
+            <!-- Fallback icon -->
+            <svg v-else width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
               <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
             </svg>
           </div>
           <div class="playlist-meta">
+            <span v-if="currentPlaylist?.album_artist" class="playlist-artist">{{ currentPlaylist.album_artist }}</span>
             <h2>{{ currentPlaylist?.name }}</h2>
             <p>{{ currentPlaylist?.track_count }} треков • {{ formatDuration(currentPlaylist?.total_duration) }}</p>
           </div>
@@ -914,6 +923,25 @@ const albumPlaylists = computed(() => {
 const userPlaylists = computed(() => {
   // User-created playlists (not auto-generated)
   return library.playlists.filter(p => !p.is_auto_album && !p.is_auto_source)
+})
+
+// Get up to 4 unique cover images for playlist collage
+const playlistCollageCovers = computed(() => {
+  if (!currentPlaylist.value?.tracks) return []
+  
+  const covers = []
+  const seen = new Set()
+  
+  for (const track of currentPlaylist.value.tracks) {
+    if (track.cover_url && !seen.has(track.cover_url)) {
+      seen.add(track.cover_url)
+      covers.push(track.cover_url)
+      if (covers.length >= 4) break
+    }
+  }
+  
+  // Only return if we have at least 1 cover
+  return covers.length > 0 ? covers : []
 })
 
 // Watch for tab changes - reset artist filter when leaving tracks tab
@@ -2432,14 +2460,14 @@ onMounted(async () => {
 
 /* Playlist view */
 .playlist-view {
-  padding: 20px;
+  padding: 16px;
 }
 
 .playlist-header-section {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .playlist-cover {
@@ -2451,26 +2479,73 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   color: var(--spotify-text-secondary);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.playlist-cover.has-cover {
+  background: transparent;
+}
+
+.playlist-cover .cover-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 4-image collage for playlists */
+.cover-collage {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 1px;
+}
+
+.cover-collage .collage-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* If only 1-3 images, adjust layout */
+.cover-collage .collage-img:only-child {
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
 }
 
 .playlist-meta {
   flex: 1;
+  min-width: 0;
+}
+
+.playlist-artist {
+  font-size: 12px;
+  color: var(--spotify-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: block;
+  margin-bottom: 2px;
 }
 
 .playlist-meta h2 {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .playlist-meta p {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--spotify-text-muted);
 }
 
 .play-all-btn {
-  width: 56px;
-  height: 56px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   background: var(--spotify-green);
   border: none;
@@ -2479,8 +2554,14 @@ onMounted(async () => {
   justify-content: center;
   cursor: pointer;
   color: black;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
   transition: transform 0.2s, box-shadow 0.2s;
+  flex-shrink: 0;
+}
+
+.play-all-btn svg {
+  width: 22px;
+  height: 22px;
 }
 
 .play-all-btn:active {
@@ -2488,22 +2569,28 @@ onMounted(async () => {
 }
 
 .download-playlist-btn {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: var(--spotify-surface);
-  border: 1px solid var(--spotify-border);
+  background: var(--spotify-gray);
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: var(--spotify-text);
-  transition: transform 0.2s, background 0.2s;
+  color: var(--spotify-text-secondary);
+  transition: transform 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.download-playlist-btn svg {
+  width: 18px;
+  height: 18px;
 }
 
 .download-playlist-btn:active {
   transform: scale(0.95);
-  background: var(--spotify-surface-highlight);
+  background: var(--spotify-gray-light);
 }
 
 /* Queue section */
