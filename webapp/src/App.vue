@@ -1859,38 +1859,64 @@ onMounted(async () => {
   margin-bottom: 16px;
 }
 
-/* Bottom Tab Bar */
+/* Bottom Tab Bar - Neumorphic Style */
 .tab-bar {
   flex-shrink: 0;
   display: flex;
-  background: var(--spotify-gray-dark);
-  border-top: 1px solid var(--spotify-gray);
-  padding: 8px 0 max(8px, env(safe-area-inset-bottom));
+  justify-content: center;
+  gap: 16px;
+  background: var(--spotify-black);
+  padding: 12px 16px max(12px, env(safe-area-inset-bottom));
   z-index: 50;
 }
 
 .tab-item {
-  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  padding: 8px 0;
+  width: 64px;
+  height: 56px;
   border: none;
-  background: none;
+  border-radius: 16px;
+  background: var(--spotify-gray-dark);
   color: var(--spotify-text-muted);
-  font-size: 11px;
+  font-size: 10px;
+  font-weight: 500;
   cursor: pointer;
-  transition: color 0.2s;
+  transition: all 0.2s ease;
+  /* Neumorphic shadow */
+  box-shadow: 
+    4px 4px 8px rgba(0, 0, 0, 0.4),
+    -2px -2px 6px rgba(255, 255, 255, 0.05);
+}
+
+.tab-item:active {
+  /* Pressed state - inset shadow */
+  box-shadow: 
+    inset 3px 3px 6px rgba(0, 0, 0, 0.4),
+    inset -2px -2px 4px rgba(255, 255, 255, 0.05);
+  transform: scale(0.95);
 }
 
 .tab-item.active {
   color: var(--spotify-green);
+  background: linear-gradient(145deg, var(--spotify-gray), var(--spotify-gray-dark));
+  box-shadow: 
+    4px 4px 10px rgba(0, 0, 0, 0.5),
+    -2px -2px 6px rgba(255, 255, 255, 0.08),
+    inset 0 0 0 1px rgba(29, 185, 84, 0.2);
+}
+
+.tab-item.active svg {
+  filter: drop-shadow(0 0 4px rgba(29, 185, 84, 0.5));
 }
 
 .tab-item svg {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
+  transition: filter 0.2s;
 }
 
 /* Modal */
