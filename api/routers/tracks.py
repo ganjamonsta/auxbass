@@ -230,9 +230,8 @@ async def fetch_artist_image(artist_name: str) -> Optional[str]:
 @router.get("/artist-image/{artist_name:path}")
 async def get_artist_image(
     artist_name: str,
-    user: TelegramUser = Depends(get_current_user),
 ):
-    """Get artist image URL from Last.fm"""
+    """Get artist image URL from Last.fm (public endpoint)"""
     image_url = await fetch_artist_image(artist_name)
     return {"artist": artist_name, "image_url": image_url}
 
