@@ -37,7 +37,7 @@ const getCachedAudio = (trackId) => {
 }
 
 const setCachedAudio = (trackId, blobUrl) => {
-  // Limit cache size
+  // Limit cache size - use LRU-like eviction (remove oldest)
   if (audioCache.size >= MAX_CACHE_SIZE) {
     const firstKey = audioCache.keys().next().value
     const oldUrl = audioCache.get(firstKey)
@@ -45,6 +45,20 @@ const setCachedAudio = (trackId, blobUrl) => {
     audioCache.delete(firstKey)
   }
   audioCache.set(trackId, blobUrl)
+}
+
+// ============== Adaptive Preload System ==============
+// Tracks download speed to adapt preload strategy
+let _lastDownloadSpeed = 0  // bytes per second
+let _userInteractionTime = 0  // timestamp of last user action (play/next/prev)
+const USER_INTERACTION_COOLDOWN = 2000  // 2 seconds - wait before resuming background preloads
+
+const markUserInteraction = () => {
+  _userInteractionTime = Date.now()
+}
+
+const isUserActivelyBrowsing = () => {
+  return Date.now() - _userInteractionTime < USER_INTERACTION_COOLDOWN
 }
 
 export const usePlayerStore = defineStore('player', () => {
@@ -64,6 +78,9 @@ export const usePlayerStore = defineStore('player', () => {
   const buffered = ref(0) // buffered endpoint in seconds
   const nextTrackPreloaded = ref(null)
   const lastError = ref(null)  // For error notifications
+  
+  // Flag to prevent duplicate preload triggers per track
+  let preloadTriggered = false
   
   // Callback for track unavailable
   let onTrackUnavailableCallback = null
@@ -242,7 +259,7 @@ export const usePlayerStore = defineStore('player', () => {
     })
     
     // Preload next track when we have a safe buffer
-    let preloadTriggered = false
+    // Note: preloadTriggered is defined at store level, reset in play()
     audio.value.addEventListener('timeupdate', () => {
       // Calculate how many seconds we have buffered ahead of current position
       const currentBuffer = (buffered.value || 0) - progress.value
@@ -267,13 +284,35 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   // Preload next tracks (caches them for gapless playback)
+  // ADAPTIVE: Adjusts how many tracks to preload based on user activity
   const preloadNextTrack = async () => {
     if (queue.value.length === 0) return
     
-    // Preload next 2 tracks for truly gapless experience
+    // If user is actively switching tracks, don't start new preloads
+    // This prevents wasting bandwidth on tracks user might skip
+    if (isUserActivelyBrowsing()) {
+      console.log('[Preload] User actively browsing, deferring preload...')
+      // Retry after cooldown
+      setTimeout(() => preloadNextTrack(), USER_INTERACTION_COOLDOWN)
+      return
+    }
+    
+    // Determine how many tracks to preload based on network speed
+    // Fast connection (>1MB/s): preload 2-3 tracks
+    // Slow connection (<500KB/s): preload only 1 track
+    let maxPreload = 2
+    if (_lastDownloadSpeed > 0) {
+      if (_lastDownloadSpeed > 1024 * 1024) {
+        maxPreload = 3
+      } else if (_lastDownloadSpeed < 500 * 1024) {
+        maxPreload = 1
+      }
+    }
+    
+    // Collect tracks to preload
     const tracksToPreload = []
     
-    for (let offset = 1; offset <= 2; offset++) {
+    for (let offset = 1; offset <= maxPreload; offset++) {
       let nextIndex = queueIndex.value + offset
       if (nextIndex >= queue.value.length) {
         if (repeat.value === 'all') {
@@ -301,15 +340,50 @@ export const usePlayerStore = defineStore('player', () => {
       }
     }
     
-    // Preload tracks in background (don't await - fire and forget)
+    // Preload tracks SEQUENTIALLY to prioritize next track
+    // This ensures track N+1 finishes before N+2 starts
     for (const track of tracksToPreload) {
-      preloadSingleTrack(track)
+      // Re-check if user became active
+      if (isUserActivelyBrowsing()) {
+        console.log('[Preload] User became active, pausing preloads')
+        break
+      }
+      await preloadSingleTrack(track)
     }
   }
   
   // Set to track which tracks are currently being preloaded
   // Map<trackId, AbortController>
   const _preloadingTracks = new Map()
+  
+  // Cancel preloads that are no longer relevant (not in next N positions)
+  const cancelIrrelevantPreloads = () => {
+    const relevantIds = new Set()
+    
+    // Keep next 3 tracks as relevant
+    for (let offset = 1; offset <= 3; offset++) {
+      let idx = queueIndex.value + offset
+      if (idx >= queue.value.length) {
+        if (repeat.value === 'all') {
+          idx = idx % queue.value.length
+        } else {
+          continue
+        }
+      }
+      if (queue.value[idx]) {
+        relevantIds.add(queue.value[idx].id)
+      }
+    }
+    
+    // Cancel any preload not in relevant set
+    for (const [trackId, controller] of _preloadingTracks.entries()) {
+      if (!relevantIds.has(trackId)) {
+        console.log(`[Preload] Cancelling irrelevant preload: track ${trackId}`)
+        controller.abort()
+        _preloadingTracks.delete(trackId)
+      }
+    }
+  }
 
   // Preload a single track into cache
   const preloadSingleTrack = async (track) => {
@@ -320,6 +394,7 @@ export const usePlayerStore = defineStore('player', () => {
     _preloadingTracks.set(track.id, controller)
     
     console.log(`[Preload] Starting: ${track.title}`)
+    const startTime = Date.now()
     
     try {
       const response = await playerApi.getStreamUrl(track.id)
@@ -334,8 +409,15 @@ export const usePlayerStore = defineStore('player', () => {
       const blob = await audioResponse.blob()
       const blobUrl = URL.createObjectURL(blob)
       
+      // Track download speed for adaptive preloading
+      const downloadTime = (Date.now() - startTime) / 1000  // seconds
+      if (downloadTime > 0) {
+        _lastDownloadSpeed = blob.size / downloadTime
+        console.log(`[Preload] Speed: ${(_lastDownloadSpeed / 1024).toFixed(0)} KB/s`)
+      }
+      
       setCachedAudio(track.id, blobUrl)
-      console.log(`[Preload] Cached: ${track.title} (${(blob.size / 1024 / 1024).toFixed(1)}MB)`)
+      console.log(`[Preload] Cached: ${track.title} (${(blob.size / 1024 / 1024).toFixed(1)}MB in ${downloadTime.toFixed(1)}s)`)
       
       // Update nextTrackPreloaded if this is the next track
       const nextIndex = queueIndex.value + 1
@@ -368,6 +450,12 @@ export const usePlayerStore = defineStore('player', () => {
   const play = async (track, newQueue = null) => {
     initAudio()
     
+    // Mark user interaction to pause background preloads
+    markUserInteraction()
+    
+    // Cancel preloads that are no longer relevant to new position
+    cancelIrrelevantPreloads()
+    
     // Update queue if provided
     if (newQueue) {
       queue.value = [...newQueue]
@@ -379,6 +467,9 @@ export const usePlayerStore = defineStore('player', () => {
       toggle()
       return
     }
+    
+    // Reset preload trigger flag for new track
+    preloadTriggered = false
     
     loading.value = true
     currentTrack.value = track
@@ -470,6 +561,11 @@ export const usePlayerStore = defineStore('player', () => {
   const next = async () => {
     if (queue.value.length === 0) return
     
+    // Mark user interaction and cancel irrelevant preloads
+    markUserInteraction()
+    cancelIrrelevantPreloads()
+    preloadTriggered = false
+    
     let nextIndex
     
     if (shuffle.value) {
@@ -534,6 +630,11 @@ export const usePlayerStore = defineStore('player', () => {
   // Previous track
   const prev = async () => {
     if (queue.value.length === 0) return
+    
+    // Mark user interaction and cancel irrelevant preloads
+    markUserInteraction()
+    cancelIrrelevantPreloads()
+    preloadTriggered = false
     
     // If more than 3 seconds played, restart current track
     if (progress.value > 3) {

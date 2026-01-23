@@ -8,11 +8,7 @@
     
     <!-- Equalizer visualization -->
     <div class="equalizer" :class="{ active: isPlaying && !loading }">
-      <div class="eq-bar"></div>
-      <div class="eq-bar"></div>
-      <div class="eq-bar"></div>
-      <div class="eq-bar"></div>
-      <div class="eq-bar"></div>
+      <div class="eq-bar" v-for="i in 32" :key="i" :style="{ '--i': i }"></div>
     </div>
     
     <!-- Cover -->
@@ -206,46 +202,87 @@ const coverInitials = computed(() => {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 24px;
+  height: 32px;
   display: flex;
   align-items: flex-end;
-  justify-content: center;
-  gap: 3px;
-  padding: 0 20%;
+  justify-content: space-between;
+  padding: 0 8px;
   pointer-events: none;
-  opacity: 0.3;
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
 .equalizer.active {
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .eq-bar {
   flex: 1;
-  max-width: 6px;
-  height: 4px;
-  background: var(--spotify-green);
+  margin: 0 1px;
+  height: 3px;
+  background: linear-gradient(to top, var(--spotify-green), rgba(29, 185, 84, 0.4));
   border-radius: 2px 2px 0 0;
   transform-origin: bottom;
+  will-change: transform;
 }
 
 .equalizer.active .eq-bar {
-  animation: eq-bounce 0.5s ease-in-out infinite alternate;
+  animation: eq-wave calc(0.4s + var(--i) * 0.02s) ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.05s);
 }
 
-.equalizer.active .eq-bar:nth-child(1) { animation-delay: 0s; }
-.equalizer.active .eq-bar:nth-child(2) { animation-delay: 0.1s; }
-.equalizer.active .eq-bar:nth-child(3) { animation-delay: 0.2s; }
-.equalizer.active .eq-bar:nth-child(4) { animation-delay: 0.15s; }
-.equalizer.active .eq-bar:nth-child(5) { animation-delay: 0.05s; }
+/* Create wave-like pattern with different heights */
+.equalizer.active .eq-bar:nth-child(4n+1) {
+  animation-name: eq-wave-high;
+  animation-duration: calc(0.6s + var(--i) * 0.015s);
+}
 
-@keyframes eq-bounce {
-  0% {
-    height: 4px;
-  }
-  100% {
-    height: 20px;
-  }
+.equalizer.active .eq-bar:nth-child(4n+2) {
+  animation-name: eq-wave-mid;
+  animation-duration: calc(0.5s + var(--i) * 0.02s);
+}
+
+.equalizer.active .eq-bar:nth-child(4n+3) {
+  animation-name: eq-wave-low;
+  animation-duration: calc(0.45s + var(--i) * 0.025s);
+}
+
+.equalizer.active .eq-bar:nth-child(4n) {
+  animation-name: eq-wave-mid2;
+  animation-duration: calc(0.55s + var(--i) * 0.018s);
+}
+
+@keyframes eq-wave-high {
+  0%, 100% { transform: scaleY(1); }
+  15% { transform: scaleY(6); }
+  35% { transform: scaleY(3); }
+  50% { transform: scaleY(8); }
+  70% { transform: scaleY(4); }
+  85% { transform: scaleY(2); }
+}
+
+@keyframes eq-wave-mid {
+  0%, 100% { transform: scaleY(1); }
+  20% { transform: scaleY(4); }
+  40% { transform: scaleY(7); }
+  60% { transform: scaleY(3); }
+  80% { transform: scaleY(5); }
+}
+
+@keyframes eq-wave-low {
+  0%, 100% { transform: scaleY(1); }
+  25% { transform: scaleY(3); }
+  50% { transform: scaleY(5); }
+  75% { transform: scaleY(2); }
+}
+
+@keyframes eq-wave-mid2 {
+  0%, 100% { transform: scaleY(1); }
+  10% { transform: scaleY(5); }
+  30% { transform: scaleY(2); }
+  55% { transform: scaleY(6); }
+  75% { transform: scaleY(3); }
+  90% { transform: scaleY(4); }
 }
 
 .mini-cover {
