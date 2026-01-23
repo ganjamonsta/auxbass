@@ -41,6 +41,16 @@
     <main class="content">
       <!-- Library view -->
       <div v-if="currentView === 'library'" class="library">
+        <!-- Active filter indicator -->
+        <div v-if="activeFilter" class="active-filter">
+          <span>{{ activeFilter }}</span>
+          <button @click="clearFilter" class="clear-filter-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
+            </svg>
+          </button>
+        </div>
+        
         <!-- Track list -->
         <div v-if="activeTab === 'tracks'" class="track-list">
           <div v-if="library.loading" class="skeleton-list">
@@ -362,6 +372,7 @@ const showFullPlayer = ref(false)
 const showCreatePlaylist = ref(false)
 const newPlaylistName = ref('')
 const currentPlaylist = ref(null)
+const activeFilter = ref(null) // Active artist/genre filter
 
 // Track menu state
 const showTrackMenuModal = ref(false)
@@ -456,15 +467,21 @@ const submitCreatePlaylist = async () => {
 }
 
 const filterByArtist = (artist) => {
-  searchQuery.value = artist
+  activeFilter.value = `Артист: ${artist}`
   activeTab.value = 'tracks'
   library.fetchTracks({ artist })
 }
 
 const filterByGenre = (genre) => {
-  searchQuery.value = genre
+  activeFilter.value = `Жанр: ${genre}`
   activeTab.value = 'tracks'
   library.fetchTracks({ genre })
+}
+
+const clearFilter = () => {
+  activeFilter.value = null
+  searchQuery.value = ''
+  library.fetchTracks()
 }
 
 const formatDuration = (seconds) => {
@@ -580,6 +597,33 @@ onMounted(async () => {
   flex: 1;
   overflow-y: auto;
   padding-bottom: 160px; /* Space for mini player + tab bar */
+}
+
+/* Active filter indicator */
+.active-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  margin: 8px 16px;
+  background: var(--spotify-green);
+  border-radius: 8px;
+  color: black;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.clear-filter-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: black;
 }
 
 /* Empty state */

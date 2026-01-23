@@ -45,7 +45,7 @@
 </template>
 
 <script setup>
-import { inject } from 'vue'
+import { inject, computed, watch } from 'vue'
 import { useLibraryStore } from '../stores/library'
 
 const props = defineProps({
@@ -58,7 +58,15 @@ const emit = defineEmits(['close', 'createNew', 'added'])
 const library = useLibraryStore()
 const telegram = inject('telegram')
 
-const playlists = library.playlists
+// Use computed to reactively get playlists
+const playlists = computed(() => library.playlists)
+
+// Fetch playlists when modal opens
+watch(() => props.show, async (isOpen) => {
+  if (isOpen) {
+    await library.fetchPlaylists()
+  }
+})
 
 const handleSelect = async (playlist) => {
   if (!props.track) return

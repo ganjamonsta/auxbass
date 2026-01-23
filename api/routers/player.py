@@ -194,12 +194,17 @@ async def stream_audio(token: str, db: AsyncSession = Depends(get_db)):
     # Determine content type
     content_type = track.mime_type or "audio/mpeg"
     
+    # Sanitize filename for Content-Disposition header (ASCII only)
+    import re
+    safe_title = re.sub(r'[^\w\s.-]', '', track.title or 'audio')
+    safe_title = safe_title.encode('ascii', 'ignore').decode('ascii') or 'audio'
+    
     return StreamingResponse(
         stream_generator(),
         media_type=content_type,
         headers={
             "Accept-Ranges": "bytes",
-            "Content-Disposition": f'inline; filename="{track.title or "audio"}.mp3"',
+            "Content-Disposition": f'inline; filename="{safe_title}.mp3"',
             "Cache-Control": "private, max-age=300",  # Cache 5 min on client
         }
     )
