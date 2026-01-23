@@ -354,8 +354,10 @@ const formatTime = (seconds) => {
   flex-direction: column;
   z-index: 100;
   padding: 12px 24px 24px;
+  padding-bottom: env(safe-area-inset-bottom, 24px);
   transition: transform 0.1s ease-out, opacity 0.1s ease-out;
   touch-action: pan-y;
+  overflow-y: auto;
 }
 
 /* Swipe indicator */
@@ -587,6 +589,9 @@ const formatTime = (seconds) => {
   display: flex;
   align-items: center;
   gap: 12px;
+  padding: 0 32px;
+  margin-top: 24px;
+  margin-bottom: 32px;
 }
 
 .volume-btn {
