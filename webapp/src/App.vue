@@ -5,31 +5,16 @@
       <div class="header-row">
         <EnrichmentStatus />
         
-        <!-- Title (always visible, navigates to home) -->
-        <h1 class="header-title-main" @click="goToHome">
-          Musiq
-        </h1>
+        <!-- Title (hides when search is open) -->
+        <Transition name="fade-title">
+          <h1 v-if="!showSearch" class="header-title-main" @click="goToHome">
+            Musiq
+          </h1>
+        </Transition>
         
-        <!-- Spacer to push button to right -->
-        <div class="header-spacer"></div>
-        
-        <!-- Search Toggle Button (fixed right, changes icon) -->
-        <button @click="toggleSearch" class="icon-btn search-toggle">
-          <Transition name="icon-flip" mode="out-in">
-            <svg v-if="!showSearch" key="search" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-            </svg>
-            <svg v-else key="close" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
-            </svg>
-          </Transition>
-        </button>
-      </div>
-      
-      <!-- Search field (slides down from top) -->
-      <Transition name="slide-down-search">
-        <div v-if="showSearch" class="search-row">
-          <div class="search-wrapper" @click="focusInput">
+        <!-- Search field (slides down from top, takes title's place) -->
+        <Transition name="slide-down-search">
+          <div v-if="showSearch" class="search-wrapper" @click="focusInput">
             <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
             </svg>
@@ -50,8 +35,23 @@
               />
             </div>
           </div>
-        </div>
-      </Transition>
+        </Transition>
+        
+        <!-- Spacer to push button to right -->
+        <div class="header-spacer"></div>
+        
+        <!-- Search Toggle Button (fixed right, changes icon) -->
+        <button @click="toggleSearch" class="icon-btn search-toggle">
+          <Transition name="icon-flip" mode="out-in">
+            <svg v-if="!showSearch" key="search" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+            </svg>
+            <svg v-else key="close" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
+            </svg>
+          </Transition>
+        </button>
+      </div>
     </header>
 
     <!-- Compact Header for other views -->
@@ -1168,7 +1168,7 @@ onMounted(async () => {
   flex: 1;
 }
 
-/* Header title - always visible */
+/* Header title - hides when search is open */
 .header-title-main {
   font-size: 24px;
   font-weight: 700;
@@ -1184,17 +1184,11 @@ onMounted(async () => {
   opacity: 0.7;
 }
 
-/* Search row - appears below header */
-.search-row {
-  padding-top: 12px;
-  overflow: hidden;
-}
-
-/* Search wrapper */
+/* Search wrapper - replaces title when active */
 .search-wrapper {
   display: flex;
   align-items: center;
-  width: 100%;
+  flex: 1;
   height: auto;
   min-height: 44px;
   background: var(--neu-bg);
@@ -1266,24 +1260,23 @@ onMounted(async () => {
 
 .slide-down-search-enter-from {
   opacity: 0;
-  transform: translateY(-100%);
-  max-height: 0;
-  padding-top: 0;
+  transform: translateY(-20px);
 }
 
 .slide-down-search-leave-to {
   opacity: 0;
-  transform: translateY(-100%);
-  max-height: 0;
-  padding-top: 0;
+  transform: translateY(-20px);
 }
 
-.slide-down-search-enter-to,
-.slide-down-search-leave-from {
-  opacity: 1;
-  transform: translateY(0);
-  max-height: 80px;
-  padding-top: 12px;
+/* Fade title animation */
+.fade-title-enter-active,
+.fade-title-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-title-enter-from,
+.fade-title-leave-to {
+  opacity: 0;
 }
 
 /* Icon flip animation */
