@@ -1184,16 +1184,11 @@ onMounted(async () => {
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-}
-
-.horizontal-scroll > *:first-child {
-  margin-left: 16px;
-}
-
-.horizontal-scroll::after {
-  content: '';
-  flex-shrink: 0;
-  width: 16px;
+  padding-left: 16px;
+  padding-right: 16px;
+  margin-left: -16px;
+  margin-right: -16px;
+  width: calc(100% + 32px);
 }
 
 .horizontal-scroll::-webkit-scrollbar {
@@ -1206,6 +1201,7 @@ onMounted(async () => {
   width: 140px;
   scroll-snap-align: start;
   cursor: pointer;
+  text-align: center;
 }
 
 .feed-card-cover {
@@ -1292,10 +1288,6 @@ onMounted(async () => {
 }
 
 /* Artist Card */
-.artist-card {
-  text-align: center;
-}
-
 .artist-card .feed-card-cover {
   border-radius: 50%;
 }
