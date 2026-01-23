@@ -24,6 +24,17 @@ export const usePlayerStore = defineStore('player', () => {
     
     audio.value = new Audio()
     audio.value.volume = volume.value
+    audio.value.preload = 'auto'  // Aggressive preloading for faster start
+    
+    // canplay event - audio ready to play
+    audio.value.addEventListener('canplay', () => {
+      loading.value = false
+    })
+    
+    // waiting event - buffering
+    audio.value.addEventListener('waiting', () => {
+      loading.value = true
+    })
     
     audio.value.addEventListener('timeupdate', () => {
       progress.value = audio.value.currentTime

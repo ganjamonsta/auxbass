@@ -24,7 +24,12 @@
     
     <!-- Controls -->
     <button class="mini-btn" @click.stop="$emit('toggle')">
-      <svg v-if="isPlaying" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+      <!-- Loading spinner -->
+      <svg v-if="loading" class="spinner" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <circle cx="12" cy="12" r="10" stroke-width="2" stroke-opacity="0.3"/>
+        <path d="M12 2a10 10 0 0 1 10 10" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <svg v-else-if="isPlaying" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
         <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
       </svg>
       <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
@@ -49,6 +54,10 @@ const props = defineProps({
     required: true
   },
   isPlaying: {
+    type: Boolean,
+    default: false
+  },
+  loading: {
     type: Boolean,
     default: false
   },
@@ -198,5 +207,14 @@ const coverInitials = computed(() => {
 
 .mini-btn:active {
   transform: scale(0.95);
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 </style>

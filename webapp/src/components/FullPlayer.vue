@@ -83,7 +83,12 @@
       </button>
       
       <button class="control-btn play-btn" @click="$emit('toggle')">
-        <svg v-if="isPlaying" width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+        <!-- Loading spinner -->
+        <svg v-if="loading" class="spinner" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <circle cx="12" cy="12" r="10" stroke-width="2" stroke-opacity="0.3"/>
+          <path d="M12 2a10 10 0 0 1 10 10" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <svg v-else-if="isPlaying" width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
           <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
         </svg>
         <svg v-else width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
@@ -172,6 +177,10 @@ import { ref, computed, inject } from 'vue'
 const props = defineProps({
   track: Object,
   isPlaying: Boolean,
+  loading: {
+    type: Boolean,
+    default: false
+  },
   progress: Number,
   duration: Number,
   volume: {
@@ -563,6 +572,15 @@ const formatTime = (seconds) => {
 
 .play-btn:active {
   background: var(--spotify-text-secondary);
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .volume-container {

@@ -3,12 +3,13 @@ TG Player API - Player Router
 Handles audio streaming with secure proxy (token never exposed to browser)
 """
 from typing import Optional
+import re
 import time
 import hashlib
 import secrets
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Header, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -163,10 +164,16 @@ async def get_stream_url(
 
 
 @router.get("/audio/{token}")
-async def stream_audio(token: str, db: AsyncSession = Depends(get_db)):
+async def stream_audio(
+    token: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    range: Optional[str] = Header(None),
+):
     """
-    Secure audio proxy endpoint.
+    Secure audio proxy endpoint with Range request support.
     Streams audio through our server - bot token never exposed to client.
+    Supports HTTP 206 Partial Content for fast seeking.
     """
     # Validate token
     token_data = validate_stream_token(token)
@@ -194,28 +201,78 @@ async def stream_audio(token: str, db: AsyncSession = Depends(get_db)):
     # Stream from Telegram through our proxy
     telegram_url = f"https://api.telegram.org/file/bot{settings.bot_token}/{file_path}"
     
-    async def stream_generator():
-        async with aiohttp.ClientSession() as session:
-            async with session.get(telegram_url) as resp:
-                async for chunk in resp.content.iter_chunked(64 * 1024):  # 64KB chunks
-                    yield chunk
-    
-    # Determine content type
+    # Determine content type and filename
     content_type = track.mime_type or "audio/mpeg"
-    
-    # Sanitize filename for Content-Disposition header (ASCII only)
-    import re
     safe_title = re.sub(r'[^\w\s.-]', '', track.title or 'audio')
     safe_title = safe_title.encode('ascii', 'ignore').decode('ascii') or 'audio'
+    
+    # Get file size from track or fetch from Telegram
+    file_size = track.file_size
+    
+    # Parse Range header
+    start_byte = 0
+    end_byte = None
+    
+    if range and range.startswith("bytes="):
+        try:
+            range_spec = range[6:]  # Remove "bytes="
+            if range_spec.startswith("-"):
+                # Last N bytes: bytes=-500
+                if file_size:
+                    start_byte = max(0, file_size - int(range_spec[1:]))
+            elif "-" in range_spec:
+                parts = range_spec.split("-")
+                start_byte = int(parts[0]) if parts[0] else 0
+                if parts[1]:
+                    end_byte = int(parts[1])
+        except (ValueError, IndexError):
+            pass
+    
+    # Build headers for Telegram request
+    telegram_headers = {}
+    if start_byte > 0 or end_byte:
+        range_value = f"bytes={start_byte}-"
+        if end_byte:
+            range_value = f"bytes={start_byte}-{end_byte}"
+        telegram_headers["Range"] = range_value
+    
+    async def stream_generator():
+        async with aiohttp.ClientSession() as session:
+            async with session.get(telegram_url, headers=telegram_headers) as resp:
+                # Use smaller chunks for faster start (8KB instead of 64KB)
+                async for chunk in resp.content.iter_chunked(8 * 1024):
+                    yield chunk
+    
+    # Build response headers
+    response_headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Disposition": f'inline; filename="{safe_title}.mp3"',
+        "Cache-Control": "private, max-age=3600",  # Cache 1 hour
+    }
+    
+    # If we have file size and Range request, return 206 Partial Content
+    if file_size and range:
+        actual_end = end_byte if end_byte else file_size - 1
+        content_length = actual_end - start_byte + 1
+        
+        response_headers["Content-Range"] = f"bytes {start_byte}-{actual_end}/{file_size}"
+        response_headers["Content-Length"] = str(content_length)
+        
+        return StreamingResponse(
+            stream_generator(),
+            status_code=206,
+            media_type=content_type,
+            headers=response_headers,
+        )
+    
+    # Regular response (no Range)
+    if file_size:
+        response_headers["Content-Length"] = str(file_size)
     
     return StreamingResponse(
         stream_generator(),
         media_type=content_type,
-        headers={
-            "Accept-Ranges": "bytes",
-            "Content-Disposition": f'inline; filename="{safe_title}.mp3"',
-            "Cache-Control": "private, max-age=300",  # Cache 5 min on client
-        }
+        headers=response_headers,
     )
 
 
