@@ -4,7 +4,9 @@
     <div class="lcd-screen">
       <div class="lcd-row lcd-row-main">
         <span class="lcd-status">{{ isPlaying ? '▶' : '■' }}</span>
-        <span class="lcd-title">{{ displayTitle }}</span>
+        <div class="lcd-title-container">
+          <span class="lcd-title" :class="{ 'marquee': shouldMarqueeTitle }">{{ track.title || 'NO TRACK' }}</span>
+        </div>
       </div>
       <div class="lcd-row lcd-row-sub">
         <div class="lcd-artist-container">
@@ -104,12 +106,12 @@ const coverInitials = computed(() => {
   return title.substring(0, 2).toUpperCase()
 })
 
-const shouldMarquee = computed(() => {
-  return (props.track?.title?.length || 0) > 18
+const shouldMarqueeTitle = computed(() => {
+  return (props.track?.title?.length || 0) > 20
 })
 
 const shouldMarqueeArtist = computed(() => {
-  return (props.track?.artist?.length || 0) > 12
+  return (props.track?.artist?.length || 0) > 15
 })
 
 const formatTime = (seconds) => {
@@ -118,11 +120,6 @@ const formatTime = (seconds) => {
   const secs = Math.floor(seconds % 60)
   return `${mins}:${secs.toString().padStart(2, '0')}`
 }
-
-const displayTitle = computed(() => {
-  const title = props.track?.title || 'NO TRACK'
-  return title.length > 22 ? title.substring(0, 20) + '..' : title
-})
 </script>
 
 <style scoped>
@@ -183,17 +180,26 @@ const displayTitle = computed(() => {
   flex-shrink: 0;
 }
 
-.lcd-title {
+.lcd-title-container {
   flex: 1 1 0;
   min-width: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.lcd-title {
+  display: inline-block;
   color: #4dc3ff;
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.5px;
   text-shadow: 0 0 8px rgba(77, 195, 255, 0.6);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: clip;
+}
+
+.lcd-title.marquee {
+  animation: marquee-text 12s linear infinite;
+  padding-right: 40px;
 }
 
 .lcd-artist-container {
@@ -212,22 +218,19 @@ const displayTitle = computed(() => {
 }
 
 .lcd-artist.marquee {
-  animation: marquee-artist 10s linear infinite;
-  padding-right: 50px;
+  animation: marquee-text 10s linear infinite;
+  padding-right: 40px;
 }
 
-@keyframes marquee-artist {
-  0%, 15% {
+@keyframes marquee-text {
+  0%, 20% {
     transform: translateX(0);
   }
-  45%, 55% {
-    transform: translateX(-100%);
-  }
-  85%, 100% {
-    transform: translateX(0);
+  50%, 70% {
+    transform: translateX(calc(-100% + 80px));
   }
   100% {
-    transform: translateX(0%);
+    transform: translateX(0);
   }
 }
 
