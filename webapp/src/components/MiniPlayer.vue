@@ -5,19 +5,13 @@
       <div class="lcd-row lcd-row-main">
         <span class="lcd-status">{{ isPlaying ? '▶' : '■' }}</span>
         <div class="lcd-title-container">
-          <div class="lcd-title-track" :class="{ 'marquee': shouldMarqueeTitle }">
-            <span class="lcd-title">{{ track.title || 'NO TRACK' }}</span>
-            <span v-if="shouldMarqueeTitle" class="lcd-title lcd-title-clone">{{ track.title || 'NO TRACK' }}</span>
+          <div class="lcd-title-track" :class="{ 'marquee': shouldMarquee }">
+            <span class="lcd-title">{{ displayText }}</span>
+            <span v-if="shouldMarquee" class="lcd-title lcd-title-clone">{{ displayText }}</span>
           </div>
         </div>
       </div>
       <div class="lcd-row lcd-row-sub">
-        <div class="lcd-artist-container">
-          <div class="lcd-artist-track" :class="{ 'marquee': shouldMarqueeArtist }">
-            <span class="lcd-artist">{{ track.artist || '---' }}</span>
-            <span v-if="shouldMarqueeArtist" class="lcd-artist lcd-artist-clone">{{ track.artist || '---' }}</span>
-          </div>
-        </div>
         <span class="lcd-time">{{ formatTime(progress) }}/{{ formatTime(duration || track.duration) }}</span>
       </div>
       <!-- LED Progress dots -->
@@ -128,8 +122,14 @@ const shouldMarqueeTitle = computed(() => {
   return (props.track?.title?.length || 0) > 20
 })
 
-const shouldMarqueeArtist = computed(() => {
-  return (props.track?.artist?.length || 0) > 15
+const displayText = computed(() => {
+  const artist = props.track?.artist || '---'
+  const title = props.track?.title || 'NO TRACK'
+  return `${artist} — ${title}`
+})
+
+const shouldMarquee = computed(() => {
+  return displayText.value.length > 25
 })
 
 const formatTime = (seconds) => {
@@ -225,34 +225,6 @@ const formatTime = (seconds) => {
 }
 
 .lcd-title-clone {
-  margin-left: 60px;
-}
-
-.lcd-artist-container {
-  flex: 1 1 0;
-  min-width: 0;
-  overflow: hidden;
-  position: relative;
-}
-
-.lcd-artist-track {
-  display: inline-flex;
-  white-space: nowrap;
-}
-
-.lcd-artist-track.marquee {
-  animation: marquee-scroll 8s linear infinite;
-}
-
-.lcd-artist {
-  color: #3399cc;
-  font-size: 11px;
-  text-shadow: 0 0 4px rgba(51, 153, 204, 0.5);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.lcd-artist-clone {
   margin-left: 60px;
 }
 
