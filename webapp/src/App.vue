@@ -7,7 +7,7 @@
         
         <!-- Title (always visible, navigates to home) -->
         <h1 class="header-title-main" @click="goToHome">
-          Musiq
+          {{ userDisplayName }}
         </h1>
         
         <!-- Search field (slides down from top, between title and button) -->
@@ -700,6 +700,15 @@ import GlobalLibrary from './components/GlobalLibrary.vue'
 import Toast from './components/Toast.vue'
 
 const telegram = inject('telegram')
+
+// Get username from Telegram
+const userDisplayName = computed(() => {
+  const user = telegram?.initDataUnsafe?.user
+  if (user?.username) {
+    return `@${user.username}`
+  }
+  return user?.first_name || 'Musiq'
+})
 
 // Stores
 const player = usePlayerStore()
