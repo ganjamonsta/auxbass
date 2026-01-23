@@ -353,11 +353,11 @@ const formatTime = (seconds) => {
   display: flex;
   flex-direction: column;
   z-index: 100;
-  padding: 12px 24px 24px;
-  padding-bottom: env(safe-area-inset-bottom, 24px);
+  padding: 12px 24px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
   transition: transform 0.1s ease-out, opacity 0.1s ease-out;
   touch-action: pan-y;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 /* Swipe indicator */
@@ -366,13 +366,15 @@ const formatTime = (seconds) => {
   height: 4px;
   background: var(--spotify-gray-light);
   border-radius: 2px;
-  margin: 0 auto 12px;
+  margin: 0 auto 8px;
+  flex-shrink: 0;
 }
 
 .player-header {
   display: flex;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
+  flex-shrink: 0;
 }
 
 .close-btn, .queue-btn {
@@ -404,18 +406,18 @@ const formatTime = (seconds) => {
 }
 
 .player-cover {
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  max-height: 320px;
-  margin-bottom: 24px;
+  min-height: 0;
+  margin-bottom: 16px;
 }
 
 .cover-image {
   width: 100%;
-  max-width: 300px;
+  max-width: min(280px, 35vh);
   aspect-ratio: 1;
   border-radius: 8px;
   display: flex;
@@ -475,25 +477,27 @@ const formatTime = (seconds) => {
 
 .player-info {
   text-align: center;
-  margin-bottom: 24px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
 }
 
 .track-title {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .track-artist {
-  font-size: 15px;
+  font-size: 14px;
   color: var(--spotify-text-secondary);
 }
 
 .progress-container {
-  margin-bottom: 20px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
 }
 
 .progress-slider {
@@ -524,7 +528,7 @@ const formatTime = (seconds) => {
 .progress-times {
   display: flex;
   justify-content: space-between;
-  margin-top: 8px;
+  margin-top: 6px;
   font-size: 11px;
   color: var(--spotify-text-muted);
 }
@@ -533,13 +537,14 @@ const formatTime = (seconds) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 20px;
-  margin-bottom: 24px;
+  gap: 16px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
 }
 
 .control-btn {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border: none;
   background: none;
   cursor: pointer;
@@ -555,8 +560,8 @@ const formatTime = (seconds) => {
 }
 
 .control-btn.secondary {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   color: var(--spotify-text-muted);
 }
 
@@ -565,8 +570,8 @@ const formatTime = (seconds) => {
 }
 
 .play-btn {
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   background: var(--spotify-text);
   color: var(--spotify-black);
@@ -589,9 +594,9 @@ const formatTime = (seconds) => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0 32px;
-  margin-top: 24px;
-  margin-bottom: 32px;
+  padding: 0 24px;
+  margin-top: auto;
+  flex-shrink: 0;
 }
 
 .volume-btn {
