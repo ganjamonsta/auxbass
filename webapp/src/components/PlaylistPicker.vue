@@ -101,6 +101,7 @@ const handleSelect = async (playlist) => {
   max-width: 400px;
   max-height: 70vh;
   overflow: hidden;
+  clip-path: inset(0);
 }
 
 .modal-header {
@@ -131,10 +132,11 @@ const handleSelect = async (playlist) => {
 
 .playlist-list {
   max-height: calc(70vh - 70px);
-  overflow-y: auto;
-  overflow-y: overlay;
+  overflow-y: scroll;
   overflow-x: hidden;
   padding: 8px;
+  margin-right: -6px;
+  padding-right: 14px;
 }
 
 .playlist-list::-webkit-scrollbar {

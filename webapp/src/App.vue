@@ -1089,9 +1089,11 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  overflow: hidden;  /* Contain scrollbar within app bounds */
+  overflow: hidden;  /* Contain scrollbar within app bounds - hides negative margin scrollbar */
   background-color: var(--spotify-black);
   color: var(--spotify-text);
+  /* Clip content so scrollbar with negative margin stays inside */
+  clip-path: inset(0);
 }
 
 /* One UI Large Header */
@@ -1269,17 +1271,17 @@ onMounted(async () => {
 .content {
   flex: 1;
   min-height: 0;  /* Allow flex shrinking for proper overflow */
-  overflow-y: auto;
-  overflow-y: overlay;
+  overflow-y: scroll;
   overflow-x: hidden;  /* Prevent horizontal scrollbar */
   position: relative;
+  margin-right: -6px;
+  padding-right: 6px;
 }
 
 /* Content scrollbar - overlay style */
 .content::-webkit-scrollbar {
   width: 6px;
   background: transparent;
-  position: absolute;
 }
 
 .content::-webkit-scrollbar-track {

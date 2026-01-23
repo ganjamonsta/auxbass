@@ -148,24 +148,32 @@ body.spotify-theme {
   background: rgba(255, 255, 255, 0.5);
 }
 
-/* Make scrollbars overlay instead of taking space */
+/* Firefox thin scrollbar */
 * {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
 }
 
-/* Overlay scrollbar for all scrollable elements */
-.overlay-scroll {
-  overflow-y: auto;
-  overflow-y: overlay;
+/* Overlay scrollbar utility class - adds negative margin to overlap content */
+.overlay-scrollbar {
+  overflow-y: scroll;
   overflow-x: hidden;
+  margin-right: -6px;
+  padding-right: 6px;
 }
 
-/* Webkit overlay scrollbar behavior */
-@supports (overflow-y: overlay) {
-  * {
-    scrollbar-gutter: auto;
-  }
+.overlay-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  background: transparent;
+}
+
+.overlay-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overlay-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
 }
 
 /* Disable text selection on UI elements */

@@ -476,6 +476,7 @@ const formatTime = (seconds) => {
   transition: transform 0.1s ease-out, opacity 0.1s ease-out;
   touch-action: pan-y;
   overflow: hidden;
+  clip-path: inset(0);
 }
 
 /* Swipe indicator */
@@ -815,11 +816,12 @@ const formatTime = (seconds) => {
   padding: 16px;
   padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
   max-height: 50%;
-  overflow-y: auto;
-  overflow-y: overlay;
+  overflow-y: scroll;
   overflow-x: hidden;
   z-index: 200;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+  margin-right: -6px;
+  padding-right: 22px;
 }
 
 .mini-queue::-webkit-scrollbar {
