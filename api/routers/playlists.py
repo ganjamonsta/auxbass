@@ -25,6 +25,27 @@ from .tracks import TrackResponse, track_to_response
 router = APIRouter()
 
 
+async def get_playlist_track_covers(db: AsyncSession, playlist_id: int, limit: int = 4) -> List[str]:
+    """Get up to 'limit' unique track cover URLs for a playlist"""
+    result = await db.execute(
+        select(Track.cover_url)
+        .join(PlaylistTrack, PlaylistTrack.track_id == Track.id)
+        .where(PlaylistTrack.playlist_id == playlist_id, Track.cover_url.isnot(None))
+        .order_by(PlaylistTrack.position)
+    )
+    covers = result.scalars().all()
+    # Get unique covers while preserving order
+    seen = set()
+    unique_covers = []
+    for cover in covers:
+        if cover and cover not in seen:
+            seen.add(cover)
+            unique_covers.append(cover)
+            if len(unique_covers) >= limit:
+                break
+    return unique_covers
+
+
 # Pydantic models
 class PlaylistBase(BaseModel):
     name: str
@@ -49,6 +70,7 @@ class PlaylistResponse(PlaylistBase):
     source_type: Optional[str] = None
     album_artist: Optional[str] = None  # Artist for album playlists
     cover_url: Optional[str] = None
+    track_covers: List[str] = []  # Up to 4 unique track cover URLs for collage
     share_code: Optional[str]
     track_count: int = 0
     total_duration: int = 0
@@ -95,6 +117,9 @@ async def get_source_playlists(
         )
         total_duration = duration_result.scalar() or 0
         
+        # Get track covers for collage
+        track_covers = await get_playlist_track_covers(db, playlist.id)
+        
         response.append(PlaylistResponse(
             id=playlist.id,
             name=playlist.name,
@@ -105,6 +130,7 @@ async def get_source_playlists(
             source_id=playlist.source_id,
             source_type=playlist.source_type,
             cover_url=playlist.cover_url,
+            track_covers=track_covers,
             share_code=playlist.share_code,
             track_count=track_count,
             total_duration=total_duration,
@@ -145,6 +171,9 @@ async def get_playlists(
         )
         total_duration = duration_result.scalar() or 0
         
+        # Get track covers for collage
+        track_covers = await get_playlist_track_covers(db, playlist.id)
+        
         response.append(PlaylistResponse(
             id=playlist.id,
             name=playlist.name,
@@ -155,6 +184,7 @@ async def get_playlists(
             source_id=playlist.source_id,
             source_type=playlist.source_type,
             cover_url=playlist.cover_url,
+            track_covers=track_covers,
             share_code=playlist.share_code,
             track_count=track_count,
             total_duration=total_duration,

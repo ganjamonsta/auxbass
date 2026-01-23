@@ -55,7 +55,7 @@ git log --oneline HEAD..origin/main | head -10
 
 # Pull changes
 echo -e "\n${YELLOW}[3/5]${NC} Pulling changes..."
-git pull origin main
+git pull --rebase origin main
 
 # Check if webapp changed
 WEBAPP_CHANGED=$(git diff --name-only $LOCAL $REMOTE | grep -c "^webapp/" || true)

@@ -1,8 +1,17 @@
 <template>
   <div class="playlist-card" @click="$emit('click')">
-    <div class="playlist-cover" :class="{ 'has-image': playlist.cover_url }">
+    <div class="playlist-cover" :class="coverClass">
+      <!-- Single cover image (albums or custom cover) -->
       <img v-if="playlist.cover_url" :src="playlist.cover_url" alt="" class="cover-image" />
+      
+      <!-- Collage from track covers -->
+      <div v-else-if="collageCovers.length > 0" class="cover-collage" :class="'collage-' + collageCovers.length">
+        <img v-for="(cover, i) in collageCovers" :key="i" :src="cover" alt="" class="collage-img" />
+      </div>
+      
+      <!-- Fallback icon -->
       <span v-else class="cover-icon">{{ coverIcon }}</span>
+      
       <!-- Artist overlay on cover for albums -->
       <div v-if="playlist.album_artist" class="artist-overlay">
         <span class="artist-text">{{ playlist.album_artist }}</span>
@@ -25,6 +34,16 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['click'])
+
+// Get up to 4 unique covers for collage
+const collageCovers = computed(() => {
+  if (!props.playlist.track_covers) return []
+  return props.playlist.track_covers.slice(0, 4)
+})
+
+const coverClass = computed(() => ({
+  'has-image': props.playlist.cover_url || collageCovers.value.length > 0
+}))
 
 const coverIcon = computed(() => {
   if (props.playlist.is_auto_source) {
@@ -85,6 +104,42 @@ const sourceLabel = computed(() => {
 
 .cover-icon {
   font-size: 28px;
+}
+
+/* Cover collage grid */
+.cover-collage {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  gap: 1px;
+}
+
+.cover-collage.collage-1 {
+  grid-template-columns: 1fr;
+}
+
+.cover-collage.collage-2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.cover-collage.collage-3 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+.cover-collage.collage-3 .collage-img:first-child {
+  grid-row: span 2;
+}
+
+.cover-collage.collage-4 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+.collage-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 /* Artist overlay on album cover */
