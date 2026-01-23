@@ -272,25 +272,35 @@ onMounted(async () => {
 
 .horizontal-scroll {
   display: flex;
+  gap: 12px;
   overflow-x: auto;
-  scroll-snap-type: x mandatory;
+  scroll-snap-type: x proximity;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+  padding: 12px 0;
+  padding-left: 16px;
+  padding-right: 16px;
 }
 
 .horizontal-scroll::-webkit-scrollbar {
   display: none;
 }
 
+.horizontal-scroll::after {
+  content: '';
+  flex-shrink: 0;
+  width: 4px;
+}
+
 .scroll-spacer {
-  min-width: 16px;
+  display: none;
 }
 
 .feed-card {
+  flex-shrink: 0;
   min-width: 140px;
   max-width: 140px;
-  margin-right: 12px;
-  scroll-snap-align: start;
+  scroll-snap-align: none;
   cursor: pointer;
   position: relative;
 }
