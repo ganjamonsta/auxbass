@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from shared.database import get_session, engine
 from shared.models import Playlist
-from sqlalchemy import select, text
+from sqlalchemy import select, text, inspect
 
 
 async def migrate():
@@ -20,14 +20,15 @@ async def migrate():
     
     # First, add the column if it doesn't exist
     async with engine.begin() as conn:
-        # Check if column exists
-        result = await conn.execute(text("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'playlists' AND column_name = 'album_artist'
-        """))
+        # Check if column exists using SQLite-compatible PRAGMA
+        def check_column(connection):
+            inspector = inspect(connection)
+            columns = [col['name'] for col in inspector.get_columns('playlists')]
+            return 'album_artist' in columns
         
-        if not result.fetchone():
+        column_exists = await conn.run_sync(check_column)
+        
+        if not column_exists:
             print("Adding album_artist column to playlists table...")
             await conn.execute(text("""
                 ALTER TABLE playlists 
