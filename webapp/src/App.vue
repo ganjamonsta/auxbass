@@ -115,43 +115,6 @@
             </div>
           </div>
 
-          <!-- Liked Tracks Section -->
-          <div v-if="library.likedTracks.length > 0" class="feed-section">
-            <h2 class="feed-section-title">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="#1db954" style="margin-right: 8px; vertical-align: -3px;">
-                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-              </svg>
-              Любимые
-            </h2>
-            <div class="horizontal-scroll">
-              <div class="scroll-spacer"></div>
-              <div 
-                v-for="track in library.likedTracks.slice(0, 10)" 
-                :key="track.id"
-                class="feed-card"
-                @click="playTrack(track)"
-              >
-                <div class="feed-card-cover" :style="getTrackCoverStyle(track)">
-                  <img v-if="track.cover_url" :src="track.cover_url" alt="" />
-                  <div v-else class="feed-card-placeholder">{{ getTrackInitials(track) }}</div>
-                  <button class="play-overlay" @click.stop="playTrack(track)">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M8 5v14l11-7z"/>
-                    </svg>
-                  </button>
-                  <div class="liked-badge">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                    </svg>
-                  </div>
-                </div>
-                <div class="feed-card-title">{{ track.title || 'Без названия' }}</div>
-                <div class="feed-card-subtitle">{{ track.artist || 'Неизвестный' }}</div>
-              </div>
-              <div class="scroll-spacer"></div>
-            </div>
-          </div>
-
           <!-- Recently Played Section -->
           <div v-if="library.history.length > 0" class="feed-section">
             <h2 class="feed-section-title">Недавно играло</h2>
@@ -495,15 +458,6 @@
           <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
         </svg>
         <span>Треки</span>
-      </button>
-      <button 
-        :class="['tab-item liked-tab', { active: activeTab === 'liked' }]"
-        @click="activeTab = 'liked'"
-      >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-        </svg>
-        <span>Любимое</span>
       </button>
       <button 
         :class="['tab-item', { active: activeTab === 'playlists' }]"
@@ -1315,7 +1269,7 @@ onMounted(async () => {
 
 .scroll-spacer {
   flex-shrink: 0;
-  width: 4px;
+  width: 16px;
 }
 
 /* Feed Cards */
