@@ -1586,6 +1586,8 @@ onMounted(async () => {
   justify-content: center;
   margin: 0 auto 10px; /* More margin for shadows */
   padding: 4px; /* Inner border effect */
+  border: 2px solid transparent; /* Ensure consistent box model */
+  box-sizing: border-box;
 }
 
 /* Rounded image inside neomorphic frame */

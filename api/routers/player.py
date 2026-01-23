@@ -278,11 +278,10 @@ async def stream_audio(
         """Stream audio using pooled connection for faster start"""
         session = await get_http_session()
         async with session.get(telegram_url, headers=telegram_headers) as resp:
-            # First chunk larger (32KB) for faster audio start, then 8KB for smooth streaming
-            first_chunk = True
-            async for chunk in resp.content.iter_chunked(32 * 1024 if first_chunk else 8 * 1024):
+            # Optimised chunk sizes for better throughput
+            # 64KB chunks provide better performance than small 8KB chunks
+            async for chunk in resp.content.iter_chunked(64 * 1024):
                 yield chunk
-                first_chunk = False
     
     # Build response headers
     response_headers = {

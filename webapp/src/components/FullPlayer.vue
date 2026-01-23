@@ -2,12 +2,8 @@
   <div 
     class="full-player"
     ref="playerRef"
-    @touchstart="onTouchStart"
-    @touchmove="onTouchMove"
-    @touchend="onTouchEnd"
-    :style="swipeStyle"
   >
-    <!-- Swipe indicator - tap to minimize -->
+    <!-- Tap indicator to minimize -->
     <div class="swipe-indicator" @click="$emit('close')"></div>
 
     <!-- Header -->
@@ -25,8 +21,14 @@
       </button>
     </div>
 
-    <!-- Cover art with generated gradient -->
-    <div class="player-cover" :class="{ swiping: isSwiping }">
+    <!-- Cover art with generated gradient - swipe area for track navigation -->
+    <div 
+      class="player-cover" 
+      :class="{ swiping: isSwiping }"
+      @touchstart="onTouchStart"
+      @touchmove="onTouchMove"
+      @touchend="onTouchEnd"
+    >
       <div class="cover-image" :style="coverStyle">
         <span v-if="!track?.cover_url" class="cover-text">{{ coverInitials }}</span>
         <img v-else :src="track.cover_url" alt="Cover" class="cover-img" />
@@ -259,14 +261,10 @@ const onTouchMove = (e) => {
   const deltaX = touchCurrent.value.x - touchStart.value.x
   const deltaY = touchCurrent.value.y - touchStart.value.y
   
-  // Determine swipe direction
-  if (Math.abs(deltaX) > 20 || Math.abs(deltaY) > 20) {
+  // Only handle horizontal swipes for track navigation
+  if (Math.abs(deltaX) > 20 && Math.abs(deltaX) > Math.abs(deltaY)) {
     isSwiping.value = true
-    if (Math.abs(deltaX) > Math.abs(deltaY)) {
-      swipeDirection.value = deltaX > 0 ? 'right' : 'left'
-    } else {
-      swipeDirection.value = deltaY > 0 ? 'down' : 'up'
-    }
+    swipeDirection.value = deltaX > 0 ? 'right' : 'left'
   }
 }
 
@@ -274,13 +272,9 @@ const onTouchEnd = () => {
   const deltaX = touchCurrent.value.x - touchStart.value.x
   const deltaY = touchCurrent.value.y - touchStart.value.y
   
-  // Swipe down to close
-  if (deltaY > SWIPE_THRESHOLD && Math.abs(deltaY) > Math.abs(deltaX)) {
-    telegram?.HapticFeedback?.impactOccurred?.('light')
-    emit('close')
-  }
+  // Only handle horizontal swipes (left/right for track navigation)
   // Swipe left for next
-  else if (deltaX < -SWIPE_THRESHOLD && Math.abs(deltaX) > Math.abs(deltaY)) {
+  if (deltaX < -SWIPE_THRESHOLD && Math.abs(deltaX) > Math.abs(deltaY)) {
     telegram?.HapticFeedback?.impactOccurred?.('medium')
     emit('next')
   }
@@ -296,22 +290,8 @@ const onTouchEnd = () => {
   touchCurrent.value = { x: 0, y: 0 }
 }
 
-const swipeStyle = computed(() => {
-  if (!isSwiping.value) return {}
-  
-  const deltaX = touchCurrent.value.x - touchStart.value.x
-  const deltaY = touchCurrent.value.y - touchStart.value.y
-  
-  // Only apply transform for down swipe
-  if (swipeDirection.value === 'down' && deltaY > 0) {
-    return {
-      transform: `translateY(${Math.min(deltaY * 0.5, 100)}px)`,
-      opacity: 1 - (deltaY / 400)
-    }
-  }
-  
-  return {}
-})
+// Swipe style removed - no longer using swipe-down gesture
+// to avoid conflict with Telegram's native close gesture
 
 // Generate cover from title
 const coverGradient = computed(() => {

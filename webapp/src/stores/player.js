@@ -154,7 +154,9 @@ export const usePlayerStore = defineStore('player', () => {
     
     audio.value = new Audio()
     audio.value.volume = volume.value
-    audio.value.preload = 'auto'  // Aggressive preloading for faster start
+    // Changed to 'metadata' to prevent aggressive buffering blocking startup
+    // user reported "2 minutes loaded" issues causing slow start
+    audio.value.preload = 'metadata' 
     
     // Setup Media Session handlers once
     setupMediaSession()
@@ -228,7 +230,12 @@ export const usePlayerStore = defineStore('player', () => {
     // Preload next track when current is 30% done
     let preloadTriggered = false
     audio.value.addEventListener('timeupdate', () => {
-      if (duration.value > 0 && progress.value / duration.value > 0.3 && !preloadTriggered) {
+      // Check if we have enough buffer to spare bandwidth for preloading
+      // (at least 15s buffered ahead, or fully buffered)
+      const currentBuffer = buffered.value - progress.value
+      const isBufferHealthy = currentBuffer > 15 || buffered.value >= (duration.value - 1)
+
+      if (duration.value > 0 && progress.value / duration.value > 0.3 && !preloadTriggered && isBufferHealthy) {
         preloadTriggered = true
         preloadNextTrack()
       }
@@ -281,19 +288,25 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
   
+  // Set to track which tracks are currently being preloaded
+  // Map<trackId, AbortController>
+  const _preloadingTracks = new Map()
+
   // Preload a single track into cache
   const preloadSingleTrack = async (track) => {
     // Skip if already cached or currently loading
     if (getCachedAudio(track.id) || _preloadingTracks.has(track.id)) return
     
-    _preloadingTracks.add(track.id)
+    const controller = new AbortController()
+    _preloadingTracks.set(track.id, controller)
+    
     console.log(`[Preload] Starting: ${track.title}`)
     
     try {
       const response = await playerApi.getStreamUrl(track.id)
       const streamUrl = response.data.url
       
-      const audioResponse = await fetch(streamUrl)
+      const audioResponse = await fetch(streamUrl, { signal: controller.signal })
       if (!audioResponse.ok) {
         console.warn(`[Preload] Failed to fetch: ${track.title}`, audioResponse.status)
         return
@@ -320,14 +333,17 @@ export const usePlayerStore = defineStore('player', () => {
       
       console.log(`Preloaded: ${track.title}`)
     } catch (e) {
-      console.error('Failed to preload track:', track.title, e)
+      if (e.name === 'AbortError') {
+        console.log(`[Preload] Aborted: ${track.title}`)
+      } else {
+        console.error('Failed to preload track:', track.title, e)
+      }
     } finally {
-      _preloadingTracks.delete(track.id)
+      if (_preloadingTracks.get(track.id) === controller) {
+        _preloadingTracks.delete(track.id)
+      }
     }
   }
-  
-  // Set to track which tracks are currently being preloaded
-  const _preloadingTracks = new Set()
 
   // Play track
   const play = async (track, newQueue = null) => {
