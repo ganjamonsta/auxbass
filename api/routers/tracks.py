@@ -2,6 +2,7 @@
 TG Player API - Tracks Router
 """
 import re
+import aiohttp
 from typing import Optional, List
 from datetime import datetime
 
@@ -16,11 +17,16 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.database import get_db
 from shared.models import Track
+from shared.config import get_settings
 
 from .auth import get_current_user, TelegramUser
 
 
 router = APIRouter()
+settings = get_settings()
+
+# Cache for artist images
+_artist_image_cache: dict[str, str] = {}
 
 
 def sanitize_input(value: str) -> str:
@@ -145,8 +151,7 @@ async def get_artists(
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get list of unique artists (split by comma/feat/&)"""
-    import re
+    """Get list of unique artists (split by comma/feat/&) with images from Last.fm"""
     
     result = await db.execute(
         select(Track.artist)
@@ -167,7 +172,67 @@ async def get_artists(
     # Sort by count descending
     sorted_artists = sorted(artist_counts.items(), key=lambda x: (-x[1], x[0]))
     
-    return [{"artist": name, "count": count} for name, count in sorted_artists]
+    return [{"artist": name, "count": count, "image_url": None} for name, count in sorted_artists]
+
+
+async def fetch_artist_image(artist_name: str) -> Optional[str]:
+    """Fetch artist image from Last.fm API"""
+    if not settings.lastfm_api_key:
+        return None
+    
+    # Check cache
+    cache_key = artist_name.lower()
+    if cache_key in _artist_image_cache:
+        return _artist_image_cache[cache_key]
+    
+    try:
+        url = "https://ws.audioscrobbler.com/2.0/"
+        params = {
+            "method": "artist.search",
+            "artist": artist_name,
+            "api_key": settings.lastfm_api_key,
+            "format": "json",
+            "limit": 1
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params=params, timeout=5) as resp:
+                if resp.status != 200:
+                    return None
+                
+                data = await resp.json()
+                artists = data.get("results", {}).get("artistmatches", {}).get("artist", [])
+                
+                if artists and len(artists) > 0:
+                    images = artists[0].get("image", [])
+                    # Get large or extralarge image
+                    for img in reversed(images):
+                        if img.get("#text") and img.get("size") in ["large", "extralarge", "mega"]:
+                            image_url = img["#text"]
+                            _artist_image_cache[cache_key] = image_url
+                            return image_url
+                    # Fallback to any available image
+                    for img in reversed(images):
+                        if img.get("#text"):
+                            image_url = img["#text"]
+                            _artist_image_cache[cache_key] = image_url
+                            return image_url
+                
+                _artist_image_cache[cache_key] = ""
+                return None
+                
+    except Exception:
+        return None
+
+
+@router.get("/artist-image/{artist_name:path}")
+async def get_artist_image(
+    artist_name: str,
+    user: TelegramUser = Depends(get_current_user),
+):
+    """Get artist image URL from Last.fm"""
+    image_url = await fetch_artist_image(artist_name)
+    return {"artist": artist_name, "image_url": image_url}
 
 
 @router.get("/genres")

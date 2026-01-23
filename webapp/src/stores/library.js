@@ -7,6 +7,7 @@ export const useLibraryStore = defineStore('library', () => {
   const tracks = ref([])
   const playlists = ref([])
   const artists = ref([])
+  const artistImages = ref({})  // Cache for artist images
   const genres = ref([])
   const history = ref([])
   const loading = ref(false)
@@ -21,6 +22,7 @@ export const useLibraryStore = defineStore('library', () => {
       fetchTracks(),
       fetchPlaylists(),
       fetchArtists(),
+      fetchHistory(),  // For home feed
     ])
   }
 
@@ -33,6 +35,7 @@ export const useLibraryStore = defineStore('library', () => {
         fetchPlaylists(),
         fetchArtists(),
         fetchGenres(),
+        fetchHistory(),
       ])
     } finally {
       refreshing.value = false
@@ -99,9 +102,34 @@ export const useLibraryStore = defineStore('library', () => {
     try {
       const response = await tracksApi.getArtists()
       artists.value = response.data
+      
+      // Fetch images for top 20 artists in background
+      fetchArtistImages(response.data.slice(0, 20))
     } catch (error) {
       console.error('Failed to fetch artists:', error)
     }
+  }
+
+  // Fetch artist images from Last.fm
+  const fetchArtistImages = async (artistList) => {
+    for (const artist of artistList) {
+      const name = artist.artist
+      if (artistImages.value[name]) continue
+      
+      try {
+        const response = await tracksApi.getArtistImage(name)
+        if (response.data.image_url) {
+          artistImages.value[name] = response.data.image_url
+        }
+      } catch (error) {
+        // Ignore errors, just skip this artist
+      }
+    }
+  }
+
+  // Get artist image (from cache or placeholder)
+  const getArtistImage = (artistName) => {
+    return artistImages.value[artistName] || null
   }
 
   // Fetch genres
@@ -200,6 +228,7 @@ export const useLibraryStore = defineStore('library', () => {
     tracks,
     playlists,
     artists,
+    artistImages,
     genres,
     history,
     loading,
@@ -215,6 +244,7 @@ export const useLibraryStore = defineStore('library', () => {
     fetchArtists,
     fetchGenres,
     fetchHistory,
+    getArtistImage,
     createPlaylist,
     deletePlaylist,
     addTrackToPlaylist,

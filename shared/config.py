@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     # Security
     secret_key: str = "dev-secret-key"
     
+    # Last.fm API (for artist images)
+    lastfm_api_key: str = ""
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

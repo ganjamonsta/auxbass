@@ -41,6 +41,7 @@ export const tracksApi = {
   update: (id, data) => api.put(`/tracks/${id}`, data),
   delete: (id) => api.delete(`/tracks/${id}`),
   getArtists: () => api.get('/tracks/artists'),
+  getArtistImage: (artistName) => api.get(`/tracks/artist-image/${encodeURIComponent(artistName)}`),
   getGenres: () => api.get('/tracks/genres'),
   getEnrichmentStatus: () => api.get('/tracks/enrichment/status'),
   getHistory: (limit = 50) => api.get('/tracks/history', { params: { limit } }),

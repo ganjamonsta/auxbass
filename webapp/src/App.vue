@@ -71,6 +71,136 @@
             </svg>
           </button>
         </div>
+
+        <!-- Home Feed (Spotify-style) -->
+        <div v-if="activeTab === 'home'" class="home-feed">
+          <!-- Quick Access Grid -->
+          <div class="quick-grid">
+            <div 
+              class="quick-item" 
+              v-if="library.history.length > 0"
+              @click="activeTab = 'history'"
+            >
+              <div class="quick-icon history-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M13 3a9 9 0 00-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0013 21a9 9 0 000-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
+                </svg>
+              </div>
+              <span class="quick-title">Недавнее</span>
+            </div>
+            <div 
+              class="quick-item" 
+              v-for="pl in library.playlists.slice(0, 5)" 
+              :key="pl.id"
+              @click="openPlaylist(pl)"
+            >
+              <div class="quick-icon playlist-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M4 10h12v2H4zm0-4h12v2H4zm0 8h8v2H4zm10 0v6l5-3z"/>
+                </svg>
+              </div>
+              <span class="quick-title">{{ pl.name }}</span>
+            </div>
+          </div>
+
+          <!-- Recently Played Section -->
+          <div v-if="library.history.length > 0" class="feed-section">
+            <h2 class="feed-section-title">Недавно играло</h2>
+            <div class="horizontal-scroll">
+              <div 
+                v-for="track in library.history.slice(0, 10)" 
+                :key="track.id"
+                class="feed-card"
+                @click="playTrack(track)"
+              >
+                <div class="feed-card-cover" :style="getTrackCoverStyle(track)">
+                  <img v-if="track.cover_url" :src="track.cover_url" alt="" />
+                  <div v-else class="feed-card-placeholder">{{ getTrackInitials(track) }}</div>
+                  <button class="play-overlay" @click.stop="playTrack(track)">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M8 5v14l11-7z"/>
+                    </svg>
+                  </button>
+                </div>
+                <div class="feed-card-title">{{ track.title || 'Без названия' }}</div>
+                <div class="feed-card-subtitle">{{ track.artist || 'Неизвестный' }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Top Artists Section -->
+          <div v-if="library.artists.length > 0" class="feed-section">
+            <h2 class="feed-section-title">Твои артисты</h2>
+            <div class="horizontal-scroll">
+              <div 
+                v-for="artist in library.artists.slice(0, 10)" 
+                :key="artist.artist"
+                class="feed-card artist-card"
+                @click="filterByArtist(artist.artist)"
+              >
+                <div class="feed-card-cover artist-cover" :style="getArtistAvatarStyle(artist.artist)">
+                  <img 
+                    v-if="library.artistImages[artist.artist]" 
+                    :src="library.artistImages[artist.artist]" 
+                    alt=""
+                  />
+                  <span v-else class="artist-initials">{{ getArtistInitials(artist.artist) }}</span>
+                </div>
+                <div class="feed-card-title">{{ artist.artist }}</div>
+                <div class="feed-card-subtitle">{{ artist.count }} треков</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Playlists Section -->
+          <div v-if="library.playlists.length > 0" class="feed-section">
+            <h2 class="feed-section-title">Плейлисты</h2>
+            <div class="horizontal-scroll">
+              <div 
+                v-for="pl in library.playlists" 
+                :key="pl.id"
+                class="feed-card"
+                @click="openPlaylist(pl)"
+              >
+                <div class="feed-card-cover playlist-cover">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M4 10h12v2H4zm0-4h12v2H4zm0 8h8v2H4zm10 0v6l5-3z"/>
+                  </svg>
+                </div>
+                <div class="feed-card-title">{{ pl.name }}</div>
+                <div class="feed-card-subtitle">{{ pl.track_count || 0 }} треков</div>
+              </div>
+              <!-- Add playlist button -->
+              <div class="feed-card add-card" @click="createPlaylist">
+                <div class="feed-card-cover add-cover">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                  </svg>
+                </div>
+                <div class="feed-card-title">Создать</div>
+                <div class="feed-card-subtitle">плейлист</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- All Tracks Section -->
+          <div class="feed-section">
+            <h2 class="feed-section-title">Вся музыка</h2>
+            <div class="feed-tracks-preview">
+              <TrackItem 
+                v-for="track in library.tracks.slice(0, 5)" 
+                :key="track.id"
+                :track="track"
+                :isPlaying="player.currentTrack?.id === track.id && player.isPlaying"
+                @click="playTrack(track)"
+                @menu="showTrackMenu(track)"
+              />
+              <button v-if="library.tracks.length > 5" class="see-all-btn" @click="activeTab = 'tracks'">
+                Смотреть все ({{ library.total }})
+              </button>
+            </div>
+          </div>
+        </div>
         
         <!-- Track list -->
         <div v-if="activeTab === 'tracks'" class="track-list">
@@ -126,10 +256,15 @@
             class="list-item"
             @click="filterByArtist(artist.artist)"
           >
-            <div class="list-item-avatar">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-              </svg>
+            <div class="list-item-avatar artist-avatar" :style="getArtistAvatarStyle(artist.artist)">
+              <img 
+                v-if="library.artistImages[artist.artist]" 
+                :src="library.artistImages[artist.artist]" 
+                alt=""
+                class="avatar-image"
+                @error="$event.target.style.display = 'none'"
+              />
+              <span v-else class="avatar-initials">{{ getArtistInitials(artist.artist) }}</span>
             </div>
             <div class="list-item-content">
               <span class="list-item-title">{{ artist.artist || 'Неизвестный' }}</span>
@@ -250,6 +385,15 @@
     <!-- Bottom Tab Bar (One UI style) -->
     <nav v-if="currentView === 'library'" class="tab-bar">
       <button 
+        :class="['tab-item', { active: activeTab === 'home' }]"
+        @click="activeTab = 'home'; library.fetchHistory()"
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+        </svg>
+        <span>Главная</span>
+      </button>
+      <button 
         :class="['tab-item', { active: activeTab === 'tracks' }]"
         @click="activeTab = 'tracks'"
       >
@@ -275,15 +419,6 @@
           <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
         </svg>
         <span>Артисты</span>
-      </button>
-      <button 
-        :class="['tab-item', { active: activeTab === 'queue' }]"
-        @click="activeTab = 'queue'"
-      >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M4 10h12v2H4zm0-4h12v2H4zm0 8h8v2H4zm10 0v6l5-3z"/>
-        </svg>
-        <span>Очередь</span>
       </button>
       <button 
         :class="['tab-item', { active: activeTab === 'history' }]"
@@ -417,7 +552,7 @@ const library = useLibraryStore()
 
 // State
 const currentView = ref('library')
-const activeTab = ref('tracks')
+const activeTab = ref('home')
 const showSearch = ref(false)
 const searchQuery = ref('')
 const showFullPlayer = ref(false)
@@ -533,6 +668,60 @@ const filterByGenre = (genre) => {
   activeFilter.value = `Жанр: ${genre}`
   activeTab.value = 'tracks'
   library.fetchTracks({ genre })
+}
+
+// Get initials for artist avatar
+const getArtistInitials = (name) => {
+  if (!name) return '?'
+  const words = name.split(' ').filter(w => w.length > 0)
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase()
+  }
+  return name.substring(0, 2).toUpperCase()
+}
+
+// Generate gradient for artist avatar
+const getArtistAvatarStyle = (name) => {
+  if (library.artistImages[name]) return {}
+  
+  // Generate gradient based on name
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const hue1 = Math.abs(hash % 360)
+  const hue2 = (hue1 + 40) % 360
+  
+  return {
+    background: `linear-gradient(135deg, hsl(${hue1}, 60%, 45%) 0%, hsl(${hue2}, 50%, 35%) 100%)`
+  }
+}
+
+// Get track cover style for feed cards
+const getTrackCoverStyle = (track) => {
+  if (track.cover_url) return {}
+  
+  const str = (track.title || '') + (track.artist || '')
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const hue1 = Math.abs(hash % 360)
+  const hue2 = (hue1 + 45) % 360
+  
+  return {
+    background: `linear-gradient(135deg, hsl(${hue1}, 55%, 40%) 0%, hsl(${hue2}, 45%, 30%) 100%)`
+  }
+}
+
+// Get track initials
+const getTrackInitials = (track) => {
+  const title = track.title || 'M'
+  const words = title.split(' ').filter(w => w.length > 0)
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase()
+  }
+  return title.substring(0, 2).toUpperCase()
 }
 
 const clearFilter = () => {
@@ -819,6 +1008,24 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   color: var(--spotify-text-secondary);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.list-item-avatar.artist-avatar {
+  border-radius: 50%;
+}
+
+.list-item-avatar .avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.list-item-avatar .avatar-initials {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .list-item-avatar.genre {
@@ -850,6 +1057,225 @@ onMounted(async () => {
 
 .list-item-arrow {
   color: var(--spotify-text-muted);
+}
+
+/* ========== Home Feed Styles ========== */
+.home-feed {
+  padding: 0 0 16px 0;
+}
+
+/* Quick Access Grid */
+.quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 16px;
+}
+
+.quick-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--spotify-gray);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.quick-item:active {
+  background: var(--spotify-gray-light);
+}
+
+.quick-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--spotify-green) 0%, #1e8e5e 100%);
+  color: white;
+  flex-shrink: 0;
+}
+
+.quick-icon.history-icon {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+}
+
+.quick-icon.playlist-icon {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+}
+
+.quick-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--spotify-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Feed Sections */
+.feed-section {
+  margin-bottom: 24px;
+}
+
+.feed-section-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--spotify-text);
+  padding: 0 16px;
+  margin-bottom: 12px;
+}
+
+.horizontal-scroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 0 16px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.horizontal-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Feed Cards */
+.feed-card {
+  flex-shrink: 0;
+  width: 140px;
+  scroll-snap-align: start;
+  cursor: pointer;
+}
+
+.feed-card-cover {
+  width: 140px;
+  height: 140px;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  background: var(--spotify-gray);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.feed-card-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.feed-card-cover .feed-card-placeholder {
+  font-size: 32px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.feed-card-cover .play-overlay {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--spotify-green);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: black;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.feed-card:hover .play-overlay,
+.feed-card:active .play-overlay {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.feed-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--spotify-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.feed-card-subtitle {
+  font-size: 12px;
+  color: var(--spotify-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+/* Artist Card */
+.artist-card .feed-card-cover {
+  border-radius: 50%;
+}
+
+.artist-cover {
+  border-radius: 50%;
+}
+
+.artist-cover img {
+  border-radius: 50%;
+}
+
+.artist-initials {
+  font-size: 36px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* Playlist Card */
+.playlist-cover {
+  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Add Card */
+.add-card .add-cover {
+  background: var(--spotify-gray);
+  border: 2px dashed var(--spotify-gray-light);
+  color: var(--spotify-text-muted);
+}
+
+.add-card:active .add-cover {
+  background: var(--spotify-gray-light);
+}
+
+/* Tracks Preview */
+.feed-tracks-preview {
+  padding: 0 16px;
+}
+
+.see-all-btn {
+  width: 100%;
+  padding: 12px;
+  margin-top: 8px;
+  background: transparent;
+  border: 1px solid var(--spotify-gray-light);
+  border-radius: 20px;
+  color: var(--spotify-text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.see-all-btn:active {
+  background: var(--spotify-gray);
 }
 
 /* Playlist section */
