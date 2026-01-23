@@ -227,6 +227,17 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
+  // Fetch tracks by genre (for shuffle play)
+  const fetchTracksByGenre = async (genre) => {
+    try {
+      const response = await tracksApi.getAll({ genre, limit: 100 })
+      return response.data.tracks || response.data
+    } catch (error) {
+      console.error('Failed to fetch tracks by genre:', error)
+      return []
+    }
+  }
+
   // Fetch liked tracks
   const fetchLikedTracks = async () => {
     try {
@@ -306,6 +317,7 @@ export const useLibraryStore = defineStore('library', () => {
     init,
     refresh,
     fetchTracks,
+    fetchTracksByGenre,
     loadMore,
     fetchPlaylists,
     fetchPlaylist,

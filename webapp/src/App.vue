@@ -141,6 +141,34 @@
             </div>
           </div>
 
+          <!-- Genres Section -->
+          <div v-if="library.genres.length > 0" class="feed-section">
+            <h2 class="feed-section-title">Жанры</h2>
+            <div class="horizontal-scroll">
+              <div class="scroll-spacer"></div>
+              <div 
+                v-for="genre in library.genres.slice(0, 10)" 
+                :key="genre.genre"
+                class="feed-card genre-card"
+                @click="playGenreShuffle(genre.genre)"
+              >
+                <div class="feed-card-cover genre-cover" :style="getGenreStyle(genre.genre)">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" class="genre-icon">
+                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                  </svg>
+                  <div class="shuffle-badge">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
+                    </svg>
+                  </div>
+                </div>
+                <div class="feed-card-title">{{ genre.genre }}</div>
+                <div class="feed-card-subtitle">{{ genre.count }} треков</div>
+              </div>
+              <div class="scroll-spacer"></div>
+            </div>
+          </div>
+
           <!-- Playlists Section -->
           <div v-if="library.playlists.length > 0" class="feed-section">
             <h2 class="feed-section-title">Плейлисты</h2>
@@ -738,6 +766,67 @@ const filterByGenre = (genre) => {
   activeFilter.value = `Жанр: ${genre}`
   activeTab.value = 'tracks'
   library.fetchTracks({ genre })
+}
+
+// Play genre with shuffle enabled
+const playGenreShuffle = async (genre) => {
+  // Fetch tracks by genre
+  const tracks = await library.fetchTracksByGenre(genre)
+  if (tracks && tracks.length > 0) {
+    // Shuffle the tracks
+    const shuffled = [...tracks].sort(() => Math.random() - 0.5)
+    player.shuffle = true
+    await player.play(shuffled[0], shuffled)
+  }
+}
+
+// Generate gradient for genre card
+const getGenreStyle = (genre) => {
+  const genreColors = {
+    'Rock': { h1: 0, h2: 30 },
+    'Pop': { h1: 300, h2: 330 },
+    'Hip-Hop': { h1: 40, h2: 60 },
+    'Rap': { h1: 35, h2: 55 },
+    'Electronic': { h1: 180, h2: 220 },
+    'Dance': { h1: 280, h2: 320 },
+    'House': { h1: 200, h2: 240 },
+    'Techno': { h1: 260, h2: 290 },
+    'Dubstep': { h1: 270, h2: 300 },
+    'Drum and Bass': { h1: 15, h2: 45 },
+    'Jazz': { h1: 45, h2: 70 },
+    'Classical': { h1: 220, h2: 250 },
+    'Metal': { h1: 0, h2: 20 },
+    'R&B': { h1: 320, h2: 350 },
+    'Soul': { h1: 30, h2: 50 },
+    'Country': { h1: 35, h2: 55 },
+    'Reggae': { h1: 100, h2: 140 },
+    'Blues': { h1: 210, h2: 240 },
+    'Indie': { h1: 150, h2: 180 },
+    'Alternative': { h1: 160, h2: 190 },
+  }
+  
+  // Find matching genre or generate from name
+  let hue1, hue2
+  const found = Object.entries(genreColors).find(([key]) => 
+    genre.toLowerCase().includes(key.toLowerCase())
+  )
+  
+  if (found) {
+    hue1 = found[1].h1
+    hue2 = found[1].h2
+  } else {
+    // Generate from name hash
+    let hash = 0
+    for (let i = 0; i < genre.length; i++) {
+      hash = genre.charCodeAt(i) + ((hash << 5) - hash)
+    }
+    hue1 = Math.abs(hash % 360)
+    hue2 = (hue1 + 40) % 360
+  }
+  
+  return {
+    background: `linear-gradient(135deg, hsl(${hue1}, 70%, 40%) 0%, hsl(${hue2}, 60%, 30%) 100%)`
+  }
 }
 
 // Get initials for artist avatar
@@ -1394,6 +1483,33 @@ onMounted(async () => {
 .playlist-cover {
   background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
   color: rgba(255, 255, 255, 0.9);
+}
+
+/* Genre Card */
+.genre-card .feed-card-cover {
+  position: relative;
+}
+
+.genre-cover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.genre-icon {
+  opacity: 0.9;
+}
+
+.shuffle-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--spotify-green);
 }
 
 /* Add Card */
