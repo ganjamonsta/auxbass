@@ -26,14 +26,26 @@
       </div>
     </div>
     
-    <!-- Controls -->
-    <button class="ctrl-btn" @click.stop="$emit('toggle')">
-      <svg v-if="loading" class="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-        <path d="M12 2a10 10 0 0 1 10 10"/>
-      </svg>
-      <template v-else>{{ isPlaying ? '❚❚' : '▶' }}</template>
-    </button>
-    <button class="ctrl-btn" @click.stop="$emit('next')">▶▶</button>
+    <!-- Nokia Style Controls -->
+    <div class="nokia-controls">
+      <button class="nokia-btn" @click.stop="$emit('toggle')">
+        <svg v-if="loading" class="spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+          <path d="M12 2a10 10 0 0 1 10 10"/>
+        </svg>
+        <svg v-else-if="isPlaying" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <rect x="6" y="4" width="4" height="16" rx="1"/>
+          <rect x="14" y="4" width="4" height="16" rx="1"/>
+        </svg>
+        <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M8 5v14l11-7z"/>
+        </svg>
+      </button>
+      <button class="nokia-btn" @click.stop="$emit('next')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M6 18l8.5-6L6 6v12zm8-12v12l8-6-8-6z"/>
+        </svg>
+      </button>
+    </div>
   </div>
 </template>
 
@@ -281,31 +293,69 @@ const formatTime = (seconds) => {
   box-shadow: 0 0 4px rgba(0, 204, 255, 0.8);
 }
 
-/* Neumorphic Control Buttons */
-.ctrl-btn {
-  width: 36px;
-  height: 36px;
+/* Nokia XpressMusic Style Controls */
+.nokia-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.nokia-btn {
+  width: 38px;
+  height: 28px;
   border: none;
-  background: var(--neu-bg);
-  border-radius: 50%;
+  border-radius: 6px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--spotify-text-muted);
-  font-size: 10px;
+  color: #fff;
   flex-shrink: 0;
   transition: all 0.15s ease;
+  position: relative;
+  
+  /* Nokia rubber button style */
+  background: linear-gradient(180deg, 
+    #3a3a3a 0%, 
+    #252525 50%, 
+    #1a1a1a 100%);
   box-shadow: 
-    4px 4px 8px var(--neu-shadow-dark),
-    -2px -2px 5px var(--neu-shadow-light);
+    0 2px 4px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  border: 1px solid #0a0a0a;
 }
 
-.ctrl-btn:active {
-  transform: scale(0.95);
+/* Rubber texture bumps */
+.nokia-btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px;
+  height: 14px;
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(255,255,255,0.08) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,0.08) 0%, transparent 40%),
+    radial-gradient(circle at 80% 50%, rgba(255,255,255,0.08) 0%, transparent 40%);
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+.nokia-btn:active {
+  transform: scale(0.96);
+  background: linear-gradient(180deg, 
+    #2a2a2a 0%, 
+    #1a1a1a 50%, 
+    #151515 100%);
   box-shadow: 
-    inset 2px 2px 5px var(--neu-shadow-dark),
-    inset -1px -1px 3px var(--neu-shadow-light);
+    0 1px 2px rgba(0, 0, 0, 0.5),
+    inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.nokia-btn:active svg {
   color: var(--spotify-green);
 }
 
