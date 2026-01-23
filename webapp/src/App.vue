@@ -1,8 +1,5 @@
 <template>
   <div class="app spotify-theme">
-    <!-- Toast notifications -->
-    <Toast ref="toast" />
-    
     <!-- One UI Style Header -->
     <header class="oneui-header" v-if="currentView === 'library'">
       <div class="header-top">
@@ -833,25 +830,10 @@ const handleTouchEnd = async () => {
   pullStartY.value = 0
 }
 
-// Handle track unavailable error
-const handleTrackUnavailable = (track, message) => {
-  toast.value?.error(
-    'Трек недоступен',
-    `${track.title || 'Трек'} был удалён из Telegram`
-  )
-  telegram?.HapticFeedback?.notificationOccurred?.('error')
-  
-  // Refresh library to update track states
-  library.fetchTracks()
-}
-
 // Apply Spotify theme on mount
 onMounted(async () => {
   document.body.classList.add('spotify-theme')
   await library.init()
-  
-  // Set up error callback for player
-  player.setOnTrackUnavailable(handleTrackUnavailable)
 })
 </script>
 
@@ -1199,22 +1181,19 @@ onMounted(async () => {
   display: flex;
   gap: 12px;
   overflow-x: auto;
-  padding: 0 16px;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
 
-.horizontal-scroll::before {
-  content: '';
-  flex-shrink: 0;
-  width: 4px;
+.horizontal-scroll > *:first-child {
+  margin-left: 16px;
 }
 
 .horizontal-scroll::after {
   content: '';
   flex-shrink: 0;
-  width: 4px;
+  width: 16px;
 }
 
 .horizontal-scroll::-webkit-scrollbar {
