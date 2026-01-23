@@ -12,6 +12,7 @@ from collections import defaultdict
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -56,9 +57,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         
         # Check rate limit
         if len(self.requests[client_ip]) >= self.requests_per_minute:
-            raise HTTPException(
+            return JSONResponse(
                 status_code=429,
-                detail="Too many requests. Please slow down."
+                content={"detail": "Too many requests. Please slow down."}
             )
         
         # Record this request
@@ -97,8 +98,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add rate limiting (60 requests per minute per IP)
-app.add_middleware(RateLimitMiddleware, requests_per_minute=60)
+# Add rate limiting (600 requests per minute per IP)
+app.add_middleware(RateLimitMiddleware, requests_per_minute=600)
 
 # Configure CORS for Mini App
 app.add_middleware(

@@ -30,9 +30,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useLibraryStore } from '@/stores/library'
-
-const library = useLibraryStore()
+import { tracksApi } from '@/api/client'
 
 const status = ref({
   pending: 0,
@@ -51,12 +49,8 @@ let intervalId = null
 
 async function fetchStatus() {
   try {
-    const res = await fetch('/api/tracks/enrichment/status', {
-      headers: library.authHeaders
-    })
-    if (res.ok) {
-      status.value = await res.json()
-    }
+    const res = await tracksApi.getEnrichmentStatus()
+    status.value = res.data
   } catch (e) {
     console.error('Failed to fetch enrichment status:', e)
   }
