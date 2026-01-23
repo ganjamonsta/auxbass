@@ -215,7 +215,6 @@ export const usePlayerStore = defineStore('player', () => {
            loading.value = false
         }
       }
-    })      }
     })
 
     audio.value.addEventListener('durationchange', () => {
