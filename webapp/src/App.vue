@@ -1174,8 +1174,13 @@ onMounted(async () => {
   min-height: 0;  /* Allow flex shrinking for proper overflow */
   overflow-y: auto;
   overflow-x: hidden;  /* Prevent horizontal scrollbar */
-  padding-bottom: 160px; /* Space for mini player + tab bar */
+  padding-bottom: 140px; /* Space for mini player + tab bar */
   position: relative;
+}
+
+/* Hide scrollbar in the area under fixed elements */
+.content::-webkit-scrollbar-track {
+  margin-bottom: 140px;
 }
 
 /* Pull to refresh */
@@ -1856,6 +1861,19 @@ onMounted(async () => {
   border-top: 1px solid var(--spotify-gray);
   padding: 8px 0 max(8px, env(safe-area-inset-bottom));
   z-index: 50;
+}
+
+/* Clip scrollbar at tab-bar area - creates visual boundary */
+.app::after {
+  content: '';
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  width: 8px;
+  height: 140px;
+  background: var(--spotify-gray-dark);
+  z-index: 49;
+  pointer-events: none;
 }
 
 .tab-item {

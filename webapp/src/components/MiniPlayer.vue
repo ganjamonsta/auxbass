@@ -128,6 +128,18 @@ const coverInitials = computed(() => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
+/* Cover scrollbar behind mini-player */
+.mini-player::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  bottom: -64px;
+  width: 16px;
+  background: linear-gradient(to right, transparent, var(--spotify-gray-dark) 50%);
+  pointer-events: none;
+}
+
 .mini-progress {
   position: absolute;
   bottom: 0;
