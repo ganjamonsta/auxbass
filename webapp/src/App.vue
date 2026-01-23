@@ -77,6 +77,18 @@
           <!-- Quick Access Grid -->
           <div class="quick-grid">
             <div 
+              class="quick-item liked-quick" 
+              v-if="library.likedTracks.length > 0"
+              @click="activeTab = 'liked'"
+            >
+              <div class="quick-icon liked-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                </svg>
+              </div>
+              <span class="quick-title">Любимое</span>
+            </div>
+            <div 
               class="quick-item" 
               v-if="library.history.length > 0"
               @click="activeTab = 'history'"
@@ -399,6 +411,41 @@
             />
           </div>
         </div>
+
+        <!-- Liked tab -->
+        <div v-if="activeTab === 'liked'" class="liked-section">
+          <div class="liked-header">
+            <div class="liked-cover">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+              </svg>
+            </div>
+            <div class="liked-meta">
+              <h2>Любимое</h2>
+              <p>{{ library.likedTracks.length }} треков</p>
+            </div>
+            <button v-if="library.likedTracks.length > 0" class="play-all-btn" @click="playLikedTracks">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z"/>
+              </svg>
+            </button>
+          </div>
+          <div v-if="library.likedTracks.length === 0" class="empty">
+            <div class="empty-icon">💚</div>
+            <p class="empty-title">Нет любимых треков</p>
+            <p class="empty-hint">Нажмите ❤️ на треке, чтобы добавить</p>
+          </div>
+          <div v-else class="liked-list">
+            <TrackItem 
+              v-for="track in library.likedTracks" 
+              :key="`liked-${track.id}`"
+              :track="track"
+              :isPlaying="player.currentTrack?.id === track.id && player.isPlaying"
+              @click="playTrack(track)"
+              @menu="showTrackMenu(track)"
+            />
+          </div>
+        </div>
       </div>
 
       <!-- Playlist view -->
@@ -450,6 +497,15 @@
         <span>Треки</span>
       </button>
       <button 
+        :class="['tab-item liked-tab', { active: activeTab === 'liked' }]"
+        @click="activeTab = 'liked'"
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+        </svg>
+        <span>Любимое</span>
+      </button>
+      <button 
         :class="['tab-item', { active: activeTab === 'playlists' }]"
         @click="activeTab = 'playlists'"
       >
@@ -466,15 +522,6 @@
           <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
         </svg>
         <span>Артисты</span>
-      </button>
-      <button 
-        :class="['tab-item', { active: activeTab === 'history' }]"
-        @click="activeTab = 'history'; library.fetchHistory()"
-      >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
-        </svg>
-        <span>История</span>
       </button>
     </nav>
 
@@ -665,6 +712,12 @@ const toggleLike = async (trackId) => {
 const playPlaylist = async () => {
   if (currentPlaylist.value?.tracks?.length) {
     await player.play(currentPlaylist.value.tracks[0], currentPlaylist.value.tracks)
+  }
+}
+
+const playLikedTracks = async () => {
+  if (library.likedTracks.length) {
+    await player.play(library.likedTracks[0], library.likedTracks)
   }
 }
 
@@ -980,6 +1033,68 @@ onMounted(async () => {
 
 .history-list {
   padding: 0 8px;
+}
+
+/* Liked section */
+.liked-section {
+  padding: 8px 0;
+}
+
+.liked-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  margin-bottom: 8px;
+}
+
+.liked-cover {
+  width: 80px;
+  height: 80px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #1db954 0%, #1ed760 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+}
+
+.liked-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.liked-meta h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--spotify-text);
+  margin: 0 0 4px;
+}
+
+.liked-meta p {
+  font-size: 14px;
+  color: var(--spotify-text-muted);
+  margin: 0;
+}
+
+.liked-list {
+  padding: 0 8px;
+}
+
+/* Liked quick item and tab */
+.liked-quick .quick-icon,
+.liked-icon {
+  background: linear-gradient(135deg, #1db954 0%, #1ed760 100%) !important;
+  color: white;
+}
+
+.liked-tab.active {
+  color: #1db954 !important;
+}
+
+.liked-tab svg {
+  fill: currentColor;
 }
 
 /* Active filter indicator */
