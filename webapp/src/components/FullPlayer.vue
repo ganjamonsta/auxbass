@@ -61,13 +61,16 @@
 
     <!-- Progress bar -->
     <div class="progress-container">
-      <input 
-        type="range"
-        class="progress-slider"
-        :value="progress"
-        :max="duration || 100"
-        @input="$emit('seek', Number($event.target.value))"
-      />
+      <div class="slider-wrapper">
+        <div class="buffered-bar" :style="{ width: (buffered / (duration || 1)) * 100 + '%' }"></div>
+        <input 
+          type="range"
+          class="progress-slider"
+          :value="progress"
+          :max="duration || 100"
+          @input="$emit('seek', Number($event.target.value))"
+        />
+      </div>
       <div class="progress-times">
         <span>{{ formatTime(progress) }}</span>
         <span>{{ formatTime(duration) }}</span>
@@ -193,6 +196,10 @@ const props = defineProps({
   },
   progress: Number,
   duration: Number,
+  buffered: {
+    type: Number,
+    default: 0
+  },
   volume: {
     type: Number,
     default: 1
@@ -522,15 +529,40 @@ const formatTime = (seconds) => {
   flex-shrink: 0;
 }
 
+.slider-wrapper {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--spotify-gray);
+}
+
+.buffered-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  z-index: 1;
+  pointer-events: none;
+  transition: width 0.2s linear;
+}
+
 .progress-slider {
+  position: absolute;
+  left: 0;
+  top: 0;
   width: 100%;
   height: 4px;
   -webkit-appearance: none;
   appearance: none;
-  background: var(--spotify-gray);
+  background: transparent;
   border-radius: 2px;
   outline: none;
   cursor: pointer;
+  z-index: 2;
+  margin: 0;
 }
 
 .progress-slider::-webkit-slider-thumb {
@@ -541,6 +573,7 @@ const formatTime = (seconds) => {
   background: var(--spotify-text);
   cursor: pointer;
   transition: transform 0.1s;
+  box-shadow: 0 0 4px rgba(0,0,0,0.5); /* Make it pop */
 }
 
 .progress-slider:active::-webkit-slider-thumb {

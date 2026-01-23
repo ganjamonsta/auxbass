@@ -61,6 +61,7 @@ export const usePlayerStore = defineStore('player', () => {
   const shuffle = ref(savedSettings.shuffle ?? false)
   const repeat = ref(savedSettings.repeat ?? 'none') // none, one, all
   const loading = ref(false)
+  const buffered = ref(0) // buffered endpoint in seconds
   const nextTrackPreloaded = ref(null)
   const lastError = ref(null)  // For error notifications
   
@@ -170,12 +171,36 @@ export const usePlayerStore = defineStore('player', () => {
     
     audio.value.addEventListener('timeupdate', () => {
       progress.value = audio.value.currentTime
+      
+      // Update buffered state
+      if (audio.value.buffered.length > 0) {
+        // Find the buffered range that covers the current time
+        for (let i = 0; i < audio.value.buffered.length; i++) {
+          if (audio.value.buffered.start(i) <= audio.value.currentTime && 
+              audio.value.buffered.end(i) >= audio.value.currentTime) {
+            buffered.value = audio.value.buffered.end(i)
+            break
+          }
+        }
+      }
+
       // Update position state every 5 seconds for media session
       if (Math.floor(progress.value) % 5 === 0) {
         updatePositionState()
       }
     })
     
+    
+    // progress event - download progress
+    audio.value.addEventListener('progress', () => {
+       if (audio.value.buffered.length > 0) {
+        // Just take the end of the last buffered range or the one covering current time
+        // Often a simple approximation of the last range is enough for simple UI
+        const lastIndex = audio.value.buffered.length - 1
+        buffered.value = audio.value.buffered.end(lastIndex)
+      }
+    })
+
     audio.value.addEventListener('durationchange', () => {
       duration.value = audio.value.duration
       updatePositionState()
@@ -352,6 +377,7 @@ export const usePlayerStore = defineStore('player', () => {
       // Stream directly - fastest start time
       // Caching is done via preloadNextTrack() which loads NEXT tracks in background
       audio.value.src = url
+      buffered.value = 0
       await audio.value.play()
       
       // Start preloading next tracks immediately after play starts
@@ -442,6 +468,7 @@ export const usePlayerStore = defineStore('player', () => {
         audio.value.pause()
         audio.value.currentTime = 0
         audio.value.src = cachedUrl || preloadedUrl
+        buffered.value = duration.value // Buffered fully if cached
         audio.value.load()  // Force reload with new source
         await audio.value.play()
         loading.value = false
@@ -636,6 +663,7 @@ export const usePlayerStore = defineStore('player', () => {
     shuffle,
     repeat,
     loading,
+    buffered,
     lastError,
     play,
     toggle,

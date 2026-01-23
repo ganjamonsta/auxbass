@@ -2,6 +2,7 @@
   <div class="mini-player" @click="$emit('expand')">
     <!-- Progress bar at top -->
     <div class="mini-progress">
+      <div class="mini-progress-buffered" :style="{ width: bufferedPercent + '%' }"></div>
       <div class="mini-progress-fill" :style="{ width: progressPercent + '%' }"></div>
     </div>
     
@@ -85,6 +86,10 @@ const props = defineProps({
   duration: {
     type: Number,
     default: 0
+  },
+  buffered: {
+    type: Number,
+    default: 0
   }
 })
 
@@ -94,6 +99,12 @@ const progressPercent = computed(() => {
   const dur = props.duration || props.track?.duration
   if (!dur) return 0
   return (props.progress / dur) * 100
+})
+
+const bufferedPercent = computed(() => {
+  const dur = props.duration || props.track?.duration
+  if (!dur) return 0
+  return (props.buffered / dur) * 100
 })
 
 // Generate cover gradient
@@ -167,6 +178,25 @@ const coverInitials = computed(() => {
 .mini-progress-fill {
   height: 100%;
   background: var(--spotify-green);
+  transition: width 0.1s linear;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+}
+
+.mini-progress-buffered {
+  height: 100%;
+  background: rgba(255, 255, 255, 0.4);
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  transition: width 0.2s linear;
+}
+
+.equalizer {
+  position: absolute;
   transition: width 0.2s linear;
 }
 
