@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { playerApi } from '../api/client'
+import { playerApi, tracksApi } from '../api/client'
 
 export const usePlayerStore = defineStore('player', () => {
   // State
@@ -17,6 +17,13 @@ export const usePlayerStore = defineStore('player', () => {
   const repeat = ref('none') // none, one, all
   const loading = ref(false)
   const nextTrackPreloaded = ref(null)
+  const lastError = ref(null)  // For error notifications
+  
+  // Callback for track unavailable
+  let onTrackUnavailableCallback = null
+  const setOnTrackUnavailable = (callback) => {
+    onTrackUnavailableCallback = callback
+  }
 
   // Initialize audio element
   const initAudio = () => {
@@ -111,6 +118,7 @@ export const usePlayerStore = defineStore('player', () => {
     
     loading.value = true
     currentTrack.value = track
+    lastError.value = null
     
     try {
       // Get stream URL from API
@@ -121,6 +129,31 @@ export const usePlayerStore = defineStore('player', () => {
       await audio.value.play()
     } catch (error) {
       console.error('Failed to play track:', error)
+      
+      // Check if file is unavailable (503 error)
+      if (error.response?.status === 503) {
+        lastError.value = {
+          type: 'unavailable',
+          track: track,
+          message: error.response?.data?.detail || 'Файл недоступен'
+        }
+        
+        // Mark track as unavailable
+        try {
+          await tracksApi.markUnavailable(track.id)
+          track.is_unavailable = true
+        } catch (e) {
+          console.error('Failed to mark track unavailable:', e)
+        }
+        
+        // Call callback if set
+        if (onTrackUnavailableCallback) {
+          onTrackUnavailableCallback(track, lastError.value.message)
+        }
+        
+        // Auto-skip to next track
+        setTimeout(() => next(), 1500)
+      }
     } finally {
       loading.value = false
     }
@@ -311,6 +344,7 @@ export const usePlayerStore = defineStore('player', () => {
     shuffle,
     repeat,
     loading,
+    lastError,
     play,
     toggle,
     next,
@@ -324,5 +358,6 @@ export const usePlayerStore = defineStore('player', () => {
     toggleRepeat,
     playFromQueue,
     stop,
+    setOnTrackUnavailable,
   }
 })

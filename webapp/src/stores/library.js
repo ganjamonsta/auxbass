@@ -272,6 +272,25 @@ export const useLibraryStore = defineStore('library', () => {
     return likedTracks.value.some(t => t.id === trackId)
   }
 
+  // Get unavailable tracks count
+  const unavailableCount = () => {
+    return tracks.value.filter(t => t.is_unavailable).length
+  }
+
+  // Delete all unavailable tracks
+  const deleteUnavailableTracks = async () => {
+    try {
+      const result = await tracksApi.deleteAllUnavailable()
+      // Remove from local state
+      tracks.value = tracks.value.filter(t => !t.is_unavailable)
+      likedTracks.value = likedTracks.value.filter(t => !t.is_unavailable)
+      return result.data.count || 0
+    } catch (error) {
+      console.error('Failed to delete unavailable tracks:', error)
+      return 0
+    }
+  }
+
   return {
     tracks,
     playlists,
@@ -303,5 +322,7 @@ export const useLibraryStore = defineStore('library', () => {
     deleteTrack,
     toggleLike,
     isTrackLiked,
+    unavailableCount,
+    deleteUnavailableTracks,
   }
 })

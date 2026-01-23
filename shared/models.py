@@ -61,6 +61,9 @@ class Track(Base):
     is_liked: Mapped[bool] = mapped_column(Boolean, default=False)
     liked_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     
+    # Availability (file deleted from Telegram)
+    is_unavailable: Mapped[bool] = mapped_column(Boolean, default=False)
+    
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -1,25 +1,32 @@
 <template>
   <div 
     class="track-item" 
-    :class="{ playing: isPlaying, compact: compact }" 
-    @click="$emit('click')"
+    :class="{ playing: isPlaying, compact: compact, unavailable: track.is_unavailable }" 
+    @click="handleClick"
   >
     <!-- Cover with generated gradient -->
     <div class="track-cover" :style="coverStyle">
       <img 
-        v-if="track.cover_url" 
+        v-if="track.cover_url && !track.is_unavailable" 
         :src="track.cover_url" 
         alt=""
         class="cover-image"
         loading="lazy"
       />
-      <span v-else class="cover-text">{{ coverInitials }}</span>
+      <span v-else class="cover-text">{{ track.is_unavailable ? '✕' : coverInitials }}</span>
       
       <!-- Playing indicator -->
       <div v-if="isPlaying" class="playing-indicator">
         <div class="bar"></div>
         <div class="bar"></div>
         <div class="bar"></div>
+      </div>
+      
+      <!-- Unavailable overlay -->
+      <div v-if="track.is_unavailable" class="unavailable-overlay">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+        </svg>
       </div>
     </div>
     
@@ -79,6 +86,15 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['click', 'menu', 'like'])
+
+const handleClick = () => {
+  if (props.track.is_unavailable) {
+    // Don't play unavailable tracks, just emit for potential action
+    emit('menu')
+    return
+  }
+  emit('click')
+}
 
 // Generate cover gradient from title
 const coverGradient = computed(() => {
@@ -307,5 +323,29 @@ const formatDuration = (seconds) => {
 
 .track-menu:active {
   opacity: 1;
+}
+
+/* Unavailable track styles */
+.track-item.unavailable {
+  opacity: 0.5;
+}
+
+.track-item.unavailable .track-title {
+  text-decoration: line-through;
+  color: var(--spotify-text-muted);
+}
+
+.track-item.unavailable .track-cover {
+  filter: grayscale(100%);
+}
+
+.unavailable-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ef4444;
 }
 </style>

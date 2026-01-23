@@ -1,5 +1,8 @@
 <template>
   <div class="app spotify-theme">
+    <!-- Toast notifications -->
+    <Toast ref="toast" />
+    
     <!-- One UI Style Header -->
     <header class="oneui-header" v-if="currentView === 'library'">
       <div class="header-top">
@@ -582,12 +585,16 @@ import EditTrackModal from './components/EditTrackModal.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import PlaylistPicker from './components/PlaylistPicker.vue'
 import EnrichmentStatus from './components/EnrichmentStatus.vue'
+import Toast from './components/Toast.vue'
 
 const telegram = inject('telegram')
 
 // Stores
 const player = usePlayerStore()
 const library = useLibraryStore()
+
+// Toast ref
+const toast = ref(null)
 
 // State
 const currentView = ref('library')
@@ -826,10 +833,25 @@ const handleTouchEnd = async () => {
   pullStartY.value = 0
 }
 
+// Handle track unavailable error
+const handleTrackUnavailable = (track, message) => {
+  toast.value?.error(
+    'Трек недоступен',
+    `${track.title || 'Трек'} был удалён из Telegram`
+  )
+  telegram?.HapticFeedback?.notificationOccurred?.('error')
+  
+  // Refresh library to update track states
+  library.fetchTracks()
+}
+
 // Apply Spotify theme on mount
 onMounted(async () => {
   document.body.classList.add('spotify-theme')
   await library.init()
+  
+  // Set up error callback for player
+  player.setOnTrackUnavailable(handleTrackUnavailable)
 })
 </script>
 
@@ -1183,6 +1205,12 @@ onMounted(async () => {
   scrollbar-width: none;
 }
 
+.horizontal-scroll::before {
+  content: '';
+  flex-shrink: 0;
+  width: 4px;
+}
+
 .horizontal-scroll::after {
   content: '';
   flex-shrink: 0;
@@ -1285,6 +1313,10 @@ onMounted(async () => {
 }
 
 /* Artist Card */
+.artist-card {
+  text-align: center;
+}
+
 .artist-card .feed-card-cover {
   border-radius: 50%;
 }

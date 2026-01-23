@@ -61,6 +61,16 @@ async def migrate():
             print("✓ liked_at column added")
         else:
             print("• liked_at column already exists")
+        
+        # Add is_unavailable if not exists
+        if 'is_unavailable' not in columns:
+            print("Adding is_unavailable column...")
+            await conn.execute(text(
+                "ALTER TABLE tracks ADD COLUMN is_unavailable BOOLEAN DEFAULT 0"
+            ))
+            print("✓ is_unavailable column added")
+        else:
+            print("• is_unavailable column already exists")
     
     print("\nMigrations completed successfully!")
 

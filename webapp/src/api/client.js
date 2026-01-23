@@ -48,6 +48,9 @@ export const tracksApi = {
   getLiked: () => api.get('/tracks/liked'),
   like: (id) => api.post(`/tracks/${id}/like`),
   unlike: (id) => api.delete(`/tracks/${id}/like`),
+  markUnavailable: (id) => api.post(`/tracks/${id}/mark-unavailable`),
+  getUnavailable: () => api.get('/tracks/unavailable/list'),
+  deleteAllUnavailable: () => api.delete('/tracks/unavailable/all'),
 }
 
 // Playlists

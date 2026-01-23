@@ -57,6 +57,7 @@ class TrackResponse(TrackBase):
     cover_url: Optional[str] = None
     enrichment_status: Optional[str] = None
     is_liked: bool = False
+    is_unavailable: bool = False
     created_at: datetime
     
     class Config:
@@ -437,3 +438,61 @@ async def delete_track(
     await db.commit()
     
     return {"status": "deleted", "id": track_id}
+
+
+@router.post("/{track_id}/mark-unavailable")
+async def mark_track_unavailable(
+    track_id: int,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark a track as unavailable (file deleted from Telegram)"""
+    track = await db.scalar(
+        select(Track).where(
+            Track.id == track_id,
+            Track.user_id == user.id
+        )
+    )
+    
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    
+    track.is_unavailable = True
+    await db.commit()
+    
+    return {"status": "marked_unavailable", "id": track_id}
+
+
+@router.get("/unavailable/list")
+async def get_unavailable_tracks(
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get all unavailable tracks"""
+    result = await db.execute(
+        select(Track)
+        .where(Track.user_id == user.id)
+        .where(Track.is_unavailable == True)
+    )
+    
+    tracks = result.scalars().all()
+    return [TrackResponse.model_validate(t) for t in tracks]
+
+
+@router.delete("/unavailable/all")
+async def delete_all_unavailable_tracks(
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete all unavailable tracks"""
+    from sqlalchemy import delete as sql_delete
+    
+    result = await db.execute(
+        sql_delete(Track)
+        .where(Track.user_id == user.id)
+        .where(Track.is_unavailable == True)
+    )
+    
+    await db.commit()
+    
+    return {"status": "deleted", "count": result.rowcount}
