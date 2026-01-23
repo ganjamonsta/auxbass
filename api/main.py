@@ -19,6 +19,7 @@ from shared.config import get_settings
 from shared.database import init_db, close_db
 
 from api.routers import tracks, playlists, player, auth
+from api.routers.player import close_http_session
 
 
 settings = get_settings()
@@ -84,6 +85,7 @@ async def lifespan(app: FastAPI):
     await init_db()
     yield
     # Shutdown
+    await close_http_session()  # Close HTTP connection pool
     await close_db()
 
 

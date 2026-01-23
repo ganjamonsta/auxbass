@@ -1,8 +1,7 @@
 """
 TG Player Bot - Audio Handler
 """
-import aiohttp
-from aiogram import Router, F, Bot
+from aiogram import Router, F
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -22,13 +21,10 @@ router = Router()
 settings = get_settings()
 
 
-async def validate_file_id(bot: Bot, file_id: str) -> bool:
-    """Validate that file_id is accessible via Telegram API"""
-    try:
-        file = await bot.get_file(file_id)
-        return file.file_path is not None
-    except Exception:
-        return False
+# NOTE: validate_file_id removed - it was redundant
+# When Telegram sends us an audio message, the file is guaranteed to be accessible
+# The file_id comes directly from Telegram in the same message
+# Validation only makes sense when playing old tracks (handled in API layer)
 
 
 def get_track_keyboard(track_id: int) -> InlineKeyboardMarkup:
@@ -91,22 +87,13 @@ async def handle_audio(message: Message):
     """Handle incoming audio files"""
     audio = message.audio
     user = message.from_user
-    bot = message.bot
     user_id = user.id
     
     # Check if in playlist creation mode
     playlist_session = session_manager.get_playlist_session(user_id)
     
-    # Validate file_id is accessible
-    if not await validate_file_id(bot, audio.file_id):
-        await message.reply(
-            "❌ <b>Не удалось получить доступ к файлу</b>\n\n"
-            "Telegram не отдаёт этот файл. Попробуй:\n"
-            "• Переслать аудио заново\n"
-            "• Убедиться что файл не повреждён\n"
-            "• Проверить размер файла (макс. 20 МБ)"
-        )
-        return
+    # NOTE: No need to validate file_id here - it just arrived from Telegram
+    # If file was inaccessible, Telegram wouldn't send us the audio message
     
     async with get_session() as session:
         # Ensure user exists

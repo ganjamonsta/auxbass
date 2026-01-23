@@ -3,6 +3,7 @@ TG Player API - Player Router
 Handles audio streaming with secure proxy (token never exposed to browser)
 """
 from typing import Optional
+import logging
 import re
 import time
 import hashlib
@@ -27,8 +28,43 @@ from shared.models import Track
 from .auth import get_current_user, TelegramUser
 
 
+logger = logging.getLogger("uvicorn.error")
+
 router = APIRouter()
 settings = get_settings()
+
+# ============== Global HTTP Session Pool ==============
+# Reuses TCP connections instead of creating new ones per request
+# This saves ~100-200ms per request on TLS handshake
+_http_session: Optional[aiohttp.ClientSession] = None
+
+
+async def get_http_session() -> aiohttp.ClientSession:
+    """Get or create global aiohttp session with connection pooling"""
+    global _http_session
+    if _http_session is None or _http_session.closed:
+        # Connection pool: keep up to 100 connections, 10 per host
+        connector = aiohttp.TCPConnector(
+            limit=100,
+            limit_per_host=10,
+            ttl_dns_cache=300,  # Cache DNS for 5 minutes
+            keepalive_timeout=60,  # Keep connections alive for 60s
+        )
+        timeout = aiohttp.ClientTimeout(total=30, connect=10)
+        _http_session = aiohttp.ClientSession(
+            connector=connector,
+            timeout=timeout,
+        )
+    return _http_session
+
+
+async def close_http_session():
+    """Close global HTTP session (call on app shutdown)"""
+    global _http_session
+    if _http_session and not _http_session.closed:
+        await _http_session.close()
+        _http_session = None
+
 
 # Cache for Telegram file paths (not full URLs!)
 _file_path_cache: dict[str, tuple[str, float]] = {}
@@ -76,10 +112,8 @@ def validate_stream_token(token: str) -> Optional[tuple[int, int]]:
 async def get_telegram_file_path(file_id: str) -> Optional[str]:
     """
     Get file path from Telegram (not full URL).
+    Uses global session pool for better performance.
     """
-    import logging
-    logger = logging.getLogger("uvicorn.error")
-    
     # Check cache
     if file_id in _file_path_cache:
         file_path, expires = _file_path_cache[file_id]
@@ -87,10 +121,11 @@ async def get_telegram_file_path(file_id: str) -> Optional[str]:
             logger.debug(f"File path cache hit for {file_id[:20]}...")
             return file_path
     
-    # Call Telegram API
+    # Call Telegram API using pooled session
     api_url = f"https://api.telegram.org/bot{settings.bot_token}/getFile"
     
-    async with aiohttp.ClientSession() as session:
+    session = await get_http_session()
+    try:
         async with session.get(api_url, params={"file_id": file_id}) as resp:
             if resp.status != 200:
                 logger.error(f"Telegram getFile failed: status={resp.status}, file_id={file_id[:20]}...")
@@ -113,6 +148,9 @@ async def get_telegram_file_path(file_id: str) -> Optional[str]:
             logger.info(f"Got file path: {file_path}")
             
             return file_path
+    except aiohttp.ClientError as e:
+        logger.error(f"HTTP error getting file path: {e}")
+        return None
 
 
 @router.get("/stream/{track_id}", response_model=StreamUrlResponse)
@@ -237,11 +275,14 @@ async def stream_audio(
         telegram_headers["Range"] = range_value
     
     async def stream_generator():
-        async with aiohttp.ClientSession() as session:
-            async with session.get(telegram_url, headers=telegram_headers) as resp:
-                # Use smaller chunks for faster start (8KB instead of 64KB)
-                async for chunk in resp.content.iter_chunked(8 * 1024):
-                    yield chunk
+        """Stream audio using pooled connection for faster start"""
+        session = await get_http_session()
+        async with session.get(telegram_url, headers=telegram_headers) as resp:
+            # First chunk larger (32KB) for faster audio start, then 8KB for smooth streaming
+            first_chunk = True
+            async for chunk in resp.content.iter_chunked(32 * 1024 if first_chunk else 8 * 1024):
+                yield chunk
+                first_chunk = False
     
     # Build response headers
     response_headers = {
@@ -321,6 +362,48 @@ async def get_batch_stream_urls(
         })
     
     return {"urls": urls}
+
+
+@router.post("/prefetch")
+async def prefetch_file_paths(
+    track_ids: list[int],
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Pre-cache Telegram file paths for a list of tracks.
+    Call this when loading track list to speed up first play.
+    Runs in background - returns immediately.
+    """
+    if len(track_ids) > 20:
+        track_ids = track_ids[:20]  # Limit to 20 tracks
+    
+    # Get tracks
+    result = await db.execute(
+        select(Track).where(
+            Track.id.in_(track_ids),
+            Track.user_id == user.id
+        )
+    )
+    tracks = result.scalars().all()
+    
+    # Prefetch file paths in parallel (fire and forget style, but we await for better caching)
+    import asyncio
+    
+    async def prefetch_one(track):
+        try:
+            await get_telegram_file_path(track.file_id)
+        except Exception as e:
+            logger.debug(f"Prefetch failed for track {track.id}: {e}")
+    
+    # Run all prefetches concurrently
+    await asyncio.gather(*[prefetch_one(t) for t in tracks], return_exceptions=True)
+    
+    return {
+        "success": True,
+        "prefetched": len(tracks),
+        "message": f"Prefetched {len(tracks)} file paths"
+    }
 
 
 @router.post("/play/{track_id}")

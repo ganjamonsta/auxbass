@@ -250,7 +250,7 @@ export const usePlayerStore = defineStore('player', () => {
     updateMediaSession()
     
     try {
-      // Check if track is cached
+      // Check if track is cached (blob URL)
       const cachedUrl = getCachedAudio(track.id)
       if (cachedUrl) {
         audio.value.src = cachedUrl
@@ -263,18 +263,12 @@ export const usePlayerStore = defineStore('player', () => {
       const response = await playerApi.getStreamUrl(track.id)
       const { url } = response.data
       
-      // Start playing immediately
+      // Stream directly - fastest start time
+      // NO separate fetch for caching - that doubled the traffic!
+      // Caching is done via preloadNextTrack() which loads NEXT track in background
       audio.value.src = url
       await audio.value.play()
       
-      // Cache in background for future use
-      fetch(url)
-        .then(res => res.blob())
-        .then(blob => {
-          const blobUrl = URL.createObjectURL(blob)
-          setCachedAudio(track.id, blobUrl)
-        })
-        .catch(() => {})  // Ignore cache errors
     } catch (error) {
       console.error('Failed to play track:', error)
       

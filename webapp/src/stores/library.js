@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { tracksApi, playlistsApi } from '../api/client'
+import { tracksApi, playlistsApi, playerApi } from '../api/client'
 
 export const useLibraryStore = defineStore('library', () => {
   // State
@@ -61,6 +61,12 @@ export const useLibraryStore = defineStore('library', () => {
         tracks.value = [...tracks.value, ...data.items]
       } else {
         tracks.value = data.items
+        
+        // Prefetch file paths for first 10 tracks (speeds up first play)
+        if (data.items.length > 0) {
+          const trackIds = data.items.slice(0, 10).map(t => t.id)
+          playerApi.prefetch(trackIds).catch(() => {})  // Fire and forget
+        }
       }
       
       total.value = data.total
