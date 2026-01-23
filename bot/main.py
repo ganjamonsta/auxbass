@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
+from aiogram.fsm.storage.memory import MemoryStorage
 
 from shared.config import get_settings
 from shared.database import init_db, close_db
@@ -46,8 +47,9 @@ async def main():
         default=DefaultBotProperties(parse_mode=ParseMode.HTML)
     )
     
-    # Initialize dispatcher
-    dp = Dispatcher()
+    # Initialize dispatcher with FSM storage
+    storage = MemoryStorage()
+    dp = Dispatcher(storage=storage)
     
     # Register routers
     dp.include_router(commands.router)

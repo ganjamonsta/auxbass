@@ -1,9 +1,12 @@
 """
 TG Player Bot - Command Handlers
 """
+import re
 from aiogram import Router
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from sqlalchemy import select, func
 
 import sys
@@ -14,9 +17,16 @@ from shared.config import get_settings
 from shared.database import get_session
 from shared.models import User, Track, Playlist
 
+from services.session import session_manager
+
 
 router = Router()
 settings = get_settings()
+
+
+class PlaylistStates(StatesGroup):
+    """FSM states for playlist creation"""
+    waiting_for_name = State()
 
 
 def get_webapp_keyboard() -> InlineKeyboardMarkup:
@@ -73,12 +83,19 @@ async def cmd_help(message: Message):
         "/start — Начало работы\n"
         "/help — Эта справка\n"
         "/library — Открыть плеер\n"
-        "/stats — Статистика библиотеки\n\n"
+        "/stats — Статистика библиотеки\n"
+        '/playlist — Создать плейлист\n'
+        '/playlist "Название" — Быстрое создание\n\n'
+        "<b>Создание плейлиста:</b>\n"
+        "1. Введи /playlist\n"
+        "2. Укажи название\n"
+        "3. Отправь аудиофайлы\n"
+        "4. Нажми «Завершить»\n\n"
         "<b>Возможности плеера:</b>\n"
-        "• Создание плейлистов\n"
+        "• Плейлисты и очереди\n"
         "• Поиск по артисту, названию, жанру\n"
         "• Редактирование метаданных\n"
-        "• Управление воспроизведением",
+        "• История прослушивания",
         reply_markup=get_webapp_keyboard()
     )
 
@@ -123,4 +140,104 @@ async def cmd_stats(message: Message):
         f"📁 Плейлистов: <b>{playlists_count or 0}</b>\n"
         f"⏱ Общая длительность: <b>{hours}ч {minutes}мин</b>",
         reply_markup=get_webapp_keyboard()
+    )
+
+
+@router.message(Command("playlist", "плейлист"))
+async def cmd_playlist(message: Message, state: FSMContext):
+    """
+    Handle /playlist command
+    Usage: /playlist or /playlist "Название плейлиста"
+    Also: /плейлист (Russian alias)
+    """
+    user_id = message.from_user.id
+    
+    # Check if already in playlist mode
+    if session_manager.has_playlist_session(user_id):
+        session = session_manager.get_playlist_session(user_id)
+        await message.answer(
+            f"⚠️ Ты уже создаёшь плейлист «{session.name}»\n"
+            f"Добавлено треков: {session.track_count}\n\n"
+            "Отправь ещё аудио или заверши создание.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=f"✓ Завершить ({session.track_count} треков)",
+                        callback_data="playlist:finish"
+                    ),
+                    InlineKeyboardButton(
+                        text="✗ Отменить",
+                        callback_data="playlist:cancel"
+                    )
+                ]
+            ])
+        )
+        return
+    
+    # Parse playlist name from command
+    text = message.text or ""
+    # Match /playlist "Name" or /playlist 'Name' or /плейлист "Name"
+    match = re.search(r'/(?:playlist|плейлист)\s+["\'](.+?)["\']', text) or \
+            re.search(r'/(?:playlist|плейлист)\s+(.+)', text)
+    
+    if match:
+        # Name provided directly
+        playlist_name = match.group(1).strip()
+        if playlist_name:
+            session_manager.start_playlist_session(user_id, playlist_name)
+            await message.answer(
+                f"📁 Плейлист «<b>{playlist_name}</b>» создаётся!\n\n"
+                "🎵 Отправляй аудиофайлы — я добавлю их в плейлист.\n"
+                "Когда закончишь, нажми кнопку ниже.",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(
+                        text="✗ Отменить создание",
+                        callback_data="playlist:cancel"
+                    )]
+                ])
+            )
+            return
+    
+    # No name provided - ask for it
+    await state.set_state(PlaylistStates.waiting_for_name)
+    await message.answer(
+        "📁 <b>Создание плейлиста</b>\n\n"
+        "Введи название для нового плейлиста:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="✗ Отмена",
+                callback_data="playlist:cancel_input"
+            )]
+        ])
+    )
+
+
+@router.message(PlaylistStates.waiting_for_name)
+async def process_playlist_name(message: Message, state: FSMContext):
+    """Process playlist name input"""
+    user_id = message.from_user.id
+    playlist_name = message.text.strip() if message.text else ""
+    
+    if not playlist_name:
+        await message.answer("❌ Название не может быть пустым. Попробуй ещё раз:")
+        return
+    
+    if len(playlist_name) > 100:
+        await message.answer("❌ Название слишком длинное (макс. 100 символов). Попробуй короче:")
+        return
+    
+    # Clear state and start session
+    await state.clear()
+    session_manager.start_playlist_session(user_id, playlist_name)
+    
+    await message.answer(
+        f"✅ Плейлист «<b>{playlist_name}</b>» создаётся!\n\n"
+        "🎵 Теперь отправляй аудиофайлы — я добавлю их в плейлист.\n"
+        "Когда закончишь, нажми кнопку «Завершить».",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="✗ Отменить создание",
+                callback_data="playlist:cancel"
+            )]
+        ])
     )
