@@ -2074,6 +2074,14 @@ onMounted(async () => {
     inset 0 0 0 1px rgba(29, 185, 84, 0.2);
 }
 
+.tab-item.active:active {
+  box-shadow: 
+    inset 3px 3px 6px rgba(0, 0, 0, 0.4),
+    inset -2px -2px 4px rgba(255, 255, 255, 0.05),
+    inset 0 0 0 1px rgba(29, 185, 84, 0.3);
+  transform: scale(0.95);
+}
+
 .tab-item.active svg {
   filter: drop-shadow(0 0 4px rgba(29, 185, 84, 0.5));
 }
