@@ -58,11 +58,12 @@ async def handle_download_playlist(callback: CallbackQuery):
     user_id = callback.from_user.id
 
     async with get_session() as session:
-        playlist = await session.get(
-            Playlist, 
-            playlist_id, 
-            options=[selectinload(Playlist.track_associations).selectinload(PlaylistTrack.track)]
+        result = await session.execute(
+            select(Playlist)
+            .options(selectinload(Playlist.track_associations).selectinload(PlaylistTrack.track))
+            .where(Playlist.id == playlist_id)
         )
+        playlist = result.scalar()
 
         if not playlist or playlist.user_id != user_id:
             await callback.answer("Плейлист не найден", show_alert=True)

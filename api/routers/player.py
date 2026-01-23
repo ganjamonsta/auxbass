@@ -438,3 +438,55 @@ async def record_play(
         "track_id": track_id,
         "play_count": track.play_count
     }
+
+
+@router.post("/download/{track_id}")
+async def download_track(
+    track_id: int,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Send track to user via Telegram bot (download).
+    Uses sendAudio to forward the file from bot to user.
+    """
+    # Get track
+    track = await db.scalar(
+        select(Track).where(
+            Track.id == track_id,
+            Track.user_id == user.id
+        )
+    )
+    
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    
+    # Send audio via Bot API
+    api_url = f"https://api.telegram.org/bot{settings.bot_token}/sendAudio"
+    
+    caption = f"🎧 {track.artist or 'Неизвестен'} - {track.title or 'Без названия'}"
+    
+    payload = {
+        "chat_id": user.id,
+        "audio": track.file_id,
+        "caption": caption,
+        "performer": track.artist,
+        "title": track.title,
+    }
+    if track.duration:
+        payload["duration"] = track.duration
+    
+    session = await get_http_session()
+    try:
+        async with session.post(api_url, json=payload) as resp:
+            data = await resp.json()
+            
+            if not data.get("ok"):
+                error_desc = data.get("description", "Unknown error")
+                logger.error(f"Telegram sendAudio error: {error_desc}")
+                raise HTTPException(status_code=503, detail=f"Failed to send: {error_desc}")
+            
+            return {"success": True, "track_id": track_id}
+    except aiohttp.ClientError as e:
+        logger.error(f"HTTP error sending audio: {e}")
+        raise HTTPException(status_code=503, detail="Failed to send audio")

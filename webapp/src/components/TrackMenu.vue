@@ -39,6 +39,11 @@
                 <span>Редактировать</span>
               </button>
 
+              <button class="menu-item" @click="handleDownload">
+                <span class="menu-icon">📥</span>
+                <span>Скачать</span>
+              </button>
+
               <div class="menu-divider"></div>
 
               <button class="menu-item danger" @click="handleDelete">
@@ -66,7 +71,7 @@ const props = defineProps({
   track: Object
 })
 
-const emit = defineEmits(['close', 'addToPlaylist', 'edit', 'delete'])
+const emit = defineEmits(['close', 'addToPlaylist', 'edit', 'delete', 'download'])
 
 const player = usePlayerStore()
 const telegram = inject('telegram')
@@ -107,6 +112,12 @@ const handleEdit = () => {
 const handleDelete = () => {
   haptic('warning')
   emit('delete', props.track)
+  emit('close')
+}
+
+const handleDownload = () => {
+  haptic('light')
+  emit('download', props.track)
   emit('close')
 }
 </script>

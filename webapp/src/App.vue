@@ -482,6 +482,11 @@
             <h2>{{ currentPlaylist?.name }}</h2>
             <p>{{ currentPlaylist?.track_count }} треков • {{ formatDuration(currentPlaylist?.total_duration) }}</p>
           </div>
+          <button class="download-playlist-btn" @click="downloadPlaylist" title="Скачать все треки">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+            </svg>
+          </button>
           <button class="play-all-btn" @click="playPlaylist">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
               <path d="M8 5v14l11-7z"/>
@@ -494,6 +499,7 @@
           :track="track"
           :isPlaying="player.currentTrack?.id === track.id && player.isPlaying"
           @click="playTrack(track, currentPlaylist?.tracks)"
+          @menu="showTrackMenu(track)"
         />
       </div>
     </main>
@@ -588,6 +594,7 @@
       @addToPlaylist="handleAddToPlaylist"
       @edit="handleEditTrack"
       @delete="handleDeleteTrack"
+      @download="handleDownloadTrack"
     />
 
     <!-- Edit Track Modal -->
@@ -642,6 +649,7 @@
 import { ref, computed, onMounted, inject, nextTick } from 'vue'
 import { usePlayerStore } from './stores/player'
 import { useLibraryStore } from './stores/library'
+import { playerApi } from './api/client'
 import TrackItem from './components/TrackItem.vue'
 import TrackSkeleton from './components/TrackSkeleton.vue'
 import PlaylistItem from './components/PlaylistItem.vue'
@@ -733,6 +741,28 @@ const playPlaylist = async () => {
   }
 }
 
+const downloadPlaylist = async () => {
+  if (!currentPlaylist.value?.tracks?.length) {
+    toast.value?.show('Плейлист пуст', 'error')
+    return
+  }
+  
+  toast.value?.show('Отправка треков...', 'info')
+  let successCount = 0
+  
+  for (const track of currentPlaylist.value.tracks) {
+    try {
+      await playerApi.download(track.id)
+      successCount++
+    } catch (error) {
+      console.error('Failed to download track:', error)
+    }
+  }
+  
+  telegram?.HapticFeedback?.notificationOccurred?.('success')
+  toast.value?.show(`Отправлено ${successCount} треков в чат`, 'success')
+}
+
 const playLikedTracks = async () => {
   if (library.likedTracks.length) {
     await player.play(library.likedTracks[0], library.likedTracks)
@@ -758,6 +788,18 @@ const handleEditTrack = (track) => {
 const handleDeleteTrack = (track) => {
   deletingTrack.value = track
   showConfirmDelete.value = true
+}
+
+const handleDownloadTrack = async (track) => {
+  try {
+    await playerApi.download(track.id)
+    telegram?.HapticFeedback?.notificationOccurred?.('success')
+    toast.value?.show('Трек отправлен в чат', 'success')
+  } catch (error) {
+    console.error('Failed to download track:', error)
+    telegram?.HapticFeedback?.notificationOccurred?.('error')
+    toast.value?.show('Не удалось отправить трек', 'error')
+  }
 }
 
 const confirmDeleteTrack = async () => {
@@ -1165,6 +1207,7 @@ onMounted(async () => {
   flex: 1;
   min-height: 0;  /* Allow flex shrinking for proper overflow */
   overflow-y: auto;
+  overflow-y: overlay;
   overflow-x: hidden;  /* Prevent horizontal scrollbar */
   position: relative;
 }
@@ -1500,6 +1543,7 @@ onMounted(async () => {
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  padding: 12px 0;
 }
 
 .horizontal-scroll::-webkit-scrollbar {
@@ -1840,6 +1884,25 @@ onMounted(async () => {
 
 .play-all-btn:active {
   transform: scale(0.95);
+}
+
+.download-playlist-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--spotify-surface);
+  border: 1px solid var(--spotify-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--spotify-text);
+  transition: transform 0.2s, background 0.2s;
+}
+
+.download-playlist-btn:active {
+  transform: scale(0.95);
+  background: var(--spotify-surface-highlight);
 }
 
 /* Queue section */

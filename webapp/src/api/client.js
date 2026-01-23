@@ -70,4 +70,5 @@ export const playerApi = {
   getBatchUrls: (trackIds) => api.post('/player/stream/batch', trackIds),
   prefetch: (trackIds) => api.post('/player/prefetch', trackIds),
   recordPlay: (trackId) => api.post(`/player/play/${trackId}`),
+  download: (trackId) => api.post(`/player/download/${trackId}`),
 }
