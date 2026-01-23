@@ -8,6 +8,7 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, W
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 
 import sys
 from pathlib import Path
@@ -254,15 +255,26 @@ async def cmd_playlists(message: Message):
     user_id = message.from_user.id
     
     async with get_session() as session:
-        # Get user's playlists
+        # Get user's playlists with track counts (eager load)
         result = await session.execute(
             select(Playlist)
+            .options(selectinload(Playlist.track_associations))
             .where(Playlist.user_id == user_id)
             .order_by(Playlist.created_at.desc())
         )
         playlists = result.scalars().all()
+        
+        # Build data while session is open
+        playlist_data = []
+        for pl in playlists[:20]:
+            track_count = len(pl.track_associations) if pl.track_associations else 0
+            playlist_data.append({
+                'id': pl.id,
+                'name': pl.name,
+                'track_count': track_count
+            })
     
-    if not playlists:
+    if not playlist_data:
         await message.answer(
             "📁 <b>Мои плейлисты</b>\n\n"
             "У тебя пока нет плейлистов.\n\n"
@@ -278,16 +290,14 @@ async def cmd_playlists(message: Message):
     text = "📁 <b>Мои плейлисты</b>\n\n"
     keyboard = []
     
-    for pl in playlists[:20]:  # Limit to 20 playlists
-        # Count tracks
-        track_count = len(pl.track_associations) if pl.track_associations else 0
-        text += f"• <b>{pl.name}</b> — {track_count} 🎵\n"
+    for pl in playlist_data:
+        text += f"• <b>{pl['name']}</b> — {pl['track_count']} 🎵\n"
         
         # Row: [Playlist name button]
         keyboard.append([
             InlineKeyboardButton(
-                text=f"📁 {pl.name}",
-                callback_data=f"pl:menu:{pl.id}"
+                text=f"📁 {pl['name']}",
+                callback_data=f"pl:menu:{pl['id']}"
             )
         ])
     

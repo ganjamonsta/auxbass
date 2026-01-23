@@ -5,6 +5,7 @@ from aiogram import Router, F
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 
 import sys
 from pathlib import Path
@@ -217,18 +218,20 @@ async def handle_playlist_menu(callback: CallbackQuery):
     user_id = callback.from_user.id
     
     async with get_session() as session:
-        playlist = await session.get(Playlist, playlist_id)
+        playlist = await session.get(Playlist, playlist_id, options=[selectinload(Playlist.track_associations)])
         
         if not playlist or playlist.user_id != user_id:
             await callback.answer("Плейлист не найден", show_alert=True)
             return
         
         track_count = len(playlist.track_associations) if playlist.track_associations else 0
+        playlist_name = playlist.name
+        created_at = playlist.created_at.strftime('%d.%m.%Y')
     
     await callback.message.edit_text(
-        f"📁 <b>{playlist.name}</b>\n\n"
+        f"📁 <b>{playlist_name}</b>\n\n"
         f"🎵 Треков: {track_count}\n"
-        f"📅 Создан: {playlist.created_at.strftime('%d.%m.%Y')}\n\n"
+        f"📅 Создан: {created_at}\n\n"
         "Выбери действие:",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [
@@ -300,7 +303,7 @@ async def handle_playlist_delete_confirm(callback: CallbackQuery):
     user_id = callback.from_user.id
     
     async with get_session() as session:
-        playlist = await session.get(Playlist, playlist_id)
+        playlist = await session.get(Playlist, playlist_id, options=[selectinload(Playlist.track_associations)])
         
         if not playlist or playlist.user_id != user_id:
             await callback.answer("Плейлист не найден", show_alert=True)
@@ -368,12 +371,23 @@ async def handle_back_to_playlist_list(callback: CallbackQuery):
     async with get_session() as session:
         result = await session.execute(
             select(Playlist)
+            .options(selectinload(Playlist.track_associations))
             .where(Playlist.user_id == user_id)
             .order_by(Playlist.created_at.desc())
         )
         playlists = result.scalars().all()
+        
+        # Build data while session is open
+        playlist_data = []
+        for pl in playlists[:20]:
+            track_count = len(pl.track_associations) if pl.track_associations else 0
+            playlist_data.append({
+                'id': pl.id,
+                'name': pl.name,
+                'track_count': track_count
+            })
     
-    if not playlists:
+    if not playlist_data:
         await callback.message.edit_text(
             "📁 <b>Мои плейлисты</b>\n\n"
             "У тебя пока нет плейлистов.\n\n"
@@ -387,14 +401,13 @@ async def handle_back_to_playlist_list(callback: CallbackQuery):
     text = "📁 <b>Мои плейлисты</b>\n\n"
     keyboard = []
     
-    for pl in playlists[:20]:
-        track_count = len(pl.track_associations) if pl.track_associations else 0
-        text += f"• <b>{pl.name}</b> — {track_count} 🎵\n"
+    for pl in playlist_data:
+        text += f"• <b>{pl['name']}</b> — {pl['track_count']} 🎵\n"
         
         keyboard.append([
             InlineKeyboardButton(
-                text=f"📁 {pl.name}",
-                callback_data=f"pl:menu:{pl.id}"
+                text=f"📁 {pl['name']}",
+                callback_data=f"pl:menu:{pl['id']}"
             )
         ])
     
