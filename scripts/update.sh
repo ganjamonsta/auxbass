@@ -60,7 +60,7 @@ git pull origin main
 # Check if webapp changed
 WEBAPP_CHANGED=$(git diff --name-only $LOCAL $REMOTE | grep -c "^webapp/" || true)
 
-if [ "$WEBAPP_CHANGED" -gt 0 ]; then
+if [ "$WEBAPP_CHANGED" -gt 0 ] || [ "$FORCE" = true ]; then
     echo -e "\n${YELLOW}[4/5]${NC} Building webapp..."
     cd "$WEBAPP_DIR"
     npm run build

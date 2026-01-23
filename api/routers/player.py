@@ -188,9 +188,9 @@ async def get_stream_url(
     # Generate secure temporary token
     token = generate_stream_token(track_id, user.id)
     
-    # Build proxy URL (relative to current host)
-    base_url = str(request.base_url).rstrip('/')
-    proxy_url = f"{base_url}/api/player/audio/{token}"
+    # Return relative URL to avoid Mixed Content issues (HTTP vs HTTPS)
+    # The frontend will resolve this against its own origin
+    proxy_url = f"/api/player/audio/{token}"
     
     expires_at = int(time.time()) + STREAM_TOKEN_TTL
     
