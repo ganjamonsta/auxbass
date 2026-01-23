@@ -7,8 +7,8 @@
     @touchend="onTouchEnd"
     :style="swipeStyle"
   >
-    <!-- Swipe indicator -->
-    <div class="swipe-indicator"></div>
+    <!-- Swipe indicator - tap to minimize -->
+    <div class="swipe-indicator" @click="$emit('close')"></div>
 
     <!-- Header -->
     <div class="player-header">
@@ -368,6 +368,18 @@ const formatTime = (seconds) => {
   border-radius: 2px;
   margin: 0 auto 8px;
   flex-shrink: 0;
+  cursor: pointer;
+  padding: 8px 40px;
+  background-clip: content-box;
+  transition: background-color 0.2s;
+}
+
+.swipe-indicator:hover {
+  background-color: var(--spotify-white);
+}
+
+.swipe-indicator:active {
+  background-color: rgba(255, 255, 255, 0.5);
 }
 
 .player-header {

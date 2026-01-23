@@ -1,6 +1,25 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { playerApi, tracksApi } from '../api/client'
+
+// Audio cache - stores blob URLs for already loaded tracks
+const audioCache = new Map()
+const MAX_CACHE_SIZE = 50
+
+const getCachedAudio = (trackId) => {
+  return audioCache.get(trackId)
+}
+
+const setCachedAudio = (trackId, blobUrl) => {
+  // Limit cache size
+  if (audioCache.size >= MAX_CACHE_SIZE) {
+    const firstKey = audioCache.keys().next().value
+    const oldUrl = audioCache.get(firstKey)
+    URL.revokeObjectURL(oldUrl)
+    audioCache.delete(firstKey)
+  }
+  audioCache.set(trackId, blobUrl)
+}
 
 export const usePlayerStore = defineStore('player', () => {
   // State
@@ -25,6 +44,83 @@ export const usePlayerStore = defineStore('player', () => {
     onTrackUnavailableCallback = callback
   }
 
+  // Update Media Session metadata
+  const updateMediaSession = () => {
+    if (!('mediaSession' in navigator) || !currentTrack.value) return
+    
+    const track = currentTrack.value
+    const artwork = track.cover_art_url ? [
+      { src: track.cover_art_url, sizes: '96x96', type: 'image/jpeg' },
+      { src: track.cover_art_url, sizes: '128x128', type: 'image/jpeg' },
+      { src: track.cover_art_url, sizes: '256x256', type: 'image/jpeg' },
+      { src: track.cover_art_url, sizes: '512x512', type: 'image/jpeg' },
+    ] : []
+    
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: track.title || 'Unknown',
+      artist: track.artist || 'Unknown Artist',
+      album: track.album || '',
+      artwork
+    })
+  }
+
+  // Setup Media Session handlers
+  const setupMediaSession = () => {
+    if (!('mediaSession' in navigator)) return
+    
+    navigator.mediaSession.setActionHandler('play', () => {
+      if (audio.value) audio.value.play()
+    })
+    
+    navigator.mediaSession.setActionHandler('pause', () => {
+      if (audio.value) audio.value.pause()
+    })
+    
+    navigator.mediaSession.setActionHandler('previoustrack', () => {
+      prev()
+    })
+    
+    navigator.mediaSession.setActionHandler('nexttrack', () => {
+      next()
+    })
+    
+    navigator.mediaSession.setActionHandler('seekto', (details) => {
+      if (details.seekTime !== undefined) {
+        seek(details.seekTime)
+      }
+    })
+    
+    navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+      const skipTime = details.seekOffset || 10
+      seek(Math.max(0, progress.value - skipTime))
+    })
+    
+    navigator.mediaSession.setActionHandler('seekforward', (details) => {
+      const skipTime = details.seekOffset || 10
+      seek(Math.min(duration.value, progress.value + skipTime))
+    })
+  }
+
+  // Update Media Session playback state
+  const updatePlaybackState = () => {
+    if (!('mediaSession' in navigator)) return
+    navigator.mediaSession.playbackState = isPlaying.value ? 'playing' : 'paused'
+  }
+
+  // Update Media Session position
+  const updatePositionState = () => {
+    if (!('mediaSession' in navigator) || !audio.value || !duration.value) return
+    try {
+      navigator.mediaSession.setPositionState({
+        duration: duration.value,
+        playbackRate: audio.value.playbackRate,
+        position: progress.value
+      })
+    } catch (e) {
+      // Ignore errors
+    }
+  }
+
   // Initialize audio element
   const initAudio = () => {
     if (audio.value) return
@@ -32,6 +128,9 @@ export const usePlayerStore = defineStore('player', () => {
     audio.value = new Audio()
     audio.value.volume = volume.value
     audio.value.preload = 'auto'  // Aggressive preloading for faster start
+    
+    // Setup Media Session handlers once
+    setupMediaSession()
     
     // canplay event - audio ready to play
     audio.value.addEventListener('canplay', () => {
@@ -45,10 +144,15 @@ export const usePlayerStore = defineStore('player', () => {
     
     audio.value.addEventListener('timeupdate', () => {
       progress.value = audio.value.currentTime
+      // Update position state every 5 seconds for media session
+      if (Math.floor(progress.value) % 5 === 0) {
+        updatePositionState()
+      }
     })
     
     audio.value.addEventListener('durationchange', () => {
       duration.value = audio.value.duration
+      updatePositionState()
     })
     
     audio.value.addEventListener('ended', () => {
@@ -57,10 +161,12 @@ export const usePlayerStore = defineStore('player', () => {
     
     audio.value.addEventListener('play', () => {
       isPlaying.value = true
+      updatePlaybackState()
     })
     
     audio.value.addEventListener('pause', () => {
       isPlaying.value = false
+      updatePlaybackState()
     })
     
     audio.value.addEventListener('error', (e) => {
@@ -76,7 +182,7 @@ export const usePlayerStore = defineStore('player', () => {
     })
   }
 
-  // Preload next track
+  // Preload next track (also caches it)
   const preloadNextTrack = async () => {
     if (nextTrackPreloaded.value || queue.value.length === 0) return
     
@@ -89,11 +195,31 @@ export const usePlayerStore = defineStore('player', () => {
     const nextTrack = queue.value[nextIndex]
     if (!nextTrack) return
     
-    try {
-      const response = await playerApi.getStreamUrl(nextTrack.id)
+    // Check if already cached
+    if (getCachedAudio(nextTrack.id)) {
       nextTrackPreloaded.value = {
         track: nextTrack,
-        url: response.data.url
+        url: getCachedAudio(nextTrack.id),
+        cached: true
+      }
+      return
+    }
+    
+    try {
+      const response = await playerApi.getStreamUrl(nextTrack.id)
+      const streamUrl = response.data.url
+      
+      // Fetch and cache as blob for faster switching
+      const audioResponse = await fetch(streamUrl)
+      const blob = await audioResponse.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      
+      setCachedAudio(nextTrack.id, blobUrl)
+      
+      nextTrackPreloaded.value = {
+        track: nextTrack,
+        url: blobUrl,
+        cached: true
       }
     } catch (e) {
       console.error('Failed to preload next track:', e)
@@ -120,13 +246,35 @@ export const usePlayerStore = defineStore('player', () => {
     currentTrack.value = track
     lastError.value = null
     
+    // Update Media Session
+    updateMediaSession()
+    
     try {
+      // Check if track is cached
+      const cachedUrl = getCachedAudio(track.id)
+      if (cachedUrl) {
+        audio.value.src = cachedUrl
+        await audio.value.play()
+        loading.value = false
+        return
+      }
+      
       // Get stream URL from API
       const response = await playerApi.getStreamUrl(track.id)
       const { url } = response.data
       
+      // Start playing immediately
       audio.value.src = url
       await audio.value.play()
+      
+      // Cache in background for future use
+      fetch(url)
+        .then(res => res.blob())
+        .then(blob => {
+          const blobUrl = URL.createObjectURL(blob)
+          setCachedAudio(track.id, blobUrl)
+        })
+        .catch(() => {})  // Ignore cache errors
     } catch (error) {
       console.error('Failed to play track:', error)
       
@@ -192,16 +340,18 @@ export const usePlayerStore = defineStore('player', () => {
     queueIndex.value = nextIndex
     const nextTrack = queue.value[nextIndex]
     
-    // Use preloaded if available
-    if (nextTrackPreloaded.value?.track?.id === nextTrack.id) {
+    // Use preloaded/cached if available
+    const cachedUrl = getCachedAudio(nextTrack.id)
+    if (cachedUrl || nextTrackPreloaded.value?.track?.id === nextTrack.id) {
       initAudio()
       loading.value = true
       currentTrack.value = nextTrack
+      updateMediaSession()
       try {
-        audio.value.src = nextTrackPreloaded.value.url
+        audio.value.src = cachedUrl || nextTrackPreloaded.value.url
         await audio.value.play()
       } catch (e) {
-        console.error('Failed to play preloaded track:', e)
+        console.error('Failed to play cached/preloaded track:', e)
       } finally {
         loading.value = false
         nextTrackPreloaded.value = null
@@ -231,13 +381,33 @@ export const usePlayerStore = defineStore('player', () => {
     }
     
     queueIndex.value = prevIndex
-    await play(queue.value[prevIndex])
+    
+    // Check cache for previous track
+    const prevTrack = queue.value[prevIndex]
+    const cachedUrl = getCachedAudio(prevTrack.id)
+    if (cachedUrl) {
+      initAudio()
+      loading.value = true
+      currentTrack.value = prevTrack
+      updateMediaSession()
+      try {
+        audio.value.src = cachedUrl
+        await audio.value.play()
+      } catch (e) {
+        console.error('Failed to play cached track:', e)
+      } finally {
+        loading.value = false
+      }
+    } else {
+      await play(prevTrack)
+    }
   }
 
   // Seek
   const seek = (time) => {
     if (!audio.value) return
     audio.value.currentTime = time
+    updatePositionState()
   }
 
   // Handle track end
