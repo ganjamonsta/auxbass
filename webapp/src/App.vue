@@ -1136,11 +1136,15 @@ onMounted(async () => {
   align-items: center;
   width: 100%;
   height: auto;
-  min-height: 44px;
-  background: var(--spotify-gray);
-  border-radius: 22px;
-  padding: 4px 12px;
+  min-height: 48px;
+  background: var(--neu-bg);
+  border-radius: 24px;
+  padding: 6px 14px;
   gap: 10px;
+  box-shadow: 
+    inset 3px 3px 6px var(--neu-shadow-dark),
+    inset -2px -2px 4px var(--neu-shadow-light);
+  border: 1px solid rgba(255, 255, 255, 0.02);
 }
 
 .search-content {
@@ -1152,14 +1156,16 @@ onMounted(async () => {
 }
 
 .search-tag {
-  background: var(--spotify-gray-light);
-  color: var(--spotify-text);
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 14px;
+  background: var(--spotify-green);
+  color: white;
+  padding: 5px 12px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 500;
   display: flex;
   align-items: center;
   white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(29, 185, 84, 0.3);
 }
 
 .search-icon {
@@ -1234,21 +1240,27 @@ onMounted(async () => {
 }
 
 .icon-btn {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border: none;
-  background: var(--spotify-gray);
+  background: var(--neu-bg);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   color: var(--spotify-text);
-  transition: background 0.2s;
+  transition: all 0.2s ease;
+  box-shadow: 
+    5px 5px 10px var(--neu-shadow-dark),
+    -2px -2px 6px var(--neu-shadow-light);
 }
 
 .icon-btn:active {
-  background: var(--spotify-gray-light);
+  box-shadow: 
+    inset 3px 3px 6px var(--neu-shadow-dark),
+    inset -2px -2px 4px var(--neu-shadow-light);
+  transform: scale(0.95);
 }
 
 /* Compact Header */
@@ -1394,12 +1406,13 @@ onMounted(async () => {
 /* Liked quick item and tab */
 .liked-quick .quick-icon,
 .liked-icon {
-  background: linear-gradient(135deg, #1db954 0%, #1ed760 100%) !important;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
   color: white;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4) !important;
 }
 
 .liked-tab.active {
-  color: #1db954 !important;
+  color: #ef4444 !important;
 }
 
 .liked-tab svg {
@@ -1548,7 +1561,7 @@ onMounted(async () => {
 .quick-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
+  gap: 12px;
   padding: 16px;
 }
 
@@ -1556,27 +1569,35 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 12px;
-  background: var(--spotify-gray);
-  border-radius: 4px;
+  padding: 10px 14px;
+  background: var(--neu-bg);
+  border-radius: 16px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s ease;
+  box-shadow: 
+    5px 5px 10px var(--neu-shadow-dark),
+    -2px -2px 6px var(--neu-shadow-light);
+  border: 1px solid rgba(255, 255, 255, 0.02);
 }
 
 .quick-item:active {
-  background: var(--spotify-gray-light);
+  box-shadow: 
+    inset 3px 3px 6px var(--neu-shadow-dark),
+    inset -2px -2px 4px var(--neu-shadow-light);
+  transform: scale(0.98);
 }
 
 .quick-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 4px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, var(--spotify-green) 0%, #1e8e5e 100%);
   color: white;
   flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(29, 185, 84, 0.3);
 }
 
 .quick-icon.history-icon {
@@ -1855,7 +1876,8 @@ onMounted(async () => {
 }
 
 .system-playlist-icon.liked-gradient {
-  background: linear-gradient(135deg, #1db954 0%, #1ed760 100%);
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
 }
 
 .system-playlist-icon.history-gradient {
@@ -2066,7 +2088,8 @@ onMounted(async () => {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2074,28 +2097,35 @@ onMounted(async () => {
 }
 
 .modal {
-  background: var(--spotify-gray);
-  padding: 24px;
-  border-radius: 16px;
+  background: var(--neu-bg);
+  padding: 28px;
+  border-radius: 24px;
   width: 90%;
   max-width: 320px;
+  box-shadow: 
+    12px 12px 24px var(--neu-shadow-dark),
+    -6px -6px 12px var(--neu-shadow-light);
+  border: 1px solid rgba(255, 255, 255, 0.03);
 }
 
 .modal h3 {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   font-size: 20px;
   font-weight: 700;
 }
 
 .modal-input {
   width: 100%;
-  padding: 14px 16px;
+  padding: 14px 18px;
   border: none;
-  border-radius: 8px;
-  background: var(--spotify-gray-dark);
+  border-radius: 16px;
+  background: var(--spotify-black);
   color: var(--spotify-text);
   font-size: 16px;
   margin-bottom: 20px;
+  box-shadow: 
+    inset 3px 3px 6px var(--neu-shadow-dark),
+    inset -2px -2px 4px var(--neu-shadow-light);
 }
 
 .modal-actions {
@@ -2107,21 +2137,42 @@ onMounted(async () => {
   flex: 1;
   padding: 14px;
   border: none;
-  border-radius: 24px;
+  border-radius: 16px;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .btn-primary {
-  background: var(--spotify-green);
-  color: black;
+  background: linear-gradient(145deg, var(--spotify-green), var(--spotify-green-dark));
+  color: white;
+  box-shadow: 
+    4px 4px 8px var(--neu-shadow-dark),
+    -2px -2px 5px var(--neu-shadow-light),
+    0 0 12px rgba(29, 185, 84, 0.3);
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+  box-shadow: 
+    inset 2px 2px 4px rgba(0, 0, 0, 0.3),
+    0 0 8px rgba(29, 185, 84, 0.3);
 }
 
 .btn-secondary {
-  background: transparent;
+  background: var(--neu-bg);
   color: var(--spotify-text);
-  border: 1px solid var(--spotify-text-muted);
+  box-shadow: 
+    4px 4px 8px var(--neu-shadow-dark),
+    -2px -2px 5px var(--neu-shadow-light);
+}
+
+.btn-secondary:active {
+  transform: scale(0.98);
+  box-shadow: 
+    inset 2px 2px 4px var(--neu-shadow-dark),
+    inset -1px -1px 3px var(--neu-shadow-light);
 }
 
 /* Skeleton list */

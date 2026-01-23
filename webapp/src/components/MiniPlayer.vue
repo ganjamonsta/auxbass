@@ -286,15 +286,18 @@ const coverInitials = computed(() => {
 }
 
 .mini-cover {
-  width: 48px;
-  height: 48px;
-  border-radius: 4px;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   overflow: hidden;
   position: relative;
+  box-shadow: 
+    4px 4px 8px var(--neu-shadow-dark),
+    -2px -2px 5px var(--neu-shadow-light);
 }
 
 .cover-image {
@@ -352,21 +355,28 @@ const coverInitials = computed(() => {
 }
 
 .mini-btn {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border: none;
-  background: none;
+  background: var(--neu-bg);
+  border-radius: 50%;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--spotify-text);
   flex-shrink: 0;
-  transition: transform 0.1s;
+  transition: all 0.15s ease;
+  box-shadow: 
+    4px 4px 8px var(--neu-shadow-dark),
+    -2px -2px 5px var(--neu-shadow-light);
 }
 
 .mini-btn:active {
   transform: scale(0.95);
+  box-shadow: 
+    inset 2px 2px 5px var(--neu-shadow-dark),
+    inset -1px -1px 3px var(--neu-shadow-light);
 }
 
 .spinner {

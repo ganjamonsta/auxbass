@@ -549,13 +549,16 @@ const formatTime = (seconds) => {
   width: 100%;
   max-width: min(280px, 35vh);
   aspect-ratio: 1;
-  border-radius: 8px;
+  border-radius: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: 
+    12px 12px 24px var(--neu-shadow-dark),
+    -6px -6px 12px var(--neu-shadow-light);
   overflow: hidden;
   transition: transform 0.2s;
+  border: 2px solid rgba(255, 255, 255, 0.03);
 }
 
 .player-cover.swiping .cover-image {
@@ -633,9 +636,12 @@ const formatTime = (seconds) => {
 .slider-wrapper {
   position: relative;
   width: 100%;
-  height: 4px;
-  border-radius: 2px;
+  height: 6px;
+  border-radius: 8px;
   background: var(--spotify-gray);
+  box-shadow: 
+    inset 2px 2px 4px var(--neu-shadow-dark),
+    inset -1px -1px 3px var(--neu-shadow-light);
 }
 
 .buffered-bar {
@@ -655,11 +661,11 @@ const formatTime = (seconds) => {
   left: 0;
   top: 0;
   width: 100%;
-  height: 4px;
+  height: 6px;
   -webkit-appearance: none;
   appearance: none;
   background: transparent;
-  border-radius: 2px;
+  border-radius: 8px;
   outline: none;
   cursor: pointer;
   z-index: 2;
@@ -668,17 +674,20 @@ const formatTime = (seconds) => {
 
 .progress-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 12px;
-  height: 12px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: var(--spotify-text);
+  background: linear-gradient(145deg, var(--spotify-green), var(--spotify-green-dark));
   cursor: pointer;
   transition: transform 0.1s;
-  box-shadow: 0 0 4px rgba(0,0,0,0.5); /* Make it pop */
+  box-shadow: 
+    3px 3px 6px var(--neu-shadow-dark),
+    -1px -1px 3px var(--neu-shadow-light),
+    0 0 8px rgba(29, 185, 84, 0.4);
 }
 
 .progress-slider:active::-webkit-slider-thumb {
-  transform: scale(1.2);
+  transform: scale(1.15);
 }
 
 .progress-times {
@@ -699,42 +708,60 @@ const formatTime = (seconds) => {
 }
 
 .control-btn {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   border: none;
-  background: none;
+  background: var(--neu-bg);
+  border-radius: 50%;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--spotify-text);
-  transition: transform 0.1s, opacity 0.2s;
+  transition: all 0.15s ease;
+  box-shadow: 
+    5px 5px 10px var(--neu-shadow-dark),
+    -2px -2px 6px var(--neu-shadow-light);
 }
 
 .control-btn:active {
   transform: scale(0.95);
+  box-shadow: 
+    inset 3px 3px 6px var(--neu-shadow-dark),
+    inset -2px -2px 4px var(--neu-shadow-light);
 }
 
 .control-btn.secondary {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   color: var(--spotify-text-muted);
 }
 
 .control-btn.secondary.active {
   color: var(--spotify-green);
+  box-shadow: 
+    inset 3px 3px 6px var(--neu-shadow-dark),
+    inset -2px -2px 4px var(--neu-shadow-light),
+    0 0 12px rgba(29, 185, 84, 0.3);
 }
 
 .play-btn {
-  width: 56px;
-  height: 56px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
-  background: var(--spotify-text);
-  color: var(--spotify-black);
+  background: linear-gradient(145deg, var(--spotify-green), var(--spotify-green-dark));
+  color: white;
+  box-shadow: 
+    6px 6px 14px var(--neu-shadow-dark),
+    -3px -3px 8px var(--neu-shadow-light),
+    0 0 20px rgba(29, 185, 84, 0.4);
 }
 
 .play-btn:active {
-  background: var(--spotify-text-secondary);
+  transform: scale(0.95);
+  box-shadow: 
+    inset 3px 3px 6px rgba(0, 0, 0, 0.3),
+    0 0 15px rgba(29, 185, 84, 0.3);
 }
 
 .loading-overlay {
@@ -786,22 +813,28 @@ const formatTime = (seconds) => {
 
 .volume-slider {
   flex: 1;
-  height: 4px;
+  height: 6px;
   -webkit-appearance: none;
   appearance: none;
   background: var(--spotify-gray);
-  border-radius: 2px;
+  border-radius: 8px;
   outline: none;
   cursor: pointer;
+  box-shadow: 
+    inset 2px 2px 4px var(--neu-shadow-dark),
+    inset -1px -1px 3px var(--neu-shadow-light);
 }
 
 .volume-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: var(--spotify-text);
   cursor: pointer;
+  box-shadow: 
+    2px 2px 5px var(--neu-shadow-dark),
+    -1px -1px 3px var(--neu-shadow-light);
 }
 
 /* Mini queue */
@@ -810,15 +843,19 @@ const formatTime = (seconds) => {
   bottom: 0;
   left: 0;
   right: 0;
-  background: var(--spotify-gray);
-  border-radius: 16px 16px 0 0;
-  padding: 16px;
-  padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
+  background: var(--neu-bg);
+  border-radius: 24px 24px 0 0;
+  padding: 20px;
+  padding-bottom: max(20px, env(safe-area-inset-bottom, 20px));
   max-height: 50%;
   overflow-y: auto;
   overflow-x: hidden;
   z-index: 200;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+  box-shadow: 
+    0 -8px 24px var(--neu-shadow-dark),
+    0 -2px 8px var(--neu-shadow-light);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-bottom: none;
 }
 
 .mini-queue::-webkit-scrollbar {
