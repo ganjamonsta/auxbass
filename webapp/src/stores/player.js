@@ -4,6 +4,8 @@ import { playerApi, tracksApi } from '../api/client'
 
 // ============== LocalStorage helpers ==============
 const STORAGE_KEY = 'tg_player_settings'
+const STATE_STORAGE_KEY = 'tg_player_state'
+const STATE_SAVE_INTERVAL = 5000 // Save position every 5 seconds
 
 const loadSettings = () => {
   try {
@@ -25,8 +27,40 @@ const saveSettings = (settings) => {
   }
 }
 
+const loadPlayerState = () => {
+  try {
+    const saved = localStorage.getItem(STATE_STORAGE_KEY)
+    if (saved) {
+      return JSON.parse(saved)
+    }
+  } catch (e) {
+    console.error('Failed to load player state:', e)
+  }
+  return null
+}
+
+const savePlayerState = (state) => {
+  try {
+    localStorage.setItem(STATE_STORAGE_KEY, JSON.stringify({
+      ...state,
+      savedAt: Date.now()
+    }))
+  } catch (e) {
+    console.error('Failed to save player state:', e)
+  }
+}
+
+const clearPlayerState = () => {
+  try {
+    localStorage.removeItem(STATE_STORAGE_KEY)
+  } catch (e) {
+    console.error('Failed to clear player state:', e)
+  }
+}
+
 // Load saved settings
 const savedSettings = loadSettings()
+const savedState = loadPlayerState()
 
 // Audio cache - stores blob URLs for already loaded tracks
 const audioCache = new Map()
@@ -78,6 +112,10 @@ export const usePlayerStore = defineStore('player', () => {
   const buffered = ref(0) // buffered endpoint in seconds
   const nextTrackPreloaded = ref(null)
   const lastError = ref(null)  // For error notifications
+  const stateRestored = ref(false) // Flag to track if state was restored
+  
+  // Interval for periodic state saving
+  let stateSaveInterval = null
   
   // Flag to prevent duplicate preload triggers per track
   let preloadTriggered = false
@@ -246,11 +284,13 @@ export const usePlayerStore = defineStore('player', () => {
     audio.value.addEventListener('play', () => {
       isPlaying.value = true
       updatePlaybackState()
+      startStateSaving()
     })
     
     audio.value.addEventListener('pause', () => {
       isPlaying.value = false
       updatePlaybackState()
+      persistState() // Save state on pause
     })
     
     audio.value.addEventListener('error', (e) => {
@@ -547,7 +587,13 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   // Toggle play/pause
-  const toggle = () => {
+  const toggle = async () => {
+    // If we have a restored state but audio is not loaded, resume from state
+    if (currentTrack.value && (!audio.value || !audio.value.src)) {
+      await resumeFromState()
+      return
+    }
+    
     if (!audio.value) return
     
     if (isPlaying.value) {
@@ -757,6 +803,133 @@ export const usePlayerStore = defineStore('player', () => {
       repeat: repeat.value,
     })
   }
+  
+  // Persist player state (current track, queue, position)
+  const persistState = () => {
+    if (!currentTrack.value) {
+      clearPlayerState()
+      return
+    }
+    
+    savePlayerState({
+      currentTrack: currentTrack.value,
+      queue: queue.value,
+      queueIndex: queueIndex.value,
+      progress: progress.value,
+      duration: duration.value,
+    })
+  }
+  
+  // Start periodic state saving
+  const startStateSaving = () => {
+    if (stateSaveInterval) return
+    stateSaveInterval = setInterval(() => {
+      if (currentTrack.value && isPlaying.value) {
+        persistState()
+      }
+    }, STATE_SAVE_INTERVAL)
+  }
+  
+  // Stop periodic state saving
+  const stopStateSaving = () => {
+    if (stateSaveInterval) {
+      clearInterval(stateSaveInterval)
+      stateSaveInterval = null
+    }
+  }
+  
+  // Restore player state from localStorage
+  const restoreState = async () => {
+    if (stateRestored.value || !savedState) return false
+    
+    stateRestored.value = true
+    
+    // Check if saved state is not too old (24 hours max)
+    const maxAge = 24 * 60 * 60 * 1000 // 24 hours
+    if (savedState.savedAt && Date.now() - savedState.savedAt > maxAge) {
+      console.log('[Player] Saved state too old, discarding')
+      clearPlayerState()
+      return false
+    }
+    
+    if (!savedState.currentTrack || !savedState.queue || savedState.queue.length === 0) {
+      return false
+    }
+    
+    console.log('[Player] Restoring saved state:', {
+      track: savedState.currentTrack?.title,
+      queueLength: savedState.queue?.length,
+      progress: savedState.progress
+    })
+    
+    // Restore queue and current track
+    queue.value = savedState.queue
+    queueIndex.value = savedState.queueIndex ?? 0
+    currentTrack.value = savedState.currentTrack
+    duration.value = savedState.duration ?? 0
+    progress.value = savedState.progress ?? 0
+    
+    // Initialize audio but don't auto-play (paused state)
+    initAudio()
+    updateMediaSession()
+    
+    // Start state saving
+    startStateSaving()
+    
+    return true
+  }
+  
+  // Resume playback from restored state
+  const resumeFromState = async () => {
+    if (!currentTrack.value) return
+    
+    const savedProgress = progress.value
+    
+    try {
+      loading.value = true
+      
+      // Get stream URL
+      const response = await playerApi.getStreamUrl(currentTrack.value.id)
+      const { url } = response.data
+      
+      audio.value.src = url
+      buffered.value = 0
+      
+      // Wait for metadata to load before seeking
+      await new Promise((resolve, reject) => {
+        const onLoaded = () => {
+          audio.value.removeEventListener('loadedmetadata', onLoaded)
+          audio.value.removeEventListener('error', onError)
+          resolve()
+        }
+        const onError = (e) => {
+          audio.value.removeEventListener('loadedmetadata', onLoaded)
+          audio.value.removeEventListener('error', onError)
+          reject(e)
+        }
+        audio.value.addEventListener('loadedmetadata', onLoaded)
+        audio.value.addEventListener('error', onError)
+        audio.value.load()
+      })
+      
+      // Seek to saved position
+      if (savedProgress > 0 && savedProgress < audio.value.duration - 1) {
+        audio.value.currentTime = savedProgress
+      }
+      
+      await audio.value.play()
+      loading.value = false
+      
+    } catch (error) {
+      console.error('Failed to resume playback:', error)
+      loading.value = false
+    }
+  }
+  
+  // Check if there's a saved state to restore
+  const hasSavedState = () => {
+    return savedState && savedState.currentTrack && savedState.queue?.length > 0
+  }
 
   // Play next (insert track after current)
   const playNext = (track) => {
@@ -770,12 +943,14 @@ export const usePlayerStore = defineStore('player', () => {
       }
     }
     queue.value.splice(insertIndex, 0, track)
+    persistState() // Save queue change
   }
 
   // Add to queue (at the end)
   const addToQueue = (track) => {
     if (!queue.value.find(t => t.id === track.id)) {
       queue.value.push(track)
+      persistState() // Save queue change
     }
   }
 
@@ -784,6 +959,7 @@ export const usePlayerStore = defineStore('player', () => {
     const targetIndex = queueIndex.value + 1 + relativeIndex
     if (targetIndex > queueIndex.value && targetIndex < queue.value.length) {
       queue.value.splice(targetIndex, 1)
+      persistState() // Save queue change
     }
   }
 
@@ -796,6 +972,7 @@ export const usePlayerStore = defineStore('player', () => {
         toIndex > queueIndex.value && toIndex <= queue.value.length) {
       const [item] = queue.value.splice(fromIndex, 1)
       queue.value.splice(toIndex > fromIndex ? toIndex - 1 : toIndex, 0, item)
+      persistState() // Save queue change
     }
   }
 
@@ -809,6 +986,10 @@ export const usePlayerStore = defineStore('player', () => {
     isPlaying.value = false
     progress.value = 0
     duration.value = 0
+    queue.value = []
+    queueIndex.value = -1
+    stopStateSaving()
+    clearPlayerState()
   }
 
   return {
@@ -825,6 +1006,7 @@ export const usePlayerStore = defineStore('player', () => {
     loading,
     buffered,
     lastError,
+    stateRestored,
     play,
     toggle,
     next,
@@ -841,5 +1023,9 @@ export const usePlayerStore = defineStore('player', () => {
     playFromQueue,
     stop,
     setOnTrackUnavailable,
+    restoreState,
+    resumeFromState,
+    hasSavedState,
+    persistState,
   }
 })

@@ -1081,6 +1081,11 @@ const handleTouchEnd = async () => {
 onMounted(async () => {
   document.body.classList.add('spotify-theme')
   await library.init()
+  
+  // Restore player state if available
+  if (player.hasSavedState()) {
+    await player.restoreState()
+  }
 })
 </script>
 
@@ -1272,25 +1277,27 @@ onMounted(async () => {
   overflow-y: auto;
   overflow-x: hidden;  /* Prevent horizontal scrollbar */
   position: relative;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
 }
 
-/* Content scrollbar - thin overlay style */
+/* Content scrollbar - thin style */
 .content::-webkit-scrollbar {
-  width: 4px;
-  background: transparent;
+  width: 4px !important;
+  background: transparent !important;
 }
 
 .content::-webkit-scrollbar-track {
-  background: transparent;
+  background: transparent !important;
 }
 
 .content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.3) !important;
+  border-radius: 2px !important;
 }
 
 .content::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.5) !important;
 }
 
 /* Pull to refresh */

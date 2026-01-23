@@ -128,7 +128,7 @@ body.spotify-theme {
   background-color: var(--spotify-black);
 }
 
-/* Custom thin scrollbar - appears over content */
+/* Custom thin scrollbar */
 ::-webkit-scrollbar {
   width: 4px;
   height: 4px;
@@ -140,24 +140,18 @@ body.spotify-theme {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.3);
   border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.5);
 }
 
-/* Firefox thin scrollbar */
+/* Firefox scrollbar */
 * {
-  scrollbar-width: none; /* Hide scrollbar on Firefox */
-}
-
-/* Show scrollbar only on webkit browsers with thin style */
-@supports (-webkit-appearance: none) {
-  * {
-    scrollbar-width: thin;
-  }
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
 }
 
 /* Disable text selection on UI elements */
