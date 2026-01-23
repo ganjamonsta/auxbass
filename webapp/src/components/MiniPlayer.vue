@@ -1,63 +1,29 @@
 <template>
   <div class="mini-player" @click="$emit('expand')">
-    <!-- LCD Screen Frame -->
-    <div class="lcd-frame">
-      <!-- Scanlines overlay -->
-      <div class="scanlines"></div>
-      
-      <!-- LCD Content -->
-      <div class="lcd-content">
-        <!-- Cover (small) -->
-        <div class="lcd-cover" :style="coverStyle">
-          <img 
-            v-if="track.cover_url" 
-            :src="track.cover_url" 
-            alt=""
-            class="cover-image"
-          />
-          <span v-else class="cover-text">{{ coverInitials }}</span>
-        </div>
-        
-        <!-- Track info with marquee effect -->
-        <div class="lcd-info">
-          <div class="lcd-title" :class="{ marquee: shouldMarquee }">
-            <span>{{ track.title || 'NO TRACK' }}</span>
-          </div>
-          <div class="lcd-artist">{{ track.artist || '---' }}</div>
-          <div class="lcd-time">{{ formatTime(progress) }} / {{ formatTime(duration || track.duration) }}</div>
-        </div>
-        
-        <!-- Playback indicator -->
-        <div class="lcd-status">
-          <div v-if="loading" class="status-loading">LOAD</div>
-          <div v-else-if="isPlaying" class="status-play">
-            <span class="blink">▶</span> PLAY
-          </div>
-          <div v-else class="status-pause">▮▮ STOP</div>
-        </div>
+    <!-- LCD Screen -->
+    <div class="lcd-screen">
+      <div class="lcd-row lcd-row-main">
+        <span class="lcd-status">{{ isPlaying ? '▶' : '■' }}</span>
+        <span class="lcd-title">{{ displayTitle }}</span>
       </div>
-      
-      <!-- Progress bar (LED style) -->
-      <div class="led-progress">
-        <div class="led-bar" v-for="i in 20" :key="i" :class="{ active: (i / 20) * 100 <= progressPercent, buffered: (i / 20) * 100 <= bufferedPercent }"></div>
+      <div class="lcd-row lcd-row-sub">
+        <span class="lcd-artist">{{ track.artist || '---' }}</span>
+        <span class="lcd-time">{{ formatTime(progress) }}/{{ formatTime(duration || track.duration) }}</span>
+      </div>
+      <!-- LED Progress dots -->
+      <div class="lcd-progress">
+        <span class="lcd-dot" v-for="i in 16" :key="i" :class="{ active: (i / 16) * 100 <= progressPercent }"></span>
       </div>
     </div>
     
-    <!-- Physical buttons (outside LCD) -->
-    <div class="physical-buttons">
-      <button class="retro-btn" @click.stop="$emit('toggle')">
-        <svg v-if="loading" class="spinner" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <circle cx="12" cy="12" r="10" stroke-width="3" stroke-opacity="0.3"/>
-          <path d="M12 2a10 10 0 0 1 10 10" stroke-width="3" stroke-linecap="round"/>
-        </svg>
-        <span v-else-if="isPlaying">▮▮</span>
-        <span v-else>▶</span>
-      </button>
-      
-      <button class="retro-btn" @click.stop="$emit('next')">
-        ▶▶
-      </button>
-    </div>
+    <!-- Controls -->
+    <button class="ctrl-btn" @click.stop="$emit('toggle')">
+      <svg v-if="loading" class="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+        <path d="M12 2a10 10 0 0 1 10 10"/>
+      </svg>
+      <template v-else>{{ isPlaying ? '❚❚' : '▶' }}</template>
+    </button>
+    <button class="ctrl-btn" @click.stop="$emit('next')">▶▶</button>
   </div>
 </template>
 
@@ -146,263 +112,145 @@ const formatTime = (seconds) => {
   const secs = Math.floor(seconds % 60)
   return `${mins}:${secs.toString().padStart(2, '0')}`
 }
+
+const displayTitle = computed(() => {
+  const title = props.track?.title || 'NO TRACK'
+  return title.length > 22 ? title.substring(0, 20) + '..' : title
+})
 </script>
 
 <style scoped>
-/* Retro LCD Player Styles */
-@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
-
+/* Neumorphism Mini Player with LCD Screen */
 .mini-player {
   display: flex;
-  align-items: stretch;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
   margin: 12px 12px 8px;
-  padding: 10px;
-  background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
-  border-radius: 12px;
+  padding: 8px 10px;
+  background: var(--neu-bg);
+  border-radius: 16px;
   cursor: pointer;
   z-index: 60;
   box-shadow: 
-    8px 8px 16px rgba(0, 0, 0, 0.5),
-    -4px -4px 10px rgba(60, 60, 60, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  border: 2px solid #333;
-  position: relative;
+    6px 6px 12px var(--neu-shadow-dark),
+    -3px -3px 8px var(--neu-shadow-light);
+  border: 1px solid rgba(255, 255, 255, 0.03);
 }
 
-/* LCD Screen Frame */
-.lcd-frame {
+/* LCD Screen - Car Stereo Style */
+.lcd-screen {
   flex: 1;
-  background: #0a1a12;
-  border-radius: 6px;
-  padding: 8px 10px;
-  position: relative;
-  overflow: hidden;
-  border: 2px solid #1a2a1f;
+  background: linear-gradient(180deg, #0a1525 0%, #061020 100%);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  border: 1px solid #1a2a40;
   box-shadow: 
-    inset 0 0 20px rgba(0, 0, 0, 0.8),
-    inset 0 0 3px rgba(0, 255, 100, 0.1);
-}
-
-/* Scanlines effect */
-.scanlines {
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0, 0, 0, 0.15) 2px,
-    rgba(0, 0, 0, 0.15) 4px
-  );
-  pointer-events: none;
-  z-index: 10;
-}
-
-/* LCD Content */
-.lcd-content {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  position: relative;
-  z-index: 1;
-}
-
-/* Cover in LCD */
-.lcd-cover {
-  width: 42px;
-  height: 42px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  overflow: hidden;
-  border: 1px solid rgba(0, 255, 100, 0.3);
-  box-shadow: 0 0 8px rgba(0, 255, 100, 0.2);
-}
-
-.lcd-cover .cover-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  filter: brightness(0.9) contrast(1.1);
-}
-
-.lcd-cover .cover-text {
-  font-family: 'VT323', monospace;
-  font-size: 18px;
-  color: #00ff66;
-  text-shadow: 0 0 8px rgba(0, 255, 100, 0.8);
-}
-
-/* LCD Info */
-.lcd-info {
-  flex: 1;
+    inset 0 2px 8px rgba(0, 0, 0, 0.8),
+    0 1px 0 rgba(100, 150, 255, 0.1);
   min-width: 0;
-  font-family: 'VT323', monospace;
 }
 
-.lcd-title {
-  font-size: 18px;
-  color: #00ff66;
-  text-shadow: 
-    0 0 10px rgba(0, 255, 100, 0.8),
-    0 0 20px rgba(0, 255, 100, 0.4);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: clip;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.lcd-title.marquee span {
-  display: inline-block;
-  animation: marquee 8s linear infinite;
-}
-
-@keyframes marquee {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
-.lcd-artist {
-  font-size: 14px;
-  color: #00cc55;
-  text-shadow: 0 0 6px rgba(0, 200, 80, 0.6);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  opacity: 0.8;
-  margin-top: 2px;
-}
-
-.lcd-time {
-  font-size: 12px;
-  color: #00aa44;
-  text-shadow: 0 0 4px rgba(0, 170, 68, 0.5);
-  margin-top: 4px;
-  letter-spacing: 2px;
-}
-
-/* Status indicator */
-.lcd-status {
-  font-family: 'VT323', monospace;
-  font-size: 12px;
-  color: #00ff66;
-  text-shadow: 0 0 8px rgba(0, 255, 100, 0.8);
-  white-space: nowrap;
-  text-align: right;
-  min-width: 50px;
-}
-
-.status-play {
-  color: #00ff66;
-}
-
-.status-pause {
-  color: #ffaa00;
-  text-shadow: 0 0 8px rgba(255, 170, 0, 0.8);
-}
-
-.status-loading {
-  color: #ff6600;
-  text-shadow: 0 0 8px rgba(255, 100, 0, 0.8);
-  animation: blink 0.5s infinite;
-}
-
-.blink {
-  animation: blink 1s infinite;
-}
-
-@keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0.3; }
-}
-
-/* LED Progress Bar */
-.led-progress {
+.lcd-row {
   display: flex;
-  gap: 2px;
-  margin-top: 8px;
-  padding: 4px;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 3px;
-}
-
-.led-bar {
-  flex: 1;
-  height: 4px;
-  background: #0a2a15;
-  border-radius: 1px;
-  transition: background 0.1s, box-shadow 0.1s;
-}
-
-.led-bar.buffered {
-  background: #1a3a25;
-}
-
-.led-bar.active {
-  background: #00ff66;
-  box-shadow: 0 0 4px rgba(0, 255, 100, 0.8);
-}
-
-.led-bar.active:nth-child(n+15) {
-  background: #ffcc00;
-  box-shadow: 0 0 4px rgba(255, 200, 0, 0.8);
-}
-
-.led-bar.active:nth-child(n+18) {
-  background: #ff4400;
-  box-shadow: 0 0 4px rgba(255, 68, 0, 0.8);
-}
-
-/* Physical Buttons */
-.physical-buttons {
-  display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 6px;
 }
 
-.retro-btn {
-  width: 44px;
-  height: 32px;
+.lcd-row-main {
+  margin-bottom: 2px;
+}
+
+.lcd-row-sub {
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.lcd-status {
+  color: #00aaff;
+  font-size: 11px;
+  text-shadow: 0 0 6px rgba(0, 170, 255, 0.8);
+  flex-shrink: 0;
+}
+
+.lcd-title {
+  color: #4dc3ff;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 8px rgba(77, 195, 255, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.lcd-artist {
+  color: #3399cc;
+  font-size: 11px;
+  text-shadow: 0 0 4px rgba(51, 153, 204, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lcd-time {
+  color: #66ccff;
+  font-size: 11px;
+  font-weight: 500;
+  text-shadow: 0 0 4px rgba(102, 204, 255, 0.5);
+  flex-shrink: 0;
+  letter-spacing: 1px;
+}
+
+/* Progress dots */
+.lcd-progress {
+  display: flex;
+  gap: 3px;
+}
+
+.lcd-dot {
+  width: 100%;
+  height: 3px;
+  background: #0a2035;
+  border-radius: 1px;
+  flex: 1;
+}
+
+.lcd-dot.active {
+  background: #00ccff;
+  box-shadow: 0 0 4px rgba(0, 204, 255, 0.8);
+}
+
+/* Neumorphic Control Buttons */
+.ctrl-btn {
+  width: 36px;
+  height: 36px;
   border: none;
-  background: linear-gradient(180deg, #3a3a3a 0%, #2a2a2a 50%, #1a1a1a 100%);
-  border-radius: 6px;
+  background: var(--neu-bg);
+  border-radius: 50%;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #aaa;
-  font-family: 'VT323', monospace;
-  font-size: 14px;
-  letter-spacing: -1px;
+  color: var(--spotify-text-muted);
+  font-size: 10px;
   flex-shrink: 0;
-  transition: all 0.1s ease;
+  transition: all 0.15s ease;
   box-shadow: 
-    2px 2px 4px rgba(0, 0, 0, 0.5),
-    -1px -1px 2px rgba(80, 80, 80, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  border: 1px solid #444;
+    4px 4px 8px var(--neu-shadow-dark),
+    -2px -2px 5px var(--neu-shadow-light);
 }
 
-.retro-btn:active {
-  transform: translateY(1px);
+.ctrl-btn:active {
+  transform: scale(0.95);
   box-shadow: 
-    1px 1px 2px rgba(0, 0, 0, 0.5),
-    inset 0 2px 4px rgba(0, 0, 0, 0.3);
-  background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 50%, #0a0a0a 100%);
+    inset 2px 2px 5px var(--neu-shadow-dark),
+    inset -1px -1px 3px var(--neu-shadow-light);
+  color: var(--spotify-green);
 }
 
-.retro-btn:first-child:active {
-  color: #00ff66;
-  text-shadow: 0 0 8px rgba(0, 255, 100, 0.8);
-}
-
-.spinner {
+.spin {
   animation: spin 1s linear infinite;
-  color: #ff6600;
 }
 
 @keyframes spin {
