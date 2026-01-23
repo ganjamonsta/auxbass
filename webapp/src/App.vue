@@ -112,6 +112,7 @@
               Любимые
             </h2>
             <div class="horizontal-scroll">
+              <div class="scroll-spacer"></div>
               <div 
                 v-for="track in library.likedTracks.slice(0, 10)" 
                 :key="track.id"
@@ -135,6 +136,7 @@
                 <div class="feed-card-title">{{ track.title || 'Без названия' }}</div>
                 <div class="feed-card-subtitle">{{ track.artist || 'Неизвестный' }}</div>
               </div>
+              <div class="scroll-spacer"></div>
             </div>
           </div>
 
@@ -142,6 +144,7 @@
           <div v-if="library.history.length > 0" class="feed-section">
             <h2 class="feed-section-title">Недавно играло</h2>
             <div class="horizontal-scroll">
+              <div class="scroll-spacer"></div>
               <div 
                 v-for="track in library.history.slice(0, 10)" 
                 :key="track.id"
@@ -160,6 +163,7 @@
                 <div class="feed-card-title">{{ track.title || 'Без названия' }}</div>
                 <div class="feed-card-subtitle">{{ track.artist || 'Неизвестный' }}</div>
               </div>
+              <div class="scroll-spacer"></div>
             </div>
           </div>
 
@@ -167,6 +171,7 @@
           <div v-if="library.artists.length > 0" class="feed-section">
             <h2 class="feed-section-title">Твои артисты</h2>
             <div class="horizontal-scroll">
+              <div class="scroll-spacer"></div>
               <div 
                 v-for="artist in library.artists.slice(0, 10)" 
                 :key="artist.artist"
@@ -184,6 +189,7 @@
                 <div class="feed-card-title">{{ artist.artist }}</div>
                 <div class="feed-card-subtitle">{{ artist.count }} треков</div>
               </div>
+              <div class="scroll-spacer"></div>
             </div>
           </div>
 
@@ -191,6 +197,7 @@
           <div v-if="library.playlists.length > 0" class="feed-section">
             <h2 class="feed-section-title">Плейлисты</h2>
             <div class="horizontal-scroll">
+              <div class="scroll-spacer"></div>
               <div 
                 v-for="pl in library.playlists" 
                 :key="pl.id"
@@ -215,6 +222,7 @@
                 <div class="feed-card-title">Создать</div>
                 <div class="feed-card-subtitle">плейлист</div>
               </div>
+              <div class="scroll-spacer"></div>
             </div>
           </div>
 
@@ -1184,15 +1192,15 @@ onMounted(async () => {
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  padding-left: 16px;
-  padding-right: 16px;
-  margin-left: -16px;
-  margin-right: -16px;
-  width: calc(100% + 32px);
 }
 
 .horizontal-scroll::-webkit-scrollbar {
   display: none;
+}
+
+.scroll-spacer {
+  flex-shrink: 0;
+  width: 4px;
 }
 
 /* Feed Cards */
