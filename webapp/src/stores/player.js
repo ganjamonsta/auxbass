@@ -352,6 +352,8 @@ export const usePlayerStore = defineStore('player', () => {
         if (repeat.value === 'all') {
           nextIndex = 0
         } else {
+          // End of queue, no repeat - stop playback
+          isPlaying.value = false
           return
         }
       }
@@ -362,23 +364,35 @@ export const usePlayerStore = defineStore('player', () => {
     
     // Use preloaded/cached if available
     const cachedUrl = getCachedAudio(nextTrack.id)
-    if (cachedUrl || nextTrackPreloaded.value?.track?.id === nextTrack.id) {
+    const preloadedUrl = nextTrackPreloaded.value?.track?.id === nextTrack.id 
+      ? nextTrackPreloaded.value.url 
+      : null
+    
+    if (cachedUrl || preloadedUrl) {
       initAudio()
       loading.value = true
       currentTrack.value = nextTrack
       updateMediaSession()
+      
       try {
-        audio.value.src = cachedUrl || nextTrackPreloaded.value.url
+        audio.value.src = cachedUrl || preloadedUrl
         await audio.value.play()
-      } catch (e) {
-        console.error('Failed to play cached/preloaded track:', e)
-      } finally {
         loading.value = false
         nextTrackPreloaded.value = null
+        return  // Success - exit
+      } catch (e) {
+        console.error('Failed to play cached/preloaded track, falling back:', e)
+        // Invalidate bad cache entry
+        if (cachedUrl) {
+          audioCache.delete(nextTrack.id)
+        }
+        nextTrackPreloaded.value = null
+        // Fall through to regular play()
       }
-    } else {
-      await play(nextTrack)
     }
+    
+    // Regular play (no cache or cache failed)
+    await play(nextTrack)
   }
 
   // Previous track
