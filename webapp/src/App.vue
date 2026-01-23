@@ -1,29 +1,53 @@
 <template>
   <div class="app spotify-theme">
-    <!-- One UI Style Header -->
+    <!-- One UI Style Header with Animated Search -->
     <header class="oneui-header" v-if="currentView === 'library'">
-      <div class="header-top">
+      <div class="header-row">
         <EnrichmentStatus />
-        <button @click="showSearch = !showSearch" class="icon-btn">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-          </svg>
-        </button>
-      </div>
-      <h1>{{ headerTitle }}</h1>
-      
-      <!-- Search bar -->
-      <Transition name="slide-down">
-        <div v-if="showSearch" class="search-container">
-          <input 
-            v-model="searchQuery"
-            type="text"
-            placeholder="Поиск треков, артистов..."
-            class="search-input"
-            @input="debouncedSearch"
-          />
+        
+        <!-- Animated Search / Title Toggle -->
+        <div class="search-title-container" :class="{ expanded: showSearch }">
+          <!-- Title (visible when search closed) -->
+          <Transition name="fade-title">
+            <h1 v-if="!showSearch" class="header-title-main" @click="openSearch">
+              TG Player
+            </h1>
+          </Transition>
+          
+          <!-- Search Input (visible when search open) -->
+          <Transition name="expand-search">
+            <div v-if="showSearch" class="search-wrapper">
+              <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+              </svg>
+              <input 
+                ref="searchInput"
+                v-model="searchQuery"
+                type="text"
+                placeholder="Поиск треков, артистов..."
+                class="search-input-inline"
+                @input="debouncedSearch"
+                @blur="onSearchBlur"
+                @keyup.escape="closeSearch"
+              />
+              <button class="search-close-btn" @click="closeSearch">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
+                </svg>
+              </button>
+            </div>
+          </Transition>
         </div>
-      </Transition>
+        
+        <!-- Search Toggle Button (visible when search closed) -->
+        <Transition name="fade">
+          <button v-if="!showSearch" @click="openSearch" class="icon-btn search-toggle">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+            </svg>
+          </button>
+        </Transition>
+      </div>
     </header>
 
     <!-- Compact Header for other views -->
@@ -613,7 +637,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, inject } from 'vue'
+import { ref, computed, onMounted, inject, nextTick } from 'vue'
 import { usePlayerStore } from './stores/player'
 import { useLibraryStore } from './stores/library'
 import TrackItem from './components/TrackItem.vue'
@@ -633,6 +657,9 @@ const telegram = inject('telegram')
 // Stores
 const player = usePlayerStore()
 const library = useLibraryStore()
+
+// Refs
+const searchInput = ref(null)
 
 // Toast ref
 const toast = ref(null)
@@ -905,6 +932,30 @@ const debouncedSearch = () => {
   }, 300)
 }
 
+// Search open/close with animation
+const openSearch = async () => {
+  showSearch.value = true
+  await nextTick()
+  searchInput.value?.focus()
+}
+
+const closeSearch = () => {
+  showSearch.value = false
+  if (searchQuery.value) {
+    searchQuery.value = ''
+    library.fetchTracks()  // Reset to full list
+  }
+}
+
+const onSearchBlur = () => {
+  // Close search if empty after small delay (allows clicking close button)
+  setTimeout(() => {
+    if (!searchQuery.value && showSearch.value) {
+      showSearch.value = false
+    }
+  }, 150)
+}
+
 // Pull-to-refresh handlers
 const handleTouchStart = (e) => {
   const scrollTop = document.querySelector('.content')?.scrollTop || 0
@@ -960,21 +1011,123 @@ onMounted(async () => {
 /* One UI Large Header */
 .oneui-header {
   flex-shrink: 0;
-  padding: 16px 20px 20px;
+  padding: 12px 16px 16px;
   background: linear-gradient(180deg, var(--spotify-gray-dark) 0%, var(--spotify-black) 100%);
 }
 
-.header-top {
+.header-row {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  gap: 12px;
 }
 
-.oneui-header h1 {
-  font-size: 34px;
+/* Search/Title Container - animated expansion */
+.search-title-container {
+  flex: 1;
+  position: relative;
+  height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.header-title-main {
+  font-size: 28px;
   font-weight: 700;
   letter-spacing: -0.5px;
+  margin: 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Search wrapper with animation */
+.search-wrapper {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 44px;
+  background: var(--spotify-gray);
+  border-radius: 22px;
+  padding: 0 12px;
+  gap: 10px;
+}
+
+.search-icon {
+  flex-shrink: 0;
+  color: var(--spotify-text-muted);
+}
+
+.search-input-inline {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--spotify-text);
+  font-size: 16px;
+  outline: none;
+  padding: 0;
+}
+
+.search-input-inline::placeholder {
+  color: var(--spotify-text-muted);
+}
+
+.search-close-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: var(--spotify-gray-light);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--spotify-text);
+}
+
+.search-toggle {
+  flex-shrink: 0;
+}
+
+/* Animations */
+.expand-search-enter-active {
+  animation: expandSearch 0.3s ease-out;
+}
+
+.expand-search-leave-active {
+  animation: expandSearch 0.2s ease-in reverse;
+}
+
+@keyframes expandSearch {
+  from {
+    opacity: 0;
+    transform: scaleX(0.3);
+    transform-origin: right center;
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+    transform-origin: right center;
+  }
+}
+
+.fade-title-enter-active,
+.fade-title-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-title-enter-from,
+.fade-title-leave-to {
+  opacity: 0;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 .icon-btn {
@@ -1012,25 +1165,6 @@ onMounted(async () => {
 
 .spacer {
   width: 40px;
-}
-
-/* Search */
-.search-container {
-  margin-top: 16px;
-}
-
-.search-input {
-  width: 100%;
-  padding: 14px 16px;
-  border: none;
-  border-radius: 8px;
-  background: var(--spotify-gray);
-  color: var(--spotify-text);
-  font-size: 16px;
-}
-
-.search-input::placeholder {
-  color: var(--spotify-text-muted);
 }
 
 /* Content */

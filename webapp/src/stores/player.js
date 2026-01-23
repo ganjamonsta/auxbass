@@ -200,57 +200,97 @@ export const usePlayerStore = defineStore('player', () => {
       loading.value = false
     })
     
-    // Preload next track when current is 80% done
+    // Preload next track when current is 30% done (earlier for smoother transition)
     audio.value.addEventListener('timeupdate', () => {
-      if (duration.value > 0 && progress.value / duration.value > 0.8) {
+      if (duration.value > 0 && progress.value / duration.value > 0.3) {
         preloadNextTrack()
       }
     })
   }
 
-  // Preload next track (also caches it)
+  // Preload next tracks (caches them for gapless playback)
   const preloadNextTrack = async () => {
-    if (nextTrackPreloaded.value || queue.value.length === 0) return
+    if (queue.value.length === 0) return
     
-    let nextIndex = queueIndex.value + 1
-    if (nextIndex >= queue.value.length) {
-      if (repeat.value === 'all') nextIndex = 0
-      else return
+    // Preload next 2 tracks for truly gapless experience
+    const tracksToPreload = []
+    
+    for (let offset = 1; offset <= 2; offset++) {
+      let nextIndex = queueIndex.value + offset
+      if (nextIndex >= queue.value.length) {
+        if (repeat.value === 'all') {
+          nextIndex = nextIndex % queue.value.length
+        } else {
+          break
+        }
+      }
+      
+      const track = queue.value[nextIndex]
+      if (track && !getCachedAudio(track.id)) {
+        tracksToPreload.push(track)
+      }
     }
     
-    const nextTrack = queue.value[nextIndex]
-    if (!nextTrack) return
+    // Mark first one as "preloaded" for quick access
+    const nextTrack = queue.value[queueIndex.value + 1] || 
+                      (repeat.value === 'all' ? queue.value[0] : null)
     
-    // Check if already cached
-    if (getCachedAudio(nextTrack.id)) {
+    if (nextTrack && getCachedAudio(nextTrack.id)) {
       nextTrackPreloaded.value = {
         track: nextTrack,
         url: getCachedAudio(nextTrack.id),
         cached: true
       }
-      return
     }
     
+    // Preload tracks in background (don't await - fire and forget)
+    for (const track of tracksToPreload) {
+      preloadSingleTrack(track)
+    }
+  }
+  
+  // Preload a single track into cache
+  const preloadSingleTrack = async (track) => {
+    // Skip if already cached or currently loading
+    if (getCachedAudio(track.id) || _preloadingTracks.has(track.id)) return
+    
+    _preloadingTracks.add(track.id)
+    
     try {
-      const response = await playerApi.getStreamUrl(nextTrack.id)
+      const response = await playerApi.getStreamUrl(track.id)
       const streamUrl = response.data.url
       
-      // Fetch and cache as blob for faster switching
       const audioResponse = await fetch(streamUrl)
+      if (!audioResponse.ok) return
+      
       const blob = await audioResponse.blob()
       const blobUrl = URL.createObjectURL(blob)
       
-      setCachedAudio(nextTrack.id, blobUrl)
+      setCachedAudio(track.id, blobUrl)
       
-      nextTrackPreloaded.value = {
-        track: nextTrack,
-        url: blobUrl,
-        cached: true
+      // Update nextTrackPreloaded if this is the next track
+      const nextIndex = queueIndex.value + 1
+      const nextTrack = queue.value[nextIndex] || 
+                        (repeat.value === 'all' ? queue.value[0] : null)
+      
+      if (nextTrack && nextTrack.id === track.id) {
+        nextTrackPreloaded.value = {
+          track: track,
+          url: blobUrl,
+          cached: true
+        }
       }
+      
+      console.log(`Preloaded: ${track.title}`)
     } catch (e) {
-      console.error('Failed to preload next track:', e)
+      console.error('Failed to preload track:', track.title, e)
+    } finally {
+      _preloadingTracks.delete(track.id)
     }
   }
+  
+  // Set to track which tracks are currently being preloaded
+  const _preloadingTracks = new Set()
 
   // Play track
   const play = async (track, newQueue = null) => {
@@ -282,6 +322,10 @@ export const usePlayerStore = defineStore('player', () => {
         audio.value.src = cachedUrl
         await audio.value.play()
         loading.value = false
+        
+        // Start preloading next tracks immediately
+        nextTrackPreloaded.value = null
+        preloadNextTrack()
         return
       }
       
@@ -290,10 +334,13 @@ export const usePlayerStore = defineStore('player', () => {
       const { url } = response.data
       
       // Stream directly - fastest start time
-      // NO separate fetch for caching - that doubled the traffic!
-      // Caching is done via preloadNextTrack() which loads NEXT track in background
+      // Caching is done via preloadNextTrack() which loads NEXT tracks in background
       audio.value.src = url
       await audio.value.play()
+      
+      // Start preloading next tracks immediately after play starts
+      nextTrackPreloaded.value = null
+      preloadNextTrack()
       
     } catch (error) {
       console.error('Failed to play track:', error)
@@ -379,6 +426,9 @@ export const usePlayerStore = defineStore('player', () => {
         await audio.value.play()
         loading.value = false
         nextTrackPreloaded.value = null
+        
+        // Immediately start preloading next tracks for gapless playback
+        preloadNextTrack()
         return  // Success - exit
       } catch (e) {
         console.error('Failed to play cached/preloaded track, falling back:', e)
