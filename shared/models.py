@@ -149,6 +149,7 @@ class Playlist(Base):
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
     is_auto_album: Mapped[bool] = mapped_column(Boolean, default=False)  # Auto-created album
     deezer_album_id: Mapped[Optional[int]] = mapped_column(Integer)  # Deezer album ID
+    album_artist: Mapped[Optional[str]] = mapped_column(String(255))  # Artist for album playlists
     
     # Auto-source playlist (auto-created based on forward source)
     is_auto_source: Mapped[bool] = mapped_column(Boolean, default=False)

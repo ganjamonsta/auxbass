@@ -26,54 +26,88 @@ class AlbumAssemblyService:
     async def get_album_candidates(self, user_id: int) -> List[Dict]:
         """
         Find potential albums from user's tracks.
-        Groups by (artist, album) or (artist, deezer_album_id)
+        Groups by deezer_album_id primarily, or by album name (case-insensitive).
+        Aggregates all artists for the album.
         Returns list of album candidates with track counts.
         """
         async with get_session() as session:
-            # Find tracks grouped by artist + album (or deezer_album_id)
+            # Get all tracks with album info
             result = await session.execute(
-                select(
-                    Track.artist,
-                    Track.album,
-                    Track.deezer_album_id,
-                    Track.cover_url,
-                    func.count(Track.id).label("track_count"),
-                    func.sum(Track.duration).label("total_duration")
-                )
+                select(Track)
                 .where(
                     Track.user_id == user_id,
                     Track.album.isnot(None),
                     Track.album != "",
-                    Track.artist.isnot(None),
-                    Track.artist != ""
                 )
-                .group_by(
-                    Track.artist,
-                    Track.album,
-                    Track.deezer_album_id,
-                    Track.cover_url
-                )
-                .having(func.count(Track.id) >= self.MIN_TRACKS_FOR_ALBUM)
-                .order_by(func.count(Track.id).desc())
             )
+            tracks = list(result.scalars().all())
             
+            # Group by deezer_album_id or album name (normalized)
+            albums: Dict[str, Dict] = {}
+            
+            for track in tracks:
+                # Use deezer_album_id as primary key, fallback to album name
+                if track.deezer_album_id:
+                    key = f"deezer:{track.deezer_album_id}"
+                else:
+                    key = f"name:{track.album.lower().strip()}"
+                
+                if key not in albums:
+                    albums[key] = {
+                        "album": track.album,
+                        "deezer_album_id": track.deezer_album_id,
+                        "cover_url": track.cover_url,
+                        "artists": set(),
+                        "track_ids": set(),
+                        "total_duration": 0,
+                    }
+                
+                album_data = albums[key]
+                
+                # Collect all artists
+                if track.artist:
+                    album_data["artists"].add(track.artist)
+                
+                # Track unique tracks
+                album_data["track_ids"].add(track.id)
+                album_data["total_duration"] += track.duration or 0
+                
+                # Update cover_url if we don't have one
+                if not album_data["cover_url"] and track.cover_url:
+                    album_data["cover_url"] = track.cover_url
+                
+                # Prefer deezer_album_id if we find one
+                if track.deezer_album_id and not album_data["deezer_album_id"]:
+                    album_data["deezer_album_id"] = track.deezer_album_id
+            
+            # Convert to list and filter by minimum tracks
             candidates = []
-            for row in result.all():
+            for key, data in albums.items():
+                if len(data["track_ids"]) < self.MIN_TRACKS_FOR_ALBUM:
+                    continue
+                
+                # Determine main artist (most common or first)
+                artists_list = sorted(data["artists"])
+                main_artist = artists_list[0] if artists_list else "Unknown"
+                
                 candidates.append({
-                    "artist": row.artist,
-                    "album": row.album,
-                    "deezer_album_id": row.deezer_album_id,
-                    "cover_url": row.cover_url,
-                    "track_count": row.track_count,
-                    "total_duration": row.total_duration or 0,
+                    "artist": main_artist,
+                    "all_artists": artists_list,
+                    "album": data["album"],
+                    "deezer_album_id": data["deezer_album_id"],
+                    "cover_url": data["cover_url"],
+                    "track_count": len(data["track_ids"]),
+                    "total_duration": data["total_duration"],
                 })
+            
+            # Sort by track count descending
+            candidates.sort(key=lambda x: x["track_count"], reverse=True)
             
             return candidates
     
     async def check_existing_album_playlist(
         self, 
         user_id: int, 
-        artist: str, 
         album: str,
         deezer_album_id: Optional[int] = None
     ) -> Optional[Playlist]:
@@ -92,47 +126,68 @@ class AlbumAssemblyService:
                 if playlist:
                     return playlist
             
-            # Fallback to name matching
-            album_name = f"{artist} — {album}"
+            # Get all album playlists for user
             result = await session.execute(
                 select(Playlist).where(
                     Playlist.user_id == user_id,
                     Playlist.is_auto_album == True,
-                    Playlist.name == album_name
                 )
             )
-            return result.scalar()
+            playlists = result.scalars().all()
+            
+            album_lower = album.lower().strip()
+            for pl in playlists:
+                if not pl.name:
+                    continue
+                    
+                name_lower = pl.name.lower()
+                
+                # Match by exact album name (new format)
+                if name_lower == album_lower:
+                    return pl
+                
+                # Match by old format "Artist — Album"
+                if name_lower.endswith(f" — {album_lower}"):
+                    return pl
+                
+                # Match if name contains album after separator
+                if " — " in pl.name:
+                    parts = pl.name.split(" — ", 1)
+                    if len(parts) > 1 and parts[1].lower().strip() == album_lower:
+                        return pl
+            
+            return None
     
     async def get_album_tracks(
         self, 
         user_id: int, 
-        artist: str, 
         album: str,
         deezer_album_id: Optional[int] = None
     ) -> List[Track]:
         """Get all user's tracks for a specific album"""
         async with get_session() as session:
-            conditions = [
-                Track.user_id == user_id,
-                Track.artist == artist,
-            ]
-            
             # Prefer deezer_album_id match if available
             if deezer_album_id:
-                conditions.append(
-                    or_(
-                        Track.deezer_album_id == deezer_album_id,
-                        Track.album == album
+                result = await session.execute(
+                    select(Track)
+                    .where(
+                        Track.user_id == user_id,
+                        or_(
+                            Track.deezer_album_id == deezer_album_id,
+                            func.lower(Track.album) == album.lower().strip()
+                        )
                     )
+                    .order_by(Track.title)
                 )
             else:
-                conditions.append(Track.album == album)
-            
-            result = await session.execute(
-                select(Track)
-                .where(and_(*conditions))
-                .order_by(Track.title)  # TODO: order by track number if available
-            )
+                result = await session.execute(
+                    select(Track)
+                    .where(
+                        Track.user_id == user_id,
+                        func.lower(Track.album) == album.lower().strip()
+                    )
+                    .order_by(Track.title)
+                )
             
             return list(result.scalars().all())
     
@@ -178,11 +233,11 @@ class AlbumAssemblyService:
     ) -> Playlist:
         """Create a new auto-album playlist from tracks"""
         async with get_session() as session:
-            album_name = f"{artist} — {album}"
-            
+            # Store album name only, artist is separate
             playlist = Playlist(
                 user_id=user_id,
-                name=album_name,
+                name=album,  # Just album name
+                album_artist=artist,  # Artist stored separately
                 description=f"Автоальбом • {len(tracks)} треков",
                 is_auto_album=True,
                 deezer_album_id=deezer_album_id,
@@ -222,7 +277,7 @@ class AlbumAssemblyService:
             
             await session.commit()
             
-            logger.info(f"Created auto-album: {album_name} ({len(tracks)} tracks)")
+            logger.info(f"Created auto-album: {artist} — {album} ({len(tracks)} tracks)")
             return playlist
     
     async def update_album_playlist(
@@ -300,19 +355,27 @@ class AlbumAssemblyService:
         candidates = await self.get_album_candidates(user_id)
         
         for candidate in candidates:
-            artist = candidate["artist"]
             album = candidate["album"]
             deezer_album_id = candidate.get("deezer_album_id")
             cover_url = candidate.get("cover_url")
+            all_artists = candidate.get("all_artists", [candidate.get("artist", "Unknown")])
+            
+            # Format artist display name
+            if len(all_artists) > 2:
+                artist_display = f"{all_artists[0]} и др."
+            elif len(all_artists) == 2:
+                artist_display = " & ".join(all_artists)
+            else:
+                artist_display = all_artists[0] if all_artists else "Unknown"
             
             # Check if playlist already exists
             existing = await self.check_existing_album_playlist(
-                user_id, artist, album, deezer_album_id
+                user_id, album, deezer_album_id
             )
             
             # Get all tracks for this album
             tracks = await self.get_album_tracks(
-                user_id, artist, album, deezer_album_id
+                user_id, album, deezer_album_id
             )
             
             if existing:
@@ -323,7 +386,7 @@ class AlbumAssemblyService:
                 if updated:
                     stats["updated"] += 1
                     stats["albums"].append({
-                        "name": f"{artist} — {album}",
+                        "name": f"{artist_display} — {album}",
                         "action": "updated"
                     })
                 else:
@@ -332,7 +395,7 @@ class AlbumAssemblyService:
                 # Create new playlist
                 await self.create_album_playlist(
                     user_id=user_id,
-                    artist=artist,
+                    artist=artist_display,
                     album=album,
                     tracks=tracks,
                     deezer_album_id=deezer_album_id,
@@ -340,7 +403,7 @@ class AlbumAssemblyService:
                 )
                 stats["created"] += 1
                 stats["albums"].append({
-                    "name": f"{artist} — {album}",
+                    "name": f"{artist_display} — {album}",
                     "action": "created",
                     "track_count": len(tracks)
                 })

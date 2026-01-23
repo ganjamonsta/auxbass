@@ -3,7 +3,11 @@
     <div class="playlist-cover" :class="{ 'has-image': playlist.cover_url }">
       <img v-if="playlist.cover_url" :src="playlist.cover_url" alt="" class="cover-image" />
       <span v-else class="cover-icon">{{ coverIcon }}</span>
-      <span v-if="playlist.is_auto_source" class="type-badge">{{ sourceLabel }}</span>
+      <!-- Artist overlay on cover for albums -->
+      <div v-if="playlist.album_artist" class="artist-overlay">
+        <span class="artist-text">{{ playlist.album_artist }}</span>
+      </div>
+      <span v-else-if="playlist.is_auto_source" class="type-badge">{{ sourceLabel }}</span>
     </div>
     <div class="playlist-name">{{ playlist.name }}</div>
     <div class="playlist-meta">{{ playlist.track_count }} треков</div>
@@ -81,6 +85,28 @@ const sourceLabel = computed(() => {
 
 .cover-icon {
   font-size: 28px;
+}
+
+/* Artist overlay on album cover */
+.artist-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent 0%, rgba(0,0,0,0.85) 100%);
+  padding: 16px 4px 4px;
+}
+
+.artist-text {
+  display: block;
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
 }
 
 .type-badge {

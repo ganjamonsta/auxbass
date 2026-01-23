@@ -47,6 +47,7 @@ class PlaylistResponse(PlaylistBase):
     is_auto_source: bool = False
     source_id: Optional[int] = None
     source_type: Optional[str] = None
+    album_artist: Optional[str] = None  # Artist for album playlists
     cover_url: Optional[str] = None
     share_code: Optional[str]
     track_count: int = 0
@@ -522,10 +523,19 @@ async def get_album_candidates(
     response = []
     for c in candidates:
         existing = await album_service.check_existing_album_playlist(
-            user.id, c["artist"], c["album"], c.get("deezer_album_id")
+            user.id, c["album"], c.get("deezer_album_id")
         )
+        # Get all artists or fall back to single artist
+        all_artists = c.get("all_artists", [c.get("artist", "Unknown")])
+        if len(all_artists) > 2:
+            artist_display = f"{all_artists[0]} и др."
+        elif len(all_artists) == 2:
+            artist_display = " & ".join(all_artists)
+        else:
+            artist_display = all_artists[0] if all_artists else "Unknown"
+        
         response.append(AlbumCandidateResponse(
-            artist=c["artist"],
+            artist=artist_display,
             album=c["album"],
             track_count=c["track_count"],
             total_duration=c["total_duration"],
