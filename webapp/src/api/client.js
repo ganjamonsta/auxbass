@@ -36,13 +36,14 @@ export const authApi = {
 
 // Tracks
 export const tracksApi = {
+  // My library
   getAll: (params = {}) => api.get('/tracks', { params }),
   getOne: (id) => api.get(`/tracks/${id}`),
   update: (id, data) => api.put(`/tracks/${id}`, data),
   delete: (id) => api.delete(`/tracks/${id}`),
-  getArtists: () => api.get('/tracks/artists'),
+  getArtists: (scope = 'library') => api.get('/tracks/artists', { params: { scope } }),
   getArtistImage: (artistName) => api.get(`/tracks/artist-image/${encodeURIComponent(artistName)}`),
-  getGenres: () => api.get('/tracks/genres'),
+  getGenres: (scope = 'library') => api.get('/tracks/genres', { params: { scope } }),
   getEnrichmentStatus: () => api.get('/tracks/enrichment/status'),
   getHistory: (limit = 50) => api.get('/tracks/history', { params: { limit } }),
   getLiked: () => api.get('/tracks/liked'),
@@ -51,6 +52,16 @@ export const tracksApi = {
   markUnavailable: (id) => api.post(`/tracks/${id}/mark-unavailable`),
   getUnavailable: () => api.get('/tracks/unavailable/list'),
   deleteAllUnavailable: () => api.delete('/tracks/unavailable/all'),
+  
+  // Global library
+  getGlobal: (params = {}) => api.get('/tracks/global', { params }),
+  getRecentUploads: (limit = 20) => api.get('/tracks/global/recent', { params: { limit } }),
+  getPopular: (limit = 20) => api.get('/tracks/global/popular', { params: { limit } }),
+  getGlobalStats: () => api.get('/tracks/global/stats'),
+  
+  // Library management
+  addToLibrary: (trackId) => api.post(`/tracks/${trackId}/add-to-library`),
+  removeFromLibrary: (trackId) => api.delete(`/tracks/${trackId}/remove-from-library`),
 }
 
 // Playlists

@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { tracksApi, playlistsApi, playerApi } from '../api/client'
 
 export const useLibraryStore = defineStore('library', () => {
-  // State
+  // State - My Library
   const tracks = ref([])
   const playlists = ref([])
   const artists = ref([])
@@ -16,6 +16,16 @@ export const useLibraryStore = defineStore('library', () => {
   const total = ref(0)
   const page = ref(1)
   const hasMore = ref(true)
+  
+  // State - Global Library
+  const globalTracks = ref([])
+  const globalLoading = ref(false)
+  const globalTotal = ref(0)
+  const globalPage = ref(1)
+  const globalHasMore = ref(true)
+  const recentUploads = ref([])
+  const popularTracks = ref([])
+  const globalStats = ref(null)
 
   // Initialize
   const init = async () => {
@@ -26,6 +36,8 @@ export const useLibraryStore = defineStore('library', () => {
       fetchGenres(),    // For home feed genres
       fetchHistory(),   // For home feed
       fetchLikedTracks(),  // Liked tracks
+      fetchGlobalStats(), // Global library stats
+      fetchRecentUploads(), // Recent uploads from all users
     ])
   }
 
@@ -40,6 +52,8 @@ export const useLibraryStore = defineStore('library', () => {
         fetchGenres(),
         fetchHistory(),
         fetchLikedTracks(),
+        fetchGlobalStats(),
+        fetchRecentUploads(),
       ])
     } finally {
       refreshing.value = false
@@ -309,7 +323,128 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
+  // ============== GLOBAL LIBRARY ==============
+  
+  // Fetch global tracks
+  const fetchGlobalTracks = async (params = {}) => {
+    globalLoading.value = true
+    try {
+      const response = await tracksApi.getGlobal({
+        page: params.page || 1,
+        per_page: 50,
+        ...params,
+      })
+      
+      const data = response.data
+      
+      if (params.page && params.page > 1) {
+        globalTracks.value = [...globalTracks.value, ...data.items]
+      } else {
+        globalTracks.value = data.items
+      }
+      
+      globalTotal.value = data.total
+      globalPage.value = data.page
+      globalHasMore.value = globalTracks.value.length < data.total
+    } catch (error) {
+      console.error('Failed to fetch global tracks:', error)
+    } finally {
+      globalLoading.value = false
+    }
+  }
+  
+  // Load more global tracks
+  const loadMoreGlobal = async (params = {}) => {
+    if (!globalHasMore.value || globalLoading.value) return
+    await fetchGlobalTracks({ ...params, page: globalPage.value + 1 })
+  }
+  
+  // Fetch recent uploads from all users
+  const fetchRecentUploads = async (limit = 20) => {
+    try {
+      const response = await tracksApi.getRecentUploads(limit)
+      recentUploads.value = response.data
+      return response.data
+    } catch (error) {
+      console.error('Failed to fetch recent uploads:', error)
+      return []
+    }
+  }
+  
+  // Fetch popular tracks globally
+  const fetchPopularTracks = async (limit = 20) => {
+    try {
+      const response = await tracksApi.getPopular(limit)
+      popularTracks.value = response.data
+      return response.data
+    } catch (error) {
+      console.error('Failed to fetch popular tracks:', error)
+      return []
+    }
+  }
+  
+  // Fetch global stats
+  const fetchGlobalStats = async () => {
+    try {
+      const response = await tracksApi.getGlobalStats()
+      globalStats.value = response.data
+      return response.data
+    } catch (error) {
+      console.error('Failed to fetch global stats:', error)
+      return null
+    }
+  }
+  
+  // Add track to my library from global
+  const addToLibrary = async (trackId) => {
+    try {
+      await tracksApi.addToLibrary(trackId)
+      // Update local state
+      const track = globalTracks.value.find(t => t.id === trackId) || 
+                    recentUploads.value.find(t => t.id === trackId) ||
+                    popularTracks.value.find(t => t.id === trackId)
+      if (track) {
+        track.in_library = true
+        // Also add to tracks list
+        if (!tracks.value.find(t => t.id === trackId)) {
+          tracks.value.unshift({ ...track, in_library: true })
+        }
+      }
+      return true
+    } catch (error) {
+      console.error('Failed to add to library:', error)
+      return false
+    }
+  }
+  
+  // Remove track from my library
+  const removeFromLibrary = async (trackId) => {
+    try {
+      await tracksApi.removeFromLibrary(trackId)
+      // Update local state
+      tracks.value = tracks.value.filter(t => t.id !== trackId)
+      // Update in_library flag in global lists
+      const updateInLibrary = (list) => {
+        const track = list.find(t => t.id === trackId)
+        if (track) track.in_library = false
+      }
+      updateInLibrary(globalTracks.value)
+      updateInLibrary(recentUploads.value)
+      updateInLibrary(popularTracks.value)
+      return true
+    } catch (error) {
+      console.error('Failed to remove from library:', error)
+      return false
+    }
+  }
+  
+  // Check if track is in my library
+  const isInLibrary = (trackId) => {
+    return tracks.value.some(t => t.id === trackId)
+  }
+
   return {
+    // My library
     tracks,
     playlists,
     artists,
@@ -321,6 +456,17 @@ export const useLibraryStore = defineStore('library', () => {
     refreshing,
     total,
     hasMore,
+    
+    // Global library
+    globalTracks,
+    globalLoading,
+    globalTotal,
+    globalHasMore,
+    recentUploads,
+    popularTracks,
+    globalStats,
+    
+    // Methods
     init,
     refresh,
     fetchTracks,
@@ -343,5 +489,15 @@ export const useLibraryStore = defineStore('library', () => {
     isTrackLiked,
     unavailableCount,
     deleteUnavailableTracks,
+    
+    // Global library methods
+    fetchGlobalTracks,
+    loadMoreGlobal,
+    fetchRecentUploads,
+    fetchPopularTracks,
+    fetchGlobalStats,
+    addToLibrary,
+    removeFromLibrary,
+    isInLibrary,
   }
 })

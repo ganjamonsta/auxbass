@@ -1,5 +1,6 @@
 """
 TG Player - Database Models
+Supports shared global library where all users can see and play each other's tracks
 """
 from datetime import datetime
 from typing import Optional, List
@@ -26,17 +27,29 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relations
-    tracks: Mapped[List["Track"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    tracks: Mapped[List["Track"]] = relationship(back_populates="uploader", cascade="all, delete-orphan")
     playlists: Mapped[List["Playlist"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    library_entries: Mapped[List["UserLibrary"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    
+    @property
+    def display_name(self) -> str:
+        """Get user's display name"""
+        if self.first_name:
+            return f"{self.first_name} {self.last_name or ''}".strip()
+        return self.username or f"User {self.id}"
 
 
 class Track(Base):
+    """
+    Global track - one instance per unique file across all users.
+    Any user can play any track, the uploader just gets credit.
+    """
     __tablename__ = "tracks"
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
     file_id: Mapped[str] = mapped_column(String(255), nullable=False)
-    file_unique_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_unique_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)  # Now globally unique!
     
     # Metadata
     title: Mapped[Optional[str]] = mapped_column(String(255))
@@ -56,13 +69,12 @@ class Track(Base):
     file_size: Mapped[Optional[int]] = mapped_column(Integer)
     mime_type: Mapped[Optional[str]] = mapped_column(String(50))
     
-    # Listening statistics
+    # Global listening statistics (across all users)
     play_count: Mapped[int] = mapped_column(Integer, default=0)
     last_played_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     
-    # Favorites
-    is_liked: Mapped[bool] = mapped_column(Boolean, default=False)
-    liked_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    # Visibility in global library
+    is_public: Mapped[bool] = mapped_column(Boolean, default=True)
     
     # Availability (file deleted from Telegram)
     is_unavailable: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -72,14 +84,50 @@ class Track(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relations
-    user: Mapped["User"] = relationship(back_populates="tracks")
+    uploader: Mapped["User"] = relationship(back_populates="tracks")
     playlist_associations: Mapped[List["PlaylistTrack"]] = relationship(back_populates="track", cascade="all, delete-orphan")
+    library_entries: Mapped[List["UserLibrary"]] = relationship(back_populates="track", cascade="all, delete-orphan")
     
     __table_args__ = (
-        UniqueConstraint("user_id", "file_unique_id", name="uq_user_track"),
         Index("idx_tracks_artist", "artist"),
         Index("idx_tracks_title", "title"),
         Index("idx_tracks_genre", "genre"),
+        Index("idx_tracks_public", "is_public"),
+        Index("idx_tracks_play_count", "play_count"),
+    )
+
+
+class UserLibrary(Base):
+    """
+    User's personal library - links users to tracks they've added.
+    Each user can have their own liked status, play count, etc.
+    """
+    __tablename__ = "user_library"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
+    track_id: Mapped[int] = mapped_column(Integer, ForeignKey("tracks.id", ondelete="CASCADE"))
+    
+    # How did user get this track
+    source: Mapped[str] = mapped_column(String(20), default="uploaded")  # uploaded, added, shared
+    
+    # Personal stats (per-user)
+    is_liked: Mapped[bool] = mapped_column(Boolean, default=False)
+    liked_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    play_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_played_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    
+    # Timestamps
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    
+    # Relations
+    user: Mapped["User"] = relationship(back_populates="library_entries")
+    track: Mapped["Track"] = relationship(back_populates="library_entries")
+    
+    __table_args__ = (
+        UniqueConstraint("user_id", "track_id", name="uq_user_library_track"),
+        Index("idx_user_library_user", "user_id"),
+        Index("idx_user_library_liked", "user_id", "is_liked"),
     )
 
 

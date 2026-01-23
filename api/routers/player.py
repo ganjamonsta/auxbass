@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.config import get_settings
 from shared.database import get_db
-from shared.models import Track
+from shared.models import Track, UserLibrary
 
 from .auth import get_current_user, TelegramUser
 
@@ -166,17 +166,22 @@ async def get_stream_url(
     Get secure proxy URL for streaming a track.
     Returns a temporary token-based URL that proxies through our server.
     Bot token is NEVER exposed to the client.
+    
+    Users can stream:
+    - Any public track (from global library)
+    - Their own private tracks
     """
-    # Get track
+    # Get track (any track, we'll check permissions)
     track = await db.scalar(
-        select(Track).where(
-            Track.id == track_id,
-            Track.user_id == user.id
-        )
+        select(Track).where(Track.id == track_id)
     )
     
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
+    
+    # Check access: public tracks are accessible to everyone, private only to uploader
+    if not track.is_public and track.user_id != user.id:
+        raise HTTPException(status_code=403, detail="This track is private")
     
     # Verify file is accessible (pre-cache the path)
     file_path = await get_telegram_file_path(track.file_id)
@@ -223,11 +228,9 @@ async def stream_audio(
     track_id, user_id, file_path = token_data
     
     # Get track for metadata (file_path already validated and cached in token)
+    # Note: user_id in token is just for logging, access was validated when token was created
     track = await db.scalar(
-        select(Track).where(
-            Track.id == track_id,
-            Track.user_id == user_id
-        )
+        select(Track).where(Track.id == track_id)
     )
     
     if not track:
@@ -330,11 +333,15 @@ async def get_batch_stream_urls(
     if len(track_ids) > 50:
         raise HTTPException(status_code=400, detail="Maximum 50 tracks per request")
     
-    # Get tracks
+    # Get tracks (allow public tracks from any user)
+    from sqlalchemy import or_
     result = await db.execute(
         select(Track).where(
             Track.id.in_(track_ids),
-            Track.user_id == user.id
+            or_(
+                Track.is_public == True,
+                Track.user_id == user.id
+            )
         )
     )
     tracks = {t.id: t for t in result.scalars().all()}
@@ -378,11 +385,15 @@ async def prefetch_file_paths(
     if len(track_ids) > 20:
         track_ids = track_ids[:20]  # Limit to 20 tracks
     
-    # Get tracks
+    # Get tracks (allow public tracks from any user)
+    from sqlalchemy import or_
     result = await db.execute(
         select(Track).where(
             Track.id.in_(track_ids),
-            Track.user_id == user.id
+            or_(
+                Track.is_public == True,
+                Track.user_id == user.id
+            )
         )
     )
     tracks = result.scalars().all()
@@ -414,29 +425,42 @@ async def record_play(
 ):
     """
     Record that a track was fully played.
-    Increments play_count for statistics.
+    Increments global play_count and user's personal play_count.
     """
-    # Get track
+    # Get track (any public track or own)
     track = await db.scalar(
-        select(Track).where(
-            Track.id == track_id,
-            Track.user_id == user.id
-        )
+        select(Track).where(Track.id == track_id)
     )
     
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
     
-    # Increment play count
+    if not track.is_public and track.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Track is private")
+    
+    # Increment global play count
     track.play_count = (track.play_count or 0) + 1
     track.last_played_at = datetime.utcnow()
+    
+    # Update user's library entry if exists
+    lib_entry = await db.scalar(
+        select(UserLibrary).where(
+            UserLibrary.user_id == user.id,
+            UserLibrary.track_id == track_id
+        )
+    )
+    
+    if lib_entry:
+        lib_entry.play_count = (lib_entry.play_count or 0) + 1
+        lib_entry.last_played_at = datetime.utcnow()
     
     await db.commit()
     
     return {
         "success": True,
         "track_id": track_id,
-        "play_count": track.play_count
+        "play_count": track.play_count,
+        "user_play_count": lib_entry.play_count if lib_entry else 0
     }
 
 
@@ -449,17 +473,18 @@ async def download_track(
     """
     Send track to user via Telegram bot (download).
     Uses sendAudio to forward the file from bot to user.
+    Works for any public track.
     """
-    # Get track
+    # Get track (any public track or own)
     track = await db.scalar(
-        select(Track).where(
-            Track.id == track_id,
-            Track.user_id == user.id
-        )
+        select(Track).where(Track.id == track_id)
     )
     
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
+    
+    if not track.is_public and track.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Track is private")
     
     # Send audio via Bot API
     api_url = f"https://api.telegram.org/bot{settings.bot_token}/sendAudio"

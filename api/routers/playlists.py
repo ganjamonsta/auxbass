@@ -16,10 +16,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.database import get_db
-from shared.models import Playlist, PlaylistTrack, Track
+from shared.models import Playlist, PlaylistTrack, Track, UserLibrary
 
 from .auth import get_current_user, TelegramUser
-from .tracks import TrackResponse
+from .tracks import TrackResponse, track_to_response
 
 
 router = APIRouter()
@@ -148,7 +148,11 @@ async def get_playlist(
     """Get playlist with tracks"""
     result = await db.execute(
         select(Playlist)
-        .options(selectinload(Playlist.track_associations).selectinload(PlaylistTrack.track))
+        .options(
+            selectinload(Playlist.track_associations)
+            .selectinload(PlaylistTrack.track)
+            .selectinload(Track.uploader)
+        )
         .where(Playlist.id == playlist_id, Playlist.user_id == user.id)
     )
     playlist = result.scalar()
@@ -156,8 +160,17 @@ async def get_playlist(
     if not playlist:
         raise HTTPException(status_code=404, detail="Playlist not found")
     
+    # Get user's library entries for these tracks
+    track_ids = [assoc.track.id for assoc in playlist.track_associations]
+    lib_result = await db.execute(
+        select(UserLibrary)
+        .where(UserLibrary.user_id == user.id)
+        .where(UserLibrary.track_id.in_(track_ids))
+    )
+    user_lib = {lib.track_id: lib for lib in lib_result.scalars().all()}
+    
     tracks = [
-        TrackResponse.model_validate(assoc.track)
+        track_to_response(assoc.track, user_lib.get(assoc.track.id), user.id)
         for assoc in sorted(playlist.track_associations, key=lambda x: x.position)
     ]
     
@@ -249,7 +262,7 @@ async def add_track_to_playlist(
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Add track to playlist"""
+    """Add track to playlist (can add any public track)"""
     # Verify playlist exists and belongs to user
     playlist = await db.scalar(
         select(Playlist).where(
@@ -261,16 +274,20 @@ async def add_track_to_playlist(
     if not playlist:
         raise HTTPException(status_code=404, detail="Playlist not found")
     
-    # Verify track exists and belongs to user
+    # Verify track exists and is accessible (public or own)
+    from sqlalchemy import or_
     track = await db.scalar(
         select(Track).where(
             Track.id == data.track_id,
-            Track.user_id == user.id
+            or_(
+                Track.is_public == True,
+                Track.user_id == user.id
+            )
         )
     )
     
     if not track:
-        raise HTTPException(status_code=404, detail="Track not found")
+        raise HTTPException(status_code=404, detail="Track not found or is private")
     
     # Check if already in playlist
     existing = await db.scalar(

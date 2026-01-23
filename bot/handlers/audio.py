@@ -1,5 +1,6 @@
 """
 TG Player Bot - Audio Handler
+Supports global shared library with deduplication
 """
 from aiogram import Router, F
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
@@ -12,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.config import get_settings
 from shared.database import get_session
-from shared.models import User, Track, Playlist, PlaylistTrack
+from shared.models import User, Track, Playlist, PlaylistTrack, UserLibrary
 
 from services.session import session_manager
 
@@ -88,16 +89,20 @@ def format_duration(seconds: int | None) -> str:
 
 @router.message(F.audio)
 async def handle_audio(message: Message):
-    """Handle incoming audio files"""
+    """
+    Handle incoming audio files.
+    
+    Global library logic:
+    1. Check if track already exists globally (by file_unique_id)
+    2. If exists: add to user's library (if not already there)
+    3. If not exists: create track + add to user's library
+    """
     audio = message.audio
     user = message.from_user
     user_id = user.id
     
     # Check if in playlist creation mode
     playlist_session = session_manager.get_playlist_session(user_id)
-    
-    # NOTE: No need to validate file_id here - it just arrived from Telegram
-    # If file was inaccessible, Telegram wouldn't send us the audio message
     
     async with get_session() as session:
         # Ensure user exists
@@ -112,46 +117,91 @@ async def handle_audio(message: Message):
             session.add(db_user)
             await session.flush()
         
-        # Check if track already exists
-        existing = await session.scalar(
-            select(Track).where(
-                Track.user_id == user_id,
-                Track.file_unique_id == audio.file_unique_id
-            )
+        # Check if track already exists GLOBALLY (not per-user)
+        existing_track = await session.scalar(
+            select(Track).where(Track.file_unique_id == audio.file_unique_id)
         )
         
-        if existing:
-            # Track exists
-            if playlist_session:
-                # In playlist mode - ask to add existing track
-                await message.reply(
-                    f"⚠️ Трек уже в библиотеке!\n\n"
-                    f"🎵 <b>{existing.title or 'Без названия'}</b>\n"
-                    f"👤 {existing.artist or 'Неизвестный исполнитель'}\n\n"
-                    f"Добавить в плейлист «{playlist_session.name}»?",
-                    reply_markup=get_duplicate_keyboard(existing.id)
+        if existing_track:
+            # Track exists globally - check if user already has it in their library
+            existing_lib = await session.scalar(
+                select(UserLibrary).where(
+                    UserLibrary.user_id == user_id,
+                    UserLibrary.track_id == existing_track.id
                 )
+            )
+            
+            if existing_lib:
+                # User already has this track
+                if playlist_session:
+                    await message.reply(
+                        f"⚠️ Трек уже в твоей библиотеке!\n\n"
+                        f"🎵 <b>{existing_track.title or 'Без названия'}</b>\n"
+                        f"👤 {existing_track.artist or 'Неизвестный исполнитель'}\n\n"
+                        f"Добавить в плейлист «{playlist_session.name}»?",
+                        reply_markup=get_duplicate_keyboard(existing_track.id)
+                    )
+                else:
+                    await message.reply(
+                        "⚠️ Этот трек уже есть в твоей библиотеке!\n\n"
+                        f"🎵 <b>{existing_track.title or 'Без названия'}</b>\n"
+                        f"👤 {existing_track.artist or 'Неизвестный исполнитель'}",
+                        reply_markup=get_track_keyboard(existing_track.id)
+                    )
+                return
             else:
-                # Normal mode
-                await message.reply(
-                    "⚠️ Этот трек уже есть в твоей библиотеке!\n\n"
-                    f"🎵 <b>{existing.title or 'Без названия'}</b>\n"
-                    f"👤 {existing.artist or 'Неизвестный исполнитель'}",
-                    reply_markup=get_track_keyboard(existing.id)
+                # Track exists globally but user doesn't have it - add to their library
+                lib_entry = UserLibrary(
+                    user_id=user_id,
+                    track_id=existing_track.id,
+                    source="uploaded",  # They uploaded it too
                 )
-            return
+                session.add(lib_entry)
+                await session.flush()
+                
+                track_id = existing_track.id
+                title = existing_track.title or audio.title or "Без названия"
+                artist = existing_track.artist or audio.performer or "Неизвестный исполнитель"
+                duration = format_duration(existing_track.duration or audio.duration)
+                size_mb = (existing_track.file_size or audio.file_size or 0) / (1024 * 1024)
+                
+                # Note: this track was uploaded by someone else
+                uploader_note = ""
+                if existing_track.user_id != user_id:
+                    uploader_note = "\n\n💡 <i>Этот трек уже был в общей библиотеке!</i>"
+                
+                if playlist_session:
+                    playlist_session.add_track(track_id)
+                    await message.reply(
+                        f"✅ Трек добавлен в плейлист «{playlist_session.name}»!\n\n"
+                        f"🎵 <b>{title}</b>\n"
+                        f"👤 {artist}\n"
+                        f"⏱ {duration}\n\n"
+                        f"📊 Всего в плейлисте: <b>{playlist_session.track_count}</b> треков{uploader_note}",
+                        reply_markup=get_playlist_mode_keyboard(playlist_session.track_count)
+                    )
+                else:
+                    await message.reply(
+                        f"✅ <b>Трек добавлен в библиотеку!</b>\n\n"
+                        f"🎵 <b>{title}</b>\n"
+                        f"👤 {artist}\n"
+                        f"⏱ {duration} • {size_mb:.1f} MB{uploader_note}",
+                        reply_markup=get_track_keyboard(track_id)
+                    )
+                return
         
-        # Create new track
+        # Track doesn't exist globally - create new track
         track = Track(
             user_id=user_id,
             file_id=audio.file_id,
             file_unique_id=audio.file_unique_id,
             title=audio.title,
             artist=audio.performer,
-            album=audio.title if not audio.performer else None,  # Will be enriched later
+            album=audio.title if not audio.performer else None,
             duration=audio.duration,
             file_size=audio.file_size,
             mime_type=audio.mime_type,
+            is_public=True,  # Default to public for shared library
         )
         
         session.add(track)
@@ -159,7 +209,18 @@ async def handle_audio(message: Message):
         try:
             await session.flush()
             track_id = track.id
+            
+            # Also add to user's library
+            lib_entry = UserLibrary(
+                user_id=user_id,
+                track_id=track_id,
+                source="uploaded",
+            )
+            session.add(lib_entry)
+            await session.flush()
+            
         except IntegrityError:
+            await session.rollback()
             await message.reply("⚠️ Этот трек уже добавлен!")
             return
     
@@ -170,7 +231,6 @@ async def handle_audio(message: Message):
     size_mb = (audio.file_size or 0) / (1024 * 1024)
     
     if playlist_session:
-        # Playlist creation mode
         playlist_session.add_track(track_id)
         
         await message.reply(
@@ -182,12 +242,12 @@ async def handle_audio(message: Message):
             reply_markup=get_playlist_mode_keyboard(playlist_session.track_count)
         )
     else:
-        # Normal mode
         await message.reply(
             f"✅ <b>Трек добавлен в библиотеку!</b>\n\n"
             f"🎵 <b>{title}</b>\n"
             f"👤 {artist}\n"
-            f"⏱ {duration} • {size_mb:.1f} MB",
+            f"⏱ {duration} • {size_mb:.1f} MB\n\n"
+            f"🌍 <i>Доступен в общей библиотеке</i>",
             reply_markup=get_track_keyboard(track_id)
         )
 
