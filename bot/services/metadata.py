@@ -1,15 +1,56 @@
 """
 TG Player - Metadata Enrichment Service
 Uses Deezer API (free, no API key) for metadata and cover art
+MusicBrainz as fallback for genres
 """
 import asyncio
 import logging
 import re
 import time
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 import aiohttp
 
 logger = logging.getLogger(__name__)
+
+
+# Common genre mappings from tags
+GENRE_KEYWORDS = {
+    "rock": "Rock",
+    "pop": "Pop", 
+    "hip hop": "Hip-Hop",
+    "hip-hop": "Hip-Hop",
+    "rap": "Hip-Hop",
+    "electronic": "Electronic",
+    "edm": "Electronic",
+    "house": "Electronic",
+    "techno": "Electronic",
+    "dubstep": "Electronic",
+    "dnb": "Drum & Bass",
+    "drum and bass": "Drum & Bass",
+    "jazz": "Jazz",
+    "blues": "Blues",
+    "classical": "Classical",
+    "metal": "Metal",
+    "punk": "Punk",
+    "r&b": "R&B",
+    "rnb": "R&B",
+    "soul": "Soul",
+    "country": "Country",
+    "folk": "Folk",
+    "indie": "Indie",
+    "alternative": "Alternative",
+    "reggae": "Reggae",
+    "latin": "Latin",
+    "world": "World",
+    "ambient": "Ambient",
+    "soundtrack": "Soundtrack",
+    "k-pop": "K-Pop",
+    "kpop": "K-Pop",
+    "j-pop": "J-Pop",
+    "jpop": "J-Pop",
+    "russian": "Russian",
+    "russian rap": "Russian Hip-Hop",
+}
 
 
 class MetadataService:
@@ -143,6 +184,53 @@ class MetadataService:
         except Exception:
             return None
     
+    def _guess_genre_from_text(self, title: str, artist: str) -> Optional[str]:
+        """Try to guess genre from title/artist keywords"""
+        text = f"{title} {artist}".lower()
+        
+        for keyword, genre in GENRE_KEYWORDS.items():
+            if keyword in text:
+                return genre
+        
+        return None
+    
+    async def _search_lastfm_genre(self, artist: str) -> Optional[str]:
+        """Get genre from Last.fm artist tags (no API key needed for basic info)"""
+        if not artist:
+            return None
+            
+        await self._rate_limit()
+        session = await self._get_session()
+        
+        try:
+            # Use Last.fm's public artist info endpoint
+            url = f"https://www.last.fm/music/{artist.replace(' ', '+')}"
+            async with session.get(url) as resp:
+                if resp.status != 200:
+                    return None
+                
+                text = await resp.text()
+                
+                # Extract genre tags from page
+                import re
+                tags = re.findall(r'class="tag"[^>]*>([^<]+)</a>', text)
+                
+                if tags:
+                    # Map to our standard genres
+                    for tag in tags[:3]:
+                        tag_lower = tag.lower().strip()
+                        if tag_lower in GENRE_KEYWORDS:
+                            return GENRE_KEYWORDS[tag_lower]
+                        # Return first meaningful tag
+                        if len(tag) > 2 and tag not in ['seen', 'live']:
+                            return tag.title()
+                
+                return None
+                
+        except Exception as e:
+            logger.debug(f"Last.fm lookup failed: {e}")
+            return None
+    
     async def enrich_track(self, title: str, artist: str) -> Dict:
         """
         Main method to enrich track metadata
@@ -154,7 +242,7 @@ class MetadataService:
             "artist": artist,
         }
         
-        # Try Deezer
+        # Try Deezer first
         deezer_data = await self.search_deezer(title, artist)
         
         if deezer_data:
@@ -164,8 +252,25 @@ class MetadataService:
             result["cover_url"] = deezer_data.get("cover_url")
             result["source"] = "deezer"
             logger.info(f"Enriched from Deezer: {title} - {artist}")
-        else:
-            logger.debug(f"No Deezer data for: {title} - {artist}")
+        
+        # If no genre from Deezer, try fallbacks
+        if not result.get("genre"):
+            # Try keyword-based guess
+            guessed = self._guess_genre_from_text(title, artist)
+            if guessed:
+                result["genre"] = guessed
+                result["enriched"] = True
+                logger.info(f"Genre guessed from keywords: {guessed}")
+            else:
+                # Try Last.fm as last resort
+                lastfm_genre = await self._search_lastfm_genre(artist)
+                if lastfm_genre:
+                    result["genre"] = lastfm_genre
+                    result["enriched"] = True
+                    logger.info(f"Genre from Last.fm: {lastfm_genre}")
+        
+        if not result["enriched"]:
+            logger.debug(f"No enrichment data for: {title} - {artist}")
         
         return result
 

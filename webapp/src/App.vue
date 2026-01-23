@@ -38,7 +38,28 @@
     </header>
 
     <!-- Main content -->
-    <main class="content">
+    <main 
+      class="content"
+      @touchstart="handleTouchStart"
+      @touchmove="handleTouchMove"
+      @touchend="handleTouchEnd"
+    >
+      <!-- Pull to refresh indicator -->
+      <div 
+        v-if="pullDistance > 0" 
+        class="pull-indicator"
+        :style="{ transform: `translateY(${Math.min(pullDistance, 80)}px)` }"
+      >
+        <div class="pull-spinner" :class="{ active: isPulling }">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" :style="{ transform: `rotate(${pullDistance * 3}deg)` }">
+            <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+          </svg>
+        </div>
+        <span v-if="library.refreshing">Обновление...</span>
+        <span v-else-if="pullDistance > 60">Отпустите для обновления</span>
+        <span v-else>Потяните для обновления</span>
+      </div>
+
       <!-- Library view -->
       <div v-if="currentView === 'library'" class="library">
         <!-- Active filter indicator -->
@@ -176,6 +197,26 @@
             </div>
           </div>
         </div>
+
+        <!-- History tab -->
+        <div v-if="activeTab === 'history'" class="history-section">
+          <div v-if="library.history.length === 0" class="empty">
+            <div class="empty-icon">🕐</div>
+            <p class="empty-title">История пуста</p>
+            <p class="empty-hint">Здесь появятся прослушанные треки</p>
+          </div>
+          <div v-else class="history-list">
+            <TrackItem 
+              v-for="track in library.history" 
+              :key="`history-${track.id}`"
+              :track="track"
+              :isPlaying="player.currentTrack?.id === track.id && player.isPlaying"
+              @click="playTrack(track)"
+              @menu="showTrackMenu(track)"
+              showLastPlayed
+            />
+          </div>
+        </div>
       </div>
 
       <!-- Playlist view -->
@@ -243,6 +284,15 @@
           <path d="M4 10h12v2H4zm0-4h12v2H4zm0 8h8v2H4zm10 0v6l5-3z"/>
         </svg>
         <span>Очередь</span>
+      </button>
+      <button 
+        :class="['tab-item', { active: activeTab === 'history' }]"
+        @click="activeTab = 'history'; library.fetchHistory()"
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
+        </svg>
+        <span>История</span>
       </button>
     </nav>
 
@@ -390,6 +440,11 @@ const deletingTrack = ref(null)
 const showPlaylistPicker = ref(false)
 const trackForPlaylist = ref(null)
 
+// Pull-to-refresh state
+const pullStartY = ref(0)
+const pullDistance = ref(0)
+const isPulling = ref(false)
+
 // Computed
 const headerTitle = computed(() => {
   switch (currentView.value) {
@@ -500,6 +555,42 @@ const debouncedSearch = () => {
   }, 300)
 }
 
+// Pull-to-refresh handlers
+const handleTouchStart = (e) => {
+  const scrollTop = document.querySelector('.content')?.scrollTop || 0
+  if (scrollTop === 0 && currentView.value === 'library') {
+    pullStartY.value = e.touches[0].clientY
+    isPulling.value = true
+  }
+}
+
+const handleTouchMove = (e) => {
+  if (!isPulling.value || library.refreshing) return
+  
+  const currentY = e.touches[0].clientY
+  const diff = currentY - pullStartY.value
+  
+  if (diff > 0) {
+    pullDistance.value = Math.min(diff * 0.5, 100)
+    if (pullDistance.value > 10) {
+      e.preventDefault()
+    }
+  }
+}
+
+const handleTouchEnd = async () => {
+  if (!isPulling.value) return
+  
+  if (pullDistance.value > 60 && !library.refreshing) {
+    await library.refresh()
+    telegram?.HapticFeedback?.impactOccurred?.('light')
+  }
+  
+  pullDistance.value = 0
+  isPulling.value = false
+  pullStartY.value = 0
+}
+
 // Apply Spotify theme on mount
 onMounted(async () => {
   document.body.classList.add('spotify-theme')
@@ -597,6 +688,51 @@ onMounted(async () => {
   flex: 1;
   overflow-y: auto;
   padding-bottom: 160px; /* Space for mini player + tab bar */
+  position: relative;
+}
+
+/* Pull to refresh */
+.pull-indicator {
+  position: absolute;
+  top: -60px;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--spotify-text-muted);
+  font-size: 13px;
+  transition: transform 0.1s ease-out;
+  z-index: 10;
+}
+
+.pull-spinner {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--spotify-green);
+}
+
+.pull-spinner.active svg {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* History section */
+.history-section {
+  padding: 8px 0;
+}
+
+.history-list {
+  padding: 0 8px;
 }
 
 /* Active filter indicator */

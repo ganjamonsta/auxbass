@@ -42,6 +42,8 @@ export const tracksApi = {
   delete: (id) => api.delete(`/tracks/${id}`),
   getArtists: () => api.get('/tracks/artists'),
   getGenres: () => api.get('/tracks/genres'),
+  getEnrichmentStatus: () => api.get('/tracks/enrichment/status'),
+  getHistory: (limit = 50) => api.get('/tracks/history', { params: { limit } }),
 }
 
 // Playlists

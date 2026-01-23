@@ -1,7 +1,8 @@
 """
 TG Player Bot - Audio Handler
 """
-from aiogram import Router, F
+import aiohttp
+from aiogram import Router, F, Bot
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -17,6 +18,15 @@ from shared.models import User, Track
 
 router = Router()
 settings = get_settings()
+
+
+async def validate_file_id(bot: Bot, file_id: str) -> bool:
+    """Validate that file_id is accessible via Telegram API"""
+    try:
+        file = await bot.get_file(file_id)
+        return file.file_path is not None
+    except Exception:
+        return False
 
 
 def get_track_keyboard(track_id: int) -> InlineKeyboardMarkup:
@@ -47,6 +57,18 @@ async def handle_audio(message: Message):
     """Handle incoming audio files"""
     audio = message.audio
     user = message.from_user
+    bot = message.bot
+    
+    # Validate file_id is accessible
+    if not await validate_file_id(bot, audio.file_id):
+        await message.reply(
+            "❌ <b>Не удалось получить доступ к файлу</b>\n\n"
+            "Telegram не отдаёт этот файл. Попробуй:\n"
+            "• Переслать аудио заново\n"
+            "• Убедиться что файл не повреждён\n"
+            "• Проверить размер файла (макс. 20 МБ)"
+        )
+        return
     
     async with get_session() as session:
         # Ensure user exists

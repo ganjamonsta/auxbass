@@ -77,8 +77,8 @@ async def get_tracks(
     search: Optional[str] = None,
     artist: Optional[str] = None,
     genre: Optional[str] = None,
-    sort_by: str = Query("created_at", regex="^(created_at|title|artist|duration)$"),
-    sort_order: str = Query("desc", regex="^(asc|desc)$"),
+    sort_by: str = Query("created_at", pattern="^(created_at|title|artist|duration|play_count|last_played_at)$"),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -187,6 +187,53 @@ async def get_genres(
     return [{"genre": row[0], "count": row[1]} for row in result.all()]
 
 
+@router.get("/enrichment/status")
+async def get_enrichment_status(
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get enrichment status for user's tracks"""
+    result = await db.execute(
+        select(
+            Track.enrichment_status,
+            func.count(Track.id)
+        )
+        .where(Track.user_id == user.id)
+        .group_by(Track.enrichment_status)
+    )
+    
+    stats = {row[0] or "pending": row[1] for row in result.all()}
+    total = sum(stats.values())
+    
+    return {
+        "pending": stats.get("pending", 0),
+        "processing": stats.get("processing", 0),
+        "completed": stats.get("completed", 0),
+        "failed": stats.get("failed", 0),
+        "total": total,
+        "progress": round(stats.get("completed", 0) / total * 100) if total > 0 else 100
+    }
+
+
+@router.get("/history")
+async def get_listening_history(
+    limit: int = Query(50, ge=1, le=100),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get listening history (recently played tracks)"""
+    result = await db.execute(
+        select(Track)
+        .where(Track.user_id == user.id)
+        .where(Track.last_played_at.isnot(None))
+        .order_by(Track.last_played_at.desc())
+        .limit(limit)
+    )
+    
+    tracks = result.scalars().all()
+    return [TrackResponse.model_validate(t) for t in tracks]
+
+
 @router.get("/{track_id}", response_model=TrackResponse)
 async def get_track(
     track_id: int,
@@ -257,31 +304,3 @@ async def delete_track(
     await db.commit()
     
     return {"status": "deleted", "id": track_id}
-
-
-@router.get("/enrichment/status")
-async def get_enrichment_status(
-    user: TelegramUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Get enrichment status for user's tracks"""
-    result = await db.execute(
-        select(
-            Track.enrichment_status,
-            func.count(Track.id)
-        )
-        .where(Track.user_id == user.id)
-        .group_by(Track.enrichment_status)
-    )
-    
-    stats = {row[0] or "pending": row[1] for row in result.all()}
-    total = sum(stats.values())
-    
-    return {
-        "pending": stats.get("pending", 0),
-        "processing": stats.get("processing", 0),
-        "completed": stats.get("completed", 0),
-        "failed": stats.get("failed", 0),
-        "total": total,
-        "progress": round(stats.get("completed", 0) / total * 100) if total > 0 else 100
-    }

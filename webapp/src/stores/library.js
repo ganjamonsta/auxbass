@@ -8,7 +8,9 @@ export const useLibraryStore = defineStore('library', () => {
   const playlists = ref([])
   const artists = ref([])
   const genres = ref([])
+  const history = ref([])
   const loading = ref(false)
+  const refreshing = ref(false)
   const total = ref(0)
   const page = ref(1)
   const hasMore = ref(true)
@@ -20,6 +22,21 @@ export const useLibraryStore = defineStore('library', () => {
       fetchPlaylists(),
       fetchArtists(),
     ])
+  }
+
+  // Refresh all data (pull-to-refresh)
+  const refresh = async () => {
+    refreshing.value = true
+    try {
+      await Promise.all([
+        fetchTracks(),
+        fetchPlaylists(),
+        fetchArtists(),
+        fetchGenres(),
+      ])
+    } finally {
+      refreshing.value = false
+    }
   }
 
   // Fetch tracks
@@ -167,21 +184,37 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
+  // Fetch listening history
+  const fetchHistory = async (limit = 50) => {
+    try {
+      const response = await tracksApi.getHistory(limit)
+      history.value = response.data
+      return response.data
+    } catch (error) {
+      console.error('Failed to fetch history:', error)
+      return []
+    }
+  }
+
   return {
     tracks,
     playlists,
     artists,
     genres,
+    history,
     loading,
+    refreshing,
     total,
     hasMore,
     init,
+    refresh,
     fetchTracks,
     loadMore,
     fetchPlaylists,
     fetchPlaylist,
     fetchArtists,
     fetchGenres,
+    fetchHistory,
     createPlaylist,
     deletePlaylist,
     addTrackToPlaylist,
