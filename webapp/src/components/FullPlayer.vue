@@ -628,8 +628,6 @@ const formatTime = (seconds) => {
 .progress-container {
   margin-bottom: 12px;
   flex-shrink: 0;
-  position: relative;
-  z-index: 10;
 }
 
 .slider-wrapper {
@@ -772,8 +770,6 @@ const formatTime = (seconds) => {
   padding: 0 24px;
   margin-top: auto;
   flex-shrink: 0;
-  position: relative;
-  z-index: 10;
 }
 
 .volume-btn {
