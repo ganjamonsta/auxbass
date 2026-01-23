@@ -5,55 +5,47 @@
       <div class="header-row">
         <EnrichmentStatus />
         
-        <!-- Animated Search / Title Toggle -->
-        <div class="search-title-container" :class="{ expanded: showSearch }">
-          <!-- Title (visible when search closed) -->
-          <Transition name="fade-title">
-            <h1 v-if="!showSearch" class="header-title-main" @click="openSearch">
-              TG Player
-            </h1>
-          </Transition>
-          
-          <!-- Search Input (visible when search open) -->
-          <Transition name="expand-search">
-            <div v-if="showSearch" class="search-wrapper" @click="focusInput">
-              <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-              </svg>
-              <div class="search-content">
-                <span v-for="(tag, index) in searchTags" :key="index" class="search-tag" @click.stop="removeTag(index)">
-                  {{ tag }}
-                </span>
-                <input 
-                  ref="searchInput"
-                  v-model="searchQuery"
-                  type="text"
-                  placeholder="Поиск..."
-                  class="search-input-inline"
-                  @input="debouncedSearch"
-                  @blur="onSearchBlur"
-                  @keyup.escape="closeSearch"
-                  @keydown.enter.prevent="addTag"
-                  @keydown.backspace="handleBackspace"
-                />
-              </div>
-              <button class="search-close-btn" @click="closeSearch">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
-                </svg>
-              </button>
-            </div>
-          </Transition>
-        </div>
+        <!-- Title (always visible, navigates to home) -->
+        <h1 class="header-title-main" @click="goToHome">
+          Musiq
+        </h1>
         
-        <!-- Search Toggle Button (visible when search closed) -->
-        <Transition name="fade">
-          <button v-if="!showSearch" @click="openSearch" class="icon-btn search-toggle">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+        <!-- Search field (slides in when active) -->
+        <Transition name="slide-search">
+          <div v-if="showSearch" class="search-wrapper" @click="focusInput">
+            <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
             </svg>
-          </button>
+            <div class="search-content">
+              <span v-for="(tag, index) in searchTags" :key="index" class="search-tag" @click.stop="removeTag(index)">
+                {{ tag }}
+              </span>
+              <input 
+                ref="searchInput"
+                v-model="searchQuery"
+                type="text"
+                placeholder="Поиск..."
+                class="search-input-inline"
+                @input="debouncedSearch"
+                @keyup.escape="closeSearch"
+                @keydown.enter.prevent="addTag"
+                @keydown.backspace="handleBackspace"
+              />
+            </div>
+          </div>
         </Transition>
+        
+        <!-- Search Toggle Button (always visible, changes icon) -->
+        <button @click="toggleSearch" class="icon-btn search-toggle">
+          <Transition name="icon-flip" mode="out-in">
+            <svg v-if="!showSearch" key="search" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+            </svg>
+            <svg v-else key="close" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
+            </svg>
+          </Transition>
+        </button>
       </div>
     </header>
 
@@ -687,7 +679,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, inject, nextTick } from 'vue'
+import { ref, computed, onMounted, inject, nextTick, watch } from 'vue'
 import { usePlayerStore } from './stores/player'
 import { useLibraryStore } from './stores/library'
 import { playerApi } from './api/client'
@@ -770,6 +762,16 @@ const displayedArtists = computed(() => {
 
 const displayedTracks = computed(() => {
   return filterScope.value === 'global' ? library.globalTracks : library.tracks
+})
+
+// Watch for tab changes - reset artist filter when leaving tracks tab
+watch(activeTab, (newTab, oldTab) => {
+  // If user leaves tracks tab and there's an active artist filter, reset it
+  if (oldTab === 'tracks' && activeFilter.value?.startsWith('Артист:')) {
+    activeFilter.value = null
+    filterScope.value = 'library'
+    library.fetchTracks()
+  }
 })
 
 // Methods
@@ -1061,10 +1063,14 @@ const focusInput = () => {
 }
 
 // Search open/close with animation
-const openSearch = async () => {
-  showSearch.value = true
-  await nextTick()
-  searchInput.value?.focus()
+const toggleSearch = async () => {
+  if (showSearch.value) {
+    closeSearch()
+  } else {
+    showSearch.value = true
+    await nextTick()
+    searchInput.value?.focus()
+  }
 }
 
 const closeSearch = () => {
@@ -1076,13 +1082,10 @@ const closeSearch = () => {
   }
 }
 
-const onSearchBlur = () => {
-  // Close search if empty after small delay (allows clicking close button)
-  setTimeout(() => {
-    if (!searchQuery.value && showSearch.value) {
-      showSearch.value = false
-    }
-  }, 150)
+// Navigate to home tab
+const goToHome = () => {
+  activeTab.value = 'home'
+  library.fetchHistory()
 }
 
 // Pull-to-refresh handlers
@@ -1156,34 +1159,33 @@ onMounted(async () => {
   gap: 12px;
 }
 
-/* Search/Title Container - animated expansion */
-.search-title-container {
-  flex: 1;
-  position: relative;
-  height: 44px;
-  display: flex;
-  align-items: center;
-}
-
+/* Header title - always visible */
 .header-title-main {
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.5px;
   margin: 0;
   cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
+  transition: opacity 0.2s ease;
 }
 
-/* Search wrapper with animation */
+.header-title-main:active {
+  opacity: 0.7;
+}
+
+/* Search wrapper with slide animation */
 .search-wrapper {
   display: flex;
   align-items: center;
-  width: 100%;
+  flex: 1;
   height: auto;
-  min-height: 48px;
+  min-height: 44px;
   background: var(--neu-bg);
-  border-radius: 24px;
-  padding: 6px 14px;
+  border-radius: 22px;
+  padding: 4px 14px;
+  margin-left: 12px;
   gap: 10px;
   box-shadow: 
     inset 3px 3px 6px var(--neu-shadow-dark),
@@ -1233,44 +1235,57 @@ onMounted(async () => {
   color: var(--spotify-text-muted);
 }
 
-.search-close-btn {
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  border: none;
-  background: var(--spotify-gray-light);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: var(--spotify-text);
-}
-
 .search-toggle {
   flex-shrink: 0;
 }
 
 /* Animations */
-.expand-search-enter-active,
-.expand-search-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+
+/* Slide search animation */
+.slide-search-enter-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.expand-search-enter-from,
-.expand-search-leave-to {
+.slide-search-leave-active {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.slide-search-enter-from {
   opacity: 0;
-  transform: translateY(-8px);
+  max-width: 0;
+  margin-left: 0;
+  padding: 4px 0;
 }
 
-.fade-title-enter-active,
-.fade-title-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.fade-title-enter-from,
-.fade-title-leave-to {
+.slide-search-leave-to {
   opacity: 0;
+  max-width: 0;
+  margin-left: 0;
+  padding: 4px 0;
+}
+
+.slide-search-enter-to,
+.slide-search-leave-from {
+  opacity: 1;
+  max-width: 500px;
+  margin-left: 12px;
+  padding: 4px 14px;
+}
+
+/* Icon flip animation */
+.icon-flip-enter-active,
+.icon-flip-leave-active {
+  transition: all 0.2s ease;
+}
+
+.icon-flip-enter-from {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.8);
+}
+
+.icon-flip-leave-to {
+  opacity: 0;
+  transform: rotate(90deg) scale(0.8);
 }
 
 .fade-enter-active,
