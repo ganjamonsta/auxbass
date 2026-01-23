@@ -35,6 +35,10 @@ def get_track_keyboard(track_id: int) -> InlineKeyboardMarkup:
             web_app=WebAppInfo(url=settings.webapp_url)
         )],
         [InlineKeyboardButton(
+            text="📥 Скачать",
+            callback_data=f"download_track:{track_id}"
+        )],
+        [InlineKeyboardButton(
             text="❌ Удалить из библиотеки",
             callback_data=f"delete_track:{track_id}"
         )]

@@ -17,7 +17,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from shared.config import get_settings
 from shared.database import init_db, close_db
 
-from handlers import commands, audio, callbacks
+from handlers import commands, audio, callbacks, download
 from services.enrichment import enrichment_worker
 
 
@@ -55,6 +55,7 @@ async def main():
     dp.include_router(commands.router)
     dp.include_router(audio.router)
     dp.include_router(callbacks.router)
+    dp.include_router(download.router)
     
     # Start polling
     logger.info("Starting bot...")

@@ -236,6 +236,12 @@ async def handle_playlist_menu(callback: CallbackQuery):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [
                 InlineKeyboardButton(
+                    text="📥 Скачать все треки",
+                    callback_data=f"download_playlist:{playlist_id}"
+                )
+            ],
+            [
+                InlineKeyboardButton(
                     text="✏️ Переименовать",
                     callback_data=f"pl:rename:{playlist_id}"
                 ),
