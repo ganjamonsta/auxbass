@@ -132,6 +132,7 @@ const handleSelect = async (playlist) => {
 .playlist-list {
   max-height: calc(70vh - 70px);
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 8px;
 }
 

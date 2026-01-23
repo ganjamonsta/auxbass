@@ -137,6 +137,7 @@ const handleSubmit = async () => {
   max-width: 400px;
   max-height: 90vh;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .modal-header {

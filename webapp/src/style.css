@@ -62,11 +62,18 @@ body.spotify-theme {
 
 ::-webkit-scrollbar-track {
   background: transparent;
+  margin: 8px 0;  /* Add margin to prevent scrollbar from reaching edges */
 }
 
 ::-webkit-scrollbar-thumb {
   background: var(--spotify-gray-light);
   border-radius: 2px;
+}
+
+/* Firefox scrollbar styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--spotify-gray-light) transparent;
 }
 
 /* Disable text selection on UI elements */

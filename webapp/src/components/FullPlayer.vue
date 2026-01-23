@@ -654,6 +654,7 @@ const formatTime = (seconds) => {
   padding: 16px;
   max-height: 50%;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .queue-header {

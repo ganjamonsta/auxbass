@@ -1004,6 +1004,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   height: 100%;
+  overflow: hidden;  /* Contain scrollbar within app bounds */
   background-color: var(--spotify-black);
   color: var(--spotify-text);
 }
@@ -1170,7 +1171,9 @@ onMounted(async () => {
 /* Content */
 .content {
   flex: 1;
+  min-height: 0;  /* Allow flex shrinking for proper overflow */
   overflow-y: auto;
+  overflow-x: hidden;  /* Prevent horizontal scrollbar */
   padding-bottom: 160px; /* Space for mini player + tab bar */
   position: relative;
 }

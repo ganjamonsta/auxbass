@@ -319,7 +319,11 @@ export const usePlayerStore = defineStore('player', () => {
       // Check if track is cached (blob URL)
       const cachedUrl = getCachedAudio(track.id)
       if (cachedUrl) {
+        // Stop current playback and reset before changing source
+        audio.value.pause()
+        audio.value.currentTime = 0
         audio.value.src = cachedUrl
+        audio.value.load()  // Force reload with new source
         await audio.value.play()
         loading.value = false
         
@@ -422,7 +426,11 @@ export const usePlayerStore = defineStore('player', () => {
       updateMediaSession()
       
       try {
+        // Stop current playback and reset before changing source
+        audio.value.pause()
+        audio.value.currentTime = 0
         audio.value.src = cachedUrl || preloadedUrl
+        audio.value.load()  // Force reload with new source
         await audio.value.play()
         loading.value = false
         nextTrackPreloaded.value = null
@@ -475,7 +483,11 @@ export const usePlayerStore = defineStore('player', () => {
       currentTrack.value = prevTrack
       updateMediaSession()
       try {
+        // Stop current playback and reset before changing source
+        audio.value.pause()
+        audio.value.currentTime = 0
         audio.value.src = cachedUrl
+        audio.value.load()  // Force reload with new source
         await audio.value.play()
       } catch (e) {
         console.error('Failed to play cached track:', e)
