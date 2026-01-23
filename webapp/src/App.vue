@@ -115,33 +115,6 @@
             </div>
           </div>
 
-          <!-- Recently Played Section -->
-          <div v-if="library.history.length > 0" class="feed-section">
-            <h2 class="feed-section-title">Недавно играло</h2>
-            <div class="horizontal-scroll">
-              <div class="scroll-spacer"></div>
-              <div 
-                v-for="track in library.history.slice(0, 10)" 
-                :key="track.id"
-                class="feed-card"
-                @click="playTrack(track)"
-              >
-                <div class="feed-card-cover" :style="getTrackCoverStyle(track)">
-                  <img v-if="track.cover_url" :src="track.cover_url" alt="" />
-                  <div v-else class="feed-card-placeholder">{{ getTrackInitials(track) }}</div>
-                  <button class="play-overlay" @click.stop="playTrack(track)">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M8 5v14l11-7z"/>
-                    </svg>
-                  </button>
-                </div>
-                <div class="feed-card-title">{{ track.title || 'Без названия' }}</div>
-                <div class="feed-card-subtitle">{{ track.artist || 'Неизвестный' }}</div>
-              </div>
-              <div class="scroll-spacer"></div>
-            </div>
-          </div>
-
           <!-- Top Artists Section -->
           <div v-if="library.artists.length > 0" class="feed-section">
             <h2 class="feed-section-title">Твои артисты</h2>
@@ -248,6 +221,40 @@
 
         <!-- Playlists -->
         <div v-if="activeTab === 'playlists'" class="playlist-section">
+          <!-- Любимое -->
+          <div 
+            v-if="library.likedTracks.length > 0" 
+            class="system-playlist-item"
+            @click="activeTab = 'liked'"
+          >
+            <div class="system-playlist-icon liked-gradient">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+              </svg>
+            </div>
+            <div class="system-playlist-info">
+              <span class="system-playlist-title">Любимое</span>
+              <span class="system-playlist-count">{{ library.likedTracks.length }} треков</span>
+            </div>
+          </div>
+          
+          <!-- История -->
+          <div 
+            v-if="library.history.length > 0" 
+            class="system-playlist-item"
+            @click="activeTab = 'history'"
+          >
+            <div class="system-playlist-icon history-gradient">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
+              </svg>
+            </div>
+            <div class="system-playlist-info">
+              <span class="system-playlist-title">История</span>
+              <span class="system-playlist-count">{{ library.history.length }} треков</span>
+            </div>
+          </div>
+
           <button @click="createPlaylist" class="create-btn">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
               <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
@@ -1426,6 +1433,61 @@ onMounted(async () => {
 /* Playlist section */
 .playlist-section {
   padding: 16px;
+}
+
+/* System playlists (Liked, History) */
+.system-playlist-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  margin-bottom: 8px;
+  background: var(--spotify-gray);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.system-playlist-item:active {
+  background: var(--spotify-gray-light);
+}
+
+.system-playlist-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+}
+
+.system-playlist-icon.liked-gradient {
+  background: linear-gradient(135deg, #1db954 0%, #1ed760 100%);
+}
+
+.system-playlist-icon.history-gradient {
+  background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+}
+
+.system-playlist-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.system-playlist-title {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--spotify-text);
+}
+
+.system-playlist-count {
+  display: block;
+  font-size: 13px;
+  color: var(--spotify-text-muted);
+  margin-top: 2px;
 }
 
 .create-btn {
