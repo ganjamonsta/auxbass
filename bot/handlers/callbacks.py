@@ -206,3 +206,207 @@ async def handle_skip_duplicate(callback: CallbackQuery):
         await callback.message.edit_text("⏭ Пропущено.")
     
     await callback.answer()
+
+
+# ========== Playlist Management Callbacks ==========
+
+@router.callback_query(F.data.startswith("pl:menu:"))
+async def handle_playlist_menu(callback: CallbackQuery):
+    """Show playlist management menu"""
+    playlist_id = int(callback.data.split(":")[2])
+    user_id = callback.from_user.id
+    
+    async with get_session() as session:
+        playlist = await session.get(Playlist, playlist_id)
+        
+        if not playlist or playlist.user_id != user_id:
+            await callback.answer("Плейлист не найден", show_alert=True)
+            return
+        
+        track_count = len(playlist.track_associations) if playlist.track_associations else 0
+    
+    await callback.message.edit_text(
+        f"📁 <b>{playlist.name}</b>\n\n"
+        f"🎵 Треков: {track_count}\n"
+        f"📅 Создан: {playlist.created_at.strftime('%d.%m.%Y')}\n\n"
+        "Выбери действие:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✏️ Переименовать",
+                    callback_data=f"pl:rename:{playlist_id}"
+                ),
+                InlineKeyboardButton(
+                    text="🗑 Удалить",
+                    callback_data=f"pl:delete_confirm:{playlist_id}"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🎵 Открыть плеер",
+                    web_app=WebAppInfo(url=settings.webapp_url)
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="◀️ Назад к списку",
+                    callback_data="pl:back_to_list"
+                )
+            ]
+        ])
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("pl:rename:"))
+async def handle_playlist_rename_start(callback: CallbackQuery, state: FSMContext):
+    """Start playlist rename process"""
+    from handlers.commands import PlaylistStates
+    
+    playlist_id = int(callback.data.split(":")[2])
+    user_id = callback.from_user.id
+    
+    async with get_session() as session:
+        playlist = await session.get(Playlist, playlist_id)
+        
+        if not playlist or playlist.user_id != user_id:
+            await callback.answer("Плейлист не найден", show_alert=True)
+            return
+        
+        playlist_name = playlist.name
+    
+    # Set state for rename
+    await state.set_state(PlaylistStates.waiting_for_rename)
+    await state.update_data(rename_playlist_id=playlist_id)
+    
+    await callback.message.edit_text(
+        f"✏️ <b>Переименование плейлиста</b>\n\n"
+        f"Текущее название: «{playlist_name}»\n\n"
+        "Введи новое название:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="✗ Отмена",
+                callback_data=f"pl:menu:{playlist_id}"
+            )]
+        ])
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("pl:delete_confirm:"))
+async def handle_playlist_delete_confirm(callback: CallbackQuery):
+    """Show delete confirmation"""
+    playlist_id = int(callback.data.split(":")[2])
+    user_id = callback.from_user.id
+    
+    async with get_session() as session:
+        playlist = await session.get(Playlist, playlist_id)
+        
+        if not playlist or playlist.user_id != user_id:
+            await callback.answer("Плейлист не найден", show_alert=True)
+            return
+        
+        track_count = len(playlist.track_associations) if playlist.track_associations else 0
+        playlist_name = playlist.name
+    
+    await callback.message.edit_text(
+        f"🗑 <b>Удалить плейлист?</b>\n\n"
+        f"📁 «{playlist_name}»\n"
+        f"🎵 {track_count} треков\n\n"
+        "⚠️ Треки останутся в библиотеке,\n"
+        "удалится только плейлист.",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🗑 Да, удалить",
+                    callback_data=f"pl:delete:{playlist_id}"
+                ),
+                InlineKeyboardButton(
+                    text="✗ Отмена",
+                    callback_data=f"pl:menu:{playlist_id}"
+                )
+            ]
+        ])
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("pl:delete:"))
+async def handle_playlist_delete(callback: CallbackQuery):
+    """Delete playlist"""
+    playlist_id = int(callback.data.split(":")[2])
+    user_id = callback.from_user.id
+    
+    async with get_session() as session:
+        playlist = await session.get(Playlist, playlist_id)
+        
+        if not playlist or playlist.user_id != user_id:
+            await callback.answer("Плейлист не найден", show_alert=True)
+            return
+        
+        playlist_name = playlist.name
+        await session.delete(playlist)
+    
+    await callback.message.edit_text(
+        f"✅ Плейлист «{playlist_name}» удалён.\n\n"
+        "Треки остались в библиотеке.",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="◀️ К плейлистам",
+                callback_data="pl:back_to_list"
+            )]
+        ])
+    )
+    await callback.answer("Удалено!")
+
+
+@router.callback_query(F.data == "pl:back_to_list")
+async def handle_back_to_playlist_list(callback: CallbackQuery):
+    """Return to playlist list"""
+    user_id = callback.from_user.id
+    
+    async with get_session() as session:
+        result = await session.execute(
+            select(Playlist)
+            .where(Playlist.user_id == user_id)
+            .order_by(Playlist.created_at.desc())
+        )
+        playlists = result.scalars().all()
+    
+    if not playlists:
+        await callback.message.edit_text(
+            "📁 <b>Мои плейлисты</b>\n\n"
+            "У тебя пока нет плейлистов.\n\n"
+            "<b>Как создать?</b>\n"
+            "• /playlist — интерактивное создание\n"
+            '• /playlist "Название" — быстрое создание'
+        )
+        await callback.answer()
+        return
+    
+    text = "📁 <b>Мои плейлисты</b>\n\n"
+    keyboard = []
+    
+    for pl in playlists[:20]:
+        track_count = len(pl.track_associations) if pl.track_associations else 0
+        text += f"• <b>{pl.name}</b> — {track_count} 🎵\n"
+        
+        keyboard.append([
+            InlineKeyboardButton(
+                text=f"📁 {pl.name}",
+                callback_data=f"pl:menu:{pl.id}"
+            )
+        ])
+    
+    text += (
+        "\n<b>Управление:</b> нажми на плейлист\n\n"
+        "<b>Создать новый:</b>\n"
+        "• /playlist — с указанием названия\n"
+        '• /playlist "Имя" — быстро'
+    )
+    
+    await callback.message.edit_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
+    )
+    await callback.answer()
