@@ -5,6 +5,15 @@
       <div class="mini-progress-fill" :style="{ width: progressPercent + '%' }"></div>
     </div>
     
+    <!-- Equalizer visualization -->
+    <div class="equalizer" :class="{ active: isPlaying && !loading }">
+      <div class="eq-bar"></div>
+      <div class="eq-bar"></div>
+      <div class="eq-bar"></div>
+      <div class="eq-bar"></div>
+      <div class="eq-bar"></div>
+    </div>
+    
     <!-- Cover -->
     <div class="mini-cover" :style="coverStyle">
       <img 
@@ -124,23 +133,71 @@ const coverInitials = computed(() => {
   cursor: pointer;
   z-index: 60;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  position: relative;  /* For absolute positioned children */
+  overflow: hidden;
 }
 
 .mini-progress {
   position: absolute;
-  bottom: 0;
-  left: 12px;
-  right: 12px;
-  height: 2px;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
   background: var(--spotify-gray-dark);
-  border-radius: 1px;
 }
 
 .mini-progress-fill {
   height: 100%;
   background: var(--spotify-green);
-  border-radius: 1px;
   transition: width 0.2s linear;
+}
+
+/* Equalizer visualization */
+.equalizer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 24px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 20%;
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+.equalizer.active {
+  opacity: 0.6;
+}
+
+.eq-bar {
+  flex: 1;
+  max-width: 6px;
+  height: 4px;
+  background: var(--spotify-green);
+  border-radius: 2px 2px 0 0;
+  transform-origin: bottom;
+}
+
+.equalizer.active .eq-bar {
+  animation: eq-bounce 0.5s ease-in-out infinite alternate;
+}
+
+.equalizer.active .eq-bar:nth-child(1) { animation-delay: 0s; }
+.equalizer.active .eq-bar:nth-child(2) { animation-delay: 0.1s; }
+.equalizer.active .eq-bar:nth-child(3) { animation-delay: 0.2s; }
+.equalizer.active .eq-bar:nth-child(4) { animation-delay: 0.15s; }
+.equalizer.active .eq-bar:nth-child(5) { animation-delay: 0.05s; }
+
+@keyframes eq-bounce {
+  0% {
+    height: 4px;
+  }
+  100% {
+    height: 20px;
+  }
 }
 
 .mini-cover {
