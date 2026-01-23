@@ -62,6 +62,26 @@ const clearPlayerState = () => {
 const savedSettings = loadSettings()
 const savedState = loadPlayerState()
 
+// ============== URL Cache for pre-generated tokens ==============
+// Maps track_id -> { url, expires_at }
+const urlCache = new Map()
+const URL_CACHE_MARGIN = 60 // Refresh URL 60 seconds before expiry
+
+const getCachedUrl = (trackId) => {
+  const cached = urlCache.get(trackId)
+  if (!cached) return null
+  // Check if not expired (with margin)
+  if (Date.now() / 1000 > cached.expires_at - URL_CACHE_MARGIN) {
+    urlCache.delete(trackId)
+    return null
+  }
+  return cached.url
+}
+
+const setCachedUrl = (trackId, url, expires_at) => {
+  urlCache.set(trackId, { url, expires_at })
+}
+
 // Audio cache - stores blob URLs for already loaded tracks
 const audioCache = new Map()
 const MAX_CACHE_SIZE = 50
@@ -81,11 +101,48 @@ const setCachedAudio = (trackId, blobUrl) => {
   audioCache.set(trackId, blobUrl)
 }
 
+// ============== Preload Audio System ==============
+// Use separate Audio element for preloading next track
+let preloadAudio = null
+let preloadTrackId = null
+
+const getPreloadAudio = () => {
+  if (!preloadAudio) {
+    preloadAudio = new Audio()
+    preloadAudio.preload = 'auto'
+    preloadAudio.volume = 0 // Silent preload
+  }
+  return preloadAudio
+}
+
+const preloadTrackWithAudio = (trackId, url) => {
+  const audio = getPreloadAudio()
+  preloadTrackId = trackId
+  audio.src = url
+  audio.load()
+  console.log(`[Preload] Started preloading track ${trackId} with Audio element`)
+}
+
+const getPreloadedAudio = (trackId) => {
+  if (preloadTrackId === trackId && preloadAudio && preloadAudio.src) {
+    return preloadAudio
+  }
+  return null
+}
+
+const clearPreloadAudio = () => {
+  if (preloadAudio) {
+    preloadAudio.pause()
+    preloadAudio.src = ''
+    preloadTrackId = null
+  }
+}
+
 // ============== Adaptive Preload System ==============
 // Tracks download speed to adapt preload strategy
 let _lastDownloadSpeed = 0  // bytes per second
 let _userInteractionTime = 0  // timestamp of last user action (play/next/prev)
-const USER_INTERACTION_COOLDOWN = 2000  // 2 seconds - wait before resuming background preloads
+const USER_INTERACTION_COOLDOWN = 1000  // 1 second - reduced for faster preload resume
 
 const markUserInteraction = () => {
   _userInteractionTime = Date.now()
@@ -304,16 +361,14 @@ export const usePlayerStore = defineStore('player', () => {
       // Calculate how many seconds we have buffered ahead of current position
       const currentBuffer = (buffered.value || 0) - progress.value
       
-      // Smart Preload Condition:
-      // 1. We have > 20 seconds of audio buffered ahead (safe reserve)
-      // 2. OR the entire track is almost fully buffered
-      // 3. AND we haven't started preloading yet
-      const isBufferHealthy = currentBuffer > 20 || (duration.value > 0 && buffered.value >= duration.value - 2)
+      // Instant Preload: Start as soon as we have 2 seconds buffered OR 2 seconds played
+      // This ensures next track URLs are ready before user can click Next
+      const isBufferHealthy = currentBuffer > 2 || progress.value > 2
 
       if (duration.value > 0 && !preloadTriggered && isBufferHealthy) {
-        console.log(`[Smart Preload] Triggering: Buffer ahead=${currentBuffer.toFixed(1)}s`)
+        console.log(`[Instant Preload] Triggering after ${progress.value.toFixed(1)}s of playback`)
         preloadTriggered = true
-        preloadNextTrack()
+        preloadNextTracks()
       }
     })
     
@@ -323,36 +378,101 @@ export const usePlayerStore = defineStore('player', () => {
     })
   }
 
-  // Preload next tracks (caches them for gapless playback)
-  // ADAPTIVE: Adjusts how many tracks to preload based on user activity
-  const preloadNextTrack = async () => {
+  // Re-attach event listeners when swapping audio elements
+  const reattachAudioListeners = () => {
+    if (!audio.value) return
+    
+    audio.value.addEventListener('canplay', () => {
+      loading.value = false
+    })
+    
+    audio.value.addEventListener('playing', () => {
+      loading.value = false
+    })
+    
+    audio.value.addEventListener('waiting', () => {
+      if (audio.value.readyState < 3) {
+        loading.value = true
+      }
+    })
+    
+    audio.value.addEventListener('timeupdate', () => {
+      progress.value = audio.value.currentTime
+      
+      if (audio.value.buffered.length > 0) {
+        for (let i = 0; i < audio.value.buffered.length; i++) {
+          if (audio.value.buffered.start(i) <= audio.value.currentTime && 
+              audio.value.buffered.end(i) >= audio.value.currentTime) {
+            buffered.value = audio.value.buffered.end(i)
+            break
+          }
+        }
+      }
+      
+      if (Math.floor(progress.value) % 5 === 0) {
+        updatePositionState()
+      }
+      
+      // Preload trigger
+      const currentBuffer = (buffered.value || 0) - progress.value
+      const isBufferHealthy = currentBuffer > 2 || progress.value > 2
+      if (duration.value > 0 && !preloadTriggered && isBufferHealthy) {
+        preloadTriggered = true
+        preloadNextTracks()
+      }
+    })
+    
+    audio.value.addEventListener('progress', () => {
+      if (audio.value.buffered.length > 0) {
+        const lastIndex = audio.value.buffered.length - 1
+        buffered.value = audio.value.buffered.end(lastIndex)
+        if (loading.value && buffered.value - progress.value > 2) {
+          loading.value = false
+        }
+      }
+    })
+    
+    audio.value.addEventListener('durationchange', () => {
+      duration.value = audio.value.duration
+      updatePositionState()
+    })
+    
+    audio.value.addEventListener('ended', () => {
+      handleEnded()
+    })
+    
+    audio.value.addEventListener('play', () => {
+      isPlaying.value = true
+      updatePlaybackState()
+      startStateSaving()
+    })
+    
+    audio.value.addEventListener('pause', () => {
+      isPlaying.value = false
+      updatePlaybackState()
+      persistState()
+    })
+    
+    audio.value.addEventListener('error', (e) => {
+      console.error('Audio error:', e)
+      loading.value = false
+    })
+  }
+  // Preload next 2-3 tracks using batch API for instant playback
+  // Uses Audio preload="auto" for the immediate next track
+  const preloadNextTracks = async () => {
     if (queue.value.length === 0) return
     
-    // If user is actively switching tracks, don't start new preloads
-    // This prevents wasting bandwidth on tracks user might skip
+    // Don't preload if user is actively switching tracks
     if (isUserActivelyBrowsing()) {
-      console.log('[Preload] User actively browsing, deferring preload...')
-      // Retry after cooldown
-      setTimeout(() => preloadNextTrack(), USER_INTERACTION_COOLDOWN)
+      console.log('[Preload] User actively browsing, deferring...')
+      setTimeout(() => preloadNextTracks(), USER_INTERACTION_COOLDOWN)
       return
     }
     
-    // Determine how many tracks to preload based on network speed
-    // Fast connection (>1MB/s): preload 2-3 tracks
-    // Slow connection (<500KB/s): preload only 1 track
-    let maxPreload = 2
-    if (_lastDownloadSpeed > 0) {
-      if (_lastDownloadSpeed > 1024 * 1024) {
-        maxPreload = 3
-      } else if (_lastDownloadSpeed < 500 * 1024) {
-        maxPreload = 1
-      }
-    }
-    
-    // Collect tracks to preload
+    // Collect next 3 tracks to preload
     const tracksToPreload = []
-    
-    for (let offset = 1; offset <= maxPreload; offset++) {
+    for (let offset = 1; offset <= 3; offset++) {
       let nextIndex = queueIndex.value + offset
       if (nextIndex >= queue.value.length) {
         if (repeat.value === 'all') {
@@ -361,36 +481,71 @@ export const usePlayerStore = defineStore('player', () => {
           break
         }
       }
-      
       const track = queue.value[nextIndex]
-      if (track && !getCachedAudio(track.id)) {
+      if (track && !getCachedUrl(track.id) && !getCachedAudio(track.id)) {
         tracksToPreload.push(track)
       }
     }
     
-    // Mark first one as "preloaded" for quick access
-    const nextTrack = queue.value[queueIndex.value + 1] || 
-                      (repeat.value === 'all' ? queue.value[0] : null)
-    
-    if (nextTrack && getCachedAudio(nextTrack.id)) {
-      nextTrackPreloaded.value = {
-        track: nextTrack,
-        url: getCachedAudio(nextTrack.id),
-        cached: true
+    if (tracksToPreload.length === 0) {
+      console.log('[Preload] All next tracks already have URLs cached')
+      // Still start Audio preloading for immediate next track
+      const nextTrack = queue.value[queueIndex.value + 1] || 
+                        (repeat.value === 'all' ? queue.value[0] : null)
+      if (nextTrack) {
+        const url = getCachedUrl(nextTrack.id)
+        if (url && preloadTrackId !== nextTrack.id) {
+          preloadTrackWithAudio(nextTrack.id, url)
+          nextTrackPreloaded.value = {
+            track: nextTrack,
+            url: url,
+            audioPreloaded: true
+          }
+        }
       }
+      return
     }
     
-    // Preload tracks SEQUENTIALLY to prioritize next track
-    // This ensures track N+1 finishes before N+2 starts
-    for (const track of tracksToPreload) {
-      // Re-check if user became active
-      if (isUserActivelyBrowsing()) {
-        console.log('[Preload] User became active, pausing preloads')
-        break
+    try {
+      // Batch request for all URLs at once (parallel file_path fetching on server)
+      const trackIds = tracksToPreload.map(t => t.id)
+      console.log(`[Preload] Fetching batch URLs for ${trackIds.length} tracks`)
+      
+      const response = await playerApi.getBatchUrls(trackIds)
+      const urlData = response.data.urls || []
+      
+      // Cache all URLs
+      for (const item of urlData) {
+        if (item.url && !item.error) {
+          setCachedUrl(item.track_id, item.url, item.expires_at)
+        }
       }
-      await preloadSingleTrack(track)
+      
+      // Start preloading the immediate next track with Audio element
+      const nextTrack = queue.value[queueIndex.value + 1] || 
+                        (repeat.value === 'all' ? queue.value[0] : null)
+      
+      if (nextTrack) {
+        const nextUrl = getCachedUrl(nextTrack.id)
+        if (nextUrl && preloadTrackId !== nextTrack.id) {
+          preloadTrackWithAudio(nextTrack.id, nextUrl)
+          nextTrackPreloaded.value = {
+            track: nextTrack,
+            url: nextUrl,
+            audioPreloaded: true
+          }
+        }
+      }
+      
+      console.log(`[Preload] Cached ${urlData.filter(u => u.url).length} URLs, next track audio preloading`)
+      
+    } catch (e) {
+      console.error('[Preload] Batch URL fetch failed:', e)
     }
   }
+
+  // Legacy function name for compatibility
+  const preloadNextTrack = preloadNextTracks
   
   // Set to track which tracks are currently being preloaded
   // Map<trackId, AbortController>
@@ -640,44 +795,105 @@ export const usePlayerStore = defineStore('player', () => {
     queueIndex.value = nextIndex
     const nextTrack = queue.value[nextIndex]
     
-    // Use preloaded/cached if available
-    const cachedUrl = getCachedAudio(nextTrack.id)
-    const preloadedUrl = nextTrackPreloaded.value?.track?.id === nextTrack.id 
-      ? nextTrackPreloaded.value.url 
-      : null
-    
-    if (cachedUrl || preloadedUrl) {
+    // Priority 1: Use blob-cached audio (fully downloaded)
+    const cachedBlobUrl = getCachedAudio(nextTrack.id)
+    if (cachedBlobUrl) {
+      console.log('[Next] Using blob cache')
       initAudio()
       loading.value = true
       currentTrack.value = nextTrack
       updateMediaSession()
       
       try {
-        // Stop current playback and reset before changing source
         audio.value.pause()
         audio.value.currentTime = 0
-        audio.value.src = cachedUrl || preloadedUrl
-        buffered.value = duration.value // Buffered fully if cached
-        audio.value.load()  // Force reload with new source
+        audio.value.src = cachedBlobUrl
+        buffered.value = duration.value
+        audio.value.load()
+        await audio.value.play()
+        loading.value = false
+        nextTrackPreloaded.value = null
+        clearPreloadAudio()
+        persistState()
+        preloadNextTracks()
+        return
+      } catch (e) {
+        console.error('Failed to play cached blob:', e)
+        audioCache.delete(nextTrack.id)
+      }
+    }
+    
+    // Priority 2: Use preloaded Audio element
+    const preloadedAudio = getPreloadedAudio(nextTrack.id)
+    if (preloadedAudio && preloadedAudio.readyState >= 2) {
+      console.log('[Next] Using preloaded Audio element')
+      
+      if (audio.value) {
+        audio.value.pause()
+        audio.value.src = ''
+      }
+      
+      const oldAudio = audio.value
+      audio.value = preloadedAudio
+      audio.value.volume = volume.value
+      audio.value.muted = isMuted.value
+      
+      reattachAudioListeners()
+      
+      loading.value = true
+      currentTrack.value = nextTrack
+      updateMediaSession()
+      
+      try {
         await audio.value.play()
         loading.value = false
         nextTrackPreloaded.value = null
         
-        // Immediately start preloading next tracks for gapless playback
-        preloadNextTrack()
-        return  // Success - exit
+        preloadAudio = oldAudio || new Audio()
+        preloadAudio.preload = 'auto'
+        preloadAudio.volume = 0
+        preloadTrackId = null
+        
+        persistState()
+        preloadNextTracks()
+        return
       } catch (e) {
-        console.error('Failed to play cached/preloaded track, falling back:', e)
-        // Invalidate bad cache entry
-        if (cachedUrl) {
-          audioCache.delete(nextTrack.id)
-        }
-        nextTrackPreloaded.value = null
-        // Fall through to regular play()
+        console.error('Failed to play preloaded audio:', e)
+        audio.value = oldAudio
+        reattachAudioListeners()
       }
     }
     
-    // Regular play (no cache or cache failed)
+    // Priority 3: Use cached URL for instant start
+    const cachedUrl = getCachedUrl(nextTrack.id)
+    if (cachedUrl) {
+      console.log('[Next] Using cached URL')
+      initAudio()
+      loading.value = true
+      currentTrack.value = nextTrack
+      updateMediaSession()
+      
+      try {
+        audio.value.pause()
+        audio.value.currentTime = 0
+        audio.value.src = cachedUrl
+        buffered.value = 0
+        await audio.value.play()
+        loading.value = false
+        nextTrackPreloaded.value = null
+        clearPreloadAudio()
+        persistState()
+        preloadNextTracks()
+        return
+      } catch (e) {
+        console.error('Failed to play from cached URL:', e)
+        urlCache.delete(nextTrack.id)
+      }
+    }
+    
+    // Fallback: Regular play (fetch new URL)
+    console.log('[Next] Fetching new URL')
+    clearPreloadAudio()
     await play(nextTrack)
   }
 
@@ -706,30 +922,62 @@ export const usePlayerStore = defineStore('player', () => {
     }
     
     queueIndex.value = prevIndex
-    
-    // Check cache for previous track
     const prevTrack = queue.value[prevIndex]
-    const cachedUrl = getCachedAudio(prevTrack.id)
-    if (cachedUrl) {
+    
+    // Priority 1: Blob cache
+    const cachedBlobUrl = getCachedAudio(prevTrack.id)
+    if (cachedBlobUrl) {
+      console.log('[Prev] Using blob cache')
       initAudio()
       loading.value = true
       currentTrack.value = prevTrack
       updateMediaSession()
       try {
-        // Stop current playback and reset before changing source
         audio.value.pause()
         audio.value.currentTime = 0
-        audio.value.src = cachedUrl
-        audio.value.load()  // Force reload with new source
+        audio.value.src = cachedBlobUrl
+        audio.value.load()
         await audio.value.play()
+        persistState()
+        preloadNextTracks()
       } catch (e) {
         console.error('Failed to play cached track:', e)
+        audioCache.delete(prevTrack.id)
+        await play(prevTrack)
       } finally {
         loading.value = false
       }
-    } else {
-      await play(prevTrack)
+      return
     }
+    
+    // Priority 2: Cached URL
+    const cachedUrl = getCachedUrl(prevTrack.id)
+    if (cachedUrl) {
+      console.log('[Prev] Using cached URL')
+      initAudio()
+      loading.value = true
+      currentTrack.value = prevTrack
+      updateMediaSession()
+      try {
+        audio.value.pause()
+        audio.value.currentTime = 0
+        audio.value.src = cachedUrl
+        buffered.value = 0
+        await audio.value.play()
+        persistState()
+        preloadNextTracks()
+      } catch (e) {
+        console.error('Failed to play from cached URL:', e)
+        urlCache.delete(prevTrack.id)
+        await play(prevTrack)
+      } finally {
+        loading.value = false
+      }
+      return
+    }
+    
+    // Fallback: Regular play
+    await play(prevTrack)
   }
 
   // Seek
@@ -884,6 +1132,30 @@ export const usePlayerStore = defineStore('player', () => {
     // Start state saving
     startStateSaving()
     
+    // Pre-fetch URLs for current and next tracks immediately
+    // This ensures instant playback when user presses play
+    const tracksToPrefetch = [savedState.currentTrack]
+    for (let i = 1; i <= 3; i++) {
+      const idx = (savedState.queueIndex ?? 0) + i
+      if (idx < savedState.queue.length) {
+        tracksToPrefetch.push(savedState.queue[idx])
+      }
+    }
+    
+    // Fire batch URL prefetch (don't await - background)
+    const trackIds = tracksToPrefetch.map(t => t.id)
+    playerApi.getBatchUrls(trackIds)
+      .then(response => {
+        const urlData = response.data.urls || []
+        for (const item of urlData) {
+          if (item.url && !item.error) {
+            setCachedUrl(item.track_id, item.url, item.expires_at)
+          }
+        }
+        console.log(`[Restore] Pre-cached ${urlData.filter(u => u.url).length} URLs`)
+      })
+      .catch(e => console.warn('[Restore] Prefetch failed:', e))
+    
     return true
   }
   
@@ -892,13 +1164,44 @@ export const usePlayerStore = defineStore('player', () => {
     if (!currentTrack.value) return
     
     const savedProgress = progress.value
+    const trackId = currentTrack.value.id
     
     try {
       loading.value = true
       
-      // Get stream URL
-      const response = await playerApi.getStreamUrl(currentTrack.value.id)
-      const { url } = response.data
+      // Priority 1: Check blob cache
+      const cachedBlobUrl = getCachedAudio(trackId)
+      if (cachedBlobUrl) {
+        console.log('[Resume] Using cached blob')
+        audio.value.src = cachedBlobUrl
+        audio.value.load()
+        
+        if (savedProgress > 0) {
+          audio.value.currentTime = savedProgress
+        }
+        
+        await audio.value.play()
+        loading.value = false
+        
+        // Start preloading next tracks
+        preloadNextTracks()
+        return
+      }
+      
+      // Priority 2: Check URL cache
+      let url = getCachedUrl(trackId)
+      
+      // Fallback: Get new stream URL
+      if (!url) {
+        console.log('[Resume] Fetching new stream URL')
+        const response = await playerApi.getStreamUrl(currentTrack.value.id)
+        url = response.data.url
+        if (response.data.expires_at) {
+          setCachedUrl(trackId, url, response.data.expires_at)
+        }
+      } else {
+        console.log('[Resume] Using cached URL')
+      }
       
       audio.value.src = url
       buffered.value = 0
@@ -927,6 +1230,9 @@ export const usePlayerStore = defineStore('player', () => {
       
       await audio.value.play()
       loading.value = false
+      
+      // Start preloading next tracks immediately after resume
+      preloadNextTracks()
       
     } catch (error) {
       console.error('Failed to resume playback:', error)
