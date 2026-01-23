@@ -216,7 +216,7 @@ export const useLibraryStore = defineStore('library', () => {
   }
 
   // Fetch listening history
-  const fetchHistory = async (limit = 50) => {
+  const fetchHistory = async (limit = 30) => {
     try {
       const response = await tracksApi.getHistory(limit)
       history.value = response.data
