@@ -265,7 +265,7 @@ export const usePlayerStore = defineStore('player', () => {
     audio.value.addEventListener('loadstart', () => {
       // Don't reset here, handled in play() for better control
     })
-  }  }
+  }
 
   // Preload next tracks (caches them for gapless playback)
   const preloadNextTrack = async () => {
