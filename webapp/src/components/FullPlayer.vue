@@ -57,8 +57,17 @@
 
     <!-- Track info -->
     <div class="player-info">
-      <h2 class="track-title">{{ track?.title || 'Без названия' }}</h2>
-      <p class="track-artist">{{ track?.artist || 'Неизвестный исполнитель' }}</p>
+      <div class="track-info-row">
+        <div class="track-info-text">
+          <h2 class="track-title">{{ track?.title || 'Без названия' }}</h2>
+          <p class="track-artist">{{ track?.artist || 'Неизвестный исполнитель' }}</p>
+        </div>
+        <button class="track-menu-btn" @click="$emit('menu')" title="Меню трека">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+          </svg>
+        </button>
+      </div>
     </div>
 
     <!-- Progress bar -->
@@ -262,6 +271,7 @@ const emit = defineEmits([
   'removeFromQueue',
   'moveInQueue',
   'playFromQueue',
+  'menu',
 ])
 
 const telegram = inject('telegram')
@@ -609,9 +619,49 @@ const formatTime = (seconds) => {
 }
 
 .player-info {
-  text-align: center;
   margin-bottom: 12px;
   flex-shrink: 0;
+}
+
+.track-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.track-info-text {
+  text-align: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.track-menu-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--spotify-gray);
+  border: none;
+  color: var(--spotify-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  box-shadow: 
+    3px 3px 6px var(--neu-shadow-dark),
+    -2px -2px 4px var(--neu-shadow-light);
+}
+
+.track-menu-btn:active {
+  box-shadow: 
+    inset 2px 2px 4px var(--neu-shadow-dark),
+    inset -1px -1px 3px var(--neu-shadow-light);
+}
+
+.track-menu-btn:hover {
+  color: var(--spotify-text);
 }
 
 .track-title {

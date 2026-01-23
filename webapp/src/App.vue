@@ -619,6 +619,7 @@
         @removeFromQueue="player.removeFromQueue($event)"
         @moveInQueue="(from, to) => player.moveInQueue(from, to)"
         @playFromQueue="player.playFromQueue($event)"
+        @menu="showTrackMenu(player.currentTrack)"
       />
     </Transition>
 
