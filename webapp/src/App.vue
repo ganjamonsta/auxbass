@@ -1246,7 +1246,7 @@ onMounted(async () => {
 /* One UI Large Header */
 .oneui-header {
   flex-shrink: 0;
-  padding: 12px 16px 16px;
+  padding: 8px 12px 10px;
   background: linear-gradient(180deg, var(--spotify-gray-dark) 0%, var(--spotify-black) 100%);
 }
 
@@ -1420,9 +1420,9 @@ onMounted(async () => {
 .compact-header {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
+  padding: 8px 12px;
   background: var(--spotify-gray-dark);
-  gap: 12px;
+  gap: 10px;
 }
 
 .header-title {
@@ -1517,14 +1517,14 @@ onMounted(async () => {
 .liked-header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px;
-  margin-bottom: 8px;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 4px;
 }
 
 .liked-cover {
-  width: 80px;
-  height: 80px;
+  width: 60px;
+  height: 60px;
   border-radius: 8px;
   background: linear-gradient(135deg, #1db954 0%, #1ed760 100%);
   display: flex;
@@ -1576,11 +1576,11 @@ onMounted(async () => {
 .active-filter {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  margin: 8px 16px;
+  gap: 6px;
+  padding: 6px 10px;
+  margin: 6px 10px;
   background: var(--spotify-green);
-  border-radius: 8px;
+  border-radius: 6px;
   color: black;
   font-size: 14px;
   font-weight: 500;
@@ -1635,8 +1635,8 @@ onMounted(async () => {
 /* Scope toggle for library/global */
 .scope-toggle {
   display: flex;
-  gap: 8px;
-  padding: 12px 16px;
+  gap: 6px;
+  padding: 8px 10px;
   background: var(--spotify-black);
   position: sticky;
   top: 0;
@@ -1645,7 +1645,7 @@ onMounted(async () => {
 
 .scope-btn {
   flex: 1;
-  padding: 10px 16px;
+  padding: 8px 12px;
   border: none;
   border-radius: 20px;
   background: var(--spotify-gray);
@@ -1673,10 +1673,10 @@ onMounted(async () => {
 .list-item {
   display: flex;
   align-items: center;
-  padding: 12px 20px;
-  gap: 16px;
+  padding: 8px 12px;
+  gap: 10px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.15s;
 }
 
 .list-item:active {
@@ -1684,8 +1684,8 @@ onMounted(async () => {
 }
 
 .list-item-avatar {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: var(--spotify-gray);
   display: flex;
@@ -1745,50 +1745,62 @@ onMounted(async () => {
 
 /* ========== Home Feed Styles ========== */
 .home-feed {
-  padding: 0 0 16px 0;
+  padding: 0 0 8px 0;
 }
 
-/* Quick Access Grid */
+/* Quick Access Grid - horizontal scroll */
 .quick-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  padding: 16px;
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.quick-grid::-webkit-scrollbar {
+  display: none;
 }
 
 .quick-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
+  gap: 8px;
+  padding: 6px 10px;
   background: var(--neu-bg);
-  border-radius: 16px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   box-shadow: 
-    5px 5px 10px var(--neu-shadow-dark),
-    -2px -2px 6px var(--neu-shadow-light);
+    3px 3px 6px var(--neu-shadow-dark),
+    -1px -1px 4px var(--neu-shadow-light);
   border: 1px solid rgba(255, 255, 255, 0.02);
+  flex-shrink: 0;
 }
 
 .quick-item:active {
   box-shadow: 
-    inset 3px 3px 6px var(--neu-shadow-dark),
-    inset -2px -2px 4px var(--neu-shadow-light);
-  transform: scale(0.98);
+    inset 2px 2px 4px var(--neu-shadow-dark),
+    inset -1px -1px 3px var(--neu-shadow-light);
+  transform: scale(0.97);
 }
 
 .quick-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, var(--spotify-green) 0%, #1e8e5e 100%);
   color: white;
   flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(29, 185, 84, 0.3);
+  box-shadow: 0 2px 8px rgba(29, 185, 84, 0.25);
+}
+
+.quick-icon svg {
+  width: 18px;
+  height: 18px;
 }
 
 .quick-icon.history-icon {
@@ -1804,37 +1816,38 @@ onMounted(async () => {
 }
 
 .quick-title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--spotify-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100px;
 }
 
 /* Feed Sections */
 .feed-section {
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .feed-section-title {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--spotify-text);
-  padding: 0 16px;
-  margin-bottom: 12px;
+  padding: 0 12px;
+  margin-bottom: 8px;
 }
 
 .horizontal-scroll {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   overflow-x: auto;
   scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  padding: 12px 0;
-  padding-left: 16px;
-  padding-right: 16px;
+  padding: 4px 0;
+  padding-left: 12px;
+  padding-right: 12px;
 }
 
 .horizontal-scroll::-webkit-scrollbar {
@@ -1854,7 +1867,7 @@ onMounted(async () => {
 /* Feed Cards */
 .feed-card {
   flex-shrink: 0;
-  width: 140px;
+  width: 100px;
   scroll-snap-align: none;
   cursor: pointer;
   text-align: center;
@@ -1862,27 +1875,24 @@ onMounted(async () => {
 }
 
 .feed-card:active {
-  transform: scale(0.97);
+  transform: scale(0.96);
 }
 
 .feed-card-cover {
-  width: 140px;
-  height: 140px;
-  /* Neumorphic card style */
+  width: 100px;
+  height: 100px;
   background: var(--spotify-gray-dark);
-  border-radius: 16px; 
+  border-radius: 12px; 
   box-shadow: 
-    6px 6px 12px var(--neu-shadow-dark),
-    -3px -3px 8px var(--neu-shadow-light);
-  
+    3px 3px 8px var(--neu-shadow-dark),
+    -2px -2px 5px var(--neu-shadow-light);
   overflow: hidden;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 10px; /* More margin for shadows */
-  padding: 4px; /* Inner border effect */
-  border: 2px solid transparent; /* Ensure consistent box model */
+  margin: 0 auto 6px;
+  padding: 2px;
   box-sizing: border-box;
 }
 
@@ -1941,7 +1951,7 @@ onMounted(async () => {
 }
 
 .feed-card-title {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--spotify-text);
   white-space: nowrap;
@@ -1950,12 +1960,12 @@ onMounted(async () => {
 }
 
 .feed-card-subtitle {
-  font-size: 12px;
+  font-size: 10px;
   color: var(--spotify-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 /* Artist Card */
@@ -1972,7 +1982,7 @@ onMounted(async () => {
 }
 
 .artist-initials {
-  font-size: 36px;
+  font-size: 28px;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.85);
 }
@@ -1992,16 +2002,21 @@ onMounted(async () => {
   color: rgba(255, 255, 255, 0.9);
 }
 
+.genre-cover svg {
+  width: 28px;
+  height: 28px;
+}
+
 .genre-icon {
   opacity: 0.9;
 }
 
 .shuffle-badge {
   position: absolute;
-  bottom: 8px;
-  right: 8px;
-  width: 24px;
-  height: 24px;
+  bottom: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.6);
   display: flex;
@@ -2010,20 +2025,25 @@ onMounted(async () => {
   color: var(--spotify-green);
 }
 
+.shuffle-badge svg {
+  width: 12px;
+  height: 12px;
+}
+
 /* Add Card */
 .add-card {
-  width: 140px;
+  width: 100px;
 }
 
 .add-card .add-cover {
-  width: 140px;
-  height: 140px;
+  width: 100px;
+  height: 100px;
   background: var(--neu-bg);
   border: 2px dashed var(--spotify-gray-light);
   color: var(--spotify-text-muted);
   box-shadow: 
-    inset 3px 3px 6px var(--neu-shadow-dark),
-    inset -2px -2px 4px var(--neu-shadow-light);
+    inset 2px 2px 4px var(--neu-shadow-dark),
+    inset -1px -1px 3px var(--neu-shadow-light);
   box-sizing: border-box;
 }
 
@@ -2063,32 +2083,32 @@ onMounted(async () => {
 
 /* Playlist section */
 .playlist-section {
-  padding: 12px 16px;
+  padding: 8px 12px;
 }
 
 /* Playlist categories */
 .playlist-category {
-  margin-bottom: 20px;
+  margin-bottom: 14px;
 }
 
 .category-title {
   display: flex;
   align-items: center;
-  font-size: 14px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--spotify-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 10px;
-  padding: 0 4px;
+  margin-bottom: 6px;
+  padding: 0 2px;
 }
 
 .category-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
-  padding: 0 4px;
+  margin-bottom: 6px;
+  padding: 0 2px;
 }
 
 .category-header .category-title {
@@ -2096,8 +2116,8 @@ onMounted(async () => {
 }
 
 .create-btn-small {
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2106,7 +2126,12 @@ onMounted(async () => {
   border-radius: 50%;
   color: var(--spotify-text);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s;
+}
+
+.create-btn-small svg {
+  width: 16px;
+  height: 16px;
 }
 
 .create-btn-small:active {
@@ -2115,39 +2140,52 @@ onMounted(async () => {
 }
 
 .system-playlists-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  display: flex;
   gap: 8px;
-  margin-bottom: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+
+.system-playlists-grid::-webkit-scrollbar {
+  display: none;
 }
 
 .playlists-compact-list {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0 8px 12px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.playlists-compact-list::-webkit-scrollbar {
+  display: none;
 }
 
 .empty-small {
   text-align: center;
-  padding: 24px 16px;
+  padding: 10px 10px;
   color: var(--spotify-text-secondary);
 }
 
 .empty-small p {
-  margin-bottom: 12px;
-  font-size: 14px;
+  margin-bottom: 6px;
+  font-size: 12px;
 }
 
 /* System playlists (Liked, History) */
 .system-playlist-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px;
+  gap: 8px;
+  padding: 8px 10px;
   background: var(--spotify-gray);
   border-radius: 8px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.15s;
+  flex-shrink: 0;
 }
 
 .system-playlist-item:active {
@@ -2155,9 +2193,9 @@ onMounted(async () => {
 }
 
 .system-playlist-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2166,13 +2204,13 @@ onMounted(async () => {
 }
 
 .system-playlist-icon svg {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
 }
 
 .system-playlist-icon.liked-gradient {
   background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
 }
 
 .system-playlist-icon.history-gradient {
@@ -2186,33 +2224,38 @@ onMounted(async () => {
 
 .system-playlist-title {
   display: block;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--spotify-text);
+  white-space: nowrap;
 }
 
 .system-playlist-count {
   display: block;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--spotify-text-muted);
-  margin-top: 1px;
 }
 
 .create-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 8px;
   width: 100%;
-  padding: 16px;
-  border: 2px dashed var(--spotify-gray-light);
-  border-radius: 12px;
+  padding: 10px;
+  border: 1px dashed var(--spotify-gray-light);
+  border-radius: 8px;
   background: transparent;
   color: var(--spotify-text-secondary);
-  font-size: 15px;
+  font-size: 13px;
   cursor: pointer;
-  margin-bottom: 16px;
-  transition: all 0.2s;
+  margin-bottom: 12px;
+  transition: all 0.15s;
+}
+
+.create-btn svg {
+  width: 18px;
+  height: 18px;
 }
 
 .create-btn:active {
@@ -2314,9 +2357,9 @@ onMounted(async () => {
 
 .queue-now-playing {
   background: var(--spotify-gray);
-  border-radius: 12px;
-  padding: 4px;
-  margin-bottom: 16px;
+  border-radius: 10px;
+  padding: 3px;
+  margin-bottom: 12px;
 }
 
 /* Bottom Tab Bar - Nokia XpressMusic Style */
@@ -2324,9 +2367,9 @@ onMounted(async () => {
   flex-shrink: 0;
   display: flex;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
-  padding: 10px 12px max(10px, env(safe-area-inset-bottom));
+  padding: 6px 10px max(6px, env(safe-area-inset-bottom));
   z-index: 50;
   border-top: 1px solid #2a2a2a;
 }
@@ -2336,13 +2379,13 @@ onMounted(async () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  width: 58px;
-  height: 50px;
+  gap: 2px;
+  width: 52px;
+  height: 44px;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   color: #888;
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -2364,11 +2407,11 @@ onMounted(async () => {
 .tab-item::before {
   content: '';
   position: absolute;
-  top: 6px;
+  top: 5px;
   left: 50%;
   transform: translateX(-50%);
-  width: 32px;
-  height: 4px;
+  width: 28px;
+  height: 3px;
   background: 
     radial-gradient(circle at 15% 50%, rgba(255,255,255,0.06) 0%, transparent 50%),
     radial-gradient(circle at 38% 50%, rgba(255,255,255,0.06) 0%, transparent 50%),
@@ -2414,8 +2457,8 @@ onMounted(async () => {
 }
 
 .tab-item svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   transition: filter 0.2s;
 }
 
@@ -2433,8 +2476,8 @@ onMounted(async () => {
 
 .modal {
   background: var(--neu-bg);
-  padding: 28px;
-  border-radius: 24px;
+  padding: 20px;
+  border-radius: 16px;
   width: 90%;
   max-width: 320px;
   box-shadow: 

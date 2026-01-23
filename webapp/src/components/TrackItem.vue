@@ -139,10 +139,10 @@ const formatDuration = (seconds) => {
 .track-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 20px;
+  gap: 8px;
+  padding: 6px 12px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.15s;
 }
 
 .track-item:active {
@@ -154,13 +154,13 @@ const formatDuration = (seconds) => {
 }
 
 .track-item.compact {
-  padding: 8px 12px;
+  padding: 5px 10px;
 }
 
 .track-cover {
-  width: 52px;
-  height: 52px;
-  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -168,13 +168,13 @@ const formatDuration = (seconds) => {
   position: relative;
   overflow: hidden;
   box-shadow: 
-    4px 4px 8px var(--neu-shadow-dark),
-    -2px -2px 5px var(--neu-shadow-light);
+    3px 3px 6px var(--neu-shadow-dark),
+    -1px -1px 3px var(--neu-shadow-light);
 }
 
 .compact .track-cover {
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
 }
 
 .cover-image {
@@ -238,7 +238,7 @@ const formatDuration = (seconds) => {
 }
 
 .track-title {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -247,7 +247,7 @@ const formatDuration = (seconds) => {
 }
 
 .compact .track-title {
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .track-item.playing .track-title {
@@ -258,11 +258,11 @@ const formatDuration = (seconds) => {
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 .track-artist {
-  font-size: 13px;
+  font-size: 11px;
   color: var(--spotify-text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -270,24 +270,24 @@ const formatDuration = (seconds) => {
 }
 
 .compact .track-artist {
-  font-size: 12px;
+  font-size: 10px;
 }
 
 .play-count {
-  font-size: 12px;
+  font-size: 10px;
   color: var(--spotify-text-muted);
   white-space: nowrap;
 }
 
 .track-duration {
-  font-size: 13px;
+  font-size: 11px;
   color: var(--spotify-text-muted);
   flex-shrink: 0;
 }
 
 .track-like {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   background: none;
   border: none;
   display: flex;

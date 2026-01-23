@@ -484,8 +484,8 @@ const formatTime = (seconds) => {
   display: flex;
   flex-direction: column;
   z-index: 100;
-  padding: 12px 24px;
-  padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
+  padding: 8px 16px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
   transition: transform 0.1s ease-out, opacity 0.1s ease-out;
   touch-action: pan-y;
   overflow: hidden;
@@ -493,14 +493,14 @@ const formatTime = (seconds) => {
 
 /* Swipe indicator */
 .swipe-indicator {
-  width: 40px;
+  width: 36px;
   height: 4px;
   background: var(--spotify-gray-light);
   border-radius: 2px;
-  margin: 0 auto 8px;
+  margin: 0 auto 4px;
   flex-shrink: 0;
   cursor: pointer;
-  padding: 8px 40px;
+  padding: 6px 36px;
   background-clip: content-box;
   transition: background-color 0.2s;
 }
@@ -806,8 +806,8 @@ const formatTime = (seconds) => {
 .bottom-controls {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 24px;
+  gap: 10px;
+  padding: 0 16px;
   margin-top: auto;
   flex-shrink: 0;
 }
@@ -815,13 +815,13 @@ const formatTime = (seconds) => {
 .volume-container {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex: 1;
 }
 
 .queue-toggle-btn {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: var(--spotify-gray);
   border: none;
