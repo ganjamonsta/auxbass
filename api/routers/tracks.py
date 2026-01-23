@@ -1,7 +1,7 @@
 """
 TG Player API - Tracks Router
 """
-
+import re
 import aiohttp
 from typing import Optional, List
 from datetime import datetime
@@ -98,12 +98,15 @@ async def get_tracks(
     if search:
         safe_search = sanitize_input(search)
         if safe_search:
-            search_filter = or_(
-                Track.title.ilike(f"%{safe_search}%"),
-                Track.artist.ilike(f"%{safe_search}%"),
-                Track.album.ilike(f"%{safe_search}%"),
-            )
-            query = query.where(search_filter)
+            # Split by spaces to support multi-term search
+            terms = safe_search.split()
+            for term in terms:
+                term_filter = or_(
+                    Track.title.ilike(f"%{term}%"),
+                    Track.artist.ilike(f"%{term}%"),
+                    Track.album.ilike(f"%{term}%"),
+                )
+                query = query.where(term_filter)
             count_query = count_query.where(search_filter)
     
     # Apply artist filter (sanitized)

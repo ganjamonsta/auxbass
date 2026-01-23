@@ -16,20 +16,27 @@
           
           <!-- Search Input (visible when search open) -->
           <Transition name="expand-search">
-            <div v-if="showSearch" class="search-wrapper">
+            <div v-if="showSearch" class="search-wrapper" @click="focusInput">
               <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
               </svg>
-              <input 
-                ref="searchInput"
-                v-model="searchQuery"
-                type="text"
-                placeholder="Поиск треков, артистов..."
-                class="search-input-inline"
-                @input="debouncedSearch"
-                @blur="onSearchBlur"
-                @keyup.escape="closeSearch"
-              />
+              <div class="search-content">
+                <span v-for="(tag, index) in searchTags" :key="index" class="search-tag" @click.stop="removeTag(index)">
+                  {{ tag }}
+                </span>
+                <input 
+                  ref="searchInput"
+                  v-model="searchQuery"
+                  type="text"
+                  placeholder="Поиск..."
+                  class="search-input-inline"
+                  @input="debouncedSearch"
+                  @blur="onSearchBlur"
+                  @keyup.escape="closeSearch"
+                  @keydown.enter.prevent="addTag"
+                  @keydown.backspace="handleBackspace"
+                />
+              </div>
               <button class="search-close-btn" @click="closeSearch">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
@@ -679,6 +686,7 @@ const currentView = ref('library')
 const activeTab = ref('home')
 const showSearch = ref(false)
 const searchQuery = ref('')
+const searchTags = ref([])
 const showFullPlayer = ref(false)
 const showCreatePlaylist = ref(false)
 const newPlaylistName = ref('')
@@ -972,11 +980,37 @@ let searchTimeout = null
 const debouncedSearch = () => {
   clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => {
-    if (searchQuery.value) {
+    if (searchQuery.value || searchTags.value.length > 0) {
       activeTab.value = 'tracks'
     }
-    library.fetchTracks({ search: searchQuery.value })
+    const fullQuery = [...searchTags.value, searchQuery.value].filter(Boolean).join(' ')
+    library.fetchTracks({ search: fullQuery })
   }, 300)
+}
+
+// Search tag handling
+const addTag = () => {
+  const query = searchQuery.value.trim()
+  if (query) {
+    searchTags.value.push(query)
+    searchQuery.value = ''
+    debouncedSearch()
+  }
+}
+
+const removeTag = (index) => {
+  searchTags.value.splice(index, 1)
+  debouncedSearch()
+}
+
+const handleBackspace = () => {
+  if (!searchQuery.value && searchTags.value.length > 0) {
+    removeTag(searchTags.value.length - 1)
+  }
+}
+
+const focusInput = () => {
+  searchInput.value?.focus()
 }
 
 // Search open/close with animation
@@ -988,8 +1022,9 @@ const openSearch = async () => {
 
 const closeSearch = () => {
   showSearch.value = false
-  if (searchQuery.value) {
+  if (searchQuery.value || searchTags.value.length > 0) {
     searchQuery.value = ''
+    searchTags.value = []
     library.fetchTracks()  // Reset to full list
   }
 }
@@ -1092,11 +1127,31 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   width: 100%;
-  height: 44px;
+  height: auto;
+  min-height: 44px;
   background: var(--spotify-gray);
   border-radius: 22px;
-  padding: 0 12px;
+  padding: 4px 12px;
   gap: 10px;
+}
+
+.search-content {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.search-tag {
+  background: var(--spotify-gray-light);
+  color: var(--spotify-text);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
 }
 
 .search-icon {
@@ -1106,12 +1161,14 @@ onMounted(async () => {
 
 .search-input-inline {
   flex: 1;
+  min-width: 60px;
   border: none;
   background: transparent;
   color: var(--spotify-text);
   font-size: 16px;
   outline: none;
   padding: 0;
+  height: 36px;
 }
 
 .search-input-inline::placeholder {
