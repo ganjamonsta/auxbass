@@ -53,17 +53,26 @@ class EnrichmentWorker:
         logger.info("Enrichment worker stopped")
     
     async def _worker_loop(self, interval: int):
-        """Main worker loop"""
+        """Main worker loop with adaptive interval"""
         while self.running:
             try:
-                await self._process_pending_tracks()
+                had_work = await self._process_pending_tracks()
+                
+                # Adaptive interval: if there was work, check again soon
+                if had_work:
+                    await asyncio.sleep(5)  # Quick retry if there's more to process
+                else:
+                    await asyncio.sleep(interval)  # Normal interval if idle
+                    
             except Exception as e:
                 logger.error(f"Enrichment worker error: {e}")
-            
-            await asyncio.sleep(interval)
+                await asyncio.sleep(interval)
     
-    async def _process_pending_tracks(self, batch_size: int = 5):
-        """Process a batch of pending tracks"""
+    async def _process_pending_tracks(self, batch_size: int = 10) -> bool:
+        """
+        Process a batch of pending tracks with parallel API calls.
+        Returns True if there was work to do.
+        """
         async with get_session() as session:
             # Get pending tracks
             result = await session.execute(
@@ -74,24 +83,24 @@ class EnrichmentWorker:
             tracks = result.scalars().all()
             
             if not tracks:
-                return
+                return False
             
             logger.info(f"Processing {len(tracks)} tracks for enrichment")
             
+            # Mark all as processing first
             for track in tracks:
+                track.enrichment_status = "processing"
+            await session.flush()
+            
+            # Process in parallel (up to 5 concurrent API calls)
+            async def enrich_one(track):
                 try:
-                    # Mark as processing
-                    track.enrichment_status = "processing"
-                    await session.flush()
-                    
-                    # Enrich
                     enriched = await metadata_service.enrich_track(
                         title=track.title,
                         artist=track.artist
                     )
                     
                     if enriched.get("enriched"):
-                        # Update track with new data
                         if not track.album and enriched.get("album"):
                             track.album = enriched["album"]
                         if not track.genre and enriched.get("genre"):
@@ -100,15 +109,19 @@ class EnrichmentWorker:
                             track.cover_url = enriched["cover_url"]
                         
                         track.enrichment_status = "completed"
-                        logger.info(f"Enriched track: {track.title} - {track.artist}")
+                        logger.info(f"Enriched: {track.title} - {track.artist}")
                     else:
-                        # No data found, mark as failed
                         track.enrichment_status = "failed"
-                        logger.info(f"No enrichment data for: {track.title} - {track.artist}")
-                    
+                        logger.debug(f"No data for: {track.title} - {track.artist}")
+                        
                 except Exception as e:
                     logger.error(f"Failed to enrich track {track.id}: {e}")
                     track.enrichment_status = "failed"
+            
+            # Run all enrichments concurrently
+            await asyncio.gather(*[enrich_one(t) for t in tracks], return_exceptions=True)
+            
+            return True
     
     async def get_stats(self) -> dict:
         """Get current enrichment statistics"""

@@ -2,6 +2,7 @@
 TG Player - Database Session Manager
 """
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.pool import NullPool
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -11,10 +12,21 @@ from .models import Base
 
 settings = get_settings()
 
-# Create async engine
+# Determine pool settings based on database type
+# SQLite doesn't support connection pooling well
+is_sqlite = settings.database_url.startswith("sqlite")
+
+# Create async engine with connection pool settings
 engine = create_async_engine(
     settings.database_url,
     echo=False,  # Set True for SQL debugging
+    # Pool settings for PostgreSQL (ignored for SQLite)
+    pool_size=10 if not is_sqlite else 0,        # Base pool size
+    max_overflow=20 if not is_sqlite else 0,     # Extra connections when busy
+    pool_timeout=30 if not is_sqlite else 0,     # Seconds to wait for connection
+    pool_recycle=1800 if not is_sqlite else -1,  # Recycle connections after 30 min
+    pool_pre_ping=True if not is_sqlite else False,  # Test connections before use
+    poolclass=NullPool if is_sqlite else None,   # Disable pooling for SQLite
 )
 
 # Session factory

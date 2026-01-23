@@ -39,7 +39,7 @@ async def main():
     
     # Start enrichment worker
     logger.info("Starting enrichment worker...")
-    await enrichment_worker.start(interval=60)
+    await enrichment_worker.start(interval=30)  # Check every 30s when idle, 5s when busy
     
     # Initialize bot
     bot = Bot(
