@@ -128,7 +128,6 @@ const handleSubmit = async () => {
   justify-content: center;
   z-index: 200;
   padding: 20px;
-  overflow: hidden;
 }
 
 .modal {
@@ -137,14 +136,12 @@ const handleSubmit = async () => {
   width: 100%;
   max-width: 400px;
   max-height: 90vh;
-  overflow-y: scroll;
+  overflow-y: auto;
   overflow-x: hidden;
-  margin-right: -6px;
-  padding-right: 6px;
 }
 
 .modal::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
   background: transparent;
 }
 
@@ -153,8 +150,8 @@ const handleSubmit = async () => {
 }
 
 .modal::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
 }
 
 .modal-header {

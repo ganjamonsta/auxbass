@@ -1089,11 +1089,9 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  overflow: hidden;  /* Contain scrollbar within app bounds - hides negative margin scrollbar */
+  overflow: hidden;
   background-color: var(--spotify-black);
   color: var(--spotify-text);
-  /* Clip content so scrollbar with negative margin stays inside */
-  clip-path: inset(0);
 }
 
 /* One UI Large Header */
@@ -1271,16 +1269,14 @@ onMounted(async () => {
 .content {
   flex: 1;
   min-height: 0;  /* Allow flex shrinking for proper overflow */
-  overflow-y: scroll;
+  overflow-y: auto;
   overflow-x: hidden;  /* Prevent horizontal scrollbar */
   position: relative;
-  margin-right: -6px;
-  padding-right: 6px;
 }
 
-/* Content scrollbar - overlay style */
+/* Content scrollbar - thin overlay style */
 .content::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
   background: transparent;
 }
 
@@ -1289,12 +1285,12 @@ onMounted(async () => {
 }
 
 .content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
 }
 
 .content::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.4);
 }
 
 /* Pull to refresh */

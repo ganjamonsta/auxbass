@@ -128,10 +128,10 @@ body.spotify-theme {
   background-color: var(--spotify-black);
 }
 
-/* Custom overlay scrollbar */
+/* Custom thin scrollbar - appears over content */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
   background: transparent;
 }
 
@@ -140,40 +140,24 @@ body.spotify-theme {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.4);
 }
 
 /* Firefox thin scrollbar */
 * {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+  scrollbar-width: none; /* Hide scrollbar on Firefox */
 }
 
-/* Overlay scrollbar utility class - adds negative margin to overlap content */
-.overlay-scrollbar {
-  overflow-y: scroll;
-  overflow-x: hidden;
-  margin-right: -6px;
-  padding-right: 6px;
-}
-
-.overlay-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  background: transparent;
-}
-
-.overlay-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.overlay-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
+/* Show scrollbar only on webkit browsers with thin style */
+@supports (-webkit-appearance: none) {
+  * {
+    scrollbar-width: thin;
+  }
 }
 
 /* Disable text selection on UI elements */

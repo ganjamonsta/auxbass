@@ -476,7 +476,6 @@ const formatTime = (seconds) => {
   transition: transform 0.1s ease-out, opacity 0.1s ease-out;
   touch-action: pan-y;
   overflow: hidden;
-  clip-path: inset(0);
 }
 
 /* Swipe indicator */
@@ -816,16 +815,14 @@ const formatTime = (seconds) => {
   padding: 16px;
   padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
   max-height: 50%;
-  overflow-y: scroll;
+  overflow-y: auto;
   overflow-x: hidden;
   z-index: 200;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
-  margin-right: -6px;
-  padding-right: 22px;
 }
 
 .mini-queue::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
   background: transparent;
 }
 
@@ -834,8 +831,8 @@ const formatTime = (seconds) => {
 }
 
 .mini-queue::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
 }
 
 .queue-header {

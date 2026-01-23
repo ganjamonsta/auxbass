@@ -101,7 +101,6 @@ const handleSelect = async (playlist) => {
   max-width: 400px;
   max-height: 70vh;
   overflow: hidden;
-  clip-path: inset(0);
 }
 
 .modal-header {
@@ -132,15 +131,13 @@ const handleSelect = async (playlist) => {
 
 .playlist-list {
   max-height: calc(70vh - 70px);
-  overflow-y: scroll;
+  overflow-y: auto;
   overflow-x: hidden;
   padding: 8px;
-  margin-right: -6px;
-  padding-right: 14px;
 }
 
 .playlist-list::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
   background: transparent;
 }
 
@@ -149,8 +146,8 @@ const handleSelect = async (playlist) => {
 }
 
 .playlist-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
 }
 
 .create-first {
