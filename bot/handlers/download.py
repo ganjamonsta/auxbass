@@ -82,25 +82,30 @@ async def handle_download_playlist(callback: CallbackQuery):
             await callback.message.reply("❌ Нет доступных треков для отправки")
             return
         
+        # Send header message first
+        total_batches = (len(valid_tracks) + 9) // 10  # ceil division
+        header_text = (
+            f"📁 <b>Плейлист: {playlist.name}</b>\n"
+            f"🎵 {len(valid_tracks)} треков"
+        )
+        if total_batches > 1:
+            header_text += f"\n📦 Будет отправлено {total_batches} сообщениями"
+        
+        await callback.message.reply(header_text)
+        
         # Telegram allows max 10 media per group
-        # Send tracks in batches of 10
         batch_size = 10
         total_sent = 0
         
         for i in range(0, len(valid_tracks), batch_size):
             batch = valid_tracks[i:i + batch_size]
+            batch_num = (i // batch_size) + 1
             
-            # Build media group
+            # Build media group (no captions - header already sent)
             media_group = []
-            for idx, track in enumerate(batch):
-                # Only first item in group gets caption with playlist name
-                caption = None
-                if i == 0 and idx == 0:
-                    caption = f"📁 Плейлист: {playlist.name}\n🎵 {len(valid_tracks)} треков"
-                
+            for track in batch:
                 media_group.append(InputMediaAudio(
                     media=track.file_id,
-                    caption=caption,
                     performer=track.artist,
                     title=track.title,
                     duration=track.duration
@@ -109,9 +114,9 @@ async def handle_download_playlist(callback: CallbackQuery):
             try:
                 await callback.message.answer_media_group(media=media_group)
                 total_sent += len(batch)
-                # Small delay between batches
+                # Delay between batches to avoid flood limits
                 if i + batch_size < len(valid_tracks):
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(1.0)
             except Exception as e:
                 # If media group fails, try sending individually
                 for track in batch:
@@ -123,8 +128,11 @@ async def handle_download_playlist(callback: CallbackQuery):
                             duration=track.duration
                         )
                         total_sent += 1
-                        await asyncio.sleep(0.1)
+                        await asyncio.sleep(0.3)
                     except:
                         continue
         
-        await callback.message.reply(f"✅ Отправлено {total_sent} треков из плейлиста «{playlist.name}»")
+        if total_sent == len(valid_tracks):
+            await callback.message.reply(f"✅ Готово! Отправлено {total_sent} треков")
+        else:
+            await callback.message.reply(f"✅ Отправлено {total_sent} из {len(valid_tracks)} треков")

@@ -506,6 +506,7 @@ async def download_playlist(
     """
     Send multiple tracks as media group via Telegram bot.
     Tracks are sent in batches of 10 (Telegram limit).
+    Header message is sent first, then audio batches.
     """
     if not request.track_ids:
         raise HTTPException(status_code=400, detail="No tracks provided")
@@ -526,6 +527,26 @@ async def download_playlist(
         raise HTTPException(status_code=404, detail="No tracks found")
     
     session = await get_http_session()
+    
+    # Send header message first
+    total_batches = (len(tracks) + 9) // 10
+    header_text = f"📁 <b>Плейлист: {request.playlist_name}</b>\n🎵 {len(tracks)} треков"
+    if total_batches > 1:
+        header_text += f"\n📦 Будет отправлено {total_batches} сообщениями"
+    
+    header_url = f"https://api.telegram.org/bot{settings.bot_token}/sendMessage"
+    header_payload = {
+        "chat_id": user.id,
+        "text": header_text,
+        "parse_mode": "HTML"
+    }
+    
+    try:
+        async with session.post(header_url, json=header_payload) as resp:
+            pass  # Header sent
+    except:
+        pass  # Continue even if header fails
+    
     api_url = f"https://api.telegram.org/bot{settings.bot_token}/sendMediaGroup"
     
     batch_size = 10
@@ -534,9 +555,9 @@ async def download_playlist(
     for i in range(0, len(tracks), batch_size):
         batch = tracks[i:i + batch_size]
         
-        # Build media group
+        # Build media group (no captions - header already sent)
         media = []
-        for idx, track in enumerate(batch):
+        for track in batch:
             item = {
                 "type": "audio",
                 "media": track.file_id,
@@ -545,9 +566,6 @@ async def download_playlist(
             }
             if track.duration:
                 item["duration"] = track.duration
-            # Add caption only to first track of first batch
-            if i == 0 and idx == 0:
-                item["caption"] = f"📁 {request.playlist_name}\n🎵 {len(tracks)} треков"
             media.append(item)
         
         payload = {
@@ -577,6 +595,12 @@ async def download_playlist(
                                     total_sent += 1
                         except:
                             continue
+            
+            # Delay between batches to avoid flood limits
+            if i + batch_size < len(tracks):
+                import asyncio
+                await asyncio.sleep(1.0)
+                
         except aiohttp.ClientError as e:
             logger.error(f"HTTP error sending media group: {e}")
     
