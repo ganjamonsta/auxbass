@@ -31,6 +31,16 @@
         <span v-if="!track?.cover_url" class="cover-text">{{ coverInitials }}</span>
         <img v-else :src="track.cover_url" alt="Cover" class="cover-img" />
       </div>
+
+      <!-- Loading Overlay -->
+      <div v-if="loading" class="loading-overlay">
+        <div class="loading-spinner">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <circle cx="12" cy="12" r="10" stroke-width="4" stroke-opacity="0.3"/>
+            <path d="M12 2a10 10 0 0 1 10 10" stroke-width="4" stroke-linecap="round"/>
+          </svg>
+        </div>
+      </div>
       
       <!-- Swipe hint arrows -->
       <div v-if="isSwiping" class="swipe-arrows">
@@ -591,6 +601,23 @@ const formatTime = (seconds) => {
 
 .play-btn:active {
   background: var(--spotify-text-secondary);
+}
+
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  z-index: 5;
+  border-radius: 8px;
+}
+
+.loading-spinner {
+  color: white;
+  animation: spin 1s linear infinite;
 }
 
 .spinner {

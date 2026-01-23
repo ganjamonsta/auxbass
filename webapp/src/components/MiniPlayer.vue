@@ -23,6 +23,14 @@
         class="cover-image"
       />
       <span v-else class="cover-text">{{ coverInitials }}</span>
+      
+      <!-- Loading Overlay -->
+      <div v-if="loading" class="mini-loading-overlay">
+        <svg class="mini-spinner" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <circle cx="12" cy="12" r="10" stroke-width="3" stroke-opacity="0.3"/>
+          <path d="M12 2a10 10 0 0 1 10 10" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
     </div>
     
     <!-- Info -->
@@ -219,12 +227,32 @@ const coverInitials = computed(() => {
   justify-content: center;
   flex-shrink: 0;
   overflow: hidden;
+  position: relative;
 }
 
 .cover-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.logo-overlay { /* Unused? remove or ignore */ }
+
+.mini-loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.mini-spinner {
+  color: white;
+  animation: spin 1s linear infinite;
+  width: 20px;
+  height: 20px;
 }
 
 .cover-text {
