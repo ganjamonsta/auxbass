@@ -1634,36 +1634,33 @@ onMounted(async () => {
   display: flex;
   gap: 12px;
   overflow-x: auto;
-  scroll-snap-type: x mandatory;
+  scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   padding: 12px 0;
+  padding-left: 16px;
+  padding-right: 16px;
 }
 
 .horizontal-scroll::-webkit-scrollbar {
   display: none;
 }
 
-.scroll-spacer {
+.horizontal-scroll::after {
+  content: '';
   flex-shrink: 0;
   width: 4px;
-  min-width: 4px;
 }
 
-/* First and last card margins */
-.horizontal-scroll > .feed-card:first-of-type {
-  margin-left: 16px;
-}
-
-.horizontal-scroll > .feed-card:last-of-type {
-  margin-right: 16px;
+.scroll-spacer {
+  display: none;
 }
 
 /* Feed Cards */
 .feed-card {
   flex-shrink: 0;
   width: 140px;
-  scroll-snap-align: start;
+  scroll-snap-align: none;
   cursor: pointer;
   text-align: center;
   transition: transform 0.1s;
