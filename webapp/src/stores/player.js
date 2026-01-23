@@ -530,6 +530,10 @@ export const usePlayerStore = defineStore('player', () => {
         await audio.value.play()
         loading.value = false
         
+        // Save state and start periodic saving
+        persistState()
+        startStateSaving()
+        
         // Start preloading next tracks immediately
         nextTrackPreloaded.value = null
         preloadNextTrack()
@@ -549,6 +553,10 @@ export const usePlayerStore = defineStore('player', () => {
       // Reset preload triggering flag for the new track
       preloadTriggered = false
       nextTrackPreloaded.value = null
+      
+      // Save state after starting playback
+      persistState()
+      startStateSaving()
       
       // Note: We deliberately DO NOT call preloadNextTrack() here immediately.
       // We wait for the 'timeupdate' event to confirm we have a healthy buffer
