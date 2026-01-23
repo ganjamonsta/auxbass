@@ -165,10 +165,19 @@ export const usePlayerStore = defineStore('player', () => {
     audio.value.addEventListener('canplay', () => {
       loading.value = false
     })
+
+    // playing event - actually playing
+    audio.value.addEventListener('playing', () => {
+       loading.value = false
+    })
     
     // waiting event - buffering
     audio.value.addEventListener('waiting', () => {
-      loading.value = true
+      // Only show loading if we are really stalled (buffer < 0.5s ahead)
+      // Sometimes browsers fire 'waiting' momentarily during seek
+      if (audio.value.readyState < 3) { 
+        loading.value = true
+      }
     })
     
     audio.value.addEventListener('timeupdate', () => {
@@ -200,7 +209,13 @@ export const usePlayerStore = defineStore('player', () => {
         // Often a simple approximation of the last range is enough for simple UI
         const lastIndex = audio.value.buffered.length - 1
         buffered.value = audio.value.buffered.end(lastIndex)
+        
+        // Ensure loading is false if we have enough buffer
+        if (loading.value && buffered.value - progress.value > 2) {
+           loading.value = false
+        }
       }
+    })      }
     })
 
     audio.value.addEventListener('durationchange', () => {
@@ -227,15 +242,20 @@ export const usePlayerStore = defineStore('player', () => {
       loading.value = false
     })
     
-    // Preload next track when current is 30% done
+    // Preload next track when we have a safe buffer
     let preloadTriggered = false
     audio.value.addEventListener('timeupdate', () => {
-      // Check if we have enough buffer to spare bandwidth for preloading
-      // (at least 15s buffered ahead, or fully buffered)
-      const currentBuffer = buffered.value - progress.value
-      const isBufferHealthy = currentBuffer > 15 || buffered.value >= (duration.value - 1)
+      // Calculate how many seconds we have buffered ahead of current position
+      const currentBuffer = (buffered.value || 0) - progress.value
+      
+      // Smart Preload Condition:
+      // 1. We have > 20 seconds of audio buffered ahead (safe reserve)
+      // 2. OR the entire track is almost fully buffered
+      // 3. AND we haven't started preloading yet
+      const isBufferHealthy = currentBuffer > 20 || (duration.value > 0 && buffered.value >= duration.value - 2)
 
-      if (duration.value > 0 && progress.value / duration.value > 0.3 && !preloadTriggered && isBufferHealthy) {
+      if (duration.value > 0 && !preloadTriggered && isBufferHealthy) {
+        console.log(`[Smart Preload] Triggering: Buffer ahead=${currentBuffer.toFixed(1)}s`)
         preloadTriggered = true
         preloadNextTrack()
       }
@@ -243,9 +263,9 @@ export const usePlayerStore = defineStore('player', () => {
     
     // Reset preload flag on new track
     audio.value.addEventListener('loadstart', () => {
-      preloadTriggered = false
+      // Don't reset here, handled in play() for better control
     })
-  }
+  }  }
 
   // Preload next tracks (caches them for gapless playback)
   const preloadNextTrack = async () => {
@@ -396,9 +416,13 @@ export const usePlayerStore = defineStore('player', () => {
       buffered.value = 0
       await audio.value.play()
       
-      // Start preloading next tracks immediately after play starts
+      // Reset preload triggering flag for the new track
+      preloadTriggered = false
       nextTrackPreloaded.value = null
-      preloadNextTrack()
+      
+      // Note: We deliberately DO NOT call preloadNextTrack() here immediately.
+      // We wait for the 'timeupdate' event to confirm we have a healthy buffer
+      // before starting to download the next track. This prevents bandwidth contention.
       
     } catch (error) {
       console.error('Failed to play track:', error)
