@@ -107,7 +107,7 @@ async def get_tracks(
                     Track.album.ilike(f"%{term}%"),
                 )
                 query = query.where(term_filter)
-            count_query = count_query.where(search_filter)
+                count_query = count_query.where(term_filter)
     
     # Apply artist filter (sanitized)
     if artist:
