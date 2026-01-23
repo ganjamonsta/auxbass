@@ -7,7 +7,9 @@
         <span class="lcd-title">{{ displayTitle }}</span>
       </div>
       <div class="lcd-row lcd-row-sub">
-        <span class="lcd-artist">{{ track.artist || '---' }}</span>
+        <div class="lcd-artist-container">
+          <span class="lcd-artist" :class="{ 'marquee': shouldMarqueeArtist }">{{ track.artist || '---' }}</span>
+        </div>
         <span class="lcd-time">{{ formatTime(progress) }}/{{ formatTime(duration || track.duration) }}</span>
       </div>
       <!-- LED Progress dots -->
@@ -106,6 +108,10 @@ const shouldMarquee = computed(() => {
   return (props.track?.title?.length || 0) > 18
 })
 
+const shouldMarqueeArtist = computed(() => {
+  return (props.track?.artist?.length || 0) > 20
+})
+
 const formatTime = (seconds) => {
   if (!seconds) return '0:00'
   const mins = Math.floor(seconds / 60)
@@ -184,13 +190,47 @@ const displayTitle = computed(() => {
   text-overflow: clip;
 }
 
+.lcd-artist-container {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+  mask-image: linear-gradient(90deg, transparent, black 4px, black calc(100% - 8px), transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, black 4px, black calc(100% - 8px), transparent);
+}
+
 .lcd-artist {
+  display: inline-block;
   color: #3399cc;
   font-size: 11px;
   text-shadow: 0 0 4px rgba(51, 153, 204, 0.5);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  padding-left: 4px;
+}
+
+.lcd-artist.marquee {
+  animation: marquee-artist 8s linear infinite;
+}
+
+@keyframes marquee-artist {
+  0% {
+    transform: translateX(0%);
+  }
+  10% {
+    transform: translateX(0%);
+  }
+  45% {
+    transform: translateX(calc(-100% + 100px));
+  }
+  55% {
+    transform: translateX(calc(-100% + 100px));
+  }
+  90% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(0%);
+  }
 }
 
 .lcd-time {

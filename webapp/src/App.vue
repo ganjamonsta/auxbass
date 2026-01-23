@@ -95,6 +95,7 @@
       <div v-if="currentView === 'library'" class="library">
         <!-- Active filter indicator -->
         <div v-if="activeFilter" class="active-filter">
+          <span v-if="filterScope === 'global'" class="global-badge">🌍</span>
           <span>{{ activeFilter }}</span>
           <button @click="clearFilter" class="clear-filter-btn">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -256,22 +257,22 @@
         
         <!-- Track list -->
         <div v-if="activeTab === 'tracks'" class="track-list">
-          <div v-if="library.loading" class="skeleton-list">
+          <div v-if="library.loading || library.globalLoading" class="skeleton-list">
             <TrackSkeleton v-for="i in 6" :key="i" />
           </div>
-          <div v-else-if="library.tracks.length === 0" class="empty">
+          <div v-else-if="displayedTracks.length === 0" class="empty">
             <div class="empty-icon">🎵</div>
-            <p class="empty-title">Библиотека пуста</p>
-            <p class="empty-hint">Отправь аудиофайлы боту,<br/>чтобы добавить музыку</p>
+            <p class="empty-title">{{ filterScope === 'global' ? 'Треки не найдены' : 'Библиотека пуста' }}</p>
+            <p class="empty-hint">{{ filterScope === 'global' ? 'Попробуйте другого артиста' : 'Отправь аудиофайлы боту, чтобы добавить музыку' }}</p>
           </div>
           <TransitionGroup v-else name="list" tag="div">
             <TrackItem 
-              v-for="track in library.tracks" 
+              v-for="track in displayedTracks" 
               :key="track.id"
               :track="track"
               :isPlaying="player.currentTrack?.id === track.id && player.isPlaying"
               :isLiked="library.isTrackLiked(track.id)"
-              @click="playTrack(track)"
+              @click="playTrack(track, displayedTracks)"
               @menu="showTrackMenu(track)"
               @like="toggleLike(track.id)"
             />
@@ -334,15 +335,31 @@
 
         <!-- Artists -->
         <div v-if="activeTab === 'artists'" class="list-section">
-          <div v-if="library.artists.length === 0" class="empty">
+          <!-- Scope toggle -->
+          <div class="scope-toggle">
+            <button 
+              :class="['scope-btn', { active: library.artistScope === 'library' }]"
+              @click="library.fetchArtists('library')"
+            >
+              Моя библиотека
+            </button>
+            <button 
+              :class="['scope-btn', { active: library.artistScope === 'global' }]"
+              @click="library.fetchArtists('global')"
+            >
+              Вся музыка
+            </button>
+          </div>
+          
+          <div v-if="displayedArtists.length === 0" class="empty">
             <div class="empty-icon">👤</div>
             <p class="empty-title">Нет артистов</p>
           </div>
           <div
-            v-for="artist in library.artists"
+            v-for="artist in displayedArtists"
             :key="artist.artist"
             class="list-item"
-            @click="filterByArtist(artist.artist)"
+            @click="filterByArtist(artist.artist, library.artistScope)"
           >
             <div class="list-item-avatar artist-avatar" :style="getArtistAvatarStyle(artist.artist)">
               <img 
@@ -710,6 +727,7 @@ const showCreatePlaylist = ref(false)
 const newPlaylistName = ref('')
 const currentPlaylist = ref(null)
 const activeFilter = ref(null) // Active artist/genre filter
+const filterScope = ref('library') // 'library' or 'global' - which library we're filtering
 
 // Track menu state
 const showTrackMenuModal = ref(false)
@@ -744,6 +762,14 @@ const headerTitle = computed(() => {
 const upcomingTracks = computed(() => {
   if (!player.queue.length || player.queueIndex < 0) return []
   return player.queue.slice(player.queueIndex + 1, player.queueIndex + 11)
+})
+
+const displayedArtists = computed(() => {
+  return library.artistScope === 'global' ? library.globalArtists : library.artists
+})
+
+const displayedTracks = computed(() => {
+  return filterScope.value === 'global' ? library.globalTracks : library.tracks
 })
 
 // Methods
@@ -850,10 +876,15 @@ const submitCreatePlaylist = async () => {
   showCreatePlaylist.value = false
 }
 
-const filterByArtist = (artist) => {
+const filterByArtist = (artist, scope = 'library') => {
   activeFilter.value = `Артист: ${artist}`
+  filterScope.value = scope
   activeTab.value = 'tracks'
-  library.fetchTracks({ artist })
+  if (scope === 'global') {
+    library.fetchGlobalTracks({ artist })
+  } else {
+    library.fetchTracks({ artist })
+  }
 }
 
 const filterByGenre = (genre) => {
@@ -979,6 +1010,7 @@ const getTrackInitials = (track) => {
 
 const clearFilter = () => {
   activeFilter.value = null
+  filterScope.value = 'library'
   searchQuery.value = ''
   library.fetchTracks()
 }
@@ -1435,7 +1467,7 @@ onMounted(async () => {
 .active-filter {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   padding: 10px 16px;
   margin: 8px 16px;
   background: var(--spotify-green);
@@ -1445,9 +1477,14 @@ onMounted(async () => {
   font-weight: 500;
 }
 
+.active-filter .global-badge {
+  font-size: 16px;
+}
+
 .clear-filter-btn {
   width: 28px;
   height: 28px;
+  margin-left: auto;
   border: none;
   background: rgba(0, 0, 0, 0.2);
   border-radius: 50%;
@@ -1484,6 +1521,39 @@ onMounted(async () => {
   font-size: 14px;
   color: var(--spotify-text-muted);
   line-height: 1.4;
+}
+
+/* Scope toggle for library/global */
+.scope-toggle {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--spotify-black);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.scope-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 20px;
+  background: var(--spotify-gray);
+  color: var(--spotify-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.scope-btn.active {
+  background: var(--spotify-green);
+  color: black;
+}
+
+.scope-btn:active {
+  transform: scale(0.97);
 }
 
 /* List items */

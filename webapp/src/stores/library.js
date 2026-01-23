@@ -7,6 +7,8 @@ export const useLibraryStore = defineStore('library', () => {
   const tracks = ref([])
   const playlists = ref([])
   const artists = ref([])
+  const globalArtists = ref([])  // All artists from global library
+  const artistScope = ref('library')  // 'library' or 'global'
   const artistImages = ref({})  // Cache for artist images
   const genres = ref([])
   const history = ref([])
@@ -124,17 +126,29 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
-  // Fetch artists
-  const fetchArtists = async () => {
+  // Fetch artists (with scope: 'library' or 'global')
+  const fetchArtists = async (scope = 'library') => {
     try {
-      const response = await tracksApi.getArtists()
-      artists.value = response.data
+      artistScope.value = scope
+      const response = await tracksApi.getArtists(scope)
       
-      // Fetch images for top 20 artists in background
-      fetchArtistImages(response.data.slice(0, 20))
+      if (scope === 'global') {
+        globalArtists.value = response.data
+        // Fetch images for top 30 global artists
+        fetchArtistImages(response.data.slice(0, 30))
+      } else {
+        artists.value = response.data
+        // Fetch images for top 20 artists in background
+        fetchArtistImages(response.data.slice(0, 20))
+      }
     } catch (error) {
       console.error('Failed to fetch artists:', error)
     }
+  }
+  
+  // Get current artists based on scope
+  const currentArtists = () => {
+    return artistScope.value === 'global' ? globalArtists.value : artists.value
   }
 
   // Fetch artist images from Last.fm
@@ -483,6 +497,8 @@ export const useLibraryStore = defineStore('library', () => {
     tracks,
     playlists,
     artists,
+    globalArtists,
+    artistScope,
     artistImages,
     genres,
     history,
