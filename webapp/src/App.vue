@@ -5,14 +5,12 @@
       <div class="header-row">
         <EnrichmentStatus />
         
-        <!-- Title (hides when search is open) -->
-        <Transition name="fade-title">
-          <h1 v-if="!showSearch" class="header-title-main" @click="goToHome">
-            Musiq
-          </h1>
-        </Transition>
+        <!-- Title (always visible, navigates to home) -->
+        <h1 class="header-title-main" @click="goToHome">
+          Musiq
+        </h1>
         
-        <!-- Search field (slides down from top, takes title's place) -->
+        <!-- Search field (slides down from top, between title and button) -->
         <Transition name="slide-down-search">
           <div v-if="showSearch" class="search-wrapper" @click="focusInput">
             <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -37,8 +35,8 @@
           </div>
         </Transition>
         
-        <!-- Spacer to push button to right -->
-        <div class="header-spacer"></div>
+        <!-- Spacer to push button to right (only when search is closed) -->
+        <div v-if="!showSearch" class="header-spacer"></div>
         
         <!-- Search Toggle Button (fixed right, changes icon) -->
         <button @click="toggleSearch" class="icon-btn search-toggle">
@@ -1266,17 +1264,6 @@ onMounted(async () => {
 .slide-down-search-leave-to {
   opacity: 0;
   transform: translateY(-20px);
-}
-
-/* Fade title animation */
-.fade-title-enter-active,
-.fade-title-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.fade-title-enter-from,
-.fade-title-leave-to {
-  opacity: 0;
 }
 
 /* Icon flip animation */
