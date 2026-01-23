@@ -2,6 +2,32 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { playerApi, tracksApi } from '../api/client'
 
+// ============== LocalStorage helpers ==============
+const STORAGE_KEY = 'tg_player_settings'
+
+const loadSettings = () => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      return JSON.parse(saved)
+    }
+  } catch (e) {
+    console.error('Failed to load player settings:', e)
+  }
+  return {}
+}
+
+const saveSettings = (settings) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
+  } catch (e) {
+    console.error('Failed to save player settings:', e)
+  }
+}
+
+// Load saved settings
+const savedSettings = loadSettings()
+
 // Audio cache - stores blob URLs for already loaded tracks
 const audioCache = new Map()
 const MAX_CACHE_SIZE = 50
@@ -22,7 +48,7 @@ const setCachedAudio = (trackId, blobUrl) => {
 }
 
 export const usePlayerStore = defineStore('player', () => {
-  // State
+  // State - restore from localStorage where applicable
   const audio = ref(null)
   const currentTrack = ref(null)
   const queue = ref([])
@@ -30,10 +56,10 @@ export const usePlayerStore = defineStore('player', () => {
   const isPlaying = ref(false)
   const progress = ref(0)
   const duration = ref(0)
-  const volume = ref(1)
-  const isMuted = ref(false)
-  const shuffle = ref(false)
-  const repeat = ref('none') // none, one, all
+  const volume = ref(savedSettings.volume ?? 1)
+  const isMuted = ref(savedSettings.isMuted ?? false)
+  const shuffle = ref(savedSettings.shuffle ?? false)
+  const repeat = ref(savedSettings.repeat ?? 'none') // none, one, all
   const loading = ref(false)
   const nextTrackPreloaded = ref(null)
   const lastError = ref(null)  // For error notifications
@@ -435,6 +461,7 @@ export const usePlayerStore = defineStore('player', () => {
   // Toggle shuffle
   const toggleShuffle = () => {
     shuffle.value = !shuffle.value
+    persistSettings()
   }
 
   // Toggle repeat
@@ -442,6 +469,7 @@ export const usePlayerStore = defineStore('player', () => {
     const modes = ['none', 'all', 'one']
     const currentIndex = modes.indexOf(repeat.value)
     repeat.value = modes[(currentIndex + 1) % modes.length]
+    persistSettings()
   }
 
   // Set volume
@@ -453,6 +481,7 @@ export const usePlayerStore = defineStore('player', () => {
     if (volume.value > 0) {
       isMuted.value = false
     }
+    persistSettings()
   }
 
   // Toggle mute
@@ -461,6 +490,17 @@ export const usePlayerStore = defineStore('player', () => {
     if (audio.value) {
       audio.value.muted = isMuted.value
     }
+    persistSettings()
+  }
+  
+  // Persist settings to localStorage
+  const persistSettings = () => {
+    saveSettings({
+      volume: volume.value,
+      isMuted: isMuted.value,
+      shuffle: shuffle.value,
+      repeat: repeat.value,
+    })
   }
 
   // Play next (insert track after current)
