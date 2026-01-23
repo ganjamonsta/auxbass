@@ -10,9 +10,26 @@
           Musiq
         </h1>
         
-        <!-- Search field (slides in when active) -->
-        <Transition name="slide-search">
-          <div v-if="showSearch" class="search-wrapper" @click="focusInput">
+        <!-- Spacer to push button to right -->
+        <div class="header-spacer"></div>
+        
+        <!-- Search Toggle Button (fixed right, changes icon) -->
+        <button @click="toggleSearch" class="icon-btn search-toggle">
+          <Transition name="icon-flip" mode="out-in">
+            <svg v-if="!showSearch" key="search" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+            </svg>
+            <svg v-else key="close" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
+            </svg>
+          </Transition>
+        </button>
+      </div>
+      
+      <!-- Search field (slides down from top) -->
+      <Transition name="slide-down-search">
+        <div v-if="showSearch" class="search-row">
+          <div class="search-wrapper" @click="focusInput">
             <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
             </svg>
@@ -33,20 +50,8 @@
               />
             </div>
           </div>
-        </Transition>
-        
-        <!-- Search Toggle Button (always visible, changes icon) -->
-        <button @click="toggleSearch" class="icon-btn search-toggle">
-          <Transition name="icon-flip" mode="out-in">
-            <svg v-if="!showSearch" key="search" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-            </svg>
-            <svg v-else key="close" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
-            </svg>
-          </Transition>
-        </button>
-      </div>
+        </div>
+      </Transition>
     </header>
 
     <!-- Compact Header for other views -->
@@ -1159,6 +1164,10 @@ onMounted(async () => {
   gap: 12px;
 }
 
+.header-spacer {
+  flex: 1;
+}
+
 /* Header title - always visible */
 .header-title-main {
   font-size: 24px;
@@ -1175,17 +1184,22 @@ onMounted(async () => {
   opacity: 0.7;
 }
 
-/* Search wrapper with slide animation */
+/* Search row - appears below header */
+.search-row {
+  padding-top: 12px;
+  overflow: hidden;
+}
+
+/* Search wrapper */
 .search-wrapper {
   display: flex;
   align-items: center;
-  flex: 1;
+  width: 100%;
   height: auto;
   min-height: 44px;
   background: var(--neu-bg);
   border-radius: 22px;
   padding: 4px 14px;
-  margin-left: 12px;
   gap: 10px;
   box-shadow: 
     inset 3px 3px 6px var(--neu-shadow-dark),
@@ -1241,35 +1255,35 @@ onMounted(async () => {
 
 /* Animations */
 
-/* Slide search animation */
-.slide-search-enter-active {
+/* Slide down search animation */
+.slide-down-search-enter-active {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.slide-search-leave-active {
+.slide-down-search-leave-active {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.slide-search-enter-from {
+.slide-down-search-enter-from {
   opacity: 0;
-  max-width: 0;
-  margin-left: 0;
-  padding: 4px 0;
+  transform: translateY(-100%);
+  max-height: 0;
+  padding-top: 0;
 }
 
-.slide-search-leave-to {
+.slide-down-search-leave-to {
   opacity: 0;
-  max-width: 0;
-  margin-left: 0;
-  padding: 4px 0;
+  transform: translateY(-100%);
+  max-height: 0;
+  padding-top: 0;
 }
 
-.slide-search-enter-to,
-.slide-search-leave-from {
+.slide-down-search-enter-to,
+.slide-down-search-leave-from {
   opacity: 1;
-  max-width: 500px;
-  margin-left: 12px;
-  padding: 4px 14px;
+  transform: translateY(0);
+  max-height: 80px;
+  padding-top: 12px;
 }
 
 /* Icon flip animation */
