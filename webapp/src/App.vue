@@ -1214,7 +1214,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 8px;
+  margin: 0 auto 8px;
 }
 
 .feed-card-cover img {
