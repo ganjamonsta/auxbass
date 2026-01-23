@@ -57,6 +57,10 @@ class Track(Base):
     play_count: Mapped[int] = mapped_column(Integer, default=0)
     last_played_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     
+    # Favorites
+    is_liked: Mapped[bool] = mapped_column(Boolean, default=False)
+    liked_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -10,6 +10,7 @@ export const useLibraryStore = defineStore('library', () => {
   const artistImages = ref({})  // Cache for artist images
   const genres = ref([])
   const history = ref([])
+  const likedTracks = ref([])  // Liked tracks
   const loading = ref(false)
   const refreshing = ref(false)
   const total = ref(0)
@@ -23,6 +24,7 @@ export const useLibraryStore = defineStore('library', () => {
       fetchPlaylists(),
       fetchArtists(),
       fetchHistory(),  // For home feed
+      fetchLikedTracks(),  // Liked tracks
     ])
   }
 
@@ -36,6 +38,7 @@ export const useLibraryStore = defineStore('library', () => {
         fetchArtists(),
         fetchGenres(),
         fetchHistory(),
+        fetchLikedTracks(),
       ])
     } finally {
       refreshing.value = false
@@ -224,6 +227,51 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
+  // Fetch liked tracks
+  const fetchLikedTracks = async () => {
+    try {
+      const response = await tracksApi.getLiked()
+      likedTracks.value = response.data
+      return response.data
+    } catch (error) {
+      console.error('Failed to fetch liked tracks:', error)
+      return []
+    }
+  }
+
+  // Toggle like on track
+  const toggleLike = async (trackId) => {
+    // Find track in tracks list
+    const track = tracks.value.find(t => t.id === trackId)
+    const isLiked = track?.is_liked || likedTracks.value.some(t => t.id === trackId)
+    
+    try {
+      if (isLiked) {
+        await tracksApi.unlike(trackId)
+        // Update local state
+        if (track) track.is_liked = false
+        likedTracks.value = likedTracks.value.filter(t => t.id !== trackId)
+      } else {
+        await tracksApi.like(trackId)
+        // Update local state
+        if (track) track.is_liked = true
+        // Refetch liked tracks to get proper order
+        await fetchLikedTracks()
+      }
+      return !isLiked
+    } catch (error) {
+      console.error('Failed to toggle like:', error)
+      return isLiked
+    }
+  }
+
+  // Check if track is liked
+  const isTrackLiked = (trackId) => {
+    const track = tracks.value.find(t => t.id === trackId)
+    if (track && track.is_liked !== undefined) return track.is_liked
+    return likedTracks.value.some(t => t.id === trackId)
+  }
+
   return {
     tracks,
     playlists,
@@ -231,6 +279,7 @@ export const useLibraryStore = defineStore('library', () => {
     artistImages,
     genres,
     history,
+    likedTracks,
     loading,
     refreshing,
     total,
@@ -244,6 +293,7 @@ export const useLibraryStore = defineStore('library', () => {
     fetchArtists,
     fetchGenres,
     fetchHistory,
+    fetchLikedTracks,
     getArtistImage,
     createPlaylist,
     deletePlaylist,
@@ -251,5 +301,7 @@ export const useLibraryStore = defineStore('library', () => {
     removeTrackFromPlaylist,
     updateTrack,
     deleteTrack,
+    toggleLike,
+    isTrackLiked,
   }
 })

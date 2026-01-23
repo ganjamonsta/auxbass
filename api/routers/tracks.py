@@ -56,6 +56,7 @@ class TrackResponse(TrackBase):
     mime_type: Optional[str] = None
     cover_url: Optional[str] = None
     enrichment_status: Optional[str] = None
+    is_liked: bool = False
     created_at: datetime
     
     class Config:
@@ -297,6 +298,73 @@ async def get_listening_history(
     
     tracks = result.scalars().all()
     return [TrackResponse.model_validate(t) for t in tracks]
+
+
+@router.get("/liked")
+async def get_liked_tracks(
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get all liked tracks"""
+    result = await db.execute(
+        select(Track)
+        .where(Track.user_id == user.id)
+        .where(Track.is_liked == True)
+        .order_by(Track.liked_at.desc())
+    )
+    
+    tracks = result.scalars().all()
+    return [TrackResponse.model_validate(t) for t in tracks]
+
+
+@router.post("/{track_id}/like")
+async def like_track(
+    track_id: int,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Like a track"""
+    track = await db.scalar(
+        select(Track).where(
+            Track.id == track_id,
+            Track.user_id == user.id
+        )
+    )
+    
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    
+    track.is_liked = True
+    track.liked_at = datetime.utcnow()
+    
+    await db.commit()
+    
+    return {"status": "liked", "id": track_id, "is_liked": True}
+
+
+@router.delete("/{track_id}/like")
+async def unlike_track(
+    track_id: int,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Unlike a track"""
+    track = await db.scalar(
+        select(Track).where(
+            Track.id == track_id,
+            Track.user_id == user.id
+        )
+    )
+    
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    
+    track.is_liked = False
+    track.liked_at = None
+    
+    await db.commit()
+    
+    return {"status": "unliked", "id": track_id, "is_liked": False}
 
 
 @router.get("/{track_id}", response_model=TrackResponse)

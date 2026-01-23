@@ -45,6 +45,9 @@ export const tracksApi = {
   getGenres: () => api.get('/tracks/genres'),
   getEnrichmentStatus: () => api.get('/tracks/enrichment/status'),
   getHistory: (limit = 50) => api.get('/tracks/history', { params: { limit } }),
+  getLiked: () => api.get('/tracks/liked'),
+  like: (id) => api.post(`/tracks/${id}/like`),
+  unlike: (id) => api.delete(`/tracks/${id}/like`),
 }
 
 // Playlists
