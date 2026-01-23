@@ -543,7 +543,6 @@
       :duration="player.duration"
       :buffered="player.buffered"
       @toggle="player.toggle()"
-      @prev="player.prev()"
       @next="player.next()"
       @expand="showFullPlayer = true"
     />
@@ -2131,16 +2130,15 @@ onMounted(async () => {
   margin-bottom: 16px;
 }
 
-/* Bottom Tab Bar - Nokia XpressMusic Style */
+/* Bottom Tab Bar - Neumorphic Style */
 .tab-bar {
   flex-shrink: 0;
   display: flex;
   justify-content: center;
-  gap: 8px;
-  background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 100%);
-  padding: 8px 12px max(8px, env(safe-area-inset-bottom));
+  gap: 16px;
+  background: var(--spotify-black);
+  padding: 12px 16px max(12px, env(safe-area-inset-bottom));
   z-index: 50;
-  border-top: 1px solid #333;
 }
 
 .tab-item {
@@ -2148,58 +2146,56 @@ onMounted(async () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  width: 56px;
-  height: 52px;
+  gap: 4px;
+  width: 64px;
+  height: 56px;
   border: none;
-  border-radius: 8px;
-  background: linear-gradient(180deg, #3a3a3a 0%, #252525 100%);
-  color: #888;
-  font-size: 9px;
+  border-radius: 16px;
+  background: var(--spotify-gray-dark);
+  color: var(--spotify-text-muted);
+  font-size: 10px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
-  /* Nokia rubber button style */
+  transition: all 0.2s ease;
+  /* Neumorphic shadow */
   box-shadow: 
-    0 3px 6px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
-  border: 1px solid #1a1a1a;
+    4px 4px 8px rgba(0, 0, 0, 0.4),
+    -2px -2px 6px rgba(255, 255, 255, 0.05);
 }
 
 .tab-item:active {
-  transform: scale(0.94) translateY(1px);
+  /* Pressed state - inset shadow */
   box-shadow: 
-    0 1px 3px rgba(0, 0, 0, 0.5),
-    inset 0 2px 4px rgba(0, 0, 0, 0.4);
-  background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
+    inset 3px 3px 6px rgba(0, 0, 0, 0.4),
+    inset -2px -2px 4px rgba(255, 255, 255, 0.05);
+  transform: scale(0.95);
 }
 
 .tab-item.active {
   color: var(--spotify-green);
-  background: linear-gradient(180deg, #404040 0%, #2a2a2a 100%);
+  background: linear-gradient(145deg, var(--spotify-gray), var(--spotify-gray-dark));
   box-shadow: 
-    0 3px 8px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    0 0 12px rgba(29, 185, 84, 0.15);
+    4px 4px 10px rgba(0, 0, 0, 0.5),
+    -2px -2px 6px rgba(255, 255, 255, 0.08),
+    inset 0 0 0 1px rgba(29, 185, 84, 0.2);
 }
 
 .tab-item.active:active {
-  transform: scale(0.94) translateY(1px);
   box-shadow: 
-    0 1px 3px rgba(0, 0, 0, 0.5),
-    inset 0 2px 4px rgba(0, 0, 0, 0.4),
-    0 0 8px rgba(29, 185, 84, 0.1);
+    inset 3px 3px 6px rgba(0, 0, 0, 0.4),
+    inset -2px -2px 4px rgba(255, 255, 255, 0.05),
+    inset 0 0 0 1px rgba(29, 185, 84, 0.3);
+  transform: scale(0.95);
 }
 
 .tab-item.active svg {
-  filter: drop-shadow(0 0 6px rgba(29, 185, 84, 0.6));
+  filter: drop-shadow(0 0 4px rgba(29, 185, 84, 0.5));
 }
 
 .tab-item svg {
-  width: 20px;
-  height: 20px;
-  transition: filter 0.15s;
+  width: 22px;
+  height: 22px;
+  transition: filter 0.2s;
 }
 
 /* Modal */

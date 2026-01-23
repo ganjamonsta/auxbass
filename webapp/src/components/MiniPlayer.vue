@@ -1,12 +1,5 @@
 <template>
-  <div class="nokia-player" @click="$emit('expand')">
-    <!-- Left side buttons - Nokia style -->
-    <div class="nokia-side nokia-side-left">
-      <button class="nokia-btn nokia-btn-prev" @click.stop="$emit('prev')">
-        <span class="nokia-btn-icon">⏮</span>
-      </button>
-    </div>
-    
+  <div class="mini-player" @click="$emit('expand')">
     <!-- LCD Screen -->
     <div class="lcd-screen">
       <div class="lcd-row lcd-row-main">
@@ -33,18 +26,14 @@
       </div>
     </div>
     
-    <!-- Right side buttons - Nokia style -->
-    <div class="nokia-side nokia-side-right">
-      <button class="nokia-btn nokia-btn-play" :class="{ playing: isPlaying }" @click.stop="$emit('toggle')">
-        <svg v-if="loading" class="spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-          <path d="M12 2a10 10 0 0 1 10 10"/>
-        </svg>
-        <span v-else class="nokia-btn-icon">{{ isPlaying ? '⏸' : '▶' }}</span>
-      </button>
-      <button class="nokia-btn nokia-btn-next" @click.stop="$emit('next')">
-        <span class="nokia-btn-icon">⏭</span>
-      </button>
-    </div>
+    <!-- Controls -->
+    <button class="ctrl-btn" @click.stop="$emit('toggle')">
+      <svg v-if="loading" class="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+        <path d="M12 2a10 10 0 0 1 10 10"/>
+      </svg>
+      <template v-else>{{ isPlaying ? '❚❚' : '▶' }}</template>
+    </button>
+    <button class="ctrl-btn" @click.stop="$emit('next')">▶▶</button>
   </div>
 </template>
 
@@ -78,7 +67,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['expand', 'toggle', 'next', 'prev'])
+const emit = defineEmits(['expand', 'toggle', 'next'])
 
 const progressPercent = computed(() => {
   const dur = props.duration || props.track?.duration
@@ -140,85 +129,21 @@ const formatTime = (seconds) => {
 </script>
 
 <style scoped>
-/* Nokia XpressMusic Style Player */
-.nokia-player {
+/* Neumorphism Mini Player with LCD Screen */
+.mini-player {
   display: flex;
-  align-items: stretch;
-  margin: 8px;
-  background: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%);
-  border-radius: 12px;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 12px 8px;
+  padding: 8px 10px;
+  background: var(--neu-bg);
+  border-radius: 16px;
   cursor: pointer;
   z-index: 60;
   box-shadow: 
-    0 4px 12px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  border: 1px solid #333;
-  overflow: hidden;
-}
-
-/* Nokia side button panels */
-.nokia-side {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 2px;
-  padding: 4px 2px;
-  background: linear-gradient(180deg, #d42a2a 0%, #a01515 50%, #8a1010 100%);
-  min-width: 28px;
-}
-
-.nokia-side-left {
-  border-radius: 11px 0 0 11px;
-  padding-left: 3px;
-}
-
-.nokia-side-right {
-  border-radius: 0 11px 11px 0;
-  padding-right: 3px;
-}
-
-/* Nokia rubber buttons */
-.nokia-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 26px;
-  border: none;
-  background: linear-gradient(180deg, #444 0%, #222 100%);
-  border-radius: 4px;
-  cursor: pointer;
-  color: #ccc;
-  font-size: 9px;
-  transition: all 0.1s ease;
-  box-shadow: 
-    0 2px 4px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
-  /* Rubber texture effect */
-  border: 1px solid #1a1a1a;
-}
-
-.nokia-btn:active {
-  transform: scale(0.92);
-  box-shadow: 
-    inset 0 2px 4px rgba(0, 0, 0, 0.5);
-  background: linear-gradient(180deg, #333 0%, #1a1a1a 100%);
-}
-
-.nokia-btn-play {
-  height: 30px;
-  background: linear-gradient(180deg, #555 0%, #2a2a2a 100%);
-}
-
-.nokia-btn-play.playing {
-  color: var(--spotify-green);
-  text-shadow: 0 0 8px rgba(29, 185, 84, 0.6);
-}
-
-.nokia-btn-icon {
-  font-size: 10px;
-  line-height: 1;
+    6px 6px 12px var(--neu-shadow-dark),
+    -3px -3px 8px var(--neu-shadow-light);
+  border: 1px solid rgba(255, 255, 255, 0.03);
 }
 
 /* LCD Screen - Car Stereo Style */
@@ -354,6 +279,34 @@ const formatTime = (seconds) => {
 .lcd-dot.active {
   background: #00ccff;
   box-shadow: 0 0 4px rgba(0, 204, 255, 0.8);
+}
+
+/* Neumorphic Control Buttons */
+.ctrl-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: var(--neu-bg);
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--spotify-text-muted);
+  font-size: 10px;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+  box-shadow: 
+    4px 4px 8px var(--neu-shadow-dark),
+    -2px -2px 5px var(--neu-shadow-light);
+}
+
+.ctrl-btn:active {
+  transform: scale(0.95);
+  box-shadow: 
+    inset 2px 2px 5px var(--neu-shadow-dark),
+    inset -1px -1px 3px var(--neu-shadow-light);
+  color: var(--spotify-green);
 }
 
 .spin {
