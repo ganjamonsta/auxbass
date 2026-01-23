@@ -126,15 +126,25 @@ const coverInitials = computed(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 8px;
-  padding: 8px 12px;
-  background: var(--spotify-gray);
-  border-radius: 8px;
+  margin: 16px 16px 8px; /* More margin for shadows */
+  padding: 10px 14px;
+  background: var(--neu-bg);
+  border-radius: 16px;
   cursor: pointer;
   z-index: 60;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  /* Active Neumorphism */
+  box-shadow: 
+    6px 6px 12px var(--neu-shadow-dark),
+    -3px -3px 8px var(--neu-shadow-light);
+  border: 1px solid rgba(255, 255, 255, 0.02);
+  
   position: relative;  /* For absolute positioned children */
   overflow: hidden;
+  transition: transform 0.15s;
+}
+
+.mini-player:active {
+  transform: scale(0.98);
 }
 
 .mini-progress {

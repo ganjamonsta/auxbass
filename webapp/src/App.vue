@@ -1526,25 +1526,38 @@ onMounted(async () => {
   scroll-snap-align: start;
   cursor: pointer;
   text-align: center;
+  transition: transform 0.1s;
+}
+
+.feed-card:active {
+  transform: scale(0.97);
 }
 
 .feed-card-cover {
   width: 140px;
   height: 140px;
-  border-radius: 8px;
+  /* Neumorphic card style */
+  background: var(--spotify-gray-dark);
+  border-radius: 16px; 
+  box-shadow: 
+    6px 6px 12px var(--neu-shadow-dark),
+    -3px -3px 8px var(--neu-shadow-light);
+  
   overflow: hidden;
   position: relative;
-  background: var(--spotify-gray);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 8px;
+  margin: 0 auto 10px; /* More margin for shadows */
+  padding: 4px; /* Inner border effect */
 }
 
+/* Rounded image inside neomorphic frame */
 .feed-card-cover img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: 12px;
 }
 
 .feed-card-cover .feed-card-placeholder {
