@@ -213,7 +213,7 @@ const formatTime = (seconds) => {
 }
 
 .lcd-title-clone {
-  padding-left: 50px;
+  margin-left: 60px;
 }
 
 .lcd-artist-container {
@@ -241,15 +241,15 @@ const formatTime = (seconds) => {
 }
 
 .lcd-artist-clone {
-  padding-left: 50px;
+  margin-left: 60px;
 }
 
 @keyframes marquee-scroll {
-  0% {
+  0%, 10% {
     transform: translateX(0);
   }
-  100% {
-    transform: translateX(-50%);
+  90%, 100% {
+    transform: translateX(calc(-50% - 30px));
   }
 }
 
