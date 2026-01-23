@@ -303,11 +303,14 @@
 
           <!-- Source playlists (from bots/channels) -->
           <div v-if="sourcePlaylists.length > 0" class="playlist-category">
-            <h3 class="category-title">
+            <h3 class="category-title clickable" @click="openSection('sources')">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 6px; opacity: 0.7;">
                 <path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM9.41 15.95L12 13.36l2.59 2.59L16 14.54l-4-4-4 4z"/>
               </svg>
               Источники
+              <svg class="section-arrow" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+              </svg>
             </h3>
             <div class="playlists-compact-list">
               <PlaylistItem
@@ -321,11 +324,14 @@
 
           <!-- Album playlists (auto-generated from Deezer) -->
           <div v-if="albumPlaylists.length > 0" class="playlist-category">
-            <h3 class="category-title">
+            <h3 class="category-title clickable" @click="openSection('albums')">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 6px; opacity: 0.7;">
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"/>
               </svg>
               Альбомы
+              <svg class="section-arrow" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+              </svg>
             </h3>
             <div class="playlists-compact-list">
               <PlaylistItem
@@ -340,13 +346,16 @@
           <!-- User playlists -->
           <div class="playlist-category">
             <div class="category-header">
-              <h3 class="category-title">
+              <h3 class="category-title clickable" @click="openSection('playlists')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 6px; opacity: 0.7;">
                   <path d="M4 10h12v2H4zm0-4h12v2H4zm0 8h8v2H4zm10 0v6l5-3z"/>
                 </svg>
                 Мои плейлисты
+                <svg class="section-arrow" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+                </svg>
               </h3>
-              <button @click="createPlaylist" class="create-btn-small">
+              <button @click.stop="createPlaylist" class="create-btn-small">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
                 </svg>
@@ -570,6 +579,66 @@
           @menu="showTrackMenu(track)"
         />
       </div>
+
+      <!-- Expanded Section View (fullscreen vertical list) -->
+      <Transition name="slide-up">
+        <div v-if="expandedSection" class="expanded-section">
+          <div class="expanded-header">
+            <button @click="expandedSection = null" class="icon-btn">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+              </svg>
+            </button>
+            <h2 class="expanded-title">
+              {{ expandedSection === 'albums' ? 'Альбомы' : 
+                 expandedSection === 'sources' ? 'Источники' : 'Мои плейлисты' }}
+            </h2>
+            <button v-if="expandedSection === 'playlists'" @click="createPlaylist" class="icon-btn">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+              </svg>
+            </button>
+            <div v-else class="spacer"></div>
+          </div>
+          
+          <div class="expanded-grid">
+            <template v-if="expandedSection === 'albums'">
+              <PlaylistItem
+                v-for="playlist in albumPlaylists"
+                :key="playlist.id"
+                :playlist="playlist"
+                @click="openPlaylist(playlist); expandedSection = null"
+              />
+            </template>
+            <template v-else-if="expandedSection === 'sources'">
+              <PlaylistItem
+                v-for="playlist in sourcePlaylists"
+                :key="playlist.id"
+                :playlist="playlist"
+                @click="openPlaylist(playlist); expandedSection = null"
+              />
+            </template>
+            <template v-else-if="expandedSection === 'playlists'">
+              <PlaylistItem
+                v-for="playlist in userPlaylists"
+                :key="playlist.id"
+                :playlist="playlist"
+                @click="openPlaylist(playlist); expandedSection = null"
+              />
+              <div v-if="userPlaylists.length === 0" class="empty-section">
+                <span class="empty-icon">📁</span>
+                <p>Нет плейлистов</p>
+                <button @click="createPlaylist" class="create-btn">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                  </svg>
+                  Создать
+                </button>
+              </div>
+            </template>
+          </div>
+        </div>
+      </Transition>
     </main>
 
     <!-- Mini Player (above tab bar in flex layout) -->
@@ -779,6 +848,9 @@ const currentPlaylist = ref(null)
 const activeFilter = ref(null) // Active artist/genre filter
 const filterScope = ref('library') // 'library' or 'global' - which library we're filtering
 
+// Fullscreen section view
+const expandedSection = ref(null) // 'albums', 'sources', 'playlists' or null
+
 // Track menu state
 const showTrackMenuModal = ref(false)
 const selectedTrack = ref(null)
@@ -873,8 +945,17 @@ const switchTab = (tab, callback = null) => {
 }
 
 const goBack = () => {
+  // If expanded section is open, close it first
+  if (expandedSection.value) {
+    expandedSection.value = null
+    return
+  }
   currentView.value = 'library'
   currentPlaylist.value = null
+}
+
+const openSection = (section) => {
+  expandedSection.value = section
 }
 
 const playTrack = async (track, queue = null) => {
@@ -2103,6 +2184,20 @@ onMounted(async () => {
   padding: 0 2px;
 }
 
+.category-title.clickable {
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.category-title.clickable:active {
+  color: var(--spotify-green);
+}
+
+.section-arrow {
+  margin-left: auto;
+  opacity: 0.5;
+}
+
 .category-header {
   display: flex;
   align-items: center;
@@ -2113,6 +2208,77 @@ onMounted(async () => {
 
 .category-header .category-title {
   margin-bottom: 0;
+  flex: 1;
+}
+
+/* Expanded section fullscreen view */
+.expanded-section {
+  position: fixed;
+  inset: 0;
+  background: var(--spotify-black);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.expanded-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--spotify-gray-dark);
+  flex-shrink: 0;
+}
+
+.expanded-title {
+  flex: 1;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--spotify-text);
+}
+
+.expanded-grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 12px;
+  align-content: start;
+}
+
+.empty-section {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--spotify-text-secondary);
+}
+
+.empty-section .empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.empty-section p {
+  margin-bottom: 16px;
+}
+
+/* Slide up transition */
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+  transform: translateY(100%);
+  opacity: 0;
 }
 
 .create-btn-small {

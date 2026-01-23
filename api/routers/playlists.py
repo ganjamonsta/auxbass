@@ -462,8 +462,18 @@ async def get_albums(
     )
     playlists = result.scalars().all()
     
-    response = []
+    # Deduplicate albums by name (case-insensitive)
+    seen_albums = {}
+    unique_playlists = []
     for playlist in playlists:
+        # Use lowercase name as key for dedup
+        key = playlist.name.lower().strip() if playlist.name else str(playlist.id)
+        if key not in seen_albums:
+            seen_albums[key] = playlist
+            unique_playlists.append(playlist)
+    
+    response = []
+    for playlist in unique_playlists:
         count_result = await db.execute(
             select(func.count(PlaylistTrack.id))
             .where(PlaylistTrack.playlist_id == playlist.id)
@@ -486,6 +496,7 @@ async def get_albums(
             is_auto_source=playlist.is_auto_source,
             source_id=playlist.source_id,
             source_type=playlist.source_type,
+            album_artist=playlist.album_artist,
             cover_url=playlist.cover_url,
             share_code=playlist.share_code,
             track_count=track_count,
