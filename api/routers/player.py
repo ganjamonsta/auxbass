@@ -76,10 +76,14 @@ async def get_telegram_file_path(file_id: str) -> Optional[str]:
     """
     Get file path from Telegram (not full URL).
     """
+    import logging
+    logger = logging.getLogger("uvicorn.error")
+    
     # Check cache
     if file_id in _file_path_cache:
         file_path, expires = _file_path_cache[file_id]
         if time.time() < expires:
+            logger.debug(f"File path cache hit for {file_id[:20]}...")
             return file_path
     
     # Call Telegram API
@@ -88,19 +92,24 @@ async def get_telegram_file_path(file_id: str) -> Optional[str]:
     async with aiohttp.ClientSession() as session:
         async with session.get(api_url, params={"file_id": file_id}) as resp:
             if resp.status != 200:
+                logger.error(f"Telegram getFile failed: status={resp.status}, file_id={file_id[:20]}...")
                 return None
             
             data = await resp.json()
             
             if not data.get("ok"):
+                error_desc = data.get("description", "Unknown error")
+                logger.error(f"Telegram getFile error: {error_desc}, file_id={file_id[:20]}...")
                 return None
             
             file_path = data.get("result", {}).get("file_path")
             if not file_path:
+                logger.error(f"No file_path in response for file_id={file_id[:20]}...")
                 return None
             
             # Cache the file path
             _file_path_cache[file_id] = (file_path, time.time() + FILE_PATH_CACHE_TTL)
+            logger.info(f"Got file path: {file_path}")
             
             return file_path
 
