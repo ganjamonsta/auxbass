@@ -161,10 +161,12 @@ const displayTitle = computed(() => {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 
 .lcd-row-main {
   margin-bottom: 2px;
+  min-width: 0;
 }
 
 .lcd-row-sub {
@@ -182,6 +184,8 @@ const displayTitle = computed(() => {
 }
 
 .lcd-title {
+  flex: 1 1 0;
+  min-width: 0;
   color: #4dc3ff;
   font-size: 14px;
   font-weight: 600;
@@ -193,9 +197,8 @@ const displayTitle = computed(() => {
 }
 
 .lcd-artist-container {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
-  max-width: calc(100% - 60px);
   overflow: hidden;
   position: relative;
 }
