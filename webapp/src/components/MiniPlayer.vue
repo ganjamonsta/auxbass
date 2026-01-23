@@ -5,12 +5,18 @@
       <div class="lcd-row lcd-row-main">
         <span class="lcd-status">{{ isPlaying ? '▶' : '■' }}</span>
         <div class="lcd-title-container">
-          <span class="lcd-title" :class="{ 'marquee': shouldMarqueeTitle }">{{ track.title || 'NO TRACK' }}</span>
+          <div class="lcd-title-track" :class="{ 'marquee': shouldMarqueeTitle }">
+            <span class="lcd-title">{{ track.title || 'NO TRACK' }}</span>
+            <span v-if="shouldMarqueeTitle" class="lcd-title lcd-title-clone">{{ track.title || 'NO TRACK' }}</span>
+          </div>
         </div>
       </div>
       <div class="lcd-row lcd-row-sub">
         <div class="lcd-artist-container">
-          <span class="lcd-artist" :class="{ 'marquee': shouldMarqueeArtist }">{{ track.artist || '---' }}</span>
+          <div class="lcd-artist-track" :class="{ 'marquee': shouldMarqueeArtist }">
+            <span class="lcd-artist">{{ track.artist || '---' }}</span>
+            <span v-if="shouldMarqueeArtist" class="lcd-artist lcd-artist-clone">{{ track.artist || '---' }}</span>
+          </div>
         </div>
         <span class="lcd-time">{{ formatTime(progress) }}/{{ formatTime(duration || track.duration) }}</span>
       </div>
@@ -187,19 +193,27 @@ const formatTime = (seconds) => {
   position: relative;
 }
 
+.lcd-title-track {
+  display: inline-flex;
+  white-space: nowrap;
+}
+
+.lcd-title-track.marquee {
+  animation: marquee-scroll 8s linear infinite;
+}
+
 .lcd-title {
-  display: inline-block;
   color: #4dc3ff;
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.5px;
   text-shadow: 0 0 8px rgba(77, 195, 255, 0.6);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.lcd-title.marquee {
-  animation: marquee-text 12s linear infinite;
-  padding-right: 40px;
+.lcd-title-clone {
+  padding-left: 50px;
 }
 
 .lcd-artist-container {
@@ -209,28 +223,33 @@ const formatTime = (seconds) => {
   position: relative;
 }
 
+.lcd-artist-track {
+  display: inline-flex;
+  white-space: nowrap;
+}
+
+.lcd-artist-track.marquee {
+  animation: marquee-scroll 8s linear infinite;
+}
+
 .lcd-artist {
-  display: inline-block;
   color: #3399cc;
   font-size: 11px;
   text-shadow: 0 0 4px rgba(51, 153, 204, 0.5);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.lcd-artist.marquee {
-  animation: marquee-text 10s linear infinite;
-  padding-right: 40px;
+.lcd-artist-clone {
+  padding-left: 50px;
 }
 
-@keyframes marquee-text {
-  0%, 25% {
+@keyframes marquee-scroll {
+  0% {
     transform: translateX(0);
-  }
-  50%, 75% {
-    transform: translateX(calc(-100% + 150px));
   }
   100% {
-    transform: translateX(0);
+    transform: translateX(-50%);
   }
 }
 
