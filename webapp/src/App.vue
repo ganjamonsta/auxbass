@@ -1177,6 +1177,21 @@ onMounted(async () => {
   position: relative;
 }
 
+/* Content scrollbar - fully transparent track */
+.content::-webkit-scrollbar {
+  width: 4px;
+  background: transparent;
+}
+
+.content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
 /* Pull to refresh */
 .pull-indicator {
   position: absolute;
