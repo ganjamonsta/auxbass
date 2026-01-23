@@ -16,18 +16,26 @@ settings = get_settings()
 # SQLite doesn't support connection pooling well
 is_sqlite = settings.database_url.startswith("sqlite")
 
-# Create async engine with connection pool settings
-engine = create_async_engine(
-    settings.database_url,
-    echo=False,  # Set True for SQL debugging
-    # Pool settings for PostgreSQL (ignored for SQLite)
-    pool_size=10 if not is_sqlite else 0,        # Base pool size
-    max_overflow=20 if not is_sqlite else 0,     # Extra connections when busy
-    pool_timeout=30 if not is_sqlite else 0,     # Seconds to wait for connection
-    pool_recycle=1800 if not is_sqlite else -1,  # Recycle connections after 30 min
-    pool_pre_ping=True if not is_sqlite else False,  # Test connections before use
-    poolclass=NullPool if is_sqlite else None,   # Disable pooling for SQLite
-)
+# Build engine kwargs based on database type
+engine_kwargs = {
+    "echo": False,  # Set True for SQL debugging
+}
+
+if is_sqlite:
+    # SQLite: use NullPool, no pool settings
+    engine_kwargs["poolclass"] = NullPool
+else:
+    # PostgreSQL: use connection pooling for better performance
+    engine_kwargs.update({
+        "pool_size": 10,           # Base pool size
+        "max_overflow": 20,        # Extra connections when busy
+        "pool_timeout": 30,        # Seconds to wait for connection
+        "pool_recycle": 1800,      # Recycle connections after 30 min
+        "pool_pre_ping": True,     # Test connections before use
+    })
+
+# Create async engine
+engine = create_async_engine(settings.database_url, **engine_kwargs)
 
 # Session factory
 async_session = async_sessionmaker(
