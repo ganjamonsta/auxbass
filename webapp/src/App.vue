@@ -1833,12 +1833,15 @@ onMounted(async () => {
 }
 
 .add-card .add-cover {
+  width: 140px;
+  height: 140px;
   background: var(--neu-bg);
   border: 2px dashed var(--spotify-gray-light);
   color: var(--spotify-text-muted);
   box-shadow: 
     inset 3px 3px 6px var(--neu-shadow-dark),
     inset -2px -2px 4px var(--neu-shadow-light);
+  box-sizing: border-box;
 }
 
 .add-card .add-cover svg {
