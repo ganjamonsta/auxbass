@@ -28,6 +28,12 @@ CREATE TABLE IF NOT EXISTS tracks (
     deezer_album_id INTEGER,
     enrichment_status VARCHAR(20) DEFAULT 'pending',
     
+    -- Forward source info (от кого переслано сообщение)
+    forward_from_id BIGINT,
+    forward_from_username VARCHAR(255),
+    forward_from_name VARCHAR(255),
+    forward_from_type VARCHAR(20),  -- user, bot, channel, supergroup, hidden
+    
     -- Telegram данные
     file_size INTEGER,
     mime_type VARCHAR(50),
@@ -51,6 +57,12 @@ CREATE TABLE IF NOT EXISTS playlists (
     is_public BOOLEAN DEFAULT FALSE,
     is_auto_album BOOLEAN DEFAULT FALSE,
     deezer_album_id INTEGER,
+    
+    -- Auto-source playlist (авто-создание по источнику пересылки)
+    is_auto_source BOOLEAN DEFAULT FALSE,
+    source_id BIGINT,           -- ID источника (бот/пользователь/канал)
+    source_type VARCHAR(20),    -- user, bot, channel, supergroup
+    
     share_code VARCHAR(50) UNIQUE,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
@@ -72,7 +84,9 @@ CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist);
 CREATE INDEX IF NOT EXISTS idx_tracks_title ON tracks(title);
 CREATE INDEX IF NOT EXISTS idx_tracks_genre ON tracks(genre);
 CREATE INDEX IF NOT EXISTS idx_tracks_deezer_album_id ON tracks(deezer_album_id);
+CREATE INDEX IF NOT EXISTS idx_tracks_forward_from_id ON tracks(forward_from_id) WHERE forward_from_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_playlists_user_id ON playlists(user_id);
+CREATE INDEX IF NOT EXISTS idx_playlists_auto_source ON playlists(user_id, is_auto_source, source_id) WHERE is_auto_source = TRUE;
 CREATE INDEX IF NOT EXISTS idx_playlist_tracks_playlist_id ON playlist_tracks(playlist_id);
 
 -- Полнотекстовый поиск (PostgreSQL)

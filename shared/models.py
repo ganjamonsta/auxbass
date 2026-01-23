@@ -65,6 +65,12 @@ class Track(Base):
     # Enrichment status: pending, processing, completed, failed
     enrichment_status: Mapped[Optional[str]] = mapped_column(String(20), default="pending")
     
+    # Forward source info (from whom the message was forwarded)
+    forward_from_id: Mapped[Optional[int]] = mapped_column(BigInteger)  # User/Bot/Channel ID
+    forward_from_username: Mapped[Optional[str]] = mapped_column(String(255))
+    forward_from_name: Mapped[Optional[str]] = mapped_column(String(255))
+    forward_from_type: Mapped[Optional[str]] = mapped_column(String(20))  # user, bot, channel
+    
     # Telegram data
     file_size: Mapped[Optional[int]] = mapped_column(Integer)
     mime_type: Mapped[Optional[str]] = mapped_column(String(50))
@@ -143,6 +149,12 @@ class Playlist(Base):
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
     is_auto_album: Mapped[bool] = mapped_column(Boolean, default=False)  # Auto-created album
     deezer_album_id: Mapped[Optional[int]] = mapped_column(Integer)  # Deezer album ID
+    
+    # Auto-source playlist (auto-created based on forward source)
+    is_auto_source: Mapped[bool] = mapped_column(Boolean, default=False)
+    source_id: Mapped[Optional[int]] = mapped_column(BigInteger)  # Forward source ID
+    source_type: Mapped[Optional[str]] = mapped_column(String(20))  # user, bot, channel
+    
     share_code: Mapped[Optional[str]] = mapped_column(String(50), unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

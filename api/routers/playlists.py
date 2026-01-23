@@ -44,6 +44,9 @@ class PlaylistResponse(PlaylistBase):
     id: int
     is_public: bool
     is_auto_album: bool = False
+    is_auto_source: bool = False
+    source_id: Optional[int] = None
+    source_type: Optional[str] = None
     cover_url: Optional[str] = None
     share_code: Optional[str]
     track_count: int = 0
@@ -61,6 +64,53 @@ class PlaylistWithTracksResponse(PlaylistResponse):
 class AddTrackRequest(BaseModel):
     track_id: int
     position: Optional[int] = None
+
+
+@router.get("/sources", response_model=List[PlaylistResponse])
+async def get_source_playlists(
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get user's auto-generated source playlists (from forwarded messages)"""
+    result = await db.execute(
+        select(Playlist)
+        .where(Playlist.user_id == user.id, Playlist.is_auto_source == True)
+        .order_by(Playlist.created_at.desc())
+    )
+    playlists = result.scalars().all()
+    
+    response = []
+    for playlist in playlists:
+        count_result = await db.execute(
+            select(func.count(PlaylistTrack.id))
+            .where(PlaylistTrack.playlist_id == playlist.id)
+        )
+        track_count = count_result.scalar() or 0
+        
+        duration_result = await db.execute(
+            select(func.sum(Track.duration))
+            .join(PlaylistTrack, PlaylistTrack.track_id == Track.id)
+            .where(PlaylistTrack.playlist_id == playlist.id)
+        )
+        total_duration = duration_result.scalar() or 0
+        
+        response.append(PlaylistResponse(
+            id=playlist.id,
+            name=playlist.name,
+            description=playlist.description,
+            is_public=playlist.is_public,
+            is_auto_album=playlist.is_auto_album,
+            is_auto_source=playlist.is_auto_source,
+            source_id=playlist.source_id,
+            source_type=playlist.source_type,
+            cover_url=playlist.cover_url,
+            share_code=playlist.share_code,
+            track_count=track_count,
+            total_duration=total_duration,
+            created_at=playlist.created_at,
+        ))
+    
+    return response
 
 
 @router.get("", response_model=List[PlaylistResponse])
@@ -100,6 +150,9 @@ async def get_playlists(
             description=playlist.description,
             is_public=playlist.is_public,
             is_auto_album=playlist.is_auto_album,
+            is_auto_source=playlist.is_auto_source,
+            source_id=playlist.source_id,
+            source_type=playlist.source_type,
             cover_url=playlist.cover_url,
             share_code=playlist.share_code,
             track_count=track_count,
@@ -429,6 +482,9 @@ async def get_albums(
             description=playlist.description,
             is_public=playlist.is_public,
             is_auto_album=playlist.is_auto_album,
+            is_auto_source=playlist.is_auto_source,
+            source_id=playlist.source_id,
+            source_type=playlist.source_type,
             cover_url=playlist.cover_url,
             share_code=playlist.share_code,
             track_count=track_count,

@@ -57,6 +57,17 @@ class UploaderInfo(BaseModel):
         from_attributes = True
 
 
+class ForwardSourceInfo(BaseModel):
+    """Info about from whom the track was forwarded"""
+    forward_from_id: Optional[int] = None
+    forward_from_username: Optional[str] = None
+    forward_from_name: Optional[str] = None
+    forward_from_type: Optional[str] = None  # user, bot, channel
+    
+    class Config:
+        from_attributes = True
+
+
 class TrackResponse(TrackBase):
     id: int
     file_id: str
@@ -71,6 +82,7 @@ class TrackResponse(TrackBase):
     play_count: int = 0  # Global play count
     in_library: bool = False  # Is in current user's library
     uploader: Optional[UploaderInfo] = None  # Who uploaded
+    forward_source: Optional[ForwardSourceInfo] = None  # Forwarded from
     created_at: datetime
     
     class Config:
@@ -102,6 +114,16 @@ def track_to_response(track: Track, user_library: Optional[UserLibrary] = None, 
             first_name=track.uploader.first_name,
         )
     
+    # Forward source info
+    forward_source = None
+    if track.forward_from_type:
+        forward_source = ForwardSourceInfo(
+            forward_from_id=track.forward_from_id,
+            forward_from_username=track.forward_from_username,
+            forward_from_name=track.forward_from_name,
+            forward_from_type=track.forward_from_type,
+        )
+    
     return TrackResponse(
         id=track.id,
         file_id=track.file_id,
@@ -120,6 +142,7 @@ def track_to_response(track: Track, user_library: Optional[UserLibrary] = None, 
         play_count=track.play_count,
         in_library=user_library is not None,
         uploader=uploader_info,
+        forward_source=forward_source,
         created_at=track.created_at,
     )
 
