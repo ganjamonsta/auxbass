@@ -222,7 +222,7 @@
               <!-- Add playlist button -->
               <div class="feed-card add-card" @click="createPlaylist">
                 <div class="feed-card-cover add-cover">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
                   </svg>
                 </div>
@@ -1816,14 +1816,28 @@ onMounted(async () => {
 }
 
 /* Add Card */
+.add-card {
+  width: 140px;
+}
+
 .add-card .add-cover {
-  background: var(--spotify-gray);
+  background: var(--neu-bg);
   border: 2px dashed var(--spotify-gray-light);
   color: var(--spotify-text-muted);
+  box-shadow: 
+    inset 3px 3px 6px var(--neu-shadow-dark),
+    inset -2px -2px 4px var(--neu-shadow-light);
+}
+
+.add-card .add-cover svg {
+  width: 32px;
+  height: 32px;
+  opacity: 0.6;
 }
 
 .add-card:active .add-cover {
-  background: var(--spotify-gray-light);
+  background: var(--spotify-gray);
+  border-style: solid;
 }
 
 /* Tracks Preview */
