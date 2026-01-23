@@ -109,7 +109,7 @@ const shouldMarquee = computed(() => {
 })
 
 const shouldMarqueeArtist = computed(() => {
-  return (props.track?.artist?.length || 0) > 20
+  return (props.track?.artist?.length || 0) > 12
 })
 
 const formatTime = (seconds) => {
@@ -170,6 +170,8 @@ const displayTitle = computed(() => {
 .lcd-row-sub {
   justify-content: space-between;
   margin-bottom: 6px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .lcd-status {
@@ -193,10 +195,9 @@ const displayTitle = computed(() => {
 .lcd-artist-container {
   flex: 1;
   min-width: 0;
+  max-width: calc(100% - 60px);
   overflow: hidden;
   position: relative;
-  mask-image: linear-gradient(90deg, transparent, black 4px, black calc(100% - 8px), transparent);
-  -webkit-mask-image: linear-gradient(90deg, transparent, black 4px, black calc(100% - 8px), transparent);
 }
 
 .lcd-artist {
@@ -205,28 +206,22 @@ const displayTitle = computed(() => {
   font-size: 11px;
   text-shadow: 0 0 4px rgba(51, 153, 204, 0.5);
   white-space: nowrap;
-  padding-left: 4px;
 }
 
 .lcd-artist.marquee {
-  animation: marquee-artist 8s linear infinite;
+  animation: marquee-artist 10s linear infinite;
+  padding-right: 50px;
 }
 
 @keyframes marquee-artist {
-  0% {
-    transform: translateX(0%);
+  0%, 15% {
+    transform: translateX(0);
   }
-  10% {
-    transform: translateX(0%);
+  45%, 55% {
+    transform: translateX(-100%);
   }
-  45% {
-    transform: translateX(calc(-100% + 100px));
-  }
-  55% {
-    transform: translateX(calc(-100% + 100px));
-  }
-  90% {
-    transform: translateX(0%);
+  85%, 100% {
+    transform: translateX(0);
   }
   100% {
     transform: translateX(0%);
