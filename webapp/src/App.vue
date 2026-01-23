@@ -1090,25 +1090,15 @@ onMounted(async () => {
 }
 
 /* Animations */
-.expand-search-enter-active {
-  animation: expandSearch 0.3s ease-out;
-}
-
+.expand-search-enter-active,
 .expand-search-leave-active {
-  animation: expandSearch 0.2s ease-in reverse;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-@keyframes expandSearch {
-  from {
-    opacity: 0;
-    transform: scaleX(0.3);
-    transform-origin: right center;
-  }
-  to {
-    opacity: 1;
-    transform: scaleX(1);
-    transform-origin: right center;
-  }
+.expand-search-enter-from,
+.expand-search-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 
 .fade-title-enter-active,

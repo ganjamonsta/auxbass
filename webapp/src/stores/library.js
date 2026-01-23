@@ -23,7 +23,8 @@ export const useLibraryStore = defineStore('library', () => {
       fetchTracks(),
       fetchPlaylists(),
       fetchArtists(),
-      fetchHistory(),  // For home feed
+      fetchGenres(),    // For home feed genres
+      fetchHistory(),   // For home feed
       fetchLikedTracks(),  // Liked tracks
     ])
   }

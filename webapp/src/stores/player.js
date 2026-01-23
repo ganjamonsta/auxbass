@@ -200,11 +200,18 @@ export const usePlayerStore = defineStore('player', () => {
       loading.value = false
     })
     
-    // Preload next track when current is 30% done (earlier for smoother transition)
+    // Preload next track when current is 30% done
+    let preloadTriggered = false
     audio.value.addEventListener('timeupdate', () => {
-      if (duration.value > 0 && progress.value / duration.value > 0.3) {
+      if (duration.value > 0 && progress.value / duration.value > 0.3 && !preloadTriggered) {
+        preloadTriggered = true
         preloadNextTrack()
       }
+    })
+    
+    // Reset preload flag on new track
+    audio.value.addEventListener('loadstart', () => {
+      preloadTriggered = false
     })
   }
 
@@ -255,18 +262,23 @@ export const usePlayerStore = defineStore('player', () => {
     if (getCachedAudio(track.id) || _preloadingTracks.has(track.id)) return
     
     _preloadingTracks.add(track.id)
+    console.log(`[Preload] Starting: ${track.title}`)
     
     try {
       const response = await playerApi.getStreamUrl(track.id)
       const streamUrl = response.data.url
       
       const audioResponse = await fetch(streamUrl)
-      if (!audioResponse.ok) return
+      if (!audioResponse.ok) {
+        console.warn(`[Preload] Failed to fetch: ${track.title}`, audioResponse.status)
+        return
+      }
       
       const blob = await audioResponse.blob()
       const blobUrl = URL.createObjectURL(blob)
       
       setCachedAudio(track.id, blobUrl)
+      console.log(`[Preload] Cached: ${track.title} (${(blob.size / 1024 / 1024).toFixed(1)}MB)`)
       
       // Update nextTrackPreloaded if this is the next track
       const nextIndex = queueIndex.value + 1
