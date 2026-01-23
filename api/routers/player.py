@@ -70,8 +70,9 @@ async def close_http_session():
 _file_path_cache: dict[str, tuple[str, float]] = {}
 FILE_PATH_CACHE_TTL = 3000  # 50 minutes
 
-# Secure token cache: maps temporary token -> (track_id, user_id, expires)
-_stream_tokens: dict[str, tuple[int, int, float]] = {}
+# Secure token cache: maps temporary token -> (track_id, user_id, file_path, expires)
+# file_path is cached to avoid second Telegram API call when streaming
+_stream_tokens: dict[str, tuple[int, int, str, float]] = {}
 STREAM_TOKEN_TTL = 300  # 5 minutes for token validity
 
 
@@ -81,32 +82,33 @@ class StreamUrlResponse(BaseModel):
     track_id: int
 
 
-def generate_stream_token(track_id: int, user_id: int) -> str:
-    """Generate a secure temporary token for streaming"""
+def generate_stream_token(track_id: int, user_id: int, file_path: str) -> str:
+    """Generate a secure temporary token for streaming with cached file_path"""
     token = secrets.token_urlsafe(32)
     expires = time.time() + STREAM_TOKEN_TTL
-    _stream_tokens[token] = (track_id, user_id, expires)
+    _stream_tokens[token] = (track_id, user_id, file_path, expires)
     
-    # Cleanup old tokens
+    # Cleanup old tokens (limit cleanup to avoid O(n) on every call)
     now = time.time()
-    expired = [k for k, v in _stream_tokens.items() if v[2] < now]
-    for k in expired:
-        del _stream_tokens[k]
+    if len(_stream_tokens) > 1000:
+        expired = [k for k, v in _stream_tokens.items() if v[3] < now]
+        for k in expired:
+            del _stream_tokens[k]
     
     return token
 
 
-def validate_stream_token(token: str) -> Optional[tuple[int, int]]:
-    """Validate token and return (track_id, user_id) or None"""
+def validate_stream_token(token: str) -> Optional[tuple[int, int, str]]:
+    """Validate token and return (track_id, user_id, file_path) or None"""
     if token not in _stream_tokens:
         return None
     
-    track_id, user_id, expires = _stream_tokens[token]
+    track_id, user_id, file_path, expires = _stream_tokens[token]
     if time.time() > expires:
         del _stream_tokens[token]
         return None
     
-    return (track_id, user_id)
+    return (track_id, user_id, file_path)
 
 
 async def get_telegram_file_path(file_id: str) -> Optional[str]:
@@ -185,8 +187,8 @@ async def get_stream_url(
             detail="Could not get file from Telegram. File might be too large (>20MB) or unavailable."
         )
     
-    # Generate secure temporary token
-    token = generate_stream_token(track_id, user.id)
+    # Generate secure temporary token with cached file_path
+    token = generate_stream_token(track_id, user.id, file_path)
     
     # Return relative URL to avoid Mixed Content issues (HTTP vs HTTPS)
     # The frontend will resolve this against its own origin
@@ -213,14 +215,14 @@ async def stream_audio(
     Streams audio through our server - bot token never exposed to client.
     Supports HTTP 206 Partial Content for fast seeking.
     """
-    # Validate token
+    # Validate token - now includes cached file_path (saves ~300ms Telegram API call)
     token_data = validate_stream_token(token)
     if not token_data:
         raise HTTPException(status_code=401, detail="Invalid or expired stream token")
     
-    track_id, user_id = token_data
+    track_id, user_id, file_path = token_data
     
-    # Get track
+    # Get track for metadata (file_path already validated and cached in token)
     track = await db.scalar(
         select(Track).where(
             Track.id == track_id,
@@ -231,8 +233,7 @@ async def stream_audio(
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
     
-    # Get file path from Telegram
-    file_path = await get_telegram_file_path(track.file_id)
+    # file_path is already in token - no need for second Telegram API call!
     if not file_path:
         raise HTTPException(status_code=503, detail="File unavailable")
     
