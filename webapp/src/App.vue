@@ -972,6 +972,9 @@ let searchTimeout = null
 const debouncedSearch = () => {
   clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => {
+    if (searchQuery.value) {
+      activeTab.value = 'tracks'
+    }
     library.fetchTracks({ search: searchQuery.value })
   }, 300)
 }

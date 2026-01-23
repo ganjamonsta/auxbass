@@ -1,7 +1,7 @@
 """
 TG Player API - Tracks Router
 """
-import re
+
 import aiohttp
 from typing import Optional, List
 from datetime import datetime
@@ -33,8 +33,6 @@ def sanitize_input(value: str) -> str:
     """Sanitize input to prevent SQL injection"""
     if not value:
         return ""
-    # Remove dangerous characters
-    value = re.sub(r'[;\'"\\]', '', value)
     # Escape % and _ for LIKE queries
     value = value.replace('%', r'\%').replace('_', r'\_')
     return value[:200].strip()
