@@ -758,20 +758,17 @@ const downloadPlaylist = async () => {
     return
   }
   
-  toast.value?.show('Отправка треков...', 'info')
-  let successCount = 0
-  
-  for (const track of currentPlaylist.value.tracks) {
-    try {
-      await playerApi.download(track.id)
-      successCount++
-    } catch (error) {
-      console.error('Failed to download track:', error)
-    }
+  try {
+    const trackIds = currentPlaylist.value.tracks.map(t => t.id)
+    const result = await playerApi.downloadPlaylist(trackIds, currentPlaylist.value.name)
+    
+    telegram?.HapticFeedback?.notificationOccurred?.('success')
+    toast.value?.show(`Отправлено ${result.data.sent} треков в чат`, 'success')
+  } catch (error) {
+    console.error('Failed to download playlist:', error)
+    telegram?.HapticFeedback?.notificationOccurred?.('error')
+    toast.value?.show('Не удалось отправить плейлист', 'error')
   }
-  
-  telegram?.HapticFeedback?.notificationOccurred?.('success')
-  toast.value?.show(`Отправлено ${successCount} треков в чат`, 'success')
 }
 
 const playLikedTracks = async () => {

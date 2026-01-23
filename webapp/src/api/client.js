@@ -71,4 +71,5 @@ export const playerApi = {
   prefetch: (trackIds) => api.post('/player/prefetch', trackIds),
   recordPlay: (trackId) => api.post(`/player/play/${trackId}`),
   download: (trackId) => api.post(`/player/download/${trackId}`),
+  downloadPlaylist: (trackIds, playlistName) => api.post('/player/download-playlist', { track_ids: trackIds, playlist_name: playlistName }),
 }

@@ -2,7 +2,7 @@
 TG Player Bot - Download Handlers
 """
 from aiogram import Router, F
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, InputMediaAudio
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 import asyncio
@@ -74,28 +74,57 @@ async def handle_download_playlist(callback: CallbackQuery):
             await callback.answer("Плейлист пуст", show_alert=True)
             return
 
-        await callback.answer("Начинаю отправку...")
-        # Reply to the message with status
-        status_msg = await callback.message.reply(f"🚀 Начинаю отправку {len(tracks)} треков...")
-
-        for track in tracks:
-            if not track.file_id:
-                continue
-                
-            caption = f"🎧 {track.artist or 'Неизвестен'} - {track.title or 'Без названия'}"
-            try:
-                await callback.message.answer_audio(
-                    audio=track.file_id,
-                    caption=caption,
-                    duration=track.duration,
-                    performer=track.artist,
-                    title=track.title
-                )
-                # Small delay to be nice to API limits
-                await asyncio.sleep(0.1)
-            except Exception as e:
-                # Log error or ignore? 
-                # If a file_id is invalid, we might want to skip.
-                continue
+        await callback.answer("Отправляю плейлист...")
         
-        await status_msg.edit_text(f"✅ Готово! Отправлено {len(tracks)} треков.")
+        # Filter tracks with valid file_id
+        valid_tracks = [t for t in tracks if t.file_id]
+        if not valid_tracks:
+            await callback.message.reply("❌ Нет доступных треков для отправки")
+            return
+        
+        # Telegram allows max 10 media per group
+        # Send tracks in batches of 10
+        batch_size = 10
+        total_sent = 0
+        
+        for i in range(0, len(valid_tracks), batch_size):
+            batch = valid_tracks[i:i + batch_size]
+            
+            # Build media group
+            media_group = []
+            for idx, track in enumerate(batch):
+                # Only first item in group gets caption with playlist name
+                caption = None
+                if i == 0 and idx == 0:
+                    caption = f"📁 Плейлист: {playlist.name}\n🎵 {len(valid_tracks)} треков"
+                
+                media_group.append(InputMediaAudio(
+                    media=track.file_id,
+                    caption=caption,
+                    performer=track.artist,
+                    title=track.title,
+                    duration=track.duration
+                ))
+            
+            try:
+                await callback.message.answer_media_group(media=media_group)
+                total_sent += len(batch)
+                # Small delay between batches
+                if i + batch_size < len(valid_tracks):
+                    await asyncio.sleep(0.5)
+            except Exception as e:
+                # If media group fails, try sending individually
+                for track in batch:
+                    try:
+                        await callback.message.answer_audio(
+                            audio=track.file_id,
+                            performer=track.artist,
+                            title=track.title,
+                            duration=track.duration
+                        )
+                        total_sent += 1
+                        await asyncio.sleep(0.1)
+                    except:
+                        continue
+        
+        await callback.message.reply(f"✅ Отправлено {total_sent} треков из плейлиста «{playlist.name}»")

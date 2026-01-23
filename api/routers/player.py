@@ -490,3 +490,94 @@ async def download_track(
     except aiohttp.ClientError as e:
         logger.error(f"HTTP error sending audio: {e}")
         raise HTTPException(status_code=503, detail="Failed to send audio")
+
+
+class DownloadPlaylistRequest(BaseModel):
+    track_ids: list[int]
+    playlist_name: str = "Плейлист"
+
+
+@router.post("/download-playlist")
+async def download_playlist(
+    request: DownloadPlaylistRequest,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Send multiple tracks as media group via Telegram bot.
+    Tracks are sent in batches of 10 (Telegram limit).
+    """
+    if not request.track_ids:
+        raise HTTPException(status_code=400, detail="No tracks provided")
+    
+    # Get tracks
+    result = await db.execute(
+        select(Track).where(
+            Track.id.in_(request.track_ids),
+            Track.user_id == user.id
+        )
+    )
+    tracks_map = {t.id: t for t in result.scalars().all()}
+    
+    # Maintain order from request
+    tracks = [tracks_map[tid] for tid in request.track_ids if tid in tracks_map]
+    
+    if not tracks:
+        raise HTTPException(status_code=404, detail="No tracks found")
+    
+    session = await get_http_session()
+    api_url = f"https://api.telegram.org/bot{settings.bot_token}/sendMediaGroup"
+    
+    batch_size = 10
+    total_sent = 0
+    
+    for i in range(0, len(tracks), batch_size):
+        batch = tracks[i:i + batch_size]
+        
+        # Build media group
+        media = []
+        for idx, track in enumerate(batch):
+            item = {
+                "type": "audio",
+                "media": track.file_id,
+                "performer": track.artist or "",
+                "title": track.title or "Без названия",
+            }
+            if track.duration:
+                item["duration"] = track.duration
+            # Add caption only to first track of first batch
+            if i == 0 and idx == 0:
+                item["caption"] = f"📁 {request.playlist_name}\n🎵 {len(tracks)} треков"
+            media.append(item)
+        
+        payload = {
+            "chat_id": user.id,
+            "media": media,
+        }
+        
+        try:
+            async with session.post(api_url, json=payload) as resp:
+                data = await resp.json()
+                
+                if data.get("ok"):
+                    total_sent += len(batch)
+                else:
+                    # If media group fails, try sending individually
+                    for track in batch:
+                        try:
+                            single_url = f"https://api.telegram.org/bot{settings.bot_token}/sendAudio"
+                            single_payload = {
+                                "chat_id": user.id,
+                                "audio": track.file_id,
+                                "performer": track.artist,
+                                "title": track.title,
+                            }
+                            async with session.post(single_url, json=single_payload) as single_resp:
+                                if (await single_resp.json()).get("ok"):
+                                    total_sent += 1
+                        except:
+                            continue
+        except aiohttp.ClientError as e:
+            logger.error(f"HTTP error sending media group: {e}")
+    
+    return {"success": True, "sent": total_sent, "total": len(tracks)}
