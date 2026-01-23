@@ -230,10 +230,28 @@ async def fetch_artist_image(artist_name: str) -> Optional[str]:
 @router.get("/artist-image/{artist_name:path}")
 async def get_artist_image(
     artist_name: str,
+    db: AsyncSession = Depends(get_db),
 ):
-    """Get artist image URL from Last.fm (public endpoint)"""
+    """Get artist image URL - from Last.fm or fallback to top track cover"""
+    # Try Last.fm first
     image_url = await fetch_artist_image(artist_name)
-    return {"artist": artist_name, "image_url": image_url}
+    
+    # Check if it's a valid image (not Last.fm placeholder)
+    if image_url and "2a96cbd8b46e442fc41c2b86b821562f" not in image_url:
+        return {"artist": artist_name, "image_url": image_url}
+    
+    # Fallback: get cover from most played track by this artist
+    result = await db.execute(
+        select(Track.cover_url)
+        .where(Track.artist.ilike(f"%{artist_name}%"))
+        .where(Track.cover_url.isnot(None))
+        .where(Track.cover_url != "")
+        .order_by(Track.play_count.desc())
+        .limit(1)
+    )
+    track_cover = result.scalar_one_or_none()
+    
+    return {"artist": artist_name, "image_url": track_cover}
 
 
 @router.get("/genres")
