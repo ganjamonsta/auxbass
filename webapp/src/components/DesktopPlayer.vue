@@ -1,5 +1,5 @@
 <template>
-  <div class="desktop-player" :class="{ playing: isPlaying }">
+  <div class="desktop-player" :class="{ playing: isPlaying }" @contextmenu.prevent="$emit('menu')">
     <!-- Left side - Volume knob -->
     <div class="player-left">
       <div 
