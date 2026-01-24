@@ -257,6 +257,19 @@
               @like="toggleLike(track.id)"
             />
           </TransitionGroup>
+          
+          <!-- Load more button -->
+          <button 
+            v-if="filterScope === 'library' && library.hasMore && !library.loading" 
+            class="load-more-btn"
+            @click="library.loadMore()"
+          >
+            Загрузить ещё ({{ library.tracks.length }} из {{ library.total }})
+          </button>
+          <div v-if="library.loading && library.tracks.length > 0" class="loading-more">
+            <div class="loading-spinner"></div>
+            <span>Загрузка...</span>
+          </div>
         </div>
 
         <!-- Playlists - Categorized -->
@@ -807,7 +820,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, inject, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, inject, nextTick, watch } from 'vue'
 import { usePlayerStore } from './stores/player'
 import { useLibraryStore } from './stores/library'
 import { playerApi } from './api/client'
@@ -957,6 +970,23 @@ watch(activeTab, (newTab, oldTab) => {
 })
 
 // Methods
+
+// Handle infinite scroll for tracks
+const handleContentScroll = () => {
+  if (!contentRef.value) return
+  
+  const { scrollTop, scrollHeight, clientHeight } = contentRef.value
+  const distanceFromBottom = scrollHeight - scrollTop - clientHeight
+  
+  // Load more when user is within 200px from bottom
+  if (distanceFromBottom < 200) {
+    // Only load more for library tracks tab (not global)
+    if (activeTab.value === 'tracks' && filterScope.value === 'library') {
+      library.loadMore()
+    }
+  }
+}
+
 const scrollToTop = () => {
   if (contentRef.value) {
     contentRef.value.scrollTo({ top: 0, behavior: 'smooth' })
@@ -1337,9 +1367,21 @@ onMounted(async () => {
   document.body.classList.add('spotify-theme')
   await library.init()
   
+  // Add scroll listener for infinite scroll
+  if (contentRef.value) {
+    contentRef.value.addEventListener('scroll', handleContentScroll)
+  }
+  
   // Restore player state if available
   if (player.hasSavedState()) {
     await player.restoreState()
+  }
+})
+
+// Cleanup on unmount
+onUnmounted(() => {
+  if (contentRef.value) {
+    contentRef.value.removeEventListener('scroll', handleContentScroll)
   }
 })
 </script>
@@ -2841,5 +2883,57 @@ onMounted(async () => {
 .list-leave-to {
   opacity: 0;
   transform: translateX(20px);
+}
+
+/* Load more button for infinite scroll */
+.load-more-btn {
+  display: block;
+  width: calc(100% - 32px);
+  margin: 16px auto;
+  padding: 14px 20px;
+  background: linear-gradient(145deg, var(--spotify-gray-light), var(--spotify-gray-dark));
+  color: var(--spotify-text);
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 
+    4px 4px 8px var(--neu-shadow-dark),
+    -2px -2px 5px var(--neu-shadow-light);
+}
+
+.load-more-btn:active {
+  transform: scale(0.98);
+  box-shadow: 
+    inset 2px 2px 4px var(--neu-shadow-dark),
+    inset -1px -1px 3px var(--neu-shadow-light);
+}
+
+/* Loading more indicator */
+.loading-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+  color: var(--spotify-text-secondary);
+  font-size: 14px;
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--spotify-gray-light);
+  border-top-color: var(--spotify-green);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>
