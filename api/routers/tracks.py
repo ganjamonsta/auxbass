@@ -741,7 +741,26 @@ async def get_artist_detail(
     if not safe_artist:
         raise HTTPException(status_code=400, detail="Artist name is required")
     
-    # Build query based on scope
+    # First, get the REAL total count of tracks for this artist
+    if scope == "library":
+        count_query = (
+            select(func.count(Track.id))
+            .join(UserLibrary, UserLibrary.track_id == Track.id)
+            .where(UserLibrary.user_id == user.id)
+            .where(Track.artist.ilike(f"%{safe_artist}%"))
+        )
+    else:
+        count_query = (
+            select(func.count(Track.id))
+            .where(Track.is_public == True)
+            .where(Track.is_unavailable == False)
+            .where(Track.artist.ilike(f"%{safe_artist}%"))
+        )
+    
+    total_count_result = await db.execute(count_query)
+    real_track_count = total_count_result.scalar() or 0
+    
+    # Build query based on scope (limited for display)
     if scope == "library":
         query = (
             select(Track, UserLibrary)
@@ -820,7 +839,7 @@ async def get_artist_detail(
         if not album_data[album_key]["cover_url"] and track.cover_url:
             album_data[album_key]["cover_url"] = track.cover_url
     
-    # Check if we have auto-album playlists for these albums
+    # Check if we have auto-album playlists for these albums and get REAL track counts
     albums = []
     for album_key, data in album_data.items():
         # Try to find existing auto-album playlist
@@ -833,12 +852,19 @@ async def get_artist_detail(
         existing_playlist = album_playlist.scalar_one_or_none()
         
         if existing_playlist:
+            # Get REAL track count from PlaylistTrack table
+            real_count_result = await db.execute(
+                select(func.count(PlaylistTrack.id))
+                .where(PlaylistTrack.playlist_id == existing_playlist.id)
+            )
+            real_album_track_count = real_count_result.scalar() or 0
+            
             # Use playlist ID for navigation
             albums.append(ArtistAlbumInfo(
                 id=existing_playlist.id,
                 name=data["name"],
                 cover_url=data["cover_url"] or existing_playlist.cover_url,
-                track_count=len(data["track_ids"])
+                track_count=real_album_track_count
             ))
         else:
             # No playlist yet, use negative ID as indicator (album from tracks)
@@ -881,7 +907,7 @@ async def get_artist_detail(
     return ArtistDetailResponse(
         name=artist_name,
         image_url=image_url,
-        track_count=len(track_responses),
+        track_count=real_track_count,
         total_plays=total_plays,
         tracks=track_responses,
         albums=albums,

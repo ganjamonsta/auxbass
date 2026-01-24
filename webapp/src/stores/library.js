@@ -191,6 +191,12 @@ export const useLibraryStore = defineStore('library', () => {
     try {
       const response = await tracksApi.getArtistDetail(artistName, scope)
       currentArtist.value = response.data
+      
+      // Sync artist image to cache to avoid desync between main page and artist card
+      if (response.data.image_url) {
+        artistImages.value[artistName] = response.data.image_url
+      }
+      
       return response.data
     } catch (error) {
       console.error('Failed to fetch artist detail:', error)
