@@ -245,6 +245,129 @@
             </div>
           </div>
         </div>
+
+        <!-- Search Results (sectioned) -->
+        <div v-if="activeTab === 'search'" class="search-results">
+          <!-- Loading state -->
+          <div v-if="(library.loading || library.globalLoading) && !hasSearchResults" class="skeleton-list">
+            <TrackSkeleton v-for="i in 4" :key="i" />
+          </div>
+
+          <!-- No results -->
+          <div v-else-if="!hasSearchResults && activeFilter" class="empty">
+            <div class="empty-icon">🔍</div>
+            <p class="empty-title">Ничего не найдено</p>
+            <p class="empty-hint">Попробуйте другой запрос</p>
+          </div>
+
+          <template v-else>
+            <!-- Artists Section -->
+            <div v-if="searchResultArtists.length > 0" class="search-section">
+              <h3 class="search-section-title">Артисты</h3>
+              <div class="search-artists-list">
+                <div
+                  v-for="artist in searchResultArtists"
+                  :key="artist.artist"
+                  class="search-artist-item"
+                  @click="filterByArtist(artist.artist, searchScope)"
+                >
+                  <div class="search-artist-avatar" :style="getArtistAvatarStyle(artist.artist)">
+                    <img 
+                      v-if="library.artistImages[artist.artist]" 
+                      :src="library.artistImages[artist.artist]" 
+                      alt=""
+                      @error="$event.target.style.display = 'none'"
+                    />
+                    <span v-else class="avatar-initials">{{ getArtistInitials(artist.artist) }}</span>
+                  </div>
+                  <div class="search-artist-info">
+                    <span class="search-artist-name">{{ artist.artist }}</span>
+                    <span class="search-artist-count">{{ artist.count }} треков</span>
+                  </div>
+                  <svg class="search-item-arrow" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <!-- Albums Section -->
+            <div v-if="searchResultAlbums.length > 0" class="search-section">
+              <h3 class="search-section-title">Альбомы</h3>
+              <div class="search-albums-list">
+                <div
+                  v-for="album in searchResultAlbums"
+                  :key="album.id"
+                  class="search-album-item"
+                  @click="openPlaylist(album)"
+                >
+                  <div class="search-album-cover">
+                    <img v-if="album.cover_url" :src="album.cover_url" alt="" />
+                    <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"/>
+                    </svg>
+                  </div>
+                  <div class="search-album-info">
+                    <span class="search-album-name">{{ album.name }}</span>
+                    <span class="search-album-artist">{{ album.album_artist || 'Альбом' }} • {{ album.track_count }} треков</span>
+                  </div>
+                  <svg class="search-item-arrow" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <!-- Playlists Section -->
+            <div v-if="searchResultPlaylists.length > 0" class="search-section">
+              <h3 class="search-section-title">Плейлисты</h3>
+              <div class="search-playlists-list">
+                <div
+                  v-for="playlist in searchResultPlaylists"
+                  :key="playlist.id"
+                  class="search-playlist-item"
+                  @click="openPlaylist(playlist)"
+                >
+                  <div class="search-playlist-cover">
+                    <img v-if="playlist.cover_url" :src="playlist.cover_url" alt="" />
+                    <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
+                    </svg>
+                  </div>
+                  <div class="search-playlist-info">
+                    <span class="search-playlist-name">{{ playlist.name }}</span>
+                    <span class="search-playlist-count">{{ playlist.track_count }} треков</span>
+                  </div>
+                  <svg class="search-item-arrow" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tracks Section -->
+            <div v-if="displayedTracks.length > 0" class="search-section">
+              <h3 class="search-section-title">Треки</h3>
+              <TrackItem 
+                v-for="track in displayedTracks.slice(0, 20)" 
+                :key="track.id"
+                :track="track"
+                :isPlaying="player.currentTrack?.id === track.id && player.isPlaying"
+                :isLiked="library.isTrackLiked(track.id)"
+                @click="playTrack(track, displayedTracks)"
+                @menu="showTrackMenu(track)"
+                @like="toggleLike(track.id)"
+              />
+              <button 
+                v-if="displayedTracks.length > 20" 
+                class="see-all-btn"
+                @click="activeTab = 'tracks'"
+              >
+                Показать все треки ({{ filterScope === 'global' ? library.globalTotal : library.total }})
+              </button>
+            </div>
+          </template>
+        </div>
         
         <!-- Track list -->
         <div v-if="activeTab === 'tracks'" class="track-list">
@@ -981,6 +1104,45 @@ const displayedTracks = computed(() => {
   return filterScope.value === 'global' ? library.globalTracks : library.tracks
 })
 
+// Search results - filtered by current search query
+const searchQueryLower = computed(() => {
+  const fullQuery = [...searchTags.value, searchQuery.value].filter(Boolean).join(' ')
+  return fullQuery.toLowerCase().trim()
+})
+
+const searchResultArtists = computed(() => {
+  if (!searchQueryLower.value) return []
+  const artists = searchScope.value === 'global' ? library.globalArtists : library.artists
+  return artists.filter(a => 
+    a.artist?.toLowerCase().includes(searchQueryLower.value)
+  ).slice(0, 5)
+})
+
+const searchResultAlbums = computed(() => {
+  if (!searchQueryLower.value) return []
+  return library.playlists.filter(p => 
+    p.is_auto_album && 
+    (p.name?.toLowerCase().includes(searchQueryLower.value) ||
+     p.album_artist?.toLowerCase().includes(searchQueryLower.value))
+  ).slice(0, 5)
+})
+
+const searchResultPlaylists = computed(() => {
+  if (!searchQueryLower.value) return []
+  return library.playlists.filter(p => 
+    !p.is_auto_album && 
+    !p.is_auto_source &&
+    p.name?.toLowerCase().includes(searchQueryLower.value)
+  ).slice(0, 5)
+})
+
+const hasSearchResults = computed(() => {
+  return searchResultArtists.value.length > 0 ||
+         searchResultAlbums.value.length > 0 ||
+         searchResultPlaylists.value.length > 0 ||
+         displayedTracks.value.length > 0
+})
+
 // Playlist categories
 const lastPlaylist = computed(() => {
   // Return most recently updated/created playlist
@@ -1175,17 +1337,31 @@ const handleGoToAlbum = async (albumName, artistName) => {
   if (!albumName) return
   showFullPlayer.value = false  // Close full player if open
   
-  // Find album playlist by name and artist
-  const albumPlaylist = library.playlists.find(p => 
-    p.is_auto_album && 
-    p.name === albumName && 
-    (!artistName || p.album_artist?.includes(artistName))
-  )
+  // Normalize album name for comparison (case-insensitive, trimmed)
+  const normalizedAlbumName = albumName.toLowerCase().trim()
+  
+  // Find album playlist by name (case-insensitive) and optionally by artist
+  const albumPlaylist = library.playlists.find(p => {
+    if (!p.is_auto_album) return false
+    
+    // Case-insensitive name comparison
+    const playlistName = (p.name || '').toLowerCase().trim()
+    if (playlistName !== normalizedAlbumName) return false
+    
+    // If we have an artist, check if it matches (also case-insensitive)
+    if (artistName && p.album_artist) {
+      const normalizedArtist = artistName.toLowerCase()
+      const playlistArtist = p.album_artist.toLowerCase()
+      return playlistArtist.includes(normalizedArtist) || normalizedArtist.includes(playlistArtist)
+    }
+    
+    return true
+  })
   
   if (albumPlaylist) {
     await openPlaylist(albumPlaylist)
   } else {
-    toast.value?.show('Альбом не найден', 'warning')
+    toast.value?.show('Альбом не найден в библиотеке', 'warning')
   }
 }
 
@@ -1360,25 +1536,36 @@ let searchTimeout = null
 const debouncedSearch = () => {
   clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => {
-    if (searchQuery.value || searchTags.value.length > 0) {
-      activeTab.value = 'tracks'
-    }
     const fullQuery = [...searchTags.value, searchQuery.value].filter(Boolean).join(' ')
+    
+    if (fullQuery) {
+      // Switch to search tab when searching
+      activeTab.value = 'search'
+      activeFilter.value = searchScope.value === 'global' ? `🌍 ${fullQuery}` : fullQuery
+    } else {
+      // If search cleared, go back to home
+      if (activeTab.value === 'search') {
+        activeTab.value = 'home'
+      }
+      activeFilter.value = null
+    }
     
     if (searchScope.value === 'global') {
       // Global search
       filterScope.value = 'global'
-      if (fullQuery) {
-        activeFilter.value = `🌍 Поиск: ${fullQuery}`
-      } else {
-        activeFilter.value = null
-      }
       library.fetchGlobalTracks({ search: fullQuery })
+      // Also fetch global artists if not loaded
+      if (library.globalArtists.length === 0) {
+        library.fetchArtists('global')
+      }
     } else {
       // Library search
       filterScope.value = 'library'
-      activeFilter.value = fullQuery ? `Поиск: ${fullQuery}` : null
       library.fetchTracks({ search: fullQuery })
+      // Also fetch library artists if not loaded
+      if (library.artists.length === 0) {
+        library.fetchArtists('library')
+      }
     }
   }, 300)
 }
@@ -1928,6 +2115,150 @@ onMounted(async () => {
   font-size: 14px;
   color: var(--spotify-text-muted);
   line-height: 1.4;
+}
+
+/* Search Results */
+.search-results {
+  padding: 0 4px;
+}
+
+.search-section {
+  margin-bottom: 20px;
+}
+
+.search-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--spotify-text-muted);
+  padding: 12px 12px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.search-artists-list,
+.search-albums-list,
+.search-playlists-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.search-artist-item,
+.search-album-item,
+.search-playlist-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--xm-bg-card);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.search-artist-item:active,
+.search-album-item:active,
+.search-playlist-item:active {
+  transform: scale(0.98);
+  opacity: 0.8;
+}
+
+.search-artist-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--spotify-gray) 0%, var(--spotify-gray-dark) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.search-artist-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-initials {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--spotify-text-muted);
+}
+
+.search-artist-info,
+.search-album-info,
+.search-playlist-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.search-artist-name,
+.search-album-name,
+.search-playlist-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--spotify-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-artist-count,
+.search-album-artist,
+.search-playlist-count {
+  font-size: 13px;
+  color: var(--spotify-text-muted);
+}
+
+.search-album-cover,
+.search-playlist-cover {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--spotify-gray) 0%, var(--spotify-gray-dark) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.search-album-cover img,
+.search-playlist-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.search-item-arrow {
+  flex-shrink: 0;
+  color: var(--spotify-text-muted);
+  opacity: 0.5;
+}
+
+.see-all-btn {
+  display: block;
+  width: calc(100% - 24px);
+  margin: 12px auto;
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  background: var(--spotify-gray);
+  color: var(--spotify-text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.see-all-btn:active {
+  transform: scale(0.98);
+  background: var(--spotify-gray-light);
 }
 
 /* Scope toggle for library/global */
