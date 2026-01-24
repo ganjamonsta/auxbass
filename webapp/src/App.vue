@@ -10,7 +10,7 @@
           <!-- Title (hides when search opens) -->
           <Transition name="fade-slide">
             <h1 v-if="!showSearch" class="header-title-main" @click="goToHome">
-              {{ userDisplayName }}
+              {{ currentTabName }}
             </h1>
           </Transition>
           
@@ -693,7 +693,6 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
           <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
         </svg>
-        <span>Главная</span>
       </button>
       <button 
         :class="['tab-item', { active: activeTab === 'tracks' }]"
@@ -702,7 +701,6 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
         </svg>
-        <span>Треки</span>
       </button>
       <button 
         :class="['tab-item', { active: activeTab === 'playlists' }]"
@@ -711,7 +709,6 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
           <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
         </svg>
-        <span>Плейлисты</span>
       </button>
       <button 
         :class="['tab-item', { active: activeTab === 'artists' }]"
@@ -720,7 +717,6 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
         </svg>
-        <span>Артисты</span>
       </button>
       <button 
         :class="['tab-item', { active: activeTab === 'explore' }]"
@@ -729,7 +725,6 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
         </svg>
-        <span>Обзор</span>
       </button>
     </nav>
 
@@ -851,6 +846,22 @@ const userDisplayName = computed(() => {
     return `@${user.username}`
   }
   return user?.first_name || 'Musiq'
+})
+
+// Current tab display name for header
+const currentTabName = computed(() => {
+  const tabNames = {
+    'home': 'Главная',
+    'tracks': 'Треки',
+    'playlists': 'Плейлисты',
+    'artists': 'Артисты',
+    'genres': 'Жанры',
+    'explore': 'Обзор',
+    'queue': 'Очередь',
+    'history': 'Недавнее',
+    'liked': 'Любимое'
+  }
+  return tabNames[activeTab.value] || 'Музыка'
 })
 
 // Stores
@@ -2678,14 +2689,14 @@ onMounted(async () => {
   margin-bottom: 12px;
 }
 
-/* Bottom Tab Bar - Nokia XpressMusic Style */
+/* Bottom Tab Bar - Nokia XpressMusic Style (Icon only) */
 .tab-bar {
   flex-shrink: 0;
   display: flex;
   justify-content: center;
-  gap: 8px;
+  gap: 12px;
   background: linear-gradient(180deg, var(--xm-bg-elevated) 0%, var(--xm-bg-deep) 100%);
-  padding: 8px 12px max(8px, env(safe-area-inset-bottom));
+  padding: 10px 16px max(10px, env(safe-area-inset-bottom));
   z-index: 50;
   border-top: 1px solid rgba(255, 255, 255, 0.03);
   box-shadow: 0 -4px 16px var(--neu-shadow-dark);
@@ -2693,17 +2704,13 @@ onMounted(async () => {
 
 .tab-item {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  width: 56px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   border: none;
-  border-radius: var(--neu-radius-md);
+  border-radius: var(--neu-radius-full);
   color: var(--xm-text-muted);
-  font-size: 9px;
-  font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
   position: relative;
@@ -2711,32 +2718,37 @@ onMounted(async () => {
   /* Nokia rubber button style */
   background: var(--rubber-bg);
   box-shadow: 
-    0 3px 6px rgba(0, 0, 0, 0.5),
+    4px 4px 8px rgba(0, 0, 0, 0.5),
+    -2px -2px 4px rgba(255, 255, 255, 0.03),
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
     inset 0 -1px 0 rgba(0, 0, 0, 0.3);
   border: 1px solid var(--rubber-border);
+}
+
+.tab-item svg {
+  width: 26px;
+  height: 26px;
 }
 
 /* Rubber texture dots */
 .tab-item::before {
   content: '';
   position: absolute;
-  top: 6px;
+  top: 8px;
   left: 50%;
   transform: translateX(-50%);
-  width: 32px;
-  height: 4px;
+  width: 24px;
+  height: 3px;
   background: 
-    radial-gradient(circle at 15% 50%, rgba(255,255,255,0.08) 0%, transparent 60%),
-    radial-gradient(circle at 38% 50%, rgba(255,255,255,0.08) 0%, transparent 60%),
-    radial-gradient(circle at 62% 50%, rgba(255,255,255,0.08) 0%, transparent 60%),
-    radial-gradient(circle at 85% 50%, rgba(255,255,255,0.08) 0%, transparent 60%);
+    radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 60%),
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,0.1) 0%, transparent 60%),
+    radial-gradient(circle at 80% 50%, rgba(255,255,255,0.1) 0%, transparent 60%);
   border-radius: 2px;
   pointer-events: none;
 }
 
 .tab-item:active {
-  transform: scale(0.94) translateY(1px);
+  transform: scale(0.92);
   background: var(--rubber-bg-pressed);
   box-shadow: 
     0 1px 2px rgba(0, 0, 0, 0.5),
