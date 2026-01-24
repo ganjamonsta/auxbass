@@ -684,14 +684,39 @@ async def fetch_artist_image(artist_name: str) -> Optional[str]:
 @router.get("/artist-image/{artist_name:path}")
 async def get_artist_image(
     artist_name: str,
+    user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get artist image URL"""
+    """Get artist image URL from newest album with release_date"""
+    from shared.models import Playlist
+    
+    # First try Last.fm
     image_url = await fetch_artist_image(artist_name)
     
     if image_url and "2a96cbd8b46e442fc41c2b86b821562f" not in image_url:
         return {"artist": artist_name, "image_url": image_url}
     
+    # Try to get cover from newest album (by release_date) for this artist
+    # Get user's auto-album playlists with release_date, sorted by date
+    album_result = await db.execute(
+        select(Playlist)
+        .where(Playlist.user_id == user.id)
+        .where(Playlist.is_auto_album == True)
+        .where(Playlist.release_date.isnot(None))
+        .where(Playlist.cover_url.isnot(None))
+        .order_by(Playlist.release_date.desc())
+    )
+    all_albums = album_result.scalars().all()
+    
+    # Find albums for this artist (check album_artist)
+    safe_artist = artist_name.lower().strip()
+    for album in all_albums:
+        # Check album_artist
+        if album.album_artist and safe_artist in album.album_artist.lower():
+            if album.cover_url:
+                return {"artist": artist_name, "image_url": album.cover_url}
+    
+    # Fallback: get cover from most popular track
     result = await db.execute(
         select(Track.cover_url)
         .where(Track.artist.ilike(f"%{artist_name}%"))
@@ -879,18 +904,26 @@ async def get_artist_detail(
     # Sort albums by release date (newest first), albums without date go to the end
     def album_sort_key(album):
         if album.release_date:
-            return (0, album.release_date)  # Has date, sort descending
-        return (1, "")  # No date, put at end
+            # Has date - return negative tuple so newer dates come first
+            # Date format YYYY-MM-DD, so string comparison works
+            return (0, album.release_date)
+        return (1, "0000-00-00")  # No date, put at end
     
     albums.sort(key=album_sort_key, reverse=True)
     
-    # Fallback for artist image: use cover from the newest album (first after sorting)
+    # Fallback for artist image: use cover from the newest album WITH release_date
     if not image_url or "2a96cbd8b46e442fc41c2b86b821562f" in image_url:
-        # Use cover from newest album
+        # First try albums with release_date (sorted newest first)
         for album in albums:
-            if album.cover_url:
+            if album.release_date and album.cover_url:
                 image_url = album.cover_url
                 break
+        # If no album with date has cover, try any album cover
+        if not image_url:
+            for album in albums:
+                if album.cover_url:
+                    image_url = album.cover_url
+                    break
         # If still no cover, fall back to any track cover
         if not image_url:
             for track, _ in tracks_data:
