@@ -105,6 +105,9 @@ async def main():
     
     print(f"\n✨ Done! Fixed: {fixed}, Skipped: {skipped}")
     
+    # Close metadata service session
+    await metadata_service.close()
+    
     # Rebuild albums after fixing
     if fixed > 0:
         print("\n🔄 Rebuilding albums...")
