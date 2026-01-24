@@ -163,8 +163,8 @@ const fileSizeMB = computed(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 12px;
-  margin: 4px 8px;
+  padding: 8px 6px 8px 12px; /* Less right padding, scrollbar is there */
+  margin: 4px 0 4px 8px; /* No right margin - scrollbar takes that space */
   border-radius: var(--neu-radius-md);
   cursor: pointer;
   transition: all 0.15s ease;
@@ -184,8 +184,8 @@ const fileSizeMB = computed(() => {
 }
 
 .track-item.compact {
-  padding: 6px 10px;
-  margin: 2px 6px;
+  padding: 6px 4px 6px 10px;
+  margin: 2px 0 2px 6px;
 }
 
 /* ─── Track Cover ─── */
@@ -364,7 +364,7 @@ const fileSizeMB = computed(() => {
 
 /* ─── Menu Button ─── */
 .track-menu {
-  width: 32px;
+  width: 28px;
   height: 32px;
   background: none;
   border: none;
@@ -376,6 +376,7 @@ const fileSizeMB = computed(() => {
   opacity: 0.6;
   transition: all 0.2s ease;
   border-radius: var(--neu-radius-full);
+  margin-right: -4px; /* Pull closer to edge, let scrollbar use that space */
 }
 
 .track-menu:active {
