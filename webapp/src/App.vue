@@ -69,6 +69,7 @@
     <main 
       ref="contentRef"
       class="content"
+      @scroll="handleContentScroll"
       @touchstart="handleTouchStart"
       @touchmove="handleTouchMove"
       @touchend="handleTouchEnd"
@@ -260,15 +261,19 @@
           
           <!-- Load more button -->
           <button 
-            v-if="filterScope === 'library' && library.hasMore && !library.loading" 
+            v-if="library.hasMore && !library.loading" 
             class="load-more-btn"
             @click="library.loadMore()"
           >
             Загрузить ещё ({{ library.tracks.length }} из {{ library.total }})
           </button>
-          <div v-if="library.loading && library.tracks.length > 0" class="loading-more">
+          <div v-else-if="library.loading && library.tracks.length > 0" class="loading-more">
             <div class="loading-spinner"></div>
             <span>Загрузка...</span>
+          </div>
+          <!-- Debug info -->
+          <div v-if="library.tracks.length > 0" style="padding: 10px; text-align: center; color: #888; font-size: 12px;">
+            Загружено: {{ library.tracks.length }} / {{ library.total }} | hasMore: {{ library.hasMore }}
           </div>
         </div>
 
@@ -820,7 +825,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, inject, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, inject, nextTick, watch } from 'vue'
 import { usePlayerStore } from './stores/player'
 import { useLibraryStore } from './stores/library'
 import { playerApi } from './api/client'
@@ -978,10 +983,15 @@ const handleContentScroll = () => {
   const { scrollTop, scrollHeight, clientHeight } = contentRef.value
   const distanceFromBottom = scrollHeight - scrollTop - clientHeight
   
-  // Load more when user is within 200px from bottom
-  if (distanceFromBottom < 200) {
-    // Only load more for library tracks tab (not global)
-    if (activeTab.value === 'tracks' && filterScope.value === 'library') {
+  // Load more when user is within 300px from bottom
+  if (distanceFromBottom < 300 && activeTab.value === 'tracks') {
+    console.log('Scroll near bottom, loading more...', { 
+      hasMore: library.hasMore, 
+      loading: library.loading,
+      total: library.total,
+      loaded: library.tracks.length 
+    })
+    if (filterScope.value === 'library') {
       library.loadMore()
     }
   }
@@ -1367,21 +1377,9 @@ onMounted(async () => {
   document.body.classList.add('spotify-theme')
   await library.init()
   
-  // Add scroll listener for infinite scroll
-  if (contentRef.value) {
-    contentRef.value.addEventListener('scroll', handleContentScroll)
-  }
-  
   // Restore player state if available
   if (player.hasSavedState()) {
     await player.restoreState()
-  }
-})
-
-// Cleanup on unmount
-onUnmounted(() => {
-  if (contentRef.value) {
-    contentRef.value.removeEventListener('scroll', handleContentScroll)
   }
 })
 </script>
