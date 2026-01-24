@@ -18,6 +18,7 @@ export const useLibraryStore = defineStore('library', () => {
   const total = ref(0)
   const page = ref(1)
   const hasMore = ref(true)
+  const currentSearchParams = ref({})  // Store current search/filter params for loadMore
   
   // State - Global Library
   const globalTracks = ref([])
@@ -25,6 +26,7 @@ export const useLibraryStore = defineStore('library', () => {
   const globalTotal = ref(0)
   const globalPage = ref(1)
   const globalHasMore = ref(true)
+  const globalSearchParams = ref({})  // Store current search/filter params for global loadMore
   const recentUploads = ref([])
   const popularTracks = ref([])
   const globalStats = ref(null)
@@ -69,6 +71,12 @@ export const useLibraryStore = defineStore('library', () => {
   const fetchTracks = async (params = {}) => {
     loading.value = true
     try {
+      // Save search params for loadMore (exclude page)
+      const { page: pageParam, ...searchParams } = params
+      if (!pageParam || pageParam === 1) {
+        currentSearchParams.value = searchParams
+      }
+      
       const response = await tracksApi.getAll({
         page: params.page || 1,
         per_page: 50,
@@ -121,10 +129,10 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
-  // Load more tracks
-  const loadMore = async (params = {}) => {
+  // Load more tracks (preserves current search/filter params)
+  const loadMore = async () => {
     if (!hasMore.value || loading.value) return
-    await fetchTracks({ ...params, page: page.value + 1 })
+    await fetchTracks({ ...currentSearchParams.value, page: page.value + 1 })
   }
 
   // Fetch playlists
@@ -387,6 +395,12 @@ export const useLibraryStore = defineStore('library', () => {
   const fetchGlobalTracks = async (params = {}) => {
     globalLoading.value = true
     try {
+      // Save search params for loadMoreGlobal (exclude page)
+      const { page: pageParam, ...searchParams } = params
+      if (!pageParam || pageParam === 1) {
+        globalSearchParams.value = searchParams
+      }
+      
       const response = await tracksApi.getGlobal({
         page: params.page || 1,
         per_page: 50,
@@ -411,10 +425,10 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
   
-  // Load more global tracks
-  const loadMoreGlobal = async (params = {}) => {
+  // Load more global tracks (preserves current search/filter params)
+  const loadMoreGlobal = async () => {
     if (!globalHasMore.value || globalLoading.value) return
-    await fetchGlobalTracks({ ...params, page: globalPage.value + 1 })
+    await fetchGlobalTracks({ ...globalSearchParams.value, page: globalPage.value + 1 })
   }
   
   // Fetch recent uploads from all users
