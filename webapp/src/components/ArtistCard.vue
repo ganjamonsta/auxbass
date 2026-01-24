@@ -260,6 +260,7 @@ const playAll = () => {
 .scroll-spacer {
   flex-shrink: 0;
   width: 16px;
+  scroll-snap-align: start;
 }
 
 /* ─── Album Cards ─── */
