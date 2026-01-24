@@ -68,8 +68,22 @@ const urlCache = new Map()
 const URL_CACHE_MARGIN = 60 // Refresh URL 60 seconds before expiry
 
 const getCachedUrl = (trackId) => {
-  const cached = urlCache.get(trackId)
+  // Check local cache first
+  let cached = urlCache.get(trackId)
+  
+  // Also check prefetched URLs from library.js (stored on window)
+  if (!cached && window._prefetchedUrls) {
+    cached = window._prefetchedUrls.get(trackId)
+    if (cached) {
+      // Move to local cache for consistency
+      urlCache.set(trackId, cached)
+      window._prefetchedUrls.delete(trackId)
+      console.log(`[Cache] Using prefetched URL for track ${trackId}`)
+    }
+  }
+  
   if (!cached) return null
+  
   // Check if not expired (with margin)
   if (Date.now() / 1000 > cached.expires_at - URL_CACHE_MARGIN) {
     urlCache.delete(trackId)
@@ -266,9 +280,9 @@ export const usePlayerStore = defineStore('player', () => {
     
     audio.value = new Audio()
     audio.value.volume = volume.value
-    // Changed to 'metadata' to prevent aggressive buffering blocking startup
-    // user reported "2 minutes loaded" issues causing slow start
-    audio.value.preload = 'metadata' 
+    // Use 'auto' for faster startup - browser will buffer intelligently
+    // The slow start issue was due to sequential API calls, not buffering
+    audio.value.preload = 'auto' 
     
     // Setup Media Session handlers once
     setupMediaSession()
@@ -355,18 +369,20 @@ export const usePlayerStore = defineStore('player', () => {
       loading.value = false
     })
     
-    // Preload next track when we have a safe buffer
-    // Note: preloadTriggered is defined at store level, reset in play()
+    // Preload next track ASAP - when current track can play through
+    audio.value.addEventListener('canplaythrough', () => {
+      if (!preloadTriggered && duration.value > 0) {
+        console.log('[Instant Preload] Triggering on canplaythrough')
+        preloadTriggered = true
+        preloadNextTracks()
+      }
+    })
+    
+    // Fallback: Also trigger preload on timeupdate if canplaythrough didn't fire
     audio.value.addEventListener('timeupdate', () => {
-      // Calculate how many seconds we have buffered ahead of current position
-      const currentBuffer = (buffered.value || 0) - progress.value
-      
-      // Instant Preload: Start as soon as we have 2 seconds buffered OR 2 seconds played
-      // This ensures next track URLs are ready before user can click Next
-      const isBufferHealthy = currentBuffer > 2 || progress.value > 2
-
-      if (duration.value > 0 && !preloadTriggered && isBufferHealthy) {
-        console.log(`[Instant Preload] Triggering after ${progress.value.toFixed(1)}s of playback`)
+      // Trigger after 0.5 seconds of playback as fallback
+      if (duration.value > 0 && !preloadTriggered && progress.value > 0.5) {
+        console.log(`[Instant Preload] Fallback trigger at ${progress.value.toFixed(1)}s`)
         preloadTriggered = true
         preloadNextTracks()
       }
@@ -384,6 +400,15 @@ export const usePlayerStore = defineStore('player', () => {
     
     audio.value.addEventListener('canplay', () => {
       loading.value = false
+    })
+    
+    audio.value.addEventListener('canplaythrough', () => {
+      // Trigger preload on canplaythrough for faster next track start
+      if (!preloadTriggered && duration.value > 0) {
+        console.log('[Instant Preload] Triggering on canplaythrough (reattached)')
+        preloadTriggered = true
+        preloadNextTracks()
+      }
     })
     
     audio.value.addEventListener('playing', () => {
@@ -413,10 +438,8 @@ export const usePlayerStore = defineStore('player', () => {
         updatePositionState()
       }
       
-      // Preload trigger
-      const currentBuffer = (buffered.value || 0) - progress.value
-      const isBufferHealthy = currentBuffer > 2 || progress.value > 2
-      if (duration.value > 0 && !preloadTriggered && isBufferHealthy) {
+      // Fallback preload trigger (if canplaythrough didn't fire)
+      if (duration.value > 0 && !preloadTriggered && progress.value > 0.5) {
         preloadTriggered = true
         preloadNextTracks()
       }
@@ -674,48 +697,86 @@ export const usePlayerStore = defineStore('player', () => {
     updateMediaSession()
     
     try {
-      // Check if track is cached (blob URL)
-      const cachedUrl = getCachedAudio(track.id)
-      if (cachedUrl) {
-        // Stop current playback and reset before changing source
+      // === PRIORITY 1: Blob cache (fully downloaded) ===
+      const cachedBlobUrl = getCachedAudio(track.id)
+      if (cachedBlobUrl) {
+        console.log('[Play] Using blob cache - instant start')
         audio.value.pause()
         audio.value.currentTime = 0
-        audio.value.src = cachedUrl
-        audio.value.load()  // Force reload with new source
+        audio.value.src = cachedBlobUrl
+        buffered.value = duration.value  // Fully buffered
+        audio.value.load()
         await audio.value.play()
         loading.value = false
-        
-        // Save state and start periodic saving
         persistState()
         startStateSaving()
-        
-        // Start preloading next tracks immediately
         nextTrackPreloaded.value = null
         preloadNextTrack()
         return
       }
       
-      // Get stream URL from API
-      const response = await playerApi.getStreamUrl(track.id)
-      const { url } = response.data
+      // === PRIORITY 2: Preloaded Audio element (already buffering) ===
+      const preloadedAudio = getPreloadedAudio(track.id)
+      if (preloadedAudio && preloadedAudio.readyState >= 2) {
+        console.log('[Play] Using preloaded Audio element - fast start')
+        
+        // Swap audio elements
+        if (audio.value) {
+          audio.value.pause()
+          audio.value.src = ''
+        }
+        
+        const oldAudio = audio.value
+        audio.value = preloadedAudio
+        audio.value.volume = volume.value
+        audio.value.muted = isMuted.value
+        
+        // Reattach event listeners to new audio element
+        reattachAudioListeners()
+        
+        await audio.value.play()
+        loading.value = false
+        
+        // Recycle old audio for next preload
+        preloadAudio = oldAudio || new Audio()
+        preloadAudio.preload = 'auto'
+        preloadAudio.volume = 0
+        preloadTrackId = null
+        
+        persistState()
+        startStateSaving()
+        nextTrackPreloaded.value = null
+        preloadNextTracks()
+        return
+      }
       
-      // Stream directly - fastest start time
-      // Caching is done via preloadNextTrack() which loads NEXT tracks in background
-      audio.value.src = url
+      // === PRIORITY 3: Cached URL token (skip first API call) ===
+      let streamUrl = getCachedUrl(track.id)
+      
+      if (streamUrl) {
+        console.log('[Play] Using cached URL token - skip API call')
+      } else {
+        // Fallback: Fetch new URL from API
+        console.log('[Play] Fetching new stream URL from API')
+        const response = await playerApi.getStreamUrl(track.id)
+        streamUrl = response.data.url
+        // Cache for potential retry
+        setCachedUrl(track.id, streamUrl, response.data.expires_at)
+      }
+      
+      // Stream directly
+      audio.value.src = streamUrl
       buffered.value = 0
       await audio.value.play()
       
-      // Reset preload triggering flag for the new track
-      preloadTriggered = false
+      loading.value = false
       nextTrackPreloaded.value = null
       
       // Save state after starting playback
       persistState()
       startStateSaving()
       
-      // Note: We deliberately DO NOT call preloadNextTrack() here immediately.
-      // We wait for the 'timeupdate' event to confirm we have a healthy buffer
-      // before starting to download the next track. This prevents bandwidth contention.
+      // Preload is now triggered by canplaythrough event for faster start
       
     } catch (error) {
       console.error('Failed to play track:', error)

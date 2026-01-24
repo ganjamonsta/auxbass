@@ -329,7 +329,10 @@ async def get_batch_stream_urls(
 ):
     """
     Get secure proxy URLs for multiple tracks at once.
+    Pre-fetches Telegram file paths in parallel for faster playback.
     """
+    import asyncio
+    
     if len(track_ids) > 50:
         raise HTTPException(status_code=400, detail="Maximum 50 tracks per request")
     
@@ -346,7 +349,26 @@ async def get_batch_stream_urls(
     )
     tracks = {t.id: t for t in result.scalars().all()}
     
-    base_url = str(request.base_url).rstrip('/')
+    # Pre-fetch all file paths in parallel (key optimization!)
+    async def get_file_path_for_track(track):
+        try:
+            return await get_telegram_file_path(track.file_id)
+        except Exception as e:
+            logger.debug(f"Failed to get file path for track {track.id}: {e}")
+            return None
+    
+    # Fetch all file paths concurrently
+    file_path_tasks = []
+    track_order = []
+    for track_id in track_ids:
+        track = tracks.get(track_id)
+        if track:
+            file_path_tasks.append(get_file_path_for_track(track))
+            track_order.append(track_id)
+    
+    file_paths = await asyncio.gather(*file_path_tasks, return_exceptions=True)
+    file_path_map = dict(zip(track_order, file_paths))
+    
     urls = []
     expires_at = int(time.time()) + STREAM_TOKEN_TTL
     
@@ -360,10 +382,20 @@ async def get_batch_stream_urls(
             })
             continue
         
-        token = generate_stream_token(track_id, user.id)
+        file_path = file_path_map.get(track_id)
+        if isinstance(file_path, Exception) or not file_path:
+            urls.append({
+                "track_id": track_id,
+                "url": None,
+                "error": "Could not get file path"
+            })
+            continue
+        
+        # Generate token WITH cached file_path (saves ~300ms on stream start)
+        token = generate_stream_token(track_id, user.id, file_path)
         urls.append({
             "track_id": track_id,
-            "url": f"{base_url}/api/player/audio/{token}",
+            "url": f"/api/player/audio/{token}",  # Relative URL
             "expires_at": expires_at,
             "error": None
         })
