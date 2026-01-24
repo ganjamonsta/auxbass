@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     
     # Bot
     bot_token: str
+    bot_username: str = ""  # For Telegram Login Widget
     
     # Telegram Bot API URL (use local server to bypass 20MB limit)
     # Default: https://api.telegram.org (20MB download limit)
@@ -29,6 +30,8 @@ class Settings(BaseSettings):
     
     # Security
     secret_key: str = "dev-secret-key"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_days: int = 30  # JWT token expiration
     
     # Last.fm API (for artist images)
     lastfm_api_key: str = ""

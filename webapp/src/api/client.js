@@ -3,24 +3,76 @@ import axios from 'axios'
 // Use relative path for production, env variable for development
 const API_URL = import.meta.env.VITE_API_URL || '/api'
 
+// ============== Auth Token Storage ==============
+const AUTH_TOKEN_KEY = 'tg_player_auth_token'
+const AUTH_USER_KEY = 'tg_player_auth_user'
+
+export const authStorage = {
+  getToken: () => localStorage.getItem(AUTH_TOKEN_KEY),
+  setToken: (token) => localStorage.setItem(AUTH_TOKEN_KEY, token),
+  removeToken: () => localStorage.removeItem(AUTH_TOKEN_KEY),
+  
+  getUser: () => {
+    try {
+      const user = localStorage.getItem(AUTH_USER_KEY)
+      return user ? JSON.parse(user) : null
+    } catch {
+      return null
+    }
+  },
+  setUser: (user) => localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user)),
+  removeUser: () => localStorage.removeItem(AUTH_USER_KEY),
+  
+  clear: () => {
+    localStorage.removeItem(AUTH_TOKEN_KEY)
+    localStorage.removeItem(AUTH_USER_KEY)
+  },
+  
+  isAuthenticated: () => {
+    // Check if we have Telegram WebApp auth OR JWT token
+    const tg = window.Telegram?.WebApp
+    return !!(tg?.initData) || !!localStorage.getItem(AUTH_TOKEN_KEY)
+  },
+  
+  isTelegramWebApp: () => {
+    const tg = window.Telegram?.WebApp
+    return !!(tg?.initData)
+  }
+}
+
 const api = axios.create({
   baseURL: API_URL,
   timeout: 30000,
 })
 
-// Add Telegram init data to all requests
+// Add auth headers to all requests
 api.interceptors.request.use((config) => {
   const tg = window.Telegram?.WebApp
+  
+  // Prefer Telegram WebApp auth if available
   if (tg?.initData) {
     config.headers['X-Telegram-Init-Data'] = tg.initData
+  } else {
+    // Fall back to JWT token for browser auth
+    const token = authStorage.getToken()
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`
+    }
   }
+  
   return config
 })
 
-// Handle errors
+// Handle errors (including 401 for expired tokens)
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // If 401 and we're using JWT, clear the token
+    if (error.response?.status === 401 && !window.Telegram?.WebApp?.initData) {
+      authStorage.clear()
+      // Dispatch event for UI to handle
+      window.dispatchEvent(new CustomEvent('auth:logout'))
+    }
     console.error('API Error:', error.response?.data || error.message)
     return Promise.reject(error)
   }
@@ -32,6 +84,9 @@ export default api
 export const authApi = {
   validate: () => api.post('/auth/validate'),
   me: () => api.get('/auth/me'),
+  getConfig: () => api.get('/auth/config'),
+  telegramLogin: (data) => api.post('/auth/telegram-login', data),
+  refresh: () => api.post('/auth/refresh'),
 }
 
 // Tracks

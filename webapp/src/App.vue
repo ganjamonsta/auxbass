@@ -1,5 +1,14 @@
 <template>
-  <div class="app spotify-theme">
+  <!-- Auth checking state -->
+  <div v-if="authChecking" class="auth-loading">
+    <div class="auth-spinner"></div>
+  </div>
+  
+  <!-- Login page for non-authenticated users (browser only) -->
+  <LoginPage v-else-if="!isAuthenticated" @login="handleLogin" />
+  
+  <!-- Main app for authenticated users -->
+  <div v-else class="app spotify-theme">
     <!-- One UI Style Header with Animated Search -->
     <header class="oneui-header" v-if="currentView === 'library'">
       <div class="header-row">
@@ -969,10 +978,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, inject, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, inject, nextTick } from 'vue'
 import { usePlayerStore } from './stores/player'
 import { useLibraryStore } from './stores/library'
-import { playerApi } from './api/client'
+import { playerApi, authStorage } from './api/client'
 import TrackItem from './components/TrackItem.vue'
 import TrackSkeleton from './components/TrackSkeleton.vue'
 import PlaylistItem from './components/PlaylistItem.vue'
@@ -986,21 +995,88 @@ import EnrichmentStatus from './components/EnrichmentStatus.vue'
 import GlobalLibrary from './components/GlobalLibrary.vue'
 import ArtistCard from './components/ArtistCard.vue'
 import Toast from './components/Toast.vue'
+import LoginPage from './components/LoginPage.vue'
 
 const telegram = inject('telegram')
 
-// Get username from Telegram
-const userDisplayName = computed(() => {
-  const user = telegram?.initDataUnsafe?.user
-  if (user?.username) {
-    return `@${user.username}`
+// ============== Authentication State ==============
+const isAuthenticated = ref(false)
+const currentUser = ref(null)
+const authChecking = ref(true)
+
+// Check authentication on mount
+const checkAuth = () => {
+  // If in Telegram WebApp, we're always authenticated via initData
+  if (telegram?.initData) {
+    isAuthenticated.value = true
+    currentUser.value = telegram.initDataUnsafe?.user || null
+    authChecking.value = false
+    return true
   }
-  return user?.first_name || 'Musiq'
+  
+  // Check for JWT token in browser
+  if (authStorage.getToken()) {
+    isAuthenticated.value = true
+    currentUser.value = authStorage.getUser()
+    authChecking.value = false
+    return true
+  }
+  
+  authChecking.value = false
+  return false
+}
+
+// Handle login from LoginPage
+const handleLogin = async (user) => {
+  isAuthenticated.value = true
+  currentUser.value = user
+  
+  // Initialize the library after successful login
+  await library.init()
+  
+  // Restore player state if available
+  if (player.hasSavedState()) {
+    await player.restoreState()
+  }
+}
+
+// Handle logout (for browser auth)
+const handleLogout = () => {
+  authStorage.clear()
+  isAuthenticated.value = false
+  currentUser.value = null
+}
+
+// Listen for auth:logout events (from API interceptor on 401)
+const onAuthLogout = () => {
+  handleLogout()
+}
+
+// Get username from Telegram or JWT
+const userDisplayName = computed(() => {
+  // First try Telegram WebApp
+  const tgUser = telegram?.initDataUnsafe?.user
+  if (tgUser?.username) {
+    return `@${tgUser.username}`
+  }
+  if (tgUser?.first_name) {
+    return tgUser.first_name
+  }
+  
+  // Fall back to JWT user
+  if (currentUser.value?.username) {
+    return `@${currentUser.value.username}`
+  }
+  if (currentUser.value?.first_name) {
+    return currentUser.value.first_name
+  }
+  
+  return 'Musiq'
 })
 
-// Get current user ID from Telegram
+// Get current user ID from Telegram or JWT
 const currentUserId = computed(() => {
-  return telegram?.initDataUnsafe?.user?.id || null
+  return telegram?.initDataUnsafe?.user?.id || currentUser.value?.id || null
 })
 
 // Current tab display name for header
@@ -1669,11 +1745,21 @@ const handleTouchEnd = async () => {
 // Apply Spotify theme on mount
 onMounted(async () => {
   document.body.classList.add('spotify-theme')
-  await library.init()
   
-  // Restore player state if available
-  if (player.hasSavedState()) {
-    await player.restoreState()
+  // Check authentication first
+  checkAuth()
+  
+  // Listen for logout events from API
+  window.addEventListener('auth:logout', onAuthLogout)
+  
+  // Only initialize if authenticated
+  if (isAuthenticated.value) {
+    await library.init()
+    
+    // Restore player state if available
+    if (player.hasSavedState()) {
+      await player.restoreState()
+    }
   }
   
   // Handle unavailable tracks - show toast with helpful message
@@ -1686,9 +1772,36 @@ onMounted(async () => {
     }
   })
 })
+
+// Cleanup on unmount
+onUnmounted(() => {
+  window.removeEventListener('auth:logout', onAuthLogout)
+})
 </script>
 
 <style scoped>
+/* Auth loading state */
+.auth-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+}
+
+.auth-spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #1DB954;
+  border-radius: 50%;
+  animation: auth-spin 1s linear infinite;
+}
+
+@keyframes auth-spin {
+  to { transform: rotate(360deg); }
+}
+
 .app {
   display: flex;
   flex-direction: column;

@@ -18,5 +18,8 @@ python-dotenv>=1.0.0
 pydantic>=2.5.0
 pydantic-settings>=2.1.0
 
+# Authentication
+PyJWT>=2.8.0
+
 # Audio metadata (for extended ID3 parsing if needed)
 mutagen>=1.47.0
