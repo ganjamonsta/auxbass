@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 class AlbumAssemblyService:
     """Service for automatically assembling albums from user's tracks"""
     
-    # Minimum tracks to consider as album
-    MIN_TRACKS_FOR_ALBUM = 2
+    # Minimum tracks to consider as album (1 = allow singles)
+    MIN_TRACKS_FOR_ALBUM = 1
     
     async def get_album_candidates(self, user_id: int) -> List[Dict]:
         """
@@ -108,6 +108,40 @@ class AlbumAssemblyService:
             candidates.sort(key=lambda x: x["track_count"], reverse=True)
             
             return candidates
+    
+    async def _cleanup_empty_albums(self, user_id: int) -> int:
+        """
+        Remove auto-album playlists that have no tracks.
+        Returns count of deleted albums.
+        """
+        async with get_session() as session:
+            # Find all auto-album playlists for user
+            result = await session.execute(
+                select(Playlist).where(
+                    Playlist.user_id == user_id,
+                    Playlist.is_auto_album == True,
+                )
+            )
+            albums = result.scalars().all()
+            
+            deleted_count = 0
+            for album in albums:
+                # Check if album has any tracks
+                track_count = await session.scalar(
+                    select(func.count(PlaylistTrack.id))
+                    .where(PlaylistTrack.playlist_id == album.id)
+                )
+                
+                if track_count == 0:
+                    logger.info(f"Removing empty album playlist: {album.name} (id={album.id})")
+                    await session.delete(album)
+                    deleted_count += 1
+            
+            if deleted_count > 0:
+                await session.commit()
+                logger.info(f"Cleaned up {deleted_count} empty album playlists for user {user_id}")
+            
+            return deleted_count
     
     async def check_existing_album_playlist(
         self, 
@@ -355,8 +389,12 @@ class AlbumAssemblyService:
             "created": 0,
             "updated": 0,
             "skipped": 0,
+            "cleaned": 0,
             "albums": []
         }
+        
+        # First, clean up empty album playlists
+        await self._cleanup_empty_albums(user_id)
         
         candidates = await self.get_album_candidates(user_id)
         

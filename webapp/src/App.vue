@@ -1109,6 +1109,7 @@ const searchResultAlbums = computed(() => {
   if (!searchQueryLower.value) return []
   return library.playlists.filter(p => 
     p.is_auto_album && 
+    p.track_count > 0 &&  // Hide empty albums
     (p.name?.toLowerCase().includes(searchQueryLower.value) ||
      p.album_artist?.toLowerCase().includes(searchQueryLower.value))
   ).slice(0, 5)
@@ -1143,8 +1144,8 @@ const sourcePlaylists = computed(() => {
 })
 
 const albumPlaylists = computed(() => {
-  // Auto-generated album playlists
-  return library.playlists.filter(p => p.is_auto_album && !p.is_auto_source)
+  // Auto-generated album playlists (exclude empty ones)
+  return library.playlists.filter(p => p.is_auto_album && !p.is_auto_source && p.track_count > 0)
 })
 
 const userPlaylists = computed(() => {
