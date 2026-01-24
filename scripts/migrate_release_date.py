@@ -19,22 +19,35 @@ from sqlalchemy import select
 async def add_column():
     """Add release_date column if it doesn't exist"""
     async with engine.begin() as conn:
-        # Check if column exists
-        result = await conn.execute(text("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'playlists' AND column_name = 'release_date'
-        """))
-        
-        if result.fetchone() is None:
-            print("Adding release_date column to playlists table...")
-            await conn.execute(text("""
-                ALTER TABLE playlists 
-                ADD COLUMN release_date VARCHAR(20)
-            """))
-            print("Column added successfully!")
-        else:
-            print("Column release_date already exists")
+        # Check if column exists using SQLite's PRAGMA (works for SQLite)
+        # For PostgreSQL, use information_schema
+        try:
+            result = await conn.execute(text("PRAGMA table_info(playlists)"))
+            columns = [row[1] for row in result.fetchall()]
+            
+            if "release_date" not in columns:
+                print("Adding release_date column to playlists table...")
+                await conn.execute(text("""
+                    ALTER TABLE playlists 
+                    ADD COLUMN release_date VARCHAR(20)
+                """))
+                print("Column added successfully!")
+            else:
+                print("Column release_date already exists")
+        except Exception as e:
+            # Fallback: try to add column, ignore if it exists
+            print(f"Checking column existence failed ({e}), trying to add...")
+            try:
+                await conn.execute(text("""
+                    ALTER TABLE playlists 
+                    ADD COLUMN release_date VARCHAR(20)
+                """))
+                print("Column added successfully!")
+            except Exception as e2:
+                if "duplicate column" in str(e2).lower() or "already exists" in str(e2).lower():
+                    print("Column release_date already exists")
+                else:
+                    raise
 
 
 async def populate_release_dates():
