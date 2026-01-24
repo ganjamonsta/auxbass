@@ -43,8 +43,12 @@ async def rebuild_all_albums():
             if stats.get('cleaned'):
                 print(f"   🧹 Cleaned: {stats['cleaned']} empty albums")
                 
-            for album in stats.get('albums', []):
-                print(f"      • {album['name']} ({album.get('action', 'processed')})")
+            for album in stats.get('albums', [])[:15]:  # Limit output
+                track_count = album.get('track_count', '?')
+                print(f"      • {album['name']} ({album.get('action', 'processed')}, {track_count} tracks)")
+            
+            if len(stats.get('albums', [])) > 15:
+                print(f"      ... and {len(stats['albums']) - 15} more")
                 
         except Exception as e:
             print(f"   ❌ Error: {e}")

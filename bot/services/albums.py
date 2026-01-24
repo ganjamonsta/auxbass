@@ -11,7 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.database import get_session
-from shared.models import Track, Playlist, PlaylistTrack
+from shared.models import Track, Playlist, PlaylistTrack, UserLibrary
 from .metadata import metadata_service
 
 logger = logging.getLogger(__name__)
@@ -33,11 +33,12 @@ class AlbumAssemblyService:
         Returns list of album candidates with track counts.
         """
         async with get_session() as session:
-            # Get all tracks with album info
+            # Get all tracks in user's library with album info
             result = await session.execute(
                 select(Track)
+                .join(UserLibrary, UserLibrary.track_id == Track.id)
                 .where(
-                    Track.user_id == user_id,
+                    UserLibrary.user_id == user_id,
                     Track.album.isnot(None),
                     Track.album != "",
                 )
@@ -199,11 +200,12 @@ class AlbumAssemblyService:
         Deduplicates by title to avoid duplicate tracks from different sources.
         """
         async with get_session() as session:
-            # Always search by album name to get all tracks regardless of source
+            # Get tracks from user's library by album name
             result = await session.execute(
                 select(Track)
+                .join(UserLibrary, UserLibrary.track_id == Track.id)
                 .where(
-                    Track.user_id == user_id,
+                    UserLibrary.user_id == user_id,
                     func.lower(Track.album) == album.lower().strip()
                 )
                 .order_by(Track.title)
