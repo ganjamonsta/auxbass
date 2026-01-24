@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  --tg-viewport-height: 100vh;
-  --tg-viewport-stable-height: 100vh;
+  --tg-viewport-height: 100dvh;
+  --tg-viewport-stable-height: 100dvh;
   
   /* Spotify-inspired theme */
   --spotify-green: #1DB954;
@@ -121,7 +121,8 @@ body.spotify-theme {
 }
 
 #app {
-  height: var(--tg-viewport-stable-height, 100vh);
+  height: 100dvh;
+  height: var(--tg-viewport-stable-height, 100dvh);
   display: flex;
   flex-direction: column;
   overflow: hidden;
