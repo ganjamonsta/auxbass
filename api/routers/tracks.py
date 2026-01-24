@@ -590,8 +590,28 @@ async def get_artists(
     artist_counts = {}
     artist_canonical = {}  # Maps lowercase -> canonical (most common) case
     
+    # Regex to split multiple artists:
+    # Group 1: Symbols as separators (with optional spaces): , & +
+    # Group 2: Word separators (require spaces around them to avoid splitting "The Band", "Andrew"):
+    #   - feat. / ft. / featuring - features
+    #   - x / vs. - collaborations  
+    #   - and / with - conjunctions
+    #   - prod. / produced by - producers
+    artist_split_pattern = re.compile(
+        r'\s*[,&+]\s*'  # Symbols: comma, ampersand, plus
+        r'|'
+        r'\s+(?:feat\.?|ft\.?|featuring)\s+'  # Features
+        r'|'
+        r'\s+(?:x|vs\.?)\s+'  # Collaborations
+        r'|'
+        r'\s+(?:and|with)\s+'  # Conjunctions (word boundaries via \s+)
+        r'|'
+        r'\s+(?:prod\.?|produced\s+by)\s+'  # Producers
+        , flags=re.IGNORECASE
+    )
+    
     for (artist_str,) in result.all():
-        artists = re.split(r'\s*[,&]\s*|\s+(?:feat\.?|ft\.?|x|vs\.?)\s+', artist_str, flags=re.IGNORECASE)
+        artists = artist_split_pattern.split(artist_str)
         for artist in artists:
             artist = artist.strip()
             if artist:

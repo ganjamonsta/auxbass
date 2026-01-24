@@ -20,22 +20,17 @@
 
             <!-- Menu items -->
             <div class="menu-items">
-              <button class="menu-item" @click="handlePlayNext">
-                <span class="menu-icon">▶️</span>
-                <span>Воспроизвести следующим</span>
-              </button>
-              
               <button class="menu-item" @click="handleAddToQueue">
                 <span class="menu-icon">📋</span>
                 <span>Добавить в очередь</span>
               </button>
 
-              <div class="menu-divider"></div>
-
               <button class="menu-item" @click="handleAddToPlaylist">
                 <span class="menu-icon">➕</span>
                 <span>Добавить в плейлист</span>
               </button>
+
+              <div class="menu-divider"></div>
 
               <button class="menu-item" @click="handleEdit">
                 <span class="menu-icon">✏️</span>
