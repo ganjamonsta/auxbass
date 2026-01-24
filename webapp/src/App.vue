@@ -1893,26 +1893,36 @@ onUnmounted(() => {
   color: var(--spotify-text);
 }
 
-/* Desktop Layout */
+/* Desktop Layout - CSS Grid for proper bottom player positioning */
 .app.desktop-layout {
-  flex-direction: row;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  grid-template-rows: 1fr 100px;
+  grid-template-areas:
+    "sidebar main"
+    "player player";
   height: 100vh;
   max-height: 100vh;
 }
 
+.app.desktop-layout :deep(.sidebar) {
+  grid-area: sidebar;
+  height: 100%;
+}
+
 .app.desktop-layout .main-content-wrapper {
-  flex: 1;
+  grid-area: main;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  height: calc(100% - 100px); /* Leave space for bottom player */
+  height: 100%;
 }
 
 /* Desktop Player at bottom spans full width */
 .app.desktop-layout :deep(.desktop-player) {
+  grid-area: player;
   width: 100%;
-  order: 3;
+  height: 100px;
 }
 
 .main-content-wrapper {

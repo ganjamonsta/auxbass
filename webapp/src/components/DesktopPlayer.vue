@@ -305,9 +305,9 @@ onUnmounted(() => {
   transform: translateX(-50%);
   width: 4px;
   height: 10px;
-  background: #ff00ff;
+  background: #4DC3FF;
   border-radius: 2px;
-  box-shadow: 0 0 8px #ff00ff, 0 0 16px #ff00ff;
+  box-shadow: 0 0 8px #4DC3FF, 0 0 16px rgba(77, 195, 255, 0.6);
 }
 
 .knob-ring {
@@ -319,14 +319,14 @@ onUnmounted(() => {
 }
 
 .knob-ring.active {
-  border-color: #ff00ff;
-  box-shadow: 0 0 15px rgba(255, 0, 255, 0.5);
+  border-color: #4DC3FF;
+  box-shadow: 0 0 15px rgba(77, 195, 255, 0.5);
 }
 
 .vol-label {
   font-size: 10px;
-  color: #ff00ff;
-  text-shadow: 0 0 5px #ff00ff;
+  color: #4DC3FF;
+  text-shadow: 0 0 5px rgba(77, 195, 255, 0.6);
   font-weight: bold;
   letter-spacing: 2px;
 }
@@ -349,7 +349,7 @@ onUnmounted(() => {
 }
 
 .lcd-screen {
-  background: linear-gradient(180deg, #0d0515 0%, #150820 50%, #0d0515 100%);
+  background: linear-gradient(180deg, #0a1520 0%, #051015 50%, #0a1520 100%);
   border-radius: 2px;
   padding: 8px 12px;
   min-height: 50px;
@@ -363,9 +363,9 @@ onUnmounted(() => {
 }
 
 .lcd-status {
-  color: #ff00ff;
+  color: #4DC3FF;
   font-size: 12px;
-  text-shadow: 0 0 8px #ff00ff;
+  text-shadow: 0 0 8px rgba(77, 195, 255, 0.6);
   flex-shrink: 0;
 }
 
@@ -393,11 +393,11 @@ onUnmounted(() => {
   font-family: 'Courier New', monospace;
   font-size: 16px;
   font-weight: bold;
-  color: #ff00ff;
+  color: #4DC3FF;
   text-shadow: 
-    0 0 5px #ff00ff,
-    0 0 10px #ff00ff,
-    0 0 20px #cc00cc;
+    0 0 5px #4DC3FF,
+    0 0 10px rgba(77, 195, 255, 0.6),
+    0 0 20px rgba(0, 188, 212, 0.4);
   letter-spacing: 1px;
   padding-right: 50px;
 }
@@ -411,8 +411,8 @@ onUnmounted(() => {
 .lcd-time {
   font-family: 'Courier New', monospace;
   font-size: 11px;
-  color: #ff66ff;
-  text-shadow: 0 0 5px #ff00ff;
+  color: #7DD3FC;
+  text-shadow: 0 0 5px rgba(77, 195, 255, 0.6);
   min-width: 35px;
 }
 
@@ -422,7 +422,7 @@ onUnmounted(() => {
 
 .progress-bar {
   height: 4px;
-  background: rgba(255, 0, 255, 0.15);
+  background: rgba(77, 195, 255, 0.15);
   border-radius: 2px;
   position: relative;
   overflow: hidden;
@@ -433,8 +433,8 @@ onUnmounted(() => {
   left: 0;
   top: 0;
   height: 100%;
-  background: linear-gradient(90deg, #ff00ff, #ff66ff);
-  box-shadow: 0 0 8px #ff00ff;
+  background: linear-gradient(90deg, #00BCD4, #4DC3FF);
+  box-shadow: 0 0 8px rgba(77, 195, 255, 0.6);
   border-radius: 2px;
   transition: width 0.1s linear;
 }
@@ -444,7 +444,7 @@ onUnmounted(() => {
   left: 0;
   top: 0;
   height: 100%;
-  background: rgba(255, 0, 255, 0.2);
+  background: rgba(77, 195, 255, 0.2);
   border-radius: 2px;
   z-index: -1;
 }
@@ -462,9 +462,9 @@ onUnmounted(() => {
 .eq-bar {
   width: 8px;
   min-height: 3px;
-  background: linear-gradient(180deg, #ff00ff, #cc00cc);
+  background: linear-gradient(180deg, #4DC3FF, #00BCD4);
   border-radius: 1px;
-  box-shadow: 0 0 4px #ff00ff;
+  box-shadow: 0 0 4px rgba(77, 195, 255, 0.6);
   transition: height 0.1s ease;
 }
 
@@ -480,7 +480,7 @@ onUnmounted(() => {
   background: linear-gradient(180deg, #2a2a2a, #1a1a1a);
   border: 1px solid #333;
   border-radius: 4px;
-  color: #ff66ff;
+  color: #7DD3FC;
   font-size: 14px;
   padding: 6px 12px;
   cursor: pointer;
@@ -492,8 +492,8 @@ onUnmounted(() => {
 
 .ctrl-btn:hover {
   background: linear-gradient(180deg, #333, #222);
-  color: #ff00ff;
-  text-shadow: 0 0 8px #ff00ff;
+  color: #4DC3FF;
+  text-shadow: 0 0 8px rgba(77, 195, 255, 0.6);
 }
 
 .ctrl-btn:active {
@@ -512,12 +512,12 @@ onUnmounted(() => {
 }
 
 .ctrl-btn.mode.active {
-  color: #ff00ff;
-  text-shadow: 0 0 8px #ff00ff;
-  border-color: #ff00ff;
+  color: #4DC3FF;
+  text-shadow: 0 0 8px rgba(77, 195, 255, 0.6);
+  border-color: #4DC3FF;
   box-shadow: 
     2px 2px 5px rgba(0, 0, 0, 0.5),
-    0 0 10px rgba(255, 0, 255, 0.3);
+    0 0 10px rgba(77, 195, 255, 0.3);
 }
 
 .btn-label {
@@ -598,9 +598,9 @@ onUnmounted(() => {
 .vinyl-center {
   position: absolute;
   inset: 40%;
-  background: #ff00ff;
+  background: #4DC3FF;
   border-radius: 50%;
-  box-shadow: 0 0 8px #ff00ff;
+  box-shadow: 0 0 8px rgba(77, 195, 255, 0.6);
 }
 
 .mute-btn {
@@ -628,13 +628,13 @@ onUnmounted(() => {
   box-shadow: 
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 -4px 20px rgba(0, 0, 0, 0.5),
-    0 0 30px rgba(255, 0, 255, 0.1);
+    0 0 30px rgba(77, 195, 255, 0.15);
 }
 
 .desktop-player.playing .lcd-frame {
   box-shadow: 
     inset 2px 2px 6px rgba(0, 0, 0, 0.8),
     inset -1px -1px 3px rgba(255, 255, 255, 0.05),
-    0 0 20px rgba(255, 0, 255, 0.2);
+    0 0 20px rgba(77, 195, 255, 0.25);
 }
 </style>

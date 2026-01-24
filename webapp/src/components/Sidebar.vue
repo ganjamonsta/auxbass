@@ -253,12 +253,26 @@ const getPlaylistCoverStyle = (playlist) => {
 <style scoped>
 .sidebar {
   width: 280px;
-  height: calc(100vh - 100px);
+  height: 100%;
   background: #0a0a0a;
   border-right: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
 }
 
 .sidebar-logo {
