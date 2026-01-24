@@ -50,7 +50,6 @@ export const tracksApi = {
   like: (id) => api.post(`/tracks/${id}/like`),
   unlike: (id) => api.delete(`/tracks/${id}/like`),
   markUnavailable: (id) => api.post(`/tracks/${id}/mark-unavailable`),
-  markAvailable: (id) => api.post(`/tracks/${id}/mark-available`),
   getUnavailable: () => api.get('/tracks/unavailable/list'),
   deleteAllUnavailable: () => api.delete('/tracks/unavailable/all'),
   

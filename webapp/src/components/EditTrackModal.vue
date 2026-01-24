@@ -137,8 +137,9 @@ const handleSubmit = async () => {
   width: 100%;
   max-width: 400px;
   max-height: 90vh;
-  overflow-y: auto;
+  overflow-y: overlay;
   overflow-x: hidden;
+  scrollbar-gutter: auto;
   box-shadow: 
     12px 12px 24px var(--neu-shadow-dark, rgba(0, 0, 0, 0.6)),
     -6px -6px 12px var(--neu-shadow-light, rgba(255, 255, 255, 0.03)),
@@ -146,7 +147,7 @@ const handleSubmit = async () => {
 }
 
 .modal::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
   background: transparent;
 }
 
@@ -156,7 +157,7 @@ const handleSubmit = async () => {
 
 .modal::-webkit-scrollbar-thumb {
   background: var(--xm-accent-glow, rgba(229, 57, 53, 0.3));
-  border-radius: 2px;
+  border-radius: 3px;
 }
 
 .modal-header {

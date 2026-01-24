@@ -947,26 +947,6 @@ async def mark_track_unavailable(
     return {"status": "marked_unavailable", "id": track_id}
 
 
-@router.post("/{track_id}/mark-available")
-async def mark_track_available(
-    track_id: int,
-    user: TelegramUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Mark a track as available again (retry)"""
-    track = await db.scalar(
-        select(Track).where(Track.id == track_id, Track.user_id == user.id)
-    )
-    
-    if not track:
-        raise HTTPException(status_code=404, detail="Track not found or you're not the uploader")
-    
-    track.is_unavailable = False
-    await db.commit()
-    
-    return {"status": "marked_available", "id": track_id}
-
-
 @router.get("/unavailable/list")
 async def get_unavailable_tracks(
     user: TelegramUser = Depends(get_current_user),

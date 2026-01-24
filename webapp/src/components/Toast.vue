@@ -14,6 +14,9 @@
           <svg v-else-if="toast.type === 'success'" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
           </svg>
+          <svg v-else-if="toast.type === 'warning'" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+          </svg>
           <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
           </svg>
@@ -70,9 +73,12 @@ const removeToast = (id) => {
 defineExpose({
   addToast,
   removeToast,
+  // Shorthand methods (title, type or (title, type, duration))
+  show: (title, type = 'info', duration) => addToast({ type, title, duration }),
   success: (title, message) => addToast({ type: 'success', title, message }),
   error: (title, message) => addToast({ type: 'error', title, message }),
   info: (title, message) => addToast({ type: 'info', title, message }),
+  warning: (title, message) => addToast({ type: 'warning', title, message }),
 })
 </script>
 
@@ -128,6 +134,14 @@ defineExpose({
     0 0 20px rgba(0, 188, 212, 0.2);
 }
 
+.toast.warning {
+  border-left-color: #FFA000;
+  box-shadow: 
+    8px 8px 16px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
+    -4px -4px 8px var(--neu-shadow-light, rgba(255, 255, 255, 0.03)),
+    0 0 20px rgba(255, 160, 0, 0.2);
+}
+
 .toast-icon {
   flex-shrink: 0;
   width: 28px;
@@ -152,6 +166,10 @@ defineExpose({
 
 .toast.info .toast-icon {
   color: var(--xm-secondary, #00BCD4);
+}
+
+.toast.warning .toast-icon {
+  color: #FFA000;
 }
 
 .toast-content {

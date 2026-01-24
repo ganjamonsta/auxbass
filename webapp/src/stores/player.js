@@ -902,23 +902,29 @@ export const usePlayerStore = defineStore('player', () => {
       
       // Check if file is unavailable (503 error)
       if (error.response?.status === 503) {
+        const errorDetail = error.response?.data?.detail || 'Файл недоступен'
+        const isLargeFile = errorDetail.includes('слишком большой') || errorDetail.includes('too large') ||
+                           (track.file_size && track.file_size > 20 * 1024 * 1024)
+        
         lastError.value = {
-          type: 'unavailable',
+          type: isLargeFile ? 'too_large' : 'unavailable',
           track: track,
-          message: error.response?.data?.detail || 'Файл недоступен'
+          message: errorDetail
         }
         
-        // Mark track as unavailable
-        try {
-          await tracksApi.markUnavailable(track.id)
-          track.is_unavailable = true
-        } catch (e) {
-          console.error('Failed to mark track unavailable:', e)
+        // Only mark as unavailable if file is truly gone (not just too large)
+        if (!isLargeFile) {
+          try {
+            await tracksApi.markUnavailable(track.id)
+            track.is_unavailable = true
+          } catch (e) {
+            console.error('Failed to mark track unavailable:', e)
+          }
         }
         
         // Call callback if set
         if (onTrackUnavailableCallback) {
-          onTrackUnavailableCallback(track, lastError.value.message)
+          onTrackUnavailableCallback(track, errorDetail, isLargeFile)
         }
         
         // Auto-skip to next track

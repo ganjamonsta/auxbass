@@ -771,7 +771,6 @@
       @edit="handleEditTrack"
       @delete="handleDeleteTrack"
       @download="handleDownloadTrack"
-      @retry="handleRetryTrack"
     />
 
     <!-- Edit Track Modal -->
@@ -826,7 +825,7 @@
 import { ref, computed, onMounted, inject, nextTick, watch } from 'vue'
 import { usePlayerStore } from './stores/player'
 import { useLibraryStore } from './stores/library'
-import { playerApi, tracksApi } from './api/client'
+import { playerApi } from './api/client'
 import TrackItem from './components/TrackItem.vue'
 import TrackSkeleton from './components/TrackSkeleton.vue'
 import PlaylistItem from './components/PlaylistItem.vue'
@@ -1106,23 +1105,6 @@ const handleDownloadTrack = async (track) => {
     console.error('Failed to download track:', error)
     telegram?.HapticFeedback?.notificationOccurred?.('error')
     toast.value?.show('Не удалось отправить трек', 'error')
-  }
-}
-
-const handleRetryTrack = async (track) => {
-  try {
-    // Mark track as available again
-    await tracksApi.markAvailable(track.id)
-    track.is_unavailable = false
-    telegram?.HapticFeedback?.notificationOccurred?.('success')
-    toast.value?.show('Попробуй воспроизвести снова', 'success')
-    
-    // Attempt to play
-    player.play(track)
-  } catch (error) {
-    console.error('Failed to retry track:', error)
-    telegram?.HapticFeedback?.notificationOccurred?.('error')
-    toast.value?.show('Не удалось восстановить трек', 'error')
   }
 }
 
@@ -1406,6 +1388,16 @@ onMounted(async () => {
   if (player.hasSavedState()) {
     await player.restoreState()
   }
+  
+  // Handle unavailable tracks - show toast with helpful message
+  player.setOnTrackUnavailable((track, message, isLargeFile) => {
+    if (isLargeFile) {
+      const sizeMB = track.file_size ? (track.file_size / 1024 / 1024).toFixed(1) : '20+'
+      toast.value?.show(`Файл слишком большой (${sizeMB} MB) для стриминга. Нажмите ⋮ → Скачать`, 'warning', 6000)
+    } else {
+      toast.value?.show(message || 'Файл недоступен в Telegram', 'error')
+    }
+  })
 })
 </script>
 
@@ -1617,17 +1609,18 @@ onMounted(async () => {
   flex: 1 1 0;
   min-height: 0;  /* Allow flex shrinking for proper overflow */
   height: 0; /* Force flex to control height */
-  overflow-y: auto;
+  overflow-y: overlay; /* Overlay scrollbar - doesn't take layout space */
   overflow-x: hidden;  /* Prevent horizontal scrollbar */
   position: relative;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+  scrollbar-gutter: auto;
   -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
 }
 
-/* Content scrollbar - thin style */
+/* Content scrollbar - overlay thin style */
 .content::-webkit-scrollbar {
-  width: 4px !important;
+  width: 6px !important;
   background: transparent !important;
 }
 
@@ -1636,12 +1629,12 @@ onMounted(async () => {
 }
 
 .content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3) !important;
-  border-radius: 2px !important;
+  background: rgba(255, 255, 255, 0.25) !important;
+  border-radius: 3px !important;
 }
 
 .content::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5) !important;
+  background: rgba(255, 255, 255, 0.45) !important;
 }
 
 /* Pull to refresh */
@@ -2348,7 +2341,8 @@ onMounted(async () => {
 
 .expanded-grid {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: overlay;
+  scrollbar-gutter: auto;
   padding: 12px;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));

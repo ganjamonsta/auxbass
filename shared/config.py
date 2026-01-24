@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     # Bot
     bot_token: str
     
+    # Telegram Bot API URL (use local server to bypass 20MB limit)
+    # Default: https://api.telegram.org (20MB download limit)
+    # Local server: http://localhost:8081 (no limit)
+    telegram_api_url: str = "https://api.telegram.org"
+    
     # Database
     database_url: str = "sqlite+aiosqlite:///./tg_player.db"
     

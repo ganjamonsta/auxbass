@@ -955,8 +955,9 @@ const formatTime = (seconds) => {
   padding: 20px;
   padding-bottom: max(24px, env(safe-area-inset-bottom, 24px));
   max-height: 55%;
-  overflow-y: auto;
+  overflow-y: overlay;
   overflow-x: hidden;
+  scrollbar-gutter: auto;
   z-index: 200;
   box-shadow: 
     0 -10px 30px var(--neu-shadow-dark),
@@ -966,7 +967,7 @@ const formatTime = (seconds) => {
 }
 
 .mini-queue::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
   background: transparent;
 }
 
@@ -976,7 +977,7 @@ const formatTime = (seconds) => {
 
 .mini-queue::-webkit-scrollbar-thumb {
   background: var(--xm-accent);
-  border-radius: 2px;
+  border-radius: 3px;
 }
 
 .queue-header {

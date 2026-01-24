@@ -124,7 +124,9 @@ async def get_telegram_file_path(file_id: str) -> Optional[str]:
             return file_path
     
     # Call Telegram API using pooled session
-    api_url = f"https://api.telegram.org/bot{settings.bot_token}/getFile"
+    # Use configurable API URL (supports local Telegram Bot API server for >20MB files)
+    base_url = settings.telegram_api_url.rstrip('/')
+    api_url = f"{base_url}/bot{settings.bot_token}/getFile"
     
     session = await get_http_session()
     try:
@@ -187,9 +189,16 @@ async def get_stream_url(
     file_path = await get_telegram_file_path(track.file_id)
     
     if not file_path:
+        # Check if file is too large (>20MB limit for standard Bot API)
+        file_size_mb = (track.file_size or 0) / (1024 * 1024)
+        if file_size_mb > 20:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Файл слишком большой ({file_size_mb:.1f} MB). Telegram Bot API поддерживает скачивание только файлов до 20 MB. Используйте кнопку 'Скачать' в боте."
+            )
         raise HTTPException(
             status_code=503,
-            detail="Could not get file from Telegram. File might be too large (>20MB) or unavailable."
+            detail="Не удалось получить файл от Telegram. Файл возможно удалён или недоступен."
         )
     
     # Generate secure temporary token with cached file_path
@@ -241,7 +250,9 @@ async def stream_audio(
         raise HTTPException(status_code=503, detail="File unavailable")
     
     # Stream from Telegram through our proxy
-    telegram_url = f"https://api.telegram.org/file/bot{settings.bot_token}/{file_path}"
+    # Use configurable API URL (supports local Telegram Bot API server for >20MB files)
+    base_url = settings.telegram_api_url.rstrip('/')
+    telegram_url = f"{base_url}/file/bot{settings.bot_token}/{file_path}"
     
     # Determine content type and filename
     content_type = track.mime_type or "audio/mpeg"
@@ -518,8 +529,9 @@ async def download_track(
     if not track.is_public and track.user_id != user.id:
         raise HTTPException(status_code=403, detail="Track is private")
     
-    # Send audio via Bot API
-    api_url = f"https://api.telegram.org/bot{settings.bot_token}/sendAudio"
+    # Send audio via Bot API (sendAudio works for any file size, unlike getFile)
+    base_url = settings.telegram_api_url.rstrip('/')
+    api_url = f"{base_url}/bot{settings.bot_token}/sendAudio"
     
     caption = f"🎧 {track.artist or 'Неизвестен'} - {track.title or 'Без названия'}"
     

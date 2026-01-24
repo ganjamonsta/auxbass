@@ -148,13 +148,14 @@ const handleSelect = async (playlist) => {
 
 .playlist-list {
   max-height: calc(70vh - 70px);
-  overflow-y: auto;
+  overflow-y: overlay;
   overflow-x: hidden;
   padding: 12px;
+  scrollbar-gutter: auto;
 }
 
 .playlist-list::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
   background: transparent;
 }
 
@@ -164,7 +165,7 @@ const handleSelect = async (playlist) => {
 
 .playlist-list::-webkit-scrollbar-thumb {
   background: var(--xm-accent-glow, rgba(229, 57, 53, 0.3));
-  border-radius: 2px;
+  border-radius: 3px;
 }
 
 .create-first {
