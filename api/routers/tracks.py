@@ -711,6 +711,7 @@ class ArtistAlbumInfo(BaseModel):
     name: str
     cover_url: Optional[str] = None
     track_count: int = 0
+    release_date: Optional[str] = None  # YYYY-MM-DD format
     
     class Config:
         from_attributes = True
@@ -811,14 +812,8 @@ async def get_artist_detail(
     # Calculate totals
     total_plays = sum(t.play_count for t in track_responses)
     
-    # Get artist image
+    # Get artist image from Last.fm first
     image_url = await fetch_artist_image(artist_name)
-    if not image_url or "2a96cbd8b46e442fc41c2b86b821562f" in image_url:
-        # Fallback to track cover
-        for track, _ in tracks_data:
-            if track.cover_url:
-                image_url = track.cover_url
-                break
     
     # Build albums from actual tracks (group by album name)
     # This is more reliable than using is_auto_album playlists
@@ -839,7 +834,7 @@ async def get_artist_detail(
         if not album_data[album_key]["cover_url"] and track.cover_url:
             album_data[album_key]["cover_url"] = track.cover_url
     
-    # Check if we have auto-album playlists for these albums and get REAL track counts
+    # Check if we have auto-album playlists for these albums and get REAL track counts + release dates
     albums = []
     for album_key, data in album_data.items():
         # Try to find existing auto-album playlist
@@ -864,7 +859,8 @@ async def get_artist_detail(
                 id=existing_playlist.id,
                 name=data["name"],
                 cover_url=data["cover_url"] or existing_playlist.cover_url,
-                track_count=real_album_track_count
+                track_count=real_album_track_count,
+                release_date=existing_playlist.release_date
             ))
         else:
             # No playlist yet, use negative ID as indicator (album from tracks)
@@ -872,8 +868,31 @@ async def get_artist_detail(
                 id=-1,  # Indicates "virtual" album without playlist
                 name=data["name"],
                 cover_url=data["cover_url"],
-                track_count=len(data["track_ids"])
+                track_count=len(data["track_ids"]),
+                release_date=None
             ))
+    
+    # Sort albums by release date (newest first), albums without date go to the end
+    def album_sort_key(album):
+        if album.release_date:
+            return (0, album.release_date)  # Has date, sort descending
+        return (1, "")  # No date, put at end
+    
+    albums.sort(key=album_sort_key, reverse=True)
+    
+    # Fallback for artist image: use cover from the newest album (first after sorting)
+    if not image_url or "2a96cbd8b46e442fc41c2b86b821562f" in image_url:
+        # Use cover from newest album
+        for album in albums:
+            if album.cover_url:
+                image_url = album.cover_url
+                break
+        # If still no cover, fall back to any track cover
+        if not image_url:
+            for track, _ in tracks_data:
+                if track.cover_url:
+                    image_url = track.cover_url
+                    break
     
     # Get playlists containing this artist's tracks (user playlists, not auto)
     playlists_query = (

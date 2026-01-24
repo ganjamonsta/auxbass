@@ -208,6 +208,27 @@ class MetadataService:
         except Exception:
             return None
     
+    async def get_album_release_date(self, album_id: int) -> Optional[str]:
+        """Get release date from Deezer album details (format: YYYY-MM-DD)"""
+        await self._rate_limit()
+        session = await self._get_session()
+        
+        try:
+            async with session.get(f"{self.DEEZER_API}/album/{album_id}") as resp:
+                if resp.status != 200:
+                    return None
+                
+                data = await resp.json()
+                release_date = data.get("release_date")
+                
+                if release_date:
+                    return release_date  # Already in YYYY-MM-DD format
+                return None
+                
+        except Exception as e:
+            logger.debug(f"Failed to get album release date: {e}")
+            return None
+    
     def _guess_genre_from_text(self, title: str, artist: str) -> Optional[str]:
         """Try to guess genre from title/artist keywords"""
         text = f"{title} {artist}".lower()

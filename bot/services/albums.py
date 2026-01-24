@@ -282,6 +282,11 @@ class AlbumAssemblyService:
     ) -> Playlist:
         """Create a new auto-album playlist from tracks"""
         async with get_session() as session:
+            # Get release date from Deezer if we have album ID
+            release_date = None
+            if deezer_album_id:
+                release_date = await metadata_service.get_album_release_date(deezer_album_id)
+            
             # Store album name only, artist is separate
             playlist = Playlist(
                 user_id=user_id,
@@ -291,6 +296,7 @@ class AlbumAssemblyService:
                 is_auto_album=True,
                 deezer_album_id=deezer_album_id,
                 cover_url=cover_url,
+                release_date=release_date,
             )
             session.add(playlist)
             await session.flush()
@@ -353,6 +359,15 @@ class AlbumAssemblyService:
             if cover_url and not playlist.cover_url:
                 playlist.cover_url = cover_url
                 cover_updated = True
+            
+            # Update release_date if not set and we have deezer_album_id
+            release_date_updated = False
+            if not playlist.release_date and (deezer_album_id or playlist.deezer_album_id):
+                album_id = deezer_album_id or playlist.deezer_album_id
+                release_date = await metadata_service.get_album_release_date(album_id)
+                if release_date:
+                    playlist.release_date = release_date
+                    release_date_updated = True
             
             # Get existing track IDs in playlist
             result = await session.execute(
