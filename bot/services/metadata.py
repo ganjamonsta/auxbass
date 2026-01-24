@@ -90,10 +90,54 @@ class MetadataService:
         """Clean string for search query"""
         if not s:
             return ""
-        # Remove feat., ft., etc.
+        # Remove content in parentheses/brackets
         s = re.sub(r'\s*[\(\[].*?[\)\]]', '', s)
-        s = re.sub(r'\s*(feat\.?|ft\.?|vs\.?)\s+.*', '', s, flags=re.IGNORECASE)
+        # Remove feat., ft., prod., etc. and everything after
+        s = re.sub(r'\s*(feat\.?|ft\.?|featuring|vs\.?|prod\.?|produced\s+by)\s+.*', '', s, flags=re.IGNORECASE)
         return s.strip()
+    
+    def _normalize_artist(self, artist: str) -> str:
+        """Normalize artist name for comparison"""
+        if not artist:
+            return ""
+        # Clean and lowercase
+        artist = self._clean_string(artist).lower()
+        # Remove common separators and take first artist
+        artist = re.split(r'\s*[,&+]\s*|\s+(?:x|and|with)\s+', artist, flags=re.IGNORECASE)[0]
+        # Replace $ with s (for A$AP -> ASAP), then remove other special characters
+        artist = artist.replace('$', 's')
+        artist = re.sub(r'[^\w\s]', '', artist)
+        # Remove extra whitespace
+        artist = ' '.join(artist.split())
+        return artist.strip()
+    
+    def _artist_matches(self, source_artist: str, deezer_artist: str, threshold: float = 0.6) -> bool:
+        """Check if two artist names match (fuzzy comparison)"""
+        norm_source = self._normalize_artist(source_artist)
+        norm_deezer = self._normalize_artist(deezer_artist)
+        
+        if not norm_source or not norm_deezer:
+            return False
+        
+        # Exact match
+        if norm_source == norm_deezer:
+            return True
+        
+        # One contains the other
+        if norm_source in norm_deezer or norm_deezer in norm_source:
+            return True
+        
+        # Word-based comparison (Jaccard similarity)
+        words_source = set(norm_source.split())
+        words_deezer = set(norm_deezer.split())
+        
+        if not words_source or not words_deezer:
+            return False
+        
+        intersection = len(words_source & words_deezer)
+        union = len(words_source | words_deezer)
+        
+        return (intersection / union) >= threshold
     
     async def search_deezer(self, title: str, artist: str) -> Optional[Dict]:
         """
@@ -137,28 +181,42 @@ class MetadataService:
                 if not data.get("data"):
                     return None
                 
-                # Pick best result: prefer album tracks over singles
-                # Singles usually have album.title == track.title
+                # Pick best result: 
+                # 1. Must match artist
+                # 2. Prefer album tracks over singles (where album name = track name)
                 tracks = data["data"]
                 best_track = None
+                best_track_is_single = True
                 
                 for track in tracks:
                     album = track.get("album", {})
                     album_title = album.get("title", "")
                     track_title = track.get("title", "")
+                    deezer_artist = track.get("artist", {}).get("name", "")
                     
-                    # Skip if album name matches track name (likely a single)
-                    if album_title.lower().strip() == track_title.lower().strip():
+                    # Check if artist matches
+                    if not self._artist_matches(artist, deezer_artist):
+                        continue  # Skip tracks from different artists
+                    
+                    # Check if this is a single (album name = track name)
+                    is_single = album_title.lower().strip() == track_title.lower().strip()
+                    
+                    if is_single:
+                        # Keep as fallback if no better option
                         if best_track is None:
-                            best_track = track  # Keep as fallback
+                            best_track = track
+                            best_track_is_single = True
                         continue
                     
-                    # This is likely an album track - use it
+                    # This is an album track with matching artist - use it!
                     best_track = track
+                    best_track_is_single = False
                     break
                 
-                if best_track is None:
-                    best_track = tracks[0]  # Fall back to first result
+                # If no matching artist found, try first result as last resort
+                if best_track is None and tracks:
+                    logger.debug(f"No artist match for '{artist}', using first result")
+                    best_track = tracks[0]
                 
                 track = best_track
                 album = track.get("album", {})
@@ -277,18 +335,34 @@ class MetadataService:
                 if not data.get("data"):
                     return None
                 
-                # Find best match
+                # Find best match - must match artist if provided
                 albums = data["data"]
                 best_album = None
                 
                 for album in albums:
                     album_title = album.get("title", "").lower().strip()
+                    album_artist = album.get("artist", {}).get("name", "")
+                    
+                    # Check artist match if we have one
+                    if clean_artist and not self._artist_matches(artist, album_artist):
+                        continue  # Skip albums from different artists
+                    
+                    # Check title match
                     if album_title == clean_album.lower().strip():
                         best_album = album
                         break
+                    
+                    # Keep first artist-matching album as fallback
+                    if best_album is None:
+                        best_album = album
+                
+                # If no artist match found but we have results, use first as last resort
+                if not best_album and albums:
+                    logger.debug(f"No artist match for album '{album_name}' by '{artist}', using first result")
+                    best_album = albums[0]
                 
                 if not best_album:
-                    best_album = albums[0]
+                    return None
                 
                 album_id = best_album.get("id")
                 
@@ -377,8 +451,10 @@ class MetadataService:
             result["album"] = deezer_data.get("album")
             result["genre"] = deezer_data.get("genre")
             result["cover_url"] = deezer_data.get("cover_url")
+            result["album_id"] = deezer_data.get("album_id")  # Pass album_id for tracks
+            result["deezer_id"] = deezer_data.get("deezer_id")  # Pass track deezer_id
             result["source"] = "deezer"
-            logger.info(f"Enriched from Deezer: {title} - {artist}")
+            logger.info(f"Enriched from Deezer: {title} - {artist} -> album: {deezer_data.get('album')}")
         
         # If no genre from Deezer, try fallbacks
         if not result.get("genre"):

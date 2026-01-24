@@ -19,6 +19,35 @@ from .metadata import metadata_service
 logger = logging.getLogger(__name__)
 
 
+def normalize_artist_for_grouping(artist: str) -> str:
+    """
+    Normalize artist name for album grouping.
+    Takes first artist, removes feat./prod., normalizes case.
+    """
+    if not artist:
+        return ""
+    
+    artist = artist.lower()
+    
+    # Remove content in parentheses
+    artist = re.sub(r'\s*[\(\[].*?[\)\]]', '', artist)
+    
+    # Remove feat., ft., prod., etc. and everything after
+    artist = re.sub(r'\s*(feat\.?|ft\.?|featuring|vs\.?|prod\.?|produced\s+by)\s+.*', '', artist, flags=re.IGNORECASE)
+    
+    # Take first artist from list
+    artist = re.split(r'\s*[,&+]\s*|\s+(?:x|and|with)\s+', artist, flags=re.IGNORECASE)[0]
+    
+    # Replace $ with s, remove special chars
+    artist = artist.replace('$', 's')
+    artist = re.sub(r'[^\w\s]', '', artist)
+    
+    # Normalize whitespace
+    artist = ' '.join(artist.split())
+    
+    return artist.strip()
+
+
 def normalize_title(title: str) -> str:
     """
     Normalize track title for comparison.
@@ -151,10 +180,10 @@ class AlbumAssemblyService:
     async def get_album_candidates(self, user_id: int) -> List[Dict]:
         """
         Find potential albums from user's tracks.
-        Groups by album name (case-insensitive) as primary key.
-        This ensures tracks from different sources with same album name 
-        but different metadata (artist, deezer_album_id) are grouped together.
-        Aggregates all artists for the album.
+        Groups by (normalized album name + normalized main artist) as key.
+        This ensures tracks from different sources with same album/artist 
+        are grouped together, while albums with same name but different artists
+        remain separate.
         Returns list of album candidates with track counts.
         """
         async with get_session() as session:
@@ -170,17 +199,24 @@ class AlbumAssemblyService:
             )
             tracks = list(result.scalars().all())
             
-            # Group by album name (normalized) - this ensures all tracks
-            # with same album name are grouped together regardless of artist/source
+            # Group by (normalized album + normalized artist) to:
+            # 1. Merge tracks from same album with slight artist name variations
+            # 2. Keep albums with same name but different artists separate
             albums: Dict[str, Dict] = {}
             
             for track in tracks:
-                # Use album name as primary key (case-insensitive, trimmed)
-                key = track.album.lower().strip()
+                # Normalize album name and main artist for grouping key
+                album_key = track.album.lower().strip()
+                artist_key = normalize_artist_for_grouping(track.artist) if track.artist else ""
+                
+                # Combined key: album + normalized artist
+                key = f"{album_key}||{artist_key}"
                 
                 if key not in albums:
                     albums[key] = {
                         "album": track.album,
+                        "album_key": album_key,
+                        "artist_key": artist_key,
                         "deezer_album_ids": set(),  # Collect all deezer IDs
                         "cover_url": track.cover_url,
                         "artists": set(),
@@ -190,7 +226,7 @@ class AlbumAssemblyService:
                 
                 album_data = albums[key]
                 
-                # Collect all artists
+                # Collect all artists (original names)
                 if track.artist:
                     album_data["artists"].add(track.artist)
                 
@@ -273,11 +309,12 @@ class AlbumAssemblyService:
         self, 
         user_id: int, 
         album: str,
+        artist: str = "",
         deezer_album_id: Optional[int] = None
     ) -> Optional[Playlist]:
         """
         Check if auto-album playlist already exists for this album.
-        Searches by album name (case-insensitive) as primary match.
+        Searches by album name and optionally artist.
         """
         async with get_session() as session:
             # Get all album playlists for user
@@ -290,25 +327,33 @@ class AlbumAssemblyService:
             playlists = result.scalars().all()
             
             album_lower = album.lower().strip()
+            artist_key = normalize_artist_for_grouping(artist) if artist else ""
+            
             for pl in playlists:
                 if not pl.name:
                     continue
                     
                 name_lower = pl.name.lower().strip()
+                pl_artist_key = normalize_artist_for_grouping(pl.album_artist) if pl.album_artist else ""
                 
-                # Match by exact album name (new format)
-                if name_lower == album_lower:
-                    return pl
+                # Check album name match
+                album_matches = (
+                    name_lower == album_lower or
+                    name_lower.endswith(f" — {album_lower}") or
+                    (" — " in pl.name and pl.name.split(" — ", 1)[1].lower().strip() == album_lower)
+                )
                 
-                # Match by old format "Artist — Album"
-                if name_lower.endswith(f" — {album_lower}"):
-                    return pl
+                if not album_matches:
+                    continue
                 
-                # Match if name contains album after separator
-                if " — " in pl.name:
-                    parts = pl.name.split(" — ", 1)
-                    if len(parts) > 1 and parts[1].lower().strip() == album_lower:
+                # If we have artist info, also check artist match
+                if artist_key and pl_artist_key:
+                    # Artists must match
+                    if artist_key == pl_artist_key or artist_key in pl_artist_key or pl_artist_key in artist_key:
                         return pl
+                else:
+                    # No artist info - just album match is enough
+                    return pl
             
             return None
     
@@ -316,19 +361,19 @@ class AlbumAssemblyService:
         self, 
         user_id: int, 
         album: str,
+        artist: str = "",
         deezer_album_id: Optional[int] = None
     ) -> List[Track]:
         """
         Get all user's tracks for a specific album.
-        Groups by album name (case-insensitive) to ensure all tracks 
-        with same album name are included regardless of artist/source.
+        Groups by album name and artist (normalized) to ensure correct grouping.
         Deduplicates by title to avoid duplicate tracks from different sources.
         """
         album_lower = album.lower().strip()
+        artist_key = normalize_artist_for_grouping(artist) if artist else ""
         
         async with get_session() as session:
             # Get all tracks from user's library with album info
-            # (using Python filter because SQL LOWER() doesn't work with Cyrillic)
             result = await session.execute(
                 select(Track)
                 .join(UserLibrary, UserLibrary.track_id == Track.id)
@@ -339,11 +384,19 @@ class AlbumAssemblyService:
                 )
             )
             
-            # Filter by album name in Python (proper Unicode support)
-            all_tracks = [
-                t for t in result.scalars().all()
-                if t.album and t.album.lower().strip() == album_lower
-            ]
+            # Filter by album name and artist in Python
+            all_tracks = []
+            for t in result.scalars().all():
+                if not t.album or t.album.lower().strip() != album_lower:
+                    continue
+                
+                # If we have artist filter, check it matches
+                if artist_key:
+                    track_artist_key = normalize_artist_for_grouping(t.artist) if t.artist else ""
+                    if track_artist_key != artist_key:
+                        continue
+                
+                all_tracks.append(t)
             
             # Deduplicate by title (case-insensitive)
             # Keep the track with cover_url or higher quality metadata
@@ -610,6 +663,7 @@ class AlbumAssemblyService:
             deezer_album_id = candidate.get("deezer_album_id")
             cover_url = candidate.get("cover_url")
             all_artists = candidate.get("all_artists", [candidate.get("artist", "Unknown")])
+            main_artist = candidate.get("artist", "Unknown")
             
             # Format artist display name
             if len(all_artists) > 2:
@@ -619,14 +673,14 @@ class AlbumAssemblyService:
             else:
                 artist_display = all_artists[0] if all_artists else "Unknown"
             
-            # Check if playlist already exists
+            # Check if playlist already exists (with artist matching)
             existing = await self.check_existing_album_playlist(
-                user_id, album, deezer_album_id
+                user_id, album, main_artist, deezer_album_id
             )
             
-            # Get all tracks for this album
+            # Get all tracks for this album (with artist matching)
             tracks = await self.get_album_tracks(
-                user_id, album, deezer_album_id
+                user_id, album, main_artist, deezer_album_id
             )
             
             if existing:
