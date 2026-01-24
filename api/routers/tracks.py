@@ -827,16 +827,12 @@ async def get_artist_detail(
             album_data[album_key] = {
                 "name": track.album,
                 "cover_url": track.cover_url,
-                "release_date": track.release_date,  # Get from track
                 "track_ids": set(),
             }
         album_data[album_key]["track_ids"].add(track.id)
         # Update cover if we don't have one
         if not album_data[album_key]["cover_url"] and track.cover_url:
             album_data[album_key]["cover_url"] = track.cover_url
-        # Update release_date if we don't have one
-        if not album_data[album_key]["release_date"] and track.release_date:
-            album_data[album_key]["release_date"] = track.release_date
     
     # Check if we have auto-album playlists for these albums and get REAL track counts
     albums = []
@@ -854,9 +850,6 @@ async def get_artist_detail(
                 existing_playlist = pl
                 break
         
-        # Use release_date from tracks (more reliable than playlist)
-        release_date = data.get("release_date")
-        
         if existing_playlist:
             # Get REAL track count from PlaylistTrack table
             real_count_result = await db.execute(
@@ -865,13 +858,13 @@ async def get_artist_detail(
             )
             real_album_track_count = real_count_result.scalar() or 0
             
-            # Use playlist ID for navigation
+            # Use playlist ID for navigation, release_date from playlist
             albums.append(ArtistAlbumInfo(
                 id=existing_playlist.id,
                 name=data["name"],
                 cover_url=data["cover_url"] or existing_playlist.cover_url,
                 track_count=real_album_track_count,
-                release_date=release_date or existing_playlist.release_date
+                release_date=existing_playlist.release_date
             ))
         else:
             # No playlist yet, use negative ID as indicator (album from tracks)
@@ -880,7 +873,7 @@ async def get_artist_detail(
                 name=data["name"],
                 cover_url=data["cover_url"],
                 track_count=len(data["track_ids"]),
-                release_date=release_date
+                release_date=None
             ))
     
     # Sort albums by release date (newest first), albums without date go to the end

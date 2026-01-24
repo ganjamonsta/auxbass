@@ -62,9 +62,6 @@ class Track(Base):
     # Deezer album ID for auto-album creation
     deezer_album_id: Mapped[Optional[int]] = mapped_column(Integer)
     
-    # Album release date from Deezer (YYYY-MM-DD format)
-    release_date: Mapped[Optional[str]] = mapped_column(String(20))
-    
     # Enrichment status: pending, processing, completed, failed
     enrichment_status: Mapped[Optional[str]] = mapped_column(String(20), default="pending")
     
