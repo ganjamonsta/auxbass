@@ -9,7 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from shared.database import get_session
-from shared.models import Track, Playlist, PlaylistTrack
+from shared.models import Track, Playlist, PlaylistTrack, UserLibrary
 from sqlalchemy import select, distinct, func
 
 
@@ -21,13 +21,9 @@ async def rebuild_all_albums():
     print("🔍 Finding users with tracks...")
     
     async with get_session() as session:
-        # Get all user IDs with tracks that have album info
+        # Get all user IDs from UserLibrary (not Track.user_id!)
         result = await session.execute(
-            select(distinct(Track.user_id))
-            .where(
-                Track.album.isnot(None),
-                Track.album != ""
-            )
+            select(distinct(UserLibrary.user_id))
         )
         user_ids = [row[0] for row in result.all()]
     

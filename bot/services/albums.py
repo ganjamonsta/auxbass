@@ -199,19 +199,26 @@ class AlbumAssemblyService:
         with same album name are included regardless of artist/source.
         Deduplicates by title to avoid duplicate tracks from different sources.
         """
+        album_lower = album.lower().strip()
+        
         async with get_session() as session:
-            # Get tracks from user's library by album name
+            # Get all tracks from user's library with album info
+            # (using Python filter because SQL LOWER() doesn't work with Cyrillic)
             result = await session.execute(
                 select(Track)
                 .join(UserLibrary, UserLibrary.track_id == Track.id)
                 .where(
                     UserLibrary.user_id == user_id,
-                    func.lower(Track.album) == album.lower().strip()
+                    Track.album.isnot(None),
+                    Track.album != ""
                 )
-                .order_by(Track.title)
             )
             
-            all_tracks = list(result.scalars().all())
+            # Filter by album name in Python (proper Unicode support)
+            all_tracks = [
+                t for t in result.scalars().all()
+                if t.album and t.album.lower().strip() == album_lower
+            ]
             
             # Deduplicate by title (case-insensitive)
             # Keep the track with cover_url or higher quality metadata
