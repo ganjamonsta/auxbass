@@ -229,6 +229,83 @@ class MetadataService:
             logger.debug(f"Failed to get album release date: {e}")
             return None
     
+    async def search_deezer_album(self, album_name: str, artist: str = "") -> Optional[Dict]:
+        """
+        Search Deezer for album info by name and artist.
+        Returns: dict with album_id, release_date, cover_url
+        """
+        if not album_name:
+            return None
+        
+        await self._rate_limit()
+        session = await self._get_session()
+        
+        clean_album = self._clean_string(album_name)
+        clean_artist = self._clean_string(artist) if artist else ""
+        
+        try:
+            # Search for album
+            query = f'album:"{clean_album}"'
+            if clean_artist:
+                query += f' artist:"{clean_artist}"'
+            
+            async with session.get(
+                f"{self.DEEZER_API}/search/album",
+                params={"q": query, "limit": 5}
+            ) as resp:
+                if resp.status != 200:
+                    return None
+                
+                data = await resp.json()
+                
+                if not data.get("data"):
+                    # Try simpler search
+                    await self._rate_limit()
+                    simple_query = f"{clean_artist} {clean_album}".strip()
+                    async with session.get(
+                        f"{self.DEEZER_API}/search/album",
+                        params={"q": simple_query, "limit": 5}
+                    ) as resp2:
+                        if resp2.status == 200:
+                            data = await resp2.json()
+                
+                if not data.get("data"):
+                    return None
+                
+                # Find best match
+                albums = data["data"]
+                best_album = None
+                
+                for album in albums:
+                    album_title = album.get("title", "").lower().strip()
+                    if album_title == clean_album.lower().strip():
+                        best_album = album
+                        break
+                
+                if not best_album:
+                    best_album = albums[0]
+                
+                album_id = best_album.get("id")
+                
+                # Get release date from album details
+                release_date = None
+                if album_id:
+                    release_date = await self.get_album_release_date(album_id)
+                
+                return {
+                    "album_id": album_id,
+                    "release_date": release_date,
+                    "cover_url": best_album.get("cover_big") or best_album.get("cover_medium"),
+                    "title": best_album.get("title"),
+                }
+                
+        except asyncio.TimeoutError:
+            logger.error("Deezer album search timeout")
+            return None
+        except Exception as e:
+            logger.error(f"Deezer album search error: {e}")
+            return None
+    
     def _guess_genre_from_text(self, title: str, artist: str) -> Optional[str]:
         """Try to guess genre from title/artist keywords"""
         text = f"{title} {artist}".lower()

@@ -55,6 +55,19 @@ async def populate_release_dates():
     from bot.services.metadata import metadata_service
     
     async with get_session() as session:
+        # First, let's see stats
+        total_result = await session.execute(
+            select(Playlist).where(Playlist.is_auto_album == True)
+        )
+        all_albums = total_result.scalars().all()
+        print(f"Total auto-albums: {len(all_albums)}")
+        
+        with_deezer_id = [a for a in all_albums if a.deezer_album_id]
+        print(f"Albums with deezer_album_id: {len(with_deezer_id)}")
+        
+        without_deezer_id = [a for a in all_albums if not a.deezer_album_id]
+        print(f"Albums WITHOUT deezer_album_id: {len(without_deezer_id)}")
+        
         # Get all auto-albums with deezer_album_id but no release_date
         result = await session.execute(
             select(Playlist)
@@ -64,7 +77,7 @@ async def populate_release_dates():
         )
         albums = result.scalars().all()
         
-        print(f"Found {len(albums)} albums to update")
+        print(f"\nAlbums to update (have deezer_id, no release_date): {len(albums)}")
         
         updated = 0
         for album in albums:
@@ -78,7 +91,30 @@ async def populate_release_dates():
                 print(f"  Error for {album.name}: {e}")
         
         await session.commit()
-        print(f"Updated {updated} albums with release dates")
+        print(f"\nUpdated {updated} albums with release dates")
+        
+        # Now try to find deezer_album_id for albums that don't have it
+        print(f"\n--- Searching Deezer for {len(without_deezer_id)} albums without deezer_id ---")
+        
+        found = 0
+        for album in without_deezer_id:
+            try:
+                # Search by album name and artist
+                artist = album.album_artist or ""
+                search_result = await metadata_service.search_deezer_album(album.name, artist)
+                
+                if search_result:
+                    album.deezer_album_id = search_result.get("album_id")
+                    album.release_date = search_result.get("release_date")
+                    if not album.cover_url and search_result.get("cover_url"):
+                        album.cover_url = search_result.get("cover_url")
+                    found += 1
+                    print(f"  Found: {album.name} by {artist} -> {search_result.get('release_date')}")
+            except Exception as e:
+                print(f"  Error searching {album.name}: {e}")
+        
+        await session.commit()
+        print(f"\nFound and updated {found} additional albums from Deezer search")
     
     await metadata_service.close()
 
