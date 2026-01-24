@@ -85,7 +85,7 @@ export const authApi = {
   validate: () => api.post('/auth/validate'),
   me: () => api.get('/auth/me'),
   getConfig: () => api.get('/auth/config'),
-  telegramLogin: (data) => api.post('/auth/telegram-login', data),
+  verifyCode: (data) => api.post('/auth/verify-code', data),
   refresh: () => api.post('/auth/refresh'),
 }
 

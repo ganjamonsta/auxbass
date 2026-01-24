@@ -85,6 +85,7 @@ async def cmd_help(message: Message):
         "/start — Начало работы\n"
         "/help — Эта справка\n"
         "/library — Открыть плеер\n"
+        "/login — Код для входа в браузере\n"
         "/stats — Статистика библиотеки\n"
         '/playlist — Создать плейлист\n'
         '/playlists — Мои плейлисты\n\n'
@@ -111,6 +112,50 @@ async def cmd_library(message: Message):
         "🎵 Нажми кнопку, чтобы открыть плеер:",
         reply_markup=get_webapp_keyboard()
     )
+
+
+@router.message(Command("login", "code", "web"))
+async def cmd_login(message: Message):
+    """Handle /login command - generate auth code for browser login"""
+    import aiohttp
+    
+    user = message.from_user
+    
+    try:
+        # Request code from API
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{settings.api_url}/auth/generate-code",
+                params={
+                    "user_id": user.id,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name or "",
+                    "username": user.username or "",
+                },
+                headers={"X-Bot-Secret": settings.secret_key},
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    code = data["code"]
+                    expires_in = data["expires_in"] // 60  # to minutes
+                    
+                    await message.answer(
+                        f"🔐 <b>Код для входа в браузере:</b>\n\n"
+                        f"<code>{code}</code>\n\n"
+                        f"⏱ Код действителен {expires_in} минут.\n\n"
+                        f"🌐 Откройте <b>{settings.webapp_url}</b> в браузере "
+                        f"и введите этот код."
+                    )
+                else:
+                    await message.answer(
+                        "❌ Не удалось получить код. Попробуйте позже."
+                    )
+    except Exception as e:
+        print(f"Login code error: {e}")
+        await message.answer(
+            "❌ Ошибка подключения к серверу. Попробуйте позже."
+        )
 
 
 @router.message(Command("stats"))

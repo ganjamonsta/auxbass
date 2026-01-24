@@ -1,10 +1,12 @@
 """
 TG Player API - Authentication
-Supports both Telegram Mini App initData and Telegram Login Widget (for browser PWA)
+Supports Telegram Mini App initData and code-based browser auth
 """
 import hmac
 import hashlib
 import json
+import random
+import string
 from urllib.parse import parse_qsl, unquote
 from typing import Optional
 from datetime import datetime, timedelta
@@ -24,6 +26,11 @@ from shared.models import User
 
 router = APIRouter()
 settings = get_settings()
+
+
+# ============== In-Memory Auth Code Storage ==============
+# Format: {code: {"user_id": int, "user_data": dict, "expires": datetime}}
+auth_codes: dict = {}
 
 
 # ============== Models ==============
@@ -46,15 +53,20 @@ class AuthResult(BaseModel):
     token: Optional[str] = None  # JWT token for browser auth
 
 
-class TelegramLoginData(BaseModel):
-    """Data from Telegram Login Widget"""
-    id: int
-    first_name: str
-    last_name: Optional[str] = None
-    username: Optional[str] = None
-    photo_url: Optional[str] = None
-    auth_date: int
-    hash: str
+class CodeRequest(BaseModel):
+    """Request for auth code"""
+    user_id: int
+
+
+class CodeVerify(BaseModel):
+    """Verify auth code"""
+    code: str
+
+
+class CodeGenerated(BaseModel):
+    """Generated auth code response (for bot)"""
+    code: str
+    expires_in: int  # seconds
 
 
 # ============== JWT Functions ==============
@@ -149,50 +161,19 @@ def parse_user_from_init_data(parsed_data: dict) -> Optional[TelegramUser]:
         return None
 
 
-# ============== Telegram Login Widget Auth ==============
+# ============== Code-Based Auth ==============
 
-def validate_telegram_login(data: dict, bot_token: str) -> bool:
-    """
-    Validate data from Telegram Login Widget
-    https://core.telegram.org/widgets/login#checking-authorization
-    """
-    try:
-        check_hash = data.pop("hash", None)
-        if not check_hash:
-            return False
-        
-        # Create data-check-string (sorted alphabetically)
-        data_check_string = "\n".join(
-            f"{k}={v}" for k, v in sorted(data.items()) if v is not None
-        )
-        
-        # Secret key is SHA256 hash of bot token
-        secret_key = hashlib.sha256(bot_token.encode("utf-8")).digest()
-        
-        # Calculate hash
-        calculated_hash = hmac.new(
-            secret_key,
-            data_check_string.encode("utf-8"),
-            hashlib.sha256
-        ).hexdigest()
-        
-        # Restore hash for later use
-        data["hash"] = check_hash
-        
-        # Verify hash
-        if calculated_hash != check_hash:
-            return False
-        
-        # Check auth_date (reject if older than 1 day)
-        auth_date = int(data.get("auth_date", 0))
-        now = int(datetime.utcnow().timestamp())
-        if now - auth_date > 86400:
-            return False
-        
-        return True
-        
-    except Exception:
-        return False
+def generate_auth_code() -> str:
+    """Generate 6-digit auth code"""
+    return ''.join(random.choices(string.digits, k=6))
+
+
+def cleanup_expired_codes():
+    """Remove expired codes from storage"""
+    now = datetime.utcnow()
+    expired = [code for code, data in auth_codes.items() if data["expires"] < now]
+    for code in expired:
+        del auth_codes[code]
 
 
 # ============== Unified Auth Dependency ==============
@@ -297,37 +278,76 @@ async def get_me(user: TelegramUser = Depends(get_current_user)):
     return user
 
 
-@router.post("/telegram-login", response_model=AuthResult)
-async def telegram_login(data: TelegramLoginData):
+@router.post("/generate-code", response_model=CodeGenerated)
+async def generate_code_for_user(
+    user_id: int,
+    first_name: str,
+    last_name: Optional[str] = None,
+    username: Optional[str] = None,
+    x_bot_secret: str = Header(..., alias="X-Bot-Secret"),
+):
     """
-    Authenticate via Telegram Login Widget.
-    Used for browser/PWA authentication.
+    Generate auth code for user (called by bot).
+    Bot must provide secret key for security.
     """
-    # Convert to dict for validation
-    login_data = {
-        "id": data.id,
-        "first_name": data.first_name,
-        "auth_date": data.auth_date,
-        "hash": data.hash,
-    }
-    if data.last_name:
-        login_data["last_name"] = data.last_name
-    if data.username:
-        login_data["username"] = data.username
-    if data.photo_url:
-        login_data["photo_url"] = data.photo_url
+    # Verify bot secret
+    if x_bot_secret != settings.secret_key:
+        raise HTTPException(status_code=403, detail="Invalid bot secret")
     
-    # Validate the login data
-    if not validate_telegram_login(login_data.copy(), settings.bot_token):
-        raise HTTPException(status_code=401, detail="Invalid Telegram login data")
+    # Cleanup expired codes
+    cleanup_expired_codes()
+    
+    # Remove any existing codes for this user
+    existing = [code for code, data in auth_codes.items() if data["user_id"] == user_id]
+    for code in existing:
+        del auth_codes[code]
+    
+    # Generate new code
+    code = generate_auth_code()
+    expires_in = 300  # 5 minutes
+    
+    auth_codes[code] = {
+        "user_id": user_id,
+        "user_data": {
+            "id": user_id,
+            "first_name": first_name,
+            "last_name": last_name,
+            "username": username,
+        },
+        "expires": datetime.utcnow() + timedelta(seconds=expires_in)
+    }
+    
+    return CodeGenerated(code=code, expires_in=expires_in)
+
+
+@router.post("/verify-code", response_model=AuthResult)
+async def verify_auth_code(data: CodeVerify):
+    """
+    Verify auth code and return JWT token.
+    Used for browser authentication.
+    """
+    # Cleanup expired codes
+    cleanup_expired_codes()
+    
+    code = data.code.strip()
+    
+    if code not in auth_codes:
+        raise HTTPException(status_code=401, detail="Неверный или истёкший код")
+    
+    code_data = auth_codes[code]
+    
+    # Check expiration
+    if datetime.utcnow() > code_data["expires"]:
+        del auth_codes[code]
+        raise HTTPException(status_code=401, detail="Код истёк")
     
     # Create user object
+    user_data = code_data["user_data"]
     user = TelegramUser(
-        id=data.id,
-        first_name=data.first_name,
-        last_name=data.last_name,
-        username=data.username,
-        photo_url=data.photo_url,
+        id=user_data["id"],
+        first_name=user_data["first_name"],
+        last_name=user_data.get("last_name"),
+        username=user_data.get("username"),
     )
     
     # Ensure user in database
@@ -336,6 +356,9 @@ async def telegram_login(data: TelegramLoginData):
     # Create JWT token
     token = create_jwt_token(user)
     
+    # Remove used code
+    del auth_codes[code]
+    
     return AuthResult(valid=True, user=user, token=token)
 
 
@@ -343,11 +366,10 @@ async def telegram_login(data: TelegramLoginData):
 async def get_auth_config():
     """
     Get authentication configuration for frontend.
-    Returns bot username for Telegram Login Widget.
     """
     return {
         "bot_username": settings.bot_username,
-        "telegram_login_enabled": bool(settings.bot_username),
+        "auth_method": "code",  # Changed from widget to code
     }
 
 
