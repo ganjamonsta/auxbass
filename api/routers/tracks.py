@@ -7,7 +7,7 @@ import aiohttp
 from typing import Optional, List
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 from sqlalchemy import select, func, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -684,11 +684,15 @@ async def fetch_artist_image(artist_name: str) -> Optional[str]:
 @router.get("/artist-image/{artist_name:path}")
 async def get_artist_image(
     artist_name: str,
+    response: Response,
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get artist image URL from newest album with release_date"""
     from shared.models import Playlist
+    
+    # Set cache headers - cache for 24 hours (artist images rarely change)
+    response.headers["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=604800"
     
     # First try Last.fm
     image_url = await fetch_artist_image(artist_name)

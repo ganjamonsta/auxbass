@@ -9,7 +9,40 @@ export const useLibraryStore = defineStore('library', () => {
   const artists = ref([])
   const globalArtists = ref([])  // All artists from global library
   const artistScope = ref('library')  // 'library' or 'global'
-  const artistImages = ref({})  // Cache for artist images
+  // LocalStorage key and TTL for artist images cache
+  const ARTIST_IMAGES_CACHE_KEY = 'tg_player_artist_images'
+  const ARTIST_IMAGES_CACHE_TTL = 24 * 60 * 60 * 1000 // 24 hours
+  
+  // Load artist images from localStorage
+  const loadArtistImagesFromCache = () => {
+    try {
+      const cached = localStorage.getItem(ARTIST_IMAGES_CACHE_KEY)
+      if (cached) {
+        const { data, timestamp } = JSON.parse(cached)
+        // Check if cache is still valid
+        if (Date.now() - timestamp < ARTIST_IMAGES_CACHE_TTL) {
+          return data
+        }
+      }
+    } catch (e) {
+      // Ignore cache errors
+    }
+    return {}
+  }
+  
+  // Save artist images to localStorage
+  const saveArtistImagesToCache = (images) => {
+    try {
+      localStorage.setItem(ARTIST_IMAGES_CACHE_KEY, JSON.stringify({
+        data: images,
+        timestamp: Date.now()
+      }))
+    } catch (e) {
+      // Ignore cache errors (e.g., quota exceeded)
+    }
+  }
+  
+  const artistImages = ref(loadArtistImagesFromCache())  // Cache for artist images with persistence
   const genres = ref([])
   const history = ref([])
   const likedTracks = ref([])  // Liked tracks
@@ -221,19 +254,29 @@ export const useLibraryStore = defineStore('library', () => {
   const fetchArtistImages = async (artistList) => {
     const BATCH_SIZE = 5  // Load 5 at a time
     const DELAY_MS = 100  // Small delay between batches
+    let hasNewImages = false
     
-    for (let i = 0; i < artistList.length; i += BATCH_SIZE) {
-      const batch = artistList.slice(i, i + BATCH_SIZE)
+    // Filter out artists we already have cached (including null = no image)
+    const uncachedArtists = artistList.filter(artist => artistImages.value[artist.artist] === undefined)
+    
+    if (uncachedArtists.length === 0) return  // All cached, skip API calls
+    
+    for (let i = 0; i < uncachedArtists.length; i += BATCH_SIZE) {
+      const batch = uncachedArtists.slice(i, i + BATCH_SIZE)
       
       // Process batch in parallel
       await Promise.all(batch.map(async (artist) => {
         const name = artist.artist
-        if (artistImages.value[name]) return
         
         try {
           const response = await tracksApi.getArtistImage(name)
           if (response.data.image_url) {
             artistImages.value[name] = response.data.image_url
+            hasNewImages = true
+          } else {
+            // Cache null result to avoid re-fetching
+            artistImages.value[name] = null
+            hasNewImages = true
           }
         } catch (error) {
           // Ignore errors, just skip this artist
@@ -241,15 +284,26 @@ export const useLibraryStore = defineStore('library', () => {
       }))
       
       // Small delay to not overload API
-      if (i + BATCH_SIZE < artistList.length) {
+      if (i + BATCH_SIZE < uncachedArtists.length) {
         await new Promise(resolve => setTimeout(resolve, DELAY_MS))
       }
+    }
+    
+    // Persist to localStorage after batch fetch
+    if (hasNewImages) {
+      saveArtistImagesToCache(artistImages.value)
     }
   }
 
   // Get artist image (from cache or placeholder)
   const getArtistImage = (artistName) => {
     return artistImages.value[artistName] || null
+  }
+  
+  // Clear artist images cache (for forced refresh)
+  const clearArtistImagesCache = () => {
+    artistImages.value = {}
+    localStorage.removeItem(ARTIST_IMAGES_CACHE_KEY)
   }
 
   // Fetch genres
@@ -631,6 +685,7 @@ export const useLibraryStore = defineStore('library', () => {
     fetchHistory,
     fetchLikedTracks,
     getArtistImage,
+    clearArtistImagesCache,
     createPlaylist,
     deletePlaylist,
     addTrackToPlaylist,
