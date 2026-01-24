@@ -239,6 +239,12 @@ export const usePlayerStore = defineStore('player', () => {
   // Flag to prevent error auto-skip during track change
   let isSkipping = false
   
+  // Protection against cascading skips
+  let consecutiveSkipCount = 0
+  let lastSkipTime = 0
+  const MAX_CONSECUTIVE_SKIPS = 3
+  const SKIP_RESET_TIMEOUT = 5000  // Reset counter after 5 seconds of stable playback
+  
   // Callback for track unavailable
   let onTrackUnavailableCallback = null
   const setOnTrackUnavailable = (callback) => {
@@ -637,19 +643,45 @@ export const usePlayerStore = defineStore('player', () => {
       console.error('Audio error:', e)
       loading.value = false
       
-      // Ignore errors during track change (src change can trigger ABORTED)
+      const errorCode = audio.value?.error?.code
+      const errorMsg = audio.value?.error?.message || 'Ошибка воспроизведения'
+      
+      // Error code 1 = ABORTED - this is normal during src change, always ignore
+      if (errorCode === 1) {
+        console.log('[Audio Error] ABORTED (code 1) - normal during src change, ignoring')
+        return
+      }
+      
+      // Ignore errors during track change
       if (isSkipping) {
         console.log('[Audio Error] Ignoring error during track skip')
         return
       }
       
-      // Auto-skip on audio element errors (network issues, decode errors, etc.)
-      // Error codes: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED
-      const errorCode = audio.value?.error?.code
-      const errorMsg = audio.value?.error?.message || 'Ошибка воспроизведения'
+      // Protection against cascading skips
+      const now = Date.now()
+      if (now - lastSkipTime < 2000) {
+        consecutiveSkipCount++
+      } else {
+        consecutiveSkipCount = 1
+      }
+      lastSkipTime = now
       
+      if (consecutiveSkipCount > MAX_CONSECUTIVE_SKIPS) {
+        console.warn(`[Audio Error] Too many consecutive skips (${consecutiveSkipCount}), stopping`)
+        lastError.value = {
+          type: 'cascade_error',
+          track: currentTrack.value,
+          message: 'Слишком много ошибок подряд, воспроизведение остановлено'
+        }
+        isPlaying.value = false
+        return
+      }
+      
+      // Auto-skip on audio element errors (network issues, decode errors, etc.)
+      // Error codes: 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED
       if (errorCode && errorCode >= 2) {
-        console.warn(`[Audio Error] Code ${errorCode}: ${errorMsg}, auto-skipping`)
+        console.warn(`[Audio Error] Code ${errorCode}: ${errorMsg}, auto-skipping (${consecutiveSkipCount}/${MAX_CONSECUTIVE_SKIPS})`)
         lastError.value = {
           type: 'audio_error',
           track: currentTrack.value,
@@ -762,6 +794,7 @@ export const usePlayerStore = defineStore('player', () => {
     audio.value.addEventListener('play', () => {
       isPlaying.value = true
       isSkipping = false  // Reset skip flag on successful playback
+      consecutiveSkipCount = 0  // Reset consecutive skip counter
       updatePlaybackState()
       startStateSaving()
     })
@@ -776,18 +809,44 @@ export const usePlayerStore = defineStore('player', () => {
       console.error('Audio error:', e)
       loading.value = false
       
+      const errorCode = audio.value?.error?.code
+      const errorMsg = audio.value?.error?.message || 'Ошибка воспроизведения'
+      
+      // Error code 1 = ABORTED - this is normal during src change, always ignore
+      if (errorCode === 1) {
+        console.log('[Audio Error] ABORTED (code 1) - normal during src change, ignoring')
+        return
+      }
+      
       // Ignore errors during track change
       if (isSkipping) {
         console.log('[Audio Error] Ignoring error during track skip')
         return
       }
       
-      // Auto-skip on audio element errors (network issues, decode errors, etc.)
-      const errorCode = audio.value?.error?.code
-      const errorMsg = audio.value?.error?.message || 'Ошибка воспроизведения'
+      // Protection against cascading skips
+      const now = Date.now()
+      if (now - lastSkipTime < 2000) {
+        consecutiveSkipCount++
+      } else {
+        consecutiveSkipCount = 1
+      }
+      lastSkipTime = now
       
+      if (consecutiveSkipCount > MAX_CONSECUTIVE_SKIPS) {
+        console.warn(`[Audio Error] Too many consecutive skips (${consecutiveSkipCount}), stopping`)
+        lastError.value = {
+          type: 'cascade_error',
+          track: currentTrack.value,
+          message: 'Слишком много ошибок подряд, воспроизведение остановлено'
+        }
+        isPlaying.value = false
+        return
+      }
+      
+      // Auto-skip on audio element errors (network issues, decode errors, etc.)
       if (errorCode && errorCode >= 2) {
-        console.warn(`[Audio Error] Code ${errorCode}: ${errorMsg}, auto-skipping`)
+        console.warn(`[Audio Error] Code ${errorCode}: ${errorMsg}, auto-skipping (${consecutiveSkipCount}/${MAX_CONSECUTIVE_SKIPS})`)
         lastError.value = {
           type: 'audio_error',
           track: currentTrack.value,
@@ -1160,6 +1219,27 @@ export const usePlayerStore = defineStore('player', () => {
       const statusCode = error.response?.status
       const errorDetail = error.response?.data?.detail || error.message || 'Ошибка воспроизведения'
       
+      // Protection against cascading skips
+      const now = Date.now()
+      if (now - lastSkipTime < 2000) {
+        consecutiveSkipCount++
+      } else {
+        consecutiveSkipCount = 1
+      }
+      lastSkipTime = now
+      
+      if (consecutiveSkipCount > MAX_CONSECUTIVE_SKIPS) {
+        console.warn(`[Play] Too many consecutive errors (${consecutiveSkipCount}), stopping playback`)
+        lastError.value = {
+          type: 'cascade_error',
+          track: track,
+          message: 'Слишком много ошибок подряд, воспроизведение остановлено'
+        }
+        isPlaying.value = false
+        loading.value = false
+        return
+      }
+      
       // Check if file is unavailable (503 error)
       if (statusCode === 503) {
         const isLargeFile = errorDetail.includes('слишком большой') || errorDetail.includes('too large') ||
@@ -1320,49 +1400,57 @@ export const usePlayerStore = defineStore('player', () => {
     }
     
     // Priority 2: Use preloaded Audio element
+    // But first check if the URL token is still valid (not expired)
+    const preloadedUrlStillValid = getCachedUrl(nextTrack.id) !== null
     const preloadedAudio = getPreloadedAudio(nextTrack.id)
+    
     if (preloadedAudio && preloadedAudio.readyState >= 2) {
-      console.log('[Next] Using preloaded Audio element, readyState:', preloadedAudio.readyState)
-      
-      if (audio.value) {
-        audio.value.pause()
-        audio.value.src = ''
-      }
-      
-      const oldAudio = audio.value
-      audio.value = preloadedAudio
-      audio.value.volume = volume.value
-      audio.value.muted = isMuted.value
-      
-      reattachAudioListeners()
-      
-      loading.value = true
-      currentTrack.value = nextTrack
-      updateMediaSession()
-      
-      try {
-        await audio.value.play()
-        loading.value = false
-        isSkipping = false  // Success - reset skip flag
-        nextTrackPreloaded.value = null
-        
-        preloadAudio = oldAudio || new Audio()
-        preloadAudio.preload = 'auto'
-        preloadAudio.volume = 0
-        preloadTrackId = null
-        
-        persistState()
-        preloadNextTracks()
-        return
-      } catch (e) {
-        console.error('[Next] Failed to play preloaded audio, falling back:', e)
-        // Restore old audio and continue to next priority
-        audio.value = oldAudio
-        if (oldAudio) {
-          reattachAudioListeners()
-        }
-        // Clear the broken preload
+      if (!preloadedUrlStillValid) {
+        console.log('[Next] Preloaded audio exists but URL token expired, skipping to fetch new URL')
         clearPreloadAudio()
+      } else {
+        console.log('[Next] Using preloaded Audio element, readyState:', preloadedAudio.readyState)
+      
+        if (audio.value) {
+          audio.value.pause()
+          audio.value.src = ''
+        }
+      
+        const oldAudio = audio.value
+        audio.value = preloadedAudio
+        audio.value.volume = volume.value
+        audio.value.muted = isMuted.value
+      
+        reattachAudioListeners()
+      
+        loading.value = true
+        currentTrack.value = nextTrack
+        updateMediaSession()
+      
+        try {
+          await audio.value.play()
+          loading.value = false
+          isSkipping = false  // Success - reset skip flag
+          nextTrackPreloaded.value = null
+        
+          preloadAudio = oldAudio || new Audio()
+          preloadAudio.preload = 'auto'
+          preloadAudio.volume = 0
+          preloadTrackId = null
+        
+          persistState()
+          preloadNextTracks()
+          return
+        } catch (e) {
+          console.error('[Next] Failed to play preloaded audio, falling back:', e)
+          // Restore old audio and continue to next priority
+          audio.value = oldAudio
+          if (oldAudio) {
+            reattachAudioListeners()
+          }
+          // Clear the broken preload
+          clearPreloadAudio()
+        }
       }
     }
     
