@@ -9,14 +9,14 @@ from collections import defaultdict
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from shared.database import get_session, init_database
+from shared.database import get_session, init_db
 from shared.models import Playlist, PlaylistTrack, Track
 from sqlalchemy import select, func, delete
 
 
 async def merge_duplicate_albums():
     """Find and merge duplicate auto-album playlists"""
-    await init_database()
+    await init_db()
     
     async with get_session() as session:
         # Get all auto-album playlists
