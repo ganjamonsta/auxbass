@@ -339,8 +339,8 @@ const formatTime = (seconds) => {
 }
 
 .lcd-dot.buffered {
-  background: var(--xm-secondary);
-  box-shadow: 0 0 4px rgba(0, 188, 212, 0.5);
+  background: rgba(0, 188, 212, 0.35);
+  box-shadow: none;
 }
 
 .lcd-dot.next {
