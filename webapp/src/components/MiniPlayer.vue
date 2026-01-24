@@ -183,7 +183,7 @@ const formatTime = (seconds) => {
   background: var(--xm-bg-elevated);
   border-radius: var(--neu-radius-lg);
   cursor: pointer;
-  z-index: 60;
+  z-index: 70; /* Above expanded-section (z-index: 60) */
   overflow: visible;
   box-shadow: 
     6px 6px 12px var(--neu-shadow-dark),

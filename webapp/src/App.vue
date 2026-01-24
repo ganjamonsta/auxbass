@@ -698,7 +698,7 @@
     />
 
     <!-- Bottom Tab Bar (One UI style) -->
-    <nav v-if="currentView === 'library'" class="tab-bar">
+    <nav v-if="currentView === 'library' && !expandedSection" class="tab-bar">
       <button 
         :class="['tab-item', { active: activeTab === 'home' }]"
         @click="switchTab('home', () => library.fetchHistory())"
@@ -2434,6 +2434,7 @@ onMounted(async () => {
   overflow-y: overlay;
   scrollbar-gutter: auto;
   padding: 12px;
+  padding-bottom: 120px; /* Space for MiniPlayer */
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
   gap: 12px;
