@@ -8,7 +8,25 @@
   <LoginPage v-else-if="!isAuthenticated" @login="handleLogin" />
   
   <!-- Main app for authenticated users -->
-  <div v-else class="app spotify-theme">
+  <div v-else class="app spotify-theme" :class="{ 'desktop-layout': isDesktop }">
+    <!-- Desktop Sidebar -->
+    <Sidebar 
+      v-if="isDesktop"
+      :activeTab="activeTab"
+      :playlists="library.playlists"
+      :trackCount="library.total"
+      :artistCount="library.artists.length"
+      :likedCount="library.likedTracks.length"
+      :historyCount="library.history.length"
+      :userName="userDisplayName"
+      @navigate="handleSidebarNavigate"
+      @openPlaylist="openPlaylist"
+      @createPlaylist="createPlaylist"
+      @logout="handleLogout"
+    />
+
+    <!-- Main Content Wrapper -->
+    <div class="main-content-wrapper">
     <!-- One UI Style Header with Animated Search -->
     <header class="oneui-header" v-if="currentView === 'library'">
       <div class="header-row">
@@ -824,9 +842,9 @@
       </Transition>
     </main>
 
-    <!-- Mini Player (above tab bar in flex layout) -->
+    <!-- Mini Player (above tab bar in flex layout) - mobile only -->
     <MiniPlayer 
-      v-if="player.currentTrack && currentView === 'library'"
+      v-if="player.currentTrack && currentView === 'library' && !isDesktop"
       :track="player.currentTrack"
       :isPlaying="player.isPlaying"
       :loading="player.loading"
@@ -838,8 +856,8 @@
       @expand="showFullPlayer = true"
     />
 
-    <!-- Bottom Tab Bar (One UI style) -->
-    <nav v-if="currentView === 'library' && !expandedSection" class="tab-bar">
+    <!-- Bottom Tab Bar (One UI style) - mobile only -->
+    <nav v-if="currentView === 'library' && !expandedSection && !isDesktop" class="tab-bar">
       <button 
         :class="['tab-item', { active: activeTab === 'home' }]"
         @click="switchTab('home', () => library.fetchHistory())"
@@ -974,11 +992,35 @@
         </div>
       </div>
     </Transition>
+    </div><!-- End main-content-wrapper -->
+
+    <!-- Desktop Floating Player -->
+    <FloatingPlayer 
+      v-if="isDesktop && player.currentTrack"
+      :track="player.currentTrack"
+      :isPlaying="player.isPlaying"
+      :loading="player.loading"
+      :progress="player.progress"
+      :duration="player.duration"
+      :buffered="player.buffered"
+      :volume="player.volume"
+      :isMuted="player.isMuted"
+      :shuffle="player.shuffle"
+      :repeat="player.repeat"
+      @toggle="player.toggle()"
+      @prev="player.prev()"
+      @next="player.next()"
+      @expand="showFullPlayer = true"
+      @toggleShuffle="player.toggleShuffle()"
+      @toggleRepeat="player.toggleRepeat()"
+      @toggleMute="player.toggleMute()"
+      @setVolume="player.setVolume($event)"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, inject, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, inject, nextTick, watch } from 'vue'
 import { usePlayerStore } from './stores/player'
 import { useLibraryStore } from './stores/library'
 import { playerApi, authStorage } from './api/client'
@@ -993,6 +1035,8 @@ import ConfirmDialog from './components/ConfirmDialog.vue'
 import PlaylistPicker from './components/PlaylistPicker.vue'
 import EnrichmentStatus from './components/EnrichmentStatus.vue'
 import GlobalLibrary from './components/GlobalLibrary.vue'
+import Sidebar from './components/Sidebar.vue'
+import FloatingPlayer from './components/FloatingPlayer.vue'
 import ArtistCard from './components/ArtistCard.vue'
 import Toast from './components/Toast.vue'
 import LoginPage from './components/LoginPage.vue'
@@ -1105,6 +1149,12 @@ const contentRef = ref(null)
 
 // Toast ref
 const toast = ref(null)
+
+// Responsive detection
+const isDesktop = ref(window.innerWidth >= 1024)
+const updateDesktopState = () => {
+  isDesktop.value = window.innerWidth >= 1024
+}
 
 // State
 const currentView = ref('library')
@@ -1281,6 +1331,33 @@ const switchTab = (tab, callback = null) => {
     // Переключаем таб
     activeTab.value = tab
     if (callback) callback()
+  }
+}
+
+// Handle sidebar navigation
+const handleSidebarNavigate = (tab) => {
+  currentView.value = 'library'
+  currentPlaylist.value = null
+  expandedSection.value = null
+  
+  // Map sidebar tabs to actual tabs with callbacks
+  const tabCallbacks = {
+    'home': () => library.fetchHistory(),
+    'tracks': null,
+    'liked': null,
+    'history': null,
+    'artists': () => library.fetchArtists(),
+    'explore': () => library.fetchGlobalStats(),
+    'playlists': null,
+    'search': () => { showSearch.value = true; nextTick(() => searchInput.value?.focus()) }
+  }
+  
+  if (tab === 'search') {
+    showSearch.value = true
+    activeTab.value = 'search'
+    nextTick(() => searchInput.value?.focus())
+  } else {
+    switchTab(tab, tabCallbacks[tab])
   }
 }
 
@@ -1746,6 +1823,9 @@ const handleTouchEnd = async () => {
 onMounted(async () => {
   document.body.classList.add('spotify-theme')
   
+  // Desktop detection
+  window.addEventListener('resize', updateDesktopState)
+  
   // Check authentication first
   checkAuth()
   
@@ -1776,6 +1856,7 @@ onMounted(async () => {
 // Cleanup on unmount
 onUnmounted(() => {
   window.removeEventListener('auth:logout', onAuthLogout)
+  window.removeEventListener('resize', updateDesktopState)
 })
 </script>
 
@@ -1810,6 +1891,100 @@ onUnmounted(() => {
   overflow: hidden;
   background-color: var(--spotify-black);
   color: var(--spotify-text);
+}
+
+/* Desktop Layout */
+.app.desktop-layout {
+  flex-direction: row;
+  height: 100vh;
+  max-height: 100vh;
+}
+
+.app.desktop-layout .main-content-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+}
+
+.main-content-wrapper {
+  display: contents;
+}
+
+/* Desktop adjustments */
+@media (min-width: 1024px) {
+  .app.desktop-layout .content {
+    padding-bottom: 20px;
+  }
+  
+  .app.desktop-layout .oneui-header {
+    padding: 16px 24px;
+    background: transparent;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  
+  .app.desktop-layout .header-title-main {
+    font-size: 28px;
+  }
+  
+  .app.desktop-layout .library {
+    padding: 0 24px;
+  }
+  
+  .app.desktop-layout .track-item {
+    border-radius: 8px;
+    margin-bottom: 2px;
+  }
+  
+  .app.desktop-layout .track-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+  
+  .app.desktop-layout .feed-section-title {
+    font-size: 24px;
+    margin-bottom: 20px;
+  }
+  
+  .app.desktop-layout .quick-grid {
+    gap: 16px;
+  }
+  
+  .app.desktop-layout .quick-item {
+    padding: 16px;
+    border-radius: 8px;
+  }
+  
+  /* Wider horizontal scroll sections */
+  .app.desktop-layout .horizontal-scroll {
+    gap: 20px;
+  }
+  
+  .app.desktop-layout .feed-card {
+    min-width: 180px;
+  }
+  
+  .app.desktop-layout .feed-card-cover {
+    width: 160px;
+    height: 160px;
+  }
+}
+
+/* Wide desktop (1440px+) */
+@media (min-width: 1440px) {
+  .app.desktop-layout .library {
+    padding: 0 40px;
+    max-width: 1600px;
+  }
+  
+  .app.desktop-layout .feed-card {
+    min-width: 200px;
+  }
+  
+  .app.desktop-layout .feed-card-cover {
+    width: 180px;
+    height: 180px;
+  }
 }
 
 /* One UI Large Header */
