@@ -386,29 +386,12 @@ const getPlaylistCoverStyle = (playlist) => {
 }
 
 .playlists-section {
-  flex: 1;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
 .playlists-list {
-  flex: 1;
-  overflow-y: auto;
   padding-bottom: 8px;
-}
-
-.playlists-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.playlists-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.playlists-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 3px;
 }
 
 .playlist-item {
@@ -442,14 +425,12 @@ const getPlaylistCoverStyle = (playlist) => {
 
 /* Album specific styles */
 .albums-section {
-  max-height: 200px;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
 .albums-section .playlists-list {
-  overflow-y: auto;
+  /* albums show all */
 }
 
 .album-cover {
@@ -495,6 +476,10 @@ const getPlaylistCoverStyle = (playlist) => {
   display: flex;
   align-items: center;
   gap: 12px;
+  background: #0a0a0a;
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
 }
 
 .user-info {
