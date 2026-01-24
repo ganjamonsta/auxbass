@@ -148,12 +148,6 @@ const handleDownload = () => {
   emit('download', props.track)
   emit('close')
 }
-
-const handleDownload = () => {
-  haptic('light')
-  emit('download', props.track)
-  emit('close')
-}
 </script>
 
 <style scoped>
