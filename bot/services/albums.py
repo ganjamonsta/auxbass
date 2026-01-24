@@ -3,7 +3,9 @@ TG Player - Auto Album Assembly Service
 Automatically creates playlists from tracks with matching album/artist
 """
 import logging
-from typing import Optional, List, Dict
+import re
+import unicodedata
+from typing import Optional, List, Dict, Tuple
 from sqlalchemy import select, func, delete
 
 import sys
@@ -15,6 +17,129 @@ from shared.models import Track, Playlist, PlaylistTrack, UserLibrary
 from .metadata import metadata_service
 
 logger = logging.getLogger(__name__)
+
+
+def normalize_title(title: str) -> str:
+    """
+    Normalize track title for comparison.
+    - Convert to lowercase
+    - Remove content in parentheses (feat., remix, mix, etc.)
+    - Remove special characters and extra spaces
+    - Normalize unicode characters
+    """
+    if not title:
+        return ""
+    
+    # Normalize unicode (e.g., curly apostrophes -> straight)
+    title = unicodedata.normalize('NFKD', title)
+    
+    # Convert to lowercase
+    title = title.lower()
+    
+    # Remove content in parentheses (often contains feat., remix, mix, etc.)
+    title = re.sub(r'\s*\([^)]*\)', '', title)
+    title = re.sub(r'\s*\[[^\]]*\]', '', title)
+    
+    # Remove "feat." / "ft." and everything after
+    title = re.sub(r'\s*(feat\.?|ft\.?)\s+.*$', '', title, flags=re.IGNORECASE)
+    
+    # Replace special apostrophes with regular ones, then remove them
+    title = title.replace("'", "'").replace("'", "'").replace("`", "'")
+    title = title.replace("'", "")  # Remove apostrophes completely for matching
+    
+    # Remove special characters but keep letters, numbers, spaces
+    title = re.sub(r"[^\w\s]", '', title)
+    
+    # Normalize spaces
+    title = ' '.join(title.split())
+    
+    return title.strip()
+
+
+def fuzzy_match_title(title1: str, title2: str) -> float:
+    """
+    Calculate similarity between two titles (0.0 to 1.0).
+    Uses normalized comparison and partial matching.
+    """
+    norm1 = normalize_title(title1)
+    norm2 = normalize_title(title2)
+    
+    if not norm1 or not norm2:
+        return 0.0
+    
+    # Exact match after normalization
+    if norm1 == norm2:
+        return 1.0
+    
+    # Compare without spaces (for cases like "cartier god" vs "cartiergod")
+    compact1 = norm1.replace(" ", "")
+    compact2 = norm2.replace(" ", "")
+    
+    if compact1 == compact2:
+        return 1.0
+    
+    # One contains the other (for cases like "SmartWater" vs "Smartwater")
+    if norm1 in norm2 or norm2 in norm1:
+        return 0.9
+    
+    # Check compact versions
+    if compact1 in compact2 or compact2 in compact1:
+        return 0.85
+    
+    # Word-based comparison
+    words1 = set(norm1.split())
+    words2 = set(norm2.split())
+    
+    if not words1 or not words2:
+        return 0.0
+    
+    # Jaccard similarity of words
+    intersection = len(words1 & words2)
+    union = len(words1 | words2)
+    
+    if union == 0:
+        return 0.0
+    
+    jaccard = intersection / union
+    
+    # Bonus for matching significant words (longer than 3 chars)
+    significant1 = {w for w in words1 if len(w) > 3}
+    significant2 = {w for w in words2 if len(w) > 3}
+    
+    if significant1 and significant2:
+        sig_intersection = len(significant1 & significant2)
+        sig_union = len(significant1 | significant2)
+        if sig_union > 0:
+            sig_jaccard = sig_intersection / sig_union
+            # Weight significant words more heavily
+            jaccard = max(jaccard, sig_jaccard * 0.95)
+    
+    return jaccard
+
+
+def find_best_match(track_title: str, deezer_tracks: List[Dict], threshold: float = 0.6) -> Optional[int]:
+    """
+    Find the best matching Deezer track position for a given track title.
+    Returns the position if a match is found above threshold, else None.
+    """
+    best_score = 0.0
+    best_position = None
+    
+    for dt in deezer_tracks:
+        deezer_title = dt.get("title", "")
+        if not deezer_title:
+            continue
+        
+        score = fuzzy_match_title(track_title, deezer_title)
+        
+        if score > best_score:
+            best_score = score
+            best_position = dt.get("position")
+    
+    if best_score >= threshold:
+        return best_position
+    
+    return None
 
 
 class AlbumAssemblyService:
@@ -303,20 +428,29 @@ class AlbumAssemblyService:
             
             # Try to get correct track order from Deezer
             track_order = {}
+            deezer_tracks_list = None
             if deezer_album_id:
-                deezer_tracks = await self.get_deezer_album_tracklist(deezer_album_id)
-                if deezer_tracks:
-                    # Create mapping: lowercase title -> position
-                    for dt in deezer_tracks:
+                deezer_tracks_list = await self.get_deezer_album_tracklist(deezer_album_id)
+                if deezer_tracks_list:
+                    # Create mapping: lowercase title -> position (for exact match)
+                    for dt in deezer_tracks_list:
                         if dt.get("title"):
                             track_order[dt["title"].lower()] = dt["position"]
             
             # Sort tracks by Deezer order or alphabetically
             def get_position(track):
                 if track.title:
+                    # Try exact match first
                     pos = track_order.get(track.title.lower())
                     if pos:
-                        return (0, pos)  # Has Deezer position
+                        return (0, pos)  # Has exact Deezer position
+                    
+                    # Try fuzzy match if we have Deezer tracks
+                    if deezer_tracks_list:
+                        fuzzy_pos = find_best_match(track.title, deezer_tracks_list)
+                        if fuzzy_pos:
+                            return (0, fuzzy_pos)  # Has fuzzy Deezer position
+                    
                 return (1, track.title or "")  # Fallback to alphabetical
             
             sorted_tracks = sorted(tracks, key=get_position)
@@ -386,26 +520,35 @@ class AlbumAssemblyService:
             if reorder or new_tracks:
                 # Get Deezer track order
                 track_order = {}
+                deezer_tracks_list = None
                 album_id = deezer_album_id or playlist.deezer_album_id
                 if album_id:
-                    deezer_tracks = await self.get_deezer_album_tracklist(album_id)
-                    if deezer_tracks:
-                        for dt in deezer_tracks:
+                    deezer_tracks_list = await self.get_deezer_album_tracklist(album_id)
+                    if deezer_tracks_list:
+                        for dt in deezer_tracks_list:
                             if dt.get("title"):
                                 track_order[dt["title"].lower().strip()] = dt["position"]
                 
-                if reorder and track_order:
+                if reorder and (track_order or deezer_tracks_list):
                     # Delete all existing playlist tracks
                     await session.execute(
                         delete(PlaylistTrack).where(PlaylistTrack.playlist_id == playlist.id)
                     )
                     
-                    # Sort all tracks by Deezer order
+                    # Sort all tracks by Deezer order (with fuzzy matching)
                     def get_position(track):
                         if track.title:
+                            # Try exact match first
                             pos = track_order.get(track.title.lower().strip())
                             if pos:
                                 return (0, pos)
+                            
+                            # Try fuzzy match if we have Deezer tracks
+                            if deezer_tracks_list:
+                                fuzzy_pos = find_best_match(track.title, deezer_tracks_list)
+                                if fuzzy_pos:
+                                    return (0, fuzzy_pos)
+                        
                         return (1, track.title or "")
                     
                     sorted_tracks = sorted(tracks, key=get_position)
