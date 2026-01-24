@@ -917,6 +917,7 @@
         :repeat="player.repeat"
         :queue="player.queue"
         :queueIndex="player.queueIndex"
+        :isLiked="player.currentTrack ? library.isTrackLiked(player.currentTrack.id) : false"
         @close="showFullPlayer = false"
         @toggle="player.toggle()"
         @next="player.next()"
@@ -930,6 +931,7 @@
         @moveInQueue="(from, to) => player.moveInQueue(from, to)"
         @playFromQueue="player.playFromQueue($event)"
         @menu="showTrackMenu(player.currentTrack)"
+        @like="toggleLike(player.currentTrack?.id)"
       />
     </Transition>
 
@@ -1021,6 +1023,7 @@
       :isMuted="player.isMuted"
       :shuffle="player.shuffle"
       :repeat="player.repeat"
+      :isLiked="library.isTrackLiked(player.currentTrack.id)"
       @toggle="player.toggle()"
       @prev="player.prev()"
       @next="player.next()"
@@ -1031,6 +1034,7 @@
       @setVolume="player.setVolume($event)"
       @seek="player.seek($event)"
       @menu="showTrackMenu(player.currentTrack)"
+      @like="toggleLike(player.currentTrack?.id)"
     />
   </div>
 </template>
