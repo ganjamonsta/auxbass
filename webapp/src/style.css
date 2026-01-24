@@ -121,8 +121,9 @@ body.spotify-theme {
 }
 
 #app {
-  height: 100dvh;
   height: var(--tg-viewport-stable-height, 100dvh);
+  max-height: var(--tg-viewport-stable-height, 100dvh);
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;

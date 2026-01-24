@@ -1348,7 +1348,8 @@ onMounted(async () => {
 .app {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: var(--tg-viewport-stable-height, 100dvh);
+  max-height: var(--tg-viewport-stable-height, 100dvh);
   overflow: hidden;
   background-color: var(--spotify-black);
   color: var(--spotify-text);
@@ -1548,13 +1549,15 @@ onMounted(async () => {
 
 /* Content */
 .content {
-  flex: 1;
+  flex: 1 1 0;
   min-height: 0;  /* Allow flex shrinking for proper overflow */
+  height: 0; /* Force flex to control height */
   overflow-y: auto;
   overflow-x: hidden;  /* Prevent horizontal scrollbar */
   position: relative;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
 }
 
 /* Content scrollbar - thin style */
