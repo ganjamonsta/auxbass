@@ -99,6 +99,7 @@ class MetadataService:
         """
         Search Deezer for track info
         Returns: dict with artist, title, album, genre, cover_url
+        Prioritizes album tracks over singles (where album name = track name)
         """
         if not title and not artist:
             return None
@@ -110,12 +111,12 @@ class MetadataService:
         clean_artist = self._clean_string(artist)
         
         try:
-            # Try specific search first
+            # Try specific search first - get more results to pick best one
             query = f'track:"{clean_title}" artist:"{clean_artist}"'
             
             async with session.get(
                 f"{self.DEEZER_API}/search",
-                params={"q": query, "limit": 1}
+                params={"q": query, "limit": 10}  # Get more results to pick best
             ) as resp:
                 if resp.status != 200:
                     logger.warning(f"Deezer search failed: {resp.status}")
@@ -128,7 +129,7 @@ class MetadataService:
                     await self._rate_limit()
                     async with session.get(
                         f"{self.DEEZER_API}/search",
-                        params={"q": f"{clean_artist} {clean_title}", "limit": 1}
+                        params={"q": f"{clean_artist} {clean_title}", "limit": 10}
                     ) as resp2:
                         if resp2.status == 200:
                             data = await resp2.json()
@@ -136,7 +137,30 @@ class MetadataService:
                 if not data.get("data"):
                     return None
                 
-                track = data["data"][0]
+                # Pick best result: prefer album tracks over singles
+                # Singles usually have album.title == track.title
+                tracks = data["data"]
+                best_track = None
+                
+                for track in tracks:
+                    album = track.get("album", {})
+                    album_title = album.get("title", "")
+                    track_title = track.get("title", "")
+                    
+                    # Skip if album name matches track name (likely a single)
+                    if album_title.lower().strip() == track_title.lower().strip():
+                        if best_track is None:
+                            best_track = track  # Keep as fallback
+                        continue
+                    
+                    # This is likely an album track - use it
+                    best_track = track
+                    break
+                
+                if best_track is None:
+                    best_track = tracks[0]  # Fall back to first result
+                
+                track = best_track
                 album = track.get("album", {})
                 artist_data = track.get("artist", {})
                 
