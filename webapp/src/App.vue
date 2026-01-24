@@ -1349,7 +1349,9 @@ const handleSidebarNavigate = (tab) => {
     'history': null,
     'artists': () => library.fetchArtists(),
     'explore': () => library.fetchGlobalStats(),
+    'global': () => library.fetchGlobalStats(),
     'playlists': null,
+    'albums': null,
     'search': () => { showSearch.value = true; nextTick(() => searchInput.value?.focus()) }
   }
   
@@ -1357,6 +1359,16 @@ const handleSidebarNavigate = (tab) => {
     showSearch.value = true
     activeTab.value = 'search'
     nextTick(() => searchInput.value?.focus())
+  } else if (tab === 'global') {
+    // Navigate to global library
+    activeTab.value = 'global'
+    library.fetchGlobalStats()
+  } else if (tab === 'albums') {
+    // Open albums section expanded
+    activeTab.value = 'albums'
+  } else if (tab === 'playlists') {
+    // Open playlists tab
+    activeTab.value = 'playlists'
   } else {
     switchTab(tab, tabCallbacks[tab])
   }

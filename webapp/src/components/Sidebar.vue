@@ -108,7 +108,7 @@
 
     <!-- Albums Section -->
     <div v-if="albums.length > 0" class="sidebar-section albums-section">
-      <div class="section-header">
+      <div class="section-header clickable" @click="$emit('navigate', 'albums')">
         <span>Альбомы</span>
         <span class="section-count">{{ albums.length }}</span>
       </div>
@@ -142,7 +142,7 @@
     <!-- Playlists Section -->
     <div class="sidebar-section playlists-section">
       <div class="section-header">
-        <span>Плейлисты</span>
+        <span class="section-title clickable" @click="$emit('navigate', 'playlists')">Плейлисты</span>
         <button class="add-playlist-btn" @click="$emit('createPlaylist')" title="Создать плейлист">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
             <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
@@ -368,6 +368,21 @@ const getPlaylistCoverStyle = (playlist) => {
   color: rgba(255, 255, 255, 0.5);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.section-header.clickable,
+.section-title.clickable {
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.section-header.clickable:hover,
+.section-title.clickable:hover {
+  color: white;
+}
+
+.section-header.clickable:hover .section-count {
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .add-playlist-btn {
