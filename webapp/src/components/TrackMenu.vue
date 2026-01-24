@@ -123,10 +123,16 @@ const handleDownload = () => {
 </script>
 
 <style scoped>
+/* ═══════════════════════════════════════════════════════════
+   🎵 TRACK MENU - Neumorphic Bottom Sheet
+   Action menu for tracks with soft shadows
+   ═══════════════════════════════════════════════════════════ */
+
 .menu-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
   z-index: 200;
   display: flex;
   align-items: flex-end;
@@ -136,28 +142,37 @@ const handleDownload = () => {
 .menu-sheet {
   width: 100%;
   max-width: 500px;
-  background: var(--tg-theme-bg-color);
-  border-radius: 16px 16px 0 0;
-  padding: 16px;
-  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  background: var(--xm-bg-elevated);
+  border-radius: var(--neu-radius-xl) var(--neu-radius-xl) 0 0;
+  padding: 20px;
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+  box-shadow: 
+    0 -10px 40px var(--neu-shadow-dark),
+    0 -4px 12px var(--neu-shadow-light);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: none;
 }
 
+/* ─── Header ─── */
 .menu-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 0;
+  gap: 14px;
+  padding: 10px 0;
 }
 
 .menu-cover {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
-  background: var(--tg-theme-secondary-bg-color);
+  width: 56px;
+  height: 56px;
+  border-radius: var(--neu-radius-md);
+  background: var(--xm-bg-surface);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: 24px;
+  box-shadow: 
+    4px 4px 8px var(--neu-shadow-dark),
+    -2px -2px 4px var(--neu-shadow-light);
 }
 
 .menu-info {
@@ -166,75 +181,106 @@ const handleDownload = () => {
 }
 
 .menu-title {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 17px;
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--xm-text-primary);
 }
 
 .menu-artist {
   font-size: 14px;
-  color: var(--tg-theme-hint-color);
+  color: var(--xm-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  margin-top: 2px;
 }
 
+/* ─── Divider ─── */
 .menu-divider {
   height: 1px;
-  background: var(--tg-theme-secondary-bg-color);
-  margin: 8px 0;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    var(--xm-bg-hover) 20%, 
+    var(--xm-bg-hover) 80%, 
+    transparent 100%);
+  margin: 10px 0;
 }
 
+/* ─── Menu Items ─── */
 .menu-items {
   display: flex;
   flex-direction: column;
+  gap: 4px;
 }
 
 .menu-item {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 8px;
-  background: none;
+  gap: 16px;
+  padding: 14px 12px;
+  background: transparent;
   border: none;
+  border-radius: var(--neu-radius-md);
   font-size: 16px;
-  color: var(--tg-theme-text-color);
+  font-weight: 500;
+  color: var(--xm-text-primary);
   cursor: pointer;
   text-align: left;
-  border-radius: 8px;
-  transition: background 0.2s;
+  transition: all 0.15s ease;
 }
 
 .menu-item:active {
-  background: var(--tg-theme-secondary-bg-color);
+  background: var(--xm-bg-surface);
+  transform: scale(0.98);
+  box-shadow: 
+    inset 2px 2px 4px var(--neu-shadow-inset-dark),
+    inset -1px -1px 3px var(--neu-shadow-inset-light);
 }
 
 .menu-item.danger {
-  color: #ff3b30;
+  color: var(--xm-accent);
+}
+
+.menu-item.danger:active {
+  background: rgba(229, 57, 53, 0.1);
 }
 
 .menu-icon {
-  font-size: 20px;
-  width: 28px;
+  font-size: 22px;
+  width: 32px;
   text-align: center;
+  flex-shrink: 0;
 }
 
+/* ─── Cancel Button ─── */
 .menu-cancel {
   width: 100%;
   padding: 16px;
-  margin-top: 8px;
-  background: var(--tg-theme-secondary-bg-color);
+  margin-top: 12px;
+  background: var(--xm-bg-surface);
   border: none;
-  border-radius: 12px;
+  border-radius: var(--neu-radius-lg);
   font-size: 17px;
-  font-weight: 600;
-  color: var(--tg-theme-link-color);
+  font-weight: 700;
+  color: var(--xm-secondary);
   cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 
+    4px 4px 8px var(--neu-shadow-dark),
+    -2px -2px 4px var(--neu-shadow-light);
 }
 
-/* Animations */
+.menu-cancel:active {
+  transform: scale(0.98);
+  box-shadow: 
+    inset 2px 2px 4px var(--neu-shadow-inset-dark),
+    inset -1px -1px 3px var(--neu-shadow-inset-light);
+}
+
+/* ─── Animations ─── */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.25s ease;
@@ -247,7 +293,7 @@ const handleDownload = () => {
 
 .slide-up-enter-active,
 .slide-up-leave-active {
-  transition: transform 0.3s ease;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .slide-up-enter-from,

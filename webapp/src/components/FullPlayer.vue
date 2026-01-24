@@ -477,42 +477,48 @@ const formatTime = (seconds) => {
 </script>
 
 <style scoped>
+/* ═══════════════════════════════════════════════════════════
+   🎵 FULL PLAYER - Nokia XpressMusic Neumorphic Style
+   Main player interface with large cover and controls
+   ═══════════════════════════════════════════════════════════ */
+
 .full-player {
   position: fixed;
   inset: 0;
-  background: linear-gradient(180deg, var(--spotify-gray-dark) 0%, var(--spotify-black) 40%);
+  background: linear-gradient(180deg, var(--xm-bg-elevated) 0%, var(--xm-bg-deep) 50%);
   display: flex;
   flex-direction: column;
   z-index: 100;
   padding: 8px 16px;
-  padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
+  padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
   transition: transform 0.1s ease-out, opacity 0.1s ease-out;
   touch-action: pan-y;
   overflow: hidden;
 }
 
-/* Swipe indicator */
+/* ─── Swipe Indicator ─── */
 .swipe-indicator {
-  width: 36px;
-  height: 4px;
-  background: var(--spotify-gray-light);
-  border-radius: 2px;
-  margin: 0 auto 4px;
+  width: 40px;
+  height: 5px;
+  background: var(--xm-bg-hover);
+  border-radius: var(--neu-radius-full);
+  margin: 0 auto 8px;
   flex-shrink: 0;
   cursor: pointer;
-  padding: 6px 36px;
+  padding: 8px 40px;
   background-clip: content-box;
   transition: background-color 0.2s;
 }
 
 .swipe-indicator:hover {
-  background-color: var(--spotify-white);
+  background-color: var(--xm-text-secondary);
 }
 
 .swipe-indicator:active {
-  background-color: rgba(255, 255, 255, 0.5);
+  background-color: var(--xm-accent);
 }
 
+/* ─── Header ─── */
 .player-header {
   display: flex;
   align-items: center;
@@ -521,33 +527,42 @@ const formatTime = (seconds) => {
 }
 
 .close-btn, .menu-btn {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border: none;
-  background: none;
+  background: var(--xm-bg-surface);
+  border-radius: var(--neu-radius-full);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: var(--spotify-text);
-  opacity: 0.7;
-  transition: opacity 0.2s;
+  color: var(--xm-text-primary);
+  opacity: 0.8;
+  transition: all 0.2s ease;
+  box-shadow: 
+    3px 3px 6px var(--neu-shadow-dark),
+    -2px -2px 4px var(--neu-shadow-light);
 }
 
 .close-btn:active, .menu-btn:active {
   opacity: 1;
+  transform: scale(0.95);
+  box-shadow: 
+    inset 2px 2px 4px var(--neu-shadow-inset-dark),
+    inset -1px -1px 3px var(--neu-shadow-inset-light);
 }
 
 .player-title {
   flex: 1;
   text-align: center;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--spotify-text-secondary);
+  letter-spacing: 2px;
+  color: var(--xm-text-secondary);
 }
 
+/* ─── Cover Art ─── */
 .player-cover {
   flex: 1 1 auto;
   display: flex;
@@ -555,34 +570,54 @@ const formatTime = (seconds) => {
   justify-content: center;
   position: relative;
   min-height: 0;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .cover-image {
   width: 100%;
-  max-width: min(280px, 35vh);
+  max-width: min(300px, 38vh);
   aspect-ratio: 1;
-  border-radius: 24px;
+  border-radius: var(--neu-radius-xl);
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 
-    12px 12px 24px var(--neu-shadow-dark),
-    -6px -6px 12px var(--neu-shadow-light);
+    16px 16px 32px var(--neu-shadow-dark),
+    -8px -8px 16px var(--neu-shadow-light),
+    0 0 60px rgba(0, 0, 0, 0.4);
   overflow: hidden;
-  transition: transform 0.2s;
-  border: 2px solid rgba(255, 255, 255, 0.03);
+  transition: transform 0.2s ease;
+  border: 2px solid rgba(255, 255, 255, 0.04);
+  position: relative;
+}
+
+/* Vinyl record effect behind cover */
+.cover-image::before {
+  content: '';
+  position: absolute;
+  inset: -10%;
+  background: conic-gradient(
+    from 0deg,
+    rgba(30, 30, 30, 0.8) 0deg,
+    rgba(50, 50, 50, 0.8) 90deg,
+    rgba(30, 30, 30, 0.8) 180deg,
+    rgba(50, 50, 50, 0.8) 270deg,
+    rgba(30, 30, 30, 0.8) 360deg
+  );
+  border-radius: 50%;
+  z-index: -1;
+  opacity: 0.3;
 }
 
 .player-cover.swiping .cover-image {
-  transform: scale(0.95);
+  transform: scale(0.93);
 }
 
 .cover-text {
   font-size: 72px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.7);
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  color: rgba(255, 255, 255, 0.6);
+  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
 .cover-img {
@@ -591,7 +626,7 @@ const formatTime = (seconds) => {
   object-fit: cover;
 }
 
-/* Swipe arrows */
+/* ─── Swipe Arrows ─── */
 .swipe-arrows {
   position: absolute;
   inset: 0;
@@ -603,58 +638,62 @@ const formatTime = (seconds) => {
 
 .arrow {
   position: absolute;
-  color: var(--spotify-green);
-  opacity: 0.8;
+  color: var(--xm-accent);
+  opacity: 0.9;
   animation: pulse 0.5s ease infinite;
+  filter: drop-shadow(0 0 8px var(--xm-accent-glow));
 }
 
 .arrow.left {
-  left: 10%;
+  left: 8%;
 }
 
 .arrow.right {
-  right: 10%;
+  right: 8%;
 }
 
 @keyframes pulse {
-  0%, 100% { transform: scale(1); opacity: 0.8; }
-  50% { transform: scale(1.1); opacity: 1; }
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.15); opacity: 1; }
 }
 
+/* ─── Track Info ─── */
 .player-info {
   text-align: center;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   flex-shrink: 0;
 }
 
 .track-title {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--xm-text-primary);
 }
 
 .track-artist {
-  font-size: 14px;
-  color: var(--spotify-text-secondary);
+  font-size: 15px;
+  color: var(--xm-text-secondary);
 }
 
+/* ─── Progress Bar ─── */
 .progress-container {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   flex-shrink: 0;
 }
 
 .slider-wrapper {
   position: relative;
   width: 100%;
-  height: 6px;
-  border-radius: 8px;
-  background: var(--spotify-gray);
+  height: 8px;
+  border-radius: var(--neu-radius-full);
+  background: var(--xm-bg-surface);
   box-shadow: 
-    inset 2px 2px 4px var(--neu-shadow-dark),
-    inset -1px -1px 3px var(--neu-shadow-light);
+    inset 3px 3px 6px var(--neu-shadow-inset-dark),
+    inset -2px -2px 4px var(--neu-shadow-inset-light);
 }
 
 .buffered-bar {
@@ -662,8 +701,8 @@ const formatTime = (seconds) => {
   left: 0;
   top: 0;
   height: 100%;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: var(--neu-radius-full);
   z-index: 1;
   pointer-events: none;
   transition: width 0.2s linear;
@@ -674,11 +713,11 @@ const formatTime = (seconds) => {
   left: 0;
   top: 0;
   width: 100%;
-  height: 6px;
+  height: 8px;
   -webkit-appearance: none;
   appearance: none;
   background: transparent;
-  border-radius: 8px;
+  border-radius: var(--neu-radius-full);
   outline: none;
   cursor: pointer;
   z-index: 2;
@@ -687,110 +726,115 @@ const formatTime = (seconds) => {
 
 .progress-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: linear-gradient(145deg, var(--spotify-green), var(--spotify-green-dark));
+  width: 20px;
+  height: 20px;
+  border-radius: var(--neu-radius-full);
+  background: linear-gradient(145deg, var(--xm-accent-light), var(--xm-accent));
   cursor: pointer;
-  transition: transform 0.1s;
+  transition: transform 0.15s ease;
   box-shadow: 
-    3px 3px 6px var(--neu-shadow-dark),
-    -1px -1px 3px var(--neu-shadow-light),
-    0 0 8px rgba(29, 185, 84, 0.4);
+    4px 4px 8px var(--neu-shadow-dark),
+    -2px -2px 4px var(--neu-shadow-light),
+    0 0 12px var(--xm-accent-glow);
 }
 
 .progress-slider:active::-webkit-slider-thumb {
-  transform: scale(1.15);
+  transform: scale(1.2);
 }
 
 .progress-times {
   display: flex;
   justify-content: space-between;
-  margin-top: 6px;
-  font-size: 11px;
-  color: var(--spotify-text-muted);
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--xm-text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
+/* ─── Main Controls ─── */
 .player-controls {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  margin-bottom: 12px;
+  gap: 18px;
+  margin-bottom: 16px;
   flex-shrink: 0;
 }
 
 .control-btn {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   border: none;
-  background: var(--neu-bg);
-  border-radius: 50%;
+  background: var(--xm-bg-elevated);
+  border-radius: var(--neu-radius-full);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--spotify-text);
+  color: var(--xm-text-primary);
   transition: all 0.15s ease;
   box-shadow: 
     5px 5px 10px var(--neu-shadow-dark),
-    -2px -2px 6px var(--neu-shadow-light);
+    -3px -3px 6px var(--neu-shadow-light);
 }
 
 .control-btn:active {
-  transform: scale(0.95);
+  transform: scale(0.93);
   box-shadow: 
-    inset 3px 3px 6px var(--neu-shadow-dark),
-    inset -2px -2px 4px var(--neu-shadow-light);
+    inset 3px 3px 6px var(--neu-shadow-inset-dark),
+    inset -2px -2px 4px var(--neu-shadow-inset-light);
 }
 
 .control-btn.secondary {
-  width: 40px;
-  height: 40px;
-  color: var(--spotify-text-muted);
+  width: 44px;
+  height: 44px;
+  color: var(--xm-text-muted);
 }
 
 .control-btn.secondary.active {
-  color: var(--spotify-green);
+  color: var(--xm-accent);
   box-shadow: 
-    inset 3px 3px 6px var(--neu-shadow-dark),
-    inset -2px -2px 4px var(--neu-shadow-light),
-    0 0 12px rgba(29, 185, 84, 0.3);
+    inset 3px 3px 6px var(--neu-shadow-inset-dark),
+    inset -2px -2px 4px var(--neu-shadow-inset-light),
+    0 0 16px var(--xm-accent-glow);
 }
 
+/* ─── Play Button (Main action) ─── */
 .play-btn {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: linear-gradient(145deg, var(--spotify-green), var(--spotify-green-dark));
+  width: 72px;
+  height: 72px;
+  border-radius: var(--neu-radius-full);
+  background: linear-gradient(145deg, var(--xm-accent-light), var(--xm-accent-dark));
   color: white;
   box-shadow: 
-    6px 6px 14px var(--neu-shadow-dark),
-    -3px -3px 8px var(--neu-shadow-light),
-    0 0 20px rgba(29, 185, 84, 0.4);
+    8px 8px 16px var(--neu-shadow-dark),
+    -4px -4px 10px var(--neu-shadow-light),
+    0 0 30px var(--xm-accent-glow);
 }
 
 .play-btn:active {
-  transform: scale(0.95);
+  transform: scale(0.93);
   box-shadow: 
-    inset 3px 3px 6px rgba(0, 0, 0, 0.3),
-    0 0 15px rgba(29, 185, 84, 0.3);
+    inset 4px 4px 8px rgba(0, 0, 0, 0.4),
+    0 0 20px var(--xm-accent-glow);
 }
 
+/* ─── Loading Overlay ─── */
 .loading-overlay {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(2px);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
   z-index: 5;
-  border-radius: 8px;
+  border-radius: var(--neu-radius-xl);
 }
 
 .loading-spinner {
-  color: white;
+  color: var(--xm-accent);
   animation: spin 1s linear infinite;
 }
 
@@ -803,11 +847,12 @@ const formatTime = (seconds) => {
   to { transform: rotate(360deg); }
 }
 
+/* ─── Bottom Controls ─── */
 .bottom-controls {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 16px;
+  gap: 12px;
+  padding: 0 8px;
   margin-top: auto;
   flex-shrink: 0;
 }
@@ -815,17 +860,17 @@ const formatTime = (seconds) => {
 .volume-container {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex: 1;
 }
 
 .queue-toggle-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--spotify-gray);
+  width: 40px;
+  height: 40px;
+  border-radius: var(--neu-radius-full);
+  background: var(--xm-bg-surface);
   border: none;
-  color: var(--spotify-text-secondary);
+  color: var(--xm-text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -833,30 +878,39 @@ const formatTime = (seconds) => {
   transition: all 0.2s ease;
   flex-shrink: 0;
   box-shadow: 
-    3px 3px 6px var(--neu-shadow-dark),
+    4px 4px 8px var(--neu-shadow-dark),
     -2px -2px 4px var(--neu-shadow-light);
 }
 
 .queue-toggle-btn:active {
   box-shadow: 
-    inset 2px 2px 4px var(--neu-shadow-dark),
-    inset -1px -1px 3px var(--neu-shadow-light);
+    inset 2px 2px 4px var(--neu-shadow-inset-dark),
+    inset -1px -1px 3px var(--neu-shadow-inset-light);
 }
 
 .queue-toggle-btn.active {
-  color: var(--spotify-green);
+  color: var(--xm-accent);
+  box-shadow: 
+    inset 2px 2px 4px var(--neu-shadow-inset-dark),
+    inset -1px -1px 3px var(--neu-shadow-inset-light),
+    0 0 12px var(--xm-accent-glow);
 }
 
 .volume-btn {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border: none;
   background: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--spotify-text-muted);
+  color: var(--xm-text-muted);
+  transition: color 0.15s ease;
+}
+
+.volume-btn:active {
+  color: var(--xm-accent);
 }
 
 .volume-slider {
@@ -864,45 +918,50 @@ const formatTime = (seconds) => {
   height: 6px;
   -webkit-appearance: none;
   appearance: none;
-  background: var(--spotify-gray);
-  border-radius: 8px;
+  background: var(--xm-bg-surface);
+  border-radius: var(--neu-radius-full);
   outline: none;
   cursor: pointer;
   box-shadow: 
-    inset 2px 2px 4px var(--neu-shadow-dark),
-    inset -1px -1px 3px var(--neu-shadow-light);
+    inset 2px 2px 4px var(--neu-shadow-inset-dark),
+    inset -1px -1px 3px var(--neu-shadow-inset-light);
 }
 
 .volume-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--spotify-text);
+  width: 18px;
+  height: 18px;
+  border-radius: var(--neu-radius-full);
+  background: var(--xm-text-primary);
   cursor: pointer;
   box-shadow: 
     2px 2px 5px var(--neu-shadow-dark),
     -1px -1px 3px var(--neu-shadow-light);
+  transition: transform 0.1s ease;
 }
 
-/* Mini queue */
+.volume-slider:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+/* ─── Mini Queue Panel ─── */
 .mini-queue {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  background: var(--neu-bg);
-  border-radius: 24px 24px 0 0;
+  background: var(--xm-bg-elevated);
+  border-radius: var(--neu-radius-xl) var(--neu-radius-xl) 0 0;
   padding: 20px;
-  padding-bottom: max(20px, env(safe-area-inset-bottom, 20px));
-  max-height: 50%;
+  padding-bottom: max(24px, env(safe-area-inset-bottom, 24px));
+  max-height: 55%;
   overflow-y: auto;
   overflow-x: hidden;
   z-index: 200;
   box-shadow: 
-    0 -8px 24px var(--neu-shadow-dark),
-    0 -2px 8px var(--neu-shadow-light);
-  border: 1px solid rgba(255, 255, 255, 0.03);
+    0 -10px 30px var(--neu-shadow-dark),
+    0 -4px 12px var(--neu-shadow-light);
+  border: 1px solid rgba(255, 255, 255, 0.04);
   border-bottom: none;
 }
 
@@ -916,7 +975,7 @@ const formatTime = (seconds) => {
 }
 
 .mini-queue::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--xm-accent);
   border-radius: 2px;
 }
 
@@ -924,26 +983,40 @@ const formatTime = (seconds) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
-  font-weight: 600;
+  margin-bottom: 16px;
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--xm-text-primary);
 }
 
 .queue-hint {
   font-size: 11px;
-  color: var(--spotify-text-muted);
+  color: var(--xm-text-muted);
   font-weight: 400;
 }
 
 .close-queue {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border: none;
-  background: none;
+  background: var(--xm-bg-surface);
+  border-radius: var(--neu-radius-full);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--spotify-text-muted);
+  color: var(--xm-text-muted);
   cursor: pointer;
+  box-shadow: 
+    3px 3px 6px var(--neu-shadow-dark),
+    -2px -2px 4px var(--neu-shadow-light);
+  transition: all 0.15s ease;
+}
+
+.close-queue:active {
+  transform: scale(0.95);
+  box-shadow: 
+    inset 2px 2px 4px var(--neu-shadow-inset-dark),
+    inset -1px -1px 3px var(--neu-shadow-inset-light);
 }
 
 .queue-list {
@@ -953,19 +1026,24 @@ const formatTime = (seconds) => {
 .queue-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 8px;
-  border-bottom: 1px solid var(--spotify-gray-dark);
+  gap: 10px;
+  padding: 12px 10px;
+  border-radius: var(--neu-radius-md);
+  margin-bottom: 8px;
   cursor: pointer;
   position: relative;
-  background: var(--spotify-gray);
+  background: var(--xm-bg-surface);
   transition: transform 0.2s ease, background 0.2s ease;
   user-select: none;
   touch-action: pan-y;
+  box-shadow: 
+    3px 3px 6px var(--neu-shadow-dark),
+    -2px -2px 4px var(--neu-shadow-light);
 }
 
 .queue-item:active {
-  background: var(--spotify-gray-dark);
+  background: var(--xm-bg-hover);
+  transform: scale(0.98);
 }
 
 .queue-item.swiping {
@@ -974,22 +1052,26 @@ const formatTime = (seconds) => {
 
 .queue-item.swipe-delete {
   background: rgba(229, 57, 53, 0.2);
+  box-shadow: 
+    3px 3px 6px var(--neu-shadow-dark),
+    -2px -2px 4px var(--neu-shadow-light),
+    0 0 12px rgba(229, 57, 53, 0.3);
 }
 
 .queue-item.dragging {
   opacity: 0.5;
-  background: var(--spotify-gray-dark);
+  background: var(--xm-bg-hover);
 }
 
 .queue-item.drag-over {
-  border-top: 2px solid var(--spotify-green);
+  border-top: 2px solid var(--xm-accent);
 }
 
 .drag-handle {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--spotify-text-muted);
+  color: var(--xm-text-muted);
   cursor: grab;
   padding: 4px;
   flex-shrink: 0;
@@ -997,13 +1079,15 @@ const formatTime = (seconds) => {
 
 .drag-handle:active {
   cursor: grabbing;
+  color: var(--xm-accent);
 }
 
 .queue-num {
-  width: 20px;
+  width: 22px;
   text-align: center;
   font-size: 13px;
-  color: var(--spotify-text-muted);
+  font-weight: 600;
+  color: var(--xm-accent);
   flex-shrink: 0;
 }
 
@@ -1016,15 +1100,17 @@ const formatTime = (seconds) => {
 .queue-title {
   display: block;
   font-size: 14px;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--xm-text-primary);
 }
 
 .queue-artist {
   display: block;
   font-size: 12px;
-  color: var(--spotify-text-muted);
+  color: var(--xm-text-muted);
 }
 
 .delete-indicator {
@@ -1037,7 +1123,7 @@ const formatTime = (seconds) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #e53935;
+  color: var(--xm-accent);
   opacity: 0;
   transition: opacity 0.2s;
 }
@@ -1049,11 +1135,12 @@ const formatTime = (seconds) => {
 
 .queue-empty {
   text-align: center;
-  color: var(--spotify-text-muted);
-  padding: 20px;
+  color: var(--xm-text-muted);
+  padding: 24px;
+  font-size: 14px;
 }
 
-/* Queue animation */
+/* ─── Queue Animation ─── */
 .slide-up-queue-enter-active,
 .slide-up-queue-leave-active {
   transition: transform 0.3s ease;

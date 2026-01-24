@@ -141,61 +141,99 @@ const formatTime = (seconds) => {
 </script>
 
 <style scoped>
-/* Neumorphism Mini Player with LCD Screen */
+/* ═══════════════════════════════════════════════════════════
+   🎵 MINI PLAYER - Nokia XpressMusic Neumorphic Style
+   Inspired by Nokia 5700 with modern neumorphism
+   ═══════════════════════════════════════════════════════════ */
+
 .mini-player {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   margin: 12px 12px 8px;
-  padding: 8px 10px;
-  background: var(--neu-bg);
-  border-radius: 16px;
+  padding: 10px 12px;
+  background: var(--xm-bg-elevated);
+  border-radius: var(--neu-radius-lg);
   cursor: pointer;
   z-index: 60;
   box-shadow: 
     6px 6px 12px var(--neu-shadow-dark),
     -3px -3px 8px var(--neu-shadow-light);
   border: 1px solid rgba(255, 255, 255, 0.03);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-/* LCD Screen - Car Stereo Style */
+.mini-player:active {
+  transform: scale(0.98);
+  box-shadow: 
+    3px 3px 6px var(--neu-shadow-dark),
+    -2px -2px 4px var(--neu-shadow-light);
+}
+
+/* ─── LCD Screen - Nokia XpressMusic Style ─── */
 .lcd-screen {
   flex: 1;
-  background: linear-gradient(180deg, #0a1525 0%, #061020 100%);
-  border-radius: 8px;
-  padding: 8px 12px;
+  background: var(--lcd-bg);
+  border-radius: var(--neu-radius-md);
+  padding: 10px 14px;
   font-family: 'Segoe UI', system-ui, sans-serif;
   border: 1px solid #1a2a40;
   box-shadow: 
     inset 0 2px 8px rgba(0, 0, 0, 0.8),
     0 1px 0 rgba(100, 150, 255, 0.1);
   min-width: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Scanline effect for retro feel */
+.lcd-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  pointer-events: none;
 }
 
 .lcd-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .lcd-row-main {
-  margin-bottom: 2px;
+  margin-bottom: 4px;
   min-width: 0;
 }
 
 .lcd-row-sub {
   justify-content: space-between;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   min-width: 0;
   overflow: hidden;
 }
 
 .lcd-status {
-  color: #00aaff;
-  font-size: 11px;
-  text-shadow: 0 0 6px rgba(0, 170, 255, 0.8);
+  color: var(--xm-accent);
+  font-size: 12px;
+  font-weight: bold;
+  text-shadow: 0 0 8px var(--xm-accent-glow);
   flex-shrink: 0;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
 .lcd-title-container {
@@ -203,6 +241,8 @@ const formatTime = (seconds) => {
   min-width: 0;
   overflow: hidden;
   position: relative;
+  mask-image: linear-gradient(90deg, black 90%, transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, black 90%, transparent 100%);
 }
 
 .lcd-title-track {
@@ -211,42 +251,43 @@ const formatTime = (seconds) => {
 }
 
 .lcd-title-track.marquee {
-  animation: marquee-scroll 8s linear infinite;
+  animation: marquee-scroll 10s linear infinite;
 }
 
 .lcd-title {
-  color: #4dc3ff;
-  font-size: 14px;
+  color: var(--lcd-text);
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: 0.5px;
-  text-shadow: 0 0 8px rgba(77, 195, 255, 0.6);
+  text-shadow: 0 0 10px var(--lcd-text-glow);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .lcd-title-clone {
-  margin-left: 60px;
+  margin-left: 80px;
 }
 
 @keyframes marquee-scroll {
-  0%, 10% {
+  0%, 5% {
     transform: translateX(0);
   }
-  90%, 100% {
-    transform: translateX(calc(-50% - 30px));
+  95%, 100% {
+    transform: translateX(calc(-50% - 40px));
   }
 }
 
 .lcd-time {
-  color: #66ccff;
-  font-size: 11px;
-  font-weight: 500;
-  text-shadow: 0 0 4px rgba(102, 204, 255, 0.5);
+  color: var(--lcd-text);
+  font-size: 12px;
+  font-weight: 600;
+  text-shadow: 0 0 6px var(--lcd-text-glow);
   flex-shrink: 0;
-  letter-spacing: 1px;
+  letter-spacing: 1.5px;
+  font-variant-numeric: tabular-nums;
 }
 
-/* Progress dots */
+/* ─── LED Progress Dots ─── */
 .lcd-progress {
   display: flex;
   gap: 3px;
@@ -254,18 +295,19 @@ const formatTime = (seconds) => {
 
 .lcd-dot {
   width: 100%;
-  height: 3px;
-  background: #0a2035;
-  border-radius: 1px;
+  height: 4px;
+  background: var(--lcd-dot-inactive);
+  border-radius: 2px;
   flex: 1;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .lcd-dot.active {
-  background: #00ccff;
-  box-shadow: 0 0 4px rgba(0, 204, 255, 0.8);
+  background: var(--xm-accent);
+  box-shadow: 0 0 6px var(--xm-accent-glow);
 }
 
-/* Nokia XpressMusic Style Controls */
+/* ─── Nokia XpressMusic Style Rubber Buttons ─── */
 .nokia-controls {
   display: flex;
   flex-direction: column;
@@ -274,29 +316,26 @@ const formatTime = (seconds) => {
 }
 
 .nokia-btn {
-  width: 38px;
-  height: 28px;
+  width: 42px;
+  height: 30px;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--xm-text-primary);
   flex-shrink: 0;
   transition: all 0.15s ease;
   position: relative;
   
   /* Nokia rubber button style */
-  background: linear-gradient(180deg, 
-    #3a3a3a 0%, 
-    #252525 50%, 
-    #1a1a1a 100%);
+  background: var(--rubber-bg);
   box-shadow: 
-    0 2px 4px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 3px 6px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
     inset 0 -1px 0 rgba(0, 0, 0, 0.3);
-  border: 1px solid #0a0a0a;
+  border: 1px solid var(--rubber-border);
 }
 
 /* Rubber texture bumps */
@@ -306,29 +345,31 @@ const formatTime = (seconds) => {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 24px;
-  height: 14px;
+  width: 28px;
+  height: 16px;
   background: 
-    radial-gradient(circle at 20% 50%, rgba(255,255,255,0.08) 0%, transparent 40%),
-    radial-gradient(circle at 50% 50%, rgba(255,255,255,0.08) 0%, transparent 40%),
-    radial-gradient(circle at 80% 50%, rgba(255,255,255,0.08) 0%, transparent 40%);
-  border-radius: 3px;
+    radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 50%, rgba(255,255,255,0.1) 0%, transparent 50%);
+  border-radius: 4px;
   pointer-events: none;
 }
 
 .nokia-btn:active {
-  transform: scale(0.96);
-  background: linear-gradient(180deg, 
-    #2a2a2a 0%, 
-    #1a1a1a 50%, 
-    #151515 100%);
+  transform: scale(0.94) translateY(1px);
+  background: var(--rubber-bg-pressed);
   box-shadow: 
     0 1px 2px rgba(0, 0, 0, 0.5),
-    inset 0 2px 4px rgba(0, 0, 0, 0.3);
+    inset 0 2px 4px rgba(0, 0, 0, 0.4);
 }
 
 .nokia-btn:active svg {
-  color: var(--spotify-green);
+  color: var(--xm-accent);
+  filter: drop-shadow(0 0 4px var(--xm-accent-glow));
+}
+
+.nokia-btn svg {
+  transition: color 0.15s ease, filter 0.15s ease;
 }
 
 .spin {

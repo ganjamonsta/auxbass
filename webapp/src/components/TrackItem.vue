@@ -136,31 +136,46 @@ const formatDuration = (seconds) => {
 </script>
 
 <style scoped>
+/* ═══════════════════════════════════════════════════════════
+   🎵 TRACK ITEM - Neumorphic Style
+   Individual track row with soft shadows
+   ═══════════════════════════════════════════════════════════ */
+
 .track-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
+  gap: 10px;
+  padding: 8px 12px;
+  margin: 4px 8px;
+  border-radius: var(--neu-radius-md);
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.15s ease;
+  background: transparent;
 }
 
 .track-item:active {
-  background: var(--spotify-gray);
+  background: var(--xm-bg-surface);
+  transform: scale(0.98);
 }
 
 .track-item.playing {
-  background: rgba(29, 185, 84, 0.1);
+  background: var(--xm-bg-surface);
+  box-shadow: 
+    inset 2px 2px 4px var(--neu-shadow-inset-dark),
+    inset -1px -1px 3px var(--neu-shadow-inset-light),
+    0 0 20px var(--xm-accent-glow);
 }
 
 .track-item.compact {
-  padding: 5px 10px;
+  padding: 6px 10px;
+  margin: 2px 6px;
 }
 
+/* ─── Track Cover ─── */
 .track-cover {
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--neu-radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -168,13 +183,21 @@ const formatDuration = (seconds) => {
   position: relative;
   overflow: hidden;
   box-shadow: 
-    3px 3px 6px var(--neu-shadow-dark),
-    -1px -1px 3px var(--neu-shadow-light);
+    4px 4px 8px var(--neu-shadow-dark),
+    -2px -2px 4px var(--neu-shadow-light);
+  transition: box-shadow 0.2s ease;
+}
+
+.track-item.playing .track-cover {
+  box-shadow: 
+    4px 4px 8px var(--neu-shadow-dark),
+    -2px -2px 4px var(--neu-shadow-light),
+    0 0 16px var(--xm-accent-glow);
 }
 
 .compact .track-cover {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
 }
 
 .cover-image {
@@ -185,7 +208,7 @@ const formatDuration = (seconds) => {
 
 .cover-text {
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   color: rgba(255, 255, 255, 0.8);
 }
 
@@ -193,123 +216,137 @@ const formatDuration = (seconds) => {
   font-size: 14px;
 }
 
-/* Playing indicator (equalizer animation) */
+/* ─── Playing Indicator (Equalizer) ─── */
 .playing-indicator {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 2px;
+  gap: 3px;
   padding-bottom: 12px;
 }
 
 .playing-indicator .bar {
-  width: 3px;
-  background: var(--spotify-green);
-  border-radius: 1px;
+  width: 4px;
+  background: var(--xm-accent);
+  border-radius: 2px;
   animation: equalizer 0.8s ease-in-out infinite;
+  box-shadow: 0 0 6px var(--xm-accent-glow);
 }
 
 .playing-indicator .bar:nth-child(1) {
-  height: 8px;
+  height: 10px;
   animation-delay: 0s;
 }
 
 .playing-indicator .bar:nth-child(2) {
-  height: 16px;
+  height: 18px;
   animation-delay: 0.2s;
 }
 
 .playing-indicator .bar:nth-child(3) {
-  height: 12px;
+  height: 14px;
   animation-delay: 0.4s;
 }
 
 @keyframes equalizer {
   0%, 100% { transform: scaleY(1); }
-  50% { transform: scaleY(0.5); }
+  50% { transform: scaleY(0.4); }
 }
 
+/* ─── Track Info ─── */
 .track-info {
   flex: 1;
   min-width: 0;
 }
 
 .track-title {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--spotify-text);
+  color: var(--xm-text-primary);
+  transition: color 0.15s ease;
 }
 
 .compact .track-title {
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .track-item.playing .track-title {
-  color: var(--spotify-green);
+  color: var(--xm-accent);
 }
 
 .track-meta {
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-top: 1px;
+  margin-top: 2px;
 }
 
 .track-artist {
-  font-size: 11px;
-  color: var(--spotify-text-muted);
+  font-size: 12px;
+  color: var(--xm-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .compact .track-artist {
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .play-count {
   font-size: 10px;
-  color: var(--spotify-text-muted);
+  color: var(--xm-text-muted);
   white-space: nowrap;
 }
 
+/* ─── Duration ─── */
 .track-duration {
-  font-size: 11px;
-  color: var(--spotify-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--xm-text-muted);
   flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 
+/* ─── Like Button ─── */
 .track-like {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   background: none;
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--spotify-text-muted);
+  color: var(--xm-text-muted);
   cursor: pointer;
-  opacity: 0.6;
-  transition: all 0.2s;
+  opacity: 0.5;
+  transition: all 0.2s ease;
   flex-shrink: 0;
+  border-radius: var(--neu-radius-full);
 }
 
 .track-like:hover,
 .track-like:active {
   opacity: 1;
+  background: var(--xm-bg-surface);
 }
 
 .track-like.liked {
-  color: #1db954;
+  color: var(--xm-accent);
   opacity: 1;
 }
 
+.track-like.liked svg {
+  filter: drop-shadow(0 0 6px var(--xm-accent-glow));
+}
+
+/* ─── Menu Button ─── */
 .track-menu {
   width: 32px;
   height: 32px;
@@ -318,24 +355,26 @@ const formatDuration = (seconds) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--spotify-text-muted);
+  color: var(--xm-text-muted);
   cursor: pointer;
-  opacity: 0.7;
-  transition: opacity 0.2s;
+  opacity: 0.6;
+  transition: all 0.2s ease;
+  border-radius: var(--neu-radius-full);
 }
 
 .track-menu:active {
   opacity: 1;
+  background: var(--xm-bg-surface);
 }
 
-/* Unavailable track styles */
+/* ─── Unavailable Track Styles ─── */
 .track-item.unavailable {
-  opacity: 0.5;
+  opacity: 0.4;
 }
 
 .track-item.unavailable .track-title {
   text-decoration: line-through;
-  color: var(--spotify-text-muted);
+  color: var(--xm-text-muted);
 }
 
 .track-item.unavailable .track-cover {
@@ -345,10 +384,10 @@ const formatDuration = (seconds) => {
 .unavailable-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ef4444;
+  color: var(--xm-accent);
 }
 </style>

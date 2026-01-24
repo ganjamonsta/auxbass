@@ -86,7 +86,8 @@ const handleSelect = async (playlist) => {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -95,45 +96,61 @@ const handleSelect = async (playlist) => {
 }
 
 .modal {
-  background: var(--tg-theme-bg-color);
-  border-radius: 16px;
+  background: var(--xm-bg-elevated, #1A1A1A);
+  border-radius: var(--neu-radius-xl, 24px);
   width: 100%;
   max-width: 400px;
   max-height: 70vh;
   overflow: hidden;
+  box-shadow: 
+    12px 12px 24px var(--neu-shadow-dark, rgba(0, 0, 0, 0.6)),
+    -6px -6px 12px var(--neu-shadow-light, rgba(255, 255, 255, 0.03)),
+    0 0 40px rgba(0, 0, 0, 0.5);
 }
 
 .modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--tg-theme-secondary-bg-color);
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--xm-bg-surface, #222);
 }
 
 .modal-header h3 {
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--xm-text-primary, #fff);
 }
 
 .modal-close {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border: none;
-  background: var(--tg-theme-secondary-bg-color);
-  border-radius: 50%;
+  background: var(--xm-bg-surface, #222);
+  border-radius: var(--neu-radius-full, 9999px);
   font-size: 16px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  color: var(--xm-text-muted, #888);
+  box-shadow: 
+    4px 4px 8px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
+    -2px -2px 4px var(--neu-shadow-light, rgba(255, 255, 255, 0.03));
+  transition: all 0.15s ease;
+}
+
+.modal-close:active {
+  box-shadow: 
+    inset 2px 2px 4px var(--neu-shadow-inset-dark, rgba(0, 0, 0, 0.4)),
+    inset -1px -1px 2px var(--neu-shadow-inset-light, rgba(255, 255, 255, 0.02));
 }
 
 .playlist-list {
   max-height: calc(70vh - 70px);
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 8px;
+  padding: 12px;
 }
 
 .playlist-list::-webkit-scrollbar {
@@ -146,27 +163,31 @@ const handleSelect = async (playlist) => {
 }
 
 .playlist-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--xm-accent-glow, rgba(229, 57, 53, 0.3));
   border-radius: 2px;
 }
 
 .create-first {
   width: 100%;
   padding: 40px 20px;
-  background: none;
-  border: 2px dashed var(--tg-theme-hint-color);
-  border-radius: 12px;
+  background: var(--xm-bg-surface, #222);
+  border: 2px dashed var(--xm-accent, #E53935);
+  border-radius: var(--neu-radius-lg, 16px);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  color: var(--tg-theme-hint-color);
+  gap: 14px;
+  color: var(--xm-accent, #E53935);
   font-size: 16px;
+  font-weight: 600;
   cursor: pointer;
+  box-shadow: 
+    inset 4px 4px 8px var(--neu-shadow-inset-dark, rgba(0, 0, 0, 0.4)),
+    inset -2px -2px 4px var(--neu-shadow-inset-light, rgba(255, 255, 255, 0.02));
 }
 
 .create-icon {
-  font-size: 32px;
+  font-size: 36px;
 }
 
 .playlist-option {
@@ -174,26 +195,33 @@ const handleSelect = async (playlist) => {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 14px 12px;
-  background: none;
+  padding: 14px;
+  background: var(--xm-bg-surface, #222);
   border: none;
-  border-radius: 10px;
+  border-radius: var(--neu-radius-md, 12px);
   cursor: pointer;
   text-align: left;
-  transition: background 0.2s;
+  transition: all 0.15s ease;
+  margin-bottom: 10px;
+  box-shadow: 
+    4px 4px 8px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
+    -2px -2px 4px var(--neu-shadow-light, rgba(255, 255, 255, 0.03));
 }
 
 .playlist-option:active {
-  background: var(--tg-theme-secondary-bg-color);
+  box-shadow: 
+    inset 2px 2px 4px var(--neu-shadow-inset-dark, rgba(0, 0, 0, 0.4)),
+    inset -1px -1px 2px var(--neu-shadow-inset-light, rgba(255, 255, 255, 0.02));
 }
 
 .playlist-option.create {
-  color: var(--tg-theme-link-color);
+  color: var(--xm-accent, #E53935);
+  background: linear-gradient(180deg, var(--xm-bg-surface, #222) 0%, var(--xm-bg-elevated, #1A1A1A) 100%);
 }
 
 .playlist-icon {
-  font-size: 24px;
-  width: 32px;
+  font-size: 26px;
+  width: 36px;
   text-align: center;
 }
 
@@ -205,14 +233,15 @@ const handleSelect = async (playlist) => {
 .playlist-name {
   display: block;
   font-size: 16px;
-  font-weight: 500;
-  color: var(--tg-theme-text-color);
+  font-weight: 600;
+  color: var(--xm-text-primary, #fff);
 }
 
 .playlist-count {
   display: block;
   font-size: 13px;
-  color: var(--tg-theme-hint-color);
+  color: var(--xm-text-muted, #888);
+  margin-top: 2px;
 }
 
 /* Animation */

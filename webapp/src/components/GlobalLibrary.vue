@@ -327,10 +327,14 @@ onMounted(async () => {
 .stats-banner {
   display: flex;
   justify-content: space-around;
-  padding: 16px;
-  margin: 0 16px 20px;
-  background: linear-gradient(135deg, #1db954 0%, #1ed760 100%);
-  border-radius: 12px;
+  padding: 18px;
+  margin: 0 16px 24px;
+  background: linear-gradient(135deg, var(--xm-accent, #E53935) 0%, var(--xm-accent-dark, #C62828) 100%);
+  border-radius: var(--neu-radius-lg, 16px);
+  box-shadow: 
+    6px 6px 12px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
+    -3px -3px 6px var(--neu-shadow-light, rgba(255, 255, 255, 0.03)),
+    0 4px 20px var(--xm-accent-glow, rgba(229, 57, 53, 0.3));
 }
 
 .stat-item {
@@ -340,27 +344,29 @@ onMounted(async () => {
 }
 
 .stat-value {
-  font-size: 24px;
-  font-weight: 700;
+  font-size: 26px;
+  font-weight: 800;
   color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .stat-label {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.8);
-  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 4px;
+  font-weight: 500;
 }
 
 .feed-section {
-  margin-bottom: 24px;
+  margin-bottom: 28px;
 }
 
 .feed-section-title {
   font-size: 18px;
   font-weight: 700;
   padding: 0 16px;
-  margin-bottom: 12px;
-  color: var(--text-primary, #fff);
+  margin-bottom: 14px;
+  color: var(--xm-text-primary, #fff);
 }
 
 .section-header {
@@ -371,21 +377,31 @@ onMounted(async () => {
 }
 
 .load-all-btn {
-  background: var(--surface-elevated, #282828);
+  background: var(--xm-bg-elevated, #1A1A1A);
   border: none;
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
+  border-radius: var(--neu-radius-full, 9999px);
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-secondary, #b3b3b3);
+  color: var(--xm-text-muted, #888);
   cursor: pointer;
+  box-shadow: 
+    4px 4px 8px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
+    -2px -2px 4px var(--neu-shadow-light, rgba(255, 255, 255, 0.03));
+  transition: all 0.15s ease;
+}
+
+.load-all-btn:active {
+  box-shadow: 
+    inset 2px 2px 4px var(--neu-shadow-inset-dark, rgba(0, 0, 0, 0.4)),
+    inset -1px -1px 2px var(--neu-shadow-inset-light, rgba(255, 255, 255, 0.02));
 }
 
 .horizontal-scroll {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   overflow-x: auto;
   scroll-snap-type: x proximity;
   scrollbar-width: none;
@@ -411,24 +427,32 @@ onMounted(async () => {
 
 .feed-card {
   flex-shrink: 0;
-  min-width: 140px;
-  max-width: 140px;
+  min-width: 150px;
+  max-width: 150px;
   scroll-snap-align: none;
   cursor: pointer;
   position: relative;
 }
 
 .feed-card-cover {
-  width: 140px;
-  height: 140px;
-  border-radius: 8px;
-  background: var(--surface-elevated, #282828);
+  width: 150px;
+  height: 150px;
+  border-radius: var(--neu-radius-md, 12px);
+  background: var(--xm-bg-elevated, #1A1A1A);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   position: relative;
-  color: var(--text-secondary, #b3b3b3);
+  color: var(--xm-text-muted, #888);
+  box-shadow: 
+    6px 6px 12px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
+    -3px -3px 6px var(--neu-shadow-light, rgba(255, 255, 255, 0.03));
+  transition: transform 0.15s ease;
+}
+
+.feed-card:active .feed-card-cover {
+  transform: scale(0.97);
 }
 
 .feed-card-cover img {
@@ -440,8 +464,8 @@ onMounted(async () => {
 .feed-card-title {
   font-size: 14px;
   font-weight: 600;
-  margin-top: 8px;
-  color: var(--text-primary, #fff);
+  margin-top: 10px;
+  color: var(--xm-text-primary, #fff);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -449,7 +473,7 @@ onMounted(async () => {
 
 .feed-card-subtitle {
   font-size: 12px;
-  color: var(--text-secondary, #b3b3b3);
+  color: var(--xm-text-muted, #888);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -457,36 +481,43 @@ onMounted(async () => {
 
 .feed-card-meta {
   font-size: 11px;
-  color: var(--text-tertiary, #666);
-  margin-top: 2px;
+  color: var(--xm-text-muted, #888);
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .in-library-badge {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #1db954;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--neu-radius-full, 9999px);
+  background: var(--xm-accent, #E53935);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
+  box-shadow: 0 3px 10px var(--xm-accent-glow, rgba(229, 57, 53, 0.4));
 }
 
 .play-count-badge {
   position: absolute;
-  bottom: 8px;
-  left: 8px;
-  background: rgba(0, 0, 0, 0.7);
-  padding: 4px 8px;
-  border-radius: 4px;
+  bottom: 10px;
+  left: 10px;
+  background: var(--xm-bg-deep, #0D0D0D);
+  padding: 5px 10px;
+  border-radius: var(--neu-radius-sm, 8px);
   font-size: 11px;
   color: white;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  font-weight: 600;
+  box-shadow: 
+    2px 2px 4px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5));
 }
 
 .global-track-list {
@@ -496,26 +527,37 @@ onMounted(async () => {
 .global-track-item {
   display: flex;
   align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.1));
+  padding: 12px;
+  margin-bottom: 10px;
+  background: var(--xm-bg-elevated, #1A1A1A);
+  border-radius: var(--neu-radius-md, 12px);
   cursor: pointer;
+  box-shadow: 
+    4px 4px 8px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
+    -2px -2px 4px var(--neu-shadow-light, rgba(255, 255, 255, 0.03));
+  transition: all 0.15s ease;
 }
 
 .global-track-item:active {
-  background: var(--surface-elevated, #282828);
+  box-shadow: 
+    inset 2px 2px 4px var(--neu-shadow-inset-dark, rgba(0, 0, 0, 0.4)),
+    inset -1px -1px 2px var(--neu-shadow-inset-light, rgba(255, 255, 255, 0.02));
 }
 
 .track-cover {
-  width: 48px;
-  height: 48px;
-  border-radius: 6px;
-  background: var(--surface-elevated, #282828);
+  width: 52px;
+  height: 52px;
+  border-radius: var(--neu-radius-sm, 8px);
+  background: var(--xm-bg-surface, #222);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   flex-shrink: 0;
-  color: var(--text-secondary, #b3b3b3);
+  color: var(--xm-text-muted, #888);
+  box-shadow: 
+    inset 2px 2px 4px var(--neu-shadow-inset-dark, rgba(0, 0, 0, 0.4)),
+    inset -1px -1px 2px var(--neu-shadow-inset-light, rgba(255, 255, 255, 0.02));
 }
 
 .track-cover img {
@@ -527,15 +569,16 @@ onMounted(async () => {
 .track-info {
   flex: 1;
   min-width: 0;
-  padding: 0 12px;
+  padding: 0 14px;
   display: flex;
   flex-direction: column;
+  gap: 3px;
 }
 
 .track-title {
   font-size: 15px;
-  font-weight: 500;
-  color: var(--text-primary, #fff);
+  font-weight: 600;
+  color: var(--xm-text-primary, #fff);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -543,7 +586,7 @@ onMounted(async () => {
 
 .track-artist {
   font-size: 13px;
-  color: var(--text-secondary, #b3b3b3);
+  color: var(--xm-text-muted, #888);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -551,7 +594,7 @@ onMounted(async () => {
 
 .track-uploader {
   font-size: 11px;
-  color: var(--text-tertiary, #666);
+  color: var(--xm-text-muted, #888);
 }
 
 .track-actions {
@@ -559,38 +602,54 @@ onMounted(async () => {
 }
 
 .add-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 1px solid var(--text-secondary, #b3b3b3);
-  background: transparent;
-  color: var(--text-secondary, #b3b3b3);
+  width: 40px;
+  height: 40px;
+  border-radius: var(--neu-radius-full, 9999px);
+  border: none;
+  background: var(--xm-bg-surface, #222);
+  color: var(--xm-text-muted, #888);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
+  box-shadow: 
+    3px 3px 6px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
+    -2px -2px 4px var(--neu-shadow-light, rgba(255, 255, 255, 0.03));
+  transition: all 0.15s ease;
 }
 
-.add-btn:hover {
-  border-color: #1db954;
-  color: #1db954;
+.add-btn:active {
+  color: var(--xm-accent, #E53935);
+  box-shadow: 
+    inset 2px 2px 4px var(--neu-shadow-inset-dark, rgba(0, 0, 0, 0.4)),
+    inset -1px -1px 2px var(--neu-shadow-inset-light, rgba(255, 255, 255, 0.02));
 }
 
 .in-library-icon {
-  color: #1db954;
+  color: var(--xm-accent, #E53935);
 }
 
 .load-more-btn {
   width: 100%;
-  padding: 12px;
-  margin-top: 12px;
-  background: var(--surface-elevated, #282828);
+  padding: 14px;
+  margin-top: 14px;
+  background: var(--xm-bg-elevated, #1A1A1A);
   border: none;
-  border-radius: 8px;
-  color: var(--text-primary, #fff);
+  border-radius: var(--neu-radius-md, 12px);
+  color: var(--xm-text-primary, #fff);
   font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
+  box-shadow: 
+    4px 4px 8px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
+    -2px -2px 4px var(--neu-shadow-light, rgba(255, 255, 255, 0.03));
+  transition: all 0.15s ease;
+}
+
+.load-more-btn:active {
+  box-shadow: 
+    inset 2px 2px 4px var(--neu-shadow-inset-dark, rgba(0, 0, 0, 0.4)),
+    inset -1px -1px 2px var(--neu-shadow-inset-light, rgba(255, 255, 255, 0.02));
 }
 
 .load-more-btn:disabled {
@@ -601,18 +660,18 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 32px;
-  color: var(--text-secondary, #b3b3b3);
+  padding: 36px;
+  color: var(--xm-text-muted, #888);
 }
 
 .spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--surface-elevated, #282828);
-  border-top-color: #1db954;
-  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--xm-bg-surface, #222);
+  border-top-color: var(--xm-accent, #E53935);
+  border-radius: var(--neu-radius-full, 9999px);
   animation: spin 1s linear infinite;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 @keyframes spin {
@@ -621,8 +680,8 @@ onMounted(async () => {
 
 .empty-state {
   text-align: center;
-  padding: 32px 16px;
-  color: var(--text-secondary, #b3b3b3);
+  padding: 36px 16px;
+  color: var(--xm-text-muted, #888);
 }
 
 /* User Cards */
@@ -631,20 +690,23 @@ onMounted(async () => {
 }
 
 .user-avatar {
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
+  width: 110px;
+  height: 110px;
+  border-radius: var(--neu-radius-full, 9999px);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 8px;
+  margin: 0 auto 10px;
+  box-shadow: 
+    6px 6px 12px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
+    -3px -3px 6px var(--neu-shadow-light, rgba(255, 255, 255, 0.03));
 }
 
 .avatar-letter {
-  font-size: 40px;
-  font-weight: 600;
+  font-size: 44px;
+  font-weight: 700;
   color: white;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
 /* User Profile View */
@@ -655,41 +717,54 @@ onMounted(async () => {
 .user-profile-header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
-  margin-bottom: 16px;
+  gap: 18px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--xm-bg-surface, #222);
+  margin-bottom: 18px;
 }
 
 .back-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--neu-radius-full, 9999px);
   border: none;
-  background: var(--surface-elevated, #282828);
-  color: var(--text-primary, #fff);
+  background: var(--xm-bg-elevated, #1A1A1A);
+  color: var(--xm-text-primary, #fff);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
+  box-shadow: 
+    4px 4px 8px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
+    -2px -2px 4px var(--neu-shadow-light, rgba(255, 255, 255, 0.03));
+  transition: all 0.15s ease;
+}
+
+.back-btn:active {
+  box-shadow: 
+    inset 2px 2px 4px var(--neu-shadow-inset-dark, rgba(0, 0, 0, 0.4)),
+    inset -1px -1px 2px var(--neu-shadow-inset-light, rgba(255, 255, 255, 0.02));
 }
 
 .user-avatar-large {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
+  width: 68px;
+  height: 68px;
+  border-radius: var(--neu-radius-full, 9999px);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: 
+    4px 4px 8px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
+    -2px -2px 4px var(--neu-shadow-light, rgba(255, 255, 255, 0.03));
 }
 
 .avatar-letter-large {
-  font-size: 28px;
-  font-weight: 600;
+  font-size: 30px;
+  font-weight: 700;
   color: white;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .user-profile-info {
@@ -700,7 +775,7 @@ onMounted(async () => {
 .user-profile-info h2 {
   font-size: 20px;
   font-weight: 700;
-  color: var(--text-primary, #fff);
+  color: var(--xm-text-primary, #fff);
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -709,13 +784,13 @@ onMounted(async () => {
 
 .user-profile-info p {
   font-size: 13px;
-  color: var(--text-secondary, #b3b3b3);
-  margin: 2px 0 0;
+  color: var(--xm-text-muted, #888);
+  margin: 3px 0 0;
 }
 
 .user-stats {
   font-size: 12px !important;
-  color: var(--text-tertiary, #666) !important;
+  color: var(--xm-text-muted, #888) !important;
 }
 
 .user-tracks-list {

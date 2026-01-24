@@ -70,26 +70,37 @@ const sourceLabel = computed(() => {
 .playlist-card {
   display: flex;
   flex-direction: column;
-  width: 90px;
+  width: 100px;
   flex-shrink: 0;
   cursor: pointer;
+  transition: transform 0.15s ease;
 }
 
 .playlist-card:active {
-  opacity: 0.8;
+  transform: scale(0.96);
 }
 
 .playlist-cover {
-  width: 90px;
-  height: 90px;
-  border-radius: 6px;
-  background: var(--spotify-gray);
+  width: 100px;
+  height: 100px;
+  border-radius: var(--neu-radius-md, 12px);
+  background: var(--xm-bg-elevated, #1A1A1A);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   overflow: hidden;
   position: relative;
+  box-shadow: 
+    6px 6px 12px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
+    -3px -3px 6px var(--neu-shadow-light, rgba(255, 255, 255, 0.03));
+  transition: box-shadow 0.15s ease;
+}
+
+.playlist-card:active .playlist-cover {
+  box-shadow: 
+    inset 3px 3px 6px var(--neu-shadow-inset-dark, rgba(0, 0, 0, 0.4)),
+    inset -2px -2px 4px var(--neu-shadow-inset-light, rgba(255, 255, 255, 0.02));
 }
 
 .playlist-cover.has-image {
@@ -103,7 +114,7 @@ const sourceLabel = computed(() => {
 }
 
 .cover-icon {
-  font-size: 28px;
+  font-size: 32px;
 }
 
 /* Cover collage grid */
@@ -148,48 +159,51 @@ const sourceLabel = computed(() => {
   bottom: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(transparent 0%, rgba(0,0,0,0.85) 100%);
-  padding: 16px 4px 4px;
+  background: linear-gradient(transparent 0%, rgba(0,0,0,0.9) 100%);
+  padding: 18px 6px 6px;
 }
 
 .artist-text {
   display: block;
-  font-size: 9px;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
   color: rgba(255, 255, 255, 0.95);
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.7);
 }
 
 .type-badge {
   position: absolute;
-  bottom: 4px;
-  right: 4px;
+  bottom: 5px;
+  right: 5px;
   font-size: 8px;
-  padding: 2px 4px;
-  border-radius: 3px;
-  background: rgba(0, 0, 0, 0.7);
-  color: #a78bfa;
-  font-weight: 600;
+  padding: 3px 5px;
+  border-radius: var(--neu-radius-sm, 8px);
+  background: var(--xm-bg-deep, #0D0D0D);
+  color: var(--xm-accent, #E53935);
+  font-weight: 700;
   text-transform: uppercase;
+  box-shadow: 
+    2px 2px 4px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
+    -1px -1px 2px var(--neu-shadow-light, rgba(255, 255, 255, 0.03));
 }
 
 .playlist-name {
-  font-size: 11px;
-  font-weight: 500;
-  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 8px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--spotify-text);
+  color: var(--xm-text-primary, #fff);
 }
 
 .playlist-meta {
-  font-size: 10px;
-  color: var(--spotify-text-muted);
+  font-size: 11px;
+  color: var(--xm-text-muted, #888);
   white-space: nowrap;
 }
 </style>

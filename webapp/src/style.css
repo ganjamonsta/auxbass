@@ -6,22 +6,72 @@
   --tg-viewport-height: 100dvh;
   --tg-viewport-stable-height: 100dvh;
   
-  /* Spotify-inspired theme */
-  --spotify-green: #1DB954;
-  --spotify-green-dark: #1aa34a;
-  --spotify-black: #121212;
-  --spotify-gray-dark: #181818;
-  --spotify-gray: #282828;
-  --spotify-gray-light: #404040;
-  --spotify-text: #ffffff;
-  --spotify-text-secondary: #b3b3b3;
-  --spotify-text-muted: #727272;
+  /* ═══════════════════════════════════════════════════════════
+     🎵 NOKIA XPRESSMUSIC NEUMORPHIC DESIGN SYSTEM
+     Inspired by Nokia 5700 XpressMusic + Modern Neumorphism
+     ═══════════════════════════════════════════════════════════ */
   
-  /* Neumorphism tokens */
-  --neu-bg: var(--spotify-gray-dark);
-  --neu-shadow-dark: rgba(0, 0, 0, 0.4);
-  --neu-shadow-light: rgba(255, 255, 255, 0.05);
-  --neu-radius: 16px;
+  /* ─── Core Palette ─── */
+  --xm-accent: #E53935;           /* Nokia XpressMusic red */
+  --xm-accent-light: #FF6F60;
+  --xm-accent-dark: #AB000D;
+  --xm-accent-glow: rgba(229, 57, 53, 0.4);
+  
+  --xm-secondary: #00BCD4;        /* Cyan for contrast */
+  --xm-secondary-glow: rgba(0, 188, 212, 0.3);
+  
+  /* ─── Surface Colors ─── */
+  --xm-bg-deep: #0D0D0D;          /* Deepest background */
+  --xm-bg-base: #141414;          /* Main background */
+  --xm-bg-elevated: #1A1A1A;      /* Cards, elevated surfaces */
+  --xm-bg-surface: #222222;       /* Interactive surfaces */
+  --xm-bg-hover: #2A2A2A;         /* Hover states */
+  
+  /* ─── Text Colors ─── */
+  --xm-text-primary: #FFFFFF;
+  --xm-text-secondary: #B0B0B0;
+  --xm-text-muted: #666666;
+  --xm-text-disabled: #444444;
+  
+  /* ─── Neumorphic Shadows ─── */
+  --neu-shadow-dark: rgba(0, 0, 0, 0.5);
+  --neu-shadow-light: rgba(255, 255, 255, 0.04);
+  --neu-shadow-inset-dark: rgba(0, 0, 0, 0.6);
+  --neu-shadow-inset-light: rgba(255, 255, 255, 0.03);
+  
+  /* ─── Neumorphic Presets ─── */
+  --neu-radius-sm: 8px;
+  --neu-radius-md: 12px;
+  --neu-radius-lg: 16px;
+  --neu-radius-xl: 24px;
+  --neu-radius-full: 9999px;
+  
+  /* ─── LCD Screen (Nokia inspired) ─── */
+  --lcd-bg: linear-gradient(180deg, #0a1520 0%, #051015 100%);
+  --lcd-text: #4DC3FF;
+  --lcd-text-glow: rgba(77, 195, 255, 0.6);
+  --lcd-dot-active: #00CCFF;
+  --lcd-dot-inactive: #0a2035;
+  
+  /* ─── Rubber Button (Nokia style) ─── */
+  --rubber-bg: linear-gradient(180deg, #3a3a3a 0%, #252525 50%, #1a1a1a 100%);
+  --rubber-bg-pressed: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 50%, #151515 100%);
+  --rubber-border: #0a0a0a;
+  
+  /* ─── Legacy compatibility (Spotify aliases) ─── */
+  --spotify-green: var(--xm-accent);
+  --spotify-green-dark: var(--xm-accent-dark);
+  --spotify-black: var(--xm-bg-base);
+  --spotify-gray-dark: var(--xm-bg-elevated);
+  --spotify-gray: var(--xm-bg-surface);
+  --spotify-gray-light: var(--xm-bg-hover);
+  --spotify-text: var(--xm-text-primary);
+  --spotify-text-secondary: var(--xm-text-secondary);
+  --spotify-text-muted: var(--xm-text-muted);
+  
+  /* ─── Neumorphism tokens (legacy) ─── */
+  --neu-bg: var(--xm-bg-elevated);
+  --neu-radius: var(--neu-radius-lg);
 }
 
 * {
@@ -30,7 +80,322 @@
   padding: 0;
 }
 
-/* --- Neumorphic Utilities --- */
+/* ═══════════════════════════════════════════════════════════
+   🔘 NEUMORPHIC UTILITY CLASSES
+   Reusable components for consistent UI
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Raised Surface (Cards, Panels) ─── */
+.neu-raised {
+  background: var(--xm-bg-elevated);
+  border-radius: var(--neu-radius-lg);
+  box-shadow: 
+    6px 6px 12px var(--neu-shadow-dark),
+    -3px -3px 8px var(--neu-shadow-light);
+  border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+/* ─── Inset Surface (Inputs, Progress bars) ─── */
+.neu-inset {
+  background: var(--xm-bg-deep);
+  border-radius: var(--neu-radius-md);
+  box-shadow: 
+    inset 4px 4px 8px var(--neu-shadow-inset-dark),
+    inset -2px -2px 6px var(--neu-shadow-inset-light);
+}
+
+/* ─── Circle Button (Icon buttons) ─── */
+.neu-btn-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--neu-radius-full);
+  background: var(--xm-bg-elevated);
+  color: var(--xm-text-primary);
+  border: none;
+  cursor: pointer;
+  box-shadow: 
+    5px 5px 10px var(--neu-shadow-dark),
+    -2px -2px 5px var(--neu-shadow-light);
+  transition: all 0.15s ease;
+}
+
+.neu-btn-circle:active {
+  transform: scale(0.95);
+  box-shadow: 
+    inset 3px 3px 6px var(--neu-shadow-inset-dark),
+    inset -2px -2px 4px var(--neu-shadow-inset-light);
+}
+
+.neu-btn-circle.active {
+  color: var(--xm-accent);
+  box-shadow: 
+    inset 3px 3px 6px var(--neu-shadow-inset-dark),
+    inset -2px -2px 4px var(--neu-shadow-inset-light),
+    0 0 12px var(--xm-accent-glow);
+}
+
+/* ─── Primary Action Button (Play, Submit) ─── */
+.neu-btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 24px;
+  border-radius: var(--neu-radius-lg);
+  background: linear-gradient(145deg, var(--xm-accent), var(--xm-accent-dark));
+  color: white;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  box-shadow: 
+    6px 6px 12px var(--neu-shadow-dark),
+    -2px -2px 6px var(--neu-shadow-light),
+    0 0 20px var(--xm-accent-glow);
+  transition: all 0.15s ease;
+}
+
+.neu-btn-primary:active {
+  transform: scale(0.97);
+  box-shadow: 
+    inset 2px 2px 5px rgba(0, 0, 0, 0.4),
+    0 0 15px var(--xm-accent-glow);
+}
+
+/* ─── Secondary Button ─── */
+.neu-btn-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 24px;
+  border-radius: var(--neu-radius-lg);
+  background: var(--xm-bg-elevated);
+  color: var(--xm-text-primary);
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  box-shadow: 
+    4px 4px 8px var(--neu-shadow-dark),
+    -2px -2px 5px var(--neu-shadow-light);
+  transition: all 0.15s ease;
+}
+
+.neu-btn-secondary:active {
+  transform: scale(0.97);
+  box-shadow: 
+    inset 2px 2px 4px var(--neu-shadow-inset-dark),
+    inset -1px -1px 3px var(--neu-shadow-inset-light);
+}
+
+/* ─── Nokia Rubber Button Style ─── */
+.neu-btn-rubber {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--xm-text-primary);
+  transition: all 0.15s ease;
+  position: relative;
+  background: var(--rubber-bg);
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--rubber-border);
+}
+
+.neu-btn-rubber::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  background: 
+    radial-gradient(circle at 20% 30%, rgba(255,255,255,0.08) 0%, transparent 40%),
+    radial-gradient(circle at 80% 30%, rgba(255,255,255,0.08) 0%, transparent 40%);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.neu-btn-rubber:active {
+  transform: scale(0.96);
+  background: var(--rubber-bg-pressed);
+  box-shadow: 
+    0 1px 2px rgba(0, 0, 0, 0.5),
+    inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.neu-btn-rubber:active svg,
+.neu-btn-rubber:active .btn-icon {
+  color: var(--xm-accent);
+}
+
+/* ─── Input Field ─── */
+.neu-input {
+  width: 100%;
+  padding: 14px 18px;
+  border: none;
+  border-radius: var(--neu-radius-lg);
+  background: var(--xm-bg-deep);
+  color: var(--xm-text-primary);
+  font-size: 16px;
+  box-shadow: 
+    inset 3px 3px 6px var(--neu-shadow-inset-dark),
+    inset -2px -2px 4px var(--neu-shadow-inset-light);
+  outline: none;
+  transition: box-shadow 0.2s ease;
+}
+
+.neu-input:focus {
+  box-shadow: 
+    inset 3px 3px 6px var(--neu-shadow-inset-dark),
+    inset -2px -2px 4px var(--neu-shadow-inset-light),
+    0 0 0 2px var(--xm-accent-glow);
+}
+
+.neu-input::placeholder {
+  color: var(--xm-text-muted);
+}
+
+/* ─── Slider/Range ─── */
+.neu-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: var(--neu-radius-full);
+  background: var(--xm-bg-surface);
+  outline: none;
+  cursor: pointer;
+  box-shadow: 
+    inset 2px 2px 4px var(--neu-shadow-inset-dark),
+    inset -1px -1px 3px var(--neu-shadow-inset-light);
+}
+
+.neu-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--neu-radius-full);
+  background: linear-gradient(145deg, var(--xm-accent), var(--xm-accent-dark));
+  cursor: pointer;
+  box-shadow: 
+    3px 3px 6px var(--neu-shadow-dark),
+    -1px -1px 3px var(--neu-shadow-light),
+    0 0 8px var(--xm-accent-glow);
+  transition: transform 0.1s ease;
+}
+
+.neu-slider:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+/* ─── Cover/Thumbnail with shadow ─── */
+.neu-cover {
+  border-radius: var(--neu-radius-md);
+  overflow: hidden;
+  box-shadow: 
+    3px 3px 6px var(--neu-shadow-dark),
+    -1px -1px 3px var(--neu-shadow-light);
+}
+
+.neu-cover-lg {
+  border-radius: var(--neu-radius-xl);
+  box-shadow: 
+    12px 12px 24px var(--neu-shadow-dark),
+    -6px -6px 12px var(--neu-shadow-light);
+  border: 2px solid rgba(255, 255, 255, 0.03);
+}
+
+/* ─── LCD Screen Container (Nokia style) ─── */
+.neu-lcd {
+  background: var(--lcd-bg);
+  border-radius: var(--neu-radius-md);
+  padding: 8px 12px;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  border: 1px solid #1a2a40;
+  box-shadow: 
+    inset 0 2px 8px rgba(0, 0, 0, 0.8),
+    0 1px 0 rgba(100, 150, 255, 0.1);
+}
+
+.neu-lcd-text {
+  color: var(--lcd-text);
+  text-shadow: 0 0 8px var(--lcd-text-glow);
+}
+
+/* ─── Progress Dots (LED style) ─── */
+.neu-led-dots {
+  display: flex;
+  gap: 3px;
+}
+
+.neu-led-dot {
+  width: 100%;
+  height: 3px;
+  background: var(--lcd-dot-inactive);
+  border-radius: 1px;
+  flex: 1;
+  transition: background 0.1s ease;
+}
+
+.neu-led-dot.active {
+  background: var(--lcd-dot-active);
+  box-shadow: 0 0 4px rgba(0, 204, 255, 0.8);
+}
+
+/* ─── Floating Sheet (Bottom sheets, Modals) ─── */
+.neu-sheet {
+  background: var(--xm-bg-elevated);
+  border-radius: var(--neu-radius-xl) var(--neu-radius-xl) 0 0;
+  box-shadow: 
+    0 -8px 24px var(--neu-shadow-dark),
+    0 -2px 8px var(--neu-shadow-light);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-bottom: none;
+}
+
+/* ─── Card with Glow on Active ─── */
+.neu-card-interactive {
+  background: var(--xm-bg-elevated);
+  border-radius: var(--neu-radius-md);
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 
+    4px 4px 8px var(--neu-shadow-dark),
+    -2px -2px 4px var(--neu-shadow-light);
+}
+
+.neu-card-interactive:active {
+  transform: scale(0.98);
+  box-shadow: 
+    inset 2px 2px 4px var(--neu-shadow-inset-dark),
+    inset -1px -1px 2px var(--neu-shadow-inset-light);
+}
+
+.neu-card-interactive.playing {
+  box-shadow: 
+    4px 4px 8px var(--neu-shadow-dark),
+    -2px -2px 4px var(--neu-shadow-light),
+    0 0 20px var(--xm-accent-glow);
+}
+
+/* ─── Divider ─── */
+.neu-divider {
+  height: 1px;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    var(--xm-bg-hover) 20%, 
+    var(--xm-bg-hover) 80%, 
+    transparent 100%);
+  margin: 8px 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Legacy Neumorphic Classes (for backward compatibility)
+   ═══════════════════════════════════════════════════════════ */
 
 /* 1. Raised Element (Cards, Buttons) */
 .neu-outset {
@@ -43,8 +408,8 @@
 }
 
 /* 2. Pressed Element (Active buttons, Inputs) */
-.neu-inset {
-  background: var(--spotify-black);
+.neu-inset-legacy {
+  background: var(--xm-bg-deep);
   box-shadow: 
     inset 4px 4px 8px var(--neu-shadow-dark),
     inset -2px -2px 6px var(--neu-shadow-light);
@@ -58,9 +423,9 @@
   justify-content: center;
   width: 48px;
   height: 48px;
-  border-radius: 50%; /* Circle */
+  border-radius: 50%;
   background: var(--neu-bg);
-  color: var(--spotify-text);
+  color: var(--xm-text-primary);
   border: none;
   cursor: pointer;
   box-shadow: 
@@ -77,19 +442,20 @@
 }
 
 .neu-icon-btn.active {
-  color: var(--spotify-green);
+  color: var(--xm-accent);
   box-shadow: 
     inset 3px 3px 6px var(--neu-shadow-dark),
     inset -2px -2px 4px var(--neu-shadow-light);
 }
 
-/* 4. Green Action Button (Play) */
+/* 4. Action Button (Play) - Now red XpressMusic style */
 .neu-action-btn {
-  background: linear-gradient(145deg, var(--spotify-green), var(--spotify-green-dark));
+  background: linear-gradient(145deg, var(--xm-accent), var(--xm-accent-dark));
   color: white;
   box-shadow: 
     6px 6px 12px rgba(0,0,0,0.5),
-    -2px -2px 6px rgba(255,255,255,0.1);
+    -2px -2px 6px rgba(255,255,255,0.1),
+    0 0 20px var(--xm-accent-glow);
 }
 
 .neu-action-btn:active {
