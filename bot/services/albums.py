@@ -180,10 +180,9 @@ class AlbumAssemblyService:
     async def get_album_candidates(self, user_id: int) -> List[Dict]:
         """
         Find potential albums from user's tracks.
-        Groups by (normalized album name + normalized main artist) as key.
-        This ensures tracks from different sources with same album/artist 
-        are grouped together, while albums with same name but different artists
-        remain separate.
+        Groups primarily by deezer_album_id (if available), otherwise by 
+        (normalized album name + normalized main artist).
+        This properly handles compilations where each track has different artists.
         Returns list of album candidates with track counts.
         """
         async with get_session() as session:
@@ -199,25 +198,26 @@ class AlbumAssemblyService:
             )
             tracks = list(result.scalars().all())
             
-            # Group by (normalized album + normalized artist) to:
-            # 1. Merge tracks from same album with slight artist name variations
-            # 2. Keep albums with same name but different artists separate
+            # Group by deezer_album_id first (most reliable), then by album+artist
             albums: Dict[str, Dict] = {}
             
             for track in tracks:
-                # Normalize album name and main artist for grouping key
                 album_key = track.album.lower().strip()
                 artist_key = normalize_artist_for_grouping(track.artist) if track.artist else ""
                 
-                # Combined key: album + normalized artist
-                key = f"{album_key}||{artist_key}"
+                # Use deezer_album_id as primary key if available (handles compilations)
+                if track.deezer_album_id:
+                    key = f"deezer:{track.deezer_album_id}"
+                else:
+                    # Fallback to album + artist
+                    key = f"album:{album_key}||{artist_key}"
                 
                 if key not in albums:
                     albums[key] = {
                         "album": track.album,
                         "album_key": album_key,
                         "artist_key": artist_key,
-                        "deezer_album_ids": set(),  # Collect all deezer IDs
+                        "deezer_album_id": track.deezer_album_id,
                         "cover_url": track.cover_url,
                         "artists": set(),
                         "track_ids": set(),
@@ -238,9 +238,9 @@ class AlbumAssemblyService:
                 if not album_data["cover_url"] and track.cover_url:
                     album_data["cover_url"] = track.cover_url
                 
-                # Collect all deezer_album_ids
-                if track.deezer_album_id:
-                    album_data["deezer_album_ids"].add(track.deezer_album_id)
+                # Update deezer_album_id if we don't have one
+                if not album_data["deezer_album_id"] and track.deezer_album_id:
+                    album_data["deezer_album_id"] = track.deezer_album_id
             
             # Convert to list and filter by minimum tracks
             candidates = []
@@ -252,15 +252,11 @@ class AlbumAssemblyService:
                 artists_list = sorted(data["artists"])
                 main_artist = artists_list[0] if artists_list else "Unknown"
                 
-                # Pick the first deezer_album_id if any exist
-                deezer_ids = list(data["deezer_album_ids"])
-                deezer_album_id = deezer_ids[0] if deezer_ids else None
-                
                 candidates.append({
                     "artist": main_artist,
                     "all_artists": artists_list,
                     "album": data["album"],
-                    "deezer_album_id": deezer_album_id,
+                    "deezer_album_id": data["deezer_album_id"],
                     "cover_url": data["cover_url"],
                     "track_count": len(data["track_ids"]),
                     "total_duration": data["total_duration"],
@@ -314,7 +310,8 @@ class AlbumAssemblyService:
     ) -> Optional[Playlist]:
         """
         Check if auto-album playlist already exists for this album.
-        Searches by album name and optionally artist.
+        First tries to match by deezer_album_id (most reliable),
+        then falls back to album name + artist matching.
         """
         async with get_session() as session:
             # Get all album playlists for user
@@ -326,9 +323,16 @@ class AlbumAssemblyService:
             )
             playlists = result.scalars().all()
             
+            # First: try exact match by deezer_album_id (most reliable)
+            if deezer_album_id:
+                for pl in playlists:
+                    if pl.deezer_album_id == deezer_album_id:
+                        return pl
+            
             album_lower = album.lower().strip()
             artist_key = normalize_artist_for_grouping(artist) if artist else ""
             
+            # Second: match by album name and artist
             for pl in playlists:
                 if not pl.name:
                     continue
@@ -366,7 +370,8 @@ class AlbumAssemblyService:
     ) -> List[Track]:
         """
         Get all user's tracks for a specific album.
-        Groups by album name and artist (normalized) to ensure correct grouping.
+        If deezer_album_id is provided, uses it for more accurate matching (handles compilations).
+        Otherwise groups by album name and artist (normalized).
         Deduplicates by title to avoid duplicate tracks from different sources.
         """
         album_lower = album.lower().strip()
@@ -384,14 +389,19 @@ class AlbumAssemblyService:
                 )
             )
             
-            # Filter by album name and artist in Python
+            # Filter by album name and optionally by deezer_album_id or artist
             all_tracks = []
             for t in result.scalars().all():
                 if not t.album or t.album.lower().strip() != album_lower:
                     continue
                 
-                # If we have artist filter, check it matches
-                if artist_key:
+                # If we have deezer_album_id, prefer matching by it (handles compilations)
+                if deezer_album_id:
+                    # Include track if it has matching deezer_album_id OR no deezer_album_id set
+                    if t.deezer_album_id and t.deezer_album_id != deezer_album_id:
+                        continue
+                elif artist_key:
+                    # Fall back to artist matching
                     track_artist_key = normalize_artist_for_grouping(t.artist) if t.artist else ""
                     if track_artist_key != artist_key:
                         continue
