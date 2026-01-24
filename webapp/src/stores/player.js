@@ -266,30 +266,36 @@ export const usePlayerStore = defineStore('player', () => {
     return queue.value[nextIdx] || null
   }
 
-  // Update Media Session metadata
+  // Update Media Session metadata (for lock screen, notification area, Bluetooth controls, etc.)
   const updateMediaSession = () => {
     if (!('mediaSession' in navigator) || !currentTrack.value) return
     
     const track = currentTrack.value
-    const artwork = track.cover_art_url ? [
-      { src: track.cover_art_url, sizes: '96x96', type: 'image/jpeg' },
-      { src: track.cover_art_url, sizes: '128x128', type: 'image/jpeg' },
-      { src: track.cover_art_url, sizes: '256x256', type: 'image/jpeg' },
-      { src: track.cover_art_url, sizes: '512x512', type: 'image/jpeg' },
+    // Use cover_url field from track model, fallback to empty array if no cover
+    const coverUrl = track.cover_url
+    const artwork = coverUrl ? [
+      { src: coverUrl, sizes: '96x96', type: 'image/jpeg' },
+      { src: coverUrl, sizes: '128x128', type: 'image/jpeg' },
+      { src: coverUrl, sizes: '256x256', type: 'image/jpeg' },
+      { src: coverUrl, sizes: '512x512', type: 'image/jpeg' },
     ] : []
     
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: track.title || 'Unknown',
-      artist: track.artist || 'Unknown Artist',
+      title: track.title || 'Без названия',
+      artist: track.artist || 'Неизвестный исполнитель',
       album: track.album || '',
       artwork
     })
+    
+    // Also update playback state when metadata changes
+    updatePlaybackState()
   }
 
-  // Setup Media Session handlers
+  // Setup Media Session handlers (for lock screen, notification controls, Bluetooth, etc.)
   const setupMediaSession = () => {
     if (!('mediaSession' in navigator)) return
     
+    // Play/Pause handlers
     navigator.mediaSession.setActionHandler('play', () => {
       if (audio.value) audio.value.play()
     })
@@ -298,6 +304,7 @@ export const usePlayerStore = defineStore('player', () => {
       if (audio.value) audio.value.pause()
     })
     
+    // Track navigation
     navigator.mediaSession.setActionHandler('previoustrack', () => {
       prev()
     })
@@ -306,21 +313,159 @@ export const usePlayerStore = defineStore('player', () => {
       next()
     })
     
+    // Seek to specific position (used by progress bar on lock screen)
     navigator.mediaSession.setActionHandler('seekto', (details) => {
-      if (details.seekTime !== undefined) {
+      if (details.seekTime !== undefined && audio.value) {
         seek(details.seekTime)
+        // Immediately update position for responsive UI
+        updatePositionState()
       }
     })
     
+    // Seek backward (headphone button double-tap, etc.)
     navigator.mediaSession.setActionHandler('seekbackward', (details) => {
       const skipTime = details.seekOffset || 10
       seek(Math.max(0, progress.value - skipTime))
+      updatePositionState()
     })
     
+    // Seek forward (headphone button triple-tap, etc.)
     navigator.mediaSession.setActionHandler('seekforward', (details) => {
       const skipTime = details.seekOffset || 10
       seek(Math.min(duration.value, progress.value + skipTime))
+      updatePositionState()
     })
+    
+    // Stop handler (some systems use this instead of pause)
+    try {
+      navigator.mediaSession.setActionHandler('stop', () => {
+        if (audio.value) {
+          audio.value.pause()
+          audio.value.currentTime = 0
+        }
+        isPlaying.value = false
+        updatePlaybackState()
+      })
+    } catch (e) {
+      // 'stop' action not supported in all browsers
+      console.log('[MediaSession] stop handler not supported')
+    }
+  }
+
+  // Setup global keyboard shortcuts for media control
+  // Works on desktop (keyboard) and some mobile devices with external keyboards
+  let keyboardHandlerAttached = false
+  const setupKeyboardShortcuts = () => {
+    if (keyboardHandlerAttached) return
+    keyboardHandlerAttached = true
+    
+    document.addEventListener('keydown', (e) => {
+      // Ignore if user is typing in an input field
+      const target = e.target
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return
+      }
+      
+      switch (e.code) {
+        case 'Space':
+          // Space - Play/Pause (only if not scrolling)
+          e.preventDefault()
+          toggle()
+          break
+          
+        case 'MediaPlayPause':
+          // Media key - Play/Pause
+          e.preventDefault()
+          toggle()
+          break
+          
+        case 'MediaTrackNext':
+          // Media key - Next track
+          e.preventDefault()
+          next()
+          break
+          
+        case 'MediaTrackPrevious':
+          // Media key - Previous track
+          e.preventDefault()
+          prev()
+          break
+          
+        case 'ArrowRight':
+          // Right arrow - Seek forward 10 seconds (when not in input)
+          if (!e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault()
+            seek(Math.min(duration.value, progress.value + 10))
+          }
+          break
+          
+        case 'ArrowLeft':
+          // Left arrow - Seek backward 10 seconds
+          if (!e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault()
+            seek(Math.max(0, progress.value - 10))
+          }
+          break
+          
+        case 'KeyM':
+          // M - Toggle mute
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault()
+            toggleMute()
+          }
+          break
+          
+        case 'KeyN':
+          // N - Next track
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault()
+            next()
+          }
+          break
+          
+        case 'KeyP':
+          // P - Previous track
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault()
+            prev()
+          }
+          break
+          
+        case 'KeyS':
+          // S - Toggle shuffle
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault()
+            toggleShuffle()
+          }
+          break
+          
+        case 'KeyR':
+          // R - Toggle repeat
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault()
+            toggleRepeat()
+          }
+          break
+          
+        case 'ArrowUp':
+          // Up arrow - Volume up
+          if (!e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault()
+            setVolume(Math.min(1, volume.value + 0.1))
+          }
+          break
+          
+        case 'ArrowDown':
+          // Down arrow - Volume down
+          if (!e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault()
+            setVolume(Math.max(0, volume.value - 0.1))
+          }
+          break
+      }
+    })
+    
+    console.log('[Keyboard] Global shortcuts enabled: Space=play/pause, ←/→=seek, ↑/↓=volume, M=mute, N/P=next/prev, S=shuffle, R=repeat')
   }
 
   // Update Media Session playback state
@@ -329,19 +474,25 @@ export const usePlayerStore = defineStore('player', () => {
     navigator.mediaSession.playbackState = isPlaying.value ? 'playing' : 'paused'
   }
 
-  // Update Media Session position
+  // Update Media Session position (shows progress on lock screen)
   const updatePositionState = () => {
-    if (!('mediaSession' in navigator) || !audio.value || !duration.value) return
+    if (!('mediaSession' in navigator) || !audio.value || !duration.value || !isFinite(duration.value)) return
     try {
-      navigator.mediaSession.setPositionState({
-        duration: duration.value,
-        playbackRate: audio.value.playbackRate,
-        position: progress.value
-      })
+      const position = Math.min(progress.value, duration.value)
+      if (isFinite(position) && position >= 0) {
+        navigator.mediaSession.setPositionState({
+          duration: duration.value,
+          playbackRate: audio.value.playbackRate || 1,
+          position: position
+        })
+      }
     } catch (e) {
-      // Ignore errors
+      // Ignore errors (can happen during track transitions)
     }
   }
+  
+  // Track for position update throttling
+  let lastPositionUpdate = 0
 
   // Initialize audio element
   const initAudio = () => {
@@ -353,8 +504,11 @@ export const usePlayerStore = defineStore('player', () => {
     // The slow start issue was due to sequential API calls, not buffering
     audio.value.preload = 'auto' 
     
-    // Setup Media Session handlers once
+    // Setup Media Session handlers once (for lock screen, notification controls, etc.)
     setupMediaSession()
+    
+    // Setup global keyboard shortcuts (for desktop media control)
+    setupKeyboardShortcuts()
     
     // canplay event - audio ready to play
     audio.value.addEventListener('canplay', () => {
@@ -390,8 +544,10 @@ export const usePlayerStore = defineStore('player', () => {
         }
       }
 
-      // Update position state every 5 seconds for media session
-      if (Math.floor(progress.value) % 5 === 0) {
+      // Update position state every second for media session (throttled)
+      const now = Date.now()
+      if (now - lastPositionUpdate >= 1000) {
+        lastPositionUpdate = now
         updatePositionState()
       }
     })
