@@ -289,14 +289,33 @@ async def stream_audio(
             range_value = f"bytes={start_byte}-{end_byte}"
         telegram_headers["Range"] = range_value
     
+    # Make request to Telegram FIRST to validate and get actual content info
+    session = await get_http_session()
+    try:
+        telegram_response = await session.get(telegram_url, headers=telegram_headers)
+    except aiohttp.ClientError as e:
+        logger.error(f"Failed to connect to Telegram for streaming: {e}")
+        raise HTTPException(status_code=503, detail="Failed to fetch audio from Telegram")
+    
+    # Check if Telegram returned an error
+    if telegram_response.status >= 400:
+        await telegram_response.release()
+        logger.error(f"Telegram returned error {telegram_response.status} for file {file_path}")
+        if telegram_response.status == 404:
+            raise HTTPException(status_code=404, detail="File no longer available on Telegram")
+        raise HTTPException(status_code=503, detail=f"Telegram error: {telegram_response.status}")
+    
+    # Get ACTUAL content length from Telegram response (not from our DB!)
+    actual_content_length = telegram_response.headers.get("Content-Length")
+    telegram_content_range = telegram_response.headers.get("Content-Range")
+    
     async def stream_generator():
-        """Stream audio using pooled connection for faster start"""
-        session = await get_http_session()
-        async with session.get(telegram_url, headers=telegram_headers) as resp:
-            # Optimised chunk sizes for better throughput
-            # 64KB chunks provide better performance than small 8KB chunks
-            async for chunk in resp.content.iter_chunked(64 * 1024):
+        """Stream audio from already-opened Telegram response"""
+        try:
+            async for chunk in telegram_response.content.iter_chunked(64 * 1024):
                 yield chunk
+        finally:
+            await telegram_response.release()
     
     # Build response headers
     response_headers = {
@@ -305,13 +324,11 @@ async def stream_audio(
         "Cache-Control": "private, max-age=3600",  # Cache 1 hour
     }
     
-    # If we have file size and Range request, return 206 Partial Content
-    if file_size and range:
-        actual_end = end_byte if end_byte else file_size - 1
-        content_length = actual_end - start_byte + 1
-        
-        response_headers["Content-Range"] = f"bytes {start_byte}-{actual_end}/{file_size}"
-        response_headers["Content-Length"] = str(content_length)
+    # If Telegram returned 206 Partial Content, pass it through
+    if telegram_response.status == 206 and telegram_content_range:
+        response_headers["Content-Range"] = telegram_content_range
+        if actual_content_length:
+            response_headers["Content-Length"] = actual_content_length
         
         return StreamingResponse(
             stream_generator(),
@@ -320,9 +337,9 @@ async def stream_audio(
             headers=response_headers,
         )
     
-    # Regular response (no Range)
-    if file_size:
-        response_headers["Content-Length"] = str(file_size)
+    # Regular 200 response - use actual content length from Telegram
+    if actual_content_length:
+        response_headers["Content-Length"] = actual_content_length
     
     return StreamingResponse(
         stream_generator(),

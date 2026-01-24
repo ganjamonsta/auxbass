@@ -433,6 +433,22 @@ export const usePlayerStore = defineStore('player', () => {
     audio.value.addEventListener('error', (e) => {
       console.error('Audio error:', e)
       loading.value = false
+      
+      // Auto-skip on audio element errors (network issues, decode errors, etc.)
+      // Error codes: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED
+      const errorCode = audio.value?.error?.code
+      const errorMsg = audio.value?.error?.message || 'Ошибка воспроизведения'
+      
+      if (errorCode && errorCode >= 2) {
+        console.warn(`[Audio Error] Code ${errorCode}: ${errorMsg}, auto-skipping`)
+        lastError.value = {
+          type: 'audio_error',
+          track: currentTrack.value,
+          message: `Ошибка аудио: ${errorMsg}`
+        }
+        // Auto-skip to keep music playing
+        setTimeout(() => next(), 1000)
+      }
     })
     
     // Preload next track ASAP - when current track can play through
@@ -545,6 +561,20 @@ export const usePlayerStore = defineStore('player', () => {
     audio.value.addEventListener('error', (e) => {
       console.error('Audio error:', e)
       loading.value = false
+      
+      // Auto-skip on audio element errors (network issues, decode errors, etc.)
+      const errorCode = audio.value?.error?.code
+      const errorMsg = audio.value?.error?.message || 'Ошибка воспроизведения'
+      
+      if (errorCode && errorCode >= 2) {
+        console.warn(`[Audio Error] Code ${errorCode}: ${errorMsg}, auto-skipping`)
+        lastError.value = {
+          type: 'audio_error',
+          track: currentTrack.value,
+          message: `Ошибка аудио: ${errorMsg}`
+        }
+        setTimeout(() => next(), 1000)
+      }
     })
   }
   // Preload next 2-3 tracks using batch API for instant playback
@@ -900,9 +930,11 @@ export const usePlayerStore = defineStore('player', () => {
     } catch (error) {
       console.error('Failed to play track:', error)
       
+      const statusCode = error.response?.status
+      const errorDetail = error.response?.data?.detail || error.message || 'Ошибка воспроизведения'
+      
       // Check if file is unavailable (503 error)
-      if (error.response?.status === 503) {
-        const errorDetail = error.response?.data?.detail || 'Файл недоступен'
+      if (statusCode === 503) {
         const isLargeFile = errorDetail.includes('слишком большой') || errorDetail.includes('too large') ||
                            (track.file_size && track.file_size > 20 * 1024 * 1024)
         
@@ -929,6 +961,39 @@ export const usePlayerStore = defineStore('player', () => {
         
         // Auto-skip to next track
         setTimeout(() => next(), 1500)
+      } else if (statusCode === 401) {
+        // Token expired - clear URL cache and retry once, or skip
+        console.warn('[Play] Stream token expired, clearing cache and skipping')
+        urlCache.delete(track.id)
+        lastError.value = {
+          type: 'auth_expired',
+          track: track,
+          message: 'Токен истёк, переключаем трек...'
+        }
+        setTimeout(() => next(), 500)
+      } else if (statusCode === 404) {
+        // Track/file not found
+        lastError.value = {
+          type: 'not_found',
+          track: track,
+          message: 'Трек не найден'
+        }
+        try {
+          await tracksApi.markUnavailable(track.id)
+          track.is_unavailable = true
+        } catch (e) {
+          console.error('Failed to mark track unavailable:', e)
+        }
+        setTimeout(() => next(), 1000)
+      } else {
+        // Any other error (network, etc) - just skip to keep music playing
+        console.warn('[Play] Unknown error, auto-skipping:', statusCode, errorDetail)
+        lastError.value = {
+          type: 'playback_error',
+          track: track,
+          message: errorDetail
+        }
+        setTimeout(() => next(), 1000)
       }
     } finally {
       loading.value = false

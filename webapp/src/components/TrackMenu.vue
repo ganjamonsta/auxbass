@@ -44,16 +44,9 @@
 
               <div class="menu-divider"></div>
 
-              <!-- If user is uploader - show full delete -->
-              <button v-if="isUploader" class="menu-item danger" @click="handleDelete">
+              <button class="menu-item danger" @click="handleDelete">
                 <span class="menu-icon">🗑️</span>
-                <span>Удалить трек</span>
-              </button>
-              
-              <!-- If user added track from global library - show remove from library -->
-              <button v-else-if="track?.in_library" class="menu-item danger" @click="handleRemoveFromLibrary">
-                <span class="menu-icon">📤</span>
-                <span>Убрать из библиотеки</span>
+                <span>Удалить</span>
               </button>
             </div>
           </div>
@@ -64,25 +57,18 @@
 </template>
 
 <script setup>
-import { inject, computed } from 'vue'
+import { inject } from 'vue'
 import { usePlayerStore } from '../stores/player'
 
 const props = defineProps({
   show: Boolean,
-  track: Object,
-  currentUserId: Number  // Current user's Telegram ID
+  track: Object
 })
 
-const emit = defineEmits(['close', 'addToPlaylist', 'edit', 'delete', 'removeFromLibrary', 'download'])
+const emit = defineEmits(['close', 'addToPlaylist', 'edit', 'delete', 'download'])
 
 const player = usePlayerStore()
 const telegram = inject('telegram')
-
-// Check if current user is the uploader of this track
-const isUploader = computed(() => {
-  if (!props.track?.uploader?.id || !props.currentUserId) return false
-  return props.track.uploader.id === props.currentUserId
-})
 
 // Haptic feedback helper
 const haptic = (type = 'light') => {
@@ -120,12 +106,6 @@ const handleEdit = () => {
 const handleDelete = () => {
   haptic('warning')
   emit('delete', props.track)
-  emit('close')
-}
-
-const handleRemoveFromLibrary = () => {
-  haptic('light')
-  emit('removeFromLibrary', props.track)
   emit('close')
 }
 
