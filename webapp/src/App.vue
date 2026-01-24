@@ -189,7 +189,7 @@
           <!-- Top Artists Section -->
           <div v-if="library.artists.length > 0" class="feed-section">
             <h2 class="feed-section-title">Твои артисты</h2>
-            <div class="horizontal-scroll">
+            <div class="horizontal-scroll artists-scroll">
               <div class="scroll-spacer"></div>
               <div 
                 v-for="artist in library.artists.slice(0, 10)" 
@@ -215,7 +215,7 @@
           <!-- Genres Section -->
           <div v-if="library.genres.length > 0" class="feed-section">
             <h2 class="feed-section-title">Жанры</h2>
-            <div class="horizontal-scroll">
+            <div class="horizontal-scroll genres-scroll">
               <div class="scroll-spacer"></div>
               <div 
                 v-for="genre in library.genres.slice(0, 10)" 
@@ -1194,6 +1194,18 @@ const filterScope = ref('library') // 'library' or 'global' - which library we'r
 // Fullscreen section view
 const expandedSection = ref(null) // 'albums', 'sources', 'playlists' or null
 
+// Navigation history stack
+const navigationStack = ref([])
+
+// Scroll positions cache (persists during session)
+const scrollPositions = ref({
+  artistsScroll: 0,
+  albumsScroll: 0,
+  sourcesScroll: 0,
+  playlistsScroll: 0,
+  genresScroll: 0,
+})
+
 // Track menu state
 const showTrackMenuModal = ref(false)
 const selectedTrack = ref(null)
@@ -1404,9 +1416,76 @@ const goBack = () => {
     expandedSection.value = null
     return
   }
-  currentView.value = 'library'
-  currentPlaylist.value = null
-  library.clearCurrentArtist()
+  
+  // Pop from navigation stack
+  if (navigationStack.value.length > 0) {
+    const prevState = navigationStack.value.pop()
+    currentView.value = prevState.view
+    currentPlaylist.value = prevState.playlist
+    
+    // Restore artist if we're going back to artist view
+    if (prevState.view === 'artist' && prevState.artist) {
+      library.setCurrentArtist(prevState.artist)
+    } else if (prevState.view === 'library') {
+      library.clearCurrentArtist()
+    }
+    
+    // Restore scroll positions after DOM update
+    nextTick(() => {
+      restoreScrollPositions()
+    })
+  } else {
+    // No history, go to library
+    currentView.value = 'library'
+    currentPlaylist.value = null
+    library.clearCurrentArtist()
+  }
+}
+
+// Save current scroll positions of horizontal scrollers
+const saveScrollPositions = () => {
+  const selectors = {
+    artistsScroll: '.artists-scroll',
+    albumsScroll: '.albums-scroll', 
+    sourcesScroll: '.sources-scroll',
+    playlistsScroll: '.playlists-scroll',
+    genresScroll: '.genres-scroll',
+  }
+  
+  for (const [key, selector] of Object.entries(selectors)) {
+    const el = document.querySelector(selector)
+    if (el) {
+      scrollPositions.value[key] = el.scrollLeft
+    }
+  }
+}
+
+// Restore scroll positions of horizontal scrollers
+const restoreScrollPositions = () => {
+  const selectors = {
+    artistsScroll: '.artists-scroll',
+    albumsScroll: '.albums-scroll',
+    sourcesScroll: '.sources-scroll', 
+    playlistsScroll: '.playlists-scroll',
+    genresScroll: '.genres-scroll',
+  }
+  
+  for (const [key, selector] of Object.entries(selectors)) {
+    const el = document.querySelector(selector)
+    if (el && scrollPositions.value[key]) {
+      el.scrollLeft = scrollPositions.value[key]
+    }
+  }
+}
+
+// Push current state to navigation stack before navigating
+const pushNavigation = () => {
+  saveScrollPositions()
+  navigationStack.value.push({
+    view: currentView.value,
+    playlist: currentPlaylist.value,
+    artist: library.currentArtist,  // Save artist state for back navigation
+  })
 }
 
 const openSection = (section) => {
@@ -1644,6 +1723,7 @@ const openPlaylist = async (playlist) => {
     currentView.value = 'main'
     return
   }
+  pushNavigation()
   currentPlaylist.value = await library.fetchPlaylist(playlist.id)
   currentView.value = 'playlist'
 }
@@ -1661,6 +1741,7 @@ const submitCreatePlaylist = async () => {
 
 const filterByArtist = async (artist, scope = 'library') => {
   // Open artist card view instead of filtering
+  pushNavigation()
   await library.fetchArtistDetail(artist, scope)
   currentView.value = 'artist'
 }

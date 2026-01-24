@@ -212,6 +212,11 @@ export const useLibraryStore = defineStore('library', () => {
     currentArtist.value = null
   }
 
+  // Set current artist (for navigation history restore)
+  const setCurrentArtist = (artist) => {
+    currentArtist.value = artist
+  }
+
   // Fetch artist images from Last.fm (in batches to not overload)
   const fetchArtistImages = async (artistList) => {
     const BATCH_SIZE = 5  // Load 5 at a time
@@ -621,6 +626,7 @@ export const useLibraryStore = defineStore('library', () => {
     fetchArtists,
     fetchArtistDetail,
     clearCurrentArtist,
+    setCurrentArtist,
     fetchGenres,
     fetchHistory,
     fetchLikedTracks,
