@@ -16,7 +16,12 @@
       </div>
       <!-- LED Progress dots -->
       <div class="lcd-progress">
-        <span class="lcd-dot" v-for="i in 16" :key="i" :class="{ active: (i / 16) * 100 <= progressPercent }"></span>
+        <span 
+          class="lcd-dot" 
+          v-for="i in 16" 
+          :key="i" 
+          :class="getDotClass(i)"
+        ></span>
       </div>
     </div>
     
@@ -86,6 +91,29 @@ const bufferedPercent = computed(() => {
   if (!dur) return 0
   return (props.buffered / dur) * 100
 })
+
+// Get class for each LED dot
+const getDotClass = (index) => {
+  const dotPercent = (index / 16) * 100
+  const prevDotPercent = ((index - 1) / 16) * 100
+  
+  // Active (played) - red
+  if (dotPercent <= progressPercent.value) {
+    return 'active'
+  }
+  
+  // Next dot to light up - blinking
+  if (prevDotPercent < progressPercent.value && dotPercent > progressPercent.value) {
+    return 'next'
+  }
+  
+  // Buffered - blue
+  if (dotPercent <= bufferedPercent.value) {
+    return 'buffered'
+  }
+  
+  return ''
+}
 
 // Generate cover gradient
 const coverGradient = computed(() => {
@@ -308,6 +336,28 @@ const formatTime = (seconds) => {
 .lcd-dot.active {
   background: var(--xm-accent);
   box-shadow: 0 0 6px var(--xm-accent-glow);
+}
+
+.lcd-dot.buffered {
+  background: var(--xm-secondary);
+  box-shadow: 0 0 4px rgba(0, 188, 212, 0.5);
+}
+
+.lcd-dot.next {
+  background: var(--xm-accent);
+  opacity: 0.5;
+  animation: dot-blink 0.6s ease-in-out infinite;
+}
+
+@keyframes dot-blink {
+  0%, 100% { 
+    opacity: 0.3;
+    box-shadow: none;
+  }
+  50% { 
+    opacity: 1;
+    box-shadow: 0 0 8px var(--xm-accent-glow);
+  }
 }
 
 /* ─── Nokia XpressMusic Style Rubber Buttons ─── */

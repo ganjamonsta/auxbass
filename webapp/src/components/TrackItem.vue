@@ -162,8 +162,7 @@ const formatDuration = (seconds) => {
   background: var(--xm-bg-surface);
   box-shadow: 
     inset 2px 2px 4px var(--neu-shadow-inset-dark),
-    inset -1px -1px 3px var(--neu-shadow-inset-light),
-    0 0 20px var(--xm-accent-glow);
+    inset -1px -1px 3px var(--neu-shadow-inset-light);
 }
 
 .track-item.compact {
@@ -191,8 +190,7 @@ const formatDuration = (seconds) => {
 .track-item.playing .track-cover {
   box-shadow: 
     4px 4px 8px var(--neu-shadow-dark),
-    -2px -2px 4px var(--neu-shadow-light),
-    0 0 16px var(--xm-accent-glow);
+    -2px -2px 4px var(--neu-shadow-light);
 }
 
 .compact .track-cover {
