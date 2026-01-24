@@ -26,6 +26,85 @@ async def debug_user_albums(user_id: int = 874295897):
         lib_count = lib_result.scalar()
         print(f"📚 UserLibrary entries: {lib_count}")
         
+        # 2. Get a specific track with Russian album
+        print("\n🔍 Checking specific track (Глюк'oZa - Москва)...")
+        track_result = await session.execute(
+            select(Track)
+            .where(Track.id == 4)
+        )
+        track = track_result.scalar_one_or_none()
+        
+        if track:
+            print(f"   Track ID: {track.id}")
+            print(f"   Title: '{track.title}'")
+            print(f"   Artist: '{track.artist}'")
+            print(f"   Album: '{track.album}'")
+            print(f"   Album bytes: {track.album.encode('utf-8') if track.album else None}")
+            print(f"   Album lower: '{track.album.lower().strip() if track.album else None}'")
+            
+            # Check if this track is in user's library
+            lib_check = await session.execute(
+                select(UserLibrary)
+                .where(
+                    UserLibrary.user_id == user_id,
+                    UserLibrary.track_id == track.id
+                )
+            )
+            lib_entry = lib_check.scalar_one_or_none()
+            print(f"   In user library: {lib_entry is not None}")
+            if lib_entry:
+                print(f"   UserLibrary ID: {lib_entry.id}")
+        
+        # 3. Check playlist
+        print("\n🔍 Checking playlist 'Москва'...")
+        pl_result = await session.execute(
+            select(Playlist)
+            .where(
+                Playlist.user_id == user_id,
+                Playlist.name == 'Москва'
+            )
+        )
+        playlist = pl_result.scalar_one_or_none()
+        
+        if playlist:
+            print(f"   Playlist ID: {playlist.id}")
+            print(f"   Name: '{playlist.name}'")
+            print(f"   Name bytes: {playlist.name.encode('utf-8')}")
+            print(f"   Name lower: '{playlist.name.lower().strip()}'")
+            
+            # Direct SQL comparison
+            if track and track.album:
+                print(f"\n🔍 Direct comparison:")
+                print(f"   track.album.lower(): '{track.album.lower().strip()}'")
+                print(f"   playlist.name.lower(): '{playlist.name.lower().strip()}'")
+                print(f"   Equal: {track.album.lower().strip() == playlist.name.lower().strip()}")
+                
+                # Try the actual query
+                match_result = await session.execute(
+                    select(Track)
+                    .join(UserLibrary, UserLibrary.track_id == Track.id)
+                    .where(
+                        UserLibrary.user_id == user_id,
+                        func.lower(Track.album) == playlist.name.lower().strip()
+                    )
+                )
+                matches = list(match_result.scalars().all())
+                print(f"   Query matches: {len(matches)}")
+                
+                # Try without func.lower - using Python lower
+                all_lib_result = await session.execute(
+                    select(Track)
+                    .join(UserLibrary, UserLibrary.track_id == Track.id)
+                    .where(UserLibrary.user_id == user_id)
+                )
+                all_lib_tracks = list(all_lib_result.scalars().all())
+                
+                python_matches = [t for t in all_lib_tracks 
+                                  if t.album and t.album.lower().strip() == playlist.name.lower().strip()]
+                print(f"   Python filter matches: {len(python_matches)}")
+                for t in python_matches:
+                    print(f"      • {t.id}: {t.title} (album: '{t.album}')")
+        
         # 2. Check tracks with albums in user's library
         tracks_result = await session.execute(
             select(Track)
