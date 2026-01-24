@@ -4,7 +4,7 @@ Automatically creates playlists from tracks with matching album/artist
 """
 import logging
 from typing import Optional, List, Dict
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func
 
 import sys
 from pathlib import Path
@@ -26,7 +26,9 @@ class AlbumAssemblyService:
     async def get_album_candidates(self, user_id: int) -> List[Dict]:
         """
         Find potential albums from user's tracks.
-        Groups by deezer_album_id primarily, or by album name (case-insensitive).
+        Groups by album name (case-insensitive) as primary key.
+        This ensures tracks from different sources with same album name 
+        but different metadata (artist, deezer_album_id) are grouped together.
         Aggregates all artists for the album.
         Returns list of album candidates with track counts.
         """
@@ -42,20 +44,18 @@ class AlbumAssemblyService:
             )
             tracks = list(result.scalars().all())
             
-            # Group by deezer_album_id or album name (normalized)
+            # Group by album name (normalized) - this ensures all tracks
+            # with same album name are grouped together regardless of artist/source
             albums: Dict[str, Dict] = {}
             
             for track in tracks:
-                # Use deezer_album_id as primary key, fallback to album name
-                if track.deezer_album_id:
-                    key = f"deezer:{track.deezer_album_id}"
-                else:
-                    key = f"name:{track.album.lower().strip()}"
+                # Use album name as primary key (case-insensitive, trimmed)
+                key = track.album.lower().strip()
                 
                 if key not in albums:
                     albums[key] = {
                         "album": track.album,
-                        "deezer_album_id": track.deezer_album_id,
+                        "deezer_album_ids": set(),  # Collect all deezer IDs
                         "cover_url": track.cover_url,
                         "artists": set(),
                         "track_ids": set(),
@@ -76,9 +76,9 @@ class AlbumAssemblyService:
                 if not album_data["cover_url"] and track.cover_url:
                     album_data["cover_url"] = track.cover_url
                 
-                # Prefer deezer_album_id if we find one
-                if track.deezer_album_id and not album_data["deezer_album_id"]:
-                    album_data["deezer_album_id"] = track.deezer_album_id
+                # Collect all deezer_album_ids
+                if track.deezer_album_id:
+                    album_data["deezer_album_ids"].add(track.deezer_album_id)
             
             # Convert to list and filter by minimum tracks
             candidates = []
@@ -90,11 +90,15 @@ class AlbumAssemblyService:
                 artists_list = sorted(data["artists"])
                 main_artist = artists_list[0] if artists_list else "Unknown"
                 
+                # Pick the first deezer_album_id if any exist
+                deezer_ids = list(data["deezer_album_ids"])
+                deezer_album_id = deezer_ids[0] if deezer_ids else None
+                
                 candidates.append({
                     "artist": main_artist,
                     "all_artists": artists_list,
                     "album": data["album"],
-                    "deezer_album_id": data["deezer_album_id"],
+                    "deezer_album_id": deezer_album_id,
                     "cover_url": data["cover_url"],
                     "track_count": len(data["track_ids"]),
                     "total_duration": data["total_duration"],
@@ -111,21 +115,11 @@ class AlbumAssemblyService:
         album: str,
         deezer_album_id: Optional[int] = None
     ) -> Optional[Playlist]:
-        """Check if auto-album playlist already exists for this album"""
+        """
+        Check if auto-album playlist already exists for this album.
+        Searches by album name (case-insensitive) as primary match.
+        """
         async with get_session() as session:
-            # First try to match by deezer_album_id if available
-            if deezer_album_id:
-                result = await session.execute(
-                    select(Playlist).where(
-                        Playlist.user_id == user_id,
-                        Playlist.is_auto_album == True,
-                        Playlist.deezer_album_id == deezer_album_id
-                    )
-                )
-                playlist = result.scalar()
-                if playlist:
-                    return playlist
-            
             # Get all album playlists for user
             result = await session.execute(
                 select(Playlist).where(
@@ -140,7 +134,7 @@ class AlbumAssemblyService:
                 if not pl.name:
                     continue
                     
-                name_lower = pl.name.lower()
+                name_lower = pl.name.lower().strip()
                 
                 # Match by exact album name (new format)
                 if name_lower == album_lower:
@@ -164,30 +158,21 @@ class AlbumAssemblyService:
         album: str,
         deezer_album_id: Optional[int] = None
     ) -> List[Track]:
-        """Get all user's tracks for a specific album"""
+        """
+        Get all user's tracks for a specific album.
+        Groups by album name (case-insensitive) to ensure all tracks 
+        with same album name are included regardless of artist/source.
+        """
         async with get_session() as session:
-            # Prefer deezer_album_id match if available
-            if deezer_album_id:
-                result = await session.execute(
-                    select(Track)
-                    .where(
-                        Track.user_id == user_id,
-                        or_(
-                            Track.deezer_album_id == deezer_album_id,
-                            func.lower(Track.album) == album.lower().strip()
-                        )
-                    )
-                    .order_by(Track.title)
+            # Always search by album name to get all tracks regardless of source
+            result = await session.execute(
+                select(Track)
+                .where(
+                    Track.user_id == user_id,
+                    func.lower(Track.album) == album.lower().strip()
                 )
-            else:
-                result = await session.execute(
-                    select(Track)
-                    .where(
-                        Track.user_id == user_id,
-                        func.lower(Track.album) == album.lower().strip()
-                    )
-                    .order_by(Track.title)
-                )
+                .order_by(Track.title)
+            )
             
             return list(result.scalars().all())
     
