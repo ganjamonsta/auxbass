@@ -17,9 +17,20 @@
           <!-- Search field (appears when search opens) -->
           <Transition name="fade-slide">
             <div v-if="showSearch" class="search-wrapper" @click="focusInput">
-              <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-              </svg>
+              <!-- Scope toggle (Library / Global) -->
+              <button 
+                class="search-scope-btn" 
+                :class="{ global: searchScope === 'global' }"
+                @click.stop="toggleSearchScope"
+                :title="searchScope === 'library' ? 'Искать в своей библиотеке' : 'Искать везде'"
+              >
+                <svg v-if="searchScope === 'library'" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                </svg>
+                <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                </svg>
+              </button>
               <div class="search-content">
                 <span v-for="(tag, index) in searchTags" :key="index" class="search-tag" @click.stop="removeTag(index)">
                   {{ tag }}
@@ -28,7 +39,7 @@
                   ref="searchInput"
                   v-model="searchQuery"
                   type="text"
-                  placeholder="Поиск..."
+                  :placeholder="searchScope === 'library' ? 'Поиск в библиотеке...' : 'Глобальный поиск...'"
                   class="search-input-inline"
                   @input="debouncedSearch"
                   @keyup.escape="closeSearch"
@@ -766,10 +777,12 @@
     <TrackMenu
       :show="showTrackMenuModal"
       :track="selectedTrack"
+      :currentUserId="currentUserId"
       @close="showTrackMenuModal = false"
       @addToPlaylist="handleAddToPlaylist"
       @edit="handleEditTrack"
       @delete="handleDeleteTrack"
+      @removeFromLibrary="handleRemoveFromLibrary"
       @download="handleDownloadTrack"
     />
 
@@ -850,6 +863,11 @@ const userDisplayName = computed(() => {
   return user?.first_name || 'Musiq'
 })
 
+// Get current user ID from Telegram
+const currentUserId = computed(() => {
+  return telegram?.initDataUnsafe?.user?.id || null
+})
+
 // Current tab display name for header
 const currentTabName = computed(() => {
   const tabNames = {
@@ -883,6 +901,7 @@ const activeTab = ref('home')
 const showSearch = ref(false)
 const searchQuery = ref('')
 const searchTags = ref([])
+const searchScope = ref('library')  // 'library' or 'global' - search scope
 const showFullPlayer = ref(false)
 const showCreatePlaylist = ref(false)
 const newPlaylistName = ref('')
@@ -1000,6 +1019,8 @@ const handleContentScroll = () => {
   if (distanceFromBottom < 300 && activeTab.value === 'tracks') {
     if (filterScope.value === 'library') {
       library.loadMore()
+    } else if (filterScope.value === 'global') {
+      library.loadMoreGlobal()
     }
   }
 }
@@ -1094,6 +1115,23 @@ const handleEditTrack = (track) => {
 const handleDeleteTrack = (track) => {
   deletingTrack.value = track
   showConfirmDelete.value = true
+}
+
+const handleRemoveFromLibrary = async (track) => {
+  try {
+    const success = await library.removeFromLibrary(track.id)
+    if (success) {
+      telegram?.HapticFeedback?.notificationOccurred?.('success')
+      toast.value?.show('Трек убран из библиотеки', 'success')
+    } else {
+      telegram?.HapticFeedback?.notificationOccurred?.('error')
+      toast.value?.show('Не удалось убрать трек', 'error')
+    }
+  } catch (error) {
+    console.error('Failed to remove from library:', error)
+    telegram?.HapticFeedback?.notificationOccurred?.('error')
+    toast.value?.show('Не удалось убрать трек', 'error')
+  }
 }
 
 const handleDownloadTrack = async (track) => {
@@ -1288,8 +1326,31 @@ const debouncedSearch = () => {
       activeTab.value = 'tracks'
     }
     const fullQuery = [...searchTags.value, searchQuery.value].filter(Boolean).join(' ')
-    library.fetchTracks({ search: fullQuery })
+    
+    if (searchScope.value === 'global') {
+      // Global search
+      filterScope.value = 'global'
+      if (fullQuery) {
+        activeFilter.value = `🌍 Поиск: ${fullQuery}`
+      } else {
+        activeFilter.value = null
+      }
+      library.fetchGlobalTracks({ search: fullQuery })
+    } else {
+      // Library search
+      filterScope.value = 'library'
+      activeFilter.value = fullQuery ? `Поиск: ${fullQuery}` : null
+      library.fetchTracks({ search: fullQuery })
+    }
   }, 300)
+}
+
+const toggleSearchScope = () => {
+  searchScope.value = searchScope.value === 'library' ? 'global' : 'library'
+  // Re-trigger search with new scope
+  if (searchQuery.value || searchTags.value.length > 0) {
+    debouncedSearch()
+  }
 }
 
 // Search tag handling
@@ -1330,9 +1391,12 @@ const toggleSearch = async () => {
 
 const closeSearch = () => {
   showSearch.value = false
-  if (searchQuery.value || searchTags.value.length > 0) {
+  if (searchQuery.value || searchTags.value.length > 0 || searchScope.value === 'global') {
     searchQuery.value = ''
     searchTags.value = []
+    searchScope.value = 'library'
+    activeFilter.value = null
+    filterScope.value = 'library'
     library.fetchTracks()  // Reset to full list
   }
 }
@@ -1465,6 +1529,31 @@ onMounted(async () => {
     inset 3px 3px 6px var(--neu-shadow-dark),
     inset -2px -2px 4px var(--neu-shadow-light);
   border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.search-scope-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: var(--xm-bg-surface);
+  color: var(--spotify-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.search-scope-btn:active {
+  transform: scale(0.9);
+}
+
+.search-scope-btn.global {
+  background: var(--spotify-green);
+  color: white;
+  box-shadow: 0 2px 8px rgba(29, 185, 84, 0.4);
 }
 
 .search-content {
