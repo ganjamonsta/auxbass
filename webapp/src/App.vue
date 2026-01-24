@@ -1015,6 +1015,7 @@
       @toggleRepeat="player.toggleRepeat()"
       @toggleMute="player.toggleMute()"
       @setVolume="player.setVolume($event)"
+      @seek="player.seek($event)"
     />
   </div>
 </template>
@@ -1891,6 +1892,15 @@ onUnmounted(() => {
   overflow: hidden;
   background-color: var(--spotify-black);
   color: var(--spotify-text);
+}
+
+/* Mobile main-content-wrapper needs to take full space */
+.main-content-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
 }
 
 /* Desktop Layout - CSS Grid for proper bottom player positioning */

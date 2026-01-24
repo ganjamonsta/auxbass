@@ -22,7 +22,7 @@
     <div class="lcd-panel">
       <div class="lcd-frame">
         <div class="lcd-screen">
-          <!-- Top row - Artist & Title -->
+          <!-- Main row - Status, Title & Progress on same line -->
           <div class="lcd-main-row">
             <span class="lcd-status">{{ isPlaying ? '▶' : '■' }}</span>
             <div class="lcd-text-container">
@@ -31,12 +31,8 @@
                 <span v-if="shouldScroll" class="segment-text clone">{{ displayText }}</span>
               </div>
             </div>
-          </div>
-
-          <!-- Middle row - Time & Progress -->
-          <div class="lcd-info-row">
-            <span class="lcd-time">{{ formatTime(progress) }}</span>
-            <div class="lcd-progress">
+            <span class="lcd-time time-current">{{ formatTime(progress) }}</span>
+            <div class="lcd-progress" @click="handleProgressClick" @mousedown="startSeek">
               <div class="progress-bar">
                 <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
                 <div class="progress-buffered" :style="{ width: bufferedPercent + '%' }"></div>
@@ -117,7 +113,7 @@ const props = defineProps({
 
 const emit = defineEmits([
   'toggle', 'prev', 'next', 'expand',
-  'toggleShuffle', 'toggleRepeat', 'toggleMute', 'setVolume'
+  'toggleShuffle', 'toggleRepeat', 'toggleMute', 'setVolume', 'seek'
 ])
 
 // Volume knob
@@ -178,6 +174,38 @@ const bufferedPercent = computed(() => {
   return (props.buffered / props.duration) * 100
 })
 
+// Seek functionality
+const handleProgressClick = (e) => {
+  const rect = e.currentTarget.getBoundingClientRect()
+  const percent = (e.clientX - rect.left) / rect.width
+  const seekTime = percent * props.duration
+  emit('seek', seekTime)
+}
+
+const isSeeking = ref(false)
+
+const startSeek = (e) => {
+  isSeeking.value = true
+  document.addEventListener('mousemove', onSeekMove)
+  document.addEventListener('mouseup', stopSeek)
+}
+
+const onSeekMove = (e) => {
+  if (!isSeeking.value) return
+  const progressEl = document.querySelector('.lcd-progress')
+  if (!progressEl) return
+  const rect = progressEl.getBoundingClientRect()
+  const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+  const seekTime = percent * props.duration
+  emit('seek', seekTime)
+}
+
+const stopSeek = () => {
+  isSeeking.value = false
+  document.removeEventListener('mousemove', onSeekMove)
+  document.removeEventListener('mouseup', stopSeek)
+}
+
 // Cover
 const coverStyle = computed(() => {
   if (props.track?.cover_url) return {}
@@ -232,6 +260,8 @@ onUnmounted(() => {
   clearInterval(eqInterval)
   document.removeEventListener('mousemove', onVolumeMove)
   document.removeEventListener('mouseup', stopVolumeAdjust)
+  document.removeEventListener('mousemove', onSeekMove)
+  document.removeEventListener('mouseup', stopSeek)
 })
 </script>
 
@@ -365,7 +395,8 @@ onUnmounted(() => {
 .lcd-main-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
+  height: 24px;
 }
 
 .lcd-status {
@@ -377,6 +408,8 @@ onUnmounted(() => {
 
 .lcd-text-container {
   flex: 1;
+  min-width: 150px;
+  max-width: 300px;
   overflow: hidden;
   mask-image: linear-gradient(90deg, transparent, black 5%, black 95%, transparent);
 }
@@ -408,22 +441,24 @@ onUnmounted(() => {
   padding-right: 50px;
 }
 
-.lcd-info-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .lcd-time {
   font-family: 'Courier New', monospace;
   font-size: 10px;
   color: #7DD3FC;
   text-shadow: 0 0 5px rgba(77, 195, 255, 0.6);
   min-width: 32px;
+  flex-shrink: 0;
+}
+
+.lcd-time.time-current {
+  text-align: right;
 }
 
 .lcd-progress {
-  flex: 1;
+  flex: 2;
+  min-width: 100px;
+  cursor: pointer;
+  padding: 4px 0;
 }
 
 .progress-bar {
@@ -431,7 +466,24 @@ onUnmounted(() => {
   background: rgba(77, 195, 255, 0.15);
   border-radius: 2px;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+}
+
+.lcd-progress:hover .progress-bar {
+  height: 6px;
+}
+
+.lcd-progress:hover .progress-fill::after {
+  content: '';
+  position: absolute;
+  right: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  background: #4DC3FF;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(77, 195, 255, 0.8);
 }
 
 .progress-fill {
