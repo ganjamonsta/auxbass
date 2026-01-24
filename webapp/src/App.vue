@@ -45,6 +45,11 @@
           </Transition>
         </div>
         
+        <!-- Title (visible when search is closed) -->
+        <h1 v-if="!showSearch" class="header-title-main" @click="goToHome">
+          {{ currentTabName }}
+        </h1>
+        
         <!-- Search Toggle Button (always fixed right) -->
         <button @click="toggleSearch" class="icon-btn search-toggle">
           <Transition name="icon-flip" mode="out-in">
@@ -1485,14 +1490,15 @@ onMounted(async () => {
 
 /* Left slot - EnrichmentStatus or Search field (mutually exclusive) */
 .header-left-slot {
-  flex: 1;
-  min-width: 0;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
 }
 
 /* Header title */
 .header-title-main {
+  flex: 1;
+  min-width: 0;
   font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.5px;
