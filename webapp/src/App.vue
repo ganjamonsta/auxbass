@@ -621,6 +621,29 @@
         />
       </div>
 
+      <!-- Artist view -->
+      <div v-if="currentView === 'artist'" class="artist-view">
+        <div v-if="library.artistLoading" class="loading-view">
+          <div class="loading-spinner"></div>
+          <span>Загрузка...</span>
+        </div>
+        <ArtistCard 
+          v-else-if="library.currentArtist"
+          :artist="library.currentArtist"
+          :currentTrackId="player.currentTrack?.id"
+          :isPlaying="player.isPlaying"
+          @play="playTrack"
+          @menu="showTrackMenu"
+          @like="toggleLike"
+          @openAlbum="openPlaylist"
+          @openPlaylist="openPlaylist"
+        />
+        <div v-else class="empty">
+          <div class="empty-icon">👤</div>
+          <p class="empty-title">Артист не найден</p>
+        </div>
+      </div>
+
       <!-- Expanded Section View (fullscreen vertical list) -->
       <Transition name="slide-up">
         <div v-if="expandedSection" class="expanded-section">
@@ -783,6 +806,8 @@
       @delete="handleDeleteTrack"
       @removeFromLibrary="handleRemoveFromLibrary"
       @download="handleDownloadTrack"
+      @goToArtist="handleGoToArtist"
+      @goToAlbum="handleGoToAlbum"
     />
 
     <!-- Edit Track Modal -->
@@ -834,7 +859,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, inject, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, inject, nextTick } from 'vue'
 import { usePlayerStore } from './stores/player'
 import { useLibraryStore } from './stores/library'
 import { playerApi } from './api/client'
@@ -849,6 +874,7 @@ import ConfirmDialog from './components/ConfirmDialog.vue'
 import PlaylistPicker from './components/PlaylistPicker.vue'
 import EnrichmentStatus from './components/EnrichmentStatus.vue'
 import GlobalLibrary from './components/GlobalLibrary.vue'
+import ArtistCard from './components/ArtistCard.vue'
 import Toast from './components/Toast.vue'
 
 const telegram = inject('telegram')
@@ -937,6 +963,7 @@ const headerTitle = computed(() => {
   switch (currentView.value) {
     case 'library': return 'TG Player'
     case 'playlist': return currentPlaylist.value?.name || 'Плейлист'
+    case 'artist': return library.currentArtist?.name || 'Артист'
     default: return 'TG Player'
   }
 })
@@ -995,16 +1022,6 @@ const playlistCollageCovers = computed(() => {
   return covers.length > 0 ? covers : []
 })
 
-// Watch for tab changes - reset artist filter when leaving tracks tab
-watch(activeTab, (newTab, oldTab) => {
-  // If user leaves tracks tab and there's an active artist filter, reset it
-  if (oldTab === 'tracks' && activeFilter.value?.startsWith('Артист:')) {
-    activeFilter.value = null
-    filterScope.value = 'library'
-    library.fetchTracks()
-  }
-})
-
 // Methods
 
 // Handle infinite scroll for tracks
@@ -1049,6 +1066,7 @@ const goBack = () => {
   }
   currentView.value = 'library'
   currentPlaylist.value = null
+  library.clearCurrentArtist()
 }
 
 const openSection = (section) => {
@@ -1145,6 +1163,32 @@ const handleDownloadTrack = async (track) => {
   }
 }
 
+// Navigate to artist card from track menu
+const handleGoToArtist = async (artistName) => {
+  if (!artistName) return
+  showFullPlayer.value = false  // Close full player if open
+  await filterByArtist(artistName)
+}
+
+// Navigate to album from track menu
+const handleGoToAlbum = async (albumName, artistName) => {
+  if (!albumName) return
+  showFullPlayer.value = false  // Close full player if open
+  
+  // Find album playlist by name and artist
+  const albumPlaylist = library.playlists.find(p => 
+    p.is_auto_album && 
+    p.name === albumName && 
+    (!artistName || p.album_artist?.includes(artistName))
+  )
+  
+  if (albumPlaylist) {
+    await openPlaylist(albumPlaylist)
+  } else {
+    toast.value?.show('Альбом не найден', 'warning')
+  }
+}
+
 const confirmDeleteTrack = async () => {
   if (deletingTrack.value) {
     await library.deleteTrack(deletingTrack.value.id)
@@ -1170,15 +1214,10 @@ const submitCreatePlaylist = async () => {
   showCreatePlaylist.value = false
 }
 
-const filterByArtist = (artist, scope = 'library') => {
-  activeFilter.value = `Артист: ${artist}`
-  filterScope.value = scope
-  activeTab.value = 'tracks'
-  if (scope === 'global') {
-    library.fetchGlobalTracks({ artist })
-  } else {
-    library.fetchTracks({ artist })
-  }
+const filterByArtist = async (artist, scope = 'library') => {
+  // Open artist card view instead of filtering
+  await library.fetchArtistDetail(artist, scope)
+  currentView.value = 'artist'
 }
 
 const filterByGenre = (genre) => {
@@ -3054,6 +3093,23 @@ onMounted(async () => {
   padding: 24px;
   color: var(--xm-text-secondary);
   font-size: 14px;
+}
+
+/* Loading view (centered spinner) */
+.loading-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 48px;
+  color: var(--xm-text-secondary);
+  font-size: 14px;
+}
+
+/* Artist view */
+.artist-view {
+  padding-bottom: 0;
 }
 
 .loading-spinner {

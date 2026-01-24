@@ -697,6 +697,168 @@ async def get_artist_image(
     return {"artist": artist_name, "image_url": track_cover}
 
 
+class ArtistAlbumInfo(BaseModel):
+    """Album info for artist card"""
+    id: int
+    name: str
+    cover_url: Optional[str] = None
+    track_count: int = 0
+    
+    class Config:
+        from_attributes = True
+
+
+class ArtistDetailResponse(BaseModel):
+    """Detailed artist info with tracks, albums and playlists"""
+    name: str
+    image_url: Optional[str] = None
+    track_count: int = 0
+    total_plays: int = 0
+    tracks: List[TrackResponse] = []
+    albums: List[ArtistAlbumInfo] = []
+    playlists: List[ArtistAlbumInfo] = []  # Playlists containing this artist
+
+
+@router.get("/artist/{artist_name:path}")
+async def get_artist_detail(
+    artist_name: str,
+    scope: str = Query("library", pattern="^(library|global)$"),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get detailed artist info with tracks, albums and playlists"""
+    from shared.models import Playlist, PlaylistTrack
+    
+    safe_artist = sanitize_input(artist_name)
+    if not safe_artist:
+        raise HTTPException(status_code=400, detail="Artist name is required")
+    
+    # Build query based on scope
+    if scope == "library":
+        query = (
+            select(Track, UserLibrary)
+            .join(UserLibrary, UserLibrary.track_id == Track.id)
+            .where(UserLibrary.user_id == user.id)
+            .where(Track.artist.ilike(f"%{safe_artist}%"))
+            .options(selectinload(Track.uploader))
+            .order_by(Track.play_count.desc())
+            .limit(100)
+        )
+    else:
+        query = (
+            select(Track)
+            .where(Track.is_public == True)
+            .where(Track.is_unavailable == False)
+            .where(Track.artist.ilike(f"%{safe_artist}%"))
+            .options(selectinload(Track.uploader))
+            .order_by(Track.play_count.desc())
+            .limit(100)
+        )
+    
+    result = await db.execute(query)
+    
+    if scope == "library":
+        rows = result.all()
+        tracks_data = [(track, lib) for track, lib in rows]
+    else:
+        tracks = result.scalars().all()
+        # Get user library entries
+        track_ids = [t.id for t in tracks]
+        if track_ids:
+            lib_result = await db.execute(
+                select(UserLibrary)
+                .where(UserLibrary.user_id == user.id)
+                .where(UserLibrary.track_id.in_(track_ids))
+            )
+            user_lib = {lib.track_id: lib for lib in lib_result.scalars().all()}
+            tracks_data = [(t, user_lib.get(t.id)) for t in tracks]
+        else:
+            tracks_data = []
+    
+    if not tracks_data:
+        raise HTTPException(status_code=404, detail="Artist not found")
+    
+    # Convert tracks
+    track_responses = [track_to_response(track, lib, user.id) for track, lib in tracks_data]
+    
+    # Calculate totals
+    total_plays = sum(t.play_count for t in track_responses)
+    
+    # Get artist image
+    image_url = await fetch_artist_image(artist_name)
+    if not image_url or "2a96cbd8b46e442fc41c2b86b821562f" in image_url:
+        # Fallback to track cover
+        for track, _ in tracks_data:
+            if track.cover_url:
+                image_url = track.cover_url
+                break
+    
+    # Get albums (playlists with is_auto_album=True that contain this artist)
+    albums_query = (
+        select(Playlist)
+        .where(Playlist.user_id == user.id)
+        .where(Playlist.is_auto_album == True)
+        .where(Playlist.album_artist.ilike(f"%{safe_artist}%"))
+    )
+    albums_result = await db.execute(albums_query)
+    albums_list = albums_result.scalars().all()
+    
+    albums = []
+    for album in albums_list:
+        # Get track count for album
+        count_result = await db.execute(
+            select(func.count(PlaylistTrack.id))
+            .where(PlaylistTrack.playlist_id == album.id)
+        )
+        track_count = count_result.scalar() or 0
+        
+        albums.append(ArtistAlbumInfo(
+            id=album.id,
+            name=album.name,
+            cover_url=album.cover_url,
+            track_count=track_count
+        ))
+    
+    # Get playlists containing this artist's tracks (user playlists, not auto)
+    playlists_query = (
+        select(Playlist)
+        .distinct()
+        .join(PlaylistTrack, PlaylistTrack.playlist_id == Playlist.id)
+        .join(Track, Track.id == PlaylistTrack.track_id)
+        .where(Playlist.user_id == user.id)
+        .where(Playlist.is_auto_album == False)
+        .where(Playlist.is_auto_source == False)
+        .where(Track.artist.ilike(f"%{safe_artist}%"))
+    )
+    playlists_result = await db.execute(playlists_query)
+    playlists_list = playlists_result.scalars().all()
+    
+    playlists = []
+    for playlist in playlists_list:
+        count_result = await db.execute(
+            select(func.count(PlaylistTrack.id))
+            .where(PlaylistTrack.playlist_id == playlist.id)
+        )
+        track_count = count_result.scalar() or 0
+        
+        playlists.append(ArtistAlbumInfo(
+            id=playlist.id,
+            name=playlist.name,
+            cover_url=playlist.cover_url,
+            track_count=track_count
+        ))
+    
+    return ArtistDetailResponse(
+        name=artist_name,
+        image_url=image_url,
+        track_count=len(track_responses),
+        total_plays=total_plays,
+        tracks=track_responses,
+        albums=albums,
+        playlists=playlists
+    )
+
+
 @router.get("/genres")
 async def get_genres(
     scope: str = Query("library", pattern="^(library|global)$"),

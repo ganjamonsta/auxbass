@@ -193,6 +193,9 @@ export const usePlayerStore = defineStore('player', () => {
   // Flag to prevent duplicate preload triggers per track
   let preloadTriggered = false
   
+  // Flag to prevent error auto-skip during track change
+  let isSkipping = false
+  
   // Callback for track unavailable
   let onTrackUnavailableCallback = null
   const setOnTrackUnavailable = (callback) => {
@@ -420,6 +423,7 @@ export const usePlayerStore = defineStore('player', () => {
     
     audio.value.addEventListener('play', () => {
       isPlaying.value = true
+      isSkipping = false  // Reset skip flag on successful playback
       updatePlaybackState()
       startStateSaving()
     })
@@ -434,6 +438,12 @@ export const usePlayerStore = defineStore('player', () => {
       console.error('Audio error:', e)
       loading.value = false
       
+      // Ignore errors during track change (src change can trigger ABORTED)
+      if (isSkipping) {
+        console.log('[Audio Error] Ignoring error during track skip')
+        return
+      }
+      
       // Auto-skip on audio element errors (network issues, decode errors, etc.)
       // Error codes: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED
       const errorCode = audio.value?.error?.code
@@ -447,7 +457,11 @@ export const usePlayerStore = defineStore('player', () => {
           message: `Ошибка аудио: ${errorMsg}`
         }
         // Auto-skip to keep music playing
-        setTimeout(() => next(), 1000)
+        isSkipping = true
+        setTimeout(() => {
+          next()
+          isSkipping = false
+        }, 1000)
       }
     })
     
@@ -548,6 +562,7 @@ export const usePlayerStore = defineStore('player', () => {
     
     audio.value.addEventListener('play', () => {
       isPlaying.value = true
+      isSkipping = false  // Reset skip flag on successful playback
       updatePlaybackState()
       startStateSaving()
     })
@@ -562,6 +577,12 @@ export const usePlayerStore = defineStore('player', () => {
       console.error('Audio error:', e)
       loading.value = false
       
+      // Ignore errors during track change
+      if (isSkipping) {
+        console.log('[Audio Error] Ignoring error during track skip')
+        return
+      }
+      
       // Auto-skip on audio element errors (network issues, decode errors, etc.)
       const errorCode = audio.value?.error?.code
       const errorMsg = audio.value?.error?.message || 'Ошибка воспроизведения'
@@ -573,7 +594,11 @@ export const usePlayerStore = defineStore('player', () => {
           track: currentTrack.value,
           message: `Ошибка аудио: ${errorMsg}`
         }
-        setTimeout(() => next(), 1000)
+        isSkipping = true
+        setTimeout(() => {
+          next()
+          isSkipping = false
+        }, 1000)
       }
     })
   }
@@ -1021,6 +1046,9 @@ export const usePlayerStore = defineStore('player', () => {
   const next = async () => {
     if (queue.value.length === 0) return
     
+    // Prevent error handlers from triggering during track change
+    isSkipping = true
+    
     // Mark user interaction and cancel irrelevant preloads
     markUserInteraction()
     cancelIrrelevantPreloads()
@@ -1038,6 +1066,7 @@ export const usePlayerStore = defineStore('player', () => {
         } else {
           // End of shuffle queue
           isPlaying.value = false
+          isSkipping = false
           return
         }
       }
@@ -1050,6 +1079,7 @@ export const usePlayerStore = defineStore('player', () => {
         } else {
           // End of queue, no repeat - stop playback
           isPlaying.value = false
+          isSkipping = false
           return
         }
       }
@@ -1164,6 +1194,9 @@ export const usePlayerStore = defineStore('player', () => {
   const prev = async () => {
     if (queue.value.length === 0) return
     
+    // Prevent error handlers from triggering during track change
+    isSkipping = true
+    
     // Mark user interaction and cancel irrelevant preloads
     markUserInteraction()
     cancelIrrelevantPreloads()
@@ -1172,6 +1205,7 @@ export const usePlayerStore = defineStore('player', () => {
     // If more than 3 seconds played, restart current track
     if (progress.value > 3) {
       seek(0)
+      isSkipping = false
       return
     }
     

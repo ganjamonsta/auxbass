@@ -20,6 +20,19 @@
 
             <!-- Menu items -->
             <div class="menu-items">
+              <!-- Navigation section -->
+              <button v-if="hasArtist" class="menu-item" @click="handleGoToArtist">
+                <span class="menu-icon">👤</span>
+                <span>Перейти к артисту</span>
+              </button>
+
+              <button v-if="hasAlbum" class="menu-item" @click="handleGoToAlbum">
+                <span class="menu-icon">💿</span>
+                <span>Перейти к альбому</span>
+              </button>
+
+              <div v-if="hasArtist || hasAlbum" class="menu-divider"></div>
+
               <button class="menu-item" @click="handleAddToQueue">
                 <span class="menu-icon">📋</span>
                 <span>Добавить в очередь</span>
@@ -57,7 +70,7 @@
 </template>
 
 <script setup>
-import { inject } from 'vue'
+import { inject, computed } from 'vue'
 import { usePlayerStore } from '../stores/player'
 
 const props = defineProps({
@@ -65,14 +78,35 @@ const props = defineProps({
   track: Object
 })
 
-const emit = defineEmits(['close', 'addToPlaylist', 'edit', 'delete', 'download'])
+const emit = defineEmits(['close', 'addToPlaylist', 'edit', 'delete', 'download', 'goToArtist', 'goToAlbum'])
 
 const player = usePlayerStore()
 const telegram = inject('telegram')
 
+// Computed properties for navigation availability
+const hasArtist = computed(() => {
+  return props.track?.artist && props.track.artist !== 'Неизвестный исполнитель'
+})
+
+const hasAlbum = computed(() => {
+  return props.track?.album && props.track.album.trim() !== ''
+})
+
 // Haptic feedback helper
 const haptic = (type = 'light') => {
   telegram?.HapticFeedback?.impactOccurred?.(type)
+}
+
+const handleGoToArtist = () => {
+  haptic('light')
+  emit('goToArtist', props.track?.artist)
+  emit('close')
+}
+
+const handleGoToAlbum = () => {
+  haptic('light')
+  emit('goToAlbum', props.track?.album, props.track?.artist)
+  emit('close')
 }
 
 const handlePlayNext = () => {
@@ -106,6 +140,12 @@ const handleEdit = () => {
 const handleDelete = () => {
   haptic('warning')
   emit('delete', props.track)
+  emit('close')
+}
+
+const handleDownload = () => {
+  haptic('light')
+  emit('download', props.track)
   emit('close')
 }
 

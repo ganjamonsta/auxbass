@@ -43,6 +43,7 @@ export const tracksApi = {
   delete: (id) => api.delete(`/tracks/${id}`),
   getArtists: (scope = 'library') => api.get('/tracks/artists', { params: { scope } }),
   getArtistImage: (artistName) => api.get(`/tracks/artist-image/${encodeURIComponent(artistName)}`),
+  getArtistDetail: (artistName, scope = 'library') => api.get(`/tracks/artist/${encodeURIComponent(artistName)}`, { params: { scope } }),
   getGenres: (scope = 'library') => api.get('/tracks/genres', { params: { scope } }),
   getEnrichmentStatus: () => api.get('/tracks/enrichment/status'),
   getHistory: (limit = 50) => api.get('/tracks/history', { params: { limit } }),

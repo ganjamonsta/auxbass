@@ -181,6 +181,31 @@ export const useLibraryStore = defineStore('library', () => {
     return artistScope.value === 'global' ? globalArtists.value : artists.value
   }
 
+  // Current artist detail for ArtistCard view
+  const currentArtist = ref(null)
+  const artistLoading = ref(false)
+
+  // Fetch artist detail with tracks, albums and playlists
+  const fetchArtistDetail = async (artistName, scope = 'library') => {
+    artistLoading.value = true
+    try {
+      const response = await tracksApi.getArtistDetail(artistName, scope)
+      currentArtist.value = response.data
+      return response.data
+    } catch (error) {
+      console.error('Failed to fetch artist detail:', error)
+      currentArtist.value = null
+      return null
+    } finally {
+      artistLoading.value = false
+    }
+  }
+
+  // Clear current artist
+  const clearCurrentArtist = () => {
+    currentArtist.value = null
+  }
+
   // Fetch artist images from Last.fm (in batches to not overload)
   const fetchArtistImages = async (artistList) => {
     const BATCH_SIZE = 5  // Load 5 at a time
@@ -575,6 +600,10 @@ export const useLibraryStore = defineStore('library', () => {
     selectedUser,
     selectedUserTracks,
     
+    // Artist detail
+    currentArtist,
+    artistLoading,
+    
     // Methods
     init,
     refresh,
@@ -584,6 +613,8 @@ export const useLibraryStore = defineStore('library', () => {
     fetchPlaylists,
     fetchPlaylist,
     fetchArtists,
+    fetchArtistDetail,
+    clearCurrentArtist,
     fetchGenres,
     fetchHistory,
     fetchLikedTracks,
