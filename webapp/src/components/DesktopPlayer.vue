@@ -79,7 +79,7 @@
 
     <!-- Right side - Cover & expand -->
     <div class="player-right">
-      <div class="cover-display" @click="$emit('expand')">
+      <div class="cover-display" @click="$emit('expand')" @contextmenu.prevent="$emit('menu')">
         <div class="cover-art" :style="coverStyle">
           <img v-if="track?.cover_url" :src="track.cover_url" alt="" />
           <span v-else class="cover-text">{{ coverInitials }}</span>
@@ -91,6 +91,13 @@
           <div class="vinyl-center"></div>
         </div>
       </div>
+      
+      <!-- Menu button for desktop -->
+      <button class="menu-btn" @click="$emit('menu')" title="Меню">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+        </svg>
+      </button>
       
       <button class="mute-btn" :class="{ muted: isMuted }" @click="$emit('toggleMute')">
         {{ isMuted ? '🔇' : '🔊' }}
@@ -116,7 +123,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
-  'toggle', 'prev', 'next', 'expand',
+  'toggle', 'prev', 'next', 'expand', 'menu',
   'toggleShuffle', 'toggleRepeat', 'toggleMute', 'setVolume', 'seek'
 ])
 
@@ -689,6 +696,25 @@ onUnmounted(() => {
 .mute-btn.muted {
   filter: grayscale(1);
   opacity: 0.5;
+}
+
+/* Menu button */
+.menu-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menu-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
 }
 
 /* Playing state glow */

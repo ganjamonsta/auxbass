@@ -23,6 +23,7 @@
       @openPlaylist="openPlaylist"
       @createPlaylist="createPlaylist"
       @logout="handleLogout"
+      @playlistMenu="showPlaylistMenu"
     />
 
     <!-- Main Content Wrapper -->
@@ -947,6 +948,19 @@
       @goToAlbum="handleGoToAlbum"
     />
 
+    <!-- Playlist Context Menu -->
+    <PlaylistMenu
+      :show="showPlaylistMenuModal"
+      :playlist="selectedPlaylist"
+      @close="showPlaylistMenuModal = false"
+      @open="handlePlaylistMenuOpen"
+      @playAll="handlePlaylistPlayAll"
+      @shuffle="handlePlaylistShuffle"
+      @addToQueue="handlePlaylistAddToQueue"
+      @rename="handlePlaylistRename"
+      @delete="handlePlaylistDelete"
+    />
+
     <!-- Edit Track Modal -->
     <EditTrackModal
       :show="showEditModal"
@@ -1016,6 +1030,7 @@
       @toggleMute="player.toggleMute()"
       @setVolume="player.setVolume($event)"
       @seek="player.seek($event)"
+      @menu="showTrackMenu(player.currentTrack)"
     />
   </div>
 </template>
@@ -1024,13 +1039,14 @@
 import { ref, computed, onMounted, onUnmounted, inject, nextTick, watch } from 'vue'
 import { usePlayerStore } from './stores/player'
 import { useLibraryStore } from './stores/library'
-import { playerApi, authStorage } from './api/client'
+import { playerApi, playlistsApi, authStorage } from './api/client'
 import TrackItem from './components/TrackItem.vue'
 import TrackSkeleton from './components/TrackSkeleton.vue'
 import PlaylistItem from './components/PlaylistItem.vue'
 import MiniPlayer from './components/MiniPlayer.vue'
 import FullPlayer from './components/FullPlayer.vue'
 import TrackMenu from './components/TrackMenu.vue'
+import PlaylistMenu from './components/PlaylistMenu.vue'
 import EditTrackModal from './components/EditTrackModal.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import PlaylistPicker from './components/PlaylistPicker.vue'
@@ -1177,6 +1193,10 @@ const expandedSection = ref(null) // 'albums', 'sources', 'playlists' or null
 // Track menu state
 const showTrackMenuModal = ref(false)
 const selectedTrack = ref(null)
+
+// Playlist menu state
+const showPlaylistMenuModal = ref(false)
+const selectedPlaylist = ref(null)
 
 // Edit modal state
 const showEditModal = ref(false)
@@ -1432,6 +1452,87 @@ const playLikedTracks = async () => {
 const showTrackMenu = (track) => {
   selectedTrack.value = track
   showTrackMenuModal.value = true
+}
+
+// Playlist menu
+const showPlaylistMenu = (playlist) => {
+  selectedPlaylist.value = playlist
+  showPlaylistMenuModal.value = true
+}
+
+// Playlist menu handlers
+const handlePlaylistMenuOpen = (playlist) => {
+  openPlaylist(playlist)
+}
+
+const handlePlaylistPlayAll = async (playlist) => {
+  try {
+    const response = await playlistsApi.getOne(playlist.id)
+    const tracks = response.data.tracks || []
+    if (tracks.length) {
+      await player.play(tracks[0], tracks)
+    }
+  } catch (error) {
+    console.error('Failed to play playlist:', error)
+    toast.value?.show('Не удалось воспроизвести плейлист', 'error')
+  }
+}
+
+const handlePlaylistShuffle = async (playlist) => {
+  try {
+    const response = await playlistsApi.getOne(playlist.id)
+    const tracks = response.data.tracks || []
+    if (tracks.length) {
+      const shuffled = [...tracks].sort(() => Math.random() - 0.5)
+      await player.play(shuffled[0], shuffled)
+    }
+  } catch (error) {
+    console.error('Failed to shuffle playlist:', error)
+    toast.value?.show('Не удалось воспроизвести плейлист', 'error')
+  }
+}
+
+const handlePlaylistAddToQueue = async (playlist) => {
+  try {
+    const response = await playlistsApi.getOne(playlist.id)
+    const tracks = response.data.tracks || []
+    tracks.forEach(track => player.addToQueue(track))
+    toast.value?.show(`Добавлено ${tracks.length} треков в очередь`, 'success')
+  } catch (error) {
+    console.error('Failed to add playlist to queue:', error)
+    toast.value?.show('Не удалось добавить в очередь', 'error')
+  }
+}
+
+const handlePlaylistRename = async (playlist) => {
+  const newName = prompt('Новое название плейлиста:', playlist.name)
+  if (newName && newName.trim() && newName !== playlist.name) {
+    try {
+      await playlistsApi.update(playlist.id, { name: newName.trim() })
+      await library.fetchPlaylists()
+      toast.value?.show('Плейлист переименован', 'success')
+    } catch (error) {
+      console.error('Failed to rename playlist:', error)
+      toast.value?.show('Не удалось переименовать плейлист', 'error')
+    }
+  }
+}
+
+const handlePlaylistDelete = async (playlist) => {
+  if (confirm(`Удалить плейлист «${playlist.name}»?`)) {
+    try {
+      await playlistsApi.delete(playlist.id)
+      await library.fetchPlaylists()
+      if (currentPlaylist.value?.id === playlist.id) {
+        currentPlaylist.value = null
+        currentView.value = 'library'
+      }
+      toast.value?.show('Плейлист удалён', 'success')
+    } catch (error) {
+      console.error('Failed to delete playlist:', error)
+      toast.value?.show('Не удалось удалить плейлист', 'error')
+    }
+  }
 }
 
 // Track menu handlers

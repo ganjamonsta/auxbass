@@ -4,12 +4,14 @@
       <div v-if="show" class="menu-overlay" @click="$emit('close')">
         <Transition name="slide-up">
           <div v-if="show" class="menu-sheet" @click.stop>
-            <!-- Track info header with close button -->
+            <!-- Playlist info header with close button -->
             <div class="menu-header">
-              <div class="menu-cover">🎵</div>
+              <div class="menu-cover" :style="getCoverStyle">
+                {{ coverEmoji }}
+              </div>
               <div class="menu-info">
-                <div class="menu-title">{{ track?.title || 'Без названия' }}</div>
-                <div class="menu-artist">{{ track?.artist || 'Неизвестный исполнитель' }}</div>
+                <div class="menu-title">{{ playlist?.name || 'Плейлист' }}</div>
+                <div class="menu-subtitle">{{ subtitle }}</div>
               </div>
               <button class="menu-close" @click="$emit('close')">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -20,46 +22,36 @@
 
             <!-- Menu items -->
             <div class="menu-items">
-              <!-- Navigation section -->
-              <button v-if="hasArtist" class="menu-item" @click="handleGoToArtist">
-                <span class="menu-icon">👤</span>
-                <span>Перейти к артисту</span>
+              <button class="menu-item" @click="handleOpen">
+                <span class="menu-icon">📂</span>
+                <span>Открыть</span>
               </button>
 
-              <button v-if="hasAlbum" class="menu-item" @click="handleGoToAlbum">
-                <span class="menu-icon">💿</span>
-                <span>Перейти к альбому</span>
+              <button class="menu-item" @click="handlePlayAll">
+                <span class="menu-icon">▶️</span>
+                <span>Воспроизвести все</span>
               </button>
 
-              <div v-if="hasArtist || hasAlbum" class="menu-divider"></div>
+              <button class="menu-item" @click="handleShuffle">
+                <span class="menu-icon">🔀</span>
+                <span>Перемешать</span>
+              </button>
 
               <button class="menu-item" @click="handleAddToQueue">
                 <span class="menu-icon">📋</span>
                 <span>Добавить в очередь</span>
               </button>
 
-              <button class="menu-item" @click="handleAddToPlaylist">
-                <span class="menu-icon">➕</span>
-                <span>Добавить в плейлист</span>
-              </button>
+              <div v-if="!isAlbum" class="menu-divider"></div>
 
-              <div class="menu-divider"></div>
-
-              <button class="menu-item" @click="handleEdit">
+              <button v-if="!isAlbum" class="menu-item" @click="handleRename">
                 <span class="menu-icon">✏️</span>
-                <span>Редактировать</span>
+                <span>Переименовать</span>
               </button>
 
-              <button class="menu-item" @click="handleDownload">
-                <span class="menu-icon">📥</span>
-                <span>Скачать</span>
-              </button>
-
-              <div class="menu-divider"></div>
-
-              <button class="menu-item danger" @click="handleDelete">
+              <button v-if="!isAlbum" class="menu-item danger" @click="handleDelete">
                 <span class="menu-icon">🗑️</span>
-                <span>Удалить</span>
+                <span>Удалить плейлист</span>
               </button>
             </div>
           </div>
@@ -75,85 +67,100 @@ import { usePlayerStore } from '../stores/player'
 
 const props = defineProps({
   show: Boolean,
-  track: Object
+  playlist: Object
 })
 
-const emit = defineEmits(['close', 'addToPlaylist', 'edit', 'delete', 'download', 'goToArtist', 'goToAlbum'])
+const emit = defineEmits(['close', 'open', 'playAll', 'shuffle', 'addToQueue', 'rename', 'delete'])
 
 const player = usePlayerStore()
 const telegram = inject('telegram')
 
-// Computed properties for navigation availability
-const hasArtist = computed(() => {
-  return props.track?.artist && props.track.artist !== 'Неизвестный исполнитель'
+// Check if this is an album (auto-generated playlist)
+const isAlbum = computed(() => props.playlist?.is_auto_album)
+
+// Cover styling
+const getCoverStyle = computed(() => {
+  if (props.playlist?.cover_url) {
+    return {
+      backgroundImage: `url(${props.playlist.cover_url})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center'
+    }
+  }
+  if (props.playlist?.cover_gradient) {
+    return { background: props.playlist.cover_gradient }
+  }
+  return {}
 })
 
-const hasAlbum = computed(() => {
-  return props.track?.album && props.track.album.trim() !== ''
+const coverEmoji = computed(() => {
+  if (props.playlist?.cover_url || props.playlist?.cover_gradient) return ''
+  return isAlbum.value ? '💿' : '🎵'
 })
+
+const subtitle = computed(() => {
+  const count = props.playlist?.track_count || 0
+  if (isAlbum.value) {
+    const artist = props.playlist?.artist || 'Неизвестный исполнитель'
+    return `${artist} • ${count} ${getTracksWord(count)}`
+  }
+  return `${count} ${getTracksWord(count)}`
+})
+
+const getTracksWord = (count) => {
+  const mod10 = count % 10
+  const mod100 = count % 100
+  if (mod100 >= 11 && mod100 <= 14) return 'треков'
+  if (mod10 === 1) return 'трек'
+  if (mod10 >= 2 && mod10 <= 4) return 'трека'
+  return 'треков'
+}
 
 // Haptic feedback helper
 const haptic = (type = 'light') => {
   telegram?.HapticFeedback?.impactOccurred?.(type)
 }
 
-const handleGoToArtist = () => {
+const handleOpen = () => {
   haptic('light')
-  emit('goToArtist', props.track?.artist)
+  emit('open', props.playlist)
   emit('close')
 }
 
-const handleGoToAlbum = () => {
+const handlePlayAll = () => {
   haptic('light')
-  emit('goToAlbum', props.track?.album, props.track?.artist)
+  emit('playAll', props.playlist)
   emit('close')
 }
 
-const handlePlayNext = () => {
-  if (props.track) {
-    player.playNext(props.track)
-    haptic('light')
-  }
+const handleShuffle = () => {
+  haptic('light')
+  emit('shuffle', props.playlist)
   emit('close')
 }
 
 const handleAddToQueue = () => {
-  if (props.track) {
-    player.addToQueue(props.track)
-    haptic('light')
-  }
+  haptic('light')
+  emit('addToQueue', props.playlist)
   emit('close')
 }
 
-const handleAddToPlaylist = () => {
+const handleRename = () => {
   haptic('light')
-  emit('addToPlaylist', props.track)
-  emit('close')
-}
-
-const handleEdit = () => {
-  haptic('light')
-  emit('edit', props.track)
+  emit('rename', props.playlist)
   emit('close')
 }
 
 const handleDelete = () => {
   haptic('warning')
-  emit('delete', props.track)
-  emit('close')
-}
-
-const handleDownload = () => {
-  haptic('light')
-  emit('download', props.track)
+  emit('delete', props.playlist)
   emit('close')
 }
 </script>
 
 <style scoped>
 /* ═══════════════════════════════════════════════════════════
-   🎵 TRACK MENU - Compact Bottom Sheet
-   Action menu for tracks with soft shadows
+   📂 PLAYLIST MENU - Context menu for playlists/albums
    ═══════════════════════════════════════════════════════════ */
 
 .menu-overlay {
@@ -217,7 +224,7 @@ const handleDownload = () => {
   color: var(--xm-text-primary);
 }
 
-.menu-artist {
+.menu-subtitle {
   font-size: 13px;
   color: var(--xm-text-muted);
   white-space: nowrap;
@@ -357,7 +364,7 @@ const handleDownload = () => {
     font-size: 14px;
   }
 
-  .menu-artist {
+  .menu-subtitle {
     font-size: 12px;
   }
 

@@ -3,6 +3,7 @@
     class="track-item" 
     :class="{ playing: isPlaying, compact: compact, unavailable: track.is_unavailable, 'too-large': isLargeFile && !track.is_unavailable }" 
     @click="handleClick"
+    @contextmenu.prevent="$emit('menu')"
   >
     <!-- Cover with generated gradient -->
     <div class="track-cover" :style="coverStyle">

@@ -120,6 +120,7 @@
           class="nav-item playlist-item"
           :class="{ active: activePlaylistId === album.id }"
           @click="$emit('openPlaylist', album)"
+          @contextmenu.prevent="$emit('playlistMenu', album)"
         >
           <div class="playlist-cover album-cover" :style="getPlaylistCoverStyle(album)">
             <img v-if="album.cover_url" :src="album.cover_url" alt="" />
@@ -166,6 +167,7 @@
           class="nav-item playlist-item"
           :class="{ active: activePlaylistId === playlist.id }"
           @click="$emit('openPlaylist', playlist)"
+          @contextmenu.prevent="$emit('playlistMenu', playlist)"
         >
           <div class="playlist-cover" :style="getPlaylistCoverStyle(playlist)">
             <img v-if="playlist.cover_url" :src="playlist.cover_url" alt="" />
@@ -226,7 +228,7 @@ const props = defineProps({
   }
 })
 
-defineEmits(['navigate', 'openPlaylist', 'createPlaylist', 'logout'])
+defineEmits(['navigate', 'openPlaylist', 'createPlaylist', 'logout', 'playlistMenu'])
 
 // Separate albums and user playlists
 const albums = computed(() => {
