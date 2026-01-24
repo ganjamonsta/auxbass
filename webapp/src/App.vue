@@ -1362,6 +1362,16 @@ const confirmDeleteTrack = async () => {
 }
 
 const openPlaylist = async (playlist) => {
+  // Check if this is a "virtual" album (no playlist created yet, id=-1)
+  if (playlist.id === -1) {
+    // Filter by album name instead
+    activeFilter.value = `Альбом: ${playlist.name}`
+    activeTab.value = 'tracks'
+    filterScope.value = 'library'
+    library.fetchTracks({ album: playlist.name })
+    currentView.value = 'main'
+    return
+  }
   currentPlaylist.value = await library.fetchPlaylist(playlist.id)
   currentView.value = 'playlist'
 }

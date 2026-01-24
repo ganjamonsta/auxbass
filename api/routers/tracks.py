@@ -155,6 +155,7 @@ async def get_my_tracks(
     per_page: int = Query(50, ge=1, le=100),
     search: Optional[str] = None,
     artist: Optional[str] = None,
+    album: Optional[str] = None,
     genre: Optional[str] = None,
     sort_by: str = Query("added_at", pattern="^(added_at|title|artist|duration|play_count|last_played_at)$"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
@@ -196,6 +197,13 @@ async def get_my_tracks(
         if safe_artist:
             query = query.where(Track.artist.ilike(f"%{safe_artist}%"))
             count_query = count_query.where(Track.artist.ilike(f"%{safe_artist}%"))
+    
+    # Apply album filter
+    if album:
+        safe_album = sanitize_input(album)
+        if safe_album:
+            query = query.where(func.lower(Track.album) == safe_album.lower())
+            count_query = count_query.where(func.lower(Track.album) == safe_album.lower())
     
     # Apply genre filter
     if genre:
@@ -793,31 +801,53 @@ async def get_artist_detail(
                 image_url = track.cover_url
                 break
     
-    # Get albums (playlists with is_auto_album=True that contain this artist)
-    albums_query = (
-        select(Playlist)
-        .where(Playlist.user_id == user.id)
-        .where(Playlist.is_auto_album == True)
-        .where(Playlist.album_artist.ilike(f"%{safe_artist}%"))
-    )
-    albums_result = await db.execute(albums_query)
-    albums_list = albums_result.scalars().all()
-    
-    albums = []
-    for album in albums_list:
-        # Get track count for album
-        count_result = await db.execute(
-            select(func.count(PlaylistTrack.id))
-            .where(PlaylistTrack.playlist_id == album.id)
-        )
-        track_count = count_result.scalar() or 0
+    # Build albums from actual tracks (group by album name)
+    # This is more reliable than using is_auto_album playlists
+    album_data = {}
+    for track, _ in tracks_data:
+        if not track.album or not track.album.strip():
+            continue
         
-        albums.append(ArtistAlbumInfo(
-            id=album.id,
-            name=album.name,
-            cover_url=album.cover_url,
-            track_count=track_count
-        ))
+        album_key = track.album.lower().strip()
+        if album_key not in album_data:
+            album_data[album_key] = {
+                "name": track.album,
+                "cover_url": track.cover_url,
+                "track_ids": set(),
+            }
+        album_data[album_key]["track_ids"].add(track.id)
+        # Update cover if we don't have one
+        if not album_data[album_key]["cover_url"] and track.cover_url:
+            album_data[album_key]["cover_url"] = track.cover_url
+    
+    # Check if we have auto-album playlists for these albums
+    albums = []
+    for album_key, data in album_data.items():
+        # Try to find existing auto-album playlist
+        album_playlist = await db.execute(
+            select(Playlist)
+            .where(Playlist.user_id == user.id)
+            .where(Playlist.is_auto_album == True)
+            .where(func.lower(Playlist.name) == album_key)
+        )
+        existing_playlist = album_playlist.scalar_one_or_none()
+        
+        if existing_playlist:
+            # Use playlist ID for navigation
+            albums.append(ArtistAlbumInfo(
+                id=existing_playlist.id,
+                name=data["name"],
+                cover_url=data["cover_url"] or existing_playlist.cover_url,
+                track_count=len(data["track_ids"])
+            ))
+        else:
+            # No playlist yet, use negative ID as indicator (album from tracks)
+            albums.append(ArtistAlbumInfo(
+                id=-1,  # Indicates "virtual" album without playlist
+                name=data["name"],
+                cover_url=data["cover_url"],
+                track_count=len(data["track_ids"])
+            ))
     
     # Get playlists containing this artist's tracks (user playlists, not auto)
     playlists_query = (
