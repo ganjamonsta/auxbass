@@ -115,7 +115,7 @@
 
       <div class="playlists-list">
         <button 
-          v-for="album in albums" 
+          v-for="album in displayedAlbums" 
           :key="album.id"
           class="nav-item playlist-item"
           :class="{ active: activePlaylistId === album.id }"
@@ -132,6 +132,15 @@
             <span v-if="album.album_artist" class="playlist-artist">{{ album.album_artist }}</span>
           </div>
           <span class="nav-count">{{ album.track_count }}</span>
+        </button>
+        
+        <!-- Show more albums link -->
+        <button 
+          v-if="hasMoreAlbums"
+          class="nav-item show-more-btn"
+          @click="$emit('navigate', 'albums')"
+        >
+          <span class="show-more-text">Показать все {{ albums.length }} альбомов</span>
         </button>
       </div>
     </div>
@@ -222,6 +231,14 @@ defineEmits(['navigate', 'openPlaylist', 'createPlaylist', 'logout'])
 // Separate albums and user playlists
 const albums = computed(() => {
   return props.playlists.filter(p => p.is_auto_album)
+})
+
+const displayedAlbums = computed(() => {
+  return albums.value.slice(0, 5)
+})
+
+const hasMoreAlbums = computed(() => {
+  return albums.value.length > 5
 })
 
 const userPlaylists = computed(() => {
@@ -445,11 +462,28 @@ const getPlaylistCoverStyle = (playlist) => {
 }
 
 .albums-section .playlists-list {
-  /* albums show all */
+  /* albums show limited */
 }
 
 .album-cover {
   border-radius: 2px;
+}
+
+/* Show more button */
+.show-more-btn {
+  justify-content: center !important;
+  padding: 10px 16px !important;
+  margin-top: 4px;
+}
+
+.show-more-text {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  transition: color 0.15s;
+}
+
+.show-more-btn:hover .show-more-text {
+  color: #1DB954;
 }
 
 .playlist-info {
