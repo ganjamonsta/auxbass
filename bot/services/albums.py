@@ -4,7 +4,7 @@ Automatically creates playlists from tracks with matching album/artist
 """
 import logging
 from typing import Optional, List, Dict
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 
 import sys
 from pathlib import Path
@@ -327,12 +327,19 @@ class AlbumAssemblyService:
         playlist: Playlist,
         tracks: List[Track],
         deezer_album_id: Optional[int] = None,
-        cover_url: Optional[str] = None
+        cover_url: Optional[str] = None,
+        reorder: bool = False
     ) -> bool:
-        """Update existing album playlist with new tracks and cover"""
+        """Update existing album playlist with new tracks and cover.
+        If reorder=True, reorders all tracks according to Deezer tracklist.
+        """
         async with get_session() as session:
             # Attach playlist to this session
             playlist = await session.merge(playlist)
+            
+            # Update deezer_album_id if not set
+            if deezer_album_id and not playlist.deezer_album_id:
+                playlist.deezer_album_id = deezer_album_id
             
             # Update cover if not set and we have one
             cover_updated = False
@@ -350,36 +357,69 @@ class AlbumAssemblyService:
             # Find new tracks
             new_tracks = [t for t in tracks if t.id not in existing_track_ids]
             
-            if not new_tracks and not cover_updated:
+            if not new_tracks and not cover_updated and not reorder:
                 return False
             
-            if not new_tracks:
-                # Only cover was updated
-                await session.commit()
-                return True
-            
-            # Get max position
-            result = await session.execute(
-                select(func.max(PlaylistTrack.position))
-                .where(PlaylistTrack.playlist_id == playlist.id)
-            )
-            max_pos = result.scalar() or 0
-            
-            # Add new tracks
-            for i, track in enumerate(new_tracks, start=1):
-                pt = PlaylistTrack(
-                    playlist_id=playlist.id,
-                    track_id=track.id,
-                    position=max_pos + i
-                )
-                session.add(pt)
+            # If reordering or adding new tracks, rebuild the playlist order
+            if reorder or new_tracks:
+                # Get Deezer track order
+                track_order = {}
+                album_id = deezer_album_id or playlist.deezer_album_id
+                if album_id:
+                    deezer_tracks = await self.get_deezer_album_tracklist(album_id)
+                    if deezer_tracks:
+                        for dt in deezer_tracks:
+                            if dt.get("title"):
+                                track_order[dt["title"].lower().strip()] = dt["position"]
+                
+                if reorder and track_order:
+                    # Delete all existing playlist tracks
+                    await session.execute(
+                        delete(PlaylistTrack).where(PlaylistTrack.playlist_id == playlist.id)
+                    )
+                    
+                    # Sort all tracks by Deezer order
+                    def get_position(track):
+                        if track.title:
+                            pos = track_order.get(track.title.lower().strip())
+                            if pos:
+                                return (0, pos)
+                        return (1, track.title or "")
+                    
+                    sorted_tracks = sorted(tracks, key=get_position)
+                    
+                    # Add all tracks with correct positions
+                    for position, track in enumerate(sorted_tracks, start=1):
+                        pt = PlaylistTrack(
+                            playlist_id=playlist.id,
+                            track_id=track.id,
+                            position=position
+                        )
+                        session.add(pt)
+                else:
+                    # Just add new tracks at end
+                    result = await session.execute(
+                        select(func.max(PlaylistTrack.position))
+                        .where(PlaylistTrack.playlist_id == playlist.id)
+                    )
+                    max_pos = result.scalar() or 0
+                    
+                    for i, track in enumerate(new_tracks, start=1):
+                        pt = PlaylistTrack(
+                            playlist_id=playlist.id,
+                            track_id=track.id,
+                            position=max_pos + i
+                        )
+                        session.add(pt)
             
             # Update description
-            playlist.description = f"Автоальбом • {len(existing_track_ids) + len(new_tracks)} треков"
+            total_tracks = len(tracks) if reorder else len(existing_track_ids) + len(new_tracks)
+            playlist.description = f"Автоальбом • {total_tracks} треков"
             
             await session.commit()
             
-            logger.info(f"Updated auto-album {playlist.name}: +{len(new_tracks)} tracks")
+            action = "reordered" if reorder else f"+{len(new_tracks)} tracks"
+            logger.info(f"Updated auto-album {playlist.name}: {action}")
             return True
     
     async def assemble_albums_for_user(self, user_id: int) -> Dict:
