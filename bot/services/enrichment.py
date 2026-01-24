@@ -117,6 +117,8 @@ class EnrichmentWorker:
                             track.cover_url = enriched["cover_url"]
                         if enriched.get("album_id"):
                             track.deezer_album_id = enriched["album_id"]
+                        if enriched.get("release_date"):
+                            track.release_date = enriched["release_date"]
                         
                         track.enrichment_status = "completed"
                         logger.info(f"Enriched: {track.title} - {track.artist}")

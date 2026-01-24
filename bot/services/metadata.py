@@ -173,11 +173,16 @@ class MetadataService:
                     "album_id": album.get("id"),
                 }
                 
-                # Try to get genre from album
+                # Try to get genre and release_date from album
                 if album.get("id"):
                     genre = await self._get_album_genre(album["id"])
                     if genre:
                         result["genre"] = genre
+                    
+                    # Get release date
+                    release_date = await self.get_album_release_date(album["id"])
+                    if release_date:
+                        result["release_date"] = release_date
                 
                 return result
                 

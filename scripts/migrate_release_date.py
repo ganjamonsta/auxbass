@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Migration script to add release_date column to playlists table
-and populate it from Deezer API for existing auto-albums
+Migration script to add release_date column to playlists and tracks tables
+and populate it from Deezer API for existing auto-albums and tracks
 """
 import asyncio
 import sys
@@ -12,42 +12,38 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy import text
 from shared.database import engine, get_session
-from shared.models import Playlist
+from shared.models import Playlist, Track
 from sqlalchemy import select
 
 
-async def add_column():
-    """Add release_date column if it doesn't exist"""
+async def add_columns():
+    """Add release_date column to playlists and tracks tables if they don't exist"""
     async with engine.begin() as conn:
-        # Check if column exists using SQLite's PRAGMA (works for SQLite)
-        # For PostgreSQL, use information_schema
+        # Add to playlists table
         try:
-            result = await conn.execute(text("PRAGMA table_info(playlists)"))
-            columns = [row[1] for row in result.fetchall()]
-            
-            if "release_date" not in columns:
-                print("Adding release_date column to playlists table...")
-                await conn.execute(text("""
-                    ALTER TABLE playlists 
-                    ADD COLUMN release_date VARCHAR(20)
-                """))
-                print("Column added successfully!")
-            else:
-                print("Column release_date already exists")
+            await conn.execute(text("""
+                ALTER TABLE playlists 
+                ADD COLUMN IF NOT EXISTS release_date VARCHAR(20)
+            """))
+            print("✅ playlists.release_date column ready")
         except Exception as e:
-            # Fallback: try to add column, ignore if it exists
-            print(f"Checking column existence failed ({e}), trying to add...")
-            try:
-                await conn.execute(text("""
-                    ALTER TABLE playlists 
-                    ADD COLUMN release_date VARCHAR(20)
-                """))
-                print("Column added successfully!")
-            except Exception as e2:
-                if "duplicate column" in str(e2).lower() or "already exists" in str(e2).lower():
-                    print("Column release_date already exists")
-                else:
-                    raise
+            if "duplicate column" in str(e).lower() or "already exists" in str(e).lower():
+                print("✅ playlists.release_date already exists")
+            else:
+                print(f"⚠️  playlists: {e}")
+        
+        # Add to tracks table
+        try:
+            await conn.execute(text("""
+                ALTER TABLE tracks 
+                ADD COLUMN IF NOT EXISTS release_date VARCHAR(20)
+            """))
+            print("✅ tracks.release_date column ready")
+        except Exception as e:
+            if "duplicate column" in str(e).lower() or "already exists" in str(e).lower():
+                print("✅ tracks.release_date already exists")
+            else:
+                print(f"⚠️  tracks: {e}")
 
 
 async def populate_release_dates():
@@ -119,17 +115,65 @@ async def populate_release_dates():
     await metadata_service.close()
 
 
+async def populate_track_release_dates():
+    """Populate release_date for tracks with deezer_album_id"""
+    from bot.services.metadata import metadata_service
+    
+    async with get_session() as session:
+        # Get tracks with deezer_album_id but no release_date
+        result = await session.execute(
+            select(Track)
+            .where(Track.deezer_album_id.isnot(None))
+            .where(Track.release_date.is_(None))
+        )
+        tracks = list(result.scalars().all())
+        
+        print(f"\n📀 Tracks with deezer_album_id but no release_date: {len(tracks)}")
+        
+        # Group by deezer_album_id to avoid duplicate API calls
+        album_dates = {}
+        updated = 0
+        
+        for track in tracks:
+            album_id = track.deezer_album_id
+            
+            # Check cache first
+            if album_id in album_dates:
+                release_date = album_dates[album_id]
+            else:
+                try:
+                    release_date = await metadata_service.get_album_release_date(album_id)
+                    album_dates[album_id] = release_date
+                except Exception as e:
+                    print(f"  ❌ Error getting date for album {album_id}: {e}")
+                    album_dates[album_id] = None
+                    continue
+            
+            if release_date:
+                track.release_date = release_date
+                updated += 1
+                print(f"  ✅ {track.artist} - {track.title} -> {release_date}")
+        
+        await session.commit()
+        print(f"\n✨ Updated {updated} tracks with release dates")
+    
+    await metadata_service.close()
+
+
 async def main():
     print("=" * 50)
-    print("Migration: Add release_date to playlists")
+    print("Migration: Add release_date to playlists & tracks")
     print("=" * 50)
     
-    await add_column()
+    await add_columns()
     
-    print("\nPopulating release dates from Deezer...")
+    print("\n📅 Populating playlist release dates from Deezer...")
     await populate_release_dates()
     
-    print("\nMigration complete!")
+    print("\n📀 Populating track release dates from Deezer...")
+    await populate_track_release_dates()
+    
+    print("\n✨ Migration complete!")
 
 
 if __name__ == "__main__":
