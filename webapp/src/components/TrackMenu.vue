@@ -4,16 +4,19 @@
       <div v-if="show" class="menu-overlay" @click="$emit('close')">
         <Transition name="slide-up">
           <div v-if="show" class="menu-sheet" @click.stop>
-            <!-- Track info header -->
+            <!-- Track info header with close button -->
             <div class="menu-header">
               <div class="menu-cover">🎵</div>
               <div class="menu-info">
                 <div class="menu-title">{{ track?.title || 'Без названия' }}</div>
                 <div class="menu-artist">{{ track?.artist || 'Неизвестный исполнитель' }}</div>
               </div>
+              <button class="menu-close" @click="$emit('close')">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
+                </svg>
+              </button>
             </div>
-
-            <div class="menu-divider"></div>
 
             <!-- Menu items -->
             <div class="menu-items">
@@ -51,10 +54,6 @@
                 <span>Удалить</span>
               </button>
             </div>
-
-            <button class="menu-cancel" @click="$emit('close')">
-              Отмена
-            </button>
           </div>
         </Transition>
       </div>
@@ -124,15 +123,15 @@ const handleDownload = () => {
 
 <style scoped>
 /* ═══════════════════════════════════════════════════════════
-   🎵 TRACK MENU - Neumorphic Bottom Sheet
+   🎵 TRACK MENU - Compact Bottom Sheet
    Action menu for tracks with soft shadows
    ═══════════════════════════════════════════════════════════ */
 
 .menu-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
   z-index: 200;
   display: flex;
   align-items: flex-end;
@@ -144,11 +143,11 @@ const handleDownload = () => {
   max-width: 500px;
   background: var(--xm-bg-elevated);
   border-radius: var(--neu-radius-xl) var(--neu-radius-xl) 0 0;
-  padding: 20px;
-  padding-bottom: max(20px, env(safe-area-inset-bottom));
+  padding: 12px 16px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
   box-shadow: 
-    0 -10px 40px var(--neu-shadow-dark),
-    0 -4px 12px var(--neu-shadow-light);
+    0 -8px 24px var(--neu-shadow-dark),
+    0 -2px 8px var(--neu-shadow-light);
   border: 1px solid rgba(255, 255, 255, 0.04);
   border-bottom: none;
 }
@@ -157,22 +156,22 @@ const handleDownload = () => {
 .menu-header {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 10px 0;
+  gap: 12px;
+  padding: 4px 0 8px;
 }
 
 .menu-cover {
-  width: 56px;
-  height: 56px;
-  border-radius: var(--neu-radius-md);
+  width: 44px;
+  height: 44px;
+  border-radius: var(--neu-radius-sm);
   background: var(--xm-bg-surface);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
+  font-size: 20px;
   box-shadow: 
-    4px 4px 8px var(--neu-shadow-dark),
-    -2px -2px 4px var(--neu-shadow-light);
+    3px 3px 6px var(--neu-shadow-dark),
+    -1px -1px 3px var(--neu-shadow-light);
 }
 
 .menu-info {
@@ -181,8 +180,8 @@ const handleDownload = () => {
 }
 
 .menu-title {
-  font-size: 17px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -190,12 +189,32 @@ const handleDownload = () => {
 }
 
 .menu-artist {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--xm-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-top: 2px;
+  margin-top: 1px;
+}
+
+.menu-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--xm-bg-surface);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--xm-text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.menu-close:active {
+  background: var(--xm-bg-hover);
+  transform: scale(0.92);
 }
 
 /* ─── Divider ─── */
@@ -206,38 +225,35 @@ const handleDownload = () => {
     var(--xm-bg-hover) 20%, 
     var(--xm-bg-hover) 80%, 
     transparent 100%);
-  margin: 10px 0;
+  margin: 6px 0;
 }
 
 /* ─── Menu Items ─── */
 .menu-items {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .menu-item {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 14px 12px;
+  gap: 14px;
+  padding: 11px 10px;
   background: transparent;
   border: none;
-  border-radius: var(--neu-radius-md);
-  font-size: 16px;
+  border-radius: var(--neu-radius-sm);
+  font-size: 15px;
   font-weight: 500;
   color: var(--xm-text-primary);
   cursor: pointer;
   text-align: left;
-  transition: all 0.15s ease;
+  transition: all 0.12s ease;
 }
 
 .menu-item:active {
   background: var(--xm-bg-surface);
   transform: scale(0.98);
-  box-shadow: 
-    inset 2px 2px 4px var(--neu-shadow-inset-dark),
-    inset -1px -1px 3px var(--neu-shadow-inset-light);
 }
 
 .menu-item.danger {
@@ -249,41 +265,16 @@ const handleDownload = () => {
 }
 
 .menu-icon {
-  font-size: 22px;
-  width: 32px;
+  font-size: 18px;
+  width: 26px;
   text-align: center;
   flex-shrink: 0;
-}
-
-/* ─── Cancel Button ─── */
-.menu-cancel {
-  width: 100%;
-  padding: 16px;
-  margin-top: 12px;
-  background: var(--xm-bg-surface);
-  border: none;
-  border-radius: var(--neu-radius-lg);
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--xm-secondary);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  box-shadow: 
-    4px 4px 8px var(--neu-shadow-dark),
-    -2px -2px 4px var(--neu-shadow-light);
-}
-
-.menu-cancel:active {
-  transform: scale(0.98);
-  box-shadow: 
-    inset 2px 2px 4px var(--neu-shadow-inset-dark),
-    inset -1px -1px 3px var(--neu-shadow-inset-light);
 }
 
 /* ─── Animations ─── */
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.25s ease;
+  transition: opacity 0.2s ease;
 }
 
 .fade-enter-from,
@@ -293,7 +284,7 @@ const handleDownload = () => {
 
 .slide-up-enter-active,
 .slide-up-leave-active {
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .slide-up-enter-from,
