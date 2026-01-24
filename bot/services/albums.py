@@ -162,6 +162,7 @@ class AlbumAssemblyService:
         Get all user's tracks for a specific album.
         Groups by album name (case-insensitive) to ensure all tracks 
         with same album name are included regardless of artist/source.
+        Deduplicates by title to avoid duplicate tracks from different sources.
         """
         async with get_session() as session:
             # Always search by album name to get all tracks regardless of source
@@ -174,7 +175,27 @@ class AlbumAssemblyService:
                 .order_by(Track.title)
             )
             
-            return list(result.scalars().all())
+            all_tracks = list(result.scalars().all())
+            
+            # Deduplicate by title (case-insensitive)
+            # Keep the track with cover_url or higher quality metadata
+            seen_titles = {}
+            unique_tracks = []
+            for track in all_tracks:
+                title_key = track.title.lower().strip() if track.title else str(track.id)
+                if title_key not in seen_titles:
+                    seen_titles[title_key] = track
+                    unique_tracks.append(track)
+                else:
+                    # Prefer track with cover_url
+                    existing = seen_titles[title_key]
+                    if not existing.cover_url and track.cover_url:
+                        # Replace with better metadata
+                        idx = unique_tracks.index(existing)
+                        unique_tracks[idx] = track
+                        seen_titles[title_key] = track
+            
+            return unique_tracks
     
     async def get_deezer_album_tracklist(self, album_id: int) -> Optional[List[Dict]]:
         """

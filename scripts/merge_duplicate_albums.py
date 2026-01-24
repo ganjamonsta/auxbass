@@ -1,6 +1,7 @@
 """
-Migration script to merge duplicate auto-album playlists.
+Migration script to merge duplicate auto-album playlists and deduplicate tracks.
 Finds albums with same name (case-insensitive) and merges them into one.
+Also removes duplicate tracks (same title) within each album.
 """
 import asyncio
 import sys
@@ -12,6 +13,68 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from shared.database import get_session, init_db
 from shared.models import Playlist, PlaylistTrack, Track
 from sqlalchemy import select, func, delete
+
+
+async def deduplicate_album_tracks():
+    """Remove duplicate tracks (by title) from all auto-album playlists"""
+    async with get_session() as session:
+        # Get all auto-album playlists
+        result = await session.execute(
+            select(Playlist).where(Playlist.is_auto_album == True)
+        )
+        all_albums = list(result.scalars().all())
+        
+        total_removed = 0
+        
+        for album in all_albums:
+            # Get all tracks in this playlist with their info
+            result = await session.execute(
+                select(PlaylistTrack, Track)
+                .join(Track, PlaylistTrack.track_id == Track.id)
+                .where(PlaylistTrack.playlist_id == album.id)
+                .order_by(PlaylistTrack.position)
+            )
+            playlist_tracks = list(result.all())
+            
+            # Find duplicates by title (case-insensitive)
+            seen_titles = {}
+            duplicates_to_remove = []
+            
+            for pt, track in playlist_tracks:
+                title_key = track.title.lower().strip() if track.title else str(track.id)
+                
+                if title_key in seen_titles:
+                    # This is a duplicate
+                    existing_pt, existing_track = seen_titles[title_key]
+                    
+                    # Decide which to keep - prefer one with cover_url
+                    if not existing_track.cover_url and track.cover_url:
+                        # Remove the existing one, keep this one
+                        duplicates_to_remove.append(existing_pt.id)
+                        seen_titles[title_key] = (pt, track)
+                    else:
+                        # Remove this one
+                        duplicates_to_remove.append(pt.id)
+                else:
+                    seen_titles[title_key] = (pt, track)
+            
+            if duplicates_to_remove:
+                print(f"Album '{album.name}': removing {len(duplicates_to_remove)} duplicate track(s)")
+                
+                # Remove duplicates
+                await session.execute(
+                    delete(PlaylistTrack)
+                    .where(PlaylistTrack.id.in_(duplicates_to_remove))
+                )
+                
+                total_removed += len(duplicates_to_remove)
+                
+                # Update track count in description
+                new_count = len(playlist_tracks) - len(duplicates_to_remove)
+                album.description = f"Автоальбом • {new_count} треков"
+        
+        await session.commit()
+        return total_removed
 
 
 async def merge_duplicate_albums():
@@ -144,9 +207,14 @@ async def merge_duplicate_albums():
         
         await session.commit()
         
-        print(f"\n=== Summary ===")
+        print(f"\n=== Merge Summary ===")
         print(f"Album groups merged: {merged_count}")
         print(f"Duplicate playlists deleted: {deleted_count}")
+    
+    # Now deduplicate tracks within each album
+    print("\n=== Deduplicating tracks within albums ===")
+    removed = await deduplicate_album_tracks()
+    print(f"\nTotal duplicate tracks removed: {removed}")
 
 
 if __name__ == "__main__":
