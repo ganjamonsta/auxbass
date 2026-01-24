@@ -156,12 +156,12 @@ export const useLibraryStore = defineStore('library', () => {
       
       if (scope === 'global') {
         globalArtists.value = response.data
-        // Fetch images for top 30 global artists
-        fetchArtistImages(response.data.slice(0, 30))
+        // Fetch images for ALL global artists in background
+        fetchArtistImages(response.data)
       } else {
         artists.value = response.data
-        // Fetch images for top 20 artists in background
-        fetchArtistImages(response.data.slice(0, 20))
+        // Fetch images for ALL artists in background
+        fetchArtistImages(response.data)
       }
     } catch (error) {
       console.error('Failed to fetch artists:', error)
@@ -173,19 +173,32 @@ export const useLibraryStore = defineStore('library', () => {
     return artistScope.value === 'global' ? globalArtists.value : artists.value
   }
 
-  // Fetch artist images from Last.fm
+  // Fetch artist images from Last.fm (in batches to not overload)
   const fetchArtistImages = async (artistList) => {
-    for (const artist of artistList) {
-      const name = artist.artist
-      if (artistImages.value[name]) continue
+    const BATCH_SIZE = 5  // Load 5 at a time
+    const DELAY_MS = 100  // Small delay between batches
+    
+    for (let i = 0; i < artistList.length; i += BATCH_SIZE) {
+      const batch = artistList.slice(i, i + BATCH_SIZE)
       
-      try {
-        const response = await tracksApi.getArtistImage(name)
-        if (response.data.image_url) {
-          artistImages.value[name] = response.data.image_url
+      // Process batch in parallel
+      await Promise.all(batch.map(async (artist) => {
+        const name = artist.artist
+        if (artistImages.value[name]) return
+        
+        try {
+          const response = await tracksApi.getArtistImage(name)
+          if (response.data.image_url) {
+            artistImages.value[name] = response.data.image_url
+          }
+        } catch (error) {
+          // Ignore errors, just skip this artist
         }
-      } catch (error) {
-        // Ignore errors, just skip this artist
+      }))
+      
+      // Small delay to not overload API
+      if (i + BATCH_SIZE < artistList.length) {
+        await new Promise(resolve => setTimeout(resolve, DELAY_MS))
       }
     }
   }

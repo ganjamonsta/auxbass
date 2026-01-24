@@ -238,15 +238,18 @@
         
         <!-- Track list -->
         <div v-if="activeTab === 'tracks'" class="track-list">
-          <div v-if="library.loading || library.globalLoading" class="skeleton-list">
+          <!-- Skeleton only on initial load when no tracks -->
+          <div v-if="(library.loading || library.globalLoading) && displayedTracks.length === 0" class="skeleton-list">
             <TrackSkeleton v-for="i in 6" :key="i" />
           </div>
+          
           <div v-else-if="displayedTracks.length === 0" class="empty">
             <div class="empty-icon">🎵</div>
             <p class="empty-title">{{ filterScope === 'global' ? 'Треки не найдены' : 'Библиотека пуста' }}</p>
             <p class="empty-hint">{{ filterScope === 'global' ? 'Попробуйте другого артиста' : 'Отправь аудиофайлы боту, чтобы добавить музыку' }}</p>
           </div>
-          <TransitionGroup v-else name="list" tag="div">
+          
+          <template v-else>
             <TrackItem 
               v-for="track in displayedTracks" 
               :key="track.id"
@@ -257,24 +260,23 @@
               @menu="showTrackMenu(track)"
               @like="toggleLike(track.id)"
             />
-          </TransitionGroup>
-          
-          <!-- Load more button -->
-          <button 
-            v-if="library.hasMore && !library.loading" 
-            class="load-more-btn"
-            @click="library.loadMore()"
-          >
-            Загрузить ещё ({{ library.tracks.length }} из {{ library.total }})
-          </button>
-          <div v-else-if="library.loading && library.tracks.length > 0" class="loading-more">
-            <div class="loading-spinner"></div>
-            <span>Загрузка...</span>
-          </div>
-          <!-- Debug info -->
-          <div v-if="library.tracks.length > 0" style="padding: 10px; text-align: center; color: #888; font-size: 12px;">
-            Загружено: {{ library.tracks.length }} / {{ library.total }} | hasMore: {{ library.hasMore }}
-          </div>
+            
+            <!-- Load more button -->
+            <button 
+              v-if="library.hasMore && !library.loading" 
+              class="load-more-btn"
+              :disabled="library.loading"
+              @click="library.loadMore()"
+            >
+              Загрузить ещё
+            </button>
+            
+            <!-- Loading indicator while fetching more -->
+            <div v-if="library.loading" class="loading-more">
+              <div class="loading-spinner"></div>
+              <span>Загрузка...</span>
+            </div>
+          </template>
         </div>
 
         <!-- Playlists - Categorized -->
@@ -996,12 +998,6 @@ const handleContentScroll = () => {
   
   // Load more when user is within 300px from bottom
   if (distanceFromBottom < 300 && activeTab.value === 'tracks') {
-    console.log('Scroll near bottom, loading more...', { 
-      hasMore: library.hasMore, 
-      loading: library.loading,
-      total: library.total,
-      loaded: library.tracks.length 
-    })
     if (filterScope.value === 'library') {
       library.loadMore()
     }

@@ -156,6 +156,7 @@ const formatTime = (seconds) => {
   border-radius: var(--neu-radius-lg);
   cursor: pointer;
   z-index: 60;
+  overflow: visible;
   box-shadow: 
     6px 6px 12px var(--neu-shadow-dark),
     -3px -3px 8px var(--neu-shadow-light);
@@ -175,7 +176,7 @@ const formatTime = (seconds) => {
   flex: 1;
   background: var(--lcd-bg);
   border-radius: var(--neu-radius-md);
-  padding: 10px 14px;
+  padding: 12px 14px 10px;
   font-family: 'Segoe UI', system-ui, sans-serif;
   border: 1px solid #1a2a40;
   box-shadow: 
@@ -183,7 +184,7 @@ const formatTime = (seconds) => {
     0 1px 0 rgba(100, 150, 255, 0.1);
   min-width: 0;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 /* Scanline effect for retro feel */
@@ -219,7 +220,7 @@ const formatTime = (seconds) => {
   justify-content: space-between;
   margin-bottom: 8px;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .lcd-status {
@@ -239,10 +240,12 @@ const formatTime = (seconds) => {
 .lcd-title-container {
   flex: 1 1 0;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
-  mask-image: linear-gradient(90deg, black 90%, transparent 100%);
-  -webkit-mask-image: linear-gradient(90deg, black 90%, transparent 100%);
+  /* Clip only horizontally, allow vertical for glow */
+  clip-path: inset(-10px 0 -10px 0);
+  mask-image: linear-gradient(90deg, black 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, black 85%, transparent 100%);
 }
 
 .lcd-title-track {
