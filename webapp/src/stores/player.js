@@ -172,6 +172,8 @@ export const usePlayerStore = defineStore('player', () => {
   const currentTrack = ref(null)
   const queue = ref([])
   const queueIndex = ref(-1)
+  const shuffleOrder = ref([])  // Pre-generated shuffle order: array of queue indices
+  const shuffleIndex = ref(-1)  // Current position in shuffleOrder
   const isPlaying = ref(false)
   const progress = ref(0)
   const duration = ref(0)
@@ -195,6 +197,70 @@ export const usePlayerStore = defineStore('player', () => {
   let onTrackUnavailableCallback = null
   const setOnTrackUnavailable = (callback) => {
     onTrackUnavailableCallback = callback
+  }
+
+  // ============== Shuffle Queue Management ==============
+  // Generate a deterministic shuffle order so we know the next track in advance
+  const generateShuffleOrder = (startingIndex = -1) => {
+    if (queue.value.length === 0) {
+      shuffleOrder.value = []
+      shuffleIndex.value = -1
+      return
+    }
+    
+    // Create array of indices [0, 1, 2, ..., n-1]
+    const indices = Array.from({ length: queue.value.length }, (_, i) => i)
+    
+    // Fisher-Yates shuffle
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[indices[i], indices[j]] = [indices[j], indices[i]]
+    }
+    
+    // If we have a starting track, move it to the front
+    if (startingIndex >= 0 && startingIndex < queue.value.length) {
+      const pos = indices.indexOf(startingIndex)
+      if (pos > 0) {
+        indices.splice(pos, 1)
+        indices.unshift(startingIndex)
+      }
+    }
+    
+    shuffleOrder.value = indices
+    shuffleIndex.value = 0
+    console.log(`[Shuffle] Generated order for ${indices.length} tracks`)
+  }
+
+  // Get next track index based on shuffle mode
+  const getNextTrackIndex = () => {
+    if (shuffle.value && shuffleOrder.value.length > 0) {
+      // Use pre-generated shuffle order
+      const nextShuffleIdx = shuffleIndex.value + 1
+      if (nextShuffleIdx >= shuffleOrder.value.length) {
+        if (repeat.value === 'all') {
+          return shuffleOrder.value[0] // Loop to start of shuffle
+        }
+        return -1 // End of queue
+      }
+      return shuffleOrder.value[nextShuffleIdx]
+    } else {
+      // Normal order
+      const nextIdx = queueIndex.value + 1
+      if (nextIdx >= queue.value.length) {
+        if (repeat.value === 'all') {
+          return 0
+        }
+        return -1
+      }
+      return nextIdx
+    }
+  }
+
+  // Get the next track object for preloading (works for both shuffle and normal modes)
+  const getNextTrackForPreload = () => {
+    const nextIdx = getNextTrackIndex()
+    if (nextIdx === -1) return null
+    return queue.value[nextIdx] || null
   }
 
   // Update Media Session metadata
@@ -493,34 +559,62 @@ export const usePlayerStore = defineStore('player', () => {
       return
     }
     
-    // Collect next 3 tracks to preload
+    // Collect next tracks to preload
     const tracksToPreload = []
-    for (let offset = 1; offset <= 3; offset++) {
-      let nextIndex = queueIndex.value + offset
-      if (nextIndex >= queue.value.length) {
-        if (repeat.value === 'all') {
-          nextIndex = nextIndex % queue.value.length
-        } else {
-          break
+    
+    if (shuffle.value && shuffleOrder.value.length > 0) {
+      // SHUFFLE MODE with pre-generated order: we KNOW the next tracks!
+      for (let offset = 1; offset <= 3; offset++) {
+        const nextShuffleIdx = shuffleIndex.value + offset
+        if (nextShuffleIdx >= shuffleOrder.value.length) {
+          if (repeat.value === 'all' && nextShuffleIdx < shuffleOrder.value.length + 3) {
+            // Wrap around for repeat all
+            const wrappedIdx = nextShuffleIdx % shuffleOrder.value.length
+            const queueIdx = shuffleOrder.value[wrappedIdx]
+            const track = queue.value[queueIdx]
+            if (track && !getCachedUrl(track.id) && !getCachedAudio(track.id)) {
+              tracksToPreload.push(track)
+            }
+          }
+          continue
+        }
+        const queueIdx = shuffleOrder.value[nextShuffleIdx]
+        const track = queue.value[queueIdx]
+        if (track && !getCachedUrl(track.id) && !getCachedAudio(track.id)) {
+          tracksToPreload.push(track)
         }
       }
-      const track = queue.value[nextIndex]
-      if (track && !getCachedUrl(track.id) && !getCachedAudio(track.id)) {
-        tracksToPreload.push(track)
+      console.log(`[Preload] Shuffle mode: preloading ${tracksToPreload.length} next tracks from shuffle order`)
+      
+      console.log(`[Preload] Shuffle mode: preloading ${tracksToPreload.length} random tracks`)
+    } else {
+      // NORMAL MODE: Preload next 3 tracks in order
+      for (let offset = 1; offset <= 3; offset++) {
+        let nextIndex = queueIndex.value + offset
+        if (nextIndex >= queue.value.length) {
+          if (repeat.value === 'all') {
+            nextIndex = nextIndex % queue.value.length
+          } else {
+            break
+          }
+        }
+        const track = queue.value[nextIndex]
+        if (track && !getCachedUrl(track.id) && !getCachedAudio(track.id)) {
+          tracksToPreload.push(track)
+        }
       }
     }
     
     if (tracksToPreload.length === 0) {
       console.log('[Preload] All next tracks already have URLs cached')
-      // Still start Audio preloading for immediate next track
-      const nextTrack = queue.value[queueIndex.value + 1] || 
-                        (repeat.value === 'all' ? queue.value[0] : null)
-      if (nextTrack) {
-        const url = getCachedUrl(nextTrack.id)
-        if (url && preloadTrackId !== nextTrack.id) {
-          preloadTrackWithAudio(nextTrack.id, url)
+      // Start Audio preloading for immediate next track
+      const nextTrackToPreload = getNextTrackForPreload()
+      if (nextTrackToPreload) {
+        const url = getCachedUrl(nextTrackToPreload.id)
+        if (url && preloadTrackId !== nextTrackToPreload.id) {
+          preloadTrackWithAudio(nextTrackToPreload.id, url)
           nextTrackPreloaded.value = {
-            track: nextTrack,
+            track: nextTrackToPreload,
             url: url,
             audioPreloaded: true
           }
@@ -545,15 +639,13 @@ export const usePlayerStore = defineStore('player', () => {
       }
       
       // Start preloading the immediate next track with Audio element
-      const nextTrack = queue.value[queueIndex.value + 1] || 
-                        (repeat.value === 'all' ? queue.value[0] : null)
-      
-      if (nextTrack) {
-        const nextUrl = getCachedUrl(nextTrack.id)
-        if (nextUrl && preloadTrackId !== nextTrack.id) {
-          preloadTrackWithAudio(nextTrack.id, nextUrl)
+      const nextTrackToPreload = getNextTrackForPreload()
+      if (nextTrackToPreload) {
+        const nextUrl = getCachedUrl(nextTrackToPreload.id)
+        if (nextUrl && preloadTrackId !== nextTrackToPreload.id) {
+          preloadTrackWithAudio(nextTrackToPreload.id, nextUrl)
           nextTrackPreloaded.value = {
-            track: nextTrack,
+            track: nextTrackToPreload,
             url: nextUrl,
             audioPreloaded: true
           }
@@ -578,18 +670,37 @@ export const usePlayerStore = defineStore('player', () => {
   const cancelIrrelevantPreloads = () => {
     const relevantIds = new Set()
     
-    // Keep next 3 tracks as relevant
-    for (let offset = 1; offset <= 3; offset++) {
-      let idx = queueIndex.value + offset
-      if (idx >= queue.value.length) {
-        if (repeat.value === 'all') {
-          idx = idx % queue.value.length
-        } else {
-          continue
+    if (shuffle.value && shuffleOrder.value.length > 0) {
+      // In shuffle mode with order: keep next 3 in shuffle order
+      for (let offset = 1; offset <= 3; offset++) {
+        const nextShuffleIdx = shuffleIndex.value + offset
+        if (nextShuffleIdx < shuffleOrder.value.length) {
+          const queueIdx = shuffleOrder.value[nextShuffleIdx]
+          if (queue.value[queueIdx]) {
+            relevantIds.add(queue.value[queueIdx].id)
+          }
+        } else if (repeat.value === 'all') {
+          const wrappedIdx = nextShuffleIdx % shuffleOrder.value.length
+          const queueIdx = shuffleOrder.value[wrappedIdx]
+          if (queue.value[queueIdx]) {
+            relevantIds.add(queue.value[queueIdx].id)
+          }
         }
       }
-      if (queue.value[idx]) {
-        relevantIds.add(queue.value[idx].id)
+    } else {
+      // Normal mode: keep next 3 tracks in order
+      for (let offset = 1; offset <= 3; offset++) {
+        let idx = queueIndex.value + offset
+        if (idx >= queue.value.length) {
+          if (repeat.value === 'all') {
+            idx = idx % queue.value.length
+          } else {
+            continue
+          }
+        }
+        if (queue.value[idx]) {
+          relevantIds.add(queue.value[idx].id)
+        }
       }
     }
     
@@ -678,6 +789,14 @@ export const usePlayerStore = defineStore('player', () => {
     if (newQueue) {
       queue.value = [...newQueue]
       queueIndex.value = newQueue.findIndex(t => t.id === track.id)
+      
+      // Generate shuffle order for new queue if shuffle is enabled
+      if (shuffle.value) {
+        generateShuffleOrder(queueIndex.value)
+      }
+    } else if (shuffle.value && shuffleOrder.value.length === 0) {
+      // Shuffle is on but no order generated yet
+      generateShuffleOrder(queueIndex.value)
     }
     
     // If same track, just toggle
@@ -838,8 +957,20 @@ export const usePlayerStore = defineStore('player', () => {
     
     let nextIndex
     
-    if (shuffle.value) {
-      nextIndex = Math.floor(Math.random() * queue.value.length)
+    if (shuffle.value && shuffleOrder.value.length > 0) {
+      // Use pre-generated shuffle order for deterministic next track
+      shuffleIndex.value++
+      if (shuffleIndex.value >= shuffleOrder.value.length) {
+        if (repeat.value === 'all') {
+          // Re-shuffle and start from beginning
+          generateShuffleOrder()
+        } else {
+          // End of shuffle queue
+          isPlaying.value = false
+          return
+        }
+      }
+      nextIndex = shuffleOrder.value[shuffleIndex.value]
     } else {
       nextIndex = queueIndex.value + 1
       if (nextIndex >= queue.value.length) {
@@ -1079,6 +1210,21 @@ export const usePlayerStore = defineStore('player', () => {
   // Toggle shuffle
   const toggleShuffle = () => {
     shuffle.value = !shuffle.value
+    
+    // Generate or clear shuffle order
+    if (shuffle.value) {
+      // Generate shuffle order starting from current track
+      generateShuffleOrder(queueIndex.value)
+    } else {
+      // Clear shuffle order
+      shuffleOrder.value = []
+      shuffleIndex.value = -1
+    }
+    
+    // Trigger preload with new order
+    preloadTriggered = false
+    preloadNextTracks()
+    
     persistSettings()
   }
 
