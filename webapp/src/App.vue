@@ -3,20 +3,14 @@
     <!-- One UI Style Header with Animated Search -->
     <header class="oneui-header" v-if="currentView === 'library'">
       <div class="header-row">
-        <EnrichmentStatus />
-        
-        <!-- Center content area -->
-        <div class="header-center">
-          <!-- Title (hides when search opens) -->
-          <Transition name="fade-slide">
-            <h1 v-if="!showSearch" class="header-title-main" @click="goToHome">
-              {{ currentTabName }}
-            </h1>
-          </Transition>
-          
-          <!-- Search field (appears when search opens) -->
-          <Transition name="fade-slide">
-            <div v-if="showSearch" class="search-wrapper" @click="focusInput">
+        <!-- Left slot: EnrichmentStatus OR Search field (mutually exclusive) -->
+        <div class="header-left-slot">
+          <Transition name="fade-slide" mode="out-in">
+            <!-- Enrichment status (when search is closed) -->
+            <EnrichmentStatus v-if="!showSearch" key="enrichment" />
+            
+            <!-- Search field (when search is open) -->
+            <div v-else key="search" class="search-wrapper" @click="focusInput">
               <!-- Scope toggle (Library / Global) -->
               <button 
                 class="search-scope-btn" 
@@ -1489,15 +1483,12 @@ onMounted(async () => {
   gap: 12px;
 }
 
-/* Center area - takes all available space */
-.header-center {
+/* Left slot - EnrichmentStatus or Search field (mutually exclusive) */
+.header-left-slot {
   flex: 1;
   min-width: 0;
-  position: relative;
-  height: 44px;
   display: flex;
   align-items: center;
-  overflow: hidden;
 }
 
 /* Header title */
