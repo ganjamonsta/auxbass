@@ -143,19 +143,6 @@
               </div>
               <span class="quick-title">Недавнее</span>
             </div>
-            <!-- Last played/updated playlist (only 1) -->
-            <div 
-              class="quick-item" 
-              v-if="lastPlaylist"
-              @click="openPlaylist(lastPlaylist)"
-            >
-              <div class="quick-icon playlist-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M4 10h12v2H4zm0-4h12v2H4zm0 8h8v2H4zm10 0v6l5-3z"/>
-                </svg>
-              </div>
-              <span class="quick-title">{{ lastPlaylist.name }}</span>
-            </div>
             <!-- All playlists link -->
             <div 
               class="quick-item"
