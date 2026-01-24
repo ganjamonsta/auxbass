@@ -4,7 +4,7 @@
     <header class="oneui-header" v-if="currentView === 'library'">
       <div class="header-row">
         <!-- Left slot: EnrichmentStatus OR Search field (mutually exclusive) -->
-        <div class="header-left-slot">
+        <div class="header-left-slot" :class="{ expanded: showSearch }">
           <Transition name="fade-slide" mode="out-in">
             <!-- Enrichment status (when search is closed) -->
             <EnrichmentStatus v-if="!showSearch" key="enrichment" />
@@ -1719,6 +1719,11 @@ onMounted(async () => {
   flex-shrink: 0;
   display: flex;
   align-items: center;
+}
+
+.header-left-slot.expanded {
+  flex: 1;
+  min-width: 0;
 }
 
 /* Header title */
