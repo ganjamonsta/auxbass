@@ -89,6 +89,14 @@ const getCachedUrl = (trackId) => {
     urlCache.delete(trackId)
     return null
   }
+  
+  // Validate URL format
+  if (!cached.url || !cached.url.startsWith('/api/player/audio/')) {
+    console.warn(`[Cache] Invalid cached URL for track ${trackId}, removing`)
+    urlCache.delete(trackId)
+    return null
+  }
+  
   return cached.url
 }
 
@@ -130,15 +138,50 @@ const getPreloadAudio = () => {
 }
 
 const preloadTrackWithAudio = (trackId, url) => {
+  // Validate URL before preloading
+  if (!url || url === '' || !url.startsWith('/api/player/audio/')) {
+    console.warn(`[Preload] Invalid URL for track ${trackId}, skipping preload`)
+    return
+  }
+  
   const audio = getPreloadAudio()
+  
+  // Clear any previous error state
+  if (audio.error) {
+    audio.src = ''
+    audio.load()
+  }
+  
   preloadTrackId = trackId
   audio.src = url
   audio.load()
+  
+  // Add one-time error handler to detect failed preloads
+  const errorHandler = () => {
+    console.warn(`[Preload] Failed to preload track ${trackId}, marking as invalid`)
+    preloadTrackId = null
+    audio.removeEventListener('error', errorHandler)
+  }
+  audio.addEventListener('error', errorHandler, { once: true })
+  
   console.log(`[Preload] Started preloading track ${trackId} with Audio element`)
 }
 
 const getPreloadedAudio = (trackId) => {
   if (preloadTrackId === trackId && preloadAudio && preloadAudio.src) {
+    // Additional validation: check that audio is not in error state
+    // and has actually started loading (readyState > 0)
+    if (preloadAudio.error) {
+      console.log(`[Preload] Audio for track ${trackId} has error, clearing`)
+      clearPreloadAudio()
+      return null
+    }
+    // Also check src is not empty (can happen with some edge cases)
+    if (!preloadAudio.src || preloadAudio.src === '' || preloadAudio.src === window.location.href) {
+      console.log(`[Preload] Audio for track ${trackId} has invalid src, clearing`)
+      clearPreloadAudio()
+      return null
+    }
     return preloadAudio
   }
   return null
@@ -796,8 +839,6 @@ export const usePlayerStore = defineStore('player', () => {
         }
       }
       console.log(`[Preload] Shuffle mode: preloading ${tracksToPreload.length} next tracks from shuffle order`)
-      
-      console.log(`[Preload] Shuffle mode: preloading ${tracksToPreload.length} random tracks`)
     } else {
       // NORMAL MODE: Preload next 3 tracks in order
       for (let offset = 1; offset <= 3; offset++) {
@@ -842,10 +883,15 @@ export const usePlayerStore = defineStore('player', () => {
       const response = await playerApi.getBatchUrls(trackIds)
       const urlData = response.data.urls || []
       
-      // Cache all URLs
+      // Cache all valid URLs
+      let cachedCount = 0
       for (const item of urlData) {
-        if (item.url && !item.error) {
+        // Validate URL format before caching
+        if (item.url && !item.error && item.url.startsWith('/api/player/audio/')) {
           setCachedUrl(item.track_id, item.url, item.expires_at)
+          cachedCount++
+        } else if (item.error) {
+          console.warn(`[Preload] Track ${item.track_id} error: ${item.error}`)
         }
       }
       
@@ -863,7 +909,7 @@ export const usePlayerStore = defineStore('player', () => {
         }
       }
       
-      console.log(`[Preload] Cached ${urlData.filter(u => u.url).length} URLs, next track audio preloading`)
+      console.log(`[Preload] Cached ${cachedCount} URLs, next track audio preloading`)
       
     } catch (e) {
       console.error('[Preload] Batch URL fetch failed:', e)
@@ -1261,13 +1307,14 @@ export const usePlayerStore = defineStore('player', () => {
         audio.value.load()
         await audio.value.play()
         loading.value = false
+        isSkipping = false  // Success - reset skip flag
         nextTrackPreloaded.value = null
         clearPreloadAudio()
         persistState()
         preloadNextTracks()
         return
       } catch (e) {
-        console.error('Failed to play cached blob:', e)
+        console.error('[Next] Failed to play cached blob, falling back:', e)
         audioCache.delete(nextTrack.id)
       }
     }
@@ -1275,7 +1322,7 @@ export const usePlayerStore = defineStore('player', () => {
     // Priority 2: Use preloaded Audio element
     const preloadedAudio = getPreloadedAudio(nextTrack.id)
     if (preloadedAudio && preloadedAudio.readyState >= 2) {
-      console.log('[Next] Using preloaded Audio element')
+      console.log('[Next] Using preloaded Audio element, readyState:', preloadedAudio.readyState)
       
       if (audio.value) {
         audio.value.pause()
@@ -1296,6 +1343,7 @@ export const usePlayerStore = defineStore('player', () => {
       try {
         await audio.value.play()
         loading.value = false
+        isSkipping = false  // Success - reset skip flag
         nextTrackPreloaded.value = null
         
         preloadAudio = oldAudio || new Audio()
@@ -1307,9 +1355,14 @@ export const usePlayerStore = defineStore('player', () => {
         preloadNextTracks()
         return
       } catch (e) {
-        console.error('Failed to play preloaded audio:', e)
+        console.error('[Next] Failed to play preloaded audio, falling back:', e)
+        // Restore old audio and continue to next priority
         audio.value = oldAudio
-        reattachAudioListeners()
+        if (oldAudio) {
+          reattachAudioListeners()
+        }
+        // Clear the broken preload
+        clearPreloadAudio()
       }
     }
     
@@ -1329,13 +1382,14 @@ export const usePlayerStore = defineStore('player', () => {
         buffered.value = 0
         await audio.value.play()
         loading.value = false
+        isSkipping = false  // Success - reset skip flag
         nextTrackPreloaded.value = null
         clearPreloadAudio()
         persistState()
         preloadNextTracks()
         return
       } catch (e) {
-        console.error('Failed to play from cached URL:', e)
+        console.error('[Next] Failed to play from cached URL, falling back:', e)
         urlCache.delete(nextTrack.id)
       }
     }
@@ -1343,6 +1397,7 @@ export const usePlayerStore = defineStore('player', () => {
     // Fallback: Regular play (fetch new URL)
     console.log('[Next] Fetching new URL')
     clearPreloadAudio()
+    isSkipping = false  // Reset before calling play()
     await play(nextTrack)
   }
 
@@ -1391,16 +1446,16 @@ export const usePlayerStore = defineStore('player', () => {
         audio.value.src = cachedBlobUrl
         audio.value.load()
         await audio.value.play()
+        isSkipping = false  // Success
         persistState()
         preloadNextTracks()
+        return
       } catch (e) {
-        console.error('Failed to play cached track:', e)
+        console.error('[Prev] Failed to play cached blob, falling back:', e)
         audioCache.delete(prevTrack.id)
-        await play(prevTrack)
       } finally {
         loading.value = false
       }
-      return
     }
     
     // Priority 2: Cached URL
@@ -1417,19 +1472,20 @@ export const usePlayerStore = defineStore('player', () => {
         audio.value.src = cachedUrl
         buffered.value = 0
         await audio.value.play()
+        isSkipping = false  // Success
         persistState()
         preloadNextTracks()
+        return
       } catch (e) {
-        console.error('Failed to play from cached URL:', e)
+        console.error('[Prev] Failed to play from cached URL, falling back:', e)
         urlCache.delete(prevTrack.id)
-        await play(prevTrack)
       } finally {
         loading.value = false
       }
-      return
     }
     
     // Fallback: Regular play
+    isSkipping = false  // Reset before calling play()
     await play(prevTrack)
   }
 
