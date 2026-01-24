@@ -22,8 +22,8 @@
     <div class="lcd-panel">
       <div class="lcd-frame">
         <div class="lcd-screen">
-          <!-- Main row - Status, Title & Progress on same line -->
-          <div class="lcd-main-row">
+          <!-- Title row - centered -->
+          <div class="lcd-title-row">
             <span class="lcd-status">{{ isPlaying ? '▶' : '■' }}</span>
             <div class="lcd-text-container">
               <div class="lcd-text" :class="{ scrolling: shouldScroll }">
@@ -31,7 +31,11 @@
                 <span v-if="shouldScroll" class="segment-text clone">{{ displayText }}</span>
               </div>
             </div>
-            <span class="lcd-time time-current">{{ formatTime(progress) }}</span>
+          </div>
+
+          <!-- Progress row -->
+          <div class="lcd-progress-row">
+            <span class="lcd-time">{{ formatTime(progress) }}</span>
             <div class="lcd-progress" @click="handleProgressClick" @mousedown="startSeek">
               <div class="progress-bar">
                 <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
@@ -392,34 +396,44 @@ onUnmounted(() => {
   justify-content: space-between;
 }
 
-.lcd-main-row {
+/* Title row - centered in LCD */
+.lcd-title-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: 24px;
+  justify-content: center;
+  gap: 8px;
+  flex: 1;
+}
+
+/* Progress row */
+.lcd-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .lcd-status {
   color: #4DC3FF;
-  font-size: 12px;
+  font-size: 14px;
   text-shadow: 0 0 8px rgba(77, 195, 255, 0.6);
   flex-shrink: 0;
 }
 
 .lcd-text-container {
   flex: 1;
-  min-width: 150px;
-  max-width: 300px;
+  max-width: 500px;
   overflow: hidden;
-  mask-image: linear-gradient(90deg, transparent, black 5%, black 95%, transparent);
+  mask-image: linear-gradient(90deg, transparent, black 3%, black 97%, transparent);
 }
 
 .lcd-text {
   display: flex;
   white-space: nowrap;
+  justify-content: center;
 }
 
 .lcd-text.scrolling {
+  justify-content: flex-start;
   animation: lcd-scroll 12s linear infinite;
 }
 
@@ -448,10 +462,6 @@ onUnmounted(() => {
   text-shadow: 0 0 5px rgba(77, 195, 255, 0.6);
   min-width: 32px;
   flex-shrink: 0;
-}
-
-.lcd-time.time-current {
-  text-align: right;
 }
 
 .lcd-progress {
