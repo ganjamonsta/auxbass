@@ -270,6 +270,10 @@ export const useLibraryStore = defineStore('library', () => {
       if (index !== -1) {
         tracks.value[index] = response.data
       }
+      // Refresh artists list if artist was changed
+      if (data.artist !== undefined) {
+        fetchArtists(artistScope.value)
+      }
       return response.data
     } catch (error) {
       console.error('Failed to update track:', error)
