@@ -17,6 +17,14 @@
 
             <!-- Menu items -->
             <div class="menu-items">
+              <!-- Retry button for unavailable tracks -->
+              <button v-if="track?.is_unavailable" class="menu-item retry" @click="handleRetry">
+                <span class="menu-icon">🔄</span>
+                <span>Повторить загрузку</span>
+              </button>
+
+              <div v-if="track?.is_unavailable" class="menu-divider"></div>
+
               <button class="menu-item" @click="handlePlayNext">
                 <span class="menu-icon">▶️</span>
                 <span>Воспроизвести следующим</span>
@@ -71,7 +79,7 @@ const props = defineProps({
   track: Object
 })
 
-const emit = defineEmits(['close', 'addToPlaylist', 'edit', 'delete', 'download'])
+const emit = defineEmits(['close', 'addToPlaylist', 'edit', 'delete', 'download', 'retry'])
 
 const player = usePlayerStore()
 const telegram = inject('telegram')
@@ -118,6 +126,12 @@ const handleDelete = () => {
 const handleDownload = () => {
   haptic('light')
   emit('download', props.track)
+  emit('close')
+}
+
+const handleRetry = () => {
+  haptic('medium')
+  emit('retry', props.track)
   emit('close')
 }
 </script>
@@ -246,6 +260,14 @@ const handleDownload = () => {
 
 .menu-item.danger:active {
   background: rgba(229, 57, 53, 0.1);
+}
+
+.menu-item.retry {
+  color: #4CAF50;
+}
+
+.menu-item.retry:active {
+  background: rgba(76, 175, 80, 0.1);
 }
 
 .menu-icon {

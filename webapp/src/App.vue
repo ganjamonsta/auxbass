@@ -771,6 +771,7 @@
       @edit="handleEditTrack"
       @delete="handleDeleteTrack"
       @download="handleDownloadTrack"
+      @retry="handleRetryTrack"
     />
 
     <!-- Edit Track Modal -->
@@ -825,7 +826,7 @@
 import { ref, computed, onMounted, inject, nextTick, watch } from 'vue'
 import { usePlayerStore } from './stores/player'
 import { useLibraryStore } from './stores/library'
-import { playerApi } from './api/client'
+import { playerApi, tracksApi } from './api/client'
 import TrackItem from './components/TrackItem.vue'
 import TrackSkeleton from './components/TrackSkeleton.vue'
 import PlaylistItem from './components/PlaylistItem.vue'
@@ -1105,6 +1106,23 @@ const handleDownloadTrack = async (track) => {
     console.error('Failed to download track:', error)
     telegram?.HapticFeedback?.notificationOccurred?.('error')
     toast.value?.show('Не удалось отправить трек', 'error')
+  }
+}
+
+const handleRetryTrack = async (track) => {
+  try {
+    // Mark track as available again
+    await tracksApi.markAvailable(track.id)
+    track.is_unavailable = false
+    telegram?.HapticFeedback?.notificationOccurred?.('success')
+    toast.value?.show('Попробуй воспроизвести снова', 'success')
+    
+    // Attempt to play
+    player.play(track)
+  } catch (error) {
+    console.error('Failed to retry track:', error)
+    telegram?.HapticFeedback?.notificationOccurred?.('error')
+    toast.value?.show('Не удалось восстановить трек', 'error')
   }
 }
 
