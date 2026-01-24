@@ -441,15 +441,15 @@ class AlbumAssemblyService:
                 else:
                     # Duplicate found - prefer track with better metadata
                     existing = unique_tracks[dup_idx]
-                    # Prefer: has cover > has deezer_id > has duration
+                    # Prefer: has cover > has deezer_album_id > has duration
                     existing_score = (
                         (1 if existing.cover_url else 0) * 100 +
-                        (1 if existing.deezer_id else 0) * 10 +
+                        (1 if existing.deezer_album_id else 0) * 10 +
                         (1 if existing.duration else 0)
                     )
                     track_score = (
                         (1 if track.cover_url else 0) * 100 +
-                        (1 if track.deezer_id else 0) * 10 +
+                        (1 if track.deezer_album_id else 0) * 10 +
                         (1 if track.duration else 0)
                     )
                     if track_score > existing_score:
