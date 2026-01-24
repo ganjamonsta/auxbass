@@ -16,6 +16,7 @@ from sqlalchemy import select, distinct, func
 async def rebuild_all_albums():
     """Rebuild album playlists for all users"""
     from bot.services.albums import album_service
+    from bot.services.metadata import metadata_service
     
     print("🔍 Finding users with tracks...")
     
@@ -47,6 +48,9 @@ async def rebuild_all_albums():
                 
         except Exception as e:
             print(f"   ❌ Error: {e}")
+    
+    # Close any open sessions
+    await metadata_service.close()
     
     print("\n✨ Done!")
 
