@@ -30,7 +30,7 @@
       <div class="horizontal-scroll">
         <div class="scroll-spacer"></div>
         <div 
-          v-for="album in artist.albums" 
+          v-for="album in sortedAlbums" 
           :key="album.id"
           class="album-card"
           @click="$emit('openAlbum', album)"
@@ -42,7 +42,10 @@
             </svg>
           </div>
           <div class="album-name">{{ album.name }}</div>
-          <div class="album-count">{{ album.track_count }} треков</div>
+          <div class="album-meta">
+            <span class="album-count">{{ album.track_count }} треков</span>
+            <span v-if="album.release_date" class="album-year">{{ formatReleaseYear(album.release_date) }}</span>
+          </div>
         </div>
         <div class="scroll-spacer"></div>
       </div>
@@ -131,6 +134,28 @@ const avatarStyle = computed(() => {
     background: `linear-gradient(135deg, hsl(${hue1}, 60%, 45%) 0%, hsl(${hue2}, 50%, 35%) 100%)`
   }
 })
+
+// Sort albums by release date (newest first)
+const sortedAlbums = computed(() => {
+  if (!props.artist.albums) return []
+  
+  return [...props.artist.albums].sort((a, b) => {
+    // Albums with release_date come first, sorted newest to oldest
+    if (a.release_date && b.release_date) {
+      return b.release_date.localeCompare(a.release_date)
+    }
+    if (a.release_date) return -1
+    if (b.release_date) return 1
+    return 0
+  })
+})
+
+// Format release date to just year
+const formatReleaseYear = (dateStr) => {
+  if (!dateStr) return ''
+  // dateStr is in YYYY-MM-DD format
+  return dateStr.split('-')[0]
+}
 
 const formatPlays = (count) => {
   if (!count) return '0 прослушиваний'
@@ -308,9 +333,25 @@ const playAll = () => {
   text-overflow: ellipsis;
 }
 
-.album-count {
+.album-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
   color: var(--spotify-text-muted);
+}
+
+.album-count {
+  /* inherits from .album-meta */
+}
+
+.album-year {
+  opacity: 0.7;
+}
+
+.album-year::before {
+  content: "•";
+  margin-right: 6px;
 }
 
 /* ─── Playlist Cards ─── */
