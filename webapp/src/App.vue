@@ -1923,10 +1923,15 @@ onUnmounted(() => {
   grid-area: player;
   width: 100%;
   height: 100px;
+  overflow: visible;
 }
 
-.main-content-wrapper {
-  display: contents;
+.app.desktop-layout .main-content-wrapper {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
 }
 
 /* Desktop adjustments */

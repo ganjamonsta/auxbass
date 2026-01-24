@@ -238,9 +238,10 @@ onUnmounted(() => {
 <style scoped>
 .desktop-player {
   height: 100px;
+  min-height: 100px;
+  max-height: 100px;
   background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 50%, #1a1a1a 100%);
   border-top: 1px solid #333;
-  border-bottom: 1px solid #000;
   display: flex;
   align-items: center;
   padding: 0 20px;
@@ -249,6 +250,7 @@ onUnmounted(() => {
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 -4px 20px rgba(0, 0, 0, 0.5);
   position: relative;
+  overflow: visible;
 }
 
 .desktop-player::before {
@@ -265,7 +267,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 
 .volume-knob {
@@ -274,8 +276,8 @@ onUnmounted(() => {
 }
 
 .knob-outer {
-  width: 60px;
-  height: 60px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
   background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
   box-shadow: 
@@ -288,8 +290,8 @@ onUnmounted(() => {
 }
 
 .knob-inner {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: linear-gradient(145deg, #333, #222);
   box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.5);
@@ -300,11 +302,11 @@ onUnmounted(() => {
 
 .knob-indicator {
   position: absolute;
-  top: 6px;
+  top: 4px;
   left: 50%;
   transform: translateX(-50%);
-  width: 4px;
-  height: 10px;
+  width: 3px;
+  height: 8px;
   background: #4DC3FF;
   border-radius: 2px;
   box-shadow: 0 0 8px #4DC3FF, 0 0 16px rgba(77, 195, 255, 0.6);
@@ -324,22 +326,24 @@ onUnmounted(() => {
 }
 
 .vol-label {
-  font-size: 10px;
+  font-size: 8px;
   color: #4DC3FF;
   text-shadow: 0 0 5px rgba(77, 195, 255, 0.6);
   font-weight: bold;
-  letter-spacing: 2px;
+  letter-spacing: 1px;
 }
 
 /* LCD Panel */
 .lcd-panel {
   flex: 1;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
 }
 
 .lcd-frame {
+  flex: 1;
   background: #0a0a0a;
   border-radius: 4px;
   padding: 3px;
@@ -351,15 +355,17 @@ onUnmounted(() => {
 .lcd-screen {
   background: linear-gradient(180deg, #0a1520 0%, #051015 50%, #0a1520 100%);
   border-radius: 2px;
-  padding: 8px 12px;
-  min-height: 50px;
+  padding: 6px 12px;
+  height: 70px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .lcd-main-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: 6px;
 }
 
 .lcd-status {
@@ -391,7 +397,7 @@ onUnmounted(() => {
 
 .segment-text {
   font-family: 'Courier New', monospace;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: bold;
   color: #4DC3FF;
   text-shadow: 
@@ -405,15 +411,15 @@ onUnmounted(() => {
 .lcd-info-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .lcd-time {
   font-family: 'Courier New', monospace;
-  font-size: 11px;
+  font-size: 10px;
   color: #7DD3FC;
   text-shadow: 0 0 5px rgba(77, 195, 255, 0.6);
-  min-width: 35px;
+  min-width: 32px;
 }
 
 .lcd-progress {
@@ -454,14 +460,13 @@ onUnmounted(() => {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 3px;
-  height: 20px;
-  margin-top: 4px;
+  gap: 2px;
+  height: 16px;
 }
 
 .eq-bar {
-  width: 8px;
-  min-height: 3px;
+  width: 6px;
+  min-height: 2px;
   background: linear-gradient(180deg, #4DC3FF, #00BCD4);
   border-radius: 1px;
   box-shadow: 0 0 4px rgba(77, 195, 255, 0.6);
@@ -473,7 +478,8 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .ctrl-btn {
@@ -481,8 +487,8 @@ onUnmounted(() => {
   border: 1px solid #333;
   border-radius: 4px;
   color: #7DD3FC;
-  font-size: 14px;
-  padding: 6px 12px;
+  font-size: 12px;
+  padding: 8px 10px;
   cursor: pointer;
   transition: all 0.15s;
   box-shadow: 
@@ -502,13 +508,13 @@ onUnmounted(() => {
 }
 
 .ctrl-btn.play-btn {
-  padding: 6px 20px;
-  font-size: 18px;
+  padding: 8px 16px;
+  font-size: 16px;
 }
 
 .ctrl-btn.mode {
-  font-size: 10px;
-  padding: 6px 8px;
+  font-size: 9px;
+  padding: 8px 6px;
 }
 
 .ctrl-btn.mode.active {
@@ -533,13 +539,13 @@ onUnmounted(() => {
 .player-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .cover-display {
   position: relative;
-  width: 70px;
-  height: 70px;
+  width: 60px;
+  height: 60px;
   cursor: pointer;
 }
 
@@ -566,9 +572,9 @@ onUnmounted(() => {
 
 .vinyl-disc {
   position: absolute;
-  width: 60px;
-  height: 60px;
-  right: -20px;
+  width: 50px;
+  height: 50px;
+  right: -18px;
   top: 50%;
   transform: translateY(-50%);
   background: linear-gradient(135deg, #1a1a1a, #0a0a0a);
