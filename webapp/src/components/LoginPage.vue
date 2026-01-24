@@ -85,7 +85,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, nextTick } from 'vue'
 import { authApi, authStorage } from '../api/client'
 
 const emit = defineEmits(['login'])
@@ -125,12 +125,14 @@ onMounted(async () => {
     const configResponse = await authApi.getConfig()
     botUsername.value = configResponse.data.bot_username
     
-    // Setup Telegram Login Widget
+    // Setup Telegram Login Widget after DOM update
+    loading.value = false
+    
+    await nextTick()
+    
     if (botUsername.value && telegramLoginContainer.value) {
       setupTelegramWidget()
     }
-    
-    loading.value = false
   } catch (e) {
     console.error('Auth check failed:', e)
     loading.value = false
