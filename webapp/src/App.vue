@@ -994,8 +994,8 @@
     </Transition>
     </div><!-- End main-content-wrapper -->
 
-    <!-- Desktop Floating Player -->
-    <FloatingPlayer 
+    <!-- Desktop Bottom Player (Car Stereo Style) -->
+    <DesktopPlayer 
       v-if="isDesktop && player.currentTrack"
       :track="player.currentTrack"
       :isPlaying="player.isPlaying"
@@ -1036,7 +1036,7 @@ import PlaylistPicker from './components/PlaylistPicker.vue'
 import EnrichmentStatus from './components/EnrichmentStatus.vue'
 import GlobalLibrary from './components/GlobalLibrary.vue'
 import Sidebar from './components/Sidebar.vue'
-import FloatingPlayer from './components/FloatingPlayer.vue'
+import DesktopPlayer from './components/DesktopPlayer.vue'
 import ArtistCard from './components/ArtistCard.vue'
 import Toast from './components/Toast.vue'
 import LoginPage from './components/LoginPage.vue'
@@ -1896,6 +1896,7 @@ onUnmounted(() => {
 /* Desktop Layout */
 .app.desktop-layout {
   flex-direction: row;
+  flex-wrap: wrap;
   height: 100vh;
   max-height: 100vh;
 }
@@ -1905,7 +1906,13 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  height: 100%;
+  height: calc(100% - 100px); /* Leave space for bottom player */
+}
+
+/* Desktop Player at bottom spans full width */
+.app.desktop-layout :deep(.desktop-player) {
+  width: 100%;
+  order: 3;
 }
 
 .main-content-wrapper {

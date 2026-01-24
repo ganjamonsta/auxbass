@@ -106,6 +106,39 @@
     <!-- Divider -->
     <div class="sidebar-divider"></div>
 
+    <!-- Albums Section -->
+    <div v-if="albums.length > 0" class="sidebar-section albums-section">
+      <div class="section-header">
+        <span>Альбомы</span>
+        <span class="section-count">{{ albums.length }}</span>
+      </div>
+
+      <div class="playlists-list">
+        <button 
+          v-for="album in albums" 
+          :key="album.id"
+          class="nav-item playlist-item"
+          :class="{ active: activePlaylistId === album.id }"
+          @click="$emit('openPlaylist', album)"
+        >
+          <div class="playlist-cover album-cover" :style="getPlaylistCoverStyle(album)">
+            <img v-if="album.cover_url" :src="album.cover_url" alt="" />
+            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"/>
+            </svg>
+          </div>
+          <div class="playlist-info">
+            <span class="playlist-name">{{ album.name }}</span>
+            <span v-if="album.album_artist" class="playlist-artist">{{ album.album_artist }}</span>
+          </div>
+          <span class="nav-count">{{ album.track_count }}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Divider -->
+    <div v-if="albums.length > 0" class="sidebar-divider"></div>
+
     <!-- Playlists Section -->
     <div class="sidebar-section playlists-section">
       <div class="section-header">
@@ -119,7 +152,7 @@
 
       <div class="playlists-list">
         <button 
-          v-for="playlist in playlists" 
+          v-for="playlist in userPlaylists" 
           :key="playlist.id"
           class="nav-item playlist-item"
           :class="{ active: activePlaylistId === playlist.id }"
@@ -127,9 +160,6 @@
         >
           <div class="playlist-cover" :style="getPlaylistCoverStyle(playlist)">
             <img v-if="playlist.cover_url" :src="playlist.cover_url" alt="" />
-            <svg v-else-if="playlist.is_auto_album" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"/>
-            </svg>
             <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
             </svg>
@@ -137,6 +167,10 @@
           <span class="playlist-name">{{ playlist.name }}</span>
           <span class="nav-count">{{ playlist.track_count }}</span>
         </button>
+
+        <div v-if="userPlaylists.length === 0" class="empty-playlists">
+          <span>Нет плейлистов</span>
+        </div>
       </div>
     </div>
 
@@ -185,6 +219,15 @@ const props = defineProps({
 
 defineEmits(['navigate', 'openPlaylist', 'createPlaylist', 'logout'])
 
+// Separate albums and user playlists
+const albums = computed(() => {
+  return props.playlists.filter(p => p.is_auto_album)
+})
+
+const userPlaylists = computed(() => {
+  return props.playlists.filter(p => !p.is_auto_album)
+})
+
 const userInitials = computed(() => {
   const name = props.userName || 'U'
   return name.substring(0, 2).toUpperCase()
@@ -210,7 +253,7 @@ const getPlaylistCoverStyle = (playlist) => {
 <style scoped>
 .sidebar {
   width: 280px;
-  height: 100vh;
+  height: calc(100vh - 100px);
   background: #0a0a0a;
   border-right: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
@@ -381,6 +424,55 @@ const getPlaylistCoverStyle = (playlist) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Album specific styles */
+.albums-section {
+  max-height: 200px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.albums-section .playlists-list {
+  overflow-y: auto;
+}
+
+.album-cover {
+  border-radius: 2px;
+}
+
+.playlist-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.playlist-info .playlist-name {
+  flex: none;
+}
+
+.playlist-artist {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.section-count {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
+  font-weight: normal;
+}
+
+.empty-playlists {
+  padding: 16px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 13px;
 }
 
 .sidebar-footer {
