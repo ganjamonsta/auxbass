@@ -1,6 +1,6 @@
 """
 Script to reorder tracks in album playlists according to Deezer track order.
-This fixes albums where tracks are in wrong order.
+This fixes albums where tracks are in wrong order and removes duplicates.
 """
 import asyncio
 import sys
@@ -9,8 +9,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from shared.database import get_session
-from shared.models import Track, Playlist, PlaylistTrack, UserLibrary
-from sqlalchemy import select, func
+from shared.models import Playlist
+from sqlalchemy import select
 from bot.services.albums import album_service
 from bot.services.metadata import metadata_service
 
@@ -19,16 +19,13 @@ async def reorder_album(playlist: Playlist) -> tuple[bool, str]:
     """Reorder tracks in a playlist according to Deezer order"""
     
     # Get all tracks for this album from user's library
-    async with get_session() as session:
-        result = await session.execute(
-            select(Track)
-            .join(UserLibrary, UserLibrary.track_id == Track.id)
-            .where(
-                UserLibrary.user_id == playlist.user_id,
-                func.lower(Track.album) == playlist.name.lower().strip()
-            )
-        )
-        tracks = list(result.scalars().all())
+    # Use album_service.get_album_tracks which filters by artist and deduplicates by title
+    tracks = await album_service.get_album_tracks(
+        user_id=playlist.user_id,
+        album=playlist.name,
+        artist=playlist.album_artist or "",
+        deezer_album_id=playlist.deezer_album_id
+    )
     
     if not tracks:
         return False, "no tracks"

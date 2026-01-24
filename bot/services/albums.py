@@ -398,23 +398,52 @@ class AlbumAssemblyService:
                 
                 all_tracks.append(t)
             
-            # Deduplicate by title (case-insensitive)
+            # Deduplicate by title using normalized matching
             # Keep the track with cover_url or higher quality metadata
-            seen_titles = {}
             unique_tracks = []
+            
+            def is_duplicate(track: Track, existing_tracks: List[Track]) -> Optional[int]:
+                """Check if track is duplicate of any existing track. Returns index if duplicate."""
+                track_title_norm = normalize_title(track.title) if track.title else ""
+                if not track_title_norm:
+                    return None
+                
+                for i, existing in enumerate(existing_tracks):
+                    existing_title_norm = normalize_title(existing.title) if existing.title else ""
+                    if not existing_title_norm:
+                        continue
+                    
+                    # Exact match after normalization
+                    if track_title_norm == existing_title_norm:
+                        return i
+                    
+                    # Fuzzy match (very high threshold to avoid false positives)
+                    if fuzzy_match_title(track.title, existing.title) >= 0.9:
+                        return i
+                
+                return None
+            
             for track in all_tracks:
-                title_key = track.title.lower().strip() if track.title else str(track.id)
-                if title_key not in seen_titles:
-                    seen_titles[title_key] = track
+                dup_idx = is_duplicate(track, unique_tracks)
+                if dup_idx is None:
+                    # Not a duplicate, add it
                     unique_tracks.append(track)
                 else:
-                    # Prefer track with cover_url
-                    existing = seen_titles[title_key]
-                    if not existing.cover_url and track.cover_url:
-                        # Replace with better metadata
-                        idx = unique_tracks.index(existing)
-                        unique_tracks[idx] = track
-                        seen_titles[title_key] = track
+                    # Duplicate found - prefer track with better metadata
+                    existing = unique_tracks[dup_idx]
+                    # Prefer: has cover > has deezer_id > has duration
+                    existing_score = (
+                        (1 if existing.cover_url else 0) * 100 +
+                        (1 if existing.deezer_id else 0) * 10 +
+                        (1 if existing.duration else 0)
+                    )
+                    track_score = (
+                        (1 if track.cover_url else 0) * 100 +
+                        (1 if track.deezer_id else 0) * 10 +
+                        (1 if track.duration else 0)
+                    )
+                    if track_score > existing_score:
+                        unique_tracks[dup_idx] = track
             
             return unique_tracks
     
@@ -531,7 +560,8 @@ class AlbumAssemblyService:
         reorder: bool = False
     ) -> bool:
         """Update existing album playlist with new tracks and cover.
-        If reorder=True, reorders all tracks according to Deezer tracklist.
+        If reorder=True or new tracks are added with Deezer data available,
+        reorders all tracks according to Deezer tracklist.
         """
         async with get_session() as session:
             # Attach playlist to this session
@@ -563,80 +593,97 @@ class AlbumAssemblyService:
             )
             existing_track_ids = {row[0] for row in result.all()}
             
-            # Find new tracks
+            # Find new tracks (not already in playlist)
             new_tracks = [t for t in tracks if t.id not in existing_track_ids]
             
             if not new_tracks and not cover_updated and not reorder:
                 return False
             
-            # If reordering or adding new tracks, rebuild the playlist order
-            if reorder or new_tracks:
-                # Get Deezer track order
-                track_order = {}
-                deezer_tracks_list = None
-                album_id = deezer_album_id or playlist.deezer_album_id
-                if album_id:
-                    deezer_tracks_list = await self.get_deezer_album_tracklist(album_id)
-                    if deezer_tracks_list:
-                        for dt in deezer_tracks_list:
-                            if dt.get("title"):
-                                track_order[dt["title"].lower().strip()] = dt["position"]
+            # Get Deezer track order for smart insertion
+            track_order = {}
+            deezer_tracks_list = None
+            album_id = deezer_album_id or playlist.deezer_album_id
+            if album_id:
+                deezer_tracks_list = await self.get_deezer_album_tracklist(album_id)
+                if deezer_tracks_list:
+                    for dt in deezer_tracks_list:
+                        if dt.get("title"):
+                            track_order[dt["title"].lower().strip()] = dt["position"]
+            
+            def get_deezer_position(track) -> Optional[int]:
+                """Get Deezer position for a track (1-based), or None if not found."""
+                if not track.title:
+                    return None
                 
-                if reorder and (track_order or deezer_tracks_list):
-                    # Delete all existing playlist tracks
-                    await session.execute(
-                        delete(PlaylistTrack).where(PlaylistTrack.playlist_id == playlist.id)
+                # Try exact match first
+                pos = track_order.get(track.title.lower().strip())
+                if pos:
+                    return pos
+                
+                # Try fuzzy match if we have Deezer tracks
+                if deezer_tracks_list:
+                    fuzzy_pos = find_best_match(track.title, deezer_tracks_list)
+                    if fuzzy_pos:
+                        return fuzzy_pos
+                
+                return None
+            
+            # If we have Deezer data or explicit reorder, rebuild entire playlist with correct order
+            should_reorder = reorder or (new_tracks and deezer_tracks_list)
+            
+            if should_reorder and deezer_tracks_list:
+                # Delete all existing playlist tracks
+                await session.execute(
+                    delete(PlaylistTrack).where(PlaylistTrack.playlist_id == playlist.id)
+                )
+                
+                # Sort all tracks by Deezer order
+                def get_sort_key(track):
+                    pos = get_deezer_position(track)
+                    if pos:
+                        return (0, pos)  # Has Deezer position
+                    return (1, track.title or "")  # Fallback to alphabetical at end
+                
+                sorted_tracks = sorted(tracks, key=get_sort_key)
+                
+                # Add all tracks with correct positions
+                for position, track in enumerate(sorted_tracks, start=1):
+                    pt = PlaylistTrack(
+                        playlist_id=playlist.id,
+                        track_id=track.id,
+                        position=position
                     )
-                    
-                    # Sort all tracks by Deezer order (with fuzzy matching)
-                    def get_position(track):
-                        if track.title:
-                            # Try exact match first
-                            pos = track_order.get(track.title.lower().strip())
-                            if pos:
-                                return (0, pos)
-                            
-                            # Try fuzzy match if we have Deezer tracks
-                            if deezer_tracks_list:
-                                fuzzy_pos = find_best_match(track.title, deezer_tracks_list)
-                                if fuzzy_pos:
-                                    return (0, fuzzy_pos)
-                        
-                        return (1, track.title or "")
-                    
-                    sorted_tracks = sorted(tracks, key=get_position)
-                    
-                    # Add all tracks with correct positions
-                    for position, track in enumerate(sorted_tracks, start=1):
-                        pt = PlaylistTrack(
-                            playlist_id=playlist.id,
-                            track_id=track.id,
-                            position=position
-                        )
-                        session.add(pt)
-                else:
-                    # Just add new tracks at end
-                    result = await session.execute(
-                        select(func.max(PlaylistTrack.position))
-                        .where(PlaylistTrack.playlist_id == playlist.id)
+                    session.add(pt)
+                
+                added_count = len(new_tracks)
+            else:
+                # No Deezer data - just add new tracks at end
+                result = await session.execute(
+                    select(func.max(PlaylistTrack.position))
+                    .where(PlaylistTrack.playlist_id == playlist.id)
+                )
+                max_pos = result.scalar() or 0
+                
+                for i, track in enumerate(new_tracks, start=1):
+                    pt = PlaylistTrack(
+                        playlist_id=playlist.id,
+                        track_id=track.id,
+                        position=max_pos + i
                     )
-                    max_pos = result.scalar() or 0
-                    
-                    for i, track in enumerate(new_tracks, start=1):
-                        pt = PlaylistTrack(
-                            playlist_id=playlist.id,
-                            track_id=track.id,
-                            position=max_pos + i
-                        )
-                        session.add(pt)
+                    session.add(pt)
+                
+                added_count = len(new_tracks)
             
             # Update description
-            total_tracks = len(tracks) if reorder else len(existing_track_ids) + len(new_tracks)
+            total_tracks = len(tracks) if should_reorder else len(existing_track_ids) + len(new_tracks)
             playlist.description = f"Автоальбом • {total_tracks} треков"
             
             await session.commit()
             
-            action = "reordered" if reorder else f"+{len(new_tracks)} tracks"
+            if should_reorder:
+                action = f"reordered ({added_count} new)" if added_count else "reordered"
+            else:
+                action = f"+{added_count} tracks"
             logger.info(f"Updated auto-album {playlist.name}: {action}")
             return True
     
