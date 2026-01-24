@@ -1497,6 +1497,7 @@ onMounted(async () => {
   height: 44px;
   display: flex;
   align-items: center;
+  overflow: hidden;
 }
 
 /* Header title */

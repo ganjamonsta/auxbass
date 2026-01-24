@@ -76,6 +76,7 @@ onUnmounted(() => {
   background: var(--xm-bg-elevated, #1A1A1A);
   border-radius: var(--neu-radius-full, 9999px);
   font-size: 12px;
+  flex-shrink: 0;
   box-shadow: 
     4px 4px 8px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
     -2px -2px 4px var(--neu-shadow-light, rgba(255, 255, 255, 0.03));
