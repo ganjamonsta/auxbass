@@ -57,21 +57,31 @@ git log --oneline HEAD..origin/main | head -10
 echo -e "\n${YELLOW}[3/5]${NC} Pulling changes..."
 git pull --rebase origin main
 
-# Check if webapp changed
+# Check what changed
 WEBAPP_CHANGED=$(git diff --name-only $LOCAL $REMOTE | grep -c "^webapp/" || true)
+REQUIREMENTS_CHANGED=$(git diff --name-only $LOCAL $REMOTE | grep -c "^requirements.txt" || true)
 
+# Install Python dependencies if requirements.txt changed
+if [ "$REQUIREMENTS_CHANGED" -gt 0 ] || [ "$FORCE" = true ]; then
+    echo -e "\n${YELLOW}[4/6]${NC} Installing Python dependencies..."
+    pip install -r requirements.txt --quiet
+else
+    echo -e "\n${YELLOW}[4/6]${NC} Requirements unchanged, skipping..."
+fi
+
+# Build webapp if changed
 if [ "$WEBAPP_CHANGED" -gt 0 ] || [ "$FORCE" = true ]; then
-    echo -e "\n${YELLOW}[4/5]${NC} Building webapp..."
+    echo -e "\n${YELLOW}[5/6]${NC} Building webapp..."
     cd "$WEBAPP_DIR"
     npm run build
     cd "$PROJECT_DIR"
 else
-    echo -e "\n${YELLOW}[4/5]${NC} Webapp unchanged, skipping build..."
+    echo -e "\n${YELLOW}[5/6]${NC} Webapp unchanged, skipping build..."
 fi
 
 # Restart services
 if [ "$NO_RESTART" = false ]; then
-    echo -e "\n${YELLOW}[5/5]${NC} Restarting services..."
+    echo -e "\n${YELLOW}[6/6]${NC} Restarting services..."
     
     # Check what changed to restart only needed services
     BOT_CHANGED=$(git diff --name-only $LOCAL $REMOTE | grep -c "^bot/" || true)
@@ -87,7 +97,7 @@ if [ "$NO_RESTART" = false ]; then
         sudo systemctl restart tg-player-api
     fi
 else
-    echo -e "\n${YELLOW}[5/5]${NC} Skipping service restart (--no-restart)"
+    echo -e "\n${YELLOW}[6/6]${NC} Skipping service restart (--no-restart)"
 fi
 
 echo -e "\n${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
