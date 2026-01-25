@@ -28,18 +28,16 @@ from bot.services.albums import normalize_album_name, normalize_title
 
 
 # Known bad album patterns that indicate wrong enrichment
+# These are specific cases where Bladee/other tracks got matched to wrong artists
 BAD_ALBUM_PATTERNS = [
     # French/other artists that Bladee tracks got matched to
     "Jok'Chirac",
-    "La Ballade des Dalton",
-    "Lucky Luke",
-    "Blade (Remixes)",  # Wrong "Blade" 
+    "La Ballade des Dalton",  # Lucky Luke cartoon
+    "Blade (Remixes)",  # Wrong "Blade" (movie soundtrack, not Bladee)
     "El Ultimo Adiós",
     "Everything I Have, Vol.",
     "Innocence v2",
-    # Generic bad patterns
-    "Remixes",
-    "Remix EP",
+    # Note: "Remixes" albums are LEGITIMATE - don't add generic patterns here!
 ]
 
 
@@ -206,6 +204,7 @@ async def main():
     if reassemble == 'y':
         print("\nReassembling albums...")
         from bot.services.albums import album_service
+        from bot.services.metadata import metadata_service
         
         async with get_session() as session:
             result = await session.execute(
@@ -219,6 +218,9 @@ async def main():
                 print(f"  User {user_id}: created={stats['created']}, updated={stats['updated']}, merged={stats.get('merged', 0)}")
             except Exception as e:
                 print(f"  User {user_id}: error - {e}")
+        
+        # Close aiohttp session
+        await metadata_service.close()
         
         print("\n✓ Album reassembly complete!")
 
