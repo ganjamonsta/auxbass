@@ -748,8 +748,17 @@ async def get_artist_detail(
     # Get artist image from Last.fm first
     image_url = await fetch_artist_image(artist_name)
     
-    # Build albums from actual tracks (group by album name)
-    # This is more reliable than using is_auto_album playlists
+    # Get auto-album playlists for this artist directly from database
+    # This is more reliable than building from limited track list
+    album_playlists_result = await db.execute(
+        select(Playlist)
+        .where(Playlist.user_id == user.id)
+        .where(Playlist.is_auto_album == True)
+        .where(Playlist.album_artist.ilike(f"%{safe_artist}%"))
+    )
+    artist_album_playlists = album_playlists_result.scalars().all()
+    
+    # Also collect albums from tracks (for albums not yet created as playlists)
     album_data = {}
     for track, _ in tracks_data:
         if not track.album or not track.album.strip():
@@ -767,47 +776,42 @@ async def get_artist_detail(
         if not album_data[album_key]["cover_url"] and track.cover_url:
             album_data[album_key]["cover_url"] = track.cover_url
     
-    # Check if we have auto-album playlists for these albums and get REAL track counts
+    # Build albums list - prioritize auto-album playlists
     albums = []
-    for album_key, data in album_data.items():
-        # Try to find existing auto-album playlist (using Python comparison for Cyrillic)
-        album_playlists_result = await db.execute(
-            select(Playlist)
-            .where(Playlist.user_id == user.id)
-            .where(Playlist.is_auto_album == True)
-        )
-        all_album_playlists = album_playlists_result.scalars().all()
-        existing_playlist = None
-        for pl in all_album_playlists:
-            if pl.name and pl.name.lower().strip() == album_key:
-                existing_playlist = pl
-                break
+    seen_album_keys = set()
+    
+    # First, add all auto-album playlists for this artist
+    for pl in artist_album_playlists:
+        album_key = pl.name.lower().strip() if pl.name else ""
+        seen_album_keys.add(album_key)
         
-        if existing_playlist:
-            # Get REAL track count from PlaylistTrack table
-            real_count_result = await db.execute(
-                select(func.count(PlaylistTrack.id))
-                .where(PlaylistTrack.playlist_id == existing_playlist.id)
-            )
-            real_album_track_count = real_count_result.scalar() or 0
-            
-            # Use playlist ID for navigation, release_date from playlist
-            albums.append(ArtistAlbumInfo(
-                id=existing_playlist.id,
-                name=data["name"],
-                cover_url=data["cover_url"] or existing_playlist.cover_url,
-                track_count=real_album_track_count,
-                release_date=existing_playlist.release_date
-            ))
-        else:
-            # No playlist yet, use negative ID as indicator (album from tracks)
-            albums.append(ArtistAlbumInfo(
-                id=-1,  # Indicates "virtual" album without playlist
-                name=data["name"],
-                cover_url=data["cover_url"],
-                track_count=len(data["track_ids"]),
-                release_date=None
-            ))
+        # Get real track count
+        real_count_result = await db.execute(
+            select(func.count(PlaylistTrack.id))
+            .where(PlaylistTrack.playlist_id == pl.id)
+        )
+        real_album_track_count = real_count_result.scalar() or 0
+        
+        albums.append(ArtistAlbumInfo(
+            id=pl.id,
+            name=pl.name,
+            cover_url=pl.cover_url,
+            track_count=real_album_track_count,
+            release_date=pl.release_date
+        ))
+    
+    # Then add virtual albums from tracks that don't have playlists yet
+    for album_key, data in album_data.items():
+        if album_key in seen_album_keys:
+            continue
+        
+        albums.append(ArtistAlbumInfo(
+            id=-1,  # Virtual album
+            name=data["name"],
+            cover_url=data["cover_url"],
+            track_count=len(data["track_ids"]),
+            release_date=None
+        ))
     
     # Sort albums by release date (newest first), albums without date go to the end
     def album_sort_key(album):
