@@ -473,10 +473,134 @@ class MetadataService:
             logger.debug(f"Last.fm lookup failed: {e}")
             return None
     
+    async def search_lastfm_track(self, title: str, artist: str) -> Optional[Dict]:
+        """
+        Search Last.fm for track info as fallback when Deezer fails.
+        Returns: dict with artist, title, album, cover_url
+        """
+        from shared.config import get_settings
+        settings = get_settings()
+        
+        if not settings.lastfm_api_key:
+            return None
+        
+        await self._rate_limit()
+        session = await self._get_session()
+        
+        clean_title = self._clean_string(title)
+        clean_artist = self._clean_string(artist)
+        
+        try:
+            params = {
+                "method": "track.getInfo",
+                "api_key": settings.lastfm_api_key,
+                "artist": clean_artist,
+                "track": clean_title,
+                "format": "json"
+            }
+            
+            async with session.get(
+                "https://ws.audioscrobbler.com/2.0/",
+                params=params
+            ) as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.json()
+            
+            if "error" in data:
+                # Try search instead of exact match
+                await self._rate_limit()
+                params = {
+                    "method": "track.search",
+                    "api_key": settings.lastfm_api_key,
+                    "track": clean_title,
+                    "artist": clean_artist,
+                    "format": "json",
+                    "limit": 5
+                }
+                
+                async with session.get(
+                    "https://ws.audioscrobbler.com/2.0/",
+                    params=params
+                ) as resp2:
+                    if resp2.status != 200:
+                        return None
+                    search_data = await resp2.json()
+                
+                results = search_data.get("results", {}).get("trackmatches", {}).get("track", [])
+                if not results:
+                    return None
+                
+                # Find matching artist
+                for r in results:
+                    if self._artist_matches(artist, r.get("artist", "")):
+                        # Get full track info
+                        await self._rate_limit()
+                        params = {
+                            "method": "track.getInfo",
+                            "api_key": settings.lastfm_api_key,
+                            "artist": r.get("artist"),
+                            "track": r.get("name"),
+                            "format": "json"
+                        }
+                        async with session.get(
+                            "https://ws.audioscrobbler.com/2.0/",
+                            params=params
+                        ) as resp3:
+                            if resp3.status == 200:
+                                data = await resp3.json()
+                                if "error" not in data:
+                                    break
+                else:
+                    return None
+            
+            track_data = data.get("track", {})
+            if not track_data:
+                return None
+            
+            album = track_data.get("album", {})
+            album_title = album.get("title") if album else None
+            
+            # Get largest album image
+            cover_url = None
+            if album and album.get("image"):
+                images = album.get("image", [])
+                for img in reversed(images):  # Largest last
+                    if img.get("#text"):
+                        cover_url = img.get("#text")
+                        break
+            
+            # Get tags for genre
+            genre = None
+            tags = track_data.get("toptags", {}).get("tag", [])
+            if tags:
+                for tag in tags[:3]:
+                    tag_name = tag.get("name", "").lower()
+                    if tag_name in GENRE_KEYWORDS:
+                        genre = GENRE_KEYWORDS[tag_name]
+                        break
+                    elif len(tag_name) > 2:
+                        genre = tag.get("name", "").title()
+                        break
+            
+            return {
+                "title": track_data.get("name"),
+                "artist": track_data.get("artist", {}).get("name"),
+                "album": album_title,
+                "cover_url": cover_url,
+                "genre": genre,
+                "source": "lastfm",
+            }
+            
+        except Exception as e:
+            logger.debug(f"Last.fm track search failed: {e}")
+            return None
+    
     async def enrich_track(self, title: str, artist: str) -> Dict:
         """
-        Main method to enrich track metadata
-        Returns dict with enriched data and 'enriched' flag
+        Main method to enrich track metadata.
+        Uses Deezer as primary source, Last.fm as fallback.
+        Returns dict with enriched data and 'enriched' flag.
         """
         result = {
             "enriched": False,
@@ -484,7 +608,7 @@ class MetadataService:
             "artist": artist,
         }
         
-        # Try Deezer first
+        # Try Deezer first (has album_id for grouping)
         deezer_data = await self.search_deezer(title, artist)
         
         if deezer_data:
@@ -492,26 +616,38 @@ class MetadataService:
             result["album"] = deezer_data.get("album")
             result["genre"] = deezer_data.get("genre")
             result["cover_url"] = deezer_data.get("cover_url")
-            result["album_id"] = deezer_data.get("album_id")  # Pass album_id for tracks
-            result["deezer_id"] = deezer_data.get("deezer_id")  # Pass track deezer_id
+            result["album_id"] = deezer_data.get("album_id")
+            result["deezer_id"] = deezer_data.get("deezer_id")
             result["source"] = "deezer"
             logger.info(f"Enriched from Deezer: {title} - {artist} -> album: {deezer_data.get('album')}")
+        else:
+            # Deezer failed - try Last.fm as fallback
+            lastfm_data = await self.search_lastfm_track(title, artist)
+            
+            if lastfm_data:
+                result["enriched"] = True
+                result["album"] = lastfm_data.get("album")
+                result["genre"] = lastfm_data.get("genre")
+                result["cover_url"] = lastfm_data.get("cover_url")
+                # No album_id from Last.fm - will group by album name
+                result["source"] = "lastfm"
+                logger.info(f"Enriched from Last.fm: {title} - {artist} -> album: {lastfm_data.get('album')}")
         
-        # If no genre from Deezer, try fallbacks
+        # If still no genre, try fallbacks
         if not result.get("genre"):
             # Try keyword-based guess
             guessed = self._guess_genre_from_text(title, artist)
             if guessed:
                 result["genre"] = guessed
                 result["enriched"] = True
-                logger.info(f"Genre guessed from keywords: {guessed}")
+                logger.debug(f"Genre guessed from keywords: {guessed}")
             else:
-                # Try Last.fm as last resort
+                # Try Last.fm artist tags
                 lastfm_genre = await self._search_lastfm_genre(artist)
                 if lastfm_genre:
                     result["genre"] = lastfm_genre
                     result["enriched"] = True
-                    logger.info(f"Genre from Last.fm: {lastfm_genre}")
+                    logger.debug(f"Genre from Last.fm artist: {lastfm_genre}")
         
         if not result["enriched"]:
             logger.debug(f"No enrichment data for: {title} - {artist}")
