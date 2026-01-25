@@ -825,6 +825,8 @@ async def get_artist_detail(
     
     albums.sort(key=album_sort_key, reverse=True)
     
+    print(f"DEBUG: Returning {len(albums)} albums in response")
+    
     # Fallback for artist image: use cover from the newest album WITH release_date
     if not image_url or "2a96cbd8b46e442fc41c2b86b821562f" in image_url:
         # First try albums with release_date (sorted newest first)
