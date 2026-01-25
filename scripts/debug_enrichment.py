@@ -229,24 +229,103 @@ async def test_album_search(artist: str, title: str):
     return None
 
 
+async def test_lastfm_search(artist: str, title: str):
+    """Try searching via Last.fm API."""
+    print(f"\n{'='*60}")
+    print(f"Last.fm search: {artist} - {title}")
+    print(f"{'='*60}")
+    
+    session = await metadata_service._get_session()
+    
+    # Last.fm API (free, needs API key)
+    # Check if we have API key
+    from shared.config import get_settings
+    settings = get_settings()
+    
+    if not settings.lastfm_api_key:
+        print("No Last.fm API key configured!")
+        print("Add LASTFM_API_KEY to .env to enable Last.fm fallback")
+        return
+    
+    api_key = settings.lastfm_api_key
+    
+    # Search for track
+    await metadata_service._rate_limit()
+    
+    params = {
+        "method": "track.getInfo",
+        "api_key": api_key,
+        "artist": artist,
+        "track": title,
+        "format": "json"
+    }
+    
+    async with session.get(
+        "https://ws.audioscrobbler.com/2.0/",
+        params=params
+    ) as resp:
+        if resp.status != 200:
+            print(f"ERROR: {resp.status}")
+            return
+        data = await resp.json()
+    
+    if "error" in data:
+        print(f"Last.fm error: {data.get('message')}")
+        
+        # Try search instead
+        print("\nTrying Last.fm search...")
+        params = {
+            "method": "track.search",
+            "api_key": api_key,
+            "track": title,
+            "artist": artist,
+            "format": "json",
+            "limit": 5
+        }
+        
+        await metadata_service._rate_limit()
+        async with session.get(
+            "https://ws.audioscrobbler.com/2.0/",
+            params=params
+        ) as resp2:
+            if resp2.status == 200:
+                data = await resp2.json()
+                results = data.get("results", {}).get("trackmatches", {}).get("track", [])
+                if results:
+                    print(f"Found {len(results)} results:")
+                    for r in results[:5]:
+                        print(f"  - {r.get('artist')} - {r.get('name')}")
+                else:
+                    print("No results from search either")
+        return
+    
+    track_data = data.get("track", {})
+    print(f"\n✓ Found on Last.fm!")
+    print(f"  Artist: {track_data.get('artist', {}).get('name')}")
+    print(f"  Track: {track_data.get('name')}")
+    print(f"  Album: {track_data.get('album', {}).get('title', 'N/A')}")
+    print(f"  Listeners: {track_data.get('listeners')}")
+    
+    # Get album info if available
+    album = track_data.get("album")
+    if album:
+        print(f"  Album image: {album.get('image', [{}])[-1].get('#text', 'N/A')[:50]}...")
+
+
 async def main():
-    # First, check the Cold Visions album directly
+    # First, check the Cold Visions album directly on Deezer
     await test_album_direct(698241761)
     
-    # Test regular search
-    test_cases = [
-        ("Bladee", "Flatline"),
-    ]
+    # Test regular Deezer search
+    await test_search("Bladee", "Flatline")
     
-    for artist, title in test_cases:
-        await test_search(artist, title)
+    # Try Last.fm
+    await test_lastfm_search("Bladee", "FLATLINE")
+    await test_lastfm_search("Bladee", "Flatline")
     
-    # Now try album-based search
-    print("\n" + "="*60)
-    print("TRYING ALBUM-BASED SEARCH APPROACH")
-    print("="*60)
-    
-    await test_album_search("Bladee", "FLATLINE")
+    # Also test some other failed tracks
+    await test_lastfm_search("Dubsidia", "Pasta Gangsta")
+    await test_lastfm_search("ECCO2K", "guardianAngels")
     
     await metadata_service.close()
 
