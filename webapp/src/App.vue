@@ -1095,12 +1095,6 @@ const playLikedTracks = async () => {
   }
 }
 
-// Playlist menu
-const showPlaylistMenu = (playlist) => {
-  selectedPlaylist.value = playlist
-  showPlaylistMenuModal.value = true
-}
-
 // Playlist menu handlers
 const handlePlaylistMenuOpen = (playlist) => {
   openPlaylist(playlist)
