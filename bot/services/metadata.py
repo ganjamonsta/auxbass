@@ -503,13 +503,9 @@ class MetadataService:
                 return None
             
             album_data = data.get("album", {})
-            # Last.fm returns "releasedate" like "6 Apr 1999, 00:00" or wiki.published
+            # Last.fm returns "releasedate" like "6 Apr 1999, 00:00"
+            # NOTE: Do NOT use wiki.published - it's when the wiki was edited, not the release date!
             release_date_str = album_data.get("releasedate", "").strip()
-            
-            # Also check wiki.published as fallback
-            if not release_date_str:
-                wiki = album_data.get("wiki", {})
-                release_date_str = wiki.get("published", "").strip()
             
             if not release_date_str:
                 return None
