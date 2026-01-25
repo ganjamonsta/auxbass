@@ -63,7 +63,7 @@
     "player player player";
 }
 
-.app.desktop-layout :deep(.sidebar) {
+.app.desktop-layout .sidebar {
   grid-area: sidebar;
   height: 100%;
 }
@@ -76,12 +76,12 @@
   height: 100%;
 }
 
-.app.desktop-layout :deep(.now-playing-sidebar) {
+.app.desktop-layout .now-playing-sidebar {
   grid-area: nowplaying;
   height: 100%;
 }
 
-.app.desktop-layout :deep(.desktop-player) {
+.app.desktop-layout .desktop-player {
   grid-area: player;
   width: 100%;
   height: 100px;
