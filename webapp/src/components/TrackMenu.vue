@@ -57,9 +57,14 @@
 
               <div class="menu-divider"></div>
 
-              <button class="menu-item danger" @click="handleDelete">
+              <!-- Owner can fully delete, others can only remove from library -->
+              <button v-if="isOwner" class="menu-item danger" @click="handleDelete">
                 <span class="menu-icon">🗑️</span>
-                <span>Удалить</span>
+                <span>Удалить полностью</span>
+              </button>
+              <button v-else class="menu-item" @click="handleRemoveFromLibrary">
+                <span class="menu-icon">➖</span>
+                <span>Убрать из библиотеки</span>
               </button>
             </div>
           </div>
@@ -75,10 +80,11 @@ import { usePlayerStore } from '../stores/player'
 
 const props = defineProps({
   show: Boolean,
-  track: Object
+  track: Object,
+  currentUserId: Number
 })
 
-const emit = defineEmits(['close', 'addToPlaylist', 'edit', 'delete', 'download', 'goToArtist', 'goToAlbum'])
+const emit = defineEmits(['close', 'addToPlaylist', 'edit', 'delete', 'removeFromLibrary', 'download', 'goToArtist', 'goToAlbum'])
 
 const player = usePlayerStore()
 const telegram = inject('telegram')
@@ -90,6 +96,12 @@ const hasArtist = computed(() => {
 
 const hasAlbum = computed(() => {
   return props.track?.album && props.track.album.trim() !== ''
+})
+
+// Check if current user is the track owner (uploader)
+const isOwner = computed(() => {
+  if (!props.track || !props.currentUserId) return false
+  return props.track.uploader?.id === props.currentUserId
 })
 
 // Haptic feedback helper
@@ -140,6 +152,12 @@ const handleEdit = () => {
 const handleDelete = () => {
   haptic('warning')
   emit('delete', props.track)
+  emit('close')
+}
+
+const handleRemoveFromLibrary = () => {
+  haptic('light')
+  emit('removeFromLibrary', props.track)
   emit('close')
 }
 
