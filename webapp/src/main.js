@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import './style.css'
+import './styles/index.css'
 
 // Initialize Telegram WebApp
 const tg = window.Telegram?.WebApp

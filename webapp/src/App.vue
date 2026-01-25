@@ -1548,8 +1548,7 @@ onUnmounted(() => {
 })
 </script>
 
-<style scoped>
-/* App styles imported from external files */
-@import './styles/index.css';
+<style>
+/* App styles - see styles/index.css imported in main.js */
 </style>
 
