@@ -8,7 +8,7 @@
   <LoginPage v-else-if="!isAuthenticated" @login="handleLogin" />
   
   <!-- Main app for authenticated users -->
-  <div v-else class="app spotify-theme" :class="{ 'desktop-layout': isDesktop }">
+  <div v-else class="app spotify-theme" :class="{ 'desktop-layout': isDesktop, 'has-now-playing': isDesktop && player.currentTrack }">
     <!-- Desktop Sidebar -->
     <Sidebar 
       v-if="isDesktop"
@@ -1010,6 +1010,19 @@
     </Transition>
     </div><!-- End main-content-wrapper -->
 
+    <!-- Right Sidebar - Now Playing (Desktop only) -->
+    <NowPlayingSidebar
+      v-if="isDesktop && player.currentTrack"
+      :track="player.currentTrack"
+      :isPlaying="player.isPlaying"
+      :isLiked="library.isTrackLiked(player.currentTrack?.id)"
+      @goToArtist="handleGoToArtist"
+      @goToAlbum="handleGoToAlbum"
+      @goToUser="handleGoToUser"
+      @like="toggleLike(player.currentTrack?.id)"
+      @menu="showTrackMenu(player.currentTrack)"
+    />
+
     <!-- Desktop Bottom Player (Car Stereo Style) -->
     <DesktopPlayer 
       v-if="isDesktop && player.currentTrack"
@@ -1058,6 +1071,7 @@ import EnrichmentStatus from './components/EnrichmentStatus.vue'
 import GlobalLibrary from './components/GlobalLibrary.vue'
 import Sidebar from './components/Sidebar.vue'
 import DesktopPlayer from './components/DesktopPlayer.vue'
+import NowPlayingSidebar from './components/NowPlayingSidebar.vue'
 import ArtistCard from './components/ArtistCard.vue'
 import Toast from './components/Toast.vue'
 import LoginPage from './components/LoginPage.vue'
@@ -1670,6 +1684,19 @@ const handleGoToArtist = async (artistName) => {
   await filterByArtist(artistName)
 }
 
+// Navigate to user profile from NowPlayingSidebar
+const handleGoToUser = async (user) => {
+  if (!user?.id) return
+  showFullPlayer.value = false  // Close full player if open
+  
+  // Switch to explore tab and show user's tracks
+  activeTab.value = 'explore'
+  currentView.value = 'library'
+  
+  // Fetch user's tracks
+  await library.fetchUserTracks(user.id)
+}
+
 // Navigate to album from track menu
 const handleGoToAlbum = async (albumName, artistName) => {
   if (!albumName) return
@@ -2113,6 +2140,14 @@ onUnmounted(() => {
   max-height: 100vh;
 }
 
+/* When track is playing, add right sidebar column */
+.app.desktop-layout.has-now-playing {
+  grid-template-columns: 280px 1fr 320px;
+  grid-template-areas:
+    "sidebar main nowplaying"
+    "player player player";
+}
+
 .app.desktop-layout :deep(.sidebar) {
   grid-area: sidebar;
   height: 100%;
@@ -2126,20 +2161,18 @@ onUnmounted(() => {
   height: 100%;
 }
 
+/* Right sidebar - Now Playing */
+.app.desktop-layout :deep(.now-playing-sidebar) {
+  grid-area: nowplaying;
+  height: 100%;
+}
+
 /* Desktop Player at bottom spans full width */
 .app.desktop-layout :deep(.desktop-player) {
   grid-area: player;
   width: 100%;
   height: 100px;
   overflow: visible;
-}
-
-.app.desktop-layout .main-content-wrapper {
-  grid-area: main;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  height: 100%;
 }
 
 /* Desktop adjustments */
