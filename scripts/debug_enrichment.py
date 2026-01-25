@@ -144,18 +144,109 @@ async def test_album_direct(album_id: int):
                 print(f"  {t.get('track_position')}. {t.get('title')}")
 
 
+async def test_album_search(artist: str, title: str):
+    """Try searching via album instead of track."""
+    print(f"\n{'='*60}")
+    print(f"Album-based search: {artist} - {title}")
+    print(f"{'='*60}")
+    
+    session = await metadata_service._get_session()
+    
+    # Try searching for artist's albums
+    await metadata_service._rate_limit()
+    
+    # First find the artist
+    async with session.get(
+        f"{metadata_service.DEEZER_API}/search/artist",
+        params={"q": artist, "limit": 5}
+    ) as resp:
+        if resp.status != 200:
+            print(f"ERROR: {resp.status}")
+            return
+        data = await resp.json()
+    
+    if not data.get("data"):
+        print("Artist not found!")
+        return
+    
+    # Find matching artist
+    target_artist = None
+    norm_artist = metadata_service._normalize_artist(artist)
+    
+    for a in data["data"]:
+        a_name = a.get("name", "")
+        if metadata_service._normalize_artist(a_name) == norm_artist:
+            target_artist = a
+            break
+    
+    if not target_artist:
+        print(f"No exact artist match. Found: {[a.get('name') for a in data['data']]}")
+        # Try first one anyway
+        target_artist = data["data"][0]
+    
+    print(f"Found artist: {target_artist.get('name')} (id: {target_artist.get('id')})")
+    
+    # Get artist's albums
+    artist_id = target_artist.get("id")
+    await metadata_service._rate_limit()
+    
+    async with session.get(
+        f"{metadata_service.DEEZER_API}/artist/{artist_id}/albums",
+        params={"limit": 50}
+    ) as resp:
+        if resp.status != 200:
+            print(f"ERROR getting albums: {resp.status}")
+            return
+        albums_data = await resp.json()
+    
+    print(f"\nArtist has {len(albums_data.get('data', []))} albums")
+    
+    # Search for the track in each album
+    clean_title = metadata_service._clean_string(title).lower()
+    
+    for album in albums_data.get("data", [])[:20]:  # Check first 20 albums
+        album_id = album.get("id")
+        album_title = album.get("title")
+        
+        await metadata_service._rate_limit()
+        
+        async with session.get(
+            f"{metadata_service.DEEZER_API}/album/{album_id}/tracks"
+        ) as resp:
+            if resp.status != 200:
+                continue
+            tracks_data = await resp.json()
+        
+        for track in tracks_data.get("data", []):
+            track_title = track.get("title", "")
+            if clean_title in track_title.lower() or track_title.lower() in clean_title:
+                print(f"\n✓ FOUND: '{track_title}' in album '{album_title}'")
+                print(f"  Album ID: {album_id}")
+                print(f"  Track ID: {track.get('id')}")
+                return album_id, track
+    
+    print("\nTrack not found in any album!")
+    return None
+
+
 async def main():
     # First, check the Cold Visions album directly
     await test_album_direct(698241761)
     
-    # Test cases
+    # Test regular search
     test_cases = [
         ("Bladee", "Flatline"),
-        ("Bladee", "FLATLINE"),  # Try uppercase
     ]
     
     for artist, title in test_cases:
         await test_search(artist, title)
+    
+    # Now try album-based search
+    print("\n" + "="*60)
+    print("TRYING ALBUM-BASED SEARCH APPROACH")
+    print("="*60)
+    
+    await test_album_search("Bladee", "FLATLINE")
     
     await metadata_service.close()
 
