@@ -3,6 +3,7 @@
    Import this file to get all App.vue styles
    ================================ */
 
+@import './app.css';
 @import './app-layout.css';
 @import './app-header.css';
 @import './app-components.css';
