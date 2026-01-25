@@ -213,22 +213,36 @@ class MetadataService:
                     best_track_is_single = False
                     break
                 
-                # If no matching artist found, try first result as last resort
-                if best_track is None and tracks:
-                    logger.debug(f"No artist match for '{artist}', using first result")
-                    best_track = tracks[0]
+                # If no matching artist found, DO NOT use random results!
+                # This was causing wrong album assignments (e.g., Bladee "Flatline" -> blanke "FLATLINE")
+                if best_track is None:
+                    logger.debug(f"No artist match for '{artist}' in Deezer results, skipping enrichment")
+                    return None
                 
                 track = best_track
                 album = track.get("album", {})
                 artist_data = track.get("artist", {})
                 
+                # Additional validation: skip if album name equals track name (likely a single or misattribution)
+                album_title = album.get("title", "")
+                track_title = track.get("title", "")
+                if album_title.lower().strip() == track_title.lower().strip():
+                    logger.debug(f"Skipping single-like result: album '{album_title}' = track '{track_title}'")
+                    # Still return cover and genre, but not the album name
+                    album = {}  # Clear album to prevent wrong album assignment
+                
+                # Build result - only include album if it's valid and different from track title
+                album_name = album.get("title")
+                if album_name and album_name.lower().strip() == track.get("title", "").lower().strip():
+                    album_name = None  # Don't use single-like albums
+                    
                 result = {
                     "title": track.get("title"),
                     "artist": artist_data.get("name"),
-                    "album": album.get("title"),
+                    "album": album_name,
                     "cover_url": album.get("cover_big") or album.get("cover_medium") or album.get("cover"),
                     "deezer_id": track.get("id"),
-                    "album_id": album.get("id"),
+                    "album_id": album.get("id") if album_name else None,  # No album_id if no valid album
                 }
                 
                 # Try to get genre and release_date from album
