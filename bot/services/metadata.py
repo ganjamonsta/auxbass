@@ -94,7 +94,7 @@ class MetadataService:
         - "Track Name prod. Producer" -> "Track Name"
         - "Track (feat. Artist)" -> "Track"
         - "Backstr€€t Boys" -> "Backstreet Boys"
-        - "guardianAngels((NO2))" -> "guardianAngels"
+        - "guardianAngels((NO2))" -> "guardian Angels"
         """
         if not s:
             return ""
@@ -103,6 +103,9 @@ class MetadataService:
         s = unicodedata.normalize('NFKD', s)
         s = s.replace('€', 'e').replace('$', 's').replace('@', 'a')
         s = s.replace(''', "'").replace(''', "'").replace('`', "'")
+        
+        # Add spaces before capital letters in camelCase (guardianAngels -> guardian Angels)
+        s = re.sub(r'([a-z])([A-Z])', r'\1 \2', s)
         
         # Remove content in parentheses/brackets (including nested)
         # Do multiple passes to handle ((nested)) brackets

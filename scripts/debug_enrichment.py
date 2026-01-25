@@ -45,21 +45,36 @@ async def test_search(artist: str, title: str):
         data = await resp.json()
     
     if not data.get("data"):
-        print("\nNo results from Deezer!")
+        print("\nNo results from specific search!")
         
         # Try simpler search
-        print(f"\nTrying simpler query: '{clean_artist} {clean_title}'")
+        simple_query = f"{clean_artist} {clean_title}"
+        print(f"\nTrying simpler query: '{simple_query}'")
         await metadata_service._rate_limit()
         
         async with session.get(
             f"{metadata_service.DEEZER_API}/search",
-            params={"q": f"{clean_artist} {clean_title}", "limit": 5}
+            params={"q": simple_query, "limit": 5}
         ) as resp2:
             if resp2.status == 200:
                 data = await resp2.json()
     
     if not data.get("data"):
-        print("\nStill no results!")
+        print("\nStill no results from search!")
+        
+        # Try searching by just artist to see what's available
+        print(f"\nSearching for artist only: '{clean_artist}'")
+        await metadata_service._rate_limit()
+        
+        async with session.get(
+            f"{metadata_service.DEEZER_API}/search/artist",
+            params={"q": clean_artist, "limit": 3}
+        ) as resp3:
+            if resp3.status == 200:
+                artist_data = await resp3.json()
+                if artist_data.get("data"):
+                    for a in artist_data["data"]:
+                        print(f"  Found artist: {a.get('name')} (id: {a.get('id')})")
         return
     
     print(f"\nDeezer returned {len(data['data'])} results:")
@@ -95,15 +110,48 @@ async def test_search(artist: str, title: str):
         print(f"\n✗ Enrichment failed!")
 
 
+async def test_album_direct(album_id: int):
+    """Test fetching album directly by ID."""
+    print(f"\n{'='*60}")
+    print(f"Fetching album directly: {album_id}")
+    print(f"{'='*60}")
+    
+    session = await metadata_service._get_session()
+    await metadata_service._rate_limit()
+    
+    async with session.get(
+        f"{metadata_service.DEEZER_API}/album/{album_id}"
+    ) as resp:
+        if resp.status != 200:
+            print(f"ERROR: {resp.status}")
+            return
+        
+        data = await resp.json()
+    
+    print(f"\nAlbum: {data.get('title')}")
+    print(f"Artist: {data.get('artist', {}).get('name')}")
+    print(f"Release: {data.get('release_date')}")
+    
+    # Get tracks
+    await metadata_service._rate_limit()
+    async with session.get(
+        f"{metadata_service.DEEZER_API}/album/{album_id}/tracks"
+    ) as resp2:
+        if resp2.status == 200:
+            tracks_data = await resp2.json()
+            print(f"\nTracks ({len(tracks_data.get('data', []))}):")
+            for t in tracks_data.get("data", []):
+                print(f"  {t.get('track_position')}. {t.get('title')}")
+
+
 async def main():
+    # First, check the Cold Visions album directly
+    await test_album_direct(698241761)
+    
     # Test cases
     test_cases = [
-        ("Dubsidia", "Pasta Gangsta"),
-        ("Dubsidia", "Elekktroshockk (Original Mix)"),
-        ("Dubsidia", "Orisa"),
-        ("BLADEE", "D-925 prod. Forza"),
-        ("ECCO2K", "guardianAngels((NO2))"),
         ("Bladee", "Flatline"),
+        ("Bladee", "FLATLINE"),  # Try uppercase
     ]
     
     for artist, title in test_cases:
