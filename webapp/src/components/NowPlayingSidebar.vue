@@ -244,6 +244,7 @@ const formatDuration = (seconds) => {
   display: flex;
   flex-direction: column;
   padding: 16px;
+  overflow-x: hidden; /* Prevent horizontal scroll from animations */
   overflow-y: auto;
   height: 100%;
 }
@@ -266,12 +267,14 @@ const formatDuration = (seconds) => {
   display: flex;
   justify-content: center;
   margin-bottom: 20px;
+  overflow: hidden; /* Prevent vinyl disc from causing horizontal scroll */
 }
 
 .cover-wrapper {
   position: relative;
   width: 240px;
   height: 240px;
+  overflow: hidden; /* Clip the vinyl disc animation */
 }
 
 .cover-art {
