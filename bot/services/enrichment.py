@@ -115,8 +115,8 @@ class EnrichmentWorker:
                             track.genre = enriched["genre"]
                         if enriched.get("cover_url"):
                             track.cover_url = enriched["cover_url"]
-                        if enriched.get("album_id"):
-                            track.deezer_album_id = enriched["album_id"]
+                        # NO deezer_album_id - grouping by album name only
+                        # Deezer IDs caused wrong album assignments
                         
                         track.enrichment_status = "completed"
                         logger.info(f"Enriched: {track.title} - {track.artist}")

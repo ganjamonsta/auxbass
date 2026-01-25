@@ -675,7 +675,8 @@ class MetadataService:
     async def enrich_track(self, title: str, artist: str) -> Dict:
         """
         Main method to enrich track metadata.
-        Uses Deezer as primary source, Last.fm as fallback.
+        Uses Last.fm as PRIMARY source (more reliable artist matching),
+        Deezer only for cover art fallback.
         Returns dict with enriched data and 'enriched' flag.
         """
         result = {
@@ -684,31 +685,37 @@ class MetadataService:
             "artist": artist,
         }
         
-        # Try Deezer first (has album_id for grouping)
-        deezer_data = await self.search_deezer(title, artist)
+        # Try Last.fm FIRST (more reliable, better artist matching)
+        lastfm_data = await self.search_lastfm_track(title, artist)
         
-        if deezer_data:
+        if lastfm_data:
             result["enriched"] = True
-            result["album"] = deezer_data.get("album")
-            result["genre"] = deezer_data.get("genre")
-            result["cover_url"] = deezer_data.get("cover_url")
-            result["album_id"] = deezer_data.get("album_id")
-            result["deezer_id"] = deezer_data.get("deezer_id")
-            result["source"] = "deezer"
-            logger.info(f"Enriched from Deezer: {title} - {artist} -> album: {deezer_data.get('album')}")
-        else:
-            # Deezer failed - try Last.fm as fallback
-            lastfm_data = await self.search_lastfm_track(title, artist)
+            result["album"] = lastfm_data.get("album")
+            result["genre"] = lastfm_data.get("genre")
+            result["cover_url"] = lastfm_data.get("cover_url")
+            result["release_date"] = lastfm_data.get("release_date")
+            result["source"] = "lastfm"
+            # NO album_id - grouping by album name is safer than Deezer IDs
+            logger.info(f"Enriched from Last.fm: {title} - {artist} -> album: {lastfm_data.get('album')}")
             
-            if lastfm_data:
+            # If no cover from Last.fm, try Deezer just for cover
+            if not result.get("cover_url"):
+                deezer_data = await self.search_deezer(title, artist)
+                if deezer_data and deezer_data.get("cover_url"):
+                    result["cover_url"] = deezer_data["cover_url"]
+                    logger.debug(f"Got cover from Deezer for: {title}")
+        else:
+            # Last.fm failed - try Deezer as fallback
+            deezer_data = await self.search_deezer(title, artist)
+            
+            if deezer_data:
                 result["enriched"] = True
-                result["album"] = lastfm_data.get("album")
-                result["genre"] = lastfm_data.get("genre")
-                result["cover_url"] = lastfm_data.get("cover_url")
-                result["release_date"] = lastfm_data.get("release_date")
-                # No album_id from Last.fm - will group by album name
-                result["source"] = "lastfm"
-                logger.info(f"Enriched from Last.fm: {title} - {artist} -> album: {lastfm_data.get('album')}, date: {lastfm_data.get('release_date')}")
+                result["album"] = deezer_data.get("album")
+                result["genre"] = deezer_data.get("genre")
+                result["cover_url"] = deezer_data.get("cover_url")
+                # Still NO album_id - don't trust Deezer for grouping
+                result["source"] = "deezer"
+                logger.info(f"Enriched from Deezer (fallback): {title} - {artist} -> album: {deezer_data.get('album')}")
         
         # If still no genre, try fallbacks
         if not result.get("genre"):
