@@ -48,7 +48,7 @@ async def main():
                     db_track = await session.get(Track, track.id)
                     if db_track:
                         if result.get("album"):
-                            db_track.album_name = result.get("album")
+                            db_track.album = result.get("album")
                         if result.get("genre"):
                             db_track.genre = result.get("genre")
                         if result.get("cover_url"):
