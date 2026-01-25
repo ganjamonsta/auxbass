@@ -1285,7 +1285,7 @@ const openPlaylist = async (playlist) => {
     activeTab.value = 'tracks'
     filterScope.value = 'library'
     library.fetchTracks({ album: playlist.name })
-    currentView.value = 'main'
+    currentView.value = 'library'
     return
   }
   pushNavigation()
