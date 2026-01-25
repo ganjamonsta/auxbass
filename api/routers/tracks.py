@@ -154,19 +154,28 @@ async def get_my_tracks(
     total = await db.scalar(count_query)
     
     # Apply sorting (some fields from UserLibrary, some from Track)
-    if sort_by == "added_at":
-        sort_column = UserLibrary.added_at
-    elif sort_by == "last_played_at":
-        sort_column = UserLibrary.last_played_at
-    elif sort_by == "play_count":
-        sort_column = UserLibrary.play_count
+    # Special case: when filtering by album, sort by track_number for album order
+    if album:
+        # Sort by track_number ascending (album track order)
+        query = query.order_by(
+            Track.track_number.asc().nullslast(),
+            Track.title.asc()  # Fallback for tracks without track_number
+        )
     else:
-        sort_column = getattr(Track, sort_by)
-    
-    if sort_order == "desc":
-        query = query.order_by(sort_column.desc())
-    else:
-        query = query.order_by(sort_column.asc())
+        # Normal sorting logic
+        if sort_by == "added_at":
+            sort_column = UserLibrary.added_at
+        elif sort_by == "last_played_at":
+            sort_column = UserLibrary.last_played_at
+        elif sort_by == "play_count":
+            sort_column = UserLibrary.play_count
+        else:
+            sort_column = getattr(Track, sort_by)
+        
+        if sort_order == "desc":
+            query = query.order_by(sort_column.desc())
+        else:
+            query = query.order_by(sort_column.asc())
     
     # Pagination
     offset = (page - 1) * per_page
