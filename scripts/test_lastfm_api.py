@@ -61,18 +61,28 @@ async def test_track_getinfo(session: aiohttp.ClientSession, api_key: str):
         artist = track.get("artist", {})
         print(f"   Type: {type(artist)}")
         if isinstance(artist, dict):
-            print(f"   - artist.name: {artist.get('name')}")
+            track_artist = artist.get('name')
+            print(f"   - artist.name: {track_artist}")
             print(f"   - artist.url: {artist.get('url')}")
         else:
+            track_artist = artist
             print(f"   VALUE: {artist}")
         
         print(f"\n4. Album structure:")
         album = track.get("album", {})
         print(f"   Type: {type(album)}")
         if isinstance(album, dict):
+            album_artist = album.get('artist')
             print(f"   - album.title: {album.get('title')}")
-            print(f"   - album.artist: {album.get('artist')}")
+            print(f"   - album.artist: {album_artist}")
             print(f"   - album.url: {album.get('url')}")
+            
+            # Check artist mismatch!
+            if track_artist and album_artist and track_artist.lower() != album_artist.lower():
+                print(f"\n   ⚠️  ARTIST MISMATCH DETECTED!")
+                print(f"   Track artist: '{track_artist}'")
+                print(f"   Album artist: '{album_artist}'")
+                print(f"   This album data should be IGNORED!")
             
             print(f"\n5. Album images:")
             images = album.get("image", [])
@@ -203,6 +213,14 @@ async def test_album_getinfo(session: aiohttp.ClientSession, api_key: str):
             print(f"   - published: {wiki.get('published')}")
             content = wiki.get('content', '')
             print(f"   - content (first 200 chars): {content[:200]}...")
+            
+            # Test date extraction regex
+            import re
+            year_match = re.search(r'released[^.]*?(\b(19|20)\d{2}\b)', content, re.IGNORECASE)
+            if year_match:
+                print(f"   - EXTRACTED YEAR: {year_match.group(1)}")
+            else:
+                print(f"   - EXTRACTED YEAR: None (regex didn't match)")
         
         print(f"\n6. Images:")
         images = album.get("image", [])

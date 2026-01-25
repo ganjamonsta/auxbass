@@ -643,6 +643,16 @@ class MetadataService:
             else:
                 track_artist = track_artist_raw.get("name", "")
             
+            # IMPORTANT: Validate that album artist matches track artist!
+            # Last.fm sometimes returns wrong album (e.g., "November Has Come" by 
+            # Wyatt Raymond White for Bladee's "Be Nice 2 Me")
+            if album_artist and track_artist:
+                if not self._artist_matches(track_artist, album_artist):
+                    logger.debug(f"Album artist mismatch: track='{track_artist}', album='{album_artist}' - ignoring album")
+                    album_title = None
+                    album_artist = None
+                    album = {}
+            
             # Get largest album image
             cover_url = None
             if album and album.get("image"):
