@@ -1,12 +1,15 @@
 """
 Script to rebuild all album playlists.
 Cleans up empty albums and reassembles them from tracks.
+
+Run from /opt/tg_player: python scripts/archive/rebuild_albums.py
 """
 import asyncio
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Go up two levels: archive -> scripts -> project root
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.database import get_session
 from shared.models import Track, Playlist, PlaylistTrack, UserLibrary
