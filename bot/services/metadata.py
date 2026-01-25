@@ -513,6 +513,9 @@ class MetadataService:
             # Method 1: Check for year tag (most reliable)
             # Tags like "2007", "2016", "2020" indicate release year
             tags = album_data.get("tags", {}).get("tag", [])
+            # Last.fm returns single tag as dict, not list - normalize it
+            if isinstance(tags, dict):
+                tags = [tags]
             for tag in tags:
                 tag_name = tag.get("name", "")
                 # Check if tag is a 4-digit year between 1950-2030
@@ -598,6 +601,10 @@ class MetadataService:
                 if not results:
                     return None
                 
+                # Last.fm returns single result as dict, not list - normalize it
+                if isinstance(results, dict):
+                    results = [results]
+                
                 # Find matching artist
                 for r in results:
                     if self._artist_matches(artist, r.get("artist", "")):
@@ -629,10 +636,20 @@ class MetadataService:
             album_title = album.get("title") if album else None
             album_artist = album.get("artist") if album else None
             
+            # Get artist name - can be string or dict with 'name' key
+            track_artist_raw = track_data.get("artist", {})
+            if isinstance(track_artist_raw, str):
+                track_artist = track_artist_raw
+            else:
+                track_artist = track_artist_raw.get("name", "")
+            
             # Get largest album image
             cover_url = None
             if album and album.get("image"):
                 images = album.get("image", [])
+                # Last.fm returns single image as dict, not list - normalize it
+                if isinstance(images, dict):
+                    images = [images]
                 for img in reversed(images):  # Largest last
                     if img.get("#text"):
                         cover_url = img.get("#text")
@@ -641,6 +658,9 @@ class MetadataService:
             # Get tags for genre
             genre = None
             tags = track_data.get("toptags", {}).get("tag", [])
+            # Last.fm returns single tag as dict, not list - normalize it
+            if isinstance(tags, dict):
+                tags = [tags]
             if tags:
                 for tag in tags[:3]:
                     tag_name = tag.get("name", "").lower()
@@ -660,7 +680,7 @@ class MetadataService:
             
             return {
                 "title": track_data.get("name"),
-                "artist": track_data.get("artist", {}).get("name"),
+                "artist": track_artist,
                 "album": album_title,
                 "cover_url": cover_url,
                 "genre": genre,

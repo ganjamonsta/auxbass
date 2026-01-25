@@ -237,16 +237,12 @@ class AlbumAssemblyService:
     
     async def get_album_candidates(self, user_id: int) -> List[Dict]:
         """
-        Find potential albums from user's tracks using smart two-phase grouping.
+        Find potential albums from user's tracks using album name + artist grouping.
         
-        Phase 1: Group by deezer_album_id (most reliable for compilations)
-        Phase 2: Merge groups without deezer_album_id into groups that have it,
-                 if the normalized album name matches
-        
-        This handles cases like:
-        - Some tracks of D&G have deezer_album_id, some don't -> merged into one
-        - Different artist spellings (BLADEE vs bladee) -> same album
-        - Collaborations with different artists per track -> one album
+        Grouping strategy:
+        - Group by normalized (album_name, primary_artist) tuple
+        - This ensures tracks from different artists don't mix into same album
+        - Handles artist spelling variations (BLADEE vs bladee)
         
         Returns list of album candidates with track counts.
         """
@@ -266,47 +262,20 @@ class AlbumAssemblyService:
             if not tracks:
                 return []
             
-            # ===== PHASE 1: Initial grouping =====
-            # Group by deezer_album_id OR by normalized album name
+            # ===== Group by (normalized_album, normalized_artist) =====
             albums: Dict[str, Dict] = {}
             
-            # Track which normalized album names have deezer_album_id
-            # Key: normalized_album_name -> deezer_album_id (if any)
-            album_name_to_deezer_id: Dict[str, int] = {}
-            
             for track in tracks:
                 album_norm = normalize_album_name(track.album)
+                artist_norm = normalize_artist_for_grouping(track.artist or "Unknown")
                 
-                # Remember deezer_album_id for this album name
-                if track.deezer_album_id and album_norm:
-                    if album_norm not in album_name_to_deezer_id:
-                        album_name_to_deezer_id[album_norm] = track.deezer_album_id
-            
-            # Now group tracks - prefer deezer_album_id, but use lookup
-            for track in tracks:
-                album_norm = normalize_album_name(track.album)
-                
-                # Determine the grouping key
-                if track.deezer_album_id:
-                    # Has deezer_album_id - use it
-                    key = f"deezer:{track.deezer_album_id}"
-                    effective_deezer_id = track.deezer_album_id
-                elif album_norm in album_name_to_deezer_id:
-                    # Doesn't have deezer_album_id, but another track with same 
-                    # album name does - merge into that group!
-                    effective_deezer_id = album_name_to_deezer_id[album_norm]
-                    key = f"deezer:{effective_deezer_id}"
-                else:
-                    # No deezer_album_id anywhere - group by album name only
-                    # (NOT by artist - albums can have multiple artists)
-                    key = f"album:{album_norm}"
-                    effective_deezer_id = None
+                # Key is combination of album + artist (to prevent cross-artist mixing)
+                key = f"{album_norm}|{artist_norm}"
                 
                 if key not in albums:
                     albums[key] = {
                         "album": track.album,  # Original name (first seen)
                         "album_norm": album_norm,
-                        "deezer_album_id": effective_deezer_id,
                         "cover_url": track.cover_url,
                         "artists": set(),
                         "track_ids": set(),
@@ -330,17 +299,8 @@ class AlbumAssemblyService:
                     elif 'dzcdn.net' in track.cover_url and 'dzcdn.net' not in album_data["cover_url"]:
                         # Prefer Deezer covers
                         album_data["cover_url"] = track.cover_url
-                
-                # Update deezer_album_id if we don't have one
-                if track.deezer_album_id and not album_data["deezer_album_id"]:
-                    album_data["deezer_album_id"] = track.deezer_album_id
             
-            # ===== PHASE 2: Merge remaining duplicates by normalized name =====
-            # This catches cases where tracks have DIFFERENT deezer_album_ids 
-            # but same album name (rare, but possible with remasters/re-releases)
-            # We'll keep them separate for now - deezer_album_id is authoritative
-            
-            # ===== PHASE 3: Build candidate list =====
+            # ===== Build candidate list =====
             candidates = []
             for key, data in albums.items():
                 if len(data["track_ids"]) < self.MIN_TRACKS_FOR_ALBUM:
@@ -375,7 +335,6 @@ class AlbumAssemblyService:
                     "all_artists": artists_list,
                     "album": data["album"],
                     "album_norm": data["album_norm"],
-                    "deezer_album_id": data["deezer_album_id"],
                     "cover_url": data["cover_url"],
                     "track_count": len(data["track_ids"]),
                     "total_duration": data["total_duration"],
@@ -425,14 +384,11 @@ class AlbumAssemblyService:
         user_id: int, 
         album: str,
         artist: str = "",
-        deezer_album_id: Optional[int] = None,
         album_norm: Optional[str] = None
     ) -> Optional[Playlist]:
         """
         Check if auto-album playlist already exists for this album.
-        Uses smart matching:
-        1. By deezer_album_id (most reliable)
-        2. By normalized album name (handles D&G vs D & G, etc.)
+        Uses normalized album name matching (handles D&G vs D & G, etc.)
         
         Returns existing playlist or None.
         """
@@ -449,16 +405,10 @@ class AlbumAssemblyService:
             if not playlists:
                 return None
             
-            # First: try exact match by deezer_album_id (most reliable)
-            if deezer_album_id:
-                for pl in playlists:
-                    if pl.deezer_album_id == deezer_album_id:
-                        return pl
-            
             # Prepare normalized album name for matching
             album_norm = album_norm or normalize_album_name(album)
             
-            # Second: match by NORMALIZED album name
+            # Match by NORMALIZED album name
             for pl in playlists:
                 if not pl.name:
                     continue
@@ -492,17 +442,12 @@ class AlbumAssemblyService:
             if len(playlists) < 2:
                 return []
             
-            # Group by normalized album name and deezer_album_id
+            # Group by normalized album name
             groups: Dict[str, List[Playlist]] = {}
             
             for pl in playlists:
-                # Generate key similar to track grouping
                 album_norm = normalize_album_name(pl.name) if pl.name else ""
-                
-                if pl.deezer_album_id:
-                    key = f"deezer:{pl.deezer_album_id}"
-                else:
-                    key = f"album:{album_norm}"
+                key = f"album:{album_norm}"
                 
                 if key not in groups:
                     groups[key] = []
@@ -517,7 +462,7 @@ class AlbumAssemblyService:
     ) -> Optional[Playlist]:
         """
         Merge multiple duplicate playlists into one.
-        Keeps the playlist with best metadata (deezer_album_id, cover_url).
+        Keeps the playlist with best metadata (cover_url, track count).
         Moves all tracks to the survivor, removes duplicates.
         """
         if len(playlists) < 2:
@@ -530,7 +475,6 @@ class AlbumAssemblyService:
             # Score each playlist to find the best one
             def score_playlist(pl: Playlist) -> int:
                 return (
-                    (100 if pl.deezer_album_id else 0) +
                     (50 if pl.cover_url and 'dzcdn.net' in pl.cover_url else 0) +
                     (10 if pl.cover_url else 0) +
                     (5 if pl.release_date else 0)
@@ -588,8 +532,6 @@ class AlbumAssemblyService:
             
             # Update survivor metadata from merged playlists if better
             for pl in to_merge:
-                if not survivor.deezer_album_id and pl.deezer_album_id:
-                    survivor.deezer_album_id = pl.deezer_album_id
                 if not survivor.cover_url and pl.cover_url:
                     survivor.cover_url = pl.cover_url
                 if not survivor.release_date and pl.release_date:
@@ -609,14 +551,11 @@ class AlbumAssemblyService:
         user_id: int, 
         album: str,
         artist: str = "",
-        deezer_album_id: Optional[int] = None,
         album_norm: Optional[str] = None
     ) -> List[Track]:
         """
         Get all user's tracks for a specific album.
-        Uses smart matching:
-        1. By deezer_album_id (most reliable, handles compilations)
-        2. By normalized album name + artist check (for non-Deezer tracks)
+        Uses normalized album name + artist matching.
         
         Artist matching prevents wrong tracks from being added to albums.
         Deduplicates by title to avoid duplicate tracks from different sources.
@@ -636,30 +575,17 @@ class AlbumAssemblyService:
                 )
             )
             
-            # Filter by deezer_album_id OR (normalized album name + artist)
+            # Filter by normalized album name + artist
             all_tracks = []
             for t in result.scalars().all():
                 track_album_norm = normalize_album_name(t.album) if t.album else ""
                 track_artist_norm = normalize_artist_for_grouping(t.artist) if t.artist else ""
                 
-                # Match by deezer_album_id (primary) or normalized album name + artist
-                if deezer_album_id:
-                    # If we're looking for a specific deezer_album_id:
-                    # - Include tracks WITH that exact deezer_album_id (trusted source)
-                    # - Also include tracks WITHOUT deezer_album_id but with matching album AND artist
-                    if t.deezer_album_id == deezer_album_id:
+                # Match by normalized album name AND artist
+                if track_album_norm == album_norm:
+                    # Check artist matches (or artist is empty/compilation)
+                    if not artist_norm or track_artist_norm == artist_norm:
                         all_tracks.append(t)
-                    elif not t.deezer_album_id and track_album_norm == album_norm:
-                        # For tracks without deezer_album_id, also check artist match
-                        # This prevents "D.O.A" from Cold Visions appearing in "Exeter"
-                        if not artist_norm or track_artist_norm == artist_norm:
-                            all_tracks.append(t)
-                else:
-                    # No deezer_album_id - match by normalized album name AND artist
-                    if track_album_norm == album_norm:
-                        # Check artist matches (or artist is empty/compilation)
-                        if not artist_norm or track_artist_norm == artist_norm:
-                            all_tracks.append(t)
             
             # Deduplicate by title using normalized matching
             # Keep the track with cover_url or higher quality metadata
@@ -694,15 +620,13 @@ class AlbumAssemblyService:
                 else:
                     # Duplicate found - prefer track with better metadata
                     existing = unique_tracks[dup_idx]
-                    # Prefer: has cover > has deezer_album_id > has duration
+                    # Prefer: has cover > has duration
                     existing_score = (
                         (1 if existing.cover_url else 0) * 100 +
-                        (1 if existing.deezer_album_id else 0) * 10 +
                         (1 if existing.duration else 0)
                     )
                     track_score = (
                         (1 if track.cover_url else 0) * 100 +
-                        (1 if track.deezer_album_id else 0) * 10 +
                         (1 if track.duration else 0)
                     )
                     if track_score > existing_score:
@@ -747,18 +671,13 @@ class AlbumAssemblyService:
         artist: str,
         album: str,
         tracks: List[Track],
-        deezer_album_id: Optional[int] = None,
         cover_url: Optional[str] = None
     ) -> Playlist:
         """Create a new auto-album playlist from tracks"""
         async with get_session() as session:
-            # Get release date from Deezer if we have album ID
+            # Try to get release date from Last.fm
             release_date = None
-            if deezer_album_id:
-                release_date = await metadata_service.get_album_release_date(deezer_album_id)
-            
-            # If no Deezer album ID, try to get release date from Last.fm
-            if not release_date and artist and album:
+            if artist and album:
                 from shared.config import get_settings
                 settings = get_settings()
                 if settings.lastfm_api_key:
@@ -774,41 +693,14 @@ class AlbumAssemblyService:
                 album_artist=artist,  # Artist stored separately
                 description=f"Автоальбом • {len(tracks)} треков",
                 is_auto_album=True,
-                deezer_album_id=deezer_album_id,
                 cover_url=cover_url,
                 release_date=release_date,
             )
             session.add(playlist)
             await session.flush()
             
-            # Try to get correct track order from Deezer
-            track_order = {}
-            deezer_tracks_list = None
-            if deezer_album_id:
-                deezer_tracks_list = await self.get_deezer_album_tracklist(deezer_album_id)
-                if deezer_tracks_list:
-                    # Create mapping: lowercase title -> position (for exact match)
-                    for dt in deezer_tracks_list:
-                        if dt.get("title"):
-                            track_order[dt["title"].lower()] = dt["position"]
-            
-            # Sort tracks by Deezer order or alphabetically
-            def get_position(track):
-                if track.title:
-                    # Try exact match first
-                    pos = track_order.get(track.title.lower())
-                    if pos:
-                        return (0, pos)  # Has exact Deezer position
-                    
-                    # Try fuzzy match if we have Deezer tracks
-                    if deezer_tracks_list:
-                        fuzzy_pos = find_best_match(track.title, deezer_tracks_list)
-                        if fuzzy_pos:
-                            return (0, fuzzy_pos)  # Has fuzzy Deezer position
-                    
-                return (1, track.title or "")  # Fallback to alphabetical
-            
-            sorted_tracks = sorted(tracks, key=get_position)
+            # Sort tracks alphabetically by title
+            sorted_tracks = sorted(tracks, key=lambda t: t.title or "")
             
             # Add tracks to playlist
             for position, track in enumerate(sorted_tracks, start=1):
@@ -828,21 +720,15 @@ class AlbumAssemblyService:
         self,
         playlist: Playlist,
         tracks: List[Track],
-        deezer_album_id: Optional[int] = None,
         cover_url: Optional[str] = None,
         reorder: bool = False
     ) -> bool:
         """Update existing album playlist with new tracks and cover.
-        If reorder=True or new tracks are added with Deezer data available,
-        reorders all tracks according to Deezer tracklist.
+        If reorder=True or new tracks are added, reorders all tracks alphabetically.
         """
         async with get_session() as session:
             # Attach playlist to this session
             playlist = await session.merge(playlist)
-            
-            # Update deezer_album_id if not set
-            if deezer_album_id and not playlist.deezer_album_id:
-                playlist.deezer_album_id = deezer_album_id
             
             # Update cover if not set and we have one
             cover_updated = False
@@ -850,19 +736,10 @@ class AlbumAssemblyService:
                 playlist.cover_url = cover_url
                 cover_updated = True
             
-            # Update release_date if not set
+            # Update release_date if not set (using Last.fm)
             release_date_updated = False
             if not playlist.release_date:
-                # Try Deezer first
-                if deezer_album_id or playlist.deezer_album_id:
-                    album_id = deezer_album_id or playlist.deezer_album_id
-                    release_date = await metadata_service.get_album_release_date(album_id)
-                    if release_date:
-                        playlist.release_date = release_date
-                        release_date_updated = True
-                
-                # If still no release date, try Last.fm
-                if not release_date_updated and playlist.album_artist and playlist.name:
+                if playlist.album_artist and playlist.name:
                     from shared.config import get_settings
                     settings = get_settings()
                     if settings.lastfm_api_key:
@@ -887,92 +764,31 @@ class AlbumAssemblyService:
             if not new_tracks and not cover_updated and not reorder:
                 return False
             
-            # Get Deezer track order for smart insertion
-            track_order = {}
-            deezer_tracks_list = None
-            album_id = deezer_album_id or playlist.deezer_album_id
-            if album_id:
-                deezer_tracks_list = await self.get_deezer_album_tracklist(album_id)
-                if deezer_tracks_list:
-                    for dt in deezer_tracks_list:
-                        if dt.get("title"):
-                            track_order[dt["title"].lower().strip()] = dt["position"]
+            # Add new tracks at end (sorted alphabetically)
+            result = await session.execute(
+                select(func.max(PlaylistTrack.position))
+                .where(PlaylistTrack.playlist_id == playlist.id)
+            )
+            max_pos = result.scalar() or 0
             
-            def get_deezer_position(track) -> Optional[int]:
-                """Get Deezer position for a track (1-based), or None if not found."""
-                if not track.title:
-                    return None
-                
-                # Try exact match first
-                pos = track_order.get(track.title.lower().strip())
-                if pos:
-                    return pos
-                
-                # Try fuzzy match if we have Deezer tracks
-                if deezer_tracks_list:
-                    fuzzy_pos = find_best_match(track.title, deezer_tracks_list)
-                    if fuzzy_pos:
-                        return fuzzy_pos
-                
-                return None
+            # Sort new tracks alphabetically
+            sorted_new_tracks = sorted(new_tracks, key=lambda t: t.title or "")
             
-            # If we have Deezer data or explicit reorder, rebuild entire playlist with correct order
-            should_reorder = reorder or (new_tracks and deezer_tracks_list)
-            
-            if should_reorder and deezer_tracks_list:
-                # Delete all existing playlist tracks
-                await session.execute(
-                    delete(PlaylistTrack).where(PlaylistTrack.playlist_id == playlist.id)
+            for i, track in enumerate(sorted_new_tracks, start=1):
+                pt = PlaylistTrack(
+                    playlist_id=playlist.id,
+                    track_id=track.id,
+                    position=max_pos + i
                 )
-                
-                # Sort all tracks by Deezer order
-                def get_sort_key(track):
-                    pos = get_deezer_position(track)
-                    if pos:
-                        return (0, pos)  # Has Deezer position
-                    return (1, track.title or "")  # Fallback to alphabetical at end
-                
-                sorted_tracks = sorted(tracks, key=get_sort_key)
-                
-                # Add all tracks with correct positions
-                for position, track in enumerate(sorted_tracks, start=1):
-                    pt = PlaylistTrack(
-                        playlist_id=playlist.id,
-                        track_id=track.id,
-                        position=position
-                    )
-                    session.add(pt)
-                
-                added_count = len(new_tracks)
-            else:
-                # No Deezer data - just add new tracks at end
-                result = await session.execute(
-                    select(func.max(PlaylistTrack.position))
-                    .where(PlaylistTrack.playlist_id == playlist.id)
-                )
-                max_pos = result.scalar() or 0
-                
-                for i, track in enumerate(new_tracks, start=1):
-                    pt = PlaylistTrack(
-                        playlist_id=playlist.id,
-                        track_id=track.id,
-                        position=max_pos + i
-                    )
-                    session.add(pt)
-                
-                added_count = len(new_tracks)
+                session.add(pt)
             
             # Update description
-            total_tracks = len(tracks) if should_reorder else len(existing_track_ids) + len(new_tracks)
+            total_tracks = len(existing_track_ids) + len(new_tracks)
             playlist.description = f"Автоальбом • {total_tracks} треков"
             
             await session.commit()
             
-            if should_reorder:
-                action = f"reordered ({added_count} new)" if added_count else "reordered"
-            else:
-                action = f"+{added_count} tracks"
-            logger.info(f"Updated auto-album {playlist.name}: {action}")
+            logger.info(f"Updated auto-album {playlist.name}: +{len(new_tracks)} tracks")
             return True
     
     async def assemble_albums_for_user(self, user_id: int) -> Dict:
@@ -1012,7 +828,6 @@ class AlbumAssemblyService:
         for candidate in candidates:
             album = candidate["album"]
             album_norm = candidate.get("album_norm")
-            deezer_album_id = candidate.get("deezer_album_id")
             cover_url = candidate.get("cover_url")
             all_artists = candidate.get("all_artists", [candidate.get("artist", "Unknown")])
             main_artist = candidate.get("artist", "Unknown")
@@ -1025,20 +840,20 @@ class AlbumAssemblyService:
             else:
                 artist_display = all_artists[0] if all_artists else "Unknown"
             
-            # Check if playlist already exists (using smart matching)
+            # Check if playlist already exists (using album name matching)
             existing = await self.check_existing_album_playlist(
-                user_id, album, main_artist, deezer_album_id, album_norm
+                user_id, album, main_artist, album_norm
             )
             
-            # Get all tracks for this album (using smart matching)
+            # Get all tracks for this album (using album name + artist matching)
             tracks = await self.get_album_tracks(
-                user_id, album, main_artist, deezer_album_id, album_norm
+                user_id, album, main_artist, album_norm
             )
             
             if existing:
                 # Update existing playlist
                 updated = await self.update_album_playlist(
-                    existing, tracks, deezer_album_id, cover_url
+                    existing, tracks, cover_url
                 )
                 if updated:
                     stats["updated"] += 1
@@ -1055,7 +870,6 @@ class AlbumAssemblyService:
                     artist=artist_display,
                     album=album,
                     tracks=tracks,
-                    deezer_album_id=deezer_album_id,
                     cover_url=cover_url
                 )
                 stats["created"] += 1
