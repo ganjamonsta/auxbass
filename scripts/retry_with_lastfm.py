@@ -17,20 +17,20 @@ from bot.services.metadata import MetadataService
 
 
 async def main():
-    # Get failed tracks
+    # Get failed AND pending tracks (pending = reset by fix_album_field.py)
     async with get_session() as session:
         result = await session.execute(
             select(Track)
-            .where(Track.enrichment_status == "failed")
+            .where(Track.enrichment_status.in_(["failed", "pending"]))
             .order_by(Track.created_at.desc())
         )
         tracks = result.scalars().all()
     
     if not tracks:
-        print("No failed tracks to retry")
+        print("No failed/pending tracks to retry")
         return
     
-    print(f"Found {len(tracks)} failed tracks to retry (using Deezer + Last.fm)")
+    print(f"Found {len(tracks)} tracks to retry (using Deezer + Last.fm)")
     print("=" * 60)
     
     service = MetadataService()
