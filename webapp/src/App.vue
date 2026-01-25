@@ -928,7 +928,8 @@ const switchTab = (tab, callback = null) => {
     // Уже на этом табе - скроллим вверх
     scrollToTop()
   } else {
-    // Переключаем таб
+    // Переключаем таб - сбрасываем фильтр
+    activeFilter.value = null
     activeTab.value = tab
     if (callback) callback()
   }
@@ -939,6 +940,7 @@ const handleSidebarNavigate = (tab) => {
   currentView.value = 'library'
   currentPlaylist.value = null
   expandedSection.value = null
+  activeFilter.value = null
   
   // Map sidebar tabs to actual tabs with callbacks
   const tabCallbacks = {
