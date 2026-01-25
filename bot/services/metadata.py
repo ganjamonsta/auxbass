@@ -478,7 +478,9 @@ class MetadataService:
     ) -> Optional[str]:
         """
         Get album release date from Last.fm album.getInfo API.
-        Returns date in YYYY-MM-DD format or None.
+        Last.fm JSON API doesn't return 'releasedate' field, but we can extract
+        the year from tags (e.g., tag "2007" for Burial - Untrue).
+        Returns date in YYYY-MM-DD format (with -01-01 for year-only) or None.
         """
         await self._rate_limit()
         
@@ -503,34 +505,32 @@ class MetadataService:
                 return None
             
             album_data = data.get("album", {})
-            # Last.fm returns "releasedate" like "6 Apr 1999, 00:00"
-            # NOTE: Do NOT use wiki.published - it's when the wiki was edited, not the release date!
-            release_date_str = album_data.get("releasedate", "").strip()
             
-            if not release_date_str:
-                return None
+            # Method 1: Check for year tag (most reliable)
+            # Tags like "2007", "2016", "2020" indicate release year
+            tags = album_data.get("tags", {}).get("tag", [])
+            for tag in tags:
+                tag_name = tag.get("name", "")
+                # Check if tag is a 4-digit year between 1950-2030
+                if tag_name.isdigit() and len(tag_name) == 4:
+                    year = int(tag_name)
+                    if 1950 <= year <= 2030:
+                        return f"{year}-01-01"
             
-            # Parse date - formats: "6 Apr 1999, 00:00" or "06 Apr 2020, 18:00"
-            try:
-                from datetime import datetime
-                # Remove time part if present
-                date_part = release_date_str.split(",")[0].strip()
-                
-                # Try parsing "6 Apr 1999" format
-                for fmt in ["%d %b %Y", "%d %B %Y", "%Y-%m-%d", "%Y"]:
-                    try:
-                        dt = datetime.strptime(date_part, fmt)
-                        return dt.strftime("%Y-%m-%d")
-                    except ValueError:
-                        continue
-                
-                # If just a year
-                if date_part.isdigit() and len(date_part) == 4:
-                    return f"{date_part}-01-01"
-                    
-                return None
-            except Exception:
-                return None
+            # Method 2: Try to parse from wiki content
+            # e.g., "It was released on November 4th, 2007"
+            wiki = album_data.get("wiki", {})
+            wiki_content = wiki.get("content", "") or wiki.get("summary", "")
+            if wiki_content:
+                import re
+                # Look for "released on/in [Month] [Day], [Year]" or just year
+                # Pattern: released ... 2007 or released on November 4th, 2007
+                year_match = re.search(r'released[^.]*?(\b(19|20)\d{2}\b)', wiki_content, re.IGNORECASE)
+                if year_match:
+                    year = year_match.group(1)
+                    return f"{year}-01-01"
+            
+            return None
                 
         except Exception as e:
             logger.debug(f"Last.fm album.getInfo failed: {e}")
