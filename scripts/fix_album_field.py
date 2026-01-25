@@ -34,25 +34,25 @@ async def main():
     
     if not tracks:
         print("No tracks with missing album field found.")
-        print("\nThey might need re-enrichment. Resetting to 'pending'...")
-        
-        async with get_session() as session:
-            # Reset tracks that were "successfully" enriched by the buggy script
-            # These would have been marked success but album field is still empty
-            result = await session.execute(text("""
-                UPDATE tracks
-                SET enrichment_status = 'pending'
-                WHERE enrichment_status = 'success'
-                AND (album IS NULL OR album = '')
-                AND (cover_url IS NOT NULL OR genre IS NOT NULL)
-            """))
-            await session.commit()
-            print(f"Reset {result.rowcount} tracks to pending for re-enrichment")
         return
     
     print(f"Found {len(tracks)} tracks to check")
     for t in tracks[:10]:
         print(f"  - {t.artist} - {t.title}: album={t.album}, status={t.enrichment_status}")
+    
+    print("\nResetting these tracks to 'pending' for re-enrichment...")
+    
+    async with get_session() as session:
+        # Reset tracks that were "successfully" enriched by the buggy script
+        # These have status=success but album is still empty
+        result = await session.execute(text("""
+            UPDATE tracks
+            SET enrichment_status = 'pending'
+            WHERE enrichment_status = 'success'
+            AND (album IS NULL OR album = '')
+        """))
+        await session.commit()
+        print(f"Reset {result.rowcount} tracks to pending for re-enrichment")
 
 
 if __name__ == "__main__":
