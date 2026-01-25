@@ -758,7 +758,7 @@ async def get_artist_detail(
     )
     artist_album_playlists = album_playlists_result.scalars().all()
     
-    logger.info(f"Found {len(artist_album_playlists)} auto-album playlists for artist '{safe_artist}' user {user.id}")
+    print(f"DEBUG: Found {len(artist_album_playlists)} auto-album playlists for artist '{safe_artist}' user {user.id}")
     
     # Also collect albums from tracks (for albums not yet created as playlists)
     album_data = {}
