@@ -242,6 +242,7 @@
 
 <script setup>
 import { ref, computed, inject } from 'vue'
+import { getTrackCoverStyle, getTrackInitials } from '@/utils'
 
 const props = defineProps({
   track: Object,
@@ -366,41 +367,9 @@ const onTouchEnd = () => {
 // Swipe style removed - no longer using swipe-down gesture
 // to avoid conflict with Telegram's native close gesture
 
-// Generate cover from title
-const coverGradient = computed(() => {
-  const title = props.track?.title || 'Music'
-  const artist = props.track?.artist || ''
-  
-  // Generate colors from string hash
-  const str = title + artist
-  let hash = 0
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  
-  const hue1 = Math.abs(hash % 360)
-  const hue2 = (hue1 + 40) % 360
-  
-  return `linear-gradient(135deg, hsl(${hue1}, 70%, 35%) 0%, hsl(${hue2}, 60%, 25%) 100%)`
-})
-
-const coverStyle = computed(() => {
-  if (props.track?.cover_url) {
-    return {}
-  }
-  return {
-    background: coverGradient.value
-  }
-})
-
-const coverInitials = computed(() => {
-  const title = props.track?.title || 'M'
-  const words = title.split(' ').filter(w => w.length > 0)
-  if (words.length >= 2) {
-    return (words[0][0] + words[1][0]).toUpperCase()
-  }
-  return title.substring(0, 2).toUpperCase()
-})
+// Use shared utils for cover style
+const coverStyle = computed(() => getTrackCoverStyle(props.track))
+const coverInitials = computed(() => getTrackInitials(props.track))
 
 const upcomingQueue = computed(() => {
   if (!props.queue.length || props.queueIndex < 0) return []

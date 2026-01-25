@@ -2,198 +2,29 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { playerApi, tracksApi } from '../api/client'
 
-// ============== LocalStorage helpers ==============
-const STORAGE_KEY = 'tg_player_settings'
-const STATE_STORAGE_KEY = 'tg_player_state'
-const STATE_SAVE_INTERVAL = 5000 // Save position every 5 seconds
+// Import storage and cache utilities
+import {
+  loadSettings,
+  saveSettings,
+  loadPlayerState,
+  savePlayerState,
+  clearPlayerState,
+  STATE_SAVE_INTERVAL,
+} from './playerStorage'
 
-const loadSettings = () => {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
-      return JSON.parse(saved)
-    }
-  } catch (e) {
-    console.error('Failed to load player settings:', e)
-  }
-  return {}
-}
-
-const saveSettings = (settings) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
-  } catch (e) {
-    console.error('Failed to save player settings:', e)
-  }
-}
-
-const loadPlayerState = () => {
-  try {
-    const saved = localStorage.getItem(STATE_STORAGE_KEY)
-    if (saved) {
-      return JSON.parse(saved)
-    }
-  } catch (e) {
-    console.error('Failed to load player state:', e)
-  }
-  return null
-}
-
-const savePlayerState = (state) => {
-  try {
-    localStorage.setItem(STATE_STORAGE_KEY, JSON.stringify({
-      ...state,
-      savedAt: Date.now()
-    }))
-  } catch (e) {
-    console.error('Failed to save player state:', e)
-  }
-}
-
-const clearPlayerState = () => {
-  try {
-    localStorage.removeItem(STATE_STORAGE_KEY)
-  } catch (e) {
-    console.error('Failed to clear player state:', e)
-  }
-}
+import {
+  getCachedUrl,
+  setCachedUrl,
+  getCachedAudio,
+  setCachedAudio,
+  preloadTrackWithAudio,
+  getPreloadedAudio,
+  clearPreloadAudio,
+} from './playerCache'
 
 // Load saved settings
 const savedSettings = loadSettings()
 const savedState = loadPlayerState()
-
-// ============== URL Cache for pre-generated tokens ==============
-// Maps track_id -> { url, expires_at }
-const urlCache = new Map()
-const URL_CACHE_MARGIN = 60 // Refresh URL 60 seconds before expiry
-
-const getCachedUrl = (trackId) => {
-  // Check local cache first
-  let cached = urlCache.get(trackId)
-  
-  // Also check prefetched URLs from library.js (stored on window)
-  if (!cached && window._prefetchedUrls) {
-    cached = window._prefetchedUrls.get(trackId)
-    if (cached) {
-      // Move to local cache for consistency
-      urlCache.set(trackId, cached)
-      window._prefetchedUrls.delete(trackId)
-      console.log(`[Cache] Using prefetched URL for track ${trackId}`)
-    }
-  }
-  
-  if (!cached) return null
-  
-  // Check if not expired (with margin)
-  if (Date.now() / 1000 > cached.expires_at - URL_CACHE_MARGIN) {
-    urlCache.delete(trackId)
-    return null
-  }
-  
-  // Validate URL format
-  if (!cached.url || !cached.url.startsWith('/api/player/audio/')) {
-    console.warn(`[Cache] Invalid cached URL for track ${trackId}, removing`)
-    urlCache.delete(trackId)
-    return null
-  }
-  
-  return cached.url
-}
-
-const setCachedUrl = (trackId, url, expires_at) => {
-  urlCache.set(trackId, { url, expires_at })
-}
-
-// Audio cache - stores blob URLs for already loaded tracks
-const audioCache = new Map()
-const MAX_CACHE_SIZE = 50
-
-const getCachedAudio = (trackId) => {
-  return audioCache.get(trackId)
-}
-
-const setCachedAudio = (trackId, blobUrl) => {
-  // Limit cache size - use LRU-like eviction (remove oldest)
-  if (audioCache.size >= MAX_CACHE_SIZE) {
-    const firstKey = audioCache.keys().next().value
-    const oldUrl = audioCache.get(firstKey)
-    URL.revokeObjectURL(oldUrl)
-    audioCache.delete(firstKey)
-  }
-  audioCache.set(trackId, blobUrl)
-}
-
-// ============== Preload Audio System ==============
-// Use separate Audio element for preloading next track
-let preloadAudio = null
-let preloadTrackId = null
-
-const getPreloadAudio = () => {
-  if (!preloadAudio) {
-    preloadAudio = new Audio()
-    preloadAudio.preload = 'auto'
-    preloadAudio.volume = 0 // Silent preload
-  }
-  return preloadAudio
-}
-
-const preloadTrackWithAudio = (trackId, url) => {
-  // Validate URL before preloading
-  if (!url || url === '' || !url.startsWith('/api/player/audio/')) {
-    console.warn(`[Preload] Invalid URL for track ${trackId}, skipping preload`)
-    return
-  }
-  
-  const audio = getPreloadAudio()
-  
-  // Clear any previous error state
-  if (audio.error) {
-    audio.src = ''
-    audio.load()
-  }
-  
-  preloadTrackId = trackId
-  audio.src = url
-  audio.load()
-  
-  // Add one-time error handler to detect failed preloads
-  const errorHandler = () => {
-    console.warn(`[Preload] Failed to preload track ${trackId}, marking as invalid`)
-    preloadTrackId = null
-    audio.removeEventListener('error', errorHandler)
-  }
-  audio.addEventListener('error', errorHandler, { once: true })
-  
-  console.log(`[Preload] Started preloading track ${trackId} with Audio element`)
-}
-
-const getPreloadedAudio = (trackId) => {
-  if (preloadTrackId === trackId && preloadAudio && preloadAudio.src) {
-    // Additional validation: check that audio is not in error state
-    // and has actually started loading (readyState > 0)
-    if (preloadAudio.error) {
-      console.log(`[Preload] Audio for track ${trackId} has error, clearing`)
-      clearPreloadAudio()
-      return null
-    }
-    // Also check src is not empty (can happen with some edge cases)
-    if (!preloadAudio.src || preloadAudio.src === '' || preloadAudio.src === window.location.href) {
-      console.log(`[Preload] Audio for track ${trackId} has invalid src, clearing`)
-      clearPreloadAudio()
-      return null
-    }
-    return preloadAudio
-  }
-  return null
-}
-
-const clearPreloadAudio = () => {
-  if (preloadAudio) {
-    preloadAudio.pause()
-    preloadAudio.src = ''
-    preloadTrackId = null
-  }
-}
 
 // ============== Adaptive Preload System ==============
 // Tracks download speed to adapt preload strategy

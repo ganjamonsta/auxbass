@@ -2,7 +2,7 @@
 TG Player Bot - Callback Query Handlers
 """
 from aiogram import Router, F
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.types import CallbackQuery
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -16,20 +16,11 @@ from shared.database import get_session
 from shared.models import Track, Playlist, PlaylistTrack
 
 from services.session import session_manager
+from utils.keyboards import get_webapp_keyboard
 
 
 router = Router()
 settings = get_settings()
-
-
-def get_webapp_keyboard() -> InlineKeyboardMarkup:
-    """Create keyboard with Mini App button"""
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(
-            text="🎵 Открыть плеер",
-            web_app=WebAppInfo(url=settings.webapp_url)
-        )]
-    ])
 
 
 @router.callback_query(F.data.startswith("delete_track:"))

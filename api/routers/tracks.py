@@ -8,7 +8,6 @@ from typing import Optional, List
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from pydantic import BaseModel
 from sqlalchemy import select, func, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -20,8 +19,21 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from shared.database import get_db
 from shared.models import Track, UserLibrary, User
 from shared.config import get_settings
+from shared.utils import sanitize_input
 
-from .auth import get_current_user, TelegramUser
+from .auth import get_current_user
+from api.schemas import (
+    TelegramUser,
+    TrackBase,
+    TrackUpdate,
+    TrackResponse,
+    TracksListResponse,
+    UploaderInfo,
+    ForwardSourceInfo,
+    UserStatsResponse,
+    ArtistAlbumInfo,
+    ArtistDetailResponse,
+)
 
 
 router = APIRouter()
@@ -29,79 +41,6 @@ settings = get_settings()
 
 # Cache for artist images
 _artist_image_cache: dict[str, str] = {}
-
-
-def sanitize_input(value: str) -> str:
-    """Sanitize input to prevent SQL injection"""
-    if not value:
-        return ""
-    value = value.replace('%', r'\%').replace('_', r'\_')
-    return value[:200].strip()
-
-
-# Pydantic models
-class TrackBase(BaseModel):
-    title: Optional[str] = None
-    artist: Optional[str] = None
-    album: Optional[str] = None
-    genre: Optional[str] = None
-
-
-class UploaderInfo(BaseModel):
-    """Info about who uploaded the track"""
-    id: int
-    username: Optional[str] = None
-    first_name: Optional[str] = None
-    
-    class Config:
-        from_attributes = True
-
-
-class ForwardSourceInfo(BaseModel):
-    """Info about from whom the track was forwarded"""
-    forward_from_id: Optional[int] = None
-    forward_from_username: Optional[str] = None
-    forward_from_name: Optional[str] = None
-    forward_from_type: Optional[str] = None  # user, bot, channel
-    
-    class Config:
-        from_attributes = True
-
-
-class TrackResponse(TrackBase):
-    id: int
-    file_id: str
-    duration: Optional[int] = None
-    file_size: Optional[int] = None
-    mime_type: Optional[str] = None
-    cover_url: Optional[str] = None
-    enrichment_status: Optional[str] = None
-    is_liked: bool = False
-    is_unavailable: bool = False
-    is_public: bool = True
-    play_count: int = 0  # Global play count
-    in_library: bool = False  # Is in current user's library
-    uploader: Optional[UploaderInfo] = None  # Who uploaded
-    forward_source: Optional[ForwardSourceInfo] = None  # Forwarded from
-    created_at: datetime
-    
-    class Config:
-        from_attributes = True
-
-
-class TrackUpdate(BaseModel):
-    title: Optional[str] = None
-    artist: Optional[str] = None
-    album: Optional[str] = None
-    genre: Optional[str] = None
-    is_public: Optional[bool] = None
-
-
-class TracksListResponse(BaseModel):
-    items: List[TrackResponse]
-    total: int
-    page: int
-    per_page: int
 
 
 def track_to_response(track: Track, user_library: Optional[UserLibrary] = None, user_id: int = None) -> TrackResponse:
@@ -427,18 +366,6 @@ async def get_global_stats(
     }
 
 
-class UserStatsResponse(BaseModel):
-    """User statistics for the global library"""
-    id: int
-    username: Optional[str] = None
-    first_name: Optional[str] = None
-    track_count: int = 0
-    total_plays: int = 0
-    
-    class Config:
-        from_attributes = True
-
-
 @router.get("/global/users", response_model=List[UserStatsResponse])
 async def get_top_users(
     limit: int = Query(20, ge=1, le=50),
@@ -732,29 +659,6 @@ async def get_artist_image(
     track_cover = result.scalar_one_or_none()
     
     return {"artist": artist_name, "image_url": track_cover}
-
-
-class ArtistAlbumInfo(BaseModel):
-    """Album info for artist card"""
-    id: int
-    name: str
-    cover_url: Optional[str] = None
-    track_count: int = 0
-    release_date: Optional[str] = None  # YYYY-MM-DD format
-    
-    class Config:
-        from_attributes = True
-
-
-class ArtistDetailResponse(BaseModel):
-    """Detailed artist info with tracks, albums and playlists"""
-    name: str
-    image_url: Optional[str] = None
-    track_count: int = 0
-    total_plays: int = 0
-    tracks: List[TrackResponse] = []
-    albums: List[ArtistAlbumInfo] = []
-    playlists: List[ArtistAlbumInfo] = []  # Playlists containing this artist
 
 
 @router.get("/artist/{artist_name:path}")

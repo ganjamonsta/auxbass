@@ -11,7 +11,7 @@
         <span class="stat-label">пользователей</span>
       </div>
       <div class="stat-item">
-        <span class="stat-value">{{ formatPlays(library.globalStats.total_plays) }}</span>
+        <span class="stat-value">{{ formatPlayCount(library.globalStats.total_plays) }}</span>
         <span class="stat-label">прослушиваний</span>
       </div>
     </div>
@@ -71,7 +71,7 @@
               <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M8 5v14l11-7z"/>
               </svg>
-              {{ formatPlays(track.play_count) }}
+              {{ formatPlayCount(track.play_count) }}
             </div>
           </div>
           <div class="feed-card-title">{{ track.title || 'Без названия' }}</div>
@@ -101,7 +101,7 @@
             <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
               <path d="M8 5v14l11-7z"/>
             </svg>
-            {{ formatPlays(user.total_plays) }}
+            {{ formatPlayCount(user.total_plays) }}
           </div>
         </div>
         <div class="scroll-spacer"></div>
@@ -124,7 +124,7 @@
           <p v-if="library.selectedUser.username">@{{ library.selectedUser.username }}</p>
           <p class="user-stats">
             {{ library.selectedUser.track_count || library.selectedUserTracks.length }} треков • 
-            {{ formatPlays(library.selectedUser.total_plays || 0) }} прослушиваний
+            {{ formatPlayCount(library.selectedUser.total_plays || 0) }} прослушиваний
           </p>
         </div>
       </div>
@@ -243,19 +243,12 @@
 <script setup>
 import { onMounted, inject } from 'vue'
 import { useLibraryStore } from '../stores/library'
+import { formatPlayCount } from '@/utils'
 
 const library = useLibraryStore()
 const telegram = inject('telegram')
 
 const emit = defineEmits(['play'])
-
-// Format play counts
-const formatPlays = (count) => {
-  if (!count) return '0'
-  if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`
-  if (count >= 1000) return `${(count / 1000).toFixed(1)}K`
-  return count.toString()
-}
 
 // Get cover style
 const getCoverStyle = (track) => {

@@ -119,7 +119,7 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
           <path d="M8 5v14l11-7z"/>
         </svg>
-        <span>{{ formatPlays(track?.play_count || 0) }} прослушиваний</span>
+        <span>{{ formatPlayCount(track?.play_count || 0) }} прослушиваний</span>
       </div>
       <div v-if="track?.duration" class="stat-item">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -162,6 +162,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { formatDuration, formatPlayCount, getTrackCoverStyle, getTrackInitials } from '@/utils'
 
 const props = defineProps({
   track: Object,
@@ -171,36 +172,9 @@ const props = defineProps({
 
 defineEmits(['goToArtist', 'goToAlbum', 'goToUser', 'like', 'menu'])
 
-// Cover gradient from title
-const coverGradient = computed(() => {
-  const title = props.track?.title || 'Music'
-  const artist = props.track?.artist || ''
-  
-  const str = title + artist
-  let hash = 0
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  
-  const hue1 = Math.abs(hash % 360)
-  const hue2 = (hue1 + 40) % 360
-  
-  return `linear-gradient(135deg, hsl(${hue1}, 60%, 40%) 0%, hsl(${hue2}, 50%, 30%) 100%)`
-})
+const coverStyle = computed(() => getTrackCoverStyle(props.track || {}))
 
-const coverStyle = computed(() => {
-  if (props.track?.cover_url) return {}
-  return { background: coverGradient.value }
-})
-
-const coverInitials = computed(() => {
-  const title = props.track?.title || 'M'
-  const words = title.split(' ').filter(w => w.length > 0)
-  if (words.length >= 2) {
-    return (words[0][0] + words[1][0]).toUpperCase()
-  }
-  return title.substring(0, 2).toUpperCase()
-})
+const coverInitials = computed(() => getTrackInitials(props.track || {}))
 
 // Uploader name
 const uploaderName = computed(() => {
@@ -221,20 +195,6 @@ const forwardSourceUrl = computed(() => {
   if (!fs?.forward_from_username) return '#'
   return `https://t.me/${fs.forward_from_username}`
 })
-
-// Format helpers
-const formatPlays = (count) => {
-  if (count >= 1000000) return (count / 1000000).toFixed(1) + 'M'
-  if (count >= 1000) return (count / 1000).toFixed(1) + 'K'
-  return count.toString()
-}
-
-const formatDuration = (seconds) => {
-  if (!seconds) return '--:--'
-  const mins = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return `${mins}:${secs.toString().padStart(2, '0')}`
-}
 </script>
 
 <style scoped>

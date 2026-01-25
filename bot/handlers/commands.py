@@ -4,7 +4,7 @@ TG Player Bot - Command Handlers
 import re
 from aiogram import Router
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from sqlalchemy import select, func
@@ -19,6 +19,7 @@ from shared.database import get_session
 from shared.models import User, Track, Playlist
 
 from services.session import session_manager
+from utils.keyboards import get_webapp_keyboard
 
 
 router = Router()
@@ -29,16 +30,6 @@ class PlaylistStates(StatesGroup):
     """FSM states for playlist creation"""
     waiting_for_name = State()
     waiting_for_rename = State()  # For renaming playlist
-
-
-def get_webapp_keyboard() -> InlineKeyboardMarkup:
-    """Create keyboard with Mini App button"""
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(
-            text="🎵 Открыть плеер",
-            web_app=WebAppInfo(url=settings.webapp_url)
-        )]
-    ])
 
 
 @router.message(CommandStart())

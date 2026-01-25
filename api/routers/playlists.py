@@ -6,7 +6,6 @@ from datetime import datetime
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -18,8 +17,20 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from shared.database import get_db
 from shared.models import Playlist, PlaylistTrack, Track, UserLibrary
 
-from .auth import get_current_user, TelegramUser
-from .tracks import TrackResponse, track_to_response
+from .auth import get_current_user
+from .tracks import track_to_response
+from api.schemas import (
+    TelegramUser,
+    TrackResponse,
+    PlaylistBase,
+    PlaylistCreate,
+    PlaylistUpdate,
+    PlaylistResponse,
+    PlaylistWithTracksResponse,
+    AddTrackRequest,
+    AlbumCandidateResponse,
+    AssembleAlbumsResponse,
+)
 
 
 router = APIRouter()
@@ -44,49 +55,6 @@ async def get_playlist_track_covers(db: AsyncSession, playlist_id: int, limit: i
             if len(unique_covers) >= limit:
                 break
     return unique_covers
-
-
-# Pydantic models
-class PlaylistBase(BaseModel):
-    name: str
-    description: Optional[str] = None
-
-
-class PlaylistCreate(PlaylistBase):
-    pass
-
-
-class PlaylistUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-
-
-class PlaylistResponse(PlaylistBase):
-    id: int
-    is_public: bool
-    is_auto_album: bool = False
-    is_auto_source: bool = False
-    source_id: Optional[int] = None
-    source_type: Optional[str] = None
-    album_artist: Optional[str] = None  # Artist for album playlists
-    cover_url: Optional[str] = None
-    track_covers: List[str] = []  # Up to 4 unique track cover URLs for collage
-    share_code: Optional[str]
-    track_count: int = 0
-    total_duration: int = 0
-    created_at: datetime
-    
-    class Config:
-        from_attributes = True
-
-
-class PlaylistWithTracksResponse(PlaylistResponse):
-    tracks: List[TrackResponse]
-
-
-class AddTrackRequest(BaseModel):
-    track_id: int
-    position: Optional[int] = None
 
 
 @router.get("/sources", response_model=List[PlaylistResponse])
@@ -537,15 +505,6 @@ async def get_albums(
     return response
 
 
-class AlbumCandidateResponse(BaseModel):
-    artist: str
-    album: str
-    track_count: int
-    total_duration: int
-    cover_url: Optional[str] = None
-    has_playlist: bool = False
-
-
 @router.get("/albums/candidates", response_model=List[AlbumCandidateResponse])
 async def get_album_candidates(
     user: TelegramUser = Depends(get_current_user),
@@ -585,13 +544,6 @@ async def get_album_candidates(
         ))
     
     return response
-
-
-class AssembleAlbumsResponse(BaseModel):
-    created: int
-    updated: int
-    skipped: int
-    albums: List[dict]
 
 
 @router.post("/albums/assemble", response_model=AssembleAlbumsResponse)

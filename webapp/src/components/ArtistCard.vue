@@ -14,7 +14,7 @@
       <div class="artist-info">
         <h1 class="artist-name">{{ artist.name }}</h1>
         <p class="artist-stats">
-          {{ artist.track_count }} треков • {{ formatPlays(artist.total_plays) }}
+          {{ artist.track_count }} треков • {{ formatPlayCount(artist.total_plays) }}
         </p>
       </div>
       <button class="play-all-btn" @click="playAll" v-if="artist.tracks?.length">
@@ -97,6 +97,7 @@
 <script setup>
 import { computed } from 'vue'
 import TrackItem from './TrackItem.vue'
+import { formatPlayCount } from '@/utils'
 
 const props = defineProps({
   artist: {
@@ -155,13 +156,6 @@ const formatReleaseYear = (dateStr) => {
   if (!dateStr) return ''
   // dateStr is in YYYY-MM-DD format
   return dateStr.split('-')[0]
-}
-
-const formatPlays = (count) => {
-  if (!count) return '0 прослушиваний'
-  if (count === 1) return '1 прослушивание'
-  if (count < 5) return `${count} прослушивания`
-  return `${count} прослушиваний`
 }
 
 const playAll = () => {

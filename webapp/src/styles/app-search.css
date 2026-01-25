@@ -1,0 +1,159 @@
+/* ================================
+   Search Results Styles
+   ================================ */
+
+.search-results {
+  padding: 0 4px;
+}
+
+.search-section {
+  margin-bottom: 20px;
+}
+
+.search-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--spotify-text-muted);
+  padding: 12px 12px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.search-artists-list,
+.search-albums-list,
+.search-playlists-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.search-artist-item,
+.search-album-item,
+.search-playlist-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--xm-bg-card);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.search-artist-item:active,
+.search-album-item:active,
+.search-playlist-item:active {
+  transform: scale(0.98);
+  opacity: 0.8;
+}
+
+.search-artist-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--spotify-gray) 0%, var(--spotify-gray-dark) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.search-artist-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-initials {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--spotify-text-muted);
+}
+
+.search-artist-info,
+.search-album-info,
+.search-playlist-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.search-artist-name,
+.search-album-name,
+.search-playlist-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--spotify-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-artist-count,
+.search-album-artist,
+.search-playlist-count {
+  font-size: 13px;
+  color: var(--spotify-text-muted);
+}
+
+.search-album-cover,
+.search-playlist-cover {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--spotify-gray) 0%, var(--spotify-gray-dark) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.search-album-cover img,
+.search-playlist-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.search-item-arrow {
+  flex-shrink: 0;
+  color: var(--spotify-text-muted);
+  opacity: 0.5;
+}
+
+/* Scope toggle */
+.scope-toggle {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--spotify-black);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.scope-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 20px;
+  background: var(--spotify-gray);
+  color: var(--spotify-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.scope-btn.active {
+  background: var(--spotify-green);
+  color: black;
+}
+
+.scope-btn:active {
+  transform: scale(0.97);
+}

@@ -3,7 +3,7 @@ TG Player Bot - Audio Handler
 Supports global shared library with deduplication
 """
 from aiogram import Router, F
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from aiogram.types import Message
 from sqlalchemy import select, and_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
@@ -15,8 +15,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from shared.config import get_settings
 from shared.database import get_session
 from shared.models import User, Track, Playlist, PlaylistTrack, UserLibrary
+from shared.utils import format_duration
 
 from services.session import session_manager
+from utils.keyboards import get_track_keyboard, get_playlist_mode_keyboard, get_duplicate_keyboard
 
 
 def extract_forward_info(message: Message) -> dict:
@@ -142,71 +144,6 @@ async def add_track_to_playlist(session, playlist: Playlist, track_id: int) -> b
 
 router = Router()
 settings = get_settings()
-
-
-# NOTE: validate_file_id removed - it was redundant
-# When Telegram sends us an audio message, the file is guaranteed to be accessible
-# The file_id comes directly from Telegram in the same message
-# Validation only makes sense when playing old tracks (handled in API layer)
-
-
-def get_track_keyboard(track_id: int) -> InlineKeyboardMarkup:
-    """Create keyboard for track message"""
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(
-            text="🎵 Открыть плеер",
-            web_app=WebAppInfo(url=settings.webapp_url)
-        )],
-        [InlineKeyboardButton(
-            text="📥 Скачать",
-            callback_data=f"download_track:{track_id}"
-        )],
-        [InlineKeyboardButton(
-            text="❌ Удалить из библиотеки",
-            callback_data=f"delete_track:{track_id}"
-        )]
-    ])
-
-
-def get_playlist_mode_keyboard(track_count: int) -> InlineKeyboardMarkup:
-    """Create keyboard for playlist creation mode"""
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(
-                text=f"✓ Завершить ({track_count} треков)" if track_count > 0 else "✓ Завершить",
-                callback_data="playlist:finish"
-            ),
-            InlineKeyboardButton(
-                text="✗ Отменить",
-                callback_data="playlist:cancel"
-            )
-        ]
-    ])
-
-
-def get_duplicate_keyboard(existing_track_id: int) -> InlineKeyboardMarkup:
-    """Create keyboard for duplicate track confirmation"""
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(
-                text="✓ Добавить в плейлист",
-                callback_data=f"playlist:add_existing:{existing_track_id}"
-            ),
-            InlineKeyboardButton(
-                text="✗ Пропустить",
-                callback_data="playlist:skip_duplicate"
-            )
-        ]
-    ])
-
-
-def format_duration(seconds: int | None) -> str:
-    """Format duration in seconds to MM:SS"""
-    if not seconds:
-        return "—"
-    minutes = seconds // 60
-    secs = seconds % 60
-    return f"{minutes}:{secs:02d}"
 
 
 @router.message(F.audio)

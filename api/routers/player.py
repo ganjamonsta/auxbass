@@ -12,7 +12,6 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Header, Response
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import aiohttp
@@ -25,7 +24,8 @@ from shared.config import get_settings
 from shared.database import get_db
 from shared.models import Track, UserLibrary
 
-from .auth import get_current_user, TelegramUser
+from .auth import get_current_user
+from api.schemas import TelegramUser, StreamUrlResponse, DownloadPlaylistRequest
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -74,12 +74,6 @@ FILE_PATH_CACHE_TTL = 3000  # 50 minutes
 # file_path is cached to avoid second Telegram API call when streaming
 _stream_tokens: dict[str, tuple[int, int, str, float]] = {}
 STREAM_TOKEN_TTL = 300  # 5 minutes for token validity
-
-
-class StreamUrlResponse(BaseModel):
-    url: str  # Now returns proxy URL, not Telegram URL
-    expires_at: int
-    track_id: int
 
 
 def generate_stream_token(track_id: int, user_id: int, file_path: str) -> str:
@@ -576,11 +570,6 @@ async def download_track(
     except aiohttp.ClientError as e:
         logger.error(f"HTTP error sending audio: {e}")
         raise HTTPException(status_code=503, detail="Failed to send audio")
-
-
-class DownloadPlaylistRequest(BaseModel):
-    track_ids: list[int]
-    playlist_name: str = "Плейлист"
 
 
 @router.post("/download-playlist")
