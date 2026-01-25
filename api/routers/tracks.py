@@ -630,14 +630,10 @@ async def get_artist_image(
     # Set cache headers - cache for 24 hours (artist images rarely change)
     response.headers["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=604800"
     
-    # First try Last.fm
-    image_url = await fetch_artist_image(artist_name)
+    safe_artist = artist_name.lower().strip()
     
-    if image_url and "2a96cbd8b46e442fc41c2b86b821562f" not in image_url:
-        return {"artist": artist_name, "image_url": image_url}
-    
-    # Try to get cover from newest album (by release_date) for this artist
-    # Get user's auto-album playlists with release_date, sorted by date
+    # Priority 1: Get cover from newest album (by release_date) for this artist
+    # This provides consistent look with artist card view
     album_result = await db.execute(
         select(Playlist)
         .where(Playlist.user_id == user.id)
@@ -649,14 +645,17 @@ async def get_artist_image(
     all_albums = album_result.scalars().all()
     
     # Find albums for this artist (check album_artist)
-    safe_artist = artist_name.lower().strip()
     for album in all_albums:
-        # Check album_artist
         if album.album_artist and safe_artist in album.album_artist.lower():
             if album.cover_url:
                 return {"artist": artist_name, "image_url": album.cover_url}
     
-    # Fallback: get cover from most popular track
+    # Priority 2: Try Last.fm as fallback
+    image_url = await fetch_artist_image(artist_name)
+    if image_url and "2a96cbd8b46e442fc41c2b86b821562f" not in image_url:
+        return {"artist": artist_name, "image_url": image_url}
+    
+    # Priority 3: Get cover from most popular track
     result = await db.execute(
         select(Track.cover_url)
         .where(Track.artist.ilike(f"%{artist_name}%"))
@@ -825,10 +824,10 @@ async def get_artist_detail(
     # Sort albums by release date (newest first), albums without date go to the end
     def album_sort_key(album):
         if album.release_date:
-            # Has date - return negative tuple so newer dates come first
-            # Date format YYYY-MM-DD, so string comparison works
-            return (0, album.release_date)
-        return (1, "0000-00-00")  # No date, put at end
+            # Has date - higher priority (1), newer dates should come first
+            # With reverse=True, (1, "2024") > (1, "2020") so newer first
+            return (1, album.release_date)
+        return (0, "0000-00-00")  # No date, lower priority - put at end
     
     albums.sort(key=album_sort_key, reverse=True)
     
