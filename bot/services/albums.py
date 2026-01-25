@@ -616,12 +616,13 @@ class AlbumAssemblyService:
         Get all user's tracks for a specific album.
         Uses smart matching:
         1. By deezer_album_id (most reliable, handles compilations)
-        2. By normalized album name (handles D&G vs D & G, etc.)
+        2. By normalized album name + artist check (for non-Deezer tracks)
         
-        Does NOT require artist match - albums can have multiple artists (compilations).
+        Artist matching prevents wrong tracks from being added to albums.
         Deduplicates by title to avoid duplicate tracks from different sources.
         """
         album_norm = album_norm or normalize_album_name(album)
+        artist_norm = normalize_artist_for_grouping(artist) if artist else ""
         
         async with get_session() as session:
             # Get all tracks from user's library with album info
@@ -635,24 +636,30 @@ class AlbumAssemblyService:
                 )
             )
             
-            # Filter by deezer_album_id OR normalized album name
+            # Filter by deezer_album_id OR (normalized album name + artist)
             all_tracks = []
             for t in result.scalars().all():
                 track_album_norm = normalize_album_name(t.album) if t.album else ""
+                track_artist_norm = normalize_artist_for_grouping(t.artist) if t.artist else ""
                 
-                # Match by deezer_album_id (primary) or normalized album name
+                # Match by deezer_album_id (primary) or normalized album name + artist
                 if deezer_album_id:
                     # If we're looking for a specific deezer_album_id:
-                    # - Include tracks WITH that deezer_album_id
-                    # - Also include tracks WITHOUT deezer_album_id but with matching album name
+                    # - Include tracks WITH that exact deezer_album_id (trusted source)
+                    # - Also include tracks WITHOUT deezer_album_id but with matching album AND artist
                     if t.deezer_album_id == deezer_album_id:
                         all_tracks.append(t)
                     elif not t.deezer_album_id and track_album_norm == album_norm:
-                        all_tracks.append(t)
+                        # For tracks without deezer_album_id, also check artist match
+                        # This prevents "D.O.A" from Cold Visions appearing in "Exeter"
+                        if not artist_norm or track_artist_norm == artist_norm:
+                            all_tracks.append(t)
                 else:
-                    # No deezer_album_id - match by normalized album name only
+                    # No deezer_album_id - match by normalized album name AND artist
                     if track_album_norm == album_norm:
-                        all_tracks.append(t)
+                        # Check artist matches (or artist is empty/compilation)
+                        if not artist_norm or track_artist_norm == artist_norm:
+                            all_tracks.append(t)
             
             # Deduplicate by title using normalized matching
             # Keep the track with cover_url or higher quality metadata

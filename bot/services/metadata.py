@@ -138,8 +138,12 @@ class MetadataService:
         artist = ' '.join(artist.split())
         return artist.strip()
     
-    def _artist_matches(self, source_artist: str, deezer_artist: str, threshold: float = 0.6) -> bool:
-        """Check if two artist names match (fuzzy comparison)"""
+    def _artist_matches(self, source_artist: str, deezer_artist: str, threshold: float = 0.75) -> bool:
+        """Check if two artist names match (fuzzy comparison)
+        
+        threshold increased from 0.6 to 0.75 to prevent false matches
+        like "Bladee" matching "Blade" or unrelated artists
+        """
         norm_source = self._normalize_artist(source_artist)
         norm_deezer = self._normalize_artist(deezer_artist)
         
