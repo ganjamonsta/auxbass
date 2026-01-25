@@ -473,6 +473,73 @@ class MetadataService:
             logger.debug(f"Last.fm lookup failed: {e}")
             return None
     
+    async def _get_lastfm_album_release_date(
+        self, artist: str, album: str, api_key: str, session
+    ) -> Optional[str]:
+        """
+        Get album release date from Last.fm album.getInfo API.
+        Returns date in YYYY-MM-DD format or None.
+        """
+        await self._rate_limit()
+        
+        try:
+            params = {
+                "method": "album.getInfo",
+                "api_key": api_key,
+                "artist": artist,
+                "album": album,
+                "format": "json"
+            }
+            
+            async with session.get(
+                "https://ws.audioscrobbler.com/2.0/",
+                params=params
+            ) as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.json()
+            
+            if "error" in data:
+                return None
+            
+            album_data = data.get("album", {})
+            # Last.fm returns "releasedate" like "6 Apr 1999, 00:00" or wiki.published
+            release_date_str = album_data.get("releasedate", "").strip()
+            
+            # Also check wiki.published as fallback
+            if not release_date_str:
+                wiki = album_data.get("wiki", {})
+                release_date_str = wiki.get("published", "").strip()
+            
+            if not release_date_str:
+                return None
+            
+            # Parse date - formats: "6 Apr 1999, 00:00" or "06 Apr 2020, 18:00"
+            try:
+                from datetime import datetime
+                # Remove time part if present
+                date_part = release_date_str.split(",")[0].strip()
+                
+                # Try parsing "6 Apr 1999" format
+                for fmt in ["%d %b %Y", "%d %B %Y", "%Y-%m-%d", "%Y"]:
+                    try:
+                        dt = datetime.strptime(date_part, fmt)
+                        return dt.strftime("%Y-%m-%d")
+                    except ValueError:
+                        continue
+                
+                # If just a year
+                if date_part.isdigit() and len(date_part) == 4:
+                    return f"{date_part}-01-01"
+                    
+                return None
+            except Exception:
+                return None
+                
+        except Exception as e:
+            logger.debug(f"Last.fm album.getInfo failed: {e}")
+            return None
+
     async def search_lastfm_track(self, title: str, artist: str) -> Optional[Dict]:
         """
         Search Last.fm for track info as fallback when Deezer fails.
@@ -560,6 +627,7 @@ class MetadataService:
             
             album = track_data.get("album", {})
             album_title = album.get("title") if album else None
+            album_artist = album.get("artist") if album else None
             
             # Get largest album image
             cover_url = None
@@ -583,12 +651,20 @@ class MetadataService:
                         genre = tag.get("name", "").title()
                         break
             
+            # Get release date from album.getInfo
+            release_date = None
+            if album_title and album_artist:
+                release_date = await self._get_lastfm_album_release_date(
+                    album_artist, album_title, settings.lastfm_api_key, session
+                )
+            
             return {
                 "title": track_data.get("name"),
                 "artist": track_data.get("artist", {}).get("name"),
                 "album": album_title,
                 "cover_url": cover_url,
                 "genre": genre,
+                "release_date": release_date,
                 "source": "lastfm",
             }
             
@@ -629,9 +705,10 @@ class MetadataService:
                 result["album"] = lastfm_data.get("album")
                 result["genre"] = lastfm_data.get("genre")
                 result["cover_url"] = lastfm_data.get("cover_url")
+                result["release_date"] = lastfm_data.get("release_date")
                 # No album_id from Last.fm - will group by album name
                 result["source"] = "lastfm"
-                logger.info(f"Enriched from Last.fm: {title} - {artist} -> album: {lastfm_data.get('album')}")
+                logger.info(f"Enriched from Last.fm: {title} - {artist} -> album: {lastfm_data.get('album')}, date: {lastfm_data.get('release_date')}")
         
         # If still no genre, try fallbacks
         if not result.get("genre"):

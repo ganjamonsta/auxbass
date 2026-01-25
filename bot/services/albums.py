@@ -750,6 +750,16 @@ class AlbumAssemblyService:
             if deezer_album_id:
                 release_date = await metadata_service.get_album_release_date(deezer_album_id)
             
+            # If no Deezer album ID, try to get release date from Last.fm
+            if not release_date and artist and album:
+                from shared.config import get_settings
+                settings = get_settings()
+                if settings.lastfm_api_key:
+                    release_date = await metadata_service._get_lastfm_album_release_date(
+                        artist, album, settings.lastfm_api_key, 
+                        await metadata_service._get_session()
+                    )
+            
             # Store album name only, artist is separate
             playlist = Playlist(
                 user_id=user_id,
@@ -833,14 +843,29 @@ class AlbumAssemblyService:
                 playlist.cover_url = cover_url
                 cover_updated = True
             
-            # Update release_date if not set and we have deezer_album_id
+            # Update release_date if not set
             release_date_updated = False
-            if not playlist.release_date and (deezer_album_id or playlist.deezer_album_id):
-                album_id = deezer_album_id or playlist.deezer_album_id
-                release_date = await metadata_service.get_album_release_date(album_id)
-                if release_date:
-                    playlist.release_date = release_date
-                    release_date_updated = True
+            if not playlist.release_date:
+                # Try Deezer first
+                if deezer_album_id or playlist.deezer_album_id:
+                    album_id = deezer_album_id or playlist.deezer_album_id
+                    release_date = await metadata_service.get_album_release_date(album_id)
+                    if release_date:
+                        playlist.release_date = release_date
+                        release_date_updated = True
+                
+                # If still no release date, try Last.fm
+                if not release_date_updated and playlist.album_artist and playlist.name:
+                    from shared.config import get_settings
+                    settings = get_settings()
+                    if settings.lastfm_api_key:
+                        release_date = await metadata_service._get_lastfm_album_release_date(
+                            playlist.album_artist, playlist.name, settings.lastfm_api_key,
+                            await metadata_service._get_session()
+                        )
+                        if release_date:
+                            playlist.release_date = release_date
+                            release_date_updated = True
             
             # Get existing track IDs in playlist
             result = await session.execute(
