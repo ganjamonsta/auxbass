@@ -7,6 +7,7 @@ import asyncio
 import logging
 import re
 import time
+import unicodedata
 from typing import Optional, Dict, List
 import aiohttp
 
@@ -87,13 +88,36 @@ class MetadataService:
             await self._session.close()
     
     def _clean_string(self, s: str) -> str:
-        """Clean string for search query"""
+        """
+        Clean string for search query.
+        Handles common patterns in user-uploaded tracks:
+        - "Track Name prod. Producer" -> "Track Name"
+        - "Track (feat. Artist)" -> "Track"
+        - "Backstr€€t Boys" -> "Backstreet Boys"
+        - "guardianAngels((NO2))" -> "guardianAngels"
+        """
         if not s:
             return ""
-        # Remove content in parentheses/brackets
-        s = re.sub(r'\s*[\(\[].*?[\)\]]', '', s)
-        # Remove feat., ft., prod., etc. and everything after
-        s = re.sub(r'\s*(feat\.?|ft\.?|featuring|vs\.?|prod\.?|produced\s+by)\s+.*', '', s, flags=re.IGNORECASE)
+        
+        # Normalize unicode and common character substitutions
+        s = unicodedata.normalize('NFKD', s)
+        s = s.replace('€', 'e').replace('$', 's').replace('@', 'a')
+        s = s.replace(''', "'").replace(''', "'").replace('`', "'")
+        
+        # Remove content in parentheses/brackets (including nested)
+        # Do multiple passes to handle ((nested)) brackets
+        for _ in range(3):
+            s = re.sub(r'\s*[\(\[][^\(\)\[\]]*[\)\]]', '', s)
+        
+        # Remove "prod.", "produced by", etc. and everything after
+        s = re.sub(r'\s*(prod\.?|produced\s+by)\s+.*$', '', s, flags=re.IGNORECASE)
+        
+        # Remove "feat.", "ft.", "featuring", "vs." and everything after
+        s = re.sub(r'\s*(feat\.?|ft\.?|featuring|vs\.?)\s+.*$', '', s, flags=re.IGNORECASE)
+        
+        # Remove trailing special characters
+        s = re.sub(r'[\s\-_\.,;:]+$', '', s)
+        
         return s.strip()
     
     def _normalize_artist(self, artist: str) -> str:
