@@ -13,6 +13,7 @@ This script:
 1. Finds tracks where album name = track title (likely wrong singles)
 2. Finds tracks with suspicious album names (known bad patterns)
 3. Resets their enrichment status to "pending" for re-processing
+4. Optionally triggers album reassembly
 """
 import asyncio
 import sys
@@ -20,9 +21,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from sqlalchemy import select, update, func
+from sqlalchemy import select, update, func, distinct
 from shared.database import get_session
 from shared.models import Track, Playlist, PlaylistTrack
+from bot.services.albums import normalize_album_name, normalize_title
 
 
 # Known bad album patterns that indicate wrong enrichment
@@ -56,9 +58,9 @@ async def find_single_like_albums():
         single_like = []
         for track in tracks:
             if track.album and track.title:
-                # Normalize for comparison
-                album_norm = track.album.lower().strip()
-                title_norm = track.title.lower().strip()
+                # Use proper normalization for comparison
+                album_norm = normalize_title(track.album)
+                title_norm = normalize_title(track.title)
                 
                 if album_norm == title_norm:
                     single_like.append(track)
@@ -198,6 +200,27 @@ async def main():
     print("=" * 60)
     print(f"\nTracks will be re-enriched automatically by the bot.")
     print(f"Albums will be re-assembled after enrichment completes.")
+    
+    # Optionally trigger album reassembly now
+    reassemble = input("\nReassemble albums now? [y/N]: ").strip().lower()
+    if reassemble == 'y':
+        print("\nReassembling albums...")
+        from bot.services.albums import album_service
+        
+        async with get_session() as session:
+            result = await session.execute(
+                select(distinct(Track.user_id))
+            )
+            user_ids = [row[0] for row in result.all()]
+        
+        for user_id in user_ids:
+            try:
+                stats = await album_service.assemble_albums_for_user(user_id)
+                print(f"  User {user_id}: created={stats['created']}, updated={stats['updated']}, merged={stats.get('merged', 0)}")
+            except Exception as e:
+                print(f"  User {user_id}: error - {e}")
+        
+        print("\n✓ Album reassembly complete!")
 
 
 if __name__ == "__main__":

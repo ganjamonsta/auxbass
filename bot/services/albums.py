@@ -48,6 +48,64 @@ def normalize_artist_for_grouping(artist: str) -> str:
     return artist.strip()
 
 
+def normalize_album_name(album: str) -> str:
+    """
+    Normalize album name for comparison/grouping.
+    PRESERVES important suffixes like (Deluxe), (Remastered), etc.
+    
+    Examples:
+    - "D&G" -> "dg"
+    - "D & G" -> "dg"  
+    - "Warlord (Deluxe)" -> "warlord deluxe"
+    - " ICEDANCER " -> "icedancer"
+    """
+    if not album:
+        return ""
+    
+    # Normalize unicode
+    album = unicodedata.normalize('NFKD', album)
+    album = album.lower().strip()
+    
+    # Extract important suffixes BEFORE cleaning
+    # These make albums distinct (Deluxe vs regular)
+    important_suffixes = []
+    suffix_patterns = [
+        r'\(deluxe[^)]*\)',
+        r'\(remaster(?:ed)?[^)]*\)',
+        r'\(expanded[^)]*\)',
+        r'\(anniversary[^)]*\)',
+        r'\(bonus[^)]*\)',
+        r'\[deluxe[^\]]*\]',
+        r'\[remaster(?:ed)?[^\]]*\]',
+    ]
+    for pattern in suffix_patterns:
+        match = re.search(pattern, album, re.IGNORECASE)
+        if match:
+            # Extract just the key word
+            suffix = re.sub(r'[\(\)\[\]]', '', match.group()).strip()
+            suffix = suffix.split()[0]  # Take first word: "deluxe edition" -> "deluxe"
+            important_suffixes.append(suffix)
+    
+    # Remove ALL content in parentheses/brackets for base comparison
+    album = re.sub(r'\s*[\(\[][^\)\]]*[\)\]]', '', album)
+    
+    # Replace & with nothing (D&G = DG)
+    album = album.replace('&', '')
+    album = album.replace('$', 's')
+    
+    # Remove special characters but keep letters and numbers
+    album = re.sub(r'[^\w\s]', '', album)
+    
+    # Normalize whitespace
+    album = ' '.join(album.split())
+    
+    # Add back important suffixes
+    if important_suffixes:
+        album = album + ' ' + ' '.join(sorted(important_suffixes))
+    
+    return album.strip()
+
+
 def normalize_title(title: str) -> str:
     """
     Normalize track title for comparison.
@@ -179,10 +237,17 @@ class AlbumAssemblyService:
     
     async def get_album_candidates(self, user_id: int) -> List[Dict]:
         """
-        Find potential albums from user's tracks.
-        Groups primarily by deezer_album_id (if available), otherwise by 
-        (normalized album name + normalized main artist).
-        This properly handles compilations where each track has different artists.
+        Find potential albums from user's tracks using smart two-phase grouping.
+        
+        Phase 1: Group by deezer_album_id (most reliable for compilations)
+        Phase 2: Merge groups without deezer_album_id into groups that have it,
+                 if the normalized album name matches
+        
+        This handles cases like:
+        - Some tracks of D&G have deezer_album_id, some don't -> merged into one
+        - Different artist spellings (BLADEE vs bladee) -> same album
+        - Collaborations with different artists per track -> one album
+        
         Returns list of album candidates with track counts.
         """
         async with get_session() as session:
@@ -198,26 +263,50 @@ class AlbumAssemblyService:
             )
             tracks = list(result.scalars().all())
             
-            # Group by deezer_album_id first (most reliable), then by album+artist
+            if not tracks:
+                return []
+            
+            # ===== PHASE 1: Initial grouping =====
+            # Group by deezer_album_id OR by normalized album name
             albums: Dict[str, Dict] = {}
             
+            # Track which normalized album names have deezer_album_id
+            # Key: normalized_album_name -> deezer_album_id (if any)
+            album_name_to_deezer_id: Dict[str, int] = {}
+            
             for track in tracks:
-                album_key = track.album.lower().strip()
-                artist_key = normalize_artist_for_grouping(track.artist) if track.artist else ""
+                album_norm = normalize_album_name(track.album)
                 
-                # Use deezer_album_id as primary key if available (handles compilations)
+                # Remember deezer_album_id for this album name
+                if track.deezer_album_id and album_norm:
+                    if album_norm not in album_name_to_deezer_id:
+                        album_name_to_deezer_id[album_norm] = track.deezer_album_id
+            
+            # Now group tracks - prefer deezer_album_id, but use lookup
+            for track in tracks:
+                album_norm = normalize_album_name(track.album)
+                
+                # Determine the grouping key
                 if track.deezer_album_id:
+                    # Has deezer_album_id - use it
                     key = f"deezer:{track.deezer_album_id}"
+                    effective_deezer_id = track.deezer_album_id
+                elif album_norm in album_name_to_deezer_id:
+                    # Doesn't have deezer_album_id, but another track with same 
+                    # album name does - merge into that group!
+                    effective_deezer_id = album_name_to_deezer_id[album_norm]
+                    key = f"deezer:{effective_deezer_id}"
                 else:
-                    # Fallback to album + artist
-                    key = f"album:{album_key}||{artist_key}"
+                    # No deezer_album_id anywhere - group by album name only
+                    # (NOT by artist - albums can have multiple artists)
+                    key = f"album:{album_norm}"
+                    effective_deezer_id = None
                 
                 if key not in albums:
                     albums[key] = {
-                        "album": track.album,
-                        "album_key": album_key,
-                        "artist_key": artist_key,
-                        "deezer_album_id": track.deezer_album_id,
+                        "album": track.album,  # Original name (first seen)
+                        "album_norm": album_norm,
+                        "deezer_album_id": effective_deezer_id,
                         "cover_url": track.cover_url,
                         "artists": set(),
                         "track_ids": set(),
@@ -226,7 +315,7 @@ class AlbumAssemblyService:
                 
                 album_data = albums[key]
                 
-                # Collect all artists (original names)
+                # Collect all artists (original names for display)
                 if track.artist:
                     album_data["artists"].add(track.artist)
                 
@@ -234,28 +323,58 @@ class AlbumAssemblyService:
                 album_data["track_ids"].add(track.id)
                 album_data["total_duration"] += track.duration or 0
                 
-                # Update cover_url if we don't have one
-                if not album_data["cover_url"] and track.cover_url:
-                    album_data["cover_url"] = track.cover_url
+                # Update cover_url if we don't have one (prefer enriched)
+                if track.cover_url:
+                    if not album_data["cover_url"]:
+                        album_data["cover_url"] = track.cover_url
+                    elif 'dzcdn.net' in track.cover_url and 'dzcdn.net' not in album_data["cover_url"]:
+                        # Prefer Deezer covers
+                        album_data["cover_url"] = track.cover_url
                 
                 # Update deezer_album_id if we don't have one
-                if not album_data["deezer_album_id"] and track.deezer_album_id:
+                if track.deezer_album_id and not album_data["deezer_album_id"]:
                     album_data["deezer_album_id"] = track.deezer_album_id
             
-            # Convert to list and filter by minimum tracks
+            # ===== PHASE 2: Merge remaining duplicates by normalized name =====
+            # This catches cases where tracks have DIFFERENT deezer_album_ids 
+            # but same album name (rare, but possible with remasters/re-releases)
+            # We'll keep them separate for now - deezer_album_id is authoritative
+            
+            # ===== PHASE 3: Build candidate list =====
             candidates = []
             for key, data in albums.items():
                 if len(data["track_ids"]) < self.MIN_TRACKS_FOR_ALBUM:
                     continue
                 
-                # Determine main artist (most common or first)
-                artists_list = sorted(data["artists"])
-                main_artist = artists_list[0] if artists_list else "Unknown"
+                # Determine main artist (most common among tracks)
+                artists_list = list(data["artists"])
+                if artists_list:
+                    # Normalize and count
+                    artist_counts: Dict[str, int] = {}
+                    for a in artists_list:
+                        norm = normalize_artist_for_grouping(a)
+                        artist_counts[norm] = artist_counts.get(norm, 0) + 1
+                    
+                    # Find most common normalized artist
+                    most_common_norm = max(artist_counts, key=artist_counts.get)
+                    
+                    # Get original form of most common artist
+                    main_artist = next(
+                        (a for a in artists_list if normalize_artist_for_grouping(a) == most_common_norm),
+                        artists_list[0]
+                    )
+                    
+                    # Sort artists for consistent display
+                    artists_list = sorted(set(artists_list))
+                else:
+                    main_artist = "Unknown"
+                    artists_list = []
                 
                 candidates.append({
                     "artist": main_artist,
                     "all_artists": artists_list,
                     "album": data["album"],
+                    "album_norm": data["album_norm"],
                     "deezer_album_id": data["deezer_album_id"],
                     "cover_url": data["cover_url"],
                     "track_count": len(data["track_ids"]),
@@ -306,12 +425,16 @@ class AlbumAssemblyService:
         user_id: int, 
         album: str,
         artist: str = "",
-        deezer_album_id: Optional[int] = None
+        deezer_album_id: Optional[int] = None,
+        album_norm: Optional[str] = None
     ) -> Optional[Playlist]:
         """
         Check if auto-album playlist already exists for this album.
-        First tries to match by deezer_album_id (most reliable),
-        then falls back to album name + artist matching.
+        Uses smart matching:
+        1. By deezer_album_id (most reliable)
+        2. By normalized album name (handles D&G vs D & G, etc.)
+        
+        Returns existing playlist or None.
         """
         async with get_session() as session:
             # Get all album playlists for user
@@ -323,59 +446,182 @@ class AlbumAssemblyService:
             )
             playlists = result.scalars().all()
             
+            if not playlists:
+                return None
+            
             # First: try exact match by deezer_album_id (most reliable)
             if deezer_album_id:
                 for pl in playlists:
                     if pl.deezer_album_id == deezer_album_id:
                         return pl
             
-            album_lower = album.lower().strip()
-            artist_key = normalize_artist_for_grouping(artist) if artist else ""
+            # Prepare normalized album name for matching
+            album_norm = album_norm or normalize_album_name(album)
             
-            # Second: match by album name and artist
+            # Second: match by NORMALIZED album name
             for pl in playlists:
                 if not pl.name:
                     continue
-                    
-                name_lower = pl.name.lower().strip()
-                pl_artist_key = normalize_artist_for_grouping(pl.album_artist) if pl.album_artist else ""
                 
-                # Check album name match
-                album_matches = (
-                    name_lower == album_lower or
-                    name_lower.endswith(f" — {album_lower}") or
-                    (" — " in pl.name and pl.name.split(" — ", 1)[1].lower().strip() == album_lower)
-                )
+                # Normalize playlist name for comparison
+                pl_album_norm = normalize_album_name(pl.name)
                 
-                if not album_matches:
-                    continue
-                
-                # If we have artist info, also check artist match
-                if artist_key and pl_artist_key:
-                    # Artists must match
-                    if artist_key == pl_artist_key or artist_key in pl_artist_key or pl_artist_key in artist_key:
-                        return pl
-                else:
-                    # No artist info - just album match is enough
+                if pl_album_norm == album_norm:
                     return pl
             
             return None
+    
+    async def find_duplicate_album_playlists(
+        self, 
+        user_id: int
+    ) -> List[List[Playlist]]:
+        """
+        Find groups of duplicate album playlists for a user.
+        Returns list of groups, where each group contains playlists 
+        that should be merged.
+        """
+        async with get_session() as session:
+            result = await session.execute(
+                select(Playlist).where(
+                    Playlist.user_id == user_id,
+                    Playlist.is_auto_album == True,
+                )
+            )
+            playlists = list(result.scalars().all())
+            
+            if len(playlists) < 2:
+                return []
+            
+            # Group by normalized album name and deezer_album_id
+            groups: Dict[str, List[Playlist]] = {}
+            
+            for pl in playlists:
+                # Generate key similar to track grouping
+                album_norm = normalize_album_name(pl.name) if pl.name else ""
+                
+                if pl.deezer_album_id:
+                    key = f"deezer:{pl.deezer_album_id}"
+                else:
+                    key = f"album:{album_norm}"
+                
+                if key not in groups:
+                    groups[key] = []
+                groups[key].append(pl)
+            
+            # Return only groups with duplicates
+            return [g for g in groups.values() if len(g) > 1]
+    
+    async def merge_duplicate_playlists(
+        self,
+        playlists: List[Playlist]
+    ) -> Optional[Playlist]:
+        """
+        Merge multiple duplicate playlists into one.
+        Keeps the playlist with best metadata (deezer_album_id, cover_url).
+        Moves all tracks to the survivor, removes duplicates.
+        """
+        if len(playlists) < 2:
+            return playlists[0] if playlists else None
+        
+        async with get_session() as session:
+            # Re-fetch playlists in this session
+            playlists = [await session.merge(pl) for pl in playlists]
+            
+            # Score each playlist to find the best one
+            def score_playlist(pl: Playlist) -> int:
+                return (
+                    (100 if pl.deezer_album_id else 0) +
+                    (50 if pl.cover_url and 'dzcdn.net' in pl.cover_url else 0) +
+                    (10 if pl.cover_url else 0) +
+                    (5 if pl.release_date else 0)
+                )
+            
+            # Sort by score descending
+            playlists.sort(key=score_playlist, reverse=True)
+            survivor = playlists[0]
+            to_merge = playlists[1:]
+            
+            logger.info(f"Merging {len(to_merge)} duplicate playlists into '{survivor.name}' (id={survivor.id})")
+            
+            # Get all track IDs from survivor
+            result = await session.execute(
+                select(PlaylistTrack.track_id)
+                .where(PlaylistTrack.playlist_id == survivor.id)
+            )
+            survivor_track_ids = {row[0] for row in result.all()}
+            
+            # Get max position in survivor
+            max_pos = await session.scalar(
+                select(func.max(PlaylistTrack.position))
+                .where(PlaylistTrack.playlist_id == survivor.id)
+            ) or 0
+            
+            # Merge tracks from other playlists
+            added_count = 0
+            for pl in to_merge:
+                result = await session.execute(
+                    select(PlaylistTrack)
+                    .where(PlaylistTrack.playlist_id == pl.id)
+                )
+                tracks = result.scalars().all()
+                
+                for pt in tracks:
+                    if pt.track_id not in survivor_track_ids:
+                        # Move track to survivor
+                        max_pos += 1
+                        new_pt = PlaylistTrack(
+                            playlist_id=survivor.id,
+                            track_id=pt.track_id,
+                            position=max_pos
+                        )
+                        session.add(new_pt)
+                        survivor_track_ids.add(pt.track_id)
+                        added_count += 1
+                
+                # Delete tracks from old playlist
+                await session.execute(
+                    delete(PlaylistTrack).where(PlaylistTrack.playlist_id == pl.id)
+                )
+                
+                # Delete the duplicate playlist
+                await session.delete(pl)
+            
+            # Update survivor metadata from merged playlists if better
+            for pl in to_merge:
+                if not survivor.deezer_album_id and pl.deezer_album_id:
+                    survivor.deezer_album_id = pl.deezer_album_id
+                if not survivor.cover_url and pl.cover_url:
+                    survivor.cover_url = pl.cover_url
+                if not survivor.release_date and pl.release_date:
+                    survivor.release_date = pl.release_date
+            
+            # Update description
+            total = len(survivor_track_ids)
+            survivor.description = f"Автоальбом • {total} треков"
+            
+            await session.commit()
+            
+            logger.info(f"Merged: kept '{survivor.name}', added {added_count} tracks, total {total}")
+            return survivor
     
     async def get_album_tracks(
         self, 
         user_id: int, 
         album: str,
         artist: str = "",
-        deezer_album_id: Optional[int] = None
+        deezer_album_id: Optional[int] = None,
+        album_norm: Optional[str] = None
     ) -> List[Track]:
         """
         Get all user's tracks for a specific album.
-        If deezer_album_id is provided, uses it for more accurate matching (handles compilations).
-        Otherwise groups by album name and artist (normalized).
+        Uses smart matching:
+        1. By deezer_album_id (most reliable, handles compilations)
+        2. By normalized album name (handles D&G vs D & G, etc.)
+        
+        Does NOT require artist match - albums can have multiple artists (compilations).
         Deduplicates by title to avoid duplicate tracks from different sources.
         """
-        album_lower = album.lower().strip()
-        artist_key = normalize_artist_for_grouping(artist) if artist else ""
+        album_norm = album_norm or normalize_album_name(album)
         
         async with get_session() as session:
             # Get all tracks from user's library with album info
@@ -389,24 +635,24 @@ class AlbumAssemblyService:
                 )
             )
             
-            # Filter by album name and optionally by deezer_album_id or artist
+            # Filter by deezer_album_id OR normalized album name
             all_tracks = []
             for t in result.scalars().all():
-                if not t.album or t.album.lower().strip() != album_lower:
-                    continue
+                track_album_norm = normalize_album_name(t.album) if t.album else ""
                 
-                # If we have deezer_album_id, prefer matching by it (handles compilations)
+                # Match by deezer_album_id (primary) or normalized album name
                 if deezer_album_id:
-                    # Include track if it has matching deezer_album_id OR no deezer_album_id set
-                    if t.deezer_album_id and t.deezer_album_id != deezer_album_id:
-                        continue
-                elif artist_key:
-                    # Fall back to artist matching
-                    track_artist_key = normalize_artist_for_grouping(t.artist) if t.artist else ""
-                    if track_artist_key != artist_key:
-                        continue
-                
-                all_tracks.append(t)
+                    # If we're looking for a specific deezer_album_id:
+                    # - Include tracks WITH that deezer_album_id
+                    # - Also include tracks WITHOUT deezer_album_id but with matching album name
+                    if t.deezer_album_id == deezer_album_id:
+                        all_tracks.append(t)
+                    elif not t.deezer_album_id and track_album_norm == album_norm:
+                        all_tracks.append(t)
+                else:
+                    # No deezer_album_id - match by normalized album name only
+                    if track_album_norm == album_norm:
+                        all_tracks.append(t)
             
             # Deduplicate by title using normalized matching
             # Keep the track with cover_url or higher quality metadata
@@ -700,23 +946,40 @@ class AlbumAssemblyService:
     async def assemble_albums_for_user(self, user_id: int) -> Dict:
         """
         Main method: find and create/update all album playlists for user.
-        Returns stats about created/updated albums.
+        
+        Steps:
+        1. Clean up empty album playlists
+        2. Merge duplicate playlists (D&G + D & G -> D&G)
+        3. Find album candidates from tracks
+        4. Create or update playlists
+        
+        Returns stats about created/updated/merged albums.
         """
         stats = {
             "created": 0,
             "updated": 0,
             "skipped": 0,
+            "merged": 0,
             "cleaned": 0,
             "albums": []
         }
         
-        # First, clean up empty album playlists
-        await self._cleanup_empty_albums(user_id)
+        # Step 1: Clean up empty album playlists
+        cleaned = await self._cleanup_empty_albums(user_id)
+        stats["cleaned"] = cleaned
         
+        # Step 2: Merge duplicate playlists BEFORE processing candidates
+        duplicate_groups = await self.find_duplicate_album_playlists(user_id)
+        for group in duplicate_groups:
+            await self.merge_duplicate_playlists(group)
+            stats["merged"] += len(group) - 1  # Count merged (not the survivor)
+        
+        # Step 3: Get album candidates
         candidates = await self.get_album_candidates(user_id)
         
         for candidate in candidates:
             album = candidate["album"]
+            album_norm = candidate.get("album_norm")
             deezer_album_id = candidate.get("deezer_album_id")
             cover_url = candidate.get("cover_url")
             all_artists = candidate.get("all_artists", [candidate.get("artist", "Unknown")])
@@ -730,14 +993,14 @@ class AlbumAssemblyService:
             else:
                 artist_display = all_artists[0] if all_artists else "Unknown"
             
-            # Check if playlist already exists (with artist matching)
+            # Check if playlist already exists (using smart matching)
             existing = await self.check_existing_album_playlist(
-                user_id, album, main_artist, deezer_album_id
+                user_id, album, main_artist, deezer_album_id, album_norm
             )
             
-            # Get all tracks for this album (with artist matching)
+            # Get all tracks for this album (using smart matching)
             tracks = await self.get_album_tracks(
-                user_id, album, main_artist, deezer_album_id
+                user_id, album, main_artist, deezer_album_id, album_norm
             )
             
             if existing:
