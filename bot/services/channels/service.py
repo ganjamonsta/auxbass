@@ -562,7 +562,7 @@ class ChannelService:
                             parse_mode="HTML",
                         )
                         
-                        # Save message record
+                        # Save message record IMMEDIATELY to prevent duplicates on restart
                         channel_message = ChannelMessage(
                             channel_id=channel.id,
                             track_id=track.id,
@@ -570,6 +570,7 @@ class ChannelService:
                             hashtags=json.dumps(hashtags) if hashtags else None,
                         )
                         session.add(channel_message)
+                        await session.commit()  # Commit after each track!
                         
                         stats["synced"] += 1
                         sent_count += 1
@@ -588,6 +589,7 @@ class ChannelService:
                     except TelegramForbiddenError:
                         channel.is_active = False
                         stats["failed"] += 1
+                        await session.commit()
                         break  # Stop sync if access lost
                         
                     except TelegramBadRequest as e:
@@ -596,7 +598,6 @@ class ChannelService:
                         sent_count += 1
                         continue
                 
-                await session.commit()
                 logger.info(f"Sync completed for user {user_id}: {stats}")
                 return stats
             finally:
