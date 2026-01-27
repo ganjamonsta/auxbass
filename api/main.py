@@ -23,6 +23,7 @@ from shared.database import init_db, close_db
 
 from api.routers import auth
 from api.routers.library import router as library_router
+from api.routers.tracks import router as tracks_router
 from api.routers.albums import router as albums_router
 from api.routers.artists import router as artists_router
 from api.routers.playlists import router as playlists_router
@@ -104,6 +105,7 @@ app.add_middleware(
 # Routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(library_router, prefix="/api/library", tags=["Library"])
+app.include_router(tracks_router, prefix="/api/tracks", tags=["Tracks"])
 app.include_router(albums_router, prefix="/api/albums", tags=["Albums"])
 app.include_router(artists_router, prefix="/api/artists", tags=["Artists"])
 app.include_router(playlists_router, prefix="/api/playlists", tags=["Playlists"])

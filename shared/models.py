@@ -15,7 +15,7 @@ from enum import Enum
 from sqlalchemy import (
     BigInteger, Integer, String, Text, Boolean, 
     DateTime, ForeignKey, UniqueConstraint, Index,
-    Enum as SQLEnum
+    Enum as SQLEnum, String as SQLString
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -49,6 +49,23 @@ class ForwardSourceType(str, Enum):
     CHANNEL = "channel"
     SUPERGROUP = "supergroup"
     HIDDEN = "hidden"
+
+
+# Helper function to create enum columns that store lowercase values
+def enum_column(enum_class, **kwargs):
+    """
+    Create SQLAlchemy Enum column that stores lowercase string values.
+    This fixes mismatch between Python enum names (PENDING) and DB values (pending).
+    """
+    return mapped_column(
+        SQLEnum(
+            enum_class,
+            values_callable=lambda obj: [e.value for e in obj],
+            native_enum=False,
+            length=30
+        ),
+        **kwargs
+    )
 
 
 # ============== User ==============
@@ -128,8 +145,8 @@ class Track(Base):
     is_unavailable: Mapped[bool] = mapped_column(Boolean, default=False)  # File deleted from Telegram
     
     # Enrichment
-    enrichment_status: Mapped[EnrichmentStatus] = mapped_column(
-        SQLEnum(EnrichmentStatus), 
+    enrichment_status: Mapped[EnrichmentStatus] = enum_column(
+        EnrichmentStatus, 
         default=EnrichmentStatus.PENDING
     )
     
@@ -138,7 +155,7 @@ class Track(Base):
     last_played_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     
     # Forward source (if track was forwarded from somewhere)
-    forward_source_type: Mapped[Optional[ForwardSourceType]] = mapped_column(SQLEnum(ForwardSourceType))
+    forward_source_type: Mapped[Optional[ForwardSourceType]] = enum_column(ForwardSourceType, nullable=True)
     forward_source_id: Mapped[Optional[int]] = mapped_column(BigInteger)
     forward_source_name: Mapped[Optional[str]] = mapped_column(String(255))
     forward_source_username: Mapped[Optional[str]] = mapped_column(String(255))
@@ -300,7 +317,7 @@ class UserLibrary(Base):
     track_id: Mapped[int] = mapped_column(Integer, ForeignKey("tracks.id", ondelete="CASCADE"))
     
     # How user got this track
-    source: Mapped[LibrarySource] = mapped_column(SQLEnum(LibrarySource), default=LibrarySource.UPLOADED)
+    source: Mapped[LibrarySource] = enum_column(LibrarySource, default=LibrarySource.UPLOADED)
     
     # User's personal data for this track
     is_liked: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -387,7 +404,7 @@ class SourceCollection(Base):
     owner_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
     
     # Source identification
-    source_type: Mapped[ForwardSourceType] = mapped_column(SQLEnum(ForwardSourceType))
+    source_type: Mapped[ForwardSourceType] = enum_column(ForwardSourceType)
     source_id: Mapped[Optional[int]] = mapped_column(BigInteger)  # Can be null for hidden sources
     source_name: Mapped[str] = mapped_column(String(255), nullable=False)
     source_username: Mapped[Optional[str]] = mapped_column(String(255))
