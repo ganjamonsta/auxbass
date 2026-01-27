@@ -50,7 +50,15 @@
       <!-- Mini player -->
       <MiniPlayer 
         v-if="playerStore.currentTrack && showNav" 
-        @click="showFullPlayer = true"
+        :track="playerStore.currentTrack"
+        :is-playing="playerStore.isPlaying"
+        :loading="playerStore.loading"
+        :progress="playerStore.progress"
+        :duration="playerStore.duration"
+        :buffered="playerStore.buffered"
+        @expand="showFullPlayer = true"
+        @toggle="playerStore.togglePlay()"
+        @next="playerStore.next()"
       />
 
       <!-- Full player modal -->

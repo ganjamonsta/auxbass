@@ -20,6 +20,8 @@ import {
   preloadTrackWithAudio,
   getPreloadedAudio,
   clearPreloadAudio,
+  getPreloadTrackId,
+  recyclePreloadAudio,
 } from './playerCache'
 
 // Load saved settings
@@ -753,7 +755,7 @@ export const usePlayerStore = defineStore('player', () => {
       const nextTrackToPreload = getNextTrackForPreload()
       if (nextTrackToPreload) {
         const url = getCachedUrl(nextTrackToPreload.id)
-        if (url && preloadTrackId !== nextTrackToPreload.id) {
+        if (url && getPreloadTrackId() !== nextTrackToPreload.id) {
           preloadTrackWithAudio(nextTrackToPreload.id, url)
           nextTrackPreloaded.value = {
             track: nextTrackToPreload,
@@ -789,7 +791,7 @@ export const usePlayerStore = defineStore('player', () => {
       const nextTrackToPreload = getNextTrackForPreload()
       if (nextTrackToPreload) {
         const nextUrl = getCachedUrl(nextTrackToPreload.id)
-        if (nextUrl && preloadTrackId !== nextTrackToPreload.id) {
+        if (nextUrl && getPreloadTrackId() !== nextTrackToPreload.id) {
           preloadTrackWithAudio(nextTrackToPreload.id, nextUrl)
           nextTrackPreloaded.value = {
             track: nextTrackToPreload,
@@ -1004,10 +1006,7 @@ export const usePlayerStore = defineStore('player', () => {
         loading.value = false
         
         // Recycle old audio for next preload
-        preloadAudio = oldAudio || new Audio()
-        preloadAudio.preload = 'auto'
-        preloadAudio.volume = 0
-        preloadTrackId = null
+        recyclePreloadAudio(oldAudio)
         
         persistState()
         startStateSaving()
@@ -1264,10 +1263,8 @@ export const usePlayerStore = defineStore('player', () => {
           isSkipping = false  // Success - reset skip flag
           nextTrackPreloaded.value = null
         
-          preloadAudio = oldAudio || new Audio()
-          preloadAudio.preload = 'auto'
-          preloadAudio.volume = 0
-          preloadTrackId = null
+          // Recycle old audio for next preload
+          recyclePreloadAudio(oldAudio)
         
           persistState()
           preloadNextTracks()

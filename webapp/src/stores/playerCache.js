@@ -178,3 +178,17 @@ export const clearPreloadAudio = () => {
  * Get current preload track ID
  */
 export const getPreloadTrackId = () => preloadTrackId
+
+/**
+ * Recycle an audio element for preloading (reuse old audio after swap)
+ */
+export const recyclePreloadAudio = (audioElement) => {
+  if (preloadAudio) {
+    preloadAudio.pause()
+    preloadAudio.src = ''
+  }
+  preloadAudio = audioElement || new Audio()
+  preloadAudio.preload = 'auto'
+  preloadAudio.volume = 0
+  preloadTrackId = null
+}
