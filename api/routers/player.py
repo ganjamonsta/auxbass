@@ -52,7 +52,15 @@ async def get_http_session() -> aiohttp.ClientSession:
             ttl_dns_cache=300,  # Cache DNS for 5 minutes
             keepalive_timeout=60,  # Keep connections alive for 60s
         )
-        timeout = aiohttp.ClientTimeout(total=30, connect=10)
+        # Timeouts:
+        # - total=None: No limit on total request time (needed for large file streaming)
+        # - connect=10: 10 seconds to establish connection
+        # - sock_read=60: 60 seconds max between data chunks (detects stalled connections)
+        timeout = aiohttp.ClientTimeout(
+            total=None,       # No total limit - files can be large!
+            connect=10,       # Connection timeout
+            sock_read=60,     # Read timeout between chunks
+        )
         _http_session = aiohttp.ClientSession(
             connector=connector,
             timeout=timeout,
