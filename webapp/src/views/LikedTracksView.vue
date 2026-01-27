@@ -40,6 +40,13 @@
         @menu="openTrackMenu(track)"
       />
     </div>
+
+    <!-- Empty state -->
+    <div v-else class="empty-state">
+      <span class="empty-icon">❤️</span>
+      <p>Нет понравившихся треков</p>
+      <p class="hint">Нажмите ♡ на треке, чтобы добавить</p>
+    </div>
     
     <!-- Track context menu -->
     <TrackMenu
@@ -52,13 +59,6 @@
       @addToPlaylist="handleAddToPlaylist"
       @download="handleDownloadTrack"
     />
-
-    <!-- Empty state -->
-    <div v-else class="empty-state">
-      <span class="empty-icon">❤️</span>
-      <p>Нет понравившихся треков</p>
-      <p class="hint">Нажмите ♡ на треке, чтобы добавить</p>
-    </div>
   </div>
 </template>
 
