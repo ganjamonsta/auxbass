@@ -61,6 +61,14 @@
       @delete="handleDeleteTrack"
       @removeFromLibrary="handleRemoveFromLibrary"
     />
+    
+    <!-- Edit track modal -->
+    <EditTrackModal
+      :show="showEditModal"
+      :track="editingTrack"
+      @close="closeEditModal"
+      @saved="handleTrackSaved"
+    />
   </div>
 </template>
 
@@ -72,6 +80,7 @@ import { useLibraryStore } from '@/stores/library'
 import { useAuthStore } from '@/stores/auth'
 import { playerApi } from '@/api/client'
 import TrackMenu from '@/components/TrackMenu.vue'
+import EditTrackModal from '@/components/EditTrackModal.vue'
 
 const router = useRouter()
 const playerStore = usePlayerStore()
@@ -139,8 +148,22 @@ const handleAddToPlaylist = (track) => {
 }
 
 const handleEditTrack = (track) => {
-  // TODO: Show edit modal
   closeTrackMenu()
+  editingTrack.value = track
+  showEditModal.value = true
+}
+
+// Edit modal state
+const showEditModal = ref(false)
+const editingTrack = ref(null)
+
+const closeEditModal = () => {
+  showEditModal.value = false
+  editingTrack.value = null
+}
+
+const handleTrackSaved = (updatedTrack) => {
+  // Update will be reflected through library store
 }
 
 const handleDownloadTrack = async (track) => {

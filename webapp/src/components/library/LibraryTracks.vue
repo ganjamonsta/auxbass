@@ -68,6 +68,14 @@
       @delete="handleDeleteTrack"
       @removeFromLibrary="handleRemoveFromLibrary"
     />
+    
+    <!-- Edit track modal -->
+    <EditTrackModal
+      :show="showEditModal"
+      :track="editingTrack"
+      @close="closeEditModal"
+      @saved="handleTrackSaved"
+    />
   </div>
 </template>
 
@@ -80,6 +88,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useSort } from '@/composables'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackMenu from '@/components/TrackMenu.vue'
+import EditTrackModal from '@/components/EditTrackModal.vue'
 import SortChips from '@/components/SortChips.vue'
 import api, { playerApi } from '@/api/client'
 
@@ -109,6 +118,10 @@ const tracks = ref([])
 const page = ref(1)
 const total = ref(0)
 const perPage = 50
+
+// Edit modal state
+const showEditModal = ref(false)
+const editingTrack = ref(null)
 
 const hasMore = computed(() => tracks.value.length < total.value)
 
@@ -256,6 +269,25 @@ const handleAddToPlaylist = (track) => {
 
 const handleEditTrack = (track) => {
   closeMenu()
+  editingTrack.value = track
+  showEditModal.value = true
+}
+
+const closeEditModal = () => {
+  showEditModal.value = false
+  editingTrack.value = null
+}
+
+const handleTrackSaved = (updatedTrack) => {
+  // Update track in local list
+  const index = tracks.value.findIndex(t => t.id === updatedTrack.id)
+  if (index !== -1) {
+    tracks.value[index] = { ...tracks.value[index], ...updatedTrack }
+  }
+  // Also update in player if currently playing
+  if (playerStore.currentTrack?.id === updatedTrack.id) {
+    playerStore.currentTrack = { ...playerStore.currentTrack, ...updatedTrack }
+  }
 }
 
 const handleDownloadTrack = async (track) => {
