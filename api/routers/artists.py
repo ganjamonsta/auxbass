@@ -455,7 +455,13 @@ async def get_artist(
         .order_by(Album.release_date.desc().nullslast())
     )
     all_albums = albums_result.scalars().all()
-    albums = [a for a in all_albums if normalize_artist(a.artist) == normalized_search]
+    all_artist_albums = [a for a in all_albums if normalize_artist(a.artist) == normalized_search]
+    
+    # For library scope, only show albums that have tracks in user's library
+    if scope == "library":
+        albums = [a for a in all_artist_albums if album_track_counts.get(a.id, 0) > 0]
+    else:
+        albums = all_artist_albums
     
     # Get cover URL from albums
     cover_url = None
