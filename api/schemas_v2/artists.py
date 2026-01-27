@@ -13,7 +13,10 @@ class ArtistResponse(BaseModel):
     """Artist summary response"""
     name: str
     track_count: int
+    album_count: int = 0
     cover_url: Optional[str] = None
+    image_url: Optional[str] = None  # Alias for cover_url (frontend compat)
+    latest_release_date: Optional[str] = None  # For sorting by date
 
 
 class ArtistsListResponse(PaginatedResponse):

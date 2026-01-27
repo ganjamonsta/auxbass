@@ -10,9 +10,22 @@
       />
     </div>
 
-    <!-- Stats -->
-    <div class="stats">
-      {{ total }} исполнителей
+    <!-- Sort options -->
+    <div class="sort-options">
+      <div class="stats">
+        {{ total }} исполнителей
+      </div>
+      <div class="sort-controls">
+        <select v-model="sortBy" @change="onSortChange">
+          <option value="name">По имени</option>
+          <option value="track_count">По трекам</option>
+          <option value="album_count">По альбомам</option>
+          <option value="latest_release">По дате релиза</option>
+        </select>
+        <button class="sort-order" @click="toggleSortOrder">
+          {{ sortOrder === 'desc' ? '↓' : '↑' }}
+        </button>
+      </div>
     </div>
 
     <!-- Top pagination (shows when not on first page) -->
@@ -91,6 +104,10 @@ const router = useRouter()
 const searchQuery = ref('')
 let searchTimeout = null
 
+// Sort state
+const sortBy = ref('name')
+const sortOrder = ref('asc')
+
 // Pagination with unified composable (windowed mode for memory optimization)
 const { 
   items: artists, 
@@ -108,10 +125,12 @@ const {
   prevPage,
   nextPage
 } = usePagination({
-  fetchFn: async ({ offset, limit, search }) => {
+  fetchFn: async ({ offset, limit, search, sort_by, sort_order }) => {
     const params = new URLSearchParams({
       offset: offset.toString(),
-      limit: limit.toString()
+      limit: limit.toString(),
+      sort_by: sort_by || 'name',
+      sort_order: sort_order || 'asc'
     })
     if (search) {
       params.set('search', search)
@@ -120,7 +139,11 @@ const {
     return response.data
   },
   limit: 30,
-  mode: 'windowed'  // Memory optimized - only current page in memory
+  mode: 'windowed',  // Memory optimized - only current page in memory
+  initialParams: {
+    sort_by: 'name',
+    sort_order: 'asc'
+  }
 })
 
 const debouncedSearch = () => {
@@ -130,6 +153,21 @@ const debouncedSearch = () => {
   searchTimeout = setTimeout(() => {
     setParams({ search: searchQuery.value || undefined })
   }, 300)
+}
+
+const onSortChange = () => {
+  // Set default order based on sort type
+  if (sortBy.value === 'name') {
+    sortOrder.value = 'asc'
+  } else {
+    sortOrder.value = 'desc'
+  }
+  setParams({ sort_by: sortBy.value, sort_order: sortOrder.value })
+}
+
+const toggleSortOrder = () => {
+  sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
+  setParams({ sort_order: sortOrder.value })
 }
 
 const goToArtist = (artist) => {
@@ -164,7 +202,48 @@ const goToArtist = (artist) => {
 .stats {
   color: var(--text-secondary);
   font-size: 14px;
+}
+
+.sort-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 20px;
+  gap: 12px;
+}
+
+.sort-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sort-controls select {
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border: none;
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.sort-order {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elevated);
+  border: none;
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.sort-order:hover {
+  background: var(--bg-highlight);
 }
 
 .artist-grid {

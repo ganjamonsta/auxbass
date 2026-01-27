@@ -78,10 +78,10 @@ def get_best_display_name(artist_names: list[str]) -> str:
 
 @router.get("", response_model=ArtistsListResponse)
 async def get_my_artists(
-    page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
     search: Optional[str] = None,
-    sort_by: str = Query("name", pattern="^(name|track_count)$"),
+    sort_by: str = Query("name", pattern="^(name|track_count|album_count|latest_release)$"),
     sort_order: str = Query("asc", pattern="^(asc|desc)$"),
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -91,6 +91,12 @@ async def get_my_artists(
     
     Artists are grouped by normalized name (case-insensitive, first artist from collabs).
     Example: "BLADEE", "Bladee", "Bladee & Ecco2k" -> one "Bladee" artist
+    
+    Sort options:
+    - name: alphabetically
+    - track_count: by number of tracks
+    - album_count: by number of albums  
+    - latest_release: by latest album release date
     """
     # Get all artist names from user's library
     query = (
@@ -113,17 +119,46 @@ async def get_my_artists(
         if normalized:
             artist_groups[normalized].append(artist)
     
-    # Build aggregated list
+    # Pre-fetch all albums for counting and getting release dates
+    albums_result = await db.execute(
+        select(Album)
+        .where(Album.artist.isnot(None))
+    )
+    all_albums = albums_result.scalars().all()
+    
+    # Build album lookup by normalized artist
+    # normalized_artist -> list of albums
+    albums_by_artist: dict[str, list] = defaultdict(list)
+    for album in all_albums:
+        norm = normalize_artist(album.artist)
+        if norm:
+            albums_by_artist[norm].append(album)
+    
+    # Build aggregated list with album info
     aggregated = []
     for normalized, names in artist_groups.items():
         display_name = get_best_display_name(names)
         track_count = len(names)
         
+        # Get albums for this artist
+        artist_albums = albums_by_artist.get(normalized, [])
+        album_count = len(artist_albums)
+        
+        # Get latest release date
+        latest_release = None
+        for album in sorted(artist_albums, key=lambda a: a.release_date or "", reverse=True):
+            if album.release_date:
+                latest_release = album.release_date
+                break
+        
         aggregated.append({
             "normalized": normalized,
             "name": display_name,
             "track_count": track_count,
+            "album_count": album_count,
+            "latest_release_date": latest_release,
             "all_names": names,  # For cover lookup
+            "albums": artist_albums,  # For cover lookup
         })
     
     # Apply search filter
@@ -137,44 +172,50 @@ async def get_my_artists(
     total = len(aggregated)
     
     # Sort
+    reverse = (sort_order == "desc")
     if sort_by == "track_count":
-        aggregated.sort(key=lambda x: x["track_count"], reverse=(sort_order == "desc"))
-    else:
-        aggregated.sort(key=lambda x: x["name"].lower(), reverse=(sort_order == "desc"))
+        aggregated.sort(key=lambda x: x["track_count"], reverse=reverse)
+    elif sort_by == "album_count":
+        aggregated.sort(key=lambda x: x["album_count"], reverse=reverse)
+    elif sort_by == "latest_release":
+        # Sort by latest release date (nulls last)
+        aggregated.sort(
+            key=lambda x: x["latest_release_date"] or "",
+            reverse=reverse
+        )
+    else:  # name
+        aggregated.sort(key=lambda x: x["name"].lower(), reverse=reverse)
     
-    # Paginate
-    offset = (page - 1) * per_page
-    page_items = aggregated[offset:offset + per_page]
+    # Paginate using offset/limit
+    page_items = aggregated[offset:offset + limit]
     
-    # Get covers for each artist (from latest album by release_date)
+    # Calculate page for response (for backwards compatibility)
+    page = (offset // limit) + 1 if limit > 0 else 1
+    
+    # Build response items with covers from pre-fetched albums
     items = []
     for artist_data in page_items:
+        # Get cover from latest album (already sorted by release_date)
         cover_url = None
-        
-        # Try to get cover from latest album (by release_date) for any matching artist name
-        for name in artist_data["all_names"][:5]:  # Limit lookups
-            cover_result = await db.execute(
-                select(Album.cover_url)
-                .where(func.lower(Album.artist) == name.lower())
-                .where(Album.cover_url.isnot(None))
-                .order_by(Album.release_date.desc().nullslast())
-                .limit(1)
-            )
-            cover_url = cover_result.scalar_one_or_none()
-            if cover_url:
+        for album in sorted(artist_data["albums"], key=lambda a: a.release_date or "", reverse=True):
+            if album.cover_url:
+                cover_url = album.cover_url
                 break
         
         items.append(ArtistResponse(
             name=artist_data["name"],
             track_count=artist_data["track_count"],
+            album_count=artist_data["album_count"],
             cover_url=cover_url,
+            image_url=cover_url,  # Frontend compatibility
+            latest_release_date=artist_data["latest_release_date"],
         ))
     
     return ArtistsListResponse(
         items=items,
         total=total,
         page=page,
-        per_page=per_page,
+        per_page=limit,
     )
 
 
