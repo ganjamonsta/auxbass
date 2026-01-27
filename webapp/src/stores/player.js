@@ -1765,6 +1765,7 @@ export const usePlayerStore = defineStore('player', () => {
     lastError,
     stateRestored,
     play,
+    playTrack: play,  // Alias for backwards compatibility
     toggle,
     next,
     prev,

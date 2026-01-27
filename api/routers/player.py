@@ -177,7 +177,7 @@ async def get_stream_url(
         raise HTTPException(status_code=404, detail="Track not found")
     
     # Check access: public tracks are accessible to everyone, private only to uploader
-    if not track.is_public and track.user_id != user.id:
+    if not track.is_public and track.uploader_id != user.id:
         raise HTTPException(status_code=403, detail="This track is private")
     
     # Verify file is accessible (pre-cache the path)
@@ -359,14 +359,26 @@ async def get_batch_stream_urls(
     if len(track_ids) > 50:
         raise HTTPException(status_code=400, detail="Maximum 50 tracks per request")
     
-    # Get tracks (allow public tracks from any user)
-    from sqlalchemy import or_
+    # Get tracks (allow public tracks or tracks in user's library)
+    from sqlalchemy import or_, exists
+    
+    # Subquery to check if user has track in their library
+    user_has_track = (
+        select(UserLibrary.id)
+        .where(
+            UserLibrary.track_id == Track.id,
+            UserLibrary.user_id == user.id
+        )
+        .exists()
+    )
+    
     result = await db.execute(
         select(Track).where(
             Track.id.in_(track_ids),
             or_(
                 Track.is_public == True,
-                Track.user_id == user.id
+                Track.uploader_id == user.id,
+                user_has_track
             )
         )
     )
@@ -440,14 +452,26 @@ async def prefetch_file_paths(
     if len(track_ids) > 20:
         track_ids = track_ids[:20]  # Limit to 20 tracks
     
-    # Get tracks (allow public tracks from any user)
-    from sqlalchemy import or_
+    # Get tracks (allow public tracks or tracks in user's library)
+    from sqlalchemy import or_, exists
+    
+    # Subquery to check if user has track in their library
+    user_has_track = (
+        select(UserLibrary.id)
+        .where(
+            UserLibrary.track_id == Track.id,
+            UserLibrary.user_id == user.id
+        )
+        .exists()
+    )
+    
     result = await db.execute(
         select(Track).where(
             Track.id.in_(track_ids),
             or_(
                 Track.is_public == True,
-                Track.user_id == user.id
+                Track.uploader_id == user.id,
+                user_has_track
             )
         )
     )
@@ -490,7 +514,7 @@ async def record_play(
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
     
-    if not track.is_public and track.user_id != user.id:
+    if not track.is_public and track.uploader_id != user.id:
         raise HTTPException(status_code=403, detail="Track is private")
     
     # Increment global play count
@@ -538,7 +562,7 @@ async def download_track(
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
     
-    if not track.is_public and track.user_id != user.id:
+    if not track.is_public and track.uploader_id != user.id:
         raise HTTPException(status_code=403, detail="Track is private")
     
     # Send audio via Bot API (sendAudio works for any file size, unlike getFile)
@@ -587,11 +611,27 @@ async def download_playlist(
     if not request.track_ids:
         raise HTTPException(status_code=400, detail="No tracks provided")
     
-    # Get tracks
+    # Get tracks (allow public tracks or tracks in user's library)
+    from sqlalchemy import or_, exists
+    
+    # Subquery to check if user has track in their library
+    user_has_track = (
+        select(UserLibrary.id)
+        .where(
+            UserLibrary.track_id == Track.id,
+            UserLibrary.user_id == user.id
+        )
+        .exists()
+    )
+    
     result = await db.execute(
         select(Track).where(
             Track.id.in_(request.track_ids),
-            Track.user_id == user.id
+            or_(
+                Track.is_public == True,
+                Track.uploader_id == user.id,
+                user_has_track
+            )
         )
     )
     tracks_map = {t.id: t for t in result.scalars().all()}
