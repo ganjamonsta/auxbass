@@ -111,7 +111,7 @@ import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackMenu from '@/components/TrackMenu.vue'
-import api from '@/api/client'
+import api, { playerApi } from '@/api/client'
 
 const router = useRouter()
 const libraryStore = useLibraryStore()
@@ -225,7 +225,11 @@ const handleEditTrack = (track) => {
 }
 
 const handleDownloadTrack = async (track) => {
-  // TODO: Download track
+  try {
+    await playerApi.download(track.id)
+  } catch (error) {
+    console.error('Failed to download track:', error)
+  }
   closeMenu()
 }
 
