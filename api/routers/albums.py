@@ -167,7 +167,10 @@ async def get_album(
             AlbumTrack.album_id == album_id,
             UserLibrary.user_id == user.id
         )
-        .options(selectinload(Track.enrichment))
+        .options(
+            selectinload(Track.enrichment),
+            selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
+        )
         .order_by(AlbumTrack.track_number.asc().nullslast())
     )
     rows = result.all()

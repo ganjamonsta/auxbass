@@ -40,13 +40,15 @@ router = APIRouter(tags=["Library"])
 
 def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None) -> TrackResponse:
     """Convert Track model to response"""
-    enrichment = track.enrichment
+    # Safe access to relationships - check if loaded to avoid lazy loading errors
+    enrichment = track.__dict__.get('enrichment')
     
-    # Get first album if any
+    # Get first album if any (only if already loaded)
     album_info = None
-    if track.album_tracks:
-        first_album_track = track.album_tracks[0]
-        album = first_album_track.album
+    album_tracks = track.__dict__.get('album_tracks')
+    if album_tracks:
+        first_album_track = album_tracks[0]
+        album = first_album_track.__dict__.get('album') if first_album_track else None
         if album:
             album_info = {
                 "id": album.id,
