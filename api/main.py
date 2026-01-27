@@ -112,14 +112,55 @@ app.include_router(playlists_router, prefix="/api/playlists", tags=["Playlists"]
 app.include_router(player_router, prefix="/api/player", tags=["Player"])
 
 
-@app.get("/")
-async def root():
-    return {"status": "ok", "service": "TG Player API v2"}
+# ============== Static Files & SPA Fallback ==============
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
+
+# Path to webapp dist
+WEBAPP_DIST = Path(__file__).parent.parent / "webapp" / "dist"
+
+# Serve static assets (js, css, images, etc.)
+if WEBAPP_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=WEBAPP_DIST / "assets"), name="assets")
+    
+    # Serve other static files from dist root
+    @app.get("/manifest.json")
+    async def manifest():
+        return FileResponse(WEBAPP_DIST / "manifest.json")
+    
+    @app.get("/sw.js")
+    async def service_worker():
+        return FileResponse(WEBAPP_DIST / "sw.js", media_type="application/javascript")
+    
+    @app.get("/favicon.ico")
+    async def favicon():
+        favicon_path = WEBAPP_DIST / "favicon.ico"
+        if favicon_path.exists():
+            return FileResponse(favicon_path)
+        return {"error": "not found"}
 
 
 @app.get("/api/health")
 async def health():
     return {"status": "healthy", "version": "2.0.0"}
+
+
+# SPA Fallback - must be LAST route
+# Catches all non-API routes and serves index.html
+@app.get("/{full_path:path}")
+async def spa_fallback(full_path: str):
+    """Serve index.html for all non-API routes (SPA client-side routing)"""
+    # Don't serve index.html for API routes
+    if full_path.startswith("api/"):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="API endpoint not found")
+    
+    index_path = WEBAPP_DIST / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path)
+    
+    return {"error": "webapp not built", "hint": "run: cd webapp && npm run build"}
 
 
 if __name__ == "__main__":
