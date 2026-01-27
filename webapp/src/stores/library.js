@@ -422,10 +422,12 @@ export const useLibraryStore = defineStore('library', () => {
   const fetchLikedTracks = async () => {
     try {
       const response = await tracksApi.getLiked()
-      likedTracks.value = response.data
-      return response.data
+      // API returns { items: [...], total: N }
+      likedTracks.value = response.data?.items || response.data || []
+      return likedTracks.value
     } catch (error) {
       console.error('Failed to fetch liked tracks:', error)
+      likedTracks.value = []
       return []
     }
   }
