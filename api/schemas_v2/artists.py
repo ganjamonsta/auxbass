@@ -22,10 +22,11 @@ class ArtistsListResponse(PaginatedResponse):
 
 
 class ArtistDetailResponse(BaseModel):
-    """Artist with albums and top tracks"""
+    """Artist with albums and all tracks"""
     name: str
     track_count: int
     album_count: int
     cover_url: Optional[str] = None
+    image_url: Optional[str] = None  # Alias for cover_url (frontend compat)
     albums: List[AlbumResponse] = []
-    top_tracks: List[TrackResponse] = []
+    tracks: List[TrackResponse] = []  # All tracks by this artist

@@ -230,9 +230,9 @@ async def get_artist(
             cover_url = album.cover_url
             break
     
-    # Top tracks (limited to 10)
+    # All tracks (not just top 10)
     from api.routers.library import track_to_response
-    top_tracks = [track_to_response(track, lib_entry) for track, lib_entry in matching_tracks[:10]]
+    all_tracks = [track_to_response(track, lib_entry) for track, lib_entry in matching_tracks]
     
     # Albums as response - pass track_count to avoid lazy loading
     from api.routers.albums import album_to_response
@@ -243,6 +243,7 @@ async def get_artist(
         track_count=track_count,
         album_count=len(albums),
         cover_url=cover_url,
+        image_url=cover_url,  # Frontend compatibility
         albums=album_items,
-        top_tracks=top_tracks,
+        tracks=all_tracks,
     )
