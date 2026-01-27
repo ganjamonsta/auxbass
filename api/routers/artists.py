@@ -196,10 +196,15 @@ async def get_artist(
     # Filter by normalized artist
     matching_tracks = []
     artist_names_seen = set()
+    album_track_counts = {}  # album_id -> count
+    
     for track, lib_entry in all_tracks:
         if normalize_artist(track.artist) == normalized_search:
             matching_tracks.append((track, lib_entry))
             artist_names_seen.add(track.artist)
+            # Count tracks per album
+            for at in track.album_tracks:
+                album_track_counts[at.album_id] = album_track_counts.get(at.album_id, 0) + 1
     
     track_count = len(matching_tracks)
     
@@ -229,9 +234,9 @@ async def get_artist(
     from api.routers.library import track_to_response
     top_tracks = [track_to_response(track, lib_entry) for track, lib_entry in matching_tracks[:10]]
     
-    # Albums as response
+    # Albums as response - pass track_count to avoid lazy loading
     from api.routers.albums import album_to_response
-    album_items = [album_to_response(album) for album in albums]
+    album_items = [album_to_response(album, track_count=album_track_counts.get(album.id, 0)) for album in albums]
     
     return ArtistDetailResponse(
         name=actual_name,
