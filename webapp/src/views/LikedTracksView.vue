@@ -29,26 +29,28 @@
 
     <!-- Track list -->
     <div class="track-list" v-else-if="tracks.length">
-      <div
+      <TrackItem
         v-for="(track, index) in sortedTracks"
         :key="track.id"
-        class="track-item"
-        :class="{ playing: playerStore.currentTrack?.id === track.id }"
+        :track="track"
+        :isPlaying="playerStore.currentTrack?.id === track.id"
+        :isLiked="true"
         @click="playTrack(track, index)"
-      >
-        <div class="track-cover">
-          <img v-if="track.cover_url" :src="track.cover_url" :alt="track.title" />
-          <div v-else class="cover-placeholder">🎵</div>
-        </div>
-        <div class="track-info">
-          <span class="track-title">{{ track.title }}</span>
-          <span class="track-artist">{{ track.artist }}</span>
-        </div>
-        <button class="like-btn liked" @click.stop="unlikeTrack(track)">
-          ❤️
-        </button>
-      </div>
+        @like="unlikeTrack(track)"
+        @menu="openTrackMenu(track)"
+      />
     </div>
+    
+    <!-- Track context menu -->
+    <TrackMenu
+      :show="showMenu"
+      :track="menuTrack"
+      @close="closeMenu"
+      @goToArtist="handleGoToArtist"
+      @goToAlbum="handleGoToAlbum"
+      @addToPlaylist="handleAddToPlaylist"
+      @download="handleDownloadTrack"
+    />
 
     <!-- Empty state -->
     <div v-else class="empty-state">
@@ -61,15 +63,21 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
+import TrackItem from '@/components/TrackItem.vue'
+import TrackMenu from '@/components/TrackMenu.vue'
 import api from '@/api/client'
 
+const router = useRouter()
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
 
 const tracks = ref([])
 const loading = ref(true)
+const showMenu = ref(false)
+const menuTrack = ref(null)
 
 const sortedTracks = computed(() => {
   return [...tracks.value].sort((a, b) => {
@@ -118,6 +126,51 @@ const unlikeTrack = async (track) => {
   } catch (error) {
     console.error('Failed to unlike track:', error)
   }
+}
+
+// Track menu handlers
+const openTrackMenu = (track) => {
+  menuTrack.value = track
+  showMenu.value = true
+}
+
+const closeMenu = () => {
+  showMenu.value = false
+  menuTrack.value = null
+}
+
+const handleGoToArtist = () => {
+  closeMenu()
+  router.push(`/artist/${encodeURIComponent(menuTrack.value?.artist)}`)
+}
+
+const handleGoToAlbum = () => {
+  closeMenu()
+  const albumId = menuTrack.value?.album?.id || menuTrack.value?.album_id
+  if (albumId) {
+    router.push(`/album/${albumId}`)
+  }
+}
+
+const handleAddToPlaylist = () => {
+  closeMenu()
+  // TODO: implement playlist picker
+}
+
+const handleDownloadTrack = async () => {
+  if (!menuTrack.value) return
+  try {
+    const response = await api.get(`/player/stream/${menuTrack.value.id}`, { responseType: 'blob' })
+    const url = window.URL.createObjectURL(response.data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${menuTrack.value.artist} - ${menuTrack.value.title}.mp3`
+    a.click()
+    window.URL.revokeObjectURL(url)
+  } catch (error) {
+    console.error('Failed to download:', error)
+  }
+  closeMenu()
 }
 
 onMounted(() => {
@@ -237,90 +290,6 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-
-.track-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.track-item:hover {
-  background: var(--bg-highlight);
-}
-
-.track-item.playing {
-  background: var(--bg-elevated);
-}
-
-.track-cover {
-  width: 48px;
-  height: 48px;
-  border-radius: 4px;
-  overflow: hidden;
-  flex-shrink: 0;
-  background: var(--bg-elevated);
-}
-
-.track-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.track-cover .cover-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-}
-
-.track-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.track-title {
-  color: var(--text-primary);
-  font-weight: 500;
-  font-size: 15px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.track-item.playing .track-title {
-  color: #ff4564;
-}
-
-.track-artist {
-  color: var(--text-tertiary);
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.like-btn {
-  width: 40px;
-  height: 40px;
-  border: none;
-  background: transparent;
-  font-size: 18px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
 }
 
 .empty-state {

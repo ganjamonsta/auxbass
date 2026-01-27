@@ -5,8 +5,11 @@
     @click="handleClick"
     @contextmenu.prevent="$emit('menu')"
   >
+    <!-- Track number (for album view) -->
+    <span v-if="trackNumber" class="track-number">{{ trackNumber }}</span>
+    
     <!-- Cover with generated gradient -->
-    <div class="track-cover" :style="coverStyle">
+    <div v-if="!hideCover" class="track-cover" :style="coverStyle">
       <img 
         v-if="track.cover_url && !track.is_unavailable" 
         :src="track.cover_url" 
@@ -38,12 +41,22 @@
       </div>
     </div>
     
+    <!-- Mini cover placeholder for hideCover mode -->
+    <div v-else class="track-cover-mini" :style="coverStyle">
+      <div v-if="isPlaying" class="playing-indicator-mini">
+        <div class="bar"></div>
+        <div class="bar"></div>
+        <div class="bar"></div>
+      </div>
+    </div>
+    
     <div class="track-info">
       <div class="track-title">{{ track.title || 'Без названия' }}</div>
       <div class="track-meta">
-        <span class="track-artist">{{ track.artist || 'Неизвестный' }}</span>
+        <span v-if="!hideArtist" class="track-artist">{{ track.artist || 'Неизвестный' }}</span>
+        <span v-if="showAlbum && albumName" class="track-album">{{ albumName }}</span>
         <span v-if="isLargeFile" class="large-file-badge">{{ fileSizeMB }} MB</span>
-        <span v-else-if="track.play_count" class="play-count">• {{ track.play_count }} прослушиваний</span>
+        <span v-else-if="track.play_count && !hideArtist" class="play-count">• {{ track.play_count }} прослушиваний</span>
       </div>
     </div>
     
@@ -92,6 +105,22 @@ const props = defineProps({
   compact: {
     type: Boolean,
     default: false
+  },
+  trackNumber: {
+    type: [Number, String],
+    default: null
+  },
+  hideCover: {
+    type: Boolean,
+    default: false
+  },
+  hideArtist: {
+    type: Boolean,
+    default: false
+  },
+  showAlbum: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -118,6 +147,10 @@ const isLargeFile = computed(() => {
 const fileSizeMB = computed(() => {
   if (!props.track?.file_size) return 0
   return (props.track.file_size / (1024 * 1024)).toFixed(1)
+})
+
+const albumName = computed(() => {
+  return props.track?.album?.name || props.track?.album_name || null
 })
 </script>
 
@@ -403,5 +436,74 @@ const fileSizeMB = computed(() => {
   padding: 2px 6px;
   border-radius: 4px;
   margin-left: 4px;
+}
+
+/* ─── Track Number ─── */
+.track-number {
+  width: 28px;
+  text-align: center;
+  color: var(--xm-text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.track-item.playing .track-number {
+  color: var(--xm-accent);
+}
+
+/* ─── Mini Cover for hideCover mode ─── */
+.track-cover-mini {
+  width: 8px;
+  height: 32px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.playing-indicator-mini {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 1px;
+}
+
+.playing-indicator-mini .bar {
+  width: 2px;
+  background: var(--xm-accent);
+  border-radius: 1px;
+  animation: equalizer 0.8s ease-in-out infinite;
+}
+
+.playing-indicator-mini .bar:nth-child(1) {
+  height: 8px;
+  animation-delay: 0s;
+}
+
+.playing-indicator-mini .bar:nth-child(2) {
+  height: 14px;
+  animation-delay: 0.2s;
+}
+
+.playing-indicator-mini .bar:nth-child(3) {
+  height: 10px;
+  animation-delay: 0.4s;
+}
+
+/* ─── Track Album ─── */
+.track-album {
+  font-size: 11px;
+  color: var(--xm-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-album::before {
+  content: '•';
+  margin: 0 4px;
 }
 </style>

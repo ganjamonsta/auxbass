@@ -57,6 +57,12 @@
 
               <div class="menu-divider"></div>
 
+              <!-- Remove from playlist (only in playlist context) -->
+              <button v-if="inPlaylist" class="menu-item danger" @click="handleRemoveFromPlaylist">
+                <span class="menu-icon">➖</span>
+                <span>Убрать из плейлиста</span>
+              </button>
+
               <!-- Owner can fully delete, others can only remove from library -->
               <button v-if="isOwner" class="menu-item danger" @click="handleDelete">
                 <span class="menu-icon">🗑️</span>
@@ -81,10 +87,11 @@ import { usePlayerStore } from '../stores/player'
 const props = defineProps({
   show: Boolean,
   track: Object,
-  currentUserId: Number
+  currentUserId: Number,
+  inPlaylist: Boolean
 })
 
-const emit = defineEmits(['close', 'addToPlaylist', 'edit', 'delete', 'removeFromLibrary', 'download', 'goToArtist', 'goToAlbum'])
+const emit = defineEmits(['close', 'addToPlaylist', 'edit', 'delete', 'removeFromLibrary', 'download', 'goToArtist', 'goToAlbum', 'removeFromPlaylist'])
 
 const player = usePlayerStore()
 const telegram = inject('telegram')
@@ -169,6 +176,12 @@ const handleRemoveFromLibrary = () => {
 const handleDownload = () => {
   haptic('light')
   emit('download', props.track)
+  emit('close')
+}
+
+const handleRemoveFromPlaylist = () => {
+  haptic('light')
+  emit('removeFromPlaylist', props.track)
   emit('close')
 }
 </script>

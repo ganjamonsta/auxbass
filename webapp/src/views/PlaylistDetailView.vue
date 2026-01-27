@@ -37,26 +37,30 @@
 
     <!-- Track list -->
     <div class="track-list" v-if="playlist.tracks?.length">
-      <div
+      <TrackItem
         v-for="(track, index) in playlist.tracks"
         :key="track.id"
-        class="track-item"
-        :class="{ playing: playerStore.currentTrack?.id === track.id }"
+        :track="track"
+        :isPlaying="playerStore.currentTrack?.id === track.id"
+        :isLiked="track.is_liked"
         @click="playTrack(track, index)"
-      >
-        <div class="track-cover">
-          <img v-if="track.cover_url" :src="track.cover_url" :alt="track.title" />
-          <div v-else class="cover-placeholder">🎵</div>
-        </div>
-        <div class="track-info">
-          <span class="track-title">{{ track.title }}</span>
-          <span class="track-artist">{{ track.artist }}</span>
-        </div>
-        <button class="remove-btn" @click.stop="removeTrack(track)">
-          ✕
-        </button>
-      </div>
+        @like="handleLikeTrack(track)"
+        @menu="openTrackMenu(track)"
+      />
     </div>
+    
+    <!-- Track context menu -->
+    <TrackMenu
+      :show="showMenu"
+      :track="menuTrack"
+      :inPlaylist="true"
+      @close="closeMenu"
+      @goToArtist="handleGoToArtist"
+      @goToAlbum="handleGoToAlbum"
+      @addToPlaylist="handleAddToPlaylist"
+      @download="handleDownloadTrack"
+      @removeFromPlaylist="handleRemoveFromPlaylist"
+    />
 
     <!-- Empty state -->
     <div v-else class="empty-state">
@@ -112,6 +116,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
+import TrackItem from '@/components/TrackItem.vue'
+import TrackMenu from '@/components/TrackMenu.vue'
 import api from '@/api/client'
 
 const route = useRoute()
@@ -123,6 +129,8 @@ const loading = ref(true)
 const showEditModal = ref(false)
 const showDeleteConfirm = ref(false)
 const editName = ref('')
+const showMenu = ref(false)
+const menuTrack = ref(null)
 
 const coverImages = computed(() => {
   if (!playlist.value?.tracks) return []
@@ -169,6 +177,71 @@ const removeTrack = async (track) => {
   } catch (error) {
     console.error('Failed to remove track:', error)
   }
+}
+
+// Track menu handlers
+const openTrackMenu = (track) => {
+  menuTrack.value = track
+  showMenu.value = true
+}
+
+const closeMenu = () => {
+  showMenu.value = false
+  menuTrack.value = null
+}
+
+const handleLikeTrack = async (track) => {
+  try {
+    if (track.is_liked) {
+      await api.delete(`/tracks/${track.id}/like`)
+      track.is_liked = false
+    } else {
+      await api.post(`/tracks/${track.id}/like`)
+      track.is_liked = true
+    }
+  } catch (error) {
+    console.error('Failed to toggle like:', error)
+  }
+}
+
+const handleGoToArtist = () => {
+  closeMenu()
+  router.push(`/artist/${encodeURIComponent(menuTrack.value?.artist)}`)
+}
+
+const handleGoToAlbum = () => {
+  closeMenu()
+  const albumId = menuTrack.value?.album?.id || menuTrack.value?.album_id
+  if (albumId) {
+    router.push(`/album/${albumId}`)
+  }
+}
+
+const handleAddToPlaylist = () => {
+  closeMenu()
+  // TODO: implement playlist picker
+}
+
+const handleDownloadTrack = async () => {
+  if (!menuTrack.value) return
+  try {
+    const response = await api.get(`/player/stream/${menuTrack.value.id}`, { responseType: 'blob' })
+    const url = window.URL.createObjectURL(response.data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${menuTrack.value.artist} - ${menuTrack.value.title}.mp3`
+    a.click()
+    window.URL.revokeObjectURL(url)
+  } catch (error) {
+    console.error('Failed to download:', error)
+  }
+  closeMenu()
+}
+
+const handleRemoveFromPlaylist = async () => {
+  if (!menuTrack.value) return
+  await removeTrack(menuTrack.value)
+  closeMenu()
 }
 
 const savePlaylist = async () => {
@@ -308,91 +381,6 @@ onMounted(() => {
 .track-list {
   display: flex;
   flex-direction: column;
-}
-
-.track-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 8px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.track-item:hover {
-  background: var(--bg-elevated);
-}
-
-.track-item.playing {
-  background: var(--bg-highlight);
-}
-
-.track-item.playing .track-title {
-  color: var(--accent);
-}
-
-.track-cover {
-  width: 48px;
-  height: 48px;
-  border-radius: 4px;
-  overflow: hidden;
-  background: var(--bg-elevated);
-  flex-shrink: 0;
-}
-
-.track-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.track-cover .cover-placeholder {
-  font-size: 20px;
-}
-
-.track-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.track-title {
-  display: block;
-  color: var(--text-primary);
-  font-size: 15px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.track-artist {
-  display: block;
-  color: var(--text-secondary);
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.remove-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: transparent;
-  border: none;
-  color: var(--text-tertiary);
-  font-size: 14px;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.track-item:hover .remove-btn {
-  opacity: 1;
-}
-
-.remove-btn:hover {
-  color: var(--danger);
 }
 
 .empty-state {
