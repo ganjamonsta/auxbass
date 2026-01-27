@@ -15,6 +15,7 @@ NC='\033[0m' # No Color
 
 PROJECT_DIR="/opt/tg_player"
 WEBAPP_DIR="$PROJECT_DIR/webapp"
+VENV_DIR="$PROJECT_DIR/venv"
 
 # Parse arguments
 NO_RESTART=false
@@ -64,6 +65,15 @@ REQUIREMENTS_CHANGED=$(git diff --name-only $LOCAL $REMOTE | grep -c "^requireme
 # Install Python dependencies if requirements.txt changed
 if [ "$REQUIREMENTS_CHANGED" -gt 0 ] || [ "$FORCE" = true ]; then
     echo -e "\n${YELLOW}[4/6]${NC} Installing Python dependencies..."
+    
+    # Create venv if not exists
+    if [ ! -d "$VENV_DIR" ]; then
+        echo -e "  Creating virtual environment..."
+        python3 -m venv "$VENV_DIR"
+    fi
+    
+    # Activate and install
+    source "$VENV_DIR/bin/activate"
     pip install -r requirements.txt --quiet
 else
     echo -e "\n${YELLOW}[4/6]${NC} Requirements unchanged, skipping..."
