@@ -299,8 +299,20 @@ const playAlbum = async (album) => {
   try {
     const params = albumScope.value === 'global' ? { scope: 'global' } : {}
     const response = await api.get(`/albums/${album.id}`, { params })
-    if (response.data.tracks?.length) {
-      playerStore.playTrack(response.data.tracks[0], response.data.tracks)
+    const albumData = response.data
+    
+    // Get playable tracks - from full_tracklist or tracks array
+    let tracks = []
+    if (albumData.full_tracklist?.length) {
+      tracks = albumData.full_tracklist
+        .filter(item => item.track)
+        .map(item => item.track)
+    } else if (albumData.tracks?.length) {
+      tracks = albumData.tracks
+    }
+    
+    if (tracks.length) {
+      playerStore.playTrack(tracks[0], tracks)
     }
   } catch (error) {
     console.error('Failed to load album:', error)

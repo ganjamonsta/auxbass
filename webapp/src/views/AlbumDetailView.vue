@@ -38,13 +38,17 @@
           v-for="item in album.full_tracklist"
           :key="item.track_number"
           class="tracklist-item"
-          :class="{ 'missing': !item.in_library, 'has-track': item.in_library }"
-          @click="item.in_library ? playTrackItem(item) : handleMissingTrack(item)"
+          :class="{ 
+            'missing': !item.track && !isGlobal, 
+            'has-track': item.track,
+            'not-in-library': isGlobal && item.track && !item.in_library
+          }"
+          @click="handleTracklistItemClick(item)"
         >
           <span class="track-number">{{ item.track_number }}</span>
           
           <div class="track-info">
-            <span class="track-title" :class="{ 'missing-title': !item.in_library }">
+            <span class="track-title" :class="{ 'missing-title': !item.track && !isGlobal }">
               {{ item.title }}
             </span>
             <span v-if="item.artist && item.artist !== album.artist" class="track-artist">
@@ -54,15 +58,29 @@
           
           <span class="track-duration">{{ formatDuration(item.duration) }}</span>
           
-          <!-- Status indicator -->
+          <!-- Add to library button for global tracks not in user's library -->
           <button
-            v-if="!item.in_library"
-            class="add-btn"
-            @click.stop="handleMissingTrack(item)"
-            title="Добавить трек"
+            v-if="isGlobal && item.track && !item.in_library"
+            class="add-library-btn"
+            @click.stop="handleAddToLibraryFromTracklist(item)"
+            title="Добавить в библиотеку"
           >
             +
           </button>
+          <!-- In library indicator -->
+          <span v-else-if="isGlobal && item.track && item.in_library" class="in-library-indicator">
+            ✓
+          </span>
+          <!-- Missing track button (library mode only) -->
+          <button
+            v-else-if="!isGlobal && !item.in_library"
+            class="add-btn"
+            @click.stop="handleMissingTrack(item)"
+            title="Найти трек"
+          >
+            +
+          </button>
+          <!-- Playing indicator -->
           <span v-else-if="playerStore.currentTrack?.id === item.track_id" class="playing-indicator">
             🎵
           </span>
@@ -175,12 +193,20 @@ const searchResult = ref(null)
 const foundTrack = ref(null)
 const addingTrack = ref(false)
 
-// Get only tracks that are in library (for playback)
+// Get playable tracks - in global mode, all tracks with track object are playable
 const playableTracks = computed(() => {
   if (album.value?.full_tracklist) {
-    return album.value.full_tracklist
-      .filter(item => item.in_library && item.track)
-      .map(item => item.track)
+    if (isGlobal.value) {
+      // Global mode: all tracks with track object are playable
+      return album.value.full_tracklist
+        .filter(item => item.track)
+        .map(item => item.track)
+    } else {
+      // Library mode: only tracks in user's library
+      return album.value.full_tracklist
+        .filter(item => item.in_library && item.track)
+        .map(item => item.track)
+    }
   }
   return album.value?.tracks || []
 })
@@ -217,6 +243,29 @@ const playTrackItem = (item) => {
   if (item.track) {
     const index = playableTracks.value.findIndex(t => t.id === item.track_id)
     playerStore.playTrack(item.track, playableTracks.value, index >= 0 ? index : 0)
+  }
+}
+
+// Handle click on tracklist item
+const handleTracklistItemClick = (item) => {
+  if (item.track) {
+    // Track exists - play it
+    playTrackItem(item)
+  } else if (!isGlobal.value) {
+    // Library mode: missing track - show search modal
+    handleMissingTrack(item)
+  }
+  // Global mode without track: do nothing (track not in global library)
+}
+
+// Add track to library from tracklist (global mode)
+const handleAddToLibraryFromTracklist = async (item) => {
+  if (!item.track_id) return
+  try {
+    await libraryStore.addToLibrary(item.track_id)
+    item.in_library = true
+  } catch (error) {
+    console.error('Failed to add to library:', error)
   }
 }
 
@@ -538,6 +587,38 @@ onMounted(() => {
 
 .add-btn:hover {
   transform: scale(1.1);
+}
+
+.add-library-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.add-library-btn:hover {
+  transform: scale(1.1);
+}
+
+.in-library-indicator {
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: bold;
+  width: 28px;
+  text-align: center;
+}
+
+.tracklist-item.not-in-library {
+  /* Slightly different style for tracks not in user's library but playable */
 }
 
 .playing-indicator {
