@@ -17,7 +17,11 @@ async def test():
         ("FALSE", "Bladee"),      # Should be Cold Visions
         ("Trial", "Bladee"),      # Should be Bladeecity  
         ("Be In Your Mind", "Bladee"),  # Should be 333
-        ("RAIN CHECK", "Bladee"),       # Should be Crest (feat Ecco2k)
+        ("RAIN CHECK", "Bladee"),       # Should be Crest or Bladeecity
+        # Test Deezer fallback - tracks that may not have album in Last.fm
+        ("The Underground", "Excision"),  # Was returning None
+        ("Nintendo", "Liquid Stranger"),  # Was returning None
+        ("Ganja Monsta", "Dubsidia"),     # Was returning different album
     ]
     
     for title, artist in tests:
