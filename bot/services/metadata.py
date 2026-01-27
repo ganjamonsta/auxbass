@@ -105,7 +105,9 @@ class MetadataService:
         s = s.replace(''', "'").replace(''', "'").replace('`', "'")
         
         # Add spaces before capital letters in camelCase (guardianAngels -> guardian Angels)
-        s = re.sub(r'([a-z])([A-Z])', r'\1 \2', s)
+        # Only for pure ASCII strings to avoid breaking mixed scripts like Глюк'oZa
+        if s.isascii():
+            s = re.sub(r'([a-z])([A-Z])', r'\1 \2', s)
         
         # Remove content in parentheses/brackets (including nested)
         # Do multiple passes to handle ((nested)) brackets
