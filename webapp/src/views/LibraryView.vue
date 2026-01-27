@@ -66,8 +66,10 @@
           :track="track"
           :isPlaying="playerStore.currentTrack?.id === track.id"
           :isActive="playerStore.isPlaying && playerStore.currentTrack?.id === track.id"
+          :isLiked="track.is_liked"
           @click="playTrack(track)"
-          @contextmenu.prevent="showTrackMenu($event, track)"
+          @like="handleLikeTrack(track)"
+          @menu="showTrackMenu($event, track)"
         />
         
         <div v-if="hasMore" class="load-more">
@@ -169,6 +171,16 @@ const toggleSortOrder = () => {
   sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
   page.value = 1
   loadTracks()
+}
+
+// Like track
+const handleLikeTrack = async (track) => {
+  const newLikedState = await libraryStore.toggleLike(track.id)
+  // Update local track state
+  const idx = tracks.value.findIndex(t => t.id === track.id)
+  if (idx !== -1) {
+    tracks.value[idx].is_liked = newLikedState
+  }
 }
 
 const playTrack = (track) => {
