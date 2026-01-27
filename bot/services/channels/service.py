@@ -213,9 +213,11 @@ class ChannelService:
                 # Generate hashtags
                 hashtags = []
                 if channel.include_hashtags:
+                    enrichment = track.enrichment
                     hashtags = generate_hashtags(
                         artist=track.artist,
-                        genre=track.enrichment.genre if track.enrichment else None,
+                        album=enrichment.album_name if enrichment else None,
+                        genre=enrichment.genre if enrichment else None,
                     )
                 
                 # Build caption
@@ -224,6 +226,8 @@ class ChannelService:
                     caption_parts.append(f"🎵 {track.title}")
                 if track.artist:
                     caption_parts.append(f"👤 {track.artist}")
+                if track.enrichment and track.enrichment.album_name:
+                    caption_parts.append(f"💿 {track.enrichment.album_name}")
                 
                 if hashtags:
                     caption_parts.append("")

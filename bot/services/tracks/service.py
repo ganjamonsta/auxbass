@@ -55,13 +55,22 @@ class TrackService:
         self._setup_enrichment_callback()
     
     def _setup_enrichment_callback(self):
-        """Connect enrichment completion to album assignment"""
+        """Connect enrichment completion to album assignment and channel update"""
         async def on_enrichment_complete(track_id: int, result):
-            if result.success and result.album_name:
+            if result.success:
+                # Auto-assign album if found
+                if result.album_name:
+                    try:
+                        await album_service.auto_assign_album_from_enrichment(track_id)
+                    except Exception as e:
+                        logger.error(f"Auto album assignment failed for track {track_id}: {e}")
+                
+                # Update channel messages with new metadata
                 try:
-                    await album_service.auto_assign_album_from_enrichment(track_id)
+                    from bot.services.channels import channel_service
+                    await channel_service.update_channel_message(track_id)
                 except Exception as e:
-                    logger.error(f"Auto album assignment failed for track {track_id}: {e}")
+                    logger.error(f"Channel message update failed for track {track_id}: {e}")
         
         enrichment_worker.set_on_enrichment_complete(on_enrichment_complete)
     
