@@ -12,7 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.database import get_session
-from shared.models import Track
+from shared.models import Track, TrackEnrichment
 from .metadata import metadata_service
 from .albums import album_service
 
@@ -101,7 +101,7 @@ class EnrichmentWorker:
             await session.flush()
             
             # Process in parallel (up to 5 concurrent API calls)
-            async def enrich_one(track):
+            async def enrich_one(track, session):
                 try:
                     enriched = await metadata_service.enrich_track(
                         title=track.title,
@@ -109,18 +109,31 @@ class EnrichmentWorker:
                     )
                     
                     if enriched.get("enriched"):
-                        if not track.album and enriched.get("album"):
-                            track.album = enriched["album"]
-                        if not track.genre and enriched.get("genre"):
-                            track.genre = enriched["genre"]
+                        # Create or update TrackEnrichment record
+                        # Data from Last.fm (primary) or Deezer (fallback)
+                        if not track.enrichment:
+                            track.enrichment = TrackEnrichment(track_id=track.id)
+                            session.add(track.enrichment)
+                        
+                        # Update enrichment data (Last.fm has priority)
+                        if enriched.get("album"):
+                            track.enrichment.album_name = enriched["album"]
+                        if enriched.get("genre"):
+                            track.enrichment.genre = enriched["genre"]
                         if enriched.get("cover_url"):
-                            track.cover_url = enriched["cover_url"]
+                            track.enrichment.cover_url = enriched["cover_url"]
+                        if enriched.get("release_date"):
+                            track.enrichment.release_date = enriched["release_date"]
                         # NO deezer_album_id - grouping by album name only
                         # Deezer IDs caused wrong album assignments
                         
                         track.enrichment_status = "completed"
-                        logger.info(f"Enriched: {track.title} - {track.artist}")
+                        logger.info(f"Enriched: {track.title} - {track.artist} -> album: {enriched.get('album')}")
                     else:
+                        # Create empty enrichment record to mark as processed
+                        if not track.enrichment:
+                            track.enrichment = TrackEnrichment(track_id=track.id)
+                            session.add(track.enrichment)
                         track.enrichment_status = "failed"
                         logger.debug(f"No data for: {track.title} - {track.artist}")
                         
@@ -128,8 +141,8 @@ class EnrichmentWorker:
                     logger.error(f"Failed to enrich track {track.id}: {e}")
                     track.enrichment_status = "failed"
             
-            # Run all enrichments concurrently
-            await asyncio.gather(*[enrich_one(t) for t in tracks], return_exceptions=True)
+            # Run all enrichments concurrently (pass session for each)
+            await asyncio.gather(*[enrich_one(t, session) for t in tracks], return_exceptions=True)
             
             # Count successful enrichments for album assembly trigger
             self._enrichment_count += len(tracks)
@@ -140,14 +153,15 @@ class EnrichmentWorker:
         """Trigger album assembly for all users with enriched tracks"""
         try:
             async with get_session() as session:
-                # Get distinct user IDs with completed enrichment
+                # Get distinct user IDs with completed enrichment that have album data
                 from sqlalchemy import distinct
                 result = await session.execute(
                     select(distinct(Track.uploader_id))
+                    .join(TrackEnrichment, TrackEnrichment.track_id == Track.id)
                     .where(
                         Track.enrichment_status == "completed",
-                        Track.album.isnot(None),
-                        Track.album != ""
+                        TrackEnrichment.album_name.isnot(None),
+                        TrackEnrichment.album_name != ""
                     )
                 )
                 user_ids = [row[0] for row in result.all()]

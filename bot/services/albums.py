@@ -13,7 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.database import get_session
-from shared.models import Track, Playlist, PlaylistTrack, UserLibrary
+from shared.models import Track, TrackEnrichment, Playlist, PlaylistTrack, UserLibrary
 from .metadata import metadata_service
 
 logger = logging.getLogger(__name__)
@@ -247,14 +247,15 @@ class AlbumAssemblyService:
         Returns list of album candidates with track counts.
         """
         async with get_session() as session:
-            # Get all tracks in user's library with album info
+            # Get all tracks in user's library with album info from enrichment
             result = await session.execute(
                 select(Track)
                 .join(UserLibrary, UserLibrary.track_id == Track.id)
+                .join(TrackEnrichment, TrackEnrichment.track_id == Track.id)
                 .where(
                     UserLibrary.user_id == user_id,
-                    Track.album.isnot(None),
-                    Track.album != "",
+                    TrackEnrichment.album_name.isnot(None),
+                    TrackEnrichment.album_name != "",
                 )
             )
             tracks = list(result.scalars().all())
@@ -564,14 +565,15 @@ class AlbumAssemblyService:
         artist_norm = normalize_artist_for_grouping(artist) if artist else ""
         
         async with get_session() as session:
-            # Get all tracks from user's library with album info
+            # Get all tracks from user's library with album info from enrichment
             result = await session.execute(
                 select(Track)
                 .join(UserLibrary, UserLibrary.track_id == Track.id)
+                .join(TrackEnrichment, TrackEnrichment.track_id == Track.id)
                 .where(
                     UserLibrary.user_id == user_id,
-                    Track.album.isnot(None),
-                    Track.album != ""
+                    TrackEnrichment.album_name.isnot(None),
+                    TrackEnrichment.album_name != ""
                 )
             )
             

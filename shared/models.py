@@ -188,6 +188,29 @@ class Track(Base):
         cascade="all, delete-orphan"
     )
     
+    # ===== Properties from enrichment =====
+    # These provide access to enrichment data directly from Track
+    
+    @property
+    def album(self) -> Optional[str]:
+        """Get album name from enrichment (Last.fm/Deezer data)"""
+        return self.enrichment.album_name if self.enrichment else None
+    
+    @property
+    def cover_url(self) -> Optional[str]:
+        """Get cover URL from enrichment"""
+        return self.enrichment.cover_url if self.enrichment else None
+    
+    @property
+    def genre(self) -> Optional[str]:
+        """Get genre from enrichment"""
+        return self.enrichment.genre if self.enrichment else None
+    
+    @property
+    def release_date(self) -> Optional[str]:
+        """Get release date from enrichment"""
+        return self.enrichment.release_date if self.enrichment else None
+    
     __table_args__ = (
         Index("idx_tracks_artist", "artist"),
         Index("idx_tracks_title", "title"),
