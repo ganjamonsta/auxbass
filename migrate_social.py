@@ -17,14 +17,14 @@ from shared.database import engine
 async def run_migration():
     """Run the migration"""
     async with engine.begin() as conn:
-        # Create user_follows table
+        # Create user_follows table (SQLite compatible)
         await conn.execute(text("""
             CREATE TABLE IF NOT EXISTS user_follows (
-                id SERIAL PRIMARY KEY,
-                follower_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                following_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                created_at TIMESTAMP DEFAULT NOW(),
-                CONSTRAINT uq_user_follow UNIQUE (follower_id, following_id)
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                follower_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                following_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (follower_id, following_id)
             )
         """))
         
@@ -41,25 +41,25 @@ async def run_migration():
         
         print("✅ Created user_follows table with indexes")
         
-        # Ensure playlists.is_public exists (it should already)
-        try:
-            await conn.execute(text("""
-                ALTER TABLE playlists 
-                ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT FALSE
-            """))
-            print("✅ Ensured is_public column exists on playlists")
-        except Exception as e:
-            print(f"ℹ️ is_public column check: {e}")
+        # Check if is_public column exists in playlists
+        result = await conn.execute(text("PRAGMA table_info(playlists)"))
+        columns = [row[1] for row in result.fetchall()]
         
-        # Ensure playlists.share_code exists
-        try:
+        if 'is_public' not in columns:
             await conn.execute(text("""
-                ALTER TABLE playlists 
-                ADD COLUMN IF NOT EXISTS share_code VARCHAR(50) UNIQUE
+                ALTER TABLE playlists ADD COLUMN is_public INTEGER DEFAULT 0
             """))
-            print("✅ Ensured share_code column exists on playlists")
-        except Exception as e:
-            print(f"ℹ️ share_code column check: {e}")
+            print("✅ Added is_public column to playlists")
+        else:
+            print("ℹ️ is_public column already exists")
+        
+        if 'share_code' not in columns:
+            await conn.execute(text("""
+                ALTER TABLE playlists ADD COLUMN share_code TEXT
+            """))
+            print("✅ Added share_code column to playlists")
+        else:
+            print("ℹ️ share_code column already exists")
     
     print("\n🎉 Migration completed successfully!")
 
