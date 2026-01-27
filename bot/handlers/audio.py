@@ -123,8 +123,8 @@ async def handle_audio(message: Message):
     # Save track using service
     result = await track_service.save_track(
         user_id=user_id,
-        telegram_file_id=audio.file_id,
-        telegram_message_id=message.message_id,
+        file_id=audio.file_id,
+        file_unique_id=audio.file_unique_id,
         title=title,
         artist=artist,
         duration=duration,
