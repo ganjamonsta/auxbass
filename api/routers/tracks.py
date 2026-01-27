@@ -6,6 +6,7 @@ Delegates to library, artists, albums routers where appropriate.
 """
 from typing import Optional, List
 from datetime import datetime
+from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, desc, asc, or_
@@ -21,6 +22,7 @@ from shared.models import (
     Track, TrackEnrichment, Album, AlbumTrack, User, UserLibrary,
     EnrichmentStatus, LibrarySource
 )
+from shared.matching import normalize_artist
 
 from api.routers.auth import get_current_user
 from api.routers.library import track_to_response
@@ -81,33 +83,71 @@ async def get_artists(
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get unique artists from tracks"""
+    """Get unique artists from tracks with normalization"""
+    # Get all artist names
     if scope == "library":
         query = (
-            select(Track.artist, func.count(Track.id).label("count"))
+            select(Track.artist)
             .join(UserLibrary, UserLibrary.track_id == Track.id)
             .where(UserLibrary.user_id == user.id)
             .where(Track.artist.isnot(None))
             .where(Track.artist != "")
-            .group_by(Track.artist)
-            .order_by(desc("count"))
         )
     else:
         query = (
-            select(Track.artist, func.count(Track.id).label("count"))
+            select(Track.artist)
             .where(Track.is_public == True)
             .where(Track.artist.isnot(None))
             .where(Track.artist != "")
-            .group_by(Track.artist)
-            .order_by(desc("count"))
         )
     
     result = await db.execute(query)
+    artists_raw = [row[0] for row in result.all()]
     
-    return [
-        {"artist": artist, "name": artist, "track_count": count}
-        for artist, count in result.all()
+    # Group by normalized artist name
+    # Key: normalized_name -> {display_name, count, display_priority}
+    artist_groups = defaultdict(lambda: {"display_name": None, "count": 0, "priority": 0})
+    
+    for artist in artists_raw:
+        normalized = normalize_artist(artist)
+        if not normalized:
+            continue
+            
+        group = artist_groups[normalized]
+        group["count"] += 1
+        
+        # Choose best display name:
+        # 1. Prefer title case (starts with uppercase)
+        # 2. Prefer shorter names (without feat, etc.)
+        # 3. First encountered as fallback
+        is_title_case = artist[0].isupper() if artist else False
+        has_collab = any(sep in artist.lower() for sep in [' & ', ' + ', ' x ', ', ', ' feat', ' ft.'])
+        
+        priority = 0
+        if is_title_case:
+            priority += 2
+        if not has_collab:
+            priority += 1
+            
+        if group["display_name"] is None or priority > group["priority"]:
+            group["display_name"] = artist
+            group["priority"] = priority
+    
+    # Convert to list and sort by count
+    artists_list = [
+        {
+            "artist": data["display_name"],
+            "name": data["display_name"],
+            "track_count": data["count"],
+            "normalized": normalized
+        }
+        for normalized, data in artist_groups.items()
     ]
+    
+    # Sort by track count descending
+    artists_list.sort(key=lambda x: x["track_count"], reverse=True)
+    
+    return artists_list
 
 
 @router.get("/artist-image/{artist_name}")
@@ -115,27 +155,35 @@ async def get_artist_image(
     artist_name: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """Get artist image (from album cover)"""
+    """Get artist image (from album cover, matched by normalized artist name)"""
+    normalized_search = normalize_artist(artist_name)
+    
+    # Get all albums with covers
     result = await db.execute(
-        select(Album.cover_url)
-        .where(func.lower(Album.artist) == func.lower(artist_name))
+        select(Album)
         .where(Album.cover_url.isnot(None))
-        .limit(1)
+        .where(Album.artist.isnot(None))
     )
-    cover = result.scalar_one_or_none()
+    albums = result.scalars().all()
     
-    if not cover:
-        # Try from track enrichment
-        result = await db.execute(
-            select(TrackEnrichment.cover_url)
-            .join(Track, Track.id == TrackEnrichment.track_id)
-            .where(func.lower(Track.artist) == func.lower(artist_name))
-            .where(TrackEnrichment.cover_url.isnot(None))
-            .limit(1)
-        )
-        cover = result.scalar_one_or_none()
+    # Find matching album by normalized artist
+    for album in albums:
+        if normalize_artist(album.artist) == normalized_search:
+            return {"image_url": album.cover_url}
     
-    return {"image_url": cover}
+    # Try from track enrichment
+    result = await db.execute(
+        select(TrackEnrichment.cover_url, Track.artist)
+        .join(Track, Track.id == TrackEnrichment.track_id)
+        .where(TrackEnrichment.cover_url.isnot(None))
+        .where(Track.artist.isnot(None))
+    )
+    
+    for cover_url, track_artist in result.all():
+        if normalize_artist(track_artist) == normalized_search:
+            return {"image_url": cover_url}
+    
+    return {"image_url": None}
 
 
 @router.get("/artist/{artist_name}")
@@ -145,13 +193,16 @@ async def get_artist_detail(
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get artist details with their tracks"""
+    """Get artist details with their tracks (matches by normalized artist name)"""
+    # Normalize the search artist name
+    normalized_search = normalize_artist(artist_name)
+    
     if scope == "library":
         query = (
             select(Track, UserLibrary)
             .join(UserLibrary, UserLibrary.track_id == Track.id)
             .where(UserLibrary.user_id == user.id)
-            .where(func.lower(Track.artist) == func.lower(artist_name))
+            .where(Track.artist.isnot(None))
             .options(
                 selectinload(Track.enrichment),
                 selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
@@ -162,7 +213,7 @@ async def get_artist_detail(
         query = (
             select(Track)
             .where(Track.is_public == True)
-            .where(func.lower(Track.artist) == func.lower(artist_name))
+            .where(Track.artist.isnot(None))
             .options(
                 selectinload(Track.enrichment),
                 selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
@@ -172,20 +223,28 @@ async def get_artist_detail(
     
     result = await db.execute(query)
     
+    # Filter tracks by normalized artist name in Python
     if scope == "library":
         rows = result.unique().all()
-        tracks = [track_to_response(track, lib) for track, lib in rows]
+        tracks = []
+        for track, lib in rows:
+            if normalize_artist(track.artist) == normalized_search:
+                tracks.append(track_to_response(track, lib))
     else:
         rows = result.unique().scalars().all()
-        tracks = [track_to_response(track) for track in rows]
+        tracks = []
+        for track in rows:
+            if normalize_artist(track.artist) == normalized_search:
+                tracks.append(track_to_response(track))
     
-    # Get albums for this artist
+    # Get albums for this artist (also by normalized name)
     albums_result = await db.execute(
         select(Album)
-        .where(func.lower(Album.artist) == func.lower(artist_name))
+        .where(Album.artist.isnot(None))
         .order_by(desc(Album.release_date))
     )
-    albums = albums_result.scalars().all()
+    all_albums = albums_result.scalars().all()
+    albums = [a for a in all_albums if normalize_artist(a.artist) == normalized_search]
     
     return {
         "name": artist_name,
