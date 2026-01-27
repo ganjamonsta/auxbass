@@ -95,7 +95,8 @@ const hasArtist = computed(() => {
 })
 
 const hasAlbum = computed(() => {
-  return props.track?.album && props.track.album.trim() !== ''
+  const albumName = props.track?.album_name || props.track?.album?.name
+  return albumName && albumName.trim() !== ''
 })
 
 // Check if current user is the track owner (uploader)
@@ -117,7 +118,11 @@ const handleGoToArtist = () => {
 
 const handleGoToAlbum = () => {
   haptic('light')
-  emit('goToAlbum', props.track?.album, props.track?.artist)
+  const album = props.track?.album
+  const albumId = album?.id
+  if (albumId) {
+    emit('goToAlbum', albumId)
+  }
   emit('close')
 }
 

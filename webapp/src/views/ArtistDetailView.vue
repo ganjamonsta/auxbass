@@ -64,7 +64,7 @@
           </div>
           <div class="track-info">
             <span class="track-title">{{ track.title }}</span>
-            <span class="track-album" v-if="track.album">{{ track.album }}</span>
+            <span class="track-album" v-if="track.album">{{ track.album?.name || track.album_name }}</span>
           </div>
           <span class="track-duration">{{ formatDuration(track.duration) }}</span>
         </div>

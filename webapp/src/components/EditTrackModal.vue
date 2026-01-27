@@ -92,7 +92,7 @@ watch(() => props.track, (track) => {
     form.value = {
       title: track.title || '',
       artist: track.artist || '',
-      album: track.album || '',
+      album: track.album_name || track.album?.name || '',
       genre: track.genre || ''
     }
   }

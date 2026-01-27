@@ -79,6 +79,7 @@ def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None)
         library_source=source,
         enrichment_status=track.enrichment_status.value if track.enrichment_status else None,
         album=album_info,
+        album_name=album_info["name"] if album_info else None,
         cover_url=enrichment.cover_url if enrichment else None,
         genre=enrichment.genre if enrichment else None,
         release_date=enrichment.release_date if enrichment else None,

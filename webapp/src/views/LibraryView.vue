@@ -231,9 +231,10 @@ const handleGoToArtist = (artist) => {
   router.push(`/artist/${encodeURIComponent(artist)}`)
 }
 
-const handleGoToAlbum = (albumName, artist) => {
-  // Find album by name and artist
-  // For now, just close menu
+const handleGoToAlbum = (albumId) => {
+  if (albumId) {
+    router.push(`/album/${albumId}`)
+  }
   closeMenu()
 }
 

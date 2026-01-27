@@ -28,6 +28,7 @@ class TrackResponse(BaseModel):
     
     # From enrichment
     album: Optional[AlbumInfo] = None
+    album_name: Optional[str] = None  # Convenience field for backward compatibility
     cover_url: Optional[str] = None
     genre: Optional[str] = None
     release_date: Optional[str] = None  # YYYY-MM-DD string
