@@ -15,6 +15,19 @@
       {{ total }} исполнителей
     </div>
 
+    <!-- Top pagination (shows when not on first page) -->
+    <PaginationNav
+      v-if="!isFirstPage"
+      :currentPage="currentPage"
+      :totalPages="totalPages"
+      :pageInfo="pageInfo"
+      :isFirstPage="isFirstPage"
+      :isLastPage="isLastPage"
+      :loading="loading"
+      position="top"
+      @goToFirst="goToFirst"
+    />
+
     <!-- Artist grid -->
     <div class="artist-grid" v-if="artists.length">
       <div
@@ -46,77 +59,82 @@
       <div class="spinner"></div>
     </div>
 
-    <!-- Pagination -->
-    <div v-if="hasMore && !loading" class="load-more">
-      <button @click="loadMore">Загрузить ещё</button>
-    </div>
+    <!-- Bottom pagination -->
+    <PaginationNav
+      v-if="totalPages > 1 && !loading"
+      :currentPage="currentPage"
+      :totalPages="totalPages"
+      :pageInfo="pageInfo"
+      :isFirstPage="isFirstPage"
+      :isLastPage="isLastPage"
+      :loading="loading"
+      position="bottom"
+      @goToPage="goToPage"
+      @goToFirst="goToFirst"
+      @goToLast="goToLast"
+      @prevPage="prevPage"
+      @nextPage="nextPage"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { usePagination } from '@/composables'
+import PaginationNav from '@/components/PaginationNav.vue'
 import api from '@/api/client'
 
 const router = useRouter()
 
-const artists = ref([])
-const total = ref(0)
-const loading = ref(false)
+// Search state
 const searchQuery = ref('')
-const offset = ref(0)
-const limit = 30
-const hasMore = ref(false)
-
 let searchTimeout = null
 
-const loadArtists = async (append = false) => {
-  loading.value = true
-  try {
+// Pagination with unified composable (windowed mode for memory optimization)
+const { 
+  items: artists, 
+  total, 
+  loading,
+  currentPage,
+  totalPages,
+  isFirstPage,
+  isLastPage,
+  pageInfo,
+  setParams,
+  goToPage,
+  goToFirst,
+  goToLast,
+  prevPage,
+  nextPage
+} = usePagination({
+  fetchFn: async ({ offset, limit, search }) => {
     const params = new URLSearchParams({
-      offset: offset.value.toString(),
+      offset: offset.toString(),
       limit: limit.toString()
     })
-    if (searchQuery.value) {
-      params.set('search', searchQuery.value)
+    if (search) {
+      params.set('search', search)
     }
-    
     const response = await api.get(`/artists?${params}`)
-    
-    if (append) {
-      artists.value = [...artists.value, ...response.data.items]
-    } else {
-      artists.value = response.data.items
-    }
-    total.value = response.data.total
-    hasMore.value = artists.value.length < total.value
-  } finally {
-    loading.value = false
-  }
-}
+    return response.data
+  },
+  limit: 30,
+  mode: 'windowed'  // Memory optimized - only current page in memory
+})
 
 const debouncedSearch = () => {
   if (searchTimeout) {
     clearTimeout(searchTimeout)
   }
   searchTimeout = setTimeout(() => {
-    offset.value = 0
-    loadArtists()
+    setParams({ search: searchQuery.value || undefined })
   }, 300)
-}
-
-const loadMore = () => {
-  offset.value += limit
-  loadArtists(true)
 }
 
 const goToArtist = (artist) => {
   router.push(`/artist/${encodeURIComponent(artist.name)}`)
 }
-
-onMounted(() => {
-  loadArtists()
-})
 </script>
 
 <style scoped>

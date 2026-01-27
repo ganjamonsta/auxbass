@@ -5,6 +5,19 @@
       <span class="count">{{ total }} альбомов</span>
     </div>
 
+    <!-- Top pagination (shows when not on first page) -->
+    <PaginationNav
+      v-if="!isFirstPage"
+      :currentPage="currentPage"
+      :totalPages="totalPages"
+      :pageInfo="pageInfo"
+      :isFirstPage="isFirstPage"
+      :isLastPage="isLastPage"
+      :loading="loading"
+      position="top"
+      @goToFirst="goToFirst"
+    />
+
     <div class="albums-grid">
       <div
         v-for="album in albums"
@@ -29,53 +42,58 @@
       <div class="spinner"></div>
     </div>
 
-    <div v-if="hasMore && !loading" class="load-more">
-      <button @click="loadMore">Загрузить ещё</button>
-    </div>
+    <!-- Bottom pagination -->
+    <PaginationNav
+      v-if="totalPages > 1 && !loading"
+      :currentPage="currentPage"
+      :totalPages="totalPages"
+      :pageInfo="pageInfo"
+      :isFirstPage="isFirstPage"
+      :isLastPage="isLastPage"
+      :loading="loading"
+      position="bottom"
+      @goToPage="goToPage"
+      @goToFirst="goToFirst"
+      @goToLast="goToLast"
+      @prevPage="prevPage"
+      @nextPage="nextPage"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
 import { usePlayerStore } from '@/stores/player'
+import { usePagination } from '@/composables'
+import PaginationNav from '@/components/PaginationNav.vue'
 import api from '@/api/client'
 
 const playerStore = usePlayerStore()
 
-const albums = ref([])
-const loading = ref(false)
-const offset = ref(0)
-const total = ref(0)
-const limit = 30
-
-const hasMore = computed(() => albums.value.length < total.value)
-
-const loadAlbums = async (append = false) => {
-  loading.value = true
-  try {
+// Pagination with unified composable (windowed mode for memory optimization)
+const { 
+  items: albums, 
+  total, 
+  loading,
+  currentPage,
+  totalPages,
+  isFirstPage,
+  isLastPage,
+  pageInfo,
+  goToPage,
+  goToFirst,
+  goToLast,
+  prevPage,
+  nextPage
+} = usePagination({
+  fetchFn: async ({ offset, limit }) => {
     const response = await api.get('/albums', {
-      params: {
-        offset: append ? offset.value : 0,
-        limit: limit,
-      }
+      params: { offset, limit }
     })
-    
-    if (append) {
-      albums.value.push(...response.data.items)
-    } else {
-      albums.value = response.data.items
-      offset.value = 0
-    }
-    total.value = response.data.total
-    offset.value += response.data.items.length
-  } finally {
-    loading.value = false
-  }
-}
-
-const loadMore = async () => {
-  await loadAlbums(true)
-}
+    return response.data
+  },
+  limit: 30,
+  mode: 'windowed'  // Memory optimized - only current page in memory
+})
 
 const playAlbum = async (album) => {
   try {
@@ -87,12 +105,7 @@ const playAlbum = async (album) => {
     console.error('Failed to load album:', error)
   }
 }
-
-onMounted(() => {
-  loadAlbums()
-})
 </script>
-
 <style scoped>
 .albums-view {
   padding: 16px;
