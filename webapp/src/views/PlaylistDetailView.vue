@@ -48,6 +48,13 @@
         @menu="openTrackMenu(track)"
       />
     </div>
+
+    <!-- Empty state -->
+    <div v-else class="empty-state">
+      <span class="empty-icon">🎵</span>
+      <p>Плейлист пуст</p>
+      <p class="hint">Добавляйте треки из библиотеки</p>
+    </div>
     
     <!-- Track context menu -->
     <TrackMenu
@@ -62,13 +69,6 @@
       @download="handleDownloadTrack"
       @removeFromPlaylist="handleRemoveFromPlaylist"
     />
-
-    <!-- Empty state -->
-    <div v-else class="empty-state">
-      <span class="empty-icon">🎵</span>
-      <p>Плейлист пуст</p>
-      <p class="hint">Добавляйте треки из библиотеки</p>
-    </div>
 
     <!-- Edit modal -->
     <div v-if="showEditModal" class="modal-overlay" @click.self="showEditModal = false">
