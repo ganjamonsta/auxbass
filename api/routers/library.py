@@ -59,9 +59,15 @@ def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None)
     # Determine library source
     source = None
     added_at = track.created_at
+    is_liked = False
+    liked_at = None
+    play_count = 0
     if library_entry:
         source = library_entry.source.value if library_entry.source else None
         added_at = library_entry.added_at
+        is_liked = library_entry.is_liked or False
+        liked_at = library_entry.liked_at
+        play_count = library_entry.play_count or 0
     
     return TrackResponse(
         id=track.id,
@@ -76,6 +82,9 @@ def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None)
         cover_url=enrichment.cover_url if enrichment else None,
         genre=enrichment.genre if enrichment else None,
         release_date=enrichment.release_date if enrichment else None,
+        is_liked=is_liked,
+        liked_at=liked_at,
+        play_count=play_count,
         added_at=added_at,
     )
 

@@ -32,6 +32,11 @@ class TrackResponse(BaseModel):
     genre: Optional[str] = None
     release_date: Optional[str] = None  # YYYY-MM-DD string
     
+    # User library state
+    is_liked: bool = False
+    liked_at: Optional[datetime] = None
+    play_count: int = 0
+    
     added_at: datetime
 
     class Config:

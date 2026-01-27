@@ -8,6 +8,17 @@
       </button>
     </div>
 
+    <!-- Liked tracks special card -->
+    <div class="special-playlists">
+      <div class="playlist-card liked-card" @click="goToLiked">
+        <div class="playlist-cover liked-cover">
+          <span class="liked-icon">❤️</span>
+        </div>
+        <div class="playlist-name">Понравившиеся</div>
+        <div class="playlist-meta">{{ likedCount }} треков</div>
+      </div>
+    </div>
+
     <!-- Playlists grid -->
     <div class="playlists-grid" v-if="playlists.length">
       <div
@@ -74,15 +85,18 @@
 <script setup>
 import { ref, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
+import { useLibraryStore } from '@/stores/library'
 import api from '@/api/client'
 
 const router = useRouter()
+const libraryStore = useLibraryStore()
 
 const playlists = ref([])
 const loading = ref(false)
 const showCreateModal = ref(false)
 const newPlaylistName = ref('')
 const nameInput = ref(null)
+const likedCount = ref(0)
 
 const loadPlaylists = async () => {
   loading.value = true
@@ -94,8 +108,21 @@ const loadPlaylists = async () => {
   }
 }
 
+const loadLikedCount = async () => {
+  try {
+    await libraryStore.fetchLikedTracks()
+    likedCount.value = libraryStore.likedTracks?.length || 0
+  } catch (e) {
+    console.error('Failed to load liked count:', e)
+  }
+}
+
 const goToPlaylist = (playlist) => {
   router.push(`/playlist/${playlist.id}`)
+}
+
+const goToLiked = () => {
+  router.push('/liked')
 }
 
 const closeModal = () => {
@@ -120,6 +147,7 @@ const createPlaylist = async () => {
 
 onMounted(() => {
   loadPlaylists()
+  loadLikedCount()
 })
 
 // Focus input when modal opens
@@ -159,6 +187,31 @@ const openModal = async () => {
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
+}
+
+.special-playlists {
+  margin-bottom: 24px;
+}
+
+.liked-card {
+  display: inline-block;
+  cursor: pointer;
+  width: 160px;
+}
+
+.liked-cover {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ff4564, #c8325a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.liked-icon {
+  font-size: 48px;
 }
 
 .playlists-grid {

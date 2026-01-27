@@ -8,6 +8,7 @@ import PlaylistsView from '@/views/PlaylistsView.vue'
 import AlbumDetailView from '@/views/AlbumDetailView.vue'
 import ArtistDetailView from '@/views/ArtistDetailView.vue'
 import PlaylistDetailView from '@/views/PlaylistDetailView.vue'
+import LikedTracksView from '@/views/LikedTracksView.vue'
 import SettingsView from '@/views/SettingsView.vue'
 import LoginView from '@/views/LoginView.vue'
 
@@ -54,6 +55,12 @@ const routes = [
     path: '/playlist/:id',
     name: 'playlist-detail',
     component: PlaylistDetailView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/liked',
+    name: 'liked',
+    component: LikedTracksView,
     meta: { requiresAuth: true }
   },
   {
