@@ -231,7 +231,14 @@
               </svg>
             </div>
           </div>
-          <div v-if="!upcomingQueue.length" class="queue-empty">
+          <div v-if="lazyShuffleMode" class="queue-lazy-shuffle">
+            <div class="lazy-shuffle-icon">🔀</div>
+            <div class="lazy-shuffle-info">
+              <span class="lazy-shuffle-title">Режим перемешивания</span>
+              <span class="lazy-shuffle-meta">{{ lazyShuffleIndex + 1 }} из {{ lazyShuffleTotal }} треков</span>
+            </div>
+          </div>
+          <div v-else-if="!upcomingQueue.length" class="queue-empty">
             Нет треков в очереди
           </div>
         </div>
@@ -278,6 +285,26 @@ const props = defineProps({
   isLiked: {
     type: Boolean,
     default: false
+  },
+  lazyShuffleMode: {
+    type: Boolean,
+    default: false
+  },
+  lazyShuffleTotal: {
+    type: Number,
+    default: 0
+  },
+  lazyShuffleIndex: {
+    type: Number,
+    default: -1
+  },
+  shuffleOrder: {
+    type: Array,
+    default: () => []
+  },
+  shuffleIndex: {
+    type: Number,
+    default: -1
   }
 })
 
@@ -373,6 +400,22 @@ const coverInitials = computed(() => getTrackInitials(props.track))
 
 const upcomingQueue = computed(() => {
   if (!props.queue.length || props.queueIndex < 0) return []
+  
+  // If shuffle mode with shuffleOrder, show tracks in shuffle order
+  if (props.shuffle && props.shuffleOrder.length > 0 && props.shuffleIndex >= 0) {
+    const upcoming = []
+    for (let i = 1; i <= 5; i++) {
+      const nextShuffleIdx = props.shuffleIndex + i
+      if (nextShuffleIdx >= props.shuffleOrder.length) break
+      const queueIdx = props.shuffleOrder[nextShuffleIdx]
+      if (props.queue[queueIdx]) {
+        upcoming.push(props.queue[queueIdx])
+      }
+    }
+    return upcoming
+  }
+  
+  // Normal mode - show next tracks in order
   return props.queue.slice(props.queueIndex + 1, props.queueIndex + 6)
 })
 
@@ -1172,6 +1215,37 @@ const formatTime = (seconds) => {
   color: var(--xm-text-muted);
   padding: 24px;
   font-size: 14px;
+}
+
+.queue-lazy-shuffle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--xm-surface-alpha);
+  border-radius: 12px;
+  margin: 8px 0;
+}
+
+.lazy-shuffle-icon {
+  font-size: 24px;
+}
+
+.lazy-shuffle-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lazy-shuffle-title {
+  font-weight: 600;
+  color: var(--xm-text-primary);
+  font-size: 14px;
+}
+
+.lazy-shuffle-meta {
+  color: var(--xm-text-muted);
+  font-size: 12px;
 }
 
 /* ─── Queue Animation ─── */

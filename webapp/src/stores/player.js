@@ -751,6 +751,76 @@ export const usePlayerStore = defineStore('player', () => {
   // Preload next 2-3 tracks using batch API for instant playback
   // Uses Audio preload="auto" for the immediate next track
   const preloadNextTracks = async () => {
+    // === LAZY SHUFFLE MODE PRELOADING ===
+    if (isLazyShuffleMode()) {
+      // Don't preload if user is actively switching tracks
+      if (isUserActivelyBrowsing()) {
+        console.log('[Preload Lazy] User actively browsing, deferring...')
+        setTimeout(() => preloadNextTracks(), USER_INTERACTION_COOLDOWN)
+        return
+      }
+      
+      // Get next 2-3 track IDs from lazy shuffle
+      const tracksToPreload = []
+      for (let offset = 1; offset <= 3; offset++) {
+        const nextIdx = lazyShuffleIndex.value + offset
+        if (nextIdx >= lazyShuffleIds.value.length) {
+          if (repeat.value === 'all' && nextIdx < lazyShuffleIds.value.length + 3) {
+            const wrappedIdx = nextIdx % lazyShuffleIds.value.length
+            const trackId = lazyShuffleIds.value[wrappedIdx]
+            if (!getCachedUrl(trackId) && !getCachedAudio(trackId)) {
+              tracksToPreload.push(trackId)
+            }
+          }
+          continue
+        }
+        const trackId = lazyShuffleIds.value[nextIdx]
+        if (!getCachedUrl(trackId) && !getCachedAudio(trackId)) {
+          tracksToPreload.push(trackId)
+        }
+      }
+      
+      if (tracksToPreload.length === 0) {
+        console.log('[Preload Lazy] All next tracks already cached')
+        // Try to start Audio preload for immediate next
+        const nextTrackId = getNextLazyShuffleTrackId()
+        if (nextTrackId) {
+          const url = getCachedUrl(nextTrackId)
+          if (url && getPreloadTrackId() !== nextTrackId) {
+            preloadTrackWithAudio(nextTrackId, url)
+          }
+        }
+        return
+      }
+      
+      try {
+        console.log(`[Preload Lazy] Fetching batch URLs for ${tracksToPreload.length} tracks`)
+        const response = await playerApi.getBatchUrls(tracksToPreload)
+        const urlData = response.data.urls || []
+        
+        for (const item of urlData) {
+          if (item.url && !item.error && item.url.startsWith('/api/player/audio/')) {
+            setCachedUrl(item.track_id, item.url, item.expires_at)
+          }
+        }
+        
+        // Start Audio preload for immediate next track
+        const nextTrackId = getNextLazyShuffleTrackId()
+        if (nextTrackId) {
+          const nextUrl = getCachedUrl(nextTrackId)
+          if (nextUrl && getPreloadTrackId() !== nextTrackId) {
+            preloadTrackWithAudio(nextTrackId, nextUrl)
+          }
+        }
+        
+        console.log(`[Preload Lazy] Cached ${urlData.length} URLs`)
+      } catch (e) {
+        console.error('[Preload Lazy] Batch URL fetch failed:', e)
+      }
+      return
+    }
+    
+    // === REGULAR MODE ===
     if (queue.value.length === 0) return
     
     // Don't preload if user is actively switching tracks
@@ -1340,6 +1410,7 @@ export const usePlayerStore = defineStore('player', () => {
             loading.value = false
             isSkipping = false
             persistState()
+            preloadNextTracks()  // Preload next tracks
             return
           } catch (e) {
             console.error('[Lazy Shuffle Next] Failed to play cached blob:', e)
@@ -1688,6 +1759,28 @@ export const usePlayerStore = defineStore('player', () => {
 
   // Toggle shuffle
   const toggleShuffle = () => {
+    // If we're in lazy shuffle mode and turning off shuffle, exit lazy mode
+    if (shuffle.value && isLazyShuffleMode()) {
+      shuffle.value = false
+      shuffleOrder.value = []
+      shuffleIndex.value = -1
+      clearLazyShuffle()
+      preloadTriggered = false
+      preloadNextTracks()
+      persistSettings()
+      return
+    }
+    
+    // If we're in lazy shuffle mode and shuffle is "on", don't toggle (already shuffled)
+    if (isLazyShuffleMode()) {
+      // Lazy shuffle is active, shuffle should be on
+      if (!shuffle.value) {
+        shuffle.value = true
+        persistSettings()
+      }
+      return
+    }
+    
     shuffle.value = !shuffle.value
     
     // Generate or clear shuffle order
@@ -1997,6 +2090,8 @@ export const usePlayerStore = defineStore('player', () => {
     currentTrack,
     queue,
     queueIndex,
+    shuffleOrder,
+    shuffleIndex,
     isPlaying,
     progress,
     duration,
