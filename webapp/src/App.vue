@@ -78,7 +78,7 @@
         :queue-index="playerStore.queueIndex"
         :shuffle-order="playerStore.shuffleOrder"
         :shuffle-index="playerStore.shuffleIndex"
-        :is-liked="playerStore.currentTrack?.is_liked"
+        :is-liked="isCurrentTrackLiked"
         :lazy-shuffle-mode="playerStore.isLazyShuffleMode()"
         :lazy-shuffle-total="playerStore.lazyShuffleIds?.length || 0"
         :lazy-shuffle-index="playerStore.lazyShuffleIndex"
@@ -118,6 +118,13 @@ const libraryStore = useLibraryStore()
 const telegram = inject('telegram')
 
 const showFullPlayer = ref(false)
+
+// Computed property for like state based on libraryStore.likedTracks
+const isCurrentTrackLiked = computed(() => {
+  const trackId = playerStore.currentTrack?.id
+  if (!trackId) return false
+  return libraryStore.isTrackLiked(trackId)
+})
 
 // Navigation visibility
 const showNav = computed(() => {
