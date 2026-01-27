@@ -24,7 +24,7 @@
     <div class="quick-stats" v-if="!searchQuery">
       <div class="stat-card" @click="$router.push('/albums')">
         <span class="stat-icon">💿</span>
-        <span class="stat-value">{{ libraryStore.artists?.length || 0 }}</span>
+        <span class="stat-value">{{ stats?.album_count || 0 }}</span>
         <span class="stat-label">Альбомов</span>
       </div>
       <div class="stat-card" @click="$router.push('/artists')">
@@ -111,6 +111,7 @@ import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackMenu from '@/components/TrackMenu.vue'
+import api from '@/api/client'
 
 const router = useRouter()
 const libraryStore = useLibraryStore()
@@ -125,6 +126,7 @@ const tracks = ref([])
 const page = ref(1)
 const total = ref(0)
 const perPage = 50
+const stats = ref(null)
 
 let searchTimeout = null
 
@@ -241,8 +243,18 @@ const handleRemoveFromLibrary = async (track) => {
   closeMenu()
 }
 
+const loadStats = async () => {
+  try {
+    const response = await api.get('/library/stats')
+    stats.value = response.data
+  } catch (e) {
+    console.error('Failed to load stats:', e)
+  }
+}
+
 onMounted(() => {
   loadTracks()
+  loadStats()
   libraryStore.fetchPlaylists()
   libraryStore.fetchArtists()
 })

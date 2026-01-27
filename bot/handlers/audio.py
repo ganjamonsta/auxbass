@@ -75,8 +75,8 @@ def extract_forward_info(message: Message) -> dict:
 def get_library_source(message: Message) -> LibrarySource:
     """Determine library source from message"""
     if message.forward_from or message.forward_from_chat or message.forward_sender_name:
-        return LibrarySource.FORWARD
-    return LibrarySource.UPLOAD
+        return LibrarySource.SHARED
+    return LibrarySource.UPLOADED
 
 
 @router.message(F.audio)

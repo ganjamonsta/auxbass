@@ -172,7 +172,7 @@ export const useLibraryStore = defineStore('library', () => {
   const fetchPlaylists = async () => {
     try {
       const response = await playlistsApi.getAll()
-      playlists.value = response.data
+      playlists.value = response.data?.items || response.data || []
     } catch (error) {
       console.error('Failed to fetch playlists:', error)
     }

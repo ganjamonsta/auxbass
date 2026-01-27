@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from shared.database import get_db
 from shared.models import (
     Track, TrackEnrichment, Album, AlbumTrack, User, UserLibrary,
-    EnrichmentStatus, LibrarySource
+    EnrichmentStatus, LibrarySource, ArtistTrack
 )
 from shared.matching import normalize_artist, normalize_title
 
@@ -249,12 +249,12 @@ async def get_library_stats(
         .where(UserLibrary.user_id == user.id)
     ) or 0
     
-    # Artist count
+    # Artist count - using normalized artists from ArtistTrack
     artist_count = await db.scalar(
-        select(func.count(func.distinct(func.lower(Track.artist))))
+        select(func.count(func.distinct(ArtistTrack.normalized_name)))
+        .join(Track, ArtistTrack.track_id == Track.id)
         .join(UserLibrary, UserLibrary.track_id == Track.id)
         .where(UserLibrary.user_id == user.id)
-        .where(Track.artist.isnot(None))
     ) or 0
     
     return LibraryStatsResponse(
