@@ -529,8 +529,9 @@ def generate_hashtags(
     tags = []
     
     if artist:
-        # Normalize: remove spaces, special chars, keep as one tag
-        tag = re.sub(r'[^\w]', '', normalize_artist(artist))
+        # Keep original case, replace ! with I (common stylization), remove other special chars
+        tag = artist.replace('!', 'I').replace(' ', '')
+        tag = re.sub(r'[^\w]', '', tag)
         if tag and len(tag) > 1:
             tags.append(tag)
     
