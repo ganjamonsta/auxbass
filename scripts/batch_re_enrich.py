@@ -57,7 +57,8 @@ async def re_enrich_all_completed(batch_size: int = 20, dry_run: bool = True):
         new_album = fresh.get('album')
         source = fresh.get('source', 'unknown')
         
-        # Compare
+        # Simple logic: if different - update. API is the truth.
+        # Last.fm first, Deezer fallback, None if both empty
         if new_album != current_album:
             changes.append({
                 'track_id': track_id,
