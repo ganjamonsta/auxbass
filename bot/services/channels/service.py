@@ -16,9 +16,10 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from aiogram import Bot
 from aiogram.types import Message
-from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter
 
 import sys
+import asyncio
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
@@ -478,9 +479,15 @@ class ChannelService:
                     
                     stats["synced"] += 1
                     
-                    # Small delay to avoid rate limiting
-                    import asyncio
-                    await asyncio.sleep(0.5)
+                    # Delay to avoid rate limiting (Telegram allows ~20 msg/min to channels)
+                    await asyncio.sleep(3)
+                    
+                except TelegramRetryAfter as e:
+                    # Rate limited - wait and retry
+                    logger.warning(f"Rate limited, waiting {e.retry_after} seconds")
+                    await asyncio.sleep(e.retry_after + 1)
+                    # Don't count as failed, will be retried on next sync
+                    continue
                     
                 except TelegramForbiddenError:
                     channel.is_active = False
