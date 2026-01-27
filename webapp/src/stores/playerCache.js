@@ -151,46 +151,56 @@ export const preloadTrackWithAudio = (trackId, url) => {
  * Get preloaded audio if available and ready
  */
 export const getPreloadedAudio = (trackId) => {
-  if (preloadTrackId === trackId && preloadAudio && preloadAudio.src) {
-    // Check that audio is not in error state
-    if (preloadAudio.error) {
-      console.log(`[Preload] Audio for track ${trackId} has error, clearing`)
-      clearPreloadAudio()
-      return null
+  // First check if track IDs match
+  if (preloadTrackId !== trackId) {
+    if (preloadTrackId !== null) {
+      console.log(`[Preload] Requested track ${trackId} but preloaded is ${preloadTrackId}, ignoring`)
     }
-    
-    // Check networkState - NETWORK_NO_SOURCE (3) means load failed
-    // NETWORK_EMPTY (0) means not initialized
-    if (preloadAudio.networkState === 3 || preloadAudio.networkState === 0) {
-      console.log(`[Preload] Audio for track ${trackId} has bad networkState: ${preloadAudio.networkState}, clearing`)
-      clearPreloadAudio()
-      return null
-    }
-    
-    // Check src is not empty or default
-    if (!preloadAudio.src || preloadAudio.src === '' || preloadAudio.src === window.location.href) {
-      console.log(`[Preload] Audio for track ${trackId} has invalid src, clearing`)
-      clearPreloadAudio()
-      return null
-    }
-    
-    // Verify src contains valid audio token path
-    if (!preloadAudio.src.includes('/api/player/audio/')) {
-      console.log(`[Preload] Audio for track ${trackId} has wrong src format, clearing`)
-      clearPreloadAudio()
-      return null
-    }
-    
-    // Verify that audio has actually started loading (duration > 0 or readyState >= 1)
-    // This prevents using stale readyState from a previous track
-    if (preloadAudio.readyState < 1 && !isFinite(preloadAudio.duration)) {
-      console.log(`[Preload] Audio for track ${trackId} not ready yet (readyState=${preloadAudio.readyState})`)
-      return null
-    }
-    
-    return preloadAudio
+    return null
   }
-  return null
+  
+  if (!preloadAudio || !preloadAudio.src) {
+    return null
+  }
+  
+  // Check that audio is not in error state
+  if (preloadAudio.error) {
+    console.log(`[Preload] Audio for track ${trackId} has error, clearing`)
+    clearPreloadAudio()
+    return null
+  }
+  
+  // Check networkState - NETWORK_NO_SOURCE (3) means load failed
+  // NETWORK_EMPTY (0) means not initialized
+  if (preloadAudio.networkState === 3 || preloadAudio.networkState === 0) {
+    console.log(`[Preload] Audio for track ${trackId} has bad networkState: ${preloadAudio.networkState}, clearing`)
+    clearPreloadAudio()
+    return null
+  }
+  
+  // Check src is not empty or default
+  if (!preloadAudio.src || preloadAudio.src === '' || preloadAudio.src === window.location.href) {
+    console.log(`[Preload] Audio for track ${trackId} has invalid src, clearing`)
+    clearPreloadAudio()
+    return null
+  }
+  
+  // Verify src contains valid audio token path
+  if (!preloadAudio.src.includes('/api/player/audio/')) {
+    console.log(`[Preload] Audio for track ${trackId} has wrong src format, clearing`)
+    clearPreloadAudio()
+    return null
+  }
+  
+  // Verify that audio has actually started loading (duration > 0 or readyState >= 1)
+  // This prevents using stale readyState from a previous track
+  if (preloadAudio.readyState < 1 && !isFinite(preloadAudio.duration)) {
+    console.log(`[Preload] Audio for track ${trackId} not ready yet (readyState=${preloadAudio.readyState})`)
+    return null
+  }
+  
+  console.log(`[Preload] Returning preloaded audio for track ${trackId} (readyState=${preloadAudio.readyState}, networkState=${preloadAudio.networkState})`)
+  return preloadAudio
 }
 
 /**

@@ -546,6 +546,12 @@ export const usePlayerStore = defineStore('player', () => {
       console.error('Audio error:', e)
       loading.value = false
       
+      // Ignore errors from obsolete (swapped out) audio elements
+      if (e.target?._obsolete) {
+        console.log('[Audio Error] Ignoring error from obsolete audio element')
+        return
+      }
+      
       const errorCode = audio.value?.error?.code
       const errorMsg = audio.value?.error?.message || 'Ошибка воспроизведения'
       
@@ -730,6 +736,12 @@ export const usePlayerStore = defineStore('player', () => {
     audio.value.addEventListener('error', (e) => {
       console.error('Audio error:', e)
       loading.value = false
+      
+      // Ignore errors from obsolete (swapped out) audio elements
+      if (e.target?._obsolete) {
+        console.log('[Audio Error] (reattached) Ignoring error from obsolete audio element')
+        return
+      }
       
       const errorCode = audio.value?.error?.code
       const errorMsg = audio.value?.error?.message || 'Ошибка воспроизведения'
@@ -1158,11 +1170,13 @@ export const usePlayerStore = defineStore('player', () => {
           preloadedAudio.readyState >= 2 && 
           preloadedUrlStillValid &&
           (preloadedAudio.networkState === 1 || preloadedAudio.networkState === 2)) {
-        console.log(`[Play] Using preloaded Audio element - fast start (readyState=${preloadedAudio.readyState}, networkState=${preloadedAudio.networkState})`)
+        console.log(`[Play] Using preloaded Audio element for track ${track.id} - fast start (readyState=${preloadedAudio.readyState}, networkState=${preloadedAudio.networkState})`)
         
         // Swap audio elements
         if (audio.value) {
           audio.value.pause()
+          // Mark old audio as obsolete to ignore its errors
+          audio.value._obsolete = true
           audio.value.src = ''
         }
         
@@ -1437,6 +1451,9 @@ export const usePlayerStore = defineStore('player', () => {
     cancelIrrelevantPreloads()
     preloadTriggered = false
     
+    // Clear preload audio since we're changing tracks - prevents using wrong preload
+    clearPreloadAudio()
+    
     // === LAZY SHUFFLE MODE ===
     if (isLazyShuffleMode()) {
       lazyShuffleIndex.value++
@@ -1684,6 +1701,9 @@ export const usePlayerStore = defineStore('player', () => {
     markUserInteraction()
     cancelIrrelevantPreloads()
     preloadTriggered = false
+    
+    // Clear preload audio since we're changing tracks
+    clearPreloadAudio()
     
     // If more than 3 seconds played, restart current track
     if (progress.value > 3) {
