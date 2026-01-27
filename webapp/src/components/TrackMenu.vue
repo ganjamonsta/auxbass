@@ -21,19 +21,25 @@
             <!-- Menu items -->
             <div class="menu-items">
               <!-- Navigation section -->
-              <button v-if="hasArtist" class="menu-item" @click="handleGoToArtist">
+              <button v-if="showGoToArtist" class="menu-item" @click="handleGoToArtist">
                 <span class="menu-icon">👤</span>
                 <span>Перейти к артисту</span>
               </button>
 
-              <button v-if="hasAlbum" class="menu-item" @click="handleGoToAlbum">
+              <button v-if="showGoToAlbum" class="menu-item" @click="handleGoToAlbum">
                 <span class="menu-icon">💿</span>
                 <span>Перейти к альбому</span>
               </button>
 
-              <div v-if="hasArtist || hasAlbum" class="menu-divider"></div>
+              <div v-if="showGoToArtist || showGoToAlbum" class="menu-divider"></div>
 
-              <button class="menu-item" @click="handleAddToQueue">
+              <!-- Queue actions - hide for current track or in player context -->
+              <button v-if="showQueueActions" class="menu-item" @click="handlePlayNext">
+                <span class="menu-icon">▶️</span>
+                <span>Включить следующим</span>
+              </button>
+
+              <button v-if="showQueueActions" class="menu-item" @click="handleAddToQueue">
                 <span class="menu-icon">📋</span>
                 <span>Добавить в очередь</span>
               </button>
@@ -88,7 +94,12 @@ const props = defineProps({
   show: Boolean,
   track: Object,
   currentUserId: Number,
-  inPlaylist: Boolean
+  inPlaylist: Boolean,
+  // Context: 'library' | 'player' | 'album' | 'artist' | 'playlist' | 'liked'
+  context: {
+    type: String,
+    default: 'library'
+  }
 })
 
 const emit = defineEmits(['close', 'addToPlaylist', 'edit', 'delete', 'removeFromLibrary', 'download', 'goToArtist', 'goToAlbum', 'removeFromPlaylist'])
@@ -110,6 +121,31 @@ const hasAlbum = computed(() => {
 const isOwner = computed(() => {
   if (!props.track || !props.currentUserId) return false
   return props.track.uploader?.id === props.currentUserId
+})
+
+// Check if this is the currently playing track
+const isCurrentTrack = computed(() => {
+  return props.track?.id === player.currentTrack?.id
+})
+
+// Check if we're in player context (where queue actions don't make sense)
+const isPlayerContext = computed(() => {
+  return props.context === 'player'
+})
+
+// Show queue actions only when not current track and not in player context
+const showQueueActions = computed(() => {
+  return !isCurrentTrack.value && !isPlayerContext.value
+})
+
+// Show navigation to artist (hide if already on artist page)
+const showGoToArtist = computed(() => {
+  return hasArtist.value && props.context !== 'artist'
+})
+
+// Show navigation to album (hide if already on album page)
+const showGoToAlbum = computed(() => {
+  return hasAlbum.value && props.context !== 'album'
 })
 
 // Haptic feedback helper
