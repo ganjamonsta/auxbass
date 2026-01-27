@@ -116,12 +116,8 @@ const loadPlaylists = async () => {
     loading.value = true
     try {
         // Fetch liked count
-        const likedRes = await api.get('/tracks/favorites') // Or however liked is fetched
-        // Wait, PlaylistsView doesn't show code for fetching liked count in the snippets I read.
-        // Assuming there is a way.
-        // I will just use libraryStore if it has it, or a rough API call.
-        // Actually I saw "likedCount" ref in PlaylistsView but didn't see the fetch.
-        // I'll skip specific Liked logic details and focus on Playlists.
+        const likedRes = await api.get('/tracks/liked') 
+        likedCount.value = likedRes.data.total
         
         await libraryStore.fetchPlaylists() // Populates libraryStore.playlists
         playlists.value = libraryStore.playlists

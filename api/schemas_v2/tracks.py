@@ -19,7 +19,7 @@ class TrackResponse(BaseModel):
     """Track response"""
     id: int
     telegram_file_id: str
-    title: str
+    title: Optional[str] = None
     artist: Optional[str] = None
     duration: Optional[int] = None
     file_size: Optional[int] = None
