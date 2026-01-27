@@ -143,7 +143,7 @@ class EnrichmentWorker:
                 # Get distinct user IDs with completed enrichment
                 from sqlalchemy import distinct
                 result = await session.execute(
-                    select(distinct(Track.user_id))
+                    select(distinct(Track.uploader_id))
                     .where(
                         Track.enrichment_status == "completed",
                         Track.album.isnot(None),

@@ -32,7 +32,7 @@ async def handle_download_track(callback: CallbackQuery):
                 # (since they have the button they probably can see it).
                 # But safer to check accessing user has rights or it is their track.
                 # However, for simplicity and assuming buttons are only shown to owner:
-                Track.user_id == user_id
+                Track.uploader_id == user_id
             )
         )
         
