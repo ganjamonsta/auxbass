@@ -200,6 +200,74 @@ async def get_my_tracks(
     )
 
 
+@router.get("/ids")
+async def get_all_track_ids(
+    source: Optional[str] = None,
+    liked_only: bool = False,
+    sort_by: str = Query("added_at", pattern="^(added_at|title|artist|duration|random)$"),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get all track IDs from user's library.
+    
+    Lightweight endpoint for shuffle - returns only IDs, not full track data.
+    Use this to build a complete shuffle queue, then load tracks on-demand.
+    
+    Args:
+        source: Filter by library source (forwarded, search, etc.)
+        liked_only: Only return liked tracks
+        sort_by: Sort field. Use 'random' for pre-shuffled order
+        sort_order: asc or desc
+    
+    Returns:
+        List of track IDs in requested order
+    """
+    query = (
+        select(Track.id)
+        .join(UserLibrary, UserLibrary.track_id == Track.id)
+        .where(UserLibrary.user_id == user.id)
+    )
+    
+    # Source filter
+    if source:
+        try:
+            source_enum = LibrarySource(source)
+            query = query.where(UserLibrary.source == source_enum)
+        except ValueError:
+            pass
+    
+    # Liked filter
+    if liked_only:
+        query = query.where(UserLibrary.is_liked == True)
+    
+    # Sorting
+    if sort_by == "random":
+        query = query.order_by(func.random())
+    else:
+        if sort_by == "added_at":
+            sort_column = UserLibrary.added_at
+        elif sort_by == "title":
+            sort_column = Track.title
+        elif sort_by == "artist":
+            sort_column = Track.artist
+        elif sort_by == "duration":
+            sort_column = Track.duration
+        else:
+            sort_column = UserLibrary.added_at
+        
+        if sort_order == "desc":
+            query = query.order_by(desc(sort_column))
+        else:
+            query = query.order_by(asc(sort_column))
+    
+    result = await db.execute(query)
+    track_ids = result.scalars().all()
+    
+    return {"ids": track_ids, "total": len(track_ids)}
+
+
 @router.get("/stats", response_model=LibraryStatsResponse)
 async def get_library_stats(
     user: TelegramUser = Depends(get_current_user),

@@ -247,3 +247,46 @@ async def get_artist(
         albums=album_items,
         tracks=all_tracks,
     )
+
+
+@router.get("/{artist_name}/ids")
+async def get_artist_track_ids(
+    artist_name: str,
+    shuffle: bool = False,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get all track IDs for an artist.
+    
+    Lightweight endpoint for shuffle - returns only IDs.
+    """
+    normalized_search = normalize_artist(artist_name)
+    
+    query = (
+        select(Track.id)
+        .join(UserLibrary, UserLibrary.track_id == Track.id)
+        .where(UserLibrary.user_id == user.id)
+        .where(Track.artist.isnot(None))
+    )
+    
+    if shuffle:
+        query = query.order_by(func.random())
+    else:
+        query = query.order_by(Track.title.asc())
+    
+    result = await db.execute(query)
+    all_ids = result.scalars().all()
+    
+    # Need to filter by normalized artist - fetch artists for filtering
+    artist_result = await db.execute(
+        select(Track.id, Track.artist)
+        .where(Track.id.in_(all_ids))
+    )
+    
+    matching_ids = [
+        row[0] for row in artist_result.all()
+        if normalize_artist(row[1]) == normalized_search
+    ]
+    
+    return {"ids": matching_ids, "total": len(matching_ids)}

@@ -37,6 +37,60 @@ from api.schemas_v2.common import TelegramUser
 router = APIRouter(tags=["Tracks"])
 
 
+# ============== Track IDs (Lightweight for Shuffle) ==============
+
+@router.get("/ids")
+async def get_track_ids(
+    sort_by: str = Query("added_at", pattern="^(added_at|title|artist|duration|random)$"),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get all track IDs from user's library.
+    
+    Lightweight endpoint for shuffle - returns only IDs, not full track data.
+    Use this to build a complete shuffle queue, then load tracks on-demand.
+    
+    Args:
+        sort_by: Sort field. Use 'random' for pre-shuffled order
+        sort_order: asc or desc
+    
+    Returns:
+        List of track IDs in requested order
+    """
+    query = (
+        select(Track.id)
+        .join(UserLibrary, UserLibrary.track_id == Track.id)
+        .where(UserLibrary.user_id == user.id)
+    )
+    
+    # Sorting
+    if sort_by == "random":
+        query = query.order_by(func.random())
+    else:
+        if sort_by == "added_at":
+            sort_column = UserLibrary.added_at
+        elif sort_by == "title":
+            sort_column = Track.title
+        elif sort_by == "artist":
+            sort_column = Track.artist
+        elif sort_by == "duration":
+            sort_column = Track.duration
+        else:
+            sort_column = UserLibrary.added_at
+        
+        if sort_order == "desc":
+            query = query.order_by(desc(sort_column))
+        else:
+            query = query.order_by(asc(sort_column))
+    
+    result = await db.execute(query)
+    ids = [row[0] for row in result.all()]
+    
+    return {"ids": ids, "total": len(ids)}
+
+
 # ============== Enrichment Status ==============
 
 @router.get("/enrichment/status")
@@ -261,6 +315,50 @@ async def get_artist_detail(
             for a in albums
         ]
     }
+
+
+@router.get("/artist/{artist_name}/ids")
+async def get_artist_track_ids(
+    artist_name: str,
+    sort_by: str = Query("added_at", pattern="^(added_at|title|duration|random)$"),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get all track IDs for an artist.
+    
+    Lightweight endpoint for shuffle by artist.
+    """
+    normalized_search = normalize_artist(artist_name)
+    
+    query = (
+        select(Track.id, Track.artist, UserLibrary.added_at)
+        .join(UserLibrary, UserLibrary.track_id == Track.id)
+        .where(UserLibrary.user_id == user.id)
+        .where(Track.artist.isnot(None))
+    )
+    
+    result = await db.execute(query)
+    rows = result.all()
+    
+    # Filter by normalized artist name
+    matching_ids = [
+        (row[0], row[2])  # (track_id, added_at)
+        for row in rows
+        if normalize_artist(row[1]) == normalized_search
+    ]
+    
+    # Sort
+    if sort_by == "random":
+        import random
+        random.shuffle(matching_ids)
+        ids = [item[0] for item in matching_ids]
+    else:
+        # Sort by added_at desc
+        matching_ids.sort(key=lambda x: x[1] or datetime.min, reverse=True)
+        ids = [item[0] for item in matching_ids]
+    
+    return {"ids": ids, "total": len(ids)}
 
 
 # ============== Genres ==============

@@ -218,3 +218,40 @@ async def get_albums_by_artist(
     albums = result.scalars().all()
     
     return [album_to_response(album) for album in albums]
+
+
+@router.get("/{album_id}/ids")
+async def get_album_track_ids(
+    album_id: int,
+    shuffle: bool = False,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get all track IDs for an album.
+    
+    Lightweight endpoint for shuffle - returns only IDs.
+    """
+    album = await db.get(Album, album_id)
+    if not album:
+        raise HTTPException(status_code=404, detail="Album not found")
+    
+    query = (
+        select(Track.id)
+        .join(AlbumTrack, AlbumTrack.track_id == Track.id)
+        .join(UserLibrary, UserLibrary.track_id == Track.id)
+        .where(
+            AlbumTrack.album_id == album_id,
+            UserLibrary.user_id == user.id
+        )
+    )
+    
+    if shuffle:
+        query = query.order_by(func.random())
+    else:
+        query = query.order_by(AlbumTrack.track_number.asc().nullslast())
+    
+    result = await db.execute(query)
+    track_ids = result.scalars().all()
+    
+    return {"ids": track_ids, "total": len(track_ids)}

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { playerApi, tracksApi } from '../api/client'
+import { playerApi, tracksApi, playlistsApi, albumsApi } from '../api/client'
 
 // Import storage and cache utilities
 import {
@@ -62,6 +62,11 @@ export const usePlayerStore = defineStore('player', () => {
   const nextTrackPreloaded = ref(null)
   const lastError = ref(null)  // For error notifications
   const stateRestored = ref(false) // Flag to track if state was restored
+  
+  // Lazy shuffle mode - when shuffling full library/playlist with IDs only
+  const lazyShuffleIds = ref([])      // Array of track IDs in shuffle order
+  const lazyShuffleIndex = ref(-1)    // Current position in lazyShuffleIds
+  const lazyShuffleContext = ref(null) // Context info: { type: 'library'|'artist'|'album'|'playlist', id?: number, name?: string }
   
   // Interval for periodic state saving
   let stateSaveInterval = null
@@ -146,6 +151,56 @@ export const usePlayerStore = defineStore('player', () => {
     const nextIdx = getNextTrackIndex()
     if (nextIdx === -1) return null
     return queue.value[nextIdx] || null
+  }
+
+  // ============== Lazy Shuffle Functions ==============
+  // Check if we're in lazy shuffle mode
+  const isLazyShuffleMode = () => {
+    return lazyShuffleIds.value.length > 0 && lazyShuffleIndex.value >= 0
+  }
+
+  // Load track by ID
+  const loadTrackById = async (trackId) => {
+    try {
+      const response = await tracksApi.getOne(trackId)
+      return response.data
+    } catch (error) {
+      console.error(`[Lazy Shuffle] Failed to load track ${trackId}:`, error)
+      return null
+    }
+  }
+
+  // Clear lazy shuffle state
+  const clearLazyShuffle = () => {
+    lazyShuffleIds.value = []
+    lazyShuffleIndex.value = -1
+    lazyShuffleContext.value = null
+  }
+
+  // Get next track ID in lazy shuffle mode
+  const getNextLazyShuffleTrackId = () => {
+    if (!isLazyShuffleMode()) return null
+    const nextIdx = lazyShuffleIndex.value + 1
+    if (nextIdx >= lazyShuffleIds.value.length) {
+      if (repeat.value === 'all') {
+        return lazyShuffleIds.value[0]
+      }
+      return null
+    }
+    return lazyShuffleIds.value[nextIdx]
+  }
+
+  // Get prev track ID in lazy shuffle mode
+  const getPrevLazyShuffleTrackId = () => {
+    if (!isLazyShuffleMode()) return null
+    const prevIdx = lazyShuffleIndex.value - 1
+    if (prevIdx < 0) {
+      if (repeat.value === 'all') {
+        return lazyShuffleIds.value[lazyShuffleIds.value.length - 1]
+      }
+      return null
+    }
+    return lazyShuffleIds.value[prevIdx]
   }
 
   // Update Media Session metadata (for lock screen, notification area, Bluetooth controls, etc.)
@@ -936,6 +991,9 @@ export const usePlayerStore = defineStore('player', () => {
     
     // Update queue if provided
     if (newQueue) {
+      // Clear lazy shuffle when user manually selects a new queue
+      clearLazyShuffle()
+      
       queue.value = [...newQueue]
       queueIndex.value = newQueue.findIndex(t => t.id === track.id)
       
@@ -943,8 +1001,8 @@ export const usePlayerStore = defineStore('player', () => {
       if (shuffle.value) {
         generateShuffleOrder(queueIndex.value)
       }
-    } else if (shuffle.value && shuffleOrder.value.length === 0) {
-      // Shuffle is on but no order generated yet
+    } else if (shuffle.value && shuffleOrder.value.length === 0 && !isLazyShuffleMode()) {
+      // Shuffle is on but no order generated yet (and not in lazy mode)
       generateShuffleOrder(queueIndex.value)
     }
     
@@ -1137,6 +1195,82 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
+  // Play with shuffle from all tracks in context (library, artist, album, playlist)
+  // This fetches all track IDs with shuffle order and plays lazily
+  const playShuffleAll = async (context, contextId = null, contextName = null) => {
+    loading.value = true
+    console.log(`[Lazy Shuffle] Starting shuffle for ${context}`, contextId || contextName || '')
+    
+    try {
+      let response
+      
+      // Fetch shuffled IDs based on context
+      switch (context) {
+        case 'library':
+          response = await tracksApi.getAllIds({ sort_by: 'random' })
+          break
+        case 'artist':
+          if (!contextName) throw new Error('Artist name required')
+          response = await tracksApi.getArtistIds(contextName, { sort_by: 'random' })
+          break
+        case 'album':
+          if (!contextId) throw new Error('Album ID required')
+          response = await albumsApi.getIds(contextId, { shuffle: true })
+          break
+        case 'playlist':
+          if (!contextId) throw new Error('Playlist ID required')
+          response = await playlistsApi.getIds(contextId, { shuffle: true })
+          break
+        default:
+          throw new Error(`Unknown context: ${context}`)
+      }
+      
+      const ids = response.data?.ids || response.data
+      if (!ids || ids.length === 0) {
+        console.warn('[Lazy Shuffle] No tracks found')
+        loading.value = false
+        return
+      }
+      
+      console.log(`[Lazy Shuffle] Got ${ids.length} track IDs`)
+      
+      // Set lazy shuffle state
+      lazyShuffleIds.value = ids
+      lazyShuffleIndex.value = 0
+      lazyShuffleContext.value = { type: context, id: contextId, name: contextName }
+      
+      // Enable shuffle mode
+      shuffle.value = true
+      saveSettings({ shuffle: true, volume: volume.value, isMuted: isMuted.value, repeat: repeat.value })
+      
+      // Clear regular queue and shuffle order
+      queue.value = []
+      queueIndex.value = -1
+      shuffleOrder.value = []
+      shuffleIndex.value = -1
+      
+      // Load and play first track
+      const firstTrack = await loadTrackById(ids[0])
+      if (!firstTrack) {
+        console.error('[Lazy Shuffle] Failed to load first track')
+        clearLazyShuffle()
+        loading.value = false
+        return
+      }
+      
+      // Add to queue and play
+      queue.value = [firstTrack]
+      queueIndex.value = 0
+      
+      await play(firstTrack)
+      
+    } catch (error) {
+      console.error('[Lazy Shuffle] Failed to start shuffle:', error)
+      clearLazyShuffle()
+      loading.value = false
+    }
+  }
+
   // Toggle play/pause
   const toggle = async () => {
     // If we have a restored state but audio is not loaded, resume from state
@@ -1156,8 +1290,6 @@ export const usePlayerStore = defineStore('player', () => {
 
   // Next track
   const next = async () => {
-    if (queue.value.length === 0) return
-    
     // Prevent error handlers from triggering during track change
     isSkipping = true
     
@@ -1165,6 +1297,82 @@ export const usePlayerStore = defineStore('player', () => {
     markUserInteraction()
     cancelIrrelevantPreloads()
     preloadTriggered = false
+    
+    // === LAZY SHUFFLE MODE ===
+    if (isLazyShuffleMode()) {
+      lazyShuffleIndex.value++
+      
+      if (lazyShuffleIndex.value >= lazyShuffleIds.value.length) {
+        if (repeat.value === 'all') {
+          lazyShuffleIndex.value = 0
+        } else {
+          // End of lazy shuffle queue
+          isPlaying.value = false
+          isSkipping = false
+          clearLazyShuffle()
+          return
+        }
+      }
+      
+      const nextTrackId = lazyShuffleIds.value[lazyShuffleIndex.value]
+      console.log(`[Lazy Shuffle] Next: loading track ${nextTrackId} (${lazyShuffleIndex.value + 1}/${lazyShuffleIds.value.length})`)
+      
+      // Check blob cache first
+      const cachedBlobUrl = getCachedAudio(nextTrackId)
+      if (cachedBlobUrl) {
+        // Need to load track data for metadata
+        const nextTrack = await loadTrackById(nextTrackId)
+        if (nextTrack) {
+          queue.value = [nextTrack]
+          queueIndex.value = 0
+          initAudio()
+          loading.value = true
+          currentTrack.value = nextTrack
+          updateMediaSession()
+          
+          try {
+            audio.value.pause()
+            audio.value.currentTime = 0
+            audio.value.src = cachedBlobUrl
+            buffered.value = duration.value
+            audio.value.load()
+            await audio.value.play()
+            loading.value = false
+            isSkipping = false
+            persistState()
+            return
+          } catch (e) {
+            console.error('[Lazy Shuffle Next] Failed to play cached blob:', e)
+          }
+        }
+      }
+      
+      // Load track and play
+      loading.value = true
+      const nextTrack = await loadTrackById(nextTrackId)
+      if (!nextTrack) {
+        console.error(`[Lazy Shuffle] Failed to load track ${nextTrackId}, skipping`)
+        isSkipping = false
+        loading.value = false
+        await next() // Try next one
+        return
+      }
+      
+      queue.value = [nextTrack]
+      queueIndex.value = 0
+      shuffleOrder.value = []
+      shuffleIndex.value = -1
+      
+      isSkipping = false
+      await play(nextTrack)
+      return
+    }
+    
+    // === REGULAR MODE ===
+    if (queue.value.length === 0) {
+      isSkipping = false
+      return
+    }
     
     let nextIndex
     
@@ -1319,8 +1527,6 @@ export const usePlayerStore = defineStore('player', () => {
 
   // Previous track
   const prev = async () => {
-    if (queue.value.length === 0) return
-    
     // Prevent error handlers from triggering during track change
     isSkipping = true
     
@@ -1332,6 +1538,46 @@ export const usePlayerStore = defineStore('player', () => {
     // If more than 3 seconds played, restart current track
     if (progress.value > 3) {
       seek(0)
+      isSkipping = false
+      return
+    }
+    
+    // === LAZY SHUFFLE MODE ===
+    if (isLazyShuffleMode()) {
+      lazyShuffleIndex.value--
+      
+      if (lazyShuffleIndex.value < 0) {
+        if (repeat.value === 'all') {
+          lazyShuffleIndex.value = lazyShuffleIds.value.length - 1
+        } else {
+          lazyShuffleIndex.value = 0
+        }
+      }
+      
+      const prevTrackId = lazyShuffleIds.value[lazyShuffleIndex.value]
+      console.log(`[Lazy Shuffle] Prev: loading track ${prevTrackId} (${lazyShuffleIndex.value + 1}/${lazyShuffleIds.value.length})`)
+      
+      loading.value = true
+      const prevTrack = await loadTrackById(prevTrackId)
+      if (!prevTrack) {
+        console.error(`[Lazy Shuffle] Failed to load track ${prevTrackId}`)
+        isSkipping = false
+        loading.value = false
+        return
+      }
+      
+      queue.value = [prevTrack]
+      queueIndex.value = 0
+      shuffleOrder.value = []
+      shuffleIndex.value = -1
+      
+      isSkipping = false
+      await play(prevTrack)
+      return
+    }
+    
+    // === REGULAR MODE ===
+    if (queue.value.length === 0) {
       isSkipping = false
       return
     }
@@ -1449,9 +1695,10 @@ export const usePlayerStore = defineStore('player', () => {
       // Generate shuffle order starting from current track
       generateShuffleOrder(queueIndex.value)
     } else {
-      // Clear shuffle order
+      // Clear shuffle order and lazy shuffle
       shuffleOrder.value = []
       shuffleIndex.value = -1
+      clearLazyShuffle()
     }
     
     // Trigger preload with new order
@@ -1761,8 +2008,12 @@ export const usePlayerStore = defineStore('player', () => {
     buffered,
     lastError,
     stateRestored,
+    lazyShuffleContext,
+    lazyShuffleIndex,
+    lazyShuffleIds,
     play,
     playTrack: play,  // Alias for backwards compatibility
+    playShuffleAll,
     toggle,
     next,
     prev,
@@ -1782,5 +2033,6 @@ export const usePlayerStore = defineStore('player', () => {
     resumeFromState,
     hasSavedState,
     persistState,
+    isLazyShuffleMode,
   }
 })

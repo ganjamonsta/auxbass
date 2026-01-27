@@ -220,6 +220,40 @@ async def get_playlist(
     )
 
 
+@router.get("/{playlist_id}/ids")
+async def get_playlist_track_ids(
+    playlist_id: int,
+    shuffle: bool = False,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get all track IDs for a playlist.
+    
+    Lightweight endpoint for shuffle - returns only IDs.
+    """
+    playlist = await db.get(Playlist, playlist_id)
+    
+    if not playlist or playlist.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    
+    query = (
+        select(Track.id)
+        .join(PlaylistTrack, PlaylistTrack.track_id == Track.id)
+        .where(PlaylistTrack.playlist_id == playlist_id)
+    )
+    
+    if shuffle:
+        query = query.order_by(func.random())
+    else:
+        query = query.order_by(PlaylistTrack.position.asc())
+    
+    result = await db.execute(query)
+    track_ids = result.scalars().all()
+    
+    return {"ids": track_ids, "total": len(track_ids)}
+
+
 @router.put("/{playlist_id}", response_model=PlaylistResponse)
 async def update_playlist(
     playlist_id: int,

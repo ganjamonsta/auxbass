@@ -93,12 +93,14 @@ export const authApi = {
 export const tracksApi = {
   // My library
   getAll: (params = {}) => api.get('/tracks', { params }),
+  getAllIds: (params = {}) => api.get('/tracks/ids', { params }),
   getOne: (id) => api.get(`/tracks/${id}`),
   update: (id, data) => api.put(`/tracks/${id}`, data),
   delete: (id) => api.delete(`/tracks/${id}`),
   getArtists: (scope = 'library') => api.get('/tracks/artists', { params: { scope } }),
   getArtistImage: (artistName) => api.get(`/tracks/artist-image/${encodeURIComponent(artistName)}`),
   getArtistDetail: (artistName, scope = 'library') => api.get(`/tracks/artist/${encodeURIComponent(artistName)}`, { params: { scope } }),
+  getArtistIds: (artistName, params = {}) => api.get(`/tracks/artist/${encodeURIComponent(artistName)}/ids`, { params }),
   getGenres: (scope = 'library') => api.get('/tracks/genres', { params: { scope } }),
   getEnrichmentStatus: () => api.get('/tracks/enrichment/status'),
   getHistory: (limit = 50) => api.get('/tracks/history', { params: { limit } }),
@@ -126,11 +128,18 @@ export const tracksApi = {
 export const playlistsApi = {
   getAll: () => api.get('/playlists'),
   getOne: (id) => api.get(`/playlists/${id}`),
+  getIds: (id, params = {}) => api.get(`/playlists/${id}/ids`, { params }),
   create: (data) => api.post('/playlists', data),
   update: (id, data) => api.put(`/playlists/${id}`, data),
   delete: (id) => api.delete(`/playlists/${id}`),
   addTrack: (playlistId, trackId) => api.post(`/playlists/${playlistId}/tracks`, { track_id: trackId }),
   removeTrack: (playlistId, trackId) => api.delete(`/playlists/${playlistId}/tracks/${trackId}`),
+}
+
+// Albums
+export const albumsApi = {
+  getOne: (id) => api.get(`/albums/${id}`),
+  getIds: (id, params = {}) => api.get(`/albums/${id}/ids`, { params }),
 }
 
 // Player

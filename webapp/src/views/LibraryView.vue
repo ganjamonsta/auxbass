@@ -65,15 +65,23 @@
 
     <!-- Sort options -->
     <div class="sort-options">
-      <select v-model="sortBy" @change="loadTracks">
-        <option value="added_at">По дате</option>
-        <option value="title">По названию</option>
-        <option value="artist">По исполнителю</option>
-        <option value="duration">По длительности</option>
-      </select>
-      <button class="sort-order" @click="toggleSortOrder">
-        {{ sortOrder === 'desc' ? '↓' : '↑' }}
+      <button class="shuffle-all-btn" @click="shuffleAll" :disabled="!total">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
+        </svg>
+        <span>Перемешать ({{ total }})</span>
       </button>
+      <div class="sort-controls">
+        <select v-model="sortBy" @change="loadTracks">
+          <option value="added_at">По дате</option>
+          <option value="title">По названию</option>
+          <option value="artist">По исполнителю</option>
+          <option value="duration">По длительности</option>
+        </select>
+        <button class="sort-order" @click="toggleSortOrder">
+          {{ sortOrder === 'desc' ? '↓' : '↑' }}
+        </button>
+      </div>
     </div>
 
     <!-- Track list -->
@@ -210,6 +218,11 @@ const handleLikeTrack = async (track) => {
 
 const playTrack = (track) => {
   playerStore.playTrack(track, tracks.value)
+}
+
+// Shuffle all library tracks using lazy loading
+const shuffleAll = async () => {
+  await playerStore.playShuffleAll('library')
 }
 
 // Track menu state
@@ -379,11 +392,42 @@ onMounted(() => {
 
 .sort-options {
   display: flex;
+  align-items: center;
   gap: 8px;
   margin-bottom: 16px;
 }
 
-.sort-options select {
+.shuffle-all-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.shuffle-all-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.shuffle-all-btn svg {
+  flex-shrink: 0;
+}
+
+.sort-controls {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+}
+
+.sort-controls select {
   flex: 1;
   background: var(--bg-elevated);
   border: none;
