@@ -208,8 +208,8 @@ async def cmd_channel(message: Message, state: FSMContext):
         from bot.handlers.keyboards import get_channel_keyboard
         await message.answer(
             f"☁️ <b>Ваш канал для бекапа</b>\n\n"
-            f"📢 {channel.channel_name or 'Канал'}\n"
-            f"🎵 Сохранено треков: {channel.message_count or 0}",
+            f"📢 {channel.channel_title or 'Канал'}\n"
+            f"🎵 Сохранено треков: {getattr(channel, '_message_count', 0)}",
             reply_markup=get_channel_keyboard(channel.channel_id, channel.channel_username)
         )
         return
@@ -251,15 +251,15 @@ async def process_channel_forward(message: Message, state: FSMContext):
     
     # Try to setup channel
     try:
-        success = await channel_service.setup_channel(
+        channel = await channel_service.setup_channel(
             user_id=message.from_user.id,
             channel_id=chat.id,
             channel_username=chat.username,
-            channel_name=chat.title,
+            channel_title=chat.title,
             bot=message.bot,
         )
         
-        if success:
+        if channel:
             await state.clear()
             await message.answer(
                 f"✅ <b>Канал подключён!</b>\n\n"

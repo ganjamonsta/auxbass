@@ -174,8 +174,8 @@ async def handle_channel_settings(callback: CallbackQuery):
     
     await callback.message.edit_text(
         f"⚙️ <b>Настройки канала</b>\n\n"
-        f"📢 {channel.channel_name or 'Канал'}\n"
-        f"🎵 Сохранено: {channel.message_count or 0} треков\n\n"
+        f"📢 {channel.channel_title or 'Канал'}\n"
+        f"🎵 Сохранено: {getattr(channel, '_message_count', 0)} треков\n\n"
         "<b>Опции:</b>",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(

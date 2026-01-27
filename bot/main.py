@@ -25,6 +25,7 @@ from bot.handlers.callbacks import router as callbacks_router
 from bot.handlers.download import router as download_router
 
 from bot.services.enrichment import enrichment_worker
+from bot.services.channels import init_channel_service
 
 
 # Configure logging
@@ -55,6 +56,9 @@ async def main():
         token=settings.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML)
     )
+    
+    # Initialize channel service with bot
+    init_channel_service(bot)
     
     # Initialize dispatcher with FSM storage
     storage = MemoryStorage()
