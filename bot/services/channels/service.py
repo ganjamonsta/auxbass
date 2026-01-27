@@ -168,6 +168,46 @@ class ChannelService:
             )
             return count or 0
     
+    async def get_sync_stats(self, user_id: int) -> dict:
+        """
+        Get sync statistics before starting sync.
+        
+        Returns:
+            Dict with: total_tracks, already_synced, to_sync
+        """
+        async with get_session() as session:
+            channel = await session.scalar(
+                select(UserChannel).where(
+                    UserChannel.user_id == user_id,
+                    UserChannel.is_active == True
+                )
+            )
+            
+            if not channel:
+                return {"total_tracks": 0, "already_synced": 0, "to_sync": 0, "error": "No channel"}
+            
+            # Count total tracks in library
+            from shared.models import UserLibrary
+            total = await session.scalar(
+                select(func.count(UserLibrary.id)).where(
+                    UserLibrary.user_id == user_id
+                )
+            ) or 0
+            
+            # Count already synced
+            already_synced = await session.scalar(
+                select(func.count(ChannelMessage.id)).where(
+                    ChannelMessage.channel_id == channel.id
+                )
+            ) or 0
+            
+            return {
+                "total_tracks": total,
+                "already_synced": already_synced,
+                "to_sync": max(0, total - already_synced),
+                "channel_title": channel.channel_title or "Канал"
+            }
+    
     async def disable_channel(
         self,
         user_id: int

@@ -294,9 +294,29 @@ async def cmd_sync(message: Message):
         )
         return
     
+    # Get sync stats first
+    stats = await channel_service.get_sync_stats(user_id)
+    
+    if stats.get("error"):
+        await message.answer(f"❌ {stats['error']}")
+        return
+    
+    if stats["to_sync"] == 0:
+        await message.answer(
+            f"✅ <b>Все треки уже синхронизированы!</b>\n\n"
+            f"📢 {stats['channel_title']}\n"
+            f"🎵 В канале: <b>{stats['already_synced']}</b> треков\n"
+            f"📚 В библиотеке: <b>{stats['total_tracks']}</b> треков"
+        )
+        return
+    
     status_msg = await message.answer(
-        "🔄 <b>Синхронизация начата...</b>\n\n"
-        "Это может занять некоторое время.",
+        f"🔄 <b>Синхронизация...</b>\n\n"
+        f"📢 {stats['channel_title']}\n"
+        f"📚 Всего в библиотеке: <b>{stats['total_tracks']}</b>\n"
+        f"✅ Уже в канале: <b>{stats['already_synced']}</b>\n"
+        f"📤 Осталось отправить: <b>{stats['to_sync']}</b>\n\n"
+        f"⏳ Прогресс: 0/{stats['to_sync']}",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(
                 text="⛔ Прервать",
@@ -306,15 +326,20 @@ async def cmd_sync(message: Message):
     )
     
     # Progress callback to update message
+    to_sync = stats["to_sync"]
     last_update = [0]
+    
     async def progress_callback(current, total):
-        # Update every 10 tracks or 10%
-        if current - last_update[0] >= max(10, total // 10):
+        if current - last_update[0] >= max(5, to_sync // 20):
             last_update[0] = current
             try:
                 await status_msg.edit_text(
                     f"🔄 <b>Синхронизация...</b>\n\n"
-                    f"📊 Обработано: {current}/{total} треков",
+                    f"📢 {stats['channel_title']}\n"
+                    f"📚 Всего в библиотеке: <b>{stats['total_tracks']}</b>\n"
+                    f"✅ Уже в канале: <b>{stats['already_synced']}</b>\n"
+                    f"📤 Осталось отправить: <b>{stats['to_sync']}</b>\n\n"
+                    f"⏳ Обработано: {current}/{total}",
                     reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                         [InlineKeyboardButton(
                             text="⛔ Прервать",

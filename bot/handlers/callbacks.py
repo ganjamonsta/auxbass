@@ -243,10 +243,34 @@ async def handle_channel_sync(callback: CallbackQuery):
         await callback.answer("Канал не найден", show_alert=True)
         return
     
-    # Show sync started with cancel button
+    # Get sync stats first
+    stats = await channel_service.get_sync_stats(user_id)
+    
+    if stats.get("error"):
+        await callback.answer(stats["error"], show_alert=True)
+        return
+    
+    if stats["to_sync"] == 0:
+        await callback.message.edit_text(
+            f"✅ <b>Все треки уже синхронизированы!</b>\n\n"
+            f"📢 {stats['channel_title']}\n"
+            f"🎵 В канале: <b>{stats['already_synced']}</b> треков\n"
+            f"📚 В библиотеке: <b>{stats['total_tracks']}</b> треков",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="channel:settings")]
+            ])
+        )
+        await callback.answer()
+        return
+    
+    # Show sync started with detailed stats
     await callback.message.edit_text(
-        "🔄 <b>Синхронизация начата...</b>\n\n"
-        "Это может занять некоторое время.",
+        f"🔄 <b>Синхронизация...</b>\n\n"
+        f"📢 {stats['channel_title']}\n"
+        f"📚 Всего в библиотеке: <b>{stats['total_tracks']}</b>\n"
+        f"✅ Уже в канале: <b>{stats['already_synced']}</b>\n"
+        f"📤 Осталось отправить: <b>{stats['to_sync']}</b>\n\n"
+        f"⏳ Прогресс: 0/{stats['to_sync']}",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(
                 text="⛔ Прервать",
@@ -257,14 +281,23 @@ async def handle_channel_sync(callback: CallbackQuery):
     await callback.answer()
     
     # Progress callback to update message
+    to_sync = stats["to_sync"]
+    synced_count = [0]
     last_update = [0]
+    
     async def progress_callback(current, total):
-        if current - last_update[0] >= max(10, total // 10):
+        # Count actual synced (not skipped)
+        nonlocal synced_count
+        if current - last_update[0] >= max(5, to_sync // 20):  # Update every 5% or 5 tracks
             last_update[0] = current
             try:
                 await callback.message.edit_text(
                     f"🔄 <b>Синхронизация...</b>\n\n"
-                    f"📊 Обработано: {current}/{total} треков",
+                    f"📢 {stats['channel_title']}\n"
+                    f"📚 Всего в библиотеке: <b>{stats['total_tracks']}</b>\n"
+                    f"✅ Уже в канале: <b>{stats['already_synced']}</b>\n"
+                    f"📤 Осталось отправить: <b>{stats['to_sync']}</b>\n\n"
+                    f"⏳ Обработано: {current}/{total}",
                     reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                         [InlineKeyboardButton(
                             text="⛔ Прервать",
