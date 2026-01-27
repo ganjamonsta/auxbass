@@ -706,7 +706,7 @@ class MetadataService:
         """
         Main method to enrich track metadata.
         Uses Last.fm as PRIMARY source (more reliable artist matching),
-        Deezer only for cover art fallback.
+        Deezer as fallback for missing data (album, cover).
         Returns dict with enriched data and 'enriched' flag.
         """
         result = {
@@ -725,17 +725,29 @@ class MetadataService:
             result["cover_url"] = lastfm_data.get("cover_url")
             result["release_date"] = lastfm_data.get("release_date")
             result["source"] = "lastfm"
-            # NO album_id - grouping by album name is safer than Deezer IDs
             logger.info(f"Enriched from Last.fm: {title} - {artist} -> album: {lastfm_data.get('album')}")
             
-            # If no cover from Last.fm, try Deezer just for cover
-            if not result.get("cover_url"):
+            # If Last.fm missing album OR cover, try Deezer for missing data
+            if not result.get("album") or not result.get("cover_url"):
                 deezer_data = await self.search_deezer(title, artist)
-                if deezer_data and deezer_data.get("cover_url"):
-                    result["cover_url"] = deezer_data["cover_url"]
-                    logger.debug(f"Got cover from Deezer for: {title}")
+                if deezer_data:
+                    # Fill missing album from Deezer
+                    if not result.get("album") and deezer_data.get("album"):
+                        result["album"] = deezer_data["album"]
+                        result["source"] = "lastfm+deezer"
+                        logger.info(f"Got album from Deezer: {title} -> {deezer_data['album']}")
+                    # Fill missing cover from Deezer
+                    if not result.get("cover_url") and deezer_data.get("cover_url"):
+                        result["cover_url"] = deezer_data["cover_url"]
+                        logger.debug(f"Got cover from Deezer for: {title}")
+                    # Fill missing genre from Deezer
+                    if not result.get("genre") and deezer_data.get("genre"):
+                        result["genre"] = deezer_data["genre"]
+                    # Fill missing release_date from Deezer
+                    if not result.get("release_date") and deezer_data.get("release_date"):
+                        result["release_date"] = deezer_data["release_date"]
         else:
-            # Last.fm failed - try Deezer as fallback
+            # Last.fm failed completely - try Deezer as full fallback
             deezer_data = await self.search_deezer(title, artist)
             
             if deezer_data:
@@ -743,7 +755,7 @@ class MetadataService:
                 result["album"] = deezer_data.get("album")
                 result["genre"] = deezer_data.get("genre")
                 result["cover_url"] = deezer_data.get("cover_url")
-                # Still NO album_id - don't trust Deezer for grouping
+                result["release_date"] = deezer_data.get("release_date")
                 result["source"] = "deezer"
                 logger.info(f"Enriched from Deezer (fallback): {title} - {artist} -> album: {deezer_data.get('album')}")
         
