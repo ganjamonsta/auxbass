@@ -1,18 +1,5 @@
 <template>
-  <div class="albums-view">
-    <div class="view-header">
-      <div class="header-left">
-        <h1>Альбомы</h1>
-        <span class="count">{{ total }} альбомов</span>
-      </div>
-      <SortChips
-        :currentOption="currentOption"
-        :sortOrder="sortOrder"
-        @next="onNextSort"
-        @toggle-order="onToggleOrder"
-      />
-    </div>
-
+  <div class="library-albums">
     <!-- Top pagination (shows when not on first page) -->
     <PaginationNav
       v-if="!isFirstPage"
@@ -60,6 +47,12 @@
     <div v-if="loading" class="loading">
       <div class="spinner"></div>
     </div>
+    
+    <div v-if="!loading && !albums.length" class="empty-state">
+      <span class="empty-icon">💿</span>
+      <h3 v-if="searchQuery">Ничего не найдено</h3>
+      <p v-else>В библиотеке нет альбомов</p>
+    </div>
 
     <!-- Bottom pagination -->
     <PaginationNav
@@ -83,34 +76,20 @@
 <script setup>
 import { watch } from 'vue'
 import { usePlayerStore } from '@/stores/player'
-import { usePagination, useSort } from '@/composables'
+import { usePagination } from '@/composables'
 import PaginationNav from '@/components/PaginationNav.vue'
-import SortChips from '@/components/SortChips.vue'
 import api from '@/api/client'
+
+const props = defineProps({
+  searchQuery: {
+    type: String,
+    default: ''
+  }
+})
 
 const playerStore = usePlayerStore()
 
-// Sort state (persisted to localStorage)
-const { 
-  sortBy, 
-  sortOrder, 
-  currentOption, 
-  nextSort, 
-  toggleOrder 
-} = useSort('albums-sort', 'albums', { sortBy: 'release_date', sortOrder: 'desc' })
-
-// Sort handlers
-const onNextSort = () => {
-  nextSort()
-  goToFirst()
-}
-
-const onToggleOrder = () => {
-  toggleOrder()
-  goToFirst()
-}
-
-// Pagination with unified composable (windowed mode for memory optimization)
+// Pagination with unified composable
 const { 
   items: albums, 
   total, 
@@ -125,26 +104,25 @@ const {
   goToLast,
   prevPage,
   nextPage,
-  refresh
+  refresh // Assuming refresh or reload exists, or I can just re-trigger fetch
 } = usePagination({
   fetchFn: async ({ offset, limit }) => {
-    const response = await api.get('/albums', {
-      params: { 
-        offset, 
-        limit,
-        sort_by: sortBy.value,
-        sort_order: sortOrder.value
-      }
-    })
+    // Pass search query if API supports it, currently backend might not.
+    // If backend ignores extra params, this is safe.
+    const params = { offset, limit }
+    if (props.searchQuery) {
+      params.search = props.searchQuery
+    }
+    const response = await api.get('/albums', { params })
     return response.data
   },
   limit: 30,
-  mode: 'windowed'  // Memory optimized - only current page in memory
+  mode: 'windowed'
 })
 
-// Watch sort changes to refresh data
-watch([sortBy, sortOrder], () => {
-  refresh()
+// Watch search query to reload
+watch(() => props.searchQuery, () => {
+    goToFirst()
 })
 
 const playAlbum = async (album) => {
@@ -158,36 +136,10 @@ const playAlbum = async (album) => {
   }
 }
 </script>
+
 <style scoped>
-.albums-view {
-  padding: 16px;
-  padding-bottom: 120px;
-}
-
-.view-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 24px;
-}
-
-.header-left {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-}
-
-.view-header h1 {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.count {
-  font-size: 14px;
-  color: var(--text-secondary);
+.library-albums {
+    padding-bottom: 20px;
 }
 
 .albums-grid {
@@ -291,7 +243,7 @@ const playAlbum = async (album) => {
   color: var(--text-tertiary);
 }
 
-.loading, .load-more {
+.loading {
   display: flex;
   justify-content: center;
   padding: 24px;
@@ -306,13 +258,13 @@ const playAlbum = async (album) => {
   animation: spin 0.8s linear infinite;
 }
 
-.load-more button {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  border: none;
-  border-radius: 20px;
-  padding: 10px 24px;
-  cursor: pointer;
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
 }
 
 @keyframes spin {
