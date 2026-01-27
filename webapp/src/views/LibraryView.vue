@@ -71,17 +71,12 @@
         </svg>
         <span>Перемешать ({{ total }})</span>
       </button>
-      <div class="sort-controls">
-        <select v-model="sortBy" @change="loadTracks">
-          <option value="added_at">По дате</option>
-          <option value="title">По названию</option>
-          <option value="artist">По исполнителю</option>
-          <option value="duration">По длительности</option>
-        </select>
-        <button class="sort-order" @click="toggleSortOrder">
-          {{ sortOrder === 'desc' ? '↓' : '↑' }}
-        </button>
-      </div>
+      <SortChips
+        :currentOption="currentOption"
+        :sortOrder="sortOrder"
+        @next="onNextSort"
+        @toggle-order="onToggleOrder"
+      />
     </div>
 
     <!-- Track list -->
@@ -142,8 +137,10 @@ import { useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
+import { useSort } from '@/composables'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackMenu from '@/components/TrackMenu.vue'
+import SortChips from '@/components/SortChips.vue'
 import api, { playerApi } from '@/api/client'
 
 const router = useRouter()
@@ -151,9 +148,16 @@ const libraryStore = useLibraryStore()
 const playerStore = usePlayerStore()
 const authStore = useAuthStore()
 
+// Sort state (persisted to localStorage)
+const { 
+  sortBy, 
+  sortOrder, 
+  currentOption, 
+  nextSort, 
+  toggleOrder 
+} = useSort('library-sort', 'library', { sortBy: 'added_at', sortOrder: 'desc' })
+
 const searchQuery = ref('')
-const sortBy = ref('added_at')
-const sortOrder = ref('desc')
 const loading = ref(false)
 const tracks = ref([])
 const page = ref(1)
@@ -201,8 +205,15 @@ const clearSearch = () => {
   loadTracks()
 }
 
-const toggleSortOrder = () => {
-  sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
+// Sort change handlers
+const onNextSort = () => {
+  nextSort()
+  page.value = 1
+  loadTracks()
+}
+
+const onToggleOrder = () => {
+  toggleOrder()
   page.value = 1
   loadTracks()
 }
@@ -420,32 +431,6 @@ onMounted(() => {
 
 .shuffle-all-btn svg {
   flex-shrink: 0;
-}
-
-.sort-controls {
-  display: flex;
-  gap: 8px;
-  flex: 1;
-}
-
-.sort-controls select {
-  flex: 1;
-  background: var(--bg-elevated);
-  border: none;
-  border-radius: 8px;
-  padding: 8px 12px;
-  color: var(--text-primary);
-  font-size: 14px;
-}
-
-.sort-order {
-  background: var(--bg-elevated);
-  border: none;
-  border-radius: 8px;
-  padding: 8px 12px;
-  color: var(--text-primary);
-  font-size: 16px;
-  cursor: pointer;
 }
 
 .loading {

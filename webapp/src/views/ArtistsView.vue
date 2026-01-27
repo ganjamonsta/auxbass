@@ -15,17 +15,12 @@
       <div class="stats">
         {{ total }} исполнителей
       </div>
-      <div class="sort-controls">
-        <select v-model="sortBy" @change="onSortChange">
-          <option value="name">По имени</option>
-          <option value="track_count">По трекам</option>
-          <option value="album_count">По альбомам</option>
-          <option value="latest_release">По дате релиза</option>
-        </select>
-        <button class="sort-order" @click="toggleSortOrder">
-          {{ sortOrder === 'desc' ? '↓' : '↑' }}
-        </button>
-      </div>
+      <SortChips
+        :currentOption="currentOption"
+        :sortOrder="sortOrder"
+        @next="onNextSort"
+        @toggle-order="onToggleOrder"
+      />
     </div>
 
     <!-- Artist grid -->
@@ -67,9 +62,20 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useSort } from '@/composables'
+import SortChips from '@/components/SortChips.vue'
 import api from '@/api/client'
 
 const router = useRouter()
+
+// Sort state (persisted to localStorage)
+const { 
+  sortBy, 
+  sortOrder, 
+  currentOption, 
+  nextSort, 
+  toggleOrder 
+} = useSort('artists-sort', 'artists', { sortBy: 'name', sortOrder: 'asc' })
 
 // Data state
 const artists = ref([])
@@ -81,10 +87,6 @@ const limit = 30
 // Search state
 const searchQuery = ref('')
 let searchTimeout = null
-
-// Sort state
-const sortBy = ref('name')
-const sortOrder = ref('asc')
 
 // Infinite scroll
 const loadTrigger = ref(null)
@@ -156,18 +158,13 @@ const debouncedSearch = () => {
 }
 
 // Sort change handlers
-const onSortChange = () => {
-  // Set default order based on sort type
-  if (sortBy.value === 'name') {
-    sortOrder.value = 'asc'
-  } else {
-    sortOrder.value = 'desc'
-  }
+const onNextSort = () => {
+  nextSort()
   reset()
 }
 
-const toggleSortOrder = () => {
-  sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
+const onToggleOrder = () => {
+  toggleOrder()
   reset()
 }
 
@@ -246,40 +243,6 @@ onUnmounted(() => {
   justify-content: space-between;
   margin-bottom: 20px;
   gap: 12px;
-}
-
-.sort-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sort-controls select {
-  padding: 8px 12px;
-  background: var(--bg-elevated);
-  border: none;
-  border-radius: 8px;
-  color: var(--text-primary);
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.sort-order {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-elevated);
-  border: none;
-  border-radius: 8px;
-  color: var(--text-primary);
-  font-size: 16px;
-  cursor: pointer;
-}
-
-.sort-order:hover {
-  background: var(--bg-highlight);
 }
 
 .artist-grid {
