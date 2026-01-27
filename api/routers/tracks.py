@@ -105,7 +105,7 @@ async def get_artists(
     result = await db.execute(query)
     
     return [
-        {"name": artist, "track_count": count}
+        {"artist": artist, "name": artist, "track_count": count}
         for artist, count in result.all()
     ]
 

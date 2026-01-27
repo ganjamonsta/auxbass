@@ -257,7 +257,11 @@ export const useLibraryStore = defineStore('library', () => {
     let hasNewImages = false
     
     // Filter out artists we already have cached (including null = no image)
-    const uncachedArtists = artistList.filter(artist => artistImages.value[artist.artist] === undefined)
+    // Support both {artist: "..."} and {name: "..."} formats
+    const uncachedArtists = artistList.filter(artist => {
+      const artistName = artist.artist || artist.name
+      return artistName && artistImages.value[artistName] === undefined
+    })
     
     if (uncachedArtists.length === 0) return  // All cached, skip API calls
     
@@ -266,7 +270,8 @@ export const useLibraryStore = defineStore('library', () => {
       
       // Process batch in parallel
       await Promise.all(batch.map(async (artist) => {
-        const name = artist.artist
+        const name = artist.artist || artist.name
+        if (!name) return  // Skip if no name
         
         try {
           const response = await tracksApi.getArtistImage(name)
