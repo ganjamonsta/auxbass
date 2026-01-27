@@ -64,7 +64,32 @@
       <!-- Full player modal -->
       <FullPlayer 
         v-if="showFullPlayer"
+        :track="playerStore.currentTrack"
+        :is-playing="playerStore.isPlaying"
+        :loading="playerStore.loading"
+        :progress="playerStore.progress"
+        :duration="playerStore.duration"
+        :buffered="playerStore.buffered"
+        :volume="playerStore.volume"
+        :is-muted="playerStore.isMuted"
+        :shuffle="playerStore.shuffle"
+        :repeat="playerStore.repeat"
+        :queue="playerStore.queue"
+        :queue-index="playerStore.queueIndex"
+        :is-liked="playerStore.currentTrack?.is_liked"
         @close="showFullPlayer = false"
+        @toggle="playerStore.togglePlay()"
+        @next="playerStore.next()"
+        @prev="playerStore.prev()"
+        @seek="playerStore.seek($event)"
+        @setVolume="playerStore.setVolume($event)"
+        @toggleMute="playerStore.toggleMute()"
+        @toggleShuffle="playerStore.toggleShuffle()"
+        @toggleRepeat="playerStore.toggleRepeat()"
+        @removeFromQueue="playerStore.removeFromQueue($event)"
+        @moveInQueue="playerStore.moveInQueue($event.from, $event.to)"
+        @playFromQueue="playerStore.playFromQueue($event)"
+        @like="handleToggleLike"
       />
     </template>
   </div>
@@ -75,6 +100,7 @@ import { ref, computed, onMounted, inject } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
+import { useLibraryStore } from '@/stores/library'
 import PageHeader from '@/components/PageHeader.vue'
 import MiniPlayer from '@/components/MiniPlayer.vue'
 import FullPlayer from '@/components/FullPlayer.vue'
@@ -83,6 +109,7 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const playerStore = usePlayerStore()
+const libraryStore = useLibraryStore()
 const telegram = inject('telegram')
 
 const showFullPlayer = ref(false)
@@ -120,6 +147,13 @@ const goBack = () => {
     router.back()
   } else {
     router.push('/')
+  }
+}
+
+// Toggle like for current track
+const handleToggleLike = async () => {
+  if (playerStore.currentTrack?.id) {
+    await libraryStore.toggleLike(playerStore.currentTrack.id)
   }
 }
 
