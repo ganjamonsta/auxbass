@@ -83,17 +83,37 @@
         </div>
       </template>
     </div>
+    
+    <!-- Track context menu -->
+    <TrackMenu
+      :show="showMenu"
+      :track="menuTrack"
+      :current-user-id="authStore.user?.id"
+      @close="closeMenu"
+      @goToArtist="handleGoToArtist"
+      @goToAlbum="handleGoToAlbum"
+      @addToPlaylist="handleAddToPlaylist"
+      @edit="handleEditTrack"
+      @download="handleDownloadTrack"
+      @delete="handleDeleteTrack"
+      @removeFromLibrary="handleRemoveFromLibrary"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
+import { useAuthStore } from '@/stores/auth'
 import TrackItem from '@/components/TrackItem.vue'
+import TrackMenu from '@/components/TrackMenu.vue'
 
+const router = useRouter()
 const libraryStore = useLibraryStore()
 const playerStore = usePlayerStore()
+const authStore = useAuthStore()
 
 const searchQuery = ref('')
 const sortBy = ref('added_at')
@@ -155,8 +175,58 @@ const playTrack = (track) => {
   playerStore.playTrack(track, tracks.value)
 }
 
+// Track menu state
+const menuTrack = ref(null)
+const showMenu = ref(false)
+
 const showTrackMenu = (event, track) => {
-  // TODO: Context menu
+  menuTrack.value = track
+  showMenu.value = true
+}
+
+const closeMenu = () => {
+  showMenu.value = false
+  menuTrack.value = null
+}
+
+// Menu handlers
+const handleGoToArtist = (artist) => {
+  router.push(`/artist/${encodeURIComponent(artist)}`)
+}
+
+const handleGoToAlbum = (albumName, artist) => {
+  // Find album by name and artist
+  // For now, just close menu
+  closeMenu()
+}
+
+const handleAddToPlaylist = (track) => {
+  // TODO: Show playlist picker
+  closeMenu()
+}
+
+const handleEditTrack = (track) => {
+  // TODO: Show edit modal
+  closeMenu()
+}
+
+const handleDownloadTrack = async (track) => {
+  // TODO: Download track
+  closeMenu()
+}
+
+const handleDeleteTrack = async (track) => {
+  if (confirm('Удалить трек полностью?')) {
+    await libraryStore.deleteTrack(track.id)
+    tracks.value = tracks.value.filter(t => t.id !== track.id)
+  }
+  closeMenu()
+}
+
+const handleRemoveFromLibrary = async (track) => {
+  await libraryStore.removeFromLibrary(track.id)
+  tracks.value = tracks.value.filter(t => t.id !== track.id)
+  closeMenu()
 }
 
 onMounted(() => {
