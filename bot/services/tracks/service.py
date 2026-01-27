@@ -124,9 +124,16 @@ class TrackService:
             
             if existing_track:
                 track = existing_track
-                # Update file_id if needed (can change)
+                # Update file_id if needed (can change when user re-sends file)
                 if track.file_id != file_id:
                     track.file_id = file_id
+                    logger.info(f"Updated file_id for track {track.id}: {title} - {artist}")
+                
+                # Clear is_unavailable flag if it was set
+                # This "resurrects" tracks that became unavailable due to stale file_id
+                if track.is_unavailable:
+                    track.is_unavailable = False
+                    logger.info(f"Track {track.id} is now available again (file re-uploaded)")
             else:
                 # Create new track
                 is_new = True

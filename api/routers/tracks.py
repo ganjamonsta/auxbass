@@ -4,6 +4,7 @@ TG Player API v2 - Tracks Router (Backwards Compatibility)
 Provides /tracks endpoints for backwards compatibility with webapp.
 Delegates to library, artists, albums routers where appropriate.
 """
+import logging
 from typing import Optional, List
 from datetime import datetime
 from collections import defaultdict
@@ -33,6 +34,8 @@ from api.schemas_v2.tracks import (
 )
 from api.schemas_v2.common import TelegramUser
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Tracks"])
 
@@ -843,19 +846,29 @@ async def mark_unavailable(
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Mark track as unavailable (owner only)"""
+    """
+    Mark track as unavailable.
+    
+    Any authenticated user can report a track as unavailable - this allows
+    users browsing global library to report broken tracks they encounter.
+    The track's file_id may have become invalid on Telegram's side.
+    
+    When the original uploader (or anyone) sends the file to the bot again,
+    the file_id will be updated and is_unavailable will be cleared.
+    """
     result = await db.execute(
-        select(Track)
-        .where(Track.id == track_id)
-        .where(Track.uploader_id == user.id)
+        select(Track).where(Track.id == track_id)
     )
     track = result.scalar_one_or_none()
     
     if not track:
-        raise HTTPException(status_code=404, detail="Track not found or not owned")
+        raise HTTPException(status_code=404, detail="Track not found")
     
-    track.is_unavailable = True
-    await db.commit()
+    # Only mark if not already unavailable
+    if not track.is_unavailable:
+        track.is_unavailable = True
+        await db.commit()
+        logger.info(f"Track {track_id} marked as unavailable by user {user.id}")
     
     return {"status": "marked_unavailable", "track_id": track_id}
 

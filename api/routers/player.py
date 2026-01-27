@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.config import get_settings
 from shared.database import get_db
-from shared.models import Track, UserLibrary
+from shared.models import Track, UserLibrary, ChannelMessage, UserChannel
 
 from .auth import get_current_user
 from api.schemas_v2.player import StreamUrlResponse, DownloadPlaylistRequest
@@ -161,6 +161,150 @@ async def get_telegram_file_path(file_id: str) -> Optional[str]:
         return None
 
 
+async def refresh_file_id_from_channel(track_id: int, db: AsyncSession) -> Optional[str]:
+    """
+    Try to get fresh file_id from user's channel message.
+    
+    When a track's file_id becomes stale, we can retrieve the message
+    from the channel where it was forwarded and extract the new file_id.
+    
+    Returns the new file_id if successful, None otherwise.
+    """
+    # Find channel message for this track
+    result = await db.execute(
+        select(ChannelMessage, UserChannel)
+        .join(UserChannel, ChannelMessage.channel_id == UserChannel.id)
+        .where(ChannelMessage.track_id == track_id)
+        .where(UserChannel.is_active == True)
+        .limit(1)
+    )
+    row = result.first()
+    
+    if not row:
+        logger.debug(f"[Refresh FileID] No channel message found for track {track_id}")
+        return None
+    
+    channel_msg, user_channel = row
+    
+    # Call Telegram API to get the message
+    base_url = settings.telegram_api_url.rstrip('/')
+    # Use copyMessage or forwardMessage to get fresh file_id? No, use getMessages via channel
+    # Actually, Bot API doesn't have getMessages. We need to use getUpdates or getChat...
+    # The only way is to forward the message to ourselves and get the file_id
+    # OR use getChatMember + some trick
+    
+    # Actually, the cleanest way: use forwardMessage to forward to the same channel (or bot's chat)
+    # and then delete it. But that's ugly.
+    
+    # Better approach: just call getFile on the old file_id - if it fails, we truly need user to re-upload
+    # BUT we can try to get the message via Bot API's copyMessage with send_copy=False... no that doesn't exist
+    
+    # The Bot API way: forward message to bot's own chat (or use sendAudio with file_id)
+    # Let's try a trick: use sendAudio to bot's own chat with the old file_id, 
+    # if it succeeds we know file is still there
+    
+    # Actually simplest: Telegram doesn't provide getMessages for bots without updates
+    # The ONLY reliable way is for user to re-send the file, OR use Local Bot API Server
+    
+    # However! We can try using the channel's message_id to COPY the message which gives us new file_id
+    api_url = f"{base_url}/bot{settings.bot_token}/copyMessage"
+    
+    session = await get_http_session()
+    try:
+        # Copy message from channel to the channel itself (we'll delete it after)
+        async with session.post(api_url, json={
+            "chat_id": user_channel.channel_id,
+            "from_chat_id": user_channel.channel_id,
+            "message_id": channel_msg.message_id,
+        }) as resp:
+            if resp.status != 200:
+                logger.warning(f"[Refresh FileID] copyMessage failed: status={resp.status}")
+                return None
+            
+            data = await resp.json()
+            if not data.get("ok"):
+                logger.warning(f"[Refresh FileID] copyMessage error: {data.get('description')}")
+                return None
+            
+            new_message_id = data.get("result", {}).get("message_id")
+            if not new_message_id:
+                return None
+            
+            logger.info(f"[Refresh FileID] Copied message {channel_msg.message_id} -> {new_message_id}")
+    except aiohttp.ClientError as e:
+        logger.error(f"[Refresh FileID] HTTP error: {e}")
+        return None
+    
+    # Now forward THIS new message to get audio with file_id
+    # Actually copyMessage doesn't return the audio... we need forwardMessage
+    # Let's delete the copied message and try forwardMessage instead
+    
+    # Delete the copied message
+    delete_url = f"{base_url}/bot{settings.bot_token}/deleteMessage"
+    try:
+        async with session.post(delete_url, json={
+            "chat_id": user_channel.channel_id,
+            "message_id": new_message_id,
+        }) as resp:
+            pass  # Ignore result
+    except:
+        pass
+    
+    # Try forwardMessage which DOES return the full message with audio
+    forward_url = f"{base_url}/bot{settings.bot_token}/forwardMessage"
+    try:
+        async with session.post(forward_url, json={
+            "chat_id": user_channel.channel_id,
+            "from_chat_id": user_channel.channel_id, 
+            "message_id": channel_msg.message_id,
+        }) as resp:
+            if resp.status != 200:
+                logger.warning(f"[Refresh FileID] forwardMessage failed: status={resp.status}")
+                return None
+            
+            data = await resp.json()
+            if not data.get("ok"):
+                logger.warning(f"[Refresh FileID] forwardMessage error: {data.get('description')}")
+                return None
+            
+            result_msg = data.get("result", {})
+            audio = result_msg.get("audio")
+            
+            if not audio or not audio.get("file_id"):
+                logger.warning(f"[Refresh FileID] No audio in forwarded message")
+                # Delete forwarded message
+                try:
+                    async with session.post(delete_url, json={
+                        "chat_id": user_channel.channel_id,
+                        "message_id": result_msg.get("message_id"),
+                    }) as resp:
+                        pass
+                except:
+                    pass
+                return None
+            
+            new_file_id = audio["file_id"]
+            new_message_id = result_msg.get("message_id")
+            
+            logger.info(f"[Refresh FileID] Got fresh file_id for track {track_id}")
+            
+            # Delete the forwarded message (cleanup)
+            try:
+                async with session.post(delete_url, json={
+                    "chat_id": user_channel.channel_id,
+                    "message_id": new_message_id,
+                }) as resp:
+                    pass
+            except:
+                pass
+            
+            return new_file_id
+            
+    except aiohttp.ClientError as e:
+        logger.error(f"[Refresh FileID] HTTP error in forwardMessage: {e}")
+        return None
+
+
 @router.get("/stream/{track_id}", response_model=StreamUrlResponse)
 async def get_stream_url(
     track_id: int,
@@ -201,11 +345,34 @@ async def get_stream_url(
                 status_code=503,
                 detail=f"Файл слишком большой ({file_size_mb:.1f} MB). Telegram Bot API поддерживает скачивание только файлов до 20 MB. Используйте кнопку 'Скачать' в боте."
             )
-        logger.warning(f"[Stream Request] Track {track_id} file unavailable from Telegram")
-        raise HTTPException(
-            status_code=503,
-            detail="Не удалось получить файл от Telegram. Файл возможно удалён или недоступен."
-        )
+        
+        # Try to refresh file_id from channel message
+        logger.info(f"[Stream Request] Track {track_id} file_id stale, attempting refresh from channel...")
+        new_file_id = await refresh_file_id_from_channel(track_id, db)
+        
+        if new_file_id:
+            # Update track with new file_id
+            track.file_id = new_file_id
+            track.is_unavailable = False  # Clear unavailable flag
+            await db.commit()
+            logger.info(f"[Stream Request] Track {track_id} file_id refreshed successfully!")
+            
+            # Try again with new file_id
+            file_path = await get_telegram_file_path(new_file_id)
+        
+        if not file_path:
+            # Still no luck - mark as unavailable
+            if not track.is_unavailable:
+                track.is_unavailable = True
+                await db.commit()
+                logger.warning(f"[Stream Request] Track {track_id} marked as unavailable (Telegram file_id invalid)")
+            else:
+                logger.warning(f"[Stream Request] Track {track_id} file unavailable from Telegram (already marked)")
+            
+            raise HTTPException(
+                status_code=503,
+                detail="Файл недоступен. Отправьте этот трек боту повторно, чтобы обновить ссылку."
+            )
     
     # Generate secure temporary token with cached file_path
     token = generate_stream_token(track_id, user.id, file_path)

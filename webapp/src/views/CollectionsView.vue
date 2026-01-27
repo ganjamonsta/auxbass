@@ -195,7 +195,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
@@ -221,6 +221,13 @@ const changeAlbumScope = (newScope) => {
   loadAlbums()
 }
 
+// Sort options for albums
+const ALBUM_SORT_OPTIONS = [
+  { value: 'release_date', label: 'Дата', icon: '📅' },
+  { value: 'name', label: 'Название', icon: '🔤' },
+  { value: 'track_count', label: 'Треки', icon: '🎵' }
+]
+
 // Albums state
 const albums = ref([])
 const albumsTotal = ref(0)
@@ -229,7 +236,9 @@ const albumsTotalPages = ref(1)
 const loadingAlbums = ref(false)
 const albumSortBy = ref('release_date')
 const albumSortOrder = ref('desc')
-const albumSortOption = ref('Дата')
+const albumSortOption = computed(() => {
+  return ALBUM_SORT_OPTIONS.find(opt => opt.value === albumSortBy.value) || ALBUM_SORT_OPTIONS[0]
+})
 
 // Playlists state
 const playlists = ref([])
@@ -279,12 +288,9 @@ const goToAlbum = (album) => {
 }
 
 const onNextAlbumSort = () => {
-  const options = ['release_date', 'name', 'track_count']
-  const labels = ['Дата', 'Название', 'Треки']
-  const idx = options.indexOf(albumSortBy.value)
-  const nextIdx = (idx + 1) % options.length
-  albumSortBy.value = options[nextIdx]
-  albumSortOption.value = labels[nextIdx]
+  const idx = ALBUM_SORT_OPTIONS.findIndex(opt => opt.value === albumSortBy.value)
+  const nextIdx = (idx + 1) % ALBUM_SORT_OPTIONS.length
+  albumSortBy.value = ALBUM_SORT_OPTIONS[nextIdx].value
   albumsPage.value = 1
   loadAlbums()
 }

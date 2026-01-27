@@ -39,16 +39,16 @@
           :key="item.track_number"
           class="tracklist-item"
           :class="{ 
-            'missing': !item.track && !isGlobal, 
+            'missing': !item.track, 
             'has-track': item.track,
-            'not-in-library': isGlobal && item.track && !item.in_library
+            'not-in-library': item.track && !item.in_library
           }"
           @click="handleTracklistItemClick(item)"
         >
           <span class="track-number">{{ item.track_number }}</span>
           
           <div class="track-info">
-            <span class="track-title" :class="{ 'missing-title': !item.track && !isGlobal }">
+            <span class="track-title" :class="{ 'missing-title': !item.track }">
               {{ item.title }}
             </span>
             <span v-if="item.artist && item.artist !== album.artist" class="track-artist">
@@ -58,9 +58,9 @@
           
           <span class="track-duration">{{ formatDuration(item.duration) }}</span>
           
-          <!-- Add to library button for global tracks not in user's library -->
+          <!-- Add to library button for tracks not in user's library -->
           <button
-            v-if="isGlobal && item.track && !item.in_library"
+            v-if="item.track && !item.in_library"
             class="add-library-btn"
             @click.stop="handleAddToLibraryFromTracklist(item)"
             title="Добавить в библиотеку"
@@ -68,12 +68,12 @@
             +
           </button>
           <!-- In library indicator -->
-          <span v-else-if="isGlobal && item.track && item.in_library" class="in-library-indicator">
+          <span v-else-if="item.track && item.in_library" class="in-library-indicator">
             ✓
           </span>
-          <!-- Missing track button (library mode only) -->
+          <!-- Missing track button - track not in database -->
           <button
-            v-else-if="!isGlobal && !item.in_library"
+            v-else-if="!item.track"
             class="add-btn"
             @click.stop="handleMissingTrack(item)"
             title="Найти трек"
@@ -81,7 +81,7 @@
             +
           </button>
           <!-- Playing indicator -->
-          <span v-else-if="playerStore.currentTrack?.id === item.track_id" class="playing-indicator">
+          <span v-if="playerStore.currentTrack?.id === item.track_id" class="playing-indicator">
             🎵
           </span>
         </div>
@@ -193,20 +193,13 @@ const searchResult = ref(null)
 const foundTrack = ref(null)
 const addingTrack = ref(false)
 
-// Get playable tracks - in global mode, all tracks with track object are playable
+// Get playable tracks - all tracks that have a track object (exist in database)
 const playableTracks = computed(() => {
   if (album.value?.full_tracklist) {
-    if (isGlobal.value) {
-      // Global mode: all tracks with track object are playable
-      return album.value.full_tracklist
-        .filter(item => item.track)
-        .map(item => item.track)
-    } else {
-      // Library mode: only tracks in user's library
-      return album.value.full_tracklist
-        .filter(item => item.in_library && item.track)
-        .map(item => item.track)
-    }
+    // All tracks with track object are playable (both library and global mode)
+    return album.value.full_tracklist
+      .filter(item => item.track)
+      .map(item => item.track)
   }
   return album.value?.tracks || []
 })
@@ -249,13 +242,12 @@ const playTrackItem = (item) => {
 // Handle click on tracklist item
 const handleTracklistItemClick = (item) => {
   if (item.track) {
-    // Track exists - play it
+    // Track exists in database - play it (works for both library and global mode)
     playTrackItem(item)
-  } else if (!isGlobal.value) {
-    // Library mode: missing track - show search modal
+  } else {
+    // Track not in database - show search modal to help user find/add it
     handleMissingTrack(item)
   }
-  // Global mode without track: do nothing (track not in global library)
 }
 
 // Add track to library from tracklist (global mode)
