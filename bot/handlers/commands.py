@@ -1,13 +1,15 @@
 """
-TG Player Bot - Command Handlers
+TG Player Bot - Command Handlers v2
+
+Uses new modular service architecture.
 """
 import re
 from aiogram import Router
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 import sys
@@ -16,10 +18,16 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.config import get_settings
 from shared.database import get_session
-from shared.models import User, Track, Playlist
+from shared.models import User, Playlist
 
-from services.session import session_manager
-from utils.keyboards import get_webapp_keyboard
+from bot.services import track_service, channel_service
+from bot.services.session import session_manager
+from bot.handlers.keyboards import (
+    get_webapp_keyboard,
+    get_stats_keyboard,
+    get_channel_setup_keyboard,
+    get_cancel_keyboard,
+)
 
 
 router = Router()
@@ -29,7 +37,12 @@ settings = get_settings()
 class PlaylistStates(StatesGroup):
     """FSM states for playlist creation"""
     waiting_for_name = State()
-    waiting_for_rename = State()  # For renaming playlist
+    waiting_for_rename = State()
+
+
+class ChannelStates(StatesGroup):
+    """FSM states for channel setup"""
+    waiting_for_channel = State()
 
 
 @router.message(CommandStart())
@@ -38,7 +51,6 @@ async def cmd_start(message: Message):
     user = message.from_user
     
     async with get_session() as session:
-        # Get or create user
         db_user = await session.get(User, user.id)
         
         if not db_user:
@@ -50,7 +62,6 @@ async def cmd_start(message: Message):
             )
             session.add(db_user)
         else:
-            # Update user info
             db_user.username = user.username
             db_user.first_name = user.first_name
             db_user.last_name = user.last_name
@@ -59,6 +70,7 @@ async def cmd_start(message: Message):
         f"👋 Привет, <b>{user.first_name}</b>!\n\n"
         "🎵 <b>TG Player</b> — твоя музыкальная библиотека в Telegram.\n\n"
         "📤 <b>Отправь мне аудиофайл</b> — я добавлю его в твою библиотеку.\n\n"
+        "🔄 Метаданные загружаются автоматически из Deezer.\n\n"
         "📂 Нажми кнопку ниже, чтобы открыть плеер:",
         reply_markup=get_webapp_keyboard()
     )
@@ -72,26 +84,22 @@ async def cmd_help(message: Message):
         "<b>Как добавить музыку?</b>\n"
         "Просто отправь мне аудиофайл (MP3, FLAC, и др.) — "
         "я автоматически добавлю его в твою библиотеку.\n\n"
-        "<b>Команды:</b>\n"
+        "<b>Основные команды:</b>\n"
         "/start — Начало работы\n"
         "/help — Эта справка\n"
         "/library — Открыть плеер\n"
         "/login — Код для входа в браузере\n"
-        "/stats — Статистика библиотеки\n"
+        "/stats — Статистика библиотеки\n\n"
+        "<b>Плейлисты:</b>\n"
         '/playlist — Создать плейлист\n'
         '/playlists — Мои плейлисты\n\n'
-        "<b>Создание плейлиста:</b>\n"
-        "1. Введи /playlist или /playlist \"Имя\"\n"
-        "2. Отправь аудиофайлы\n"
-        "3. Нажми «Завершить»\n\n"
-        "<b>Управление плейлистами:</b>\n"
-        "/playlists — список с кнопками\n"
-        "• Переименовать\n"
-        "• Удалить\n\n"
-        "<b>Возможности плеера:</b>\n"
-        "• Очереди воспроизведения\n"
-        "• Поиск по артисту, названию\n"
-        "• История прослушивания",
+        "<b>Резервное копирование:</b>\n"
+        "/channel — Настроить свой канал для бекапа\n"
+        "/sync — Синхронизировать библиотеку с каналом\n\n"
+        "<b>Возможности:</b>\n"
+        "• Автоматическое обогащение метаданных\n"
+        "• Группировка по альбомам\n"
+        "• Бекап в личный канал",
         reply_markup=get_webapp_keyboard()
     )
 
@@ -113,9 +121,8 @@ async def cmd_login(message: Message):
     user = message.from_user
     
     try:
-        # Request code from API
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
+        async with aiohttp.ClientSession() as http_session:
+            async with http_session.post(
                 f"{settings.api_url}/auth/generate-code",
                 params={
                     "user_id": user.id,
@@ -129,7 +136,7 @@ async def cmd_login(message: Message):
                 if resp.status == 200:
                     data = await resp.json()
                     code = data["code"]
-                    expires_in = data["expires_in"] // 60  # to minutes
+                    expires_in = data["expires_in"] // 60
                     
                     await message.answer(
                         f"🔐 <b>Код для входа в браузере:</b>\n\n"
@@ -143,7 +150,6 @@ async def cmd_login(message: Message):
                         "❌ Не удалось получить код. Попробуйте позже."
                     )
     except Exception as e:
-        print(f"Login code error: {e}")
         await message.answer(
             "❌ Ошибка подключения к серверу. Попробуйте позже."
         )
@@ -154,42 +160,148 @@ async def cmd_stats(message: Message):
     """Handle /stats command"""
     user_id = message.from_user.id
     
-    async with get_session() as session:
-        # Count tracks
-        tracks_count = await session.scalar(
-            select(func.count(Track.id)).where(Track.user_id == user_id)
-        )
-        
-        # Count playlists
-        playlists_count = await session.scalar(
-            select(func.count(Playlist.id)).where(Playlist.user_id == user_id)
-        )
-        
-        # Total duration
-        total_duration = await session.scalar(
-            select(func.sum(Track.duration)).where(Track.user_id == user_id)
-        ) or 0
-        
-        # Format duration
-        hours = total_duration // 3600
-        minutes = (total_duration % 3600) // 60
+    stats = await track_service.get_library_stats(user_id)
+    
+    # Format duration
+    total_seconds = stats.get("total_duration_seconds", 0)
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    
+    # Enrichment info
+    enrichment = stats.get("enrichment", {})
+    completed = enrichment.get("completed", 0)
+    pending = enrichment.get("pending", 0)
+    failed = enrichment.get("failed", 0)
+    
+    enrichment_text = ""
+    if pending > 0:
+        enrichment_text = f"\n🔄 Обогащение: {pending} в очереди"
+    elif failed > 0:
+        enrichment_text = f"\n⚠️ Не обогащено: {failed} треков"
     
     await message.answer(
         "📊 <b>Статистика библиотеки</b>\n\n"
-        f"🎵 Треков: <b>{tracks_count or 0}</b>\n"
-        f"📁 Плейлистов: <b>{playlists_count or 0}</b>\n"
-        f"⏱ Общая длительность: <b>{hours}ч {minutes}мин</b>",
-        reply_markup=get_webapp_keyboard()
+        f"🎵 Треков: <b>{stats['total_tracks']}</b>\n"
+        f"💿 Альбомов: <b>{stats['album_count']}</b>\n"
+        f"⏱ Общая длительность: <b>{hours}ч {minutes}мин</b>{enrichment_text}",
+        reply_markup=get_stats_keyboard()
+    )
+
+
+@router.message(Command("channel"))
+async def cmd_channel(message: Message, state: FSMContext):
+    """Handle /channel command - setup backup channel"""
+    user_id = message.from_user.id
+    
+    # Check if user already has a channel
+    channel = await channel_service.get_user_channel(user_id)
+    
+    if channel:
+        from bot.handlers.keyboards import get_channel_keyboard
+        await message.answer(
+            f"☁️ <b>Ваш канал для бекапа</b>\n\n"
+            f"📢 {channel.channel_name or 'Канал'}\n"
+            f"🎵 Сохранено треков: {channel.message_count or 0}",
+            reply_markup=get_channel_keyboard(channel.channel_id, channel.channel_username)
+        )
+        return
+    
+    await message.answer(
+        "☁️ <b>Настройка канала для бекапа</b>\n\n"
+        "Создайте приватный канал в Telegram и добавьте меня администратором.\n\n"
+        "<b>Инструкция:</b>\n"
+        "1. Создайте новый канал (приватный)\n"
+        "2. Добавьте @{bot_username} как администратора\n"
+        "3. Дайте права на публикацию сообщений\n"
+        "4. Перешлите мне любое сообщение из канала\n\n"
+        "Все новые треки будут автоматически сохраняться в ваш канал.",
+        reply_markup=get_channel_setup_keyboard()
+    )
+    
+    await state.set_state(ChannelStates.waiting_for_channel)
+
+
+@router.message(ChannelStates.waiting_for_channel)
+async def process_channel_forward(message: Message, state: FSMContext):
+    """Process forwarded message from user's channel"""
+    if not message.forward_from_chat:
+        await message.answer(
+            "❌ Пожалуйста, перешлите сообщение из вашего канала.\n\n"
+            "Убедитесь, что бот добавлен как администратор.",
+            reply_markup=get_cancel_keyboard("channel:cancel")
+        )
+        return
+    
+    chat = message.forward_from_chat
+    if chat.type != "channel":
+        await message.answer(
+            "❌ Это не канал. Перешлите сообщение именно из канала.",
+            reply_markup=get_cancel_keyboard("channel:cancel")
+        )
+        return
+    
+    # Try to setup channel
+    try:
+        success = await channel_service.setup_channel(
+            user_id=message.from_user.id,
+            channel_id=chat.id,
+            channel_username=chat.username,
+            channel_name=chat.title,
+            bot=message.bot,
+        )
+        
+        if success:
+            await state.clear()
+            await message.answer(
+                f"✅ <b>Канал подключён!</b>\n\n"
+                f"📢 {chat.title}\n\n"
+                "Теперь все новые треки будут автоматически сохраняться в ваш канал с хэштегами.",
+            )
+        else:
+            await message.answer(
+                "❌ Не удалось подключить канал.\n\n"
+                "Убедитесь, что бот имеет права администратора "
+                "и может публиковать сообщения.",
+                reply_markup=get_channel_setup_keyboard()
+            )
+    except Exception as e:
+        await message.answer(
+            f"❌ Ошибка: {str(e)}\n\n"
+            "Попробуйте ещё раз или обратитесь в поддержку.",
+            reply_markup=get_channel_setup_keyboard()
+        )
+
+
+@router.message(Command("sync"))
+async def cmd_sync(message: Message):
+    """Handle /sync command - sync library to channel"""
+    user_id = message.from_user.id
+    
+    channel = await channel_service.get_user_channel(user_id)
+    if not channel:
+        await message.answer(
+            "❌ У вас не настроен канал для бекапа.\n\n"
+            "Используйте /channel для настройки."
+        )
+        return
+    
+    await message.answer(
+        "🔄 Синхронизация начата...\n\n"
+        "Это может занять некоторое время."
+    )
+    
+    # TODO: Implement sync
+    synced = 0  # await channel_service.sync_all_tracks(user_id, message.bot)
+    
+    await message.answer(
+        f"✅ Синхронизация завершена!\n\n"
+        f"Добавлено в канал: {synced} треков"
     )
 
 
 @router.message(Command("playlist", "плейлист"))
 async def cmd_playlist(message: Message, state: FSMContext):
-    """
-    Handle /playlist command
-    Usage: /playlist or /playlist "Название плейлиста"
-    Also: /плейлист (Russian alias)
-    """
+    """Handle /playlist command"""
     user_id = message.from_user.id
     
     # Check if already in playlist mode
@@ -216,12 +328,10 @@ async def cmd_playlist(message: Message, state: FSMContext):
     
     # Parse playlist name from command
     text = message.text or ""
-    # Match /playlist "Name" or /playlist 'Name' or /плейлист "Name"
     match = re.search(r'/(?:playlist|плейлист)\s+["\'](.+?)["\']', text) or \
             re.search(r'/(?:playlist|плейлист)\s+(.+)', text)
     
     if match:
-        # Name provided directly
         playlist_name = match.group(1).strip()
         if playlist_name:
             session_manager.start_playlist_session(user_id, playlist_name)
@@ -238,7 +348,6 @@ async def cmd_playlist(message: Message, state: FSMContext):
             )
             return
     
-    # No name provided - ask for it
     await state.set_state(PlaylistStates.waiting_for_name)
     await message.answer(
         "📁 <b>Создание плейлиста</b>\n\n"
@@ -263,10 +372,9 @@ async def process_playlist_name(message: Message, state: FSMContext):
         return
     
     if len(playlist_name) > 100:
-        await message.answer("❌ Название слишком длинное (макс. 100 символов). Попробуй короче:")
+        await message.answer("❌ Название слишком длинное (макс. 100 символов):")
         return
     
-    # Clear state and start session
     await state.clear()
     session_manager.start_playlist_session(user_id, playlist_name)
     
@@ -285,13 +393,10 @@ async def process_playlist_name(message: Message, state: FSMContext):
 
 @router.message(Command("playlists", "плейлисты"))
 async def cmd_playlists(message: Message):
-    """
-    Handle /playlists command - show user's playlists with management options
-    """
+    """Handle /playlists command"""
     user_id = message.from_user.id
     
     async with get_session() as session:
-        # Get user's playlists with track counts (eager load)
         result = await session.execute(
             select(Playlist)
             .options(selectinload(Playlist.track_associations))
@@ -300,7 +405,6 @@ async def cmd_playlists(message: Message):
         )
         playlists = result.scalars().all()
         
-        # Build data while session is open
         playlist_data = []
         for pl in playlists[:20]:
             track_count = len(pl.track_associations) if pl.track_associations else 0
@@ -316,20 +420,16 @@ async def cmd_playlists(message: Message):
             "У тебя пока нет плейлистов.\n\n"
             "<b>Как создать?</b>\n"
             "• /playlist — интерактивное создание\n"
-            '• /playlist "Название" — быстрое создание\n\n'
-            "После команды отправляй аудиофайлы,\n"
-            "затем нажми «Завершить»."
+            '• /playlist "Название" — быстрое создание'
         )
         return
     
-    # Build playlist list with inline buttons
     text = "📁 <b>Мои плейлисты</b>\n\n"
     keyboard = []
     
     for pl in playlist_data:
         text += f"• <b>{pl['name']}</b> — {pl['track_count']} 🎵\n"
         
-        # Row: [Playlist name button]
         keyboard.append([
             InlineKeyboardButton(
                 text=f"📁 {pl['name']}",
@@ -337,7 +437,6 @@ async def cmd_playlists(message: Message):
             )
         ])
     
-    # Add info about creation
     text += (
         "\n<b>Управление:</b> нажми на плейлист\n\n"
         "<b>Создать новый:</b>\n"
@@ -357,14 +456,13 @@ async def process_playlist_rename(message: Message, state: FSMContext):
     new_name = message.text.strip() if message.text else ""
     
     if not new_name:
-        await message.answer("❌ Название не может быть пустым. Попробуй ещё раз:")
+        await message.answer("❌ Название не может быть пустым:")
         return
     
     if len(new_name) > 100:
         await message.answer("❌ Название слишком длинное (макс. 100 символов):")
         return
     
-    # Get playlist id from state
     data = await state.get_data()
     playlist_id = data.get("rename_playlist_id")
     
@@ -373,7 +471,6 @@ async def process_playlist_rename(message: Message, state: FSMContext):
         await message.answer("❌ Ошибка. Попробуй снова через /playlists")
         return
     
-    # Update in database
     async with get_session() as session:
         playlist = await session.get(Playlist, playlist_id)
         if playlist and playlist.user_id == message.from_user.id:

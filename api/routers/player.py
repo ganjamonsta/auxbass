@@ -25,7 +25,8 @@ from shared.database import get_db
 from shared.models import Track, UserLibrary
 
 from .auth import get_current_user
-from api.schemas import TelegramUser, StreamUrlResponse, DownloadPlaylistRequest
+from api.schemas_v2.player import StreamUrlResponse, DownloadPlaylistRequest
+from api.schemas_v2.common import TelegramUser
 
 
 logger = logging.getLogger("uvicorn.error")

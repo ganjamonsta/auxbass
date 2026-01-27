@@ -1,21 +1,60 @@
 """
-TG Player - Database Models
-Supports shared global library where all users can see and play each other's tracks
+TG Player - Database Models v2.0
+Clean separation of concerns with proper entity types
+
+Changes from v1:
+- Album is a separate entity (not a Playlist with is_auto_album flag)
+- SourceCollection for auto-playlists by forward source
+- UserChannel for user's backup channel functionality
+- Cleaner Track model without denormalized fields
+- EnrichmentData as separate entity for external API data
 """
 from datetime import datetime
 from typing import Optional, List
+from enum import Enum
 from sqlalchemy import (
     BigInteger, Integer, String, Text, Boolean, 
-    DateTime, ForeignKey, UniqueConstraint, Index
+    DateTime, ForeignKey, UniqueConstraint, Index,
+    Enum as SQLEnum
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
+    """Base class for all models"""
     pass
 
 
+# ============== Enums ==============
+
+class EnrichmentStatus(str, Enum):
+    """Track enrichment status"""
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class LibrarySource(str, Enum):
+    """How user got the track in their library"""
+    UPLOADED = "uploaded"      # User uploaded directly
+    ADDED = "added"            # Added from global library
+    SHARED = "shared"          # Shared by another user
+
+
+class ForwardSourceType(str, Enum):
+    """Type of forward source"""
+    USER = "user"
+    BOT = "bot"
+    CHANNEL = "channel"
+    SUPERGROUP = "supergroup"
+    HIDDEN = "hidden"
+
+
+# ============== User ==============
+
 class User(Base):
+    """Telegram user"""
     __tablename__ = "users"
     
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)  # Telegram user_id
@@ -23,90 +62,236 @@ class User(Base):
     first_name: Mapped[Optional[str]] = mapped_column(String(255))
     last_name: Mapped[Optional[str]] = mapped_column(String(255))
     is_premium: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relations
-    tracks: Mapped[List["Track"]] = relationship(back_populates="uploader", cascade="all, delete-orphan")
-    playlists: Mapped[List["Playlist"]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    library_entries: Mapped[List["UserLibrary"]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    
-    @property
-    def display_name(self) -> str:
-        """Get user's display name"""
-        if self.first_name:
-            return f"{self.first_name} {self.last_name or ''}".strip()
-        return self.username or f"User {self.id}"
-
-
-class Track(Base):
-    """
-    Global track - one instance per unique file across all users.
-    Any user can play any track, the uploader just gets credit.
-    """
-    __tablename__ = "tracks"
-    
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
-    file_id: Mapped[str] = mapped_column(String(255), nullable=False)
-    file_unique_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)  # Now globally unique!
-    
-    # Metadata
-    title: Mapped[Optional[str]] = mapped_column(String(255))
-    artist: Mapped[Optional[str]] = mapped_column(String(255))
-    album: Mapped[Optional[str]] = mapped_column(String(255))
-    genre: Mapped[Optional[str]] = mapped_column(String(100))
-    duration: Mapped[Optional[int]] = mapped_column(Integer)  # seconds
-    cover_url: Mapped[Optional[str]] = mapped_column(String(500))  # Album cover URL
-    
-    # Deezer album ID for auto-album creation
-    deezer_album_id: Mapped[Optional[int]] = mapped_column(Integer)
-    
-    # Enrichment status: pending, processing, completed, failed
-    enrichment_status: Mapped[Optional[str]] = mapped_column(String(20), default="pending")
-    
-    # Forward source info (from whom the message was forwarded)
-    forward_from_id: Mapped[Optional[int]] = mapped_column(BigInteger)  # User/Bot/Channel ID
-    forward_from_username: Mapped[Optional[str]] = mapped_column(String(255))
-    forward_from_name: Mapped[Optional[str]] = mapped_column(String(255))
-    forward_from_type: Mapped[Optional[str]] = mapped_column(String(20))  # user, bot, channel
-    
-    # Telegram data
-    file_size: Mapped[Optional[int]] = mapped_column(Integer)
-    mime_type: Mapped[Optional[str]] = mapped_column(String(50))
-    
-    # Global listening statistics (across all users)
-    play_count: Mapped[int] = mapped_column(Integer, default=0)
-    last_played_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    
-    # Visibility in global library
-    is_public: Mapped[bool] = mapped_column(Boolean, default=True)
-    
-    # Availability (file deleted from Telegram)
-    is_unavailable: Mapped[bool] = mapped_column(Boolean, default=False)
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    # Relations
-    uploader: Mapped["User"] = relationship(back_populates="tracks")
-    playlist_associations: Mapped[List["PlaylistTrack"]] = relationship(back_populates="track", cascade="all, delete-orphan")
-    library_entries: Mapped[List["UserLibrary"]] = relationship(back_populates="track", cascade="all, delete-orphan")
+    # Relationships
+    uploaded_tracks: Mapped[List["Track"]] = relationship(
+        back_populates="uploader", 
+        cascade="all, delete-orphan",
+        foreign_keys="Track.uploader_id"
+    )
+    library_entries: Mapped[List["UserLibrary"]] = relationship(
+        back_populates="user", 
+        cascade="all, delete-orphan"
+    )
+    playlists: Mapped[List["Playlist"]] = relationship(
+        back_populates="owner", 
+        cascade="all, delete-orphan"
+    )
+    channel: Mapped[Optional["UserChannel"]] = relationship(
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan"
+    )
+    
+    @property
+    def display_name(self) -> str:
+        """Get user's display name"""
+        if self.first_name:
+            name = self.first_name
+            if self.last_name:
+                name += f" {self.last_name}"
+            return name.strip()
+        return self.username or f"User {self.id}"
+
+
+# ============== Track (Core Entity) ==============
+
+class Track(Base):
+    """
+    Audio track - core entity.
+    One instance per unique file (file_unique_id is globally unique).
+    """
+    __tablename__ = "tracks"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    
+    # Telegram file reference
+    file_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_unique_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    file_size: Mapped[Optional[int]] = mapped_column(Integer)
+    mime_type: Mapped[Optional[str]] = mapped_column(String(50))
+    
+    # Basic metadata (from ID3 tags or user input)
+    title: Mapped[Optional[str]] = mapped_column(String(255))
+    artist: Mapped[Optional[str]] = mapped_column(String(255))
+    duration: Mapped[Optional[int]] = mapped_column(Integer)  # seconds
+    
+    # Who uploaded this track
+    uploader_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
+    
+    # Visibility
+    is_public: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_unavailable: Mapped[bool] = mapped_column(Boolean, default=False)  # File deleted from Telegram
+    
+    # Enrichment
+    enrichment_status: Mapped[EnrichmentStatus] = mapped_column(
+        SQLEnum(EnrichmentStatus), 
+        default=EnrichmentStatus.PENDING
+    )
+    
+    # Global statistics
+    play_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_played_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    
+    # Forward source (if track was forwarded from somewhere)
+    forward_source_type: Mapped[Optional[ForwardSourceType]] = mapped_column(SQLEnum(ForwardSourceType))
+    forward_source_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    forward_source_name: Mapped[Optional[str]] = mapped_column(String(255))
+    forward_source_username: Mapped[Optional[str]] = mapped_column(String(255))
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    uploader: Mapped["User"] = relationship(back_populates="uploaded_tracks", foreign_keys=[uploader_id])
+    enrichment: Mapped[Optional["TrackEnrichment"]] = relationship(
+        back_populates="track",
+        uselist=False,
+        cascade="all, delete-orphan"
+    )
+    library_entries: Mapped[List["UserLibrary"]] = relationship(
+        back_populates="track", 
+        cascade="all, delete-orphan"
+    )
+    album_tracks: Mapped[List["AlbumTrack"]] = relationship(
+        back_populates="track",
+        cascade="all, delete-orphan"
+    )
+    playlist_tracks: Mapped[List["PlaylistTrack"]] = relationship(
+        back_populates="track",
+        cascade="all, delete-orphan"
+    )
+    channel_messages: Mapped[List["ChannelMessage"]] = relationship(
+        back_populates="track",
+        cascade="all, delete-orphan"
+    )
     
     __table_args__ = (
         Index("idx_tracks_artist", "artist"),
         Index("idx_tracks_title", "title"),
-        Index("idx_tracks_genre", "genre"),
+        Index("idx_tracks_uploader", "uploader_id"),
         Index("idx_tracks_public", "is_public"),
-        Index("idx_tracks_play_count", "play_count"),
+        Index("idx_tracks_enrichment", "enrichment_status"),
     )
 
+
+# ============== Track Enrichment (External API Data) ==============
+
+class TrackEnrichment(Base):
+    """
+    Enrichment data from external APIs (Deezer, Last.fm, MusicBrainz).
+    Separated from Track to allow easy re-enrichment and rollback.
+    """
+    __tablename__ = "track_enrichments"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    track_id: Mapped[int] = mapped_column(Integer, ForeignKey("tracks.id", ondelete="CASCADE"), unique=True)
+    
+    # Enriched metadata
+    album_name: Mapped[Optional[str]] = mapped_column(String(255))
+    genre: Mapped[Optional[str]] = mapped_column(String(100))
+    cover_url: Mapped[Optional[str]] = mapped_column(String(500))
+    release_date: Mapped[Optional[str]] = mapped_column(String(20))  # YYYY-MM-DD
+    track_number: Mapped[Optional[int]] = mapped_column(Integer)
+    
+    # Source info
+    deezer_track_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    deezer_album_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    lastfm_url: Mapped[Optional[str]] = mapped_column(String(500))
+    musicbrainz_id: Mapped[Optional[str]] = mapped_column(String(50))
+    
+    # Confidence score (0-100) - how sure we are about the match
+    confidence: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Timestamps
+    enriched_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    
+    # Relationship
+    track: Mapped["Track"] = relationship(back_populates="enrichment")
+    
+    __table_args__ = (
+        Index("idx_enrichment_deezer_album", "deezer_album_id"),
+        Index("idx_enrichment_album_name", "album_name"),
+    )
+
+
+# ============== Album ==============
+
+class Album(Base):
+    """
+    Album entity - represents a music album.
+    Can be auto-created from enrichment or manually by user.
+    Albums are global (not per-user).
+    """
+    __tablename__ = "albums"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    
+    # Album metadata
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    artist: Mapped[str] = mapped_column(String(255), nullable=False)
+    normalized_name: Mapped[str] = mapped_column(String(255), nullable=False)  # For matching
+    normalized_artist: Mapped[str] = mapped_column(String(255), nullable=False)  # For matching
+    
+    cover_url: Mapped[Optional[str]] = mapped_column(String(500))
+    release_date: Mapped[Optional[str]] = mapped_column(String(20))  # YYYY-MM-DD
+    total_tracks: Mapped[Optional[int]] = mapped_column(Integer)
+    
+    # External IDs
+    deezer_album_id: Mapped[Optional[int]] = mapped_column(BigInteger, unique=True)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    tracks: Mapped[List["AlbumTrack"]] = relationship(
+        back_populates="album",
+        cascade="all, delete-orphan",
+        order_by="AlbumTrack.track_number"
+    )
+    
+    __table_args__ = (
+        # Unique constraint on normalized name + artist
+        UniqueConstraint("normalized_name", "normalized_artist", name="uq_album_name_artist"),
+        Index("idx_album_artist", "normalized_artist"),
+        Index("idx_album_deezer", "deezer_album_id"),
+    )
+
+
+class AlbumTrack(Base):
+    """Association between Album and Track with ordering"""
+    __tablename__ = "album_tracks"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    album_id: Mapped[int] = mapped_column(Integer, ForeignKey("albums.id", ondelete="CASCADE"))
+    track_id: Mapped[int] = mapped_column(Integer, ForeignKey("tracks.id", ondelete="CASCADE"))
+    
+    track_number: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Timestamps
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    album: Mapped["Album"] = relationship(back_populates="tracks")
+    track: Mapped["Track"] = relationship(back_populates="album_tracks")
+    
+    __table_args__ = (
+        UniqueConstraint("album_id", "track_id", name="uq_album_track"),
+    )
+
+
+# ============== User Library ==============
 
 class UserLibrary(Base):
     """
     User's personal library - links users to tracks they've added.
-    Each user can have their own liked status, play count, etc.
+    Contains user-specific data (likes, play counts, etc.)
     """
     __tablename__ = "user_library"
     
@@ -114,10 +299,10 @@ class UserLibrary(Base):
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
     track_id: Mapped[int] = mapped_column(Integer, ForeignKey("tracks.id", ondelete="CASCADE"))
     
-    # How did user get this track
-    source: Mapped[str] = mapped_column(String(20), default="uploaded")  # uploaded, added, shared
+    # How user got this track
+    source: Mapped[LibrarySource] = mapped_column(SQLEnum(LibrarySource), default=LibrarySource.UPLOADED)
     
-    # Personal stats (per-user)
+    # User's personal data for this track
     is_liked: Mapped[bool] = mapped_column(Boolean, default=False)
     liked_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     play_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -126,7 +311,7 @@ class UserLibrary(Base):
     # Timestamps
     added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     
-    # Relations
+    # Relationships
     user: Mapped["User"] = relationship(back_populates="library_entries")
     track: Mapped["Track"] = relationship(back_populates="library_entries")
     
@@ -137,56 +322,175 @@ class UserLibrary(Base):
     )
 
 
+# ============== Playlist (User-Created Only) ==============
+
 class Playlist(Base):
+    """
+    User-created playlist.
+    Only for manual playlists, NOT for auto-albums or source collections.
+    """
     __tablename__ = "playlists"
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
+    owner_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
+    
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text)
-    cover_file_id: Mapped[Optional[str]] = mapped_column(String(255))
-    cover_url: Mapped[Optional[str]] = mapped_column(String(500))  # Album cover from Deezer
+    cover_url: Mapped[Optional[str]] = mapped_column(String(500))
+    
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
-    is_auto_album: Mapped[bool] = mapped_column(Boolean, default=False)  # Auto-created album
-    deezer_album_id: Mapped[Optional[int]] = mapped_column(Integer)  # Deezer album ID
-    album_artist: Mapped[Optional[str]] = mapped_column(String(255))  # Artist for album playlists
-    release_date: Mapped[Optional[str]] = mapped_column(String(20))  # Album release date (YYYY-MM-DD format)
-    
-    # Auto-source playlist (auto-created based on forward source)
-    is_auto_source: Mapped[bool] = mapped_column(Boolean, default=False)
-    source_id: Mapped[Optional[int]] = mapped_column(BigInteger)  # Forward source ID
-    source_type: Mapped[Optional[str]] = mapped_column(String(20))  # user, bot, channel
-    
     share_code: Mapped[Optional[str]] = mapped_column(String(50), unique=True)
+    
+    # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    # Relations
-    user: Mapped["User"] = relationship(back_populates="playlists")
-    track_associations: Mapped[List["PlaylistTrack"]] = relationship(
-        back_populates="playlist", 
+    # Relationships
+    owner: Mapped["User"] = relationship(back_populates="playlists")
+    tracks: Mapped[List["PlaylistTrack"]] = relationship(
+        back_populates="playlist",
         cascade="all, delete-orphan",
         order_by="PlaylistTrack.position"
     )
-    
-    @property
-    def tracks(self) -> List["Track"]:
-        return [assoc.track for assoc in self.track_associations]
 
 
 class PlaylistTrack(Base):
+    """Association between Playlist and Track with ordering"""
     __tablename__ = "playlist_tracks"
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     playlist_id: Mapped[int] = mapped_column(Integer, ForeignKey("playlists.id", ondelete="CASCADE"))
     track_id: Mapped[int] = mapped_column(Integer, ForeignKey("tracks.id", ondelete="CASCADE"))
+    
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     
-    # Relations
-    playlist: Mapped["Playlist"] = relationship(back_populates="track_associations")
-    track: Mapped["Track"] = relationship(back_populates="playlist_associations")
+    # Relationships
+    playlist: Mapped["Playlist"] = relationship(back_populates="tracks")
+    track: Mapped["Track"] = relationship(back_populates="playlist_tracks")
     
     __table_args__ = (
         UniqueConstraint("playlist_id", "track_id", name="uq_playlist_track"),
+    )
+
+
+# ============== Source Collection (Auto-Playlist by Forward Source) ==============
+
+class SourceCollection(Base):
+    """
+    Auto-generated collection based on forward source.
+    Created when user forwards tracks from a bot/channel/user.
+    """
+    __tablename__ = "source_collections"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
+    
+    # Source identification
+    source_type: Mapped[ForwardSourceType] = mapped_column(SQLEnum(ForwardSourceType))
+    source_id: Mapped[Optional[int]] = mapped_column(BigInteger)  # Can be null for hidden sources
+    source_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    source_username: Mapped[Optional[str]] = mapped_column(String(255))
+    
+    # Display
+    cover_url: Mapped[Optional[str]] = mapped_column(String(500))
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    tracks: Mapped[List["SourceCollectionTrack"]] = relationship(
+        back_populates="collection",
+        cascade="all, delete-orphan",
+        order_by="SourceCollectionTrack.added_at"
+    )
+    
+    __table_args__ = (
+        UniqueConstraint("owner_id", "source_type", "source_id", name="uq_source_collection"),
+        Index("idx_source_collection_owner", "owner_id"),
+    )
+
+
+class SourceCollectionTrack(Base):
+    """Association between SourceCollection and Track"""
+    __tablename__ = "source_collection_tracks"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    collection_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_collections.id", ondelete="CASCADE"))
+    track_id: Mapped[int] = mapped_column(Integer, ForeignKey("tracks.id", ondelete="CASCADE"))
+    
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    collection: Mapped["SourceCollection"] = relationship(back_populates="tracks")
+    track: Mapped["Track"] = relationship()
+    
+    __table_args__ = (
+        UniqueConstraint("collection_id", "track_id", name="uq_source_collection_track"),
+    )
+
+
+# ============== User Channel (Backup to Telegram Channel) ==============
+
+class UserChannel(Base):
+    """
+    User's personal Telegram channel for library backup.
+    All tracks added to library are forwarded here with hashtags.
+    """
+    __tablename__ = "user_channels"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), unique=True)
+    
+    # Channel info
+    channel_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    channel_username: Mapped[Optional[str]] = mapped_column(String(255))
+    channel_title: Mapped[Optional[str]] = mapped_column(String(255))
+    
+    # Settings
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    auto_forward: Mapped[bool] = mapped_column(Boolean, default=True)  # Auto-forward new tracks
+    include_hashtags: Mapped[bool] = mapped_column(Boolean, default=True)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user: Mapped["User"] = relationship(back_populates="channel")
+    messages: Mapped[List["ChannelMessage"]] = relationship(
+        back_populates="channel",
+        cascade="all, delete-orphan"
+    )
+
+
+class ChannelMessage(Base):
+    """
+    Record of a track message in user's channel.
+    Used to update messages when enrichment completes (edit hashtags, etc.)
+    """
+    __tablename__ = "channel_messages"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    channel_id: Mapped[int] = mapped_column(Integer, ForeignKey("user_channels.id", ondelete="CASCADE"))
+    track_id: Mapped[int] = mapped_column(Integer, ForeignKey("tracks.id", ondelete="CASCADE"))
+    
+    # Telegram message reference
+    message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    
+    # Hashtags stored with message
+    hashtags: Mapped[Optional[str]] = mapped_column(Text)  # JSON array or comma-separated
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    channel: Mapped["UserChannel"] = relationship(back_populates="messages")
+    track: Mapped["Track"] = relationship(back_populates="channel_messages")
+    
+    __table_args__ = (
+        UniqueConstraint("channel_id", "track_id", name="uq_channel_message_track"),
+        Index("idx_channel_message_track", "track_id"),
     )

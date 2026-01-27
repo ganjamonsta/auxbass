@@ -1,5 +1,7 @@
 """
-TG Player Bot - Entry Point
+TG Player Bot v2 - Entry Point
+
+Uses new modular service architecture.
 """
 import asyncio
 import logging
@@ -17,8 +19,12 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from shared.config import get_settings
 from shared.database import init_db, close_db
 
-from handlers import commands, audio, callbacks, download
-from services.enrichment import enrichment_worker
+from bot.handlers.audio import router as audio_router
+from bot.handlers.commands import router as commands_router
+from bot.handlers.callbacks import router as callbacks_router
+from bot.handlers.download import router as download_router
+
+from bot.services.enrichment import enrichment_worker
 
 
 # Configure logging
@@ -39,7 +45,10 @@ async def main():
     
     # Start enrichment worker
     logger.info("Starting enrichment worker...")
-    await enrichment_worker.start(interval=30)  # Check every 30s when idle, 5s when busy
+    await enrichment_worker.start(
+        idle_interval=60,   # Check every 60s when no pending tracks
+        busy_interval=5     # Check every 5s when processing
+    )
     
     # Initialize bot
     bot = Bot(
@@ -52,16 +61,17 @@ async def main():
     dp = Dispatcher(storage=storage)
     
     # Register routers
-    dp.include_router(commands.router)
-    dp.include_router(audio.router)
-    dp.include_router(callbacks.router)
-    dp.include_router(download.router)
+    dp.include_router(commands_router)
+    dp.include_router(audio_router)
+    dp.include_router(callbacks_router)
+    dp.include_router(download_router)
     
     # Start polling
-    logger.info("Starting bot...")
+    logger.info("Starting bot v2...")
     try:
         await dp.start_polling(bot)
     finally:
+        logger.info("Shutting down...")
         await enrichment_worker.stop()
         await close_db()
         await bot.session.close()

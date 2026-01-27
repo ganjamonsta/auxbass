@@ -1,4 +1,4 @@
 """API routers"""
-from . import auth, tracks, playlists, player
+from . import auth, library, albums, artists, playlists, player
 
-__all__ = ["auth", "tracks", "playlists", "player"]
+__all__ = ["auth", "library", "albums", "artists", "playlists", "player"]

@@ -21,8 +21,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from shared.config import get_settings
 from shared.database import get_session
 from shared.models import User
-from api.schemas import (
-    TelegramUser,
+from api.schemas_v2.common import TelegramUser
+from api.schemas_v2.auth import (
     AuthResult,
     CodeRequest,
     CodeVerify,

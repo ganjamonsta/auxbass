@@ -1,201 +1,45 @@
 """
 TG Player - Shared Utilities
-Common functions used across API and Bot
+
+This module re-exports functions from matching.py for backward compatibility
+and provides formatting utilities.
 """
 import re
-import unicodedata
-from typing import Optional
+from typing import Optional, List
 
-
-# ============== Input Sanitization ==============
-
-def sanitize_input(value: str, max_length: int = 200) -> str:
-    """
-    Sanitize user input to prevent SQL injection.
-    Use for search queries, filters, and any user-provided strings.
-    """
-    if not value:
-        return ""
-    # Escape SQL wildcards
-    value = value.replace('%', r'\%').replace('_', r'\_')
-    return value[:max_length].strip()
-
-
-def sanitize_search_query(query: str, max_length: int = 100) -> str:
-    """
-    Sanitize search input - more aggressive for search queries.
-    Removes SQL special characters and limits length.
-    """
-    if not query:
-        return ""
-    # Remove SQL special characters
-    query = re.sub(r'[;\'"\\%_]', '', query)
-    return query[:max_length].strip()
-
-
-# ============== Text Normalization ==============
-
-def normalize_artist(artist: str) -> str:
-    """
-    Normalize artist name for comparison/grouping.
-    - Takes first artist from collaborations
-    - Removes feat./prod. suffixes
-    - Normalizes case and special chars
+# Re-export from matching module for backward compatibility
+from .matching import (
+    # Normalization
+    normalize_unicode,
+    normalize_artist,
+    normalize_title,
+    normalize_album,
+    normalize_genre,
+    clean_for_search,
+    remove_parenthetical,
+    remove_featuring,
     
-    Use for: matching, deduplication, grouping
-    """
-    if not artist:
-        return ""
+    # Matching
+    fuzzy_match_title,
+    fuzzy_match_artist,
+    artists_match,
+    titles_match,
+    jaccard_similarity,
     
-    artist = artist.lower()
+    # Sanitization
+    sanitize_input,
+    sanitize_search_query,
     
-    # Remove content in parentheses
-    artist = re.sub(r'\s*[\(\[].*?[\)\]]', '', artist)
+    # Hashtags
+    generate_hashtags,
+    format_hashtags,
     
-    # Remove feat., ft., prod., etc. and everything after
-    artist = re.sub(
-        r'\s*(feat\.?|ft\.?|featuring|vs\.?|prod\.?|produced\s+by)\s+.*',
-        '', artist, flags=re.IGNORECASE
-    )
-    
-    # Take first artist from list (separators: comma, ampersand, plus, x, and, with)
-    artist = re.split(
-        r'\s*[,&+]\s*|\s+(?:x|and|with)\s+',
-        artist, flags=re.IGNORECASE
-    )[0]
-    
-    # Replace $ with s (A$AP -> ASAP), remove special chars
-    artist = artist.replace('$', 's')
-    artist = re.sub(r'[^\w\s]', '', artist)
-    
-    # Normalize whitespace
-    artist = ' '.join(artist.split())
-    
-    return artist.strip()
-
-
-def normalize_title(title: str) -> str:
-    """
-    Normalize track title for comparison.
-    - Removes parenthetical content (feat., remix, etc.)
-    - Normalizes unicode and case
-    - Removes special characters
-    
-    Use for: matching tracks, deduplication
-    """
-    if not title:
-        return ""
-    
-    # Normalize unicode (curly apostrophes -> straight)
-    title = unicodedata.normalize('NFKD', title)
-    title = title.lower()
-    
-    # Remove content in parentheses/brackets
-    title = re.sub(r'\s*\([^)]*\)', '', title)
-    title = re.sub(r'\s*\[[^\]]*\]', '', title)
-    
-    # Remove "feat." / "ft." and everything after
-    title = re.sub(r'\s*(feat\.?|ft\.?)\s+.*$', '', title, flags=re.IGNORECASE)
-    
-    # Normalize apostrophes and remove them
-    title = title.replace("'", "'").replace("'", "'").replace("`", "'")
-    title = title.replace("'", "")
-    
-    # Remove special characters, keep letters/numbers/spaces
-    title = re.sub(r"[^\w\s]", '', title)
-    
-    # Normalize spaces
-    title = ' '.join(title.split())
-    
-    return title.strip()
-
-
-def clean_search_string(s: str) -> str:
-    """
-    Clean string for external API search queries.
-    Removes parenthetical content and feature credits.
-    """
-    if not s:
-        return ""
-    # Remove content in parentheses/brackets
-    s = re.sub(r'\s*[\(\[].*?[\)\]]', '', s)
-    # Remove feat., ft., prod., etc. and everything after
-    s = re.sub(
-        r'\s*(feat\.?|ft\.?|featuring|vs\.?|prod\.?|produced\s+by)\s+.*',
-        '', s, flags=re.IGNORECASE
-    )
-    return s.strip()
-
-
-def fuzzy_match_strings(s1: str, s2: str, threshold: float = 0.6) -> bool:
-    """
-    Check if two strings match using word-based Jaccard similarity.
-    
-    Args:
-        s1: First string (will be normalized)
-        s2: Second string (will be normalized)
-        threshold: Minimum similarity (0.0 to 1.0)
-    
-    Returns:
-        True if strings match above threshold
-    """
-    norm1 = normalize_title(s1)
-    norm2 = normalize_title(s2)
-    
-    if not norm1 or not norm2:
-        return False
-    
-    # Exact match
-    if norm1 == norm2:
-        return True
-    
-    # One contains the other
-    if norm1 in norm2 or norm2 in norm1:
-        return True
-    
-    # Jaccard similarity on words
-    words1 = set(norm1.split())
-    words2 = set(norm2.split())
-    
-    if not words1 or not words2:
-        return False
-    
-    intersection = len(words1 & words2)
-    union = len(words1 | words2)
-    
-    return (intersection / union) >= threshold
-
-
-def artist_matches(source: str, target: str, threshold: float = 0.6) -> bool:
-    """
-    Check if two artist names match (fuzzy comparison).
-    Handles collaborations, features, special characters.
-    """
-    norm_source = normalize_artist(source)
-    norm_target = normalize_artist(target)
-    
-    if not norm_source or not norm_target:
-        return False
-    
-    # Exact match
-    if norm_source == norm_target:
-        return True
-    
-    # One contains the other
-    if norm_source in norm_target or norm_target in norm_source:
-        return True
-    
-    # Word-based Jaccard similarity
-    words_source = set(norm_source.split())
-    words_target = set(norm_target.split())
-    
-    if not words_source or not words_target:
-        return False
-    
-    intersection = len(words_source & words_target)
-    union = len(words_source | words_target)
-    
-    return (intersection / union) >= threshold
+    # Constants
+    ARTIST_MATCH_THRESHOLD,
+    TITLE_MATCH_THRESHOLD,
+    ALBUM_MATCH_THRESHOLD,
+    GENRE_MAPPINGS,
+)
 
 
 # ============== Formatting ==============
@@ -240,6 +84,32 @@ def format_file_size(bytes_size: Optional[int]) -> str:
     return f"{bytes_size:.1f} TB"
 
 
+def format_track_info(
+    title: Optional[str] = None,
+    artist: Optional[str] = None,
+    duration: Optional[int] = None,
+    include_duration: bool = True
+) -> str:
+    """
+    Format track info for display.
+    
+    Examples:
+        "Track Name - Artist (3:45)"
+        "Track Name - Unknown Artist"
+    """
+    parts = []
+    
+    title_str = title or "Без названия"
+    artist_str = artist or "Неизвестный исполнитель"
+    
+    parts.append(f"{title_str} — {artist_str}")
+    
+    if include_duration and duration:
+        parts.append(f"({format_duration(duration)})")
+    
+    return " ".join(parts)
+
+
 # ============== Artist Splitting ==============
 
 # Regex pattern to split multiple artists
@@ -257,7 +127,7 @@ ARTIST_SPLIT_PATTERN = re.compile(
 )
 
 
-def split_artists(artist_string: str) -> list[str]:
+def split_artists(artist_string: str) -> List[str]:
     """
     Split a string containing multiple artists into a list.
     Handles: commas, ampersands, feat., ft., x, vs., and, with, prod.
@@ -270,3 +140,35 @@ def split_artists(artist_string: str) -> list[str]:
     
     artists = ARTIST_SPLIT_PATTERN.split(artist_string)
     return [a.strip() for a in artists if a.strip()]
+
+
+def get_primary_artist(artist_string: str) -> str:
+    """
+    Get the primary (first) artist from a collaboration string.
+    
+    Example: "Drake, Future" -> "Drake"
+    """
+    artists = split_artists(artist_string)
+    return artists[0] if artists else artist_string or ""
+
+
+# ============== Telegram Helpers ==============
+
+def escape_html(text: str) -> str:
+    """Escape HTML special characters for Telegram messages."""
+    if not text:
+        return ""
+    return (
+        text
+        .replace('&', '&amp;')
+        .replace('<', '&lt;')
+        .replace('>', '&gt;')
+    )
+
+
+def truncate_text(text: str, max_length: int = 100, suffix: str = "...") -> str:
+    """Truncate text to max length, adding suffix if truncated."""
+    if not text or len(text) <= max_length:
+        return text or ""
+    
+    return text[:max_length - len(suffix)] + suffix

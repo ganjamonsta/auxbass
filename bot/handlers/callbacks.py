@@ -1,10 +1,12 @@
 """
-TG Player Bot - Callback Query Handlers
+TG Player Bot - Callback Query Handlers v2
+
+Uses new modular service architecture.
 """
 from aiogram import Router, F
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiogram.fsm.context import FSMContext
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 import sys
@@ -15,40 +17,182 @@ from shared.config import get_settings
 from shared.database import get_session
 from shared.models import Track, Playlist, PlaylistTrack
 
-from services.session import session_manager
-from utils.keyboards import get_webapp_keyboard
+from bot.services import track_service, album_service, channel_service
+from bot.services.session import session_manager
+from bot.handlers.keyboards import get_webapp_keyboard
 
 
 router = Router()
 settings = get_settings()
 
 
+# ========== Track Callbacks ==========
+
 @router.callback_query(F.data.startswith("delete_track:"))
 async def handle_delete_track(callback: CallbackQuery):
     """Handle track deletion"""
     track_id = int(callback.data.split(":")[1])
+    
+    track = await track_service.get_track(track_id)
+    if not track:
+        await callback.answer("Трек не найден", show_alert=True)
+        return
+    
+    track_title = track.title or "Без названия"
+    
+    success = await track_service.delete_track(track_id)
+    if success:
+        await callback.message.edit_text(
+            f"🗑 Трек <b>{track_title}</b> удалён из библиотеки."
+        )
+        await callback.answer("Удалено!")
+    else:
+        await callback.answer("Ошибка удаления", show_alert=True)
+
+
+@router.callback_query(F.data.startswith("enrich_track:"))
+async def handle_enrich_track(callback: CallbackQuery):
+    """Handle manual track enrichment"""
+    track_id = int(callback.data.split(":")[1])
+    
+    await callback.answer("Обновление метаданных...")
+    
+    success = await track_service.trigger_enrichment(track_id)
+    
+    if success:
+        await callback.message.edit_reply_markup(reply_markup=None)
+        await callback.message.reply("✅ Метаданные обновлены!")
+    else:
+        await callback.answer("Не удалось обновить метаданные", show_alert=True)
+
+
+# ========== Stats Callbacks ==========
+
+@router.callback_query(F.data == "stats:refresh")
+async def handle_stats_refresh(callback: CallbackQuery):
+    """Refresh stats"""
     user_id = callback.from_user.id
     
-    async with get_session() as session:
-        # Find track
-        track = await session.scalar(
-            select(Track).where(
-                Track.id == track_id,
-                Track.user_id == user_id
-            )
-        )
-        
-        if not track:
-            await callback.answer("Трек не найден", show_alert=True)
-            return
-        
-        track_title = track.title or "Без названия"
-        await session.delete(track)
+    stats = await track_service.get_library_stats(user_id)
+    
+    total_seconds = stats.get("total_duration_seconds", 0)
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    
+    enrichment = stats.get("enrichment", {})
+    pending = enrichment.get("pending", 0)
+    failed = enrichment.get("failed", 0)
+    
+    enrichment_text = ""
+    if pending > 0:
+        enrichment_text = f"\n🔄 Обогащение: {pending} в очереди"
+    elif failed > 0:
+        enrichment_text = f"\n⚠️ Не обогащено: {failed} треков"
+    
+    from bot.handlers.keyboards import get_stats_keyboard
     
     await callback.message.edit_text(
-        f"🗑 Трек <b>{track_title}</b> удалён из библиотеки."
+        "📊 <b>Статистика библиотеки</b>\n\n"
+        f"🎵 Треков: <b>{stats['total_tracks']}</b>\n"
+        f"💿 Альбомов: <b>{stats['album_count']}</b>\n"
+        f"⏱ Общая длительность: <b>{hours}ч {minutes}мин</b>{enrichment_text}",
+        reply_markup=get_stats_keyboard()
     )
-    await callback.answer("Удалено!")
+    await callback.answer("Обновлено!")
+
+
+# ========== Channel Callbacks ==========
+
+@router.callback_query(F.data == "channel:verify")
+async def handle_channel_verify(callback: CallbackQuery):
+    """Verify channel setup"""
+    await callback.answer("Перешлите сообщение из вашего канала", show_alert=True)
+
+
+@router.callback_query(F.data == "channel:help")
+async def handle_channel_help(callback: CallbackQuery):
+    """Show channel setup help"""
+    await callback.message.edit_text(
+        "❓ <b>Помощь по настройке канала</b>\n\n"
+        "<b>Зачем нужен канал?</b>\n"
+        "Ваш личный канал станет бекапом вашей музыки. "
+        "Все треки будут пересылаться туда с хэштегами.\n\n"
+        "<b>Как настроить:</b>\n"
+        "1. Создайте новый приватный канал\n"
+        "2. Зайдите в настройки канала → Администраторы\n"
+        "3. Добавьте бота и дайте права на публикацию\n"
+        "4. Перешлите любое сообщение из канала боту\n\n"
+        "<b>Что получите:</b>\n"
+        "• Автоматический бекап всех треков\n"
+        "• Хэштеги для поиска (#Исполнитель, #Альбом)\n"
+        "• Независимое хранилище вашей музыки",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="◀️ Назад",
+                callback_data="channel:back"
+            )]
+        ])
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "channel:back")
+async def handle_channel_back(callback: CallbackQuery):
+    """Go back to channel setup"""
+    from bot.handlers.keyboards import get_channel_setup_keyboard
+    
+    await callback.message.edit_text(
+        "☁️ <b>Настройка канала для бекапа</b>\n\n"
+        "Создайте приватный канал в Telegram и добавьте меня администратором.\n\n"
+        "<b>Инструкция:</b>\n"
+        "1. Создайте новый канал (приватный)\n"
+        "2. Добавьте бота как администратора\n"
+        "3. Дайте права на публикацию сообщений\n"
+        "4. Перешлите мне любое сообщение из канала",
+        reply_markup=get_channel_setup_keyboard()
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "channel:cancel")
+async def handle_channel_cancel(callback: CallbackQuery, state: FSMContext):
+    """Cancel channel setup"""
+    await state.clear()
+    await callback.message.edit_text("❌ Настройка канала отменена.")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "channel:settings")
+async def handle_channel_settings(callback: CallbackQuery):
+    """Show channel settings"""
+    user_id = callback.from_user.id
+    channel = await channel_service.get_user_channel(user_id)
+    
+    if not channel:
+        await callback.answer("Канал не найден", show_alert=True)
+        return
+    
+    await callback.message.edit_text(
+        f"⚙️ <b>Настройки канала</b>\n\n"
+        f"📢 {channel.channel_name or 'Канал'}\n"
+        f"🎵 Сохранено: {channel.message_count or 0} треков\n\n"
+        "<b>Опции:</b>",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="🔄 Синхронизировать всё",
+                callback_data="channel:sync"
+            )],
+            [InlineKeyboardButton(
+                text="❌ Отключить канал",
+                callback_data="channel:disconnect_confirm"
+            )],
+            [InlineKeyboardButton(
+                text="◀️ Назад",
+                callback_data="channel:main"
+            )]
+        ])
+    )
+    await callback.answer()
 
 
 # ========== Playlist Creation Callbacks ==========
@@ -67,9 +211,7 @@ async def handle_playlist_finish(callback: CallbackQuery):
         await callback.answer("Добавь хотя бы один трек!", show_alert=True)
         return
     
-    # Create playlist in database
     async with get_session() as session:
-        # Create playlist
         playlist = Playlist(
             user_id=user_id,
             name=playlist_session.name,
@@ -77,7 +219,6 @@ async def handle_playlist_finish(callback: CallbackQuery):
         session.add(playlist)
         await session.flush()
         
-        # Add tracks
         for position, track_id in enumerate(playlist_session.track_ids):
             pt = PlaylistTrack(
                 playlist_id=playlist.id,
@@ -88,7 +229,6 @@ async def handle_playlist_finish(callback: CallbackQuery):
         
         playlist_id = playlist.id
     
-    # Clear session
     session_manager.end_playlist_session(user_id)
     
     await callback.message.edit_text(
@@ -138,18 +278,11 @@ async def handle_add_existing_to_playlist(callback: CallbackQuery):
         await callback.answer("Нет активного плейлиста", show_alert=True)
         return
     
-    # Check if track already in this playlist session
     if track_id in playlist_session.track_ids:
         await callback.answer("Трек уже в плейлисте!", show_alert=True)
         return
     
-    # Add to session
     playlist_session.add_track(track_id)
-    
-    # Get track info
-    async with get_session() as session:
-        track = await session.get(Track, track_id)
-        title = track.title if track else "Трек"
     
     await callback.message.edit_text(
         f"✅ Трек добавлен в плейлист «{playlist_session.name}»!\n\n"
@@ -209,7 +342,10 @@ async def handle_playlist_menu(callback: CallbackQuery):
     user_id = callback.from_user.id
     
     async with get_session() as session:
-        playlist = await session.get(Playlist, playlist_id, options=[selectinload(Playlist.track_associations)])
+        playlist = await session.get(
+            Playlist, playlist_id,
+            options=[selectinload(Playlist.track_associations)]
+        )
         
         if not playlist or playlist.user_id != user_id:
             await callback.answer("Плейлист не найден", show_alert=True)
@@ -225,12 +361,14 @@ async def handle_playlist_menu(callback: CallbackQuery):
         f"📅 Создан: {created_at}\n\n"
         "Выбери действие:",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="📥 Скачать все треки",
-                    callback_data=f"download_playlist:{playlist_id}"
-                )
-            ],
+            [InlineKeyboardButton(
+                text="🎵 Открыть плеер",
+                web_app=WebAppInfo(url=f"{settings.webapp_url}?playlist={playlist_id}")
+            )],
+            [InlineKeyboardButton(
+                text="📥 Скачать все треки",
+                callback_data=f"download_playlist:{playlist_id}"
+            )],
             [
                 InlineKeyboardButton(
                     text="✏️ Переименовать",
@@ -241,18 +379,10 @@ async def handle_playlist_menu(callback: CallbackQuery):
                     callback_data=f"pl:delete_confirm:{playlist_id}"
                 )
             ],
-            [
-                InlineKeyboardButton(
-                    text="🎵 Открыть плеер",
-                    web_app=WebAppInfo(url=settings.webapp_url)
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="◀️ Назад к списку",
-                    callback_data="pl:back_to_list"
-                )
-            ]
+            [InlineKeyboardButton(
+                text="◀️ Назад к списку",
+                callback_data="pl:back_to_list"
+            )]
         ])
     )
     await callback.answer()
@@ -261,7 +391,7 @@ async def handle_playlist_menu(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("pl:rename:"))
 async def handle_playlist_rename_start(callback: CallbackQuery, state: FSMContext):
     """Start playlist rename process"""
-    from handlers.commands import PlaylistStates
+    from bot.handlers.commands_v2 import PlaylistStates
     
     playlist_id = int(callback.data.split(":")[2])
     user_id = callback.from_user.id
@@ -275,7 +405,6 @@ async def handle_playlist_rename_start(callback: CallbackQuery, state: FSMContex
         
         playlist_name = playlist.name
     
-    # Set state for rename
     await state.set_state(PlaylistStates.waiting_for_rename)
     await state.update_data(rename_playlist_id=playlist_id)
     
@@ -300,7 +429,10 @@ async def handle_playlist_delete_confirm(callback: CallbackQuery):
     user_id = callback.from_user.id
     
     async with get_session() as session:
-        playlist = await session.get(Playlist, playlist_id, options=[selectinload(Playlist.track_associations)])
+        playlist = await session.get(
+            Playlist, playlist_id,
+            options=[selectinload(Playlist.track_associations)]
+        )
         
         if not playlist or playlist.user_id != user_id:
             await callback.answer("Плейлист не найден", show_alert=True)
@@ -313,8 +445,7 @@ async def handle_playlist_delete_confirm(callback: CallbackQuery):
         f"🗑 <b>Удалить плейлист?</b>\n\n"
         f"📁 «{playlist_name}»\n"
         f"🎵 {track_count} треков\n\n"
-        "⚠️ Треки останутся в библиотеке,\n"
-        "удалится только плейлист.",
+        "⚠️ Треки останутся в библиотеке.",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [
                 InlineKeyboardButton(
@@ -374,7 +505,6 @@ async def handle_back_to_playlist_list(callback: CallbackQuery):
         )
         playlists = result.scalars().all()
         
-        # Build data while session is open
         playlist_data = []
         for pl in playlists[:20]:
             track_count = len(pl.track_associations) if pl.track_associations else 0
@@ -408,15 +538,26 @@ async def handle_back_to_playlist_list(callback: CallbackQuery):
             )
         ])
     
-    text += (
-        "\n<b>Управление:</b> нажми на плейлист\n\n"
-        "<b>Создать новый:</b>\n"
-        "• /playlist — с указанием названия\n"
-        '• /playlist "Имя" — быстро'
-    )
+    text += "\n<b>Управление:</b> нажми на плейлист"
     
     await callback.message.edit_text(
         text,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
     )
+    await callback.answer()
+
+
+# ========== General Callbacks ==========
+
+@router.callback_query(F.data == "cancel")
+async def handle_cancel(callback: CallbackQuery, state: FSMContext):
+    """Handle general cancel"""
+    await state.clear()
+    await callback.message.edit_text("❌ Отменено.")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "noop")
+async def handle_noop(callback: CallbackQuery):
+    """Handle no-op (page indicator, etc.)"""
     await callback.answer()

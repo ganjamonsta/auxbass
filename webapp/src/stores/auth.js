@@ -1,0 +1,105 @@
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import api, { authStorage, authApi } from '@/api/client'
+
+export const useAuthStore = defineStore('auth', () => {
+  // State
+  const user = ref(authStorage.getUser())
+  const loading = ref(false)
+  const initialized = ref(false)
+  const error = ref(null)
+
+  // Getters
+  const isAuthenticated = computed(() => authStorage.isAuthenticated())
+  const isTelegramWebApp = computed(() => authStorage.isTelegramWebApp())
+
+  // Actions
+  async function initialize() {
+    if (initialized.value) return
+    
+    loading.value = true
+    error.value = null
+    
+    try {
+      // Validate existing auth
+      const response = await authApi.validate()
+      if (response.data?.user) {
+        user.value = response.data.user
+        authStorage.setUser(response.data.user)
+      }
+      initialized.value = true
+    } catch (err) {
+      // Auth failed - clear storage
+      authStorage.clear()
+      user.value = null
+      error.value = 'Authentication failed'
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function loginWithCode(code) {
+    loading.value = true
+    error.value = null
+    
+    try {
+      const response = await authApi.verifyCode({ code })
+      
+      if (response.data?.token) {
+        authStorage.setToken(response.data.token)
+      }
+      if (response.data?.user) {
+        user.value = response.data.user
+        authStorage.setUser(response.data.user)
+      }
+      
+      initialized.value = true
+      return response.data
+    } catch (err) {
+      error.value = 'Invalid or expired code'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  function logout() {
+    authStorage.clear()
+    user.value = null
+    initialized.value = false
+    error.value = null
+  }
+
+  async function refreshUser() {
+    try {
+      const response = await authApi.me()
+      user.value = response.data
+      authStorage.setUser(response.data)
+    } catch (err) {
+      if (err.response?.status === 401) {
+        logout()
+      }
+    }
+  }
+
+  // Listen for logout events from API interceptor
+  window.addEventListener('auth:logout', () => {
+    logout()
+  })
+
+  return {
+    // State
+    user,
+    loading,
+    initialized,
+    error,
+    // Getters
+    isAuthenticated,
+    isTelegramWebApp,
+    // Actions
+    initialize,
+    loginWithCode,
+    logout,
+    refreshUser
+  }
+})

@@ -1,0 +1,441 @@
+"""
+TG Player - Track Service v2
+
+Unified service for track management with new model structure:
+- Track is global (one per file_unique_id)
+- UserLibrary connects users to tracks
+- Albums via AlbumTrack association
+"""
+import logging
+from typing import Optional, List, Dict, Any
+from datetime import datetime
+from dataclasses import dataclass
+
+from sqlalchemy import select, func, and_, or_, desc, delete
+from sqlalchemy.orm import selectinload
+
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
+
+from shared.database import get_session
+from shared.models import (
+    Track, TrackEnrichment, Album, AlbumTrack, User, UserLibrary,
+    EnrichmentStatus, LibrarySource, ForwardSourceType
+)
+from shared.matching import normalize_artist, normalize_title
+
+from ..enrichment import enrichment_worker, enrichment_processor
+from ..albums import album_service
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class SaveTrackResult:
+    """Result of saving a track"""
+    track_id: int
+    is_new: bool  # True if track was newly created (not just added to library)
+    was_in_library: bool = False  # True if already in user's library
+    album_id: Optional[int] = None
+
+
+@dataclass
+class TrackSearchResult:
+    """Result of track search"""
+    tracks: List[Track]
+    total: int
+    has_more: bool
+
+
+class TrackService:
+    """Unified service for track operations"""
+    
+    def __init__(self):
+        self._setup_enrichment_callback()
+    
+    def _setup_enrichment_callback(self):
+        """Connect enrichment completion to album assignment"""
+        async def on_enrichment_complete(track_id: int, result):
+            if result.success and result.album_name:
+                try:
+                    await album_service.auto_assign_album_from_enrichment(track_id)
+                except Exception as e:
+                    logger.error(f"Auto album assignment failed for track {track_id}: {e}")
+        
+        enrichment_worker.set_on_enrichment_complete(on_enrichment_complete)
+    
+    async def save_track(
+        self,
+        user_id: int,
+        file_id: str,
+        file_unique_id: str,
+        title: str,
+        artist: Optional[str] = None,
+        duration: Optional[int] = None,
+        file_size: Optional[int] = None,
+        mime_type: Optional[str] = None,
+        library_source: LibrarySource = LibrarySource.UPLOADED,
+        forward_source_type: Optional[ForwardSourceType] = None,
+        forward_source_id: Optional[int] = None,
+        forward_source_name: Optional[str] = None,
+        forward_source_username: Optional[str] = None,
+        enrich: bool = True,
+    ) -> SaveTrackResult:
+        """
+        Save a new track or add existing one to user's library.
+        
+        Track is global - if file_unique_id exists, we add it to user's library.
+        If track is new, schedules enrichment.
+        
+        Args:
+            user_id: Telegram user ID
+            file_id: Telegram file ID
+            file_unique_id: Unique file identifier
+            title: Track title
+            artist: Artist name
+            duration: Duration in seconds
+            file_size: File size in bytes
+            mime_type: MIME type
+            library_source: How track was added
+            forward_source_*: Forwarding source info
+            enrich: Whether to schedule enrichment
+            
+        Returns:
+            SaveTrackResult with track_id, is_new, and was_in_library flags
+        """
+        async with get_session() as session:
+            # Check for existing track by file_unique_id (globally unique)
+            result = await session.execute(
+                select(Track).where(Track.file_unique_id == file_unique_id)
+            )
+            existing_track = result.scalar_one_or_none()
+            
+            is_new = False
+            
+            if existing_track:
+                track = existing_track
+                # Update file_id if needed (can change)
+                if track.file_id != file_id:
+                    track.file_id = file_id
+            else:
+                # Create new track
+                is_new = True
+                
+                # Ensure user exists
+                user = await session.get(User, user_id)
+                if not user:
+                    user = User(id=user_id)
+                    session.add(user)
+                    await session.flush()
+                
+                track = Track(
+                    file_id=file_id,
+                    file_unique_id=file_unique_id,
+                    title=title,
+                    artist=artist,
+                    duration=duration,
+                    file_size=file_size,
+                    mime_type=mime_type,
+                    uploader_id=user_id,
+                    forward_source_type=forward_source_type,
+                    forward_source_id=forward_source_id,
+                    forward_source_name=forward_source_name,
+                    forward_source_username=forward_source_username,
+                    enrichment_status=EnrichmentStatus.PENDING if enrich else EnrichmentStatus.COMPLETED,
+                )
+                session.add(track)
+                await session.flush()
+                
+                logger.info(f"Created track {track.id}: {title} - {artist}")
+            
+            track_id = track.id
+            
+            # Check if already in user's library
+            lib_result = await session.execute(
+                select(UserLibrary)
+                .where(UserLibrary.user_id == user_id, UserLibrary.track_id == track_id)
+            )
+            existing_lib = lib_result.scalar_one_or_none()
+            
+            if existing_lib:
+                return SaveTrackResult(
+                    track_id=track_id,
+                    is_new=False,
+                    was_in_library=True,
+                )
+            
+            # Add to user's library
+            lib_entry = UserLibrary(
+                user_id=user_id,
+                track_id=track_id,
+                source=library_source,
+            )
+            session.add(lib_entry)
+            
+            logger.info(f"Added track {track_id} to user {user_id}'s library")
+        
+        return SaveTrackResult(
+            track_id=track_id,
+            is_new=is_new,
+            was_in_library=False,
+        )
+    
+    async def get_track(
+        self,
+        track_id: int,
+        with_enrichment: bool = True,
+        with_albums: bool = False,
+    ) -> Optional[Track]:
+        """Get track by ID with optional relationships"""
+        async with get_session() as session:
+            options = []
+            if with_enrichment:
+                options.append(selectinload(Track.enrichment))
+            if with_albums:
+                options.append(selectinload(Track.album_tracks).selectinload(AlbumTrack.album))
+            
+            query = select(Track).where(Track.id == track_id)
+            if options:
+                query = query.options(*options)
+            
+            result = await session.execute(query)
+            return result.scalar_one_or_none()
+    
+    async def get_user_tracks(
+        self,
+        user_id: int,
+        source: Optional[LibrarySource] = None,
+        search: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+        order_by: str = "added_desc",
+    ) -> TrackSearchResult:
+        """
+        Get tracks from user's library.
+        
+        Args:
+            user_id: User ID
+            source: Filter by library source
+            search: Search query (matches title, artist)
+            limit: Max results
+            offset: Pagination offset
+            order_by: Sort order (added_desc, added_asc, title_asc, artist_asc)
+            
+        Returns:
+            TrackSearchResult with tracks, total count, and has_more flag
+        """
+        async with get_session() as session:
+            # Base query - join Track with UserLibrary
+            query = (
+                select(Track)
+                .join(UserLibrary, UserLibrary.track_id == Track.id)
+                .where(UserLibrary.user_id == user_id)
+            )
+            
+            # Source filter
+            if source:
+                query = query.where(UserLibrary.source == source)
+            
+            # Search filter
+            if search:
+                search_term = f"%{search.lower()}%"
+                query = query.where(
+                    or_(
+                        func.lower(Track.title).like(search_term),
+                        func.lower(Track.artist).like(search_term),
+                    )
+                )
+            
+            # Count total
+            count_query = select(func.count()).select_from(query.subquery())
+            total = (await session.execute(count_query)).scalar() or 0
+            
+            # Ordering
+            if order_by == "added_desc":
+                query = query.order_by(desc(UserLibrary.added_at))
+            elif order_by == "added_asc":
+                query = query.order_by(UserLibrary.added_at)
+            elif order_by == "title_asc":
+                query = query.order_by(func.lower(Track.title))
+            elif order_by == "artist_asc":
+                query = query.order_by(func.lower(Track.artist))
+            
+            # Pagination
+            query = query.offset(offset).limit(limit)
+            
+            # Load with enrichment
+            query = query.options(selectinload(Track.enrichment))
+            
+            result = await session.execute(query)
+            tracks = list(result.scalars().unique().all())
+            
+            return TrackSearchResult(
+                tracks=tracks,
+                total=total,
+                has_more=(offset + len(tracks)) < total,
+            )
+    
+    async def update_track(
+        self,
+        track_id: int,
+        user_id: int,
+        title: Optional[str] = None,
+        artist: Optional[str] = None,
+    ) -> bool:
+        """
+        Update track metadata.
+        
+        Only uploader can edit track.
+        Triggers re-enrichment if title or artist changed.
+        
+        Returns:
+            True if track was found and updated
+        """
+        async with get_session() as session:
+            track = await session.get(Track, track_id)
+            if not track:
+                return False
+            
+            # Only uploader can edit
+            if track.uploader_id != user_id:
+                logger.warning(f"User {user_id} tried to edit track {track_id} owned by {track.uploader_id}")
+                return False
+            
+            changed = False
+            
+            if title and title != track.title:
+                track.title = title
+                changed = True
+            
+            if artist and artist != track.artist:
+                track.artist = artist
+                changed = True
+            
+            if changed:
+                track.updated_at = datetime.utcnow()
+                track.enrichment_status = EnrichmentStatus.PENDING
+                
+                # Remove from current albums (will be re-assigned after enrichment)
+                await session.execute(
+                    delete(AlbumTrack).where(AlbumTrack.track_id == track_id)
+                )
+                
+                logger.info(f"Updated track {track_id}, scheduled re-enrichment")
+            
+            return True
+    
+    async def remove_from_library(self, track_id: int, user_id: int) -> bool:
+        """
+        Remove a track from user's library.
+        
+        If user is uploader and no one else has the track, track is deleted.
+        
+        Returns:
+            True if track was removed
+        """
+        async with get_session() as session:
+            # Find library entry
+            result = await session.execute(
+                select(UserLibrary)
+                .where(UserLibrary.track_id == track_id, UserLibrary.user_id == user_id)
+            )
+            lib_entry = result.scalar_one_or_none()
+            
+            if not lib_entry:
+                return False
+            
+            # Remove from library
+            await session.delete(lib_entry)
+            
+            # Check if anyone else has this track
+            other_count = await session.scalar(
+                select(func.count(UserLibrary.id))
+                .where(UserLibrary.track_id == track_id, UserLibrary.user_id != user_id)
+            )
+            
+            if other_count == 0:
+                # No one else has it - delete if user is uploader
+                track = await session.get(Track, track_id)
+                if track and track.uploader_id == user_id:
+                    # Delete album associations
+                    await session.execute(
+                        delete(AlbumTrack).where(AlbumTrack.track_id == track_id)
+                    )
+                    # Delete enrichment
+                    if track.enrichment:
+                        await session.delete(track.enrichment)
+                    # Delete track
+                    await session.delete(track)
+                    logger.info(f"Deleted track {track_id}")
+            
+            return True
+    
+    async def get_library_stats(self, user_id: int) -> Dict[str, Any]:
+        """Get user's library statistics"""
+        async with get_session() as session:
+            # Total tracks
+            total_result = await session.execute(
+                select(func.count(UserLibrary.id))
+                .where(UserLibrary.user_id == user_id)
+            )
+            total_tracks = total_result.scalar() or 0
+            
+            # By source
+            source_result = await session.execute(
+                select(UserLibrary.source, func.count(UserLibrary.id))
+                .where(UserLibrary.user_id == user_id)
+                .group_by(UserLibrary.source)
+            )
+            by_source = {
+                source.value if hasattr(source, 'value') else str(source): count
+                for source, count in source_result.all()
+            }
+            
+            # Enrichment stats
+            enrichment_result = await session.execute(
+                select(Track.enrichment_status, func.count(Track.id))
+                .join(UserLibrary, UserLibrary.track_id == Track.id)
+                .where(UserLibrary.user_id == user_id)
+                .group_by(Track.enrichment_status)
+            )
+            enrichment_stats = {
+                status.value if hasattr(status, 'value') else str(status): count
+                for status, count in enrichment_result.all()
+            }
+            
+            # Album count (albums with tracks in user's library)
+            album_count_result = await session.execute(
+                select(func.count(func.distinct(AlbumTrack.album_id)))
+                .join(UserLibrary, UserLibrary.track_id == AlbumTrack.track_id)
+                .where(UserLibrary.user_id == user_id)
+            )
+            album_count = album_count_result.scalar() or 0
+            
+            # Total duration
+            duration_result = await session.execute(
+                select(func.sum(Track.duration))
+                .join(UserLibrary, UserLibrary.track_id == Track.id)
+                .where(UserLibrary.user_id == user_id)
+            )
+            total_duration = duration_result.scalar() or 0
+            
+            return {
+                "total_tracks": total_tracks,
+                "by_source": by_source,
+                "enrichment": enrichment_stats,
+                "album_count": album_count,
+                "total_duration_seconds": total_duration,
+            }
+    
+    async def trigger_enrichment(self, track_id: int) -> bool:
+        """Manually trigger enrichment for a track"""
+        return await enrichment_worker.enrich_single(track_id)
+    
+    async def retry_failed_enrichment(self) -> int:
+        """Reset all failed enrichments to pending"""
+        return await enrichment_worker.retry_failed()
+
+
+# Global instance
+track_service = TrackService()
