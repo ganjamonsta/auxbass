@@ -247,8 +247,8 @@ html, body {
   font-weight: 500;
 }
 
-/* Has mini player adjustment */
+/* Has mini player adjustment - nav stays at bottom, mini player is above it */
 .app.has-player .bottom-nav {
-  bottom: var(--player-height);
+  /* Mini player now has position: fixed and sits above nav */
 }
 </style>

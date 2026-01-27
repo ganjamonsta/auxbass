@@ -175,15 +175,19 @@ const formatTime = (seconds) => {
    ═══════════════════════════════════════════════════════════ */
 
 .mini-player {
+  position: fixed;
+  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom));
+  left: 0;
+  right: 0;
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 12px 12px 8px;
+  margin: 0 12px;
   padding: 10px 12px;
   background: var(--xm-bg-elevated);
   border-radius: var(--neu-radius-lg);
   cursor: pointer;
-  z-index: 70; /* Above expanded-section (z-index: 60) */
+  z-index: 99; /* Below nav (100), above content */
   overflow: visible;
   box-shadow: 
     6px 6px 12px var(--neu-shadow-dark),
