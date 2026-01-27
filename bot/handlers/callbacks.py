@@ -172,10 +172,33 @@ async def handle_channel_settings(callback: CallbackQuery):
         await callback.answer("Канал не найден", show_alert=True)
         return
     
+    # Check if sync is running
+    if channel_service.is_sync_active(user_id):
+        sync_status = channel_service.get_sync_status(user_id)
+        await callback.message.edit_text(
+            f"🔄 <b>Синхронизация в процессе...</b>\n\n"
+            f"📢 {channel.channel_title or 'Канал'}\n"
+            f"⏳ Отправлено: {sync_status['synced']}/{sync_status['total']}",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(
+                    text="⛔ Прервать синхронизацию",
+                    callback_data="channel:sync_cancel"
+                )],
+                [InlineKeyboardButton(
+                    text="🔄 Обновить",
+                    callback_data="channel:settings"
+                )]
+            ])
+        )
+        await callback.answer()
+        return
+    
+    msg_count = await channel_service.get_channel_message_count(user_id)
+    
     await callback.message.edit_text(
         f"⚙️ <b>Настройки канала</b>\n\n"
         f"📢 {channel.channel_title or 'Канал'}\n"
-        f"🎵 Сохранено: {getattr(channel, '_message_count', 0)} треков\n\n"
+        f"🎵 Сохранено: {msg_count} треков\n\n"
         "<b>Опции:</b>",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(
@@ -238,6 +261,12 @@ async def handle_channel_sync(callback: CallbackQuery):
     """Start sync from inline button"""
     user_id = callback.from_user.id
     
+    # Check if sync is already running
+    if channel_service.is_sync_active(user_id):
+        sync_status = channel_service.get_sync_status(user_id)
+        await callback.answer("Синхронизация уже идёт!", show_alert=True)
+        return
+    
     channel = await channel_service.get_user_channel(user_id)
     if not channel:
         await callback.answer("Канал не найден", show_alert=True)
@@ -267,10 +296,8 @@ async def handle_channel_sync(callback: CallbackQuery):
     await callback.message.edit_text(
         f"🔄 <b>Синхронизация...</b>\n\n"
         f"📢 {stats['channel_title']}\n"
-        f"📚 Всего в библиотеке: <b>{stats['total_tracks']}</b>\n"
-        f"✅ Уже в канале: <b>{stats['already_synced']}</b>\n"
-        f"📤 Осталось отправить: <b>{stats['to_sync']}</b>\n\n"
-        f"⏳ Прогресс: 0/{stats['to_sync']}",
+        f"📤 К отправке: <b>{stats['to_sync']}</b> треков\n\n"
+        f"⏳ Отправлено: 0/{stats['to_sync']}",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(
                 text="⛔ Прервать",
@@ -280,33 +307,26 @@ async def handle_channel_sync(callback: CallbackQuery):
     )
     await callback.answer()
     
-    # Progress callback to update message
-    to_sync = stats["to_sync"]
-    synced_count = [0]
-    last_update = [0]
+    # Progress callback - update on EVERY track sent
+    channel_title = stats['channel_title']
+    to_sync_total = stats['to_sync']
     
-    async def progress_callback(current, total):
-        # Count actual synced (not skipped)
-        nonlocal synced_count
-        if current - last_update[0] >= max(5, to_sync // 20):  # Update every 5% or 5 tracks
-            last_update[0] = current
-            try:
-                await callback.message.edit_text(
-                    f"🔄 <b>Синхронизация...</b>\n\n"
-                    f"📢 {stats['channel_title']}\n"
-                    f"📚 Всего в библиотеке: <b>{stats['total_tracks']}</b>\n"
-                    f"✅ Уже в канале: <b>{stats['already_synced']}</b>\n"
-                    f"📤 Осталось отправить: <b>{stats['to_sync']}</b>\n\n"
-                    f"⏳ Обработано: {current}/{total}",
-                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                        [InlineKeyboardButton(
-                            text="⛔ Прервать",
-                            callback_data="channel:sync_cancel"
-                        )]
-                    ])
-                )
-            except:
-                pass
+    async def progress_callback(current, total, synced):
+        try:
+            await callback.message.edit_text(
+                f"🔄 <b>Синхронизация...</b>\n\n"
+                f"📢 {channel_title}\n"
+                f"📤 К отправке: <b>{total}</b> треков\n\n"
+                f"⏳ Отправлено: {synced}/{total}",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(
+                        text="⛔ Прервать",
+                        callback_data="channel:sync_cancel"
+                    )]
+                ])
+            )
+        except:
+            pass
     
     result = await channel_service.sync_all_tracks(
         user_id=user_id,

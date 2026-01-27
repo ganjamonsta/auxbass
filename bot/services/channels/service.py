@@ -38,6 +38,7 @@ class ChannelService:
     def __init__(self):
         self.bot: Optional[Bot] = None
         self._cancel_sync: dict[int, bool] = {}  # user_id -> cancel flag
+        self._active_sync: dict[int, dict] = {}  # user_id -> sync status info
     
     def set_bot(self, bot: Bot):
         """Set bot instance for sending messages"""
@@ -54,6 +55,26 @@ class ChannelService:
     def clear_cancel_flag(self, user_id: int):
         """Clear cancel flag for user"""
         self._cancel_sync.pop(user_id, None)
+    
+    def is_sync_active(self, user_id: int) -> bool:
+        """Check if sync is currently running for user"""
+        return user_id in self._active_sync
+    
+    def get_sync_status(self, user_id: int) -> Optional[dict]:
+        """Get current sync status for user"""
+        return self._active_sync.get(user_id)
+    
+    def _update_sync_status(self, user_id: int, current: int, total: int, synced: int):
+        """Update sync status for user"""
+        self._active_sync[user_id] = {
+            "current": current,
+            "total": total,
+            "synced": synced
+        }
+    
+    def _clear_sync_status(self, user_id: int):
+        """Clear sync status for user"""
+        self._active_sync.pop(user_id, None)
     
     async def setup_channel(
         self,
@@ -476,97 +497,111 @@ class ChannelService:
             
             stats = {"synced": 0, "skipped": 0, "failed": 0, "total": len(tracks), "cancelled": False}
             
-            # Clear any previous cancel flag
+            # Calculate tracks to sync
+            to_sync_count = len([t for t in tracks if t.id not in synced_track_ids])
+            
+            # Clear any previous cancel flag and set active sync
             self.clear_cancel_flag(user_id)
+            self._update_sync_status(user_id, 0, to_sync_count, 0)
             
-            for i, track in enumerate(tracks):
-                # Check for cancellation
-                if self.is_sync_cancelled(user_id):
-                    stats["cancelled"] = True
-                    self.clear_cancel_flag(user_id)
-                    break
+            try:
+                sent_count = 0  # Actual sent counter for progress
                 
-                # Skip already synced
-                if track.id in synced_track_ids:
-                    stats["skipped"] += 1
-                    continue
-                
-                # Progress callback
-                if progress_callback:
+                for i, track in enumerate(tracks):
+                    # Check for cancellation
+                    if self.is_sync_cancelled(user_id):
+                        stats["cancelled"] = True
+                        self.clear_cancel_flag(user_id)
+                        break
+                    
+                    # Skip already synced
+                    if track.id in synced_track_ids:
+                        stats["skipped"] += 1
+                        continue
+                    
+                    # Update sync status and call progress callback BEFORE sending
+                    self._update_sync_status(user_id, sent_count, to_sync_count, stats["synced"])
+                    if progress_callback:
+                        try:
+                            await progress_callback(sent_count, to_sync_count, stats["synced"])
+                        except:
+                            pass
+                    
                     try:
-                        await progress_callback(i + 1, len(tracks))
-                    except:
-                        pass
-                
-                try:
-                    # Generate hashtags
-                    hashtags = []
-                    if channel.include_hashtags:
-                        enrichment = track.enrichment
-                        hashtags = generate_hashtags(
-                            artist=track.artist,
-                            title=track.title,
-                            album=enrichment.album_name if enrichment else None,
-                            genre=enrichment.genre if enrichment else None,
+                        # Generate hashtags
+                        hashtags = []
+                        if channel.include_hashtags:
+                            enrichment = track.enrichment
+                            hashtags = generate_hashtags(
+                                artist=track.artist,
+                                title=track.title,
+                                album=enrichment.album_name if enrichment else None,
+                                genre=enrichment.genre if enrichment else None,
+                            )
+                        
+                        # Build caption
+                        caption_parts = []
+                        if track.title:
+                            caption_parts.append(f"🎵 {track.title}")
+                        if track.artist:
+                            caption_parts.append(f"👤 {track.artist}")
+                        if track.enrichment and track.enrichment.album_name:
+                            caption_parts.append(f"💿 {track.enrichment.album_name}")
+                        
+                        if hashtags:
+                            caption_parts.append("")
+                            caption_parts.append(format_hashtags(hashtags))
+                        
+                        caption = "\n".join(caption_parts) if caption_parts else None
+                        
+                        # Send audio
+                        sent_message = await use_bot.send_audio(
+                            chat_id=channel.channel_id,
+                            audio=track.file_id,
+                            caption=caption,
+                            parse_mode="HTML",
                         )
-                    
-                    # Build caption
-                    caption_parts = []
-                    if track.title:
-                        caption_parts.append(f"🎵 {track.title}")
-                    if track.artist:
-                        caption_parts.append(f"👤 {track.artist}")
-                    if track.enrichment and track.enrichment.album_name:
-                        caption_parts.append(f"💿 {track.enrichment.album_name}")
-                    
-                    if hashtags:
-                        caption_parts.append("")
-                        caption_parts.append(format_hashtags(hashtags))
-                    
-                    caption = "\n".join(caption_parts) if caption_parts else None
-                    
-                    # Send audio
-                    sent_message = await use_bot.send_audio(
-                        chat_id=channel.channel_id,
-                        audio=track.file_id,
-                        caption=caption,
-                        parse_mode="HTML",
-                    )
-                    
-                    # Save message record
-                    channel_message = ChannelMessage(
-                        channel_id=channel.id,
-                        track_id=track.id,
-                        message_id=sent_message.message_id,
-                        hashtags=json.dumps(hashtags) if hashtags else None,
-                    )
-                    session.add(channel_message)
-                    
-                    stats["synced"] += 1
-                    
-                    # Delay to avoid rate limiting (Telegram allows ~20 msg/min to channels)
-                    await asyncio.sleep(3)
-                    
-                except TelegramRetryAfter as e:
-                    # Rate limited - wait and retry
-                    logger.warning(f"Rate limited, waiting {e.retry_after} seconds")
-                    await asyncio.sleep(e.retry_after + 1)
-                    # Don't count as failed, will be retried on next sync
-                    continue
-                    
-                except TelegramForbiddenError:
-                    channel.is_active = False
-                    stats["failed"] += 1
-                    break  # Stop sync if access lost
-                    
-                except TelegramBadRequest as e:
-                    logger.error(f"Failed to sync track {track.id}: {e}")
-                    stats["failed"] += 1
-                    continue
-            
-            await session.commit()
-            logger.info(f"Sync completed for user {user_id}: {stats}")
-            return stats
+                        
+                        # Save message record
+                        channel_message = ChannelMessage(
+                            channel_id=channel.id,
+                            track_id=track.id,
+                            message_id=sent_message.message_id,
+                            hashtags=json.dumps(hashtags) if hashtags else None,
+                        )
+                        session.add(channel_message)
+                        
+                        stats["synced"] += 1
+                        sent_count += 1
+                        
+                        # Delay to avoid rate limiting (Telegram allows ~20 msg/min to channels)
+                        await asyncio.sleep(3)
+                        
+                    except TelegramRetryAfter as e:
+                        # Rate limited - wait and retry
+                        logger.warning(f"Rate limited, waiting {e.retry_after} seconds")
+                        await asyncio.sleep(e.retry_after + 1)
+                        # Don't count as failed, will be retried on next sync
+                        sent_count += 1
+                        continue
+                        
+                    except TelegramForbiddenError:
+                        channel.is_active = False
+                        stats["failed"] += 1
+                        break  # Stop sync if access lost
+                        
+                    except TelegramBadRequest as e:
+                        logger.error(f"Failed to sync track {track.id}: {e}")
+                        stats["failed"] += 1
+                        sent_count += 1
+                        continue
+                
+                await session.commit()
+                logger.info(f"Sync completed for user {user_id}: {stats}")
+                return stats
+            finally:
+                # Always clear sync status when done
+                self._clear_sync_status(user_id)
     
     async def verify_channel_access(
         self,
