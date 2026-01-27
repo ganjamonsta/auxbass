@@ -247,87 +247,153 @@ async def get_global_albums(
 @router.get("/{album_id}", response_model=AlbumDetailResponse)
 async def get_album(
     album_id: int,
+    scope: str = Query("library", pattern="^(library|global)$"),
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Get album details with tracks from user's library.
+    Get album details with tracks.
     
-    Returns full_tracklist with in_library flags for each track,
-    allowing UI to show missing tracks that can be added.
+    scope=library: only user's library tracks
+    scope=global: all public tracks from this album
     """
     album = await db.get(Album, album_id)
     
     if not album:
         raise HTTPException(status_code=404, detail="Album not found")
     
-    # Get tracks from this album that are in user's library
-    result = await db.execute(
-        select(Track, AlbumTrack, UserLibrary)
-        .join(AlbumTrack, AlbumTrack.track_id == Track.id)
-        .join(UserLibrary, UserLibrary.track_id == Track.id)
-        .where(
-            AlbumTrack.album_id == album_id,
-            UserLibrary.user_id == user.id
-        )
-        .options(
-            selectinload(Track.enrichment),
-            selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
-        )
-        .order_by(AlbumTrack.track_number.asc().nullslast())
-    )
-    rows = result.all()
+    from api.routers.library import track_to_response, track_to_response_global
     
-    from api.routers.library import track_to_response
-    user_tracks = [(track, lib_entry, at.track_number) for track, at, lib_entry in rows]
-    tracks = [track_to_response(track, lib_entry) for track, lib_entry, _ in user_tracks]
-    
-    # Build full tracklist with in_library status
-    full_tracklist = None
-    if album.full_tracklist:
-        try:
-            tracklist_data = json.loads(album.full_tracklist)
-            
-            # Create lookup by normalized title for matching
-            user_tracks_by_title = {}
-            for track, lib_entry, track_num in user_tracks:
-                norm_title = normalize_title(track.title or "")
-                user_tracks_by_title[norm_title] = (track, lib_entry)
-            
-            full_tracklist = []
-            for item in tracklist_data:
-                item_title = item.get("title", "")
-                norm_item_title = normalize_title(item_title)
+    if scope == "global":
+        # Get all public tracks from this album
+        result = await db.execute(
+            select(Track, AlbumTrack)
+            .join(AlbumTrack, AlbumTrack.track_id == Track.id)
+            .where(
+                AlbumTrack.album_id == album_id,
+                Track.is_public == True,
+                Track.is_unavailable == False
+            )
+            .options(
+                selectinload(Track.enrichment),
+                selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
+            )
+            .order_by(AlbumTrack.track_number.asc().nullslast())
+        )
+        rows = result.unique().all()
+        
+        # Get user's library to mark which tracks are in library
+        user_lib_result = await db.execute(
+            select(UserLibrary.track_id)
+            .where(UserLibrary.user_id == user.id)
+        )
+        user_library_ids = set(row[0] for row in user_lib_result.all())
+        
+        tracks = [
+            track_to_response_global(track, in_library=track.id in user_library_ids)
+            for track, at in rows
+        ]
+        
+        # Build full tracklist for global scope
+        full_tracklist = None
+        if album.full_tracklist:
+            try:
+                tracklist_data = json.loads(album.full_tracklist)
                 
-                # Check if this track is in user's library (fuzzy match)
-                matched_track = None
-                matched_lib = None
+                # Create lookup by normalized title
+                tracks_by_title = {}
+                for track, at in rows:
+                    norm_title = normalize_title(track.title or "")
+                    tracks_by_title[norm_title] = track
                 
-                # First try exact normalized match
-                if norm_item_title in user_tracks_by_title:
-                    matched_track, matched_lib = user_tracks_by_title[norm_item_title]
-                else:
-                    # Try fuzzy match
-                    for norm_title, (track, lib_entry) in user_tracks_by_title.items():
-                        if fuzzy_match_title(item_title, track.title or ""):
-                            matched_track, matched_lib = track, lib_entry
-                            break
+                full_tracklist = []
+                for item in tracklist_data:
+                    item_title = item.get("title", "")
+                    norm_item_title = normalize_title(item_title)
+                    
+                    matched_track = None
+                    if norm_item_title in tracks_by_title:
+                        matched_track = tracks_by_title[norm_item_title]
+                    else:
+                        for norm_title, track in tracks_by_title.items():
+                            if fuzzy_match_title(item_title, track.title or ""):
+                                matched_track = track
+                                break
+                    
+                    tracklist_item = AlbumTracklistItem(
+                        track_number=item.get("track_number", 0),
+                        title=item_title,
+                        artist=item.get("artist", ""),
+                        duration=item.get("duration", 0),
+                        deezer_id=item.get("deezer_id"),
+                        in_library=matched_track.id in user_library_ids if matched_track else False,
+                        track_id=matched_track.id if matched_track else None,
+                        track=track_to_response_global(matched_track, in_library=matched_track.id in user_library_ids) if matched_track else None,
+                    )
+                    full_tracklist.append(tracklist_item)
+            except (json.JSONDecodeError, Exception):
+                full_tracklist = None
+    else:
+        # Library scope: user's tracks only (original logic)
+        result = await db.execute(
+            select(Track, AlbumTrack, UserLibrary)
+            .join(AlbumTrack, AlbumTrack.track_id == Track.id)
+            .join(UserLibrary, UserLibrary.track_id == Track.id)
+            .where(
+                AlbumTrack.album_id == album_id,
+                UserLibrary.user_id == user.id
+            )
+            .options(
+                selectinload(Track.enrichment),
+                selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
+            )
+            .order_by(AlbumTrack.track_number.asc().nullslast())
+        )
+        rows = result.all()
+        
+        user_tracks = [(track, lib_entry, at.track_number) for track, at, lib_entry in rows]
+        tracks = [track_to_response(track, lib_entry) for track, lib_entry, _ in user_tracks]
+        
+        # Build full tracklist with in_library status
+        full_tracklist = None
+        if album.full_tracklist:
+            try:
+                tracklist_data = json.loads(album.full_tracklist)
                 
-                tracklist_item = AlbumTracklistItem(
-                    track_number=item.get("track_number", 0),
-                    title=item_title,
-                    artist=item.get("artist", ""),
-                    duration=item.get("duration", 0),
-                    deezer_id=item.get("deezer_id"),
-                    in_library=matched_track is not None,
-                    track_id=matched_track.id if matched_track else None,
-                    track=track_to_response(matched_track, matched_lib) if matched_track else None,
-                )
-                full_tracklist.append(tracklist_item)
+                user_tracks_by_title = {}
+                for track, lib_entry, track_num in user_tracks:
+                    norm_title = normalize_title(track.title or "")
+                    user_tracks_by_title[norm_title] = (track, lib_entry)
                 
-        except (json.JSONDecodeError, Exception) as e:
-            # Invalid JSON or error - skip tracklist
-            full_tracklist = None
+                full_tracklist = []
+                for item in tracklist_data:
+                    item_title = item.get("title", "")
+                    norm_item_title = normalize_title(item_title)
+                    
+                    matched_track = None
+                    matched_lib = None
+                    
+                    if norm_item_title in user_tracks_by_title:
+                        matched_track, matched_lib = user_tracks_by_title[norm_item_title]
+                    else:
+                        for norm_title, (track, lib_entry) in user_tracks_by_title.items():
+                            if fuzzy_match_title(item_title, track.title or ""):
+                                matched_track, matched_lib = track, lib_entry
+                                break
+                    
+                    tracklist_item = AlbumTracklistItem(
+                        track_number=item.get("track_number", 0),
+                        title=item_title,
+                        artist=item.get("artist", ""),
+                        duration=item.get("duration", 0),
+                        deezer_id=item.get("deezer_id"),
+                        in_library=matched_track is not None,
+                        track_id=matched_track.id if matched_track else None,
+                        track=track_to_response(matched_track, matched_lib) if matched_track else None,
+                    )
+                    full_tracklist.append(tracklist_item)
+            except (json.JSONDecodeError, Exception):
+                full_tracklist = None
     
     return AlbumDetailResponse(
         id=album.id,

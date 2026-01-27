@@ -201,7 +201,11 @@ const onToggleOrder = () => {
 
 // Navigation
 const goToArtist = (artist) => {
-  router.push(`/artist/${encodeURIComponent(artist.name)}`)
+  const query = scope.value === 'global' ? { scope: 'global' } : {}
+  router.push({ 
+    path: `/artist/${encodeURIComponent(artist.name)}`,
+    query
+  })
 }
 
 // Setup infinite scroll with IntersectionObserver

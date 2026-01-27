@@ -55,7 +55,7 @@
           v-for="album in albums"
           :key="album.id"
           class="album-card"
-          @click="$router.push(`/album/${album.id}`)"
+          @click="goToAlbum(album)"
         >
           <div class="album-cover">
             <img v-if="album.cover_url" :src="album.cover_url" :alt="album.name" />
@@ -270,6 +270,14 @@ const goToAlbumsPage = (page) => {
   loadAlbums()
 }
 
+const goToAlbum = (album) => {
+  const query = albumScope.value === 'global' ? { scope: 'global' } : {}
+  router.push({ 
+    path: `/album/${album.id}`,
+    query
+  })
+}
+
 const onNextAlbumSort = () => {
   const options = ['release_date', 'name', 'track_count']
   const labels = ['Дата', 'Название', 'Треки']
@@ -289,7 +297,8 @@ const onToggleAlbumOrder = () => {
 
 const playAlbum = async (album) => {
   try {
-    const response = await api.get(`/albums/${album.id}`)
+    const params = albumScope.value === 'global' ? { scope: 'global' } : {}
+    const response = await api.get(`/albums/${album.id}`, { params })
     if (response.data.tracks?.length) {
       playerStore.playTrack(response.data.tracks[0], response.data.tracks)
     }

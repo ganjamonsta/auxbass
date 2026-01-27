@@ -90,6 +90,48 @@ def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None)
     )
 
 
+def track_to_response_global(track: Track, in_library: bool = False) -> TrackResponse:
+    """
+    Convert Track model to response for global library.
+    Similar to track_to_response but without library_entry.
+    Uses in_library flag to indicate if user has this track.
+    """
+    enrichment = track.__dict__.get('enrichment')
+    
+    album_info = None
+    album_tracks = track.__dict__.get('album_tracks')
+    if album_tracks:
+        first_album_track = album_tracks[0]
+        album = first_album_track.__dict__.get('album') if first_album_track else None
+        if album:
+            album_info = {
+                "id": album.id,
+                "name": album.name,
+                "cover_url": album.cover_url,
+            }
+    
+    return TrackResponse(
+        id=track.id,
+        telegram_file_id=track.file_id,
+        title=track.title if track.title else f"Track {track.id}",
+        artist=track.artist,
+        duration=track.duration,
+        file_size=track.file_size,
+        library_source="global",
+        enrichment_status=track.enrichment_status.value if track.enrichment_status else None,
+        album=album_info,
+        album_name=album_info["name"] if album_info else None,
+        cover_url=enrichment.cover_url if enrichment else None,
+        genre=enrichment.genre if enrichment else None,
+        release_date=enrichment.release_date if enrichment else None,
+        is_liked=False,
+        liked_at=None,
+        play_count=0,
+        added_at=track.created_at,
+        in_library=in_library,  # Extra field for global tracks
+    )
+
+
 @router.get("", response_model=TracksListResponse)
 async def get_my_tracks(
     page: int = Query(1, ge=1),

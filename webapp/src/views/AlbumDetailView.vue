@@ -79,8 +79,11 @@
           :isPlaying="playerStore.currentTrack?.id === track.id"
           :isLiked="track.is_liked"
           :hideCover="true"
+          :showAddToLibrary="isGlobal"
+          :inLibrary="track.in_library"
           @click="playTrack(track, index)"
           @like="handleLikeTrack(track)"
+          @addToLibrary="handleAddToLibrary(track)"
           @menu="openTrackMenu(track)"
         />
       </template>
@@ -145,6 +148,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
+import { useLibraryStore } from '@/stores/library'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackMenu from '@/components/TrackMenu.vue'
 import api from '@/api/client'
@@ -152,11 +156,16 @@ import api from '@/api/client'
 const route = useRoute()
 const router = useRouter()
 const playerStore = usePlayerStore()
+const libraryStore = useLibraryStore()
 
 const album = ref(null)
 const loading = ref(true)
 const showMenu = ref(false)
 const menuTrack = ref(null)
+
+// Scope from query
+const scope = computed(() => route.query.scope || 'library')
+const isGlobal = computed(() => scope.value === 'global')
 
 // Missing track modal state
 const showMissingModal = ref(false)
@@ -179,7 +188,8 @@ const playableTracks = computed(() => {
 const loadAlbum = async () => {
   loading.value = true
   try {
-    const response = await api.get(`/albums/${route.params.id}`)
+    const params = { scope: scope.value }
+    const response = await api.get(`/albums/${route.params.id}`, { params })
     album.value = response.data
   } finally {
     loading.value = false
@@ -263,7 +273,8 @@ const closeMissingModal = () => {
 }
 
 const goToArtist = () => {
-  router.push(`/artist/${encodeURIComponent(album.value.artist)}`)
+  const query = isGlobal.value ? { scope: 'global' } : {}
+  router.push({ path: `/artist/${encodeURIComponent(album.value.artist)}`, query })
 }
 
 // Track menu handlers
@@ -291,9 +302,19 @@ const handleLikeTrack = async (track) => {
   }
 }
 
+const handleAddToLibrary = async (track) => {
+  try {
+    await libraryStore.addToLibrary(track.id)
+    track.in_library = true
+  } catch (error) {
+    console.error('Failed to add to library:', error)
+  }
+}
+
 const handleGoToArtist = () => {
   closeMenu()
-  router.push(`/artist/${encodeURIComponent(menuTrack.value?.artist)}`)
+  const query = isGlobal.value ? { scope: 'global' } : {}
+  router.push({ path: `/artist/${encodeURIComponent(menuTrack.value?.artist)}`, query })
 }
 
 const handleAddToPlaylist = () => {

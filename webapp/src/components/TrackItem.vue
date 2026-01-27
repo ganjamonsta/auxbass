@@ -77,6 +77,21 @@
       </svg>
     </button>
     
+    <!-- Add to library button for global tracks -->
+    <button 
+      v-if="showAddToLibrary && !inLibrary" 
+      class="track-add-library" 
+      @click.stop="$emit('addToLibrary')"
+      title="Добавить в библиотеку"
+    >
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+      </svg>
+    </button>
+    <span v-else-if="showAddToLibrary && inLibrary" class="in-library-badge" title="В библиотеке">
+      ✓
+    </span>
+    
     <button v-if="!compact" class="track-menu" @click.stop="$emit('menu')">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
         <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
@@ -121,10 +136,18 @@ const props = defineProps({
   showAlbum: {
     type: Boolean,
     default: false
+  },
+  showAddToLibrary: {
+    type: Boolean,
+    default: false
+  },
+  inLibrary: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['click', 'menu', 'like'])
+const emit = defineEmits(['click', 'menu', 'like', 'addToLibrary'])
 
 const handleClick = () => {
   if (props.track.is_unavailable) {
@@ -361,6 +384,38 @@ const albumName = computed(() => {
 
 .track-like.liked svg {
   filter: drop-shadow(0 0 6px var(--xm-accent-glow));
+}
+
+/* ─── Add to Library Button ─── */
+.track-add-library {
+  width: 32px;
+  height: 32px;
+  background: var(--accent);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  border-radius: var(--neu-radius-full);
+}
+
+.track-add-library:hover {
+  transform: scale(1.1);
+}
+
+.in-library-badge {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: bold;
+  flex-shrink: 0;
 }
 
 /* ─── Menu Button ─── */

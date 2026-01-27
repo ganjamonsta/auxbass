@@ -58,8 +58,11 @@
           :isPlaying="playerStore.currentTrack?.id === track.id"
           :isLiked="track.is_liked"
           :showAlbum="true"
+          :showAddToLibrary="isGlobal"
+          :inLibrary="track.in_library"
           @click="playTrack(track, index)"
           @like="handleLikeTrack(track)"
+          @addToLibrary="handleAddToLibrary(track)"
           @menu="openTrackMenu(track)"
         />
       </div>
@@ -83,9 +86,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
+import { useLibraryStore } from '@/stores/library'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackMenu from '@/components/TrackMenu.vue'
 import api from '@/api/client'
@@ -93,17 +97,23 @@ import api from '@/api/client'
 const route = useRoute()
 const router = useRouter()
 const playerStore = usePlayerStore()
+const libraryStore = useLibraryStore()
 
 const artist = ref(null)
 const loading = ref(true)
 const showMenu = ref(false)
 const menuTrack = ref(null)
 
+// Get scope from query param
+const scope = computed(() => route.query.scope || 'library')
+const isGlobal = computed(() => scope.value === 'global')
+
 const loadArtist = async () => {
   loading.value = true
   try {
     const name = decodeURIComponent(route.params.name)
-    const response = await api.get(`/artists/${encodeURIComponent(name)}`)
+    const params = { scope: scope.value }
+    const response = await api.get(`/artists/${encodeURIComponent(name)}`, { params })
     artist.value = response.data
   } finally {
     loading.value = false
@@ -128,7 +138,8 @@ const playTrack = (track, index) => {
 }
 
 const goToAlbum = (album) => {
-  router.push(`/album/${album.id}`)
+  const query = isGlobal.value ? { scope: 'global' } : {}
+  router.push({ path: `/album/${album.id}`, query })
 }
 
 // Track menu handlers
@@ -153,6 +164,15 @@ const handleLikeTrack = async (track) => {
     }
   } catch (error) {
     console.error('Failed to toggle like:', error)
+  }
+}
+
+const handleAddToLibrary = async (track) => {
+  try {
+    await libraryStore.addToLibrary(track.id)
+    track.in_library = true
+  } catch (error) {
+    console.error('Failed to add to library:', error)
   }
 }
 

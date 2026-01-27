@@ -351,43 +351,99 @@ async def get_global_artists(
 @router.get("/{artist_name}", response_model=ArtistDetailResponse)
 async def get_artist(
     artist_name: str,
+    scope: str = Query("library", pattern="^(library|global)$"),
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get artist details with tracks and albums (matched by normalized name)"""
+    """
+    Get artist details with tracks and albums.
+    
+    scope=library: only user's library tracks
+    scope=global: all public tracks
+    """
     normalized_search = normalize_artist(artist_name)
     
-    # Get all tracks and filter by normalized artist
-    tracks_result = await db.execute(
-        select(Track, UserLibrary)
-        .join(UserLibrary, UserLibrary.track_id == Track.id)
-        .where(UserLibrary.user_id == user.id)
-        .where(Track.artist.isnot(None))
-        .options(
-            selectinload(Track.enrichment),
-            selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
+    # Build query based on scope
+    if scope == "global":
+        # Global: get public tracks
+        tracks_result = await db.execute(
+            select(Track)
+            .where(Track.is_public == True)
+            .where(Track.is_unavailable == False)
+            .where(Track.artist.isnot(None))
+            .options(
+                selectinload(Track.enrichment),
+                selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
+            )
+            .order_by(Track.created_at.desc())
         )
-        .order_by(UserLibrary.play_count.desc(), Track.title.asc())
-    )
-    all_tracks = tracks_result.unique().all()
-    
-    # Filter by normalized artist
-    matching_tracks = []
-    artist_names_seen = set()
-    album_track_counts = {}  # album_id -> count
-    
-    for track, lib_entry in all_tracks:
-        if normalize_artist(track.artist) == normalized_search:
-            matching_tracks.append((track, lib_entry))
-            artist_names_seen.add(track.artist)
-            # Count tracks per album
-            for at in track.album_tracks:
-                album_track_counts[at.album_id] = album_track_counts.get(at.album_id, 0) + 1
-    
-    track_count = len(matching_tracks)
-    
-    if track_count == 0:
-        raise HTTPException(status_code=404, detail="Artist not found in your library")
+        all_tracks_raw = tracks_result.unique().scalars().all()
+        
+        # Filter by normalized artist
+        matching_tracks = []
+        artist_names_seen = set()
+        album_track_counts = {}
+        
+        for track in all_tracks_raw:
+            if normalize_artist(track.artist) == normalized_search:
+                matching_tracks.append(track)
+                artist_names_seen.add(track.artist)
+                for at in track.album_tracks:
+                    album_track_counts[at.album_id] = album_track_counts.get(at.album_id, 0) + 1
+        
+        track_count = len(matching_tracks)
+        
+        if track_count == 0:
+            raise HTTPException(status_code=404, detail="Artist not found")
+        
+        # Get user's library to mark which tracks are in library
+        user_lib_result = await db.execute(
+            select(UserLibrary.track_id)
+            .where(UserLibrary.user_id == user.id)
+        )
+        user_library_ids = set(row[0] for row in user_lib_result.all())
+        
+        # Build track responses with in_library flag
+        from api.routers.library import track_to_response_global
+        all_tracks_response = [
+            track_to_response_global(track, in_library=track.id in user_library_ids)
+            for track in matching_tracks
+        ]
+    else:
+        # Library: user's tracks only (original logic)
+        tracks_result = await db.execute(
+            select(Track, UserLibrary)
+            .join(UserLibrary, UserLibrary.track_id == Track.id)
+            .where(UserLibrary.user_id == user.id)
+            .where(Track.artist.isnot(None))
+            .options(
+                selectinload(Track.enrichment),
+                selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
+            )
+            .order_by(UserLibrary.play_count.desc(), Track.title.asc())
+        )
+        all_tracks = tracks_result.unique().all()
+        
+        # Filter by normalized artist
+        matching_tracks = []
+        artist_names_seen = set()
+        album_track_counts = {}
+        
+        for track, lib_entry in all_tracks:
+            if normalize_artist(track.artist) == normalized_search:
+                matching_tracks.append((track, lib_entry))
+                artist_names_seen.add(track.artist)
+                for at in track.album_tracks:
+                    album_track_counts[at.album_id] = album_track_counts.get(at.album_id, 0) + 1
+        
+        track_count = len(matching_tracks)
+        
+        if track_count == 0:
+            raise HTTPException(status_code=404, detail="Artist not found in your library")
+        
+        from api.routers.library import track_to_response
+        all_tracks_response = [track_to_response(track, lib_entry) for track, lib_entry in matching_tracks]
+        artist_names_seen = set(t.artist for t, _ in matching_tracks)
     
     # Get best display name
     actual_name = get_best_display_name(list(artist_names_seen)) or artist_name
@@ -408,11 +464,7 @@ async def get_artist(
             cover_url = album.cover_url
             break
     
-    # All tracks (not just top 10)
-    from api.routers.library import track_to_response
-    all_tracks = [track_to_response(track, lib_entry) for track, lib_entry in matching_tracks]
-    
-    # Albums as response - pass track_count to avoid lazy loading
+    # Albums as response
     from api.routers.albums import album_to_response
     album_items = [album_to_response(album, track_count=album_track_counts.get(album.id, 0)) for album in albums]
     
@@ -421,9 +473,9 @@ async def get_artist(
         track_count=track_count,
         album_count=len(albums),
         cover_url=cover_url,
-        image_url=cover_url,  # Frontend compatibility
+        image_url=cover_url,
         albums=album_items,
-        tracks=all_tracks,
+        tracks=all_tracks_response,
     )
 
 
