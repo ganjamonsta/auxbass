@@ -14,7 +14,13 @@
       </div>
       <div class="playlist-info">
         <h1>{{ playlist.name }}</h1>
-        <p class="meta">{{ playlist.track_count }} треков</p>
+        <p class="meta">
+          {{ playlist.track_count }} треков
+          <span v-if="playlist.is_public" class="public-badge">🌐 Публичный</span>
+        </p>
+        <p v-if="playlist.owner_name && !isOwner" class="owner-info">
+          от {{ playlist.owner_name }}
+        </p>
       </div>
     </div>
 
@@ -27,10 +33,10 @@
       <button class="shuffle-btn" @click="shufflePlay" :disabled="!playlist.tracks?.length">
         🔀
       </button>
-      <button class="edit-btn" @click="showEditModal = true">
+      <button v-if="isOwner" class="edit-btn" @click="openEditModal">
         ✏️
       </button>
-      <button class="delete-btn" @click="showDeleteConfirm = true">
+      <button v-if="isOwner" class="delete-btn" @click="showDeleteConfirm = true">
         🗑️
       </button>
     </div>
@@ -80,6 +86,11 @@
           placeholder="Название плейлиста"
           @keyup.enter="savePlaylist"
         />
+        <label class="checkbox-label">
+          <input type="checkbox" v-model="editIsPublic" />
+          <span>Публичный плейлист</span>
+        </label>
+        <p class="hint-text">Публичные плейлисты видны другим пользователям</p>
         <div class="modal-actions">
           <button class="cancel-btn" @click="showEditModal = false">Отмена</button>
           <button 
@@ -117,6 +128,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
+import { useAuthStore } from '@/stores/auth'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackMenu from '@/components/TrackMenu.vue'
 import api from '@/api/client'
@@ -124,14 +136,21 @@ import api from '@/api/client'
 const route = useRoute()
 const router = useRouter()
 const playerStore = usePlayerStore()
+const authStore = useAuthStore()
 
 const playlist = ref(null)
 const loading = ref(true)
 const showEditModal = ref(false)
 const showDeleteConfirm = ref(false)
 const editName = ref('')
+const editIsPublic = ref(false)
 const showMenu = ref(false)
 const menuTrack = ref(null)
+
+const isOwner = computed(() => {
+  if (!playlist.value || !authStore.user) return true
+  return playlist.value.owner_id === authStore.user.id || !playlist.value.owner_id
+})
 
 const coverImages = computed(() => {
   if (!playlist.value?.tracks) return []
@@ -148,9 +167,16 @@ const loadPlaylist = async () => {
     const response = await api.get(`/playlists/${route.params.id}`)
     playlist.value = response.data
     editName.value = playlist.value.name
+    editIsPublic.value = playlist.value.is_public || false
   } finally {
     loading.value = false
   }
+}
+
+const openEditModal = () => {
+  editName.value = playlist.value.name
+  editIsPublic.value = playlist.value.is_public || false
+  showEditModal.value = true
 }
 
 const playAll = () => {
@@ -249,10 +275,12 @@ const savePlaylist = async () => {
   if (!editName.value.trim()) return
   
   try {
-    await api.patch(`/playlists/${playlist.value.id}`, {
-      name: editName.value.trim()
+    await api.put(`/playlists/${playlist.value.id}`, {
+      name: editName.value.trim(),
+      is_public: editIsPublic.value
     })
     playlist.value.name = editName.value.trim()
+    playlist.value.is_public = editIsPublic.value
     showEditModal.value = false
   } catch (error) {
     console.error('Failed to update playlist:', error)
@@ -515,5 +543,40 @@ onMounted(() => {
   color: #fff;
   font-weight: 600;
   cursor: pointer;
+}
+
+.public-badge {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.owner-info {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.hint-text {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin: 0 0 16px 0;
 }
 </style>

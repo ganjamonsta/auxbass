@@ -538,3 +538,26 @@ class ChannelMessage(Base):
         UniqueConstraint("channel_id", "track_id", name="uq_channel_message_track"),
         Index("idx_channel_message_track", "track_id"),
     )
+
+
+# ============== User Following (Social) ==============
+
+class UserFollow(Base):
+    """
+    User following relationship for social features.
+    Allows users to follow friends and view their public libraries.
+    """
+    __tablename__ = "user_follows"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    follower_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
+    following_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (
+        UniqueConstraint("follower_id", "following_id", name="uq_user_follow"),
+        Index("idx_user_follow_follower", "follower_id"),
+        Index("idx_user_follow_following", "following_id"),
+    )

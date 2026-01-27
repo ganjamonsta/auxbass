@@ -17,7 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.database import get_db
-from shared.models import Playlist, PlaylistTrack, Track, UserLibrary, AlbumTrack
+from shared.models import Playlist, PlaylistTrack, Track, UserLibrary, AlbumTrack, User
 
 from api.routers.auth import get_current_user
 from api.routers.library import track_to_response
@@ -32,11 +32,13 @@ router = APIRouter(tags=["Playlists"])
 class PlaylistCreate(BaseModel):
     name: str
     description: Optional[str] = None
+    is_public: bool = False
 
 
 class PlaylistUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    is_public: Optional[bool] = None
 
 
 class PlaylistResponse(BaseModel):
@@ -46,6 +48,9 @@ class PlaylistResponse(BaseModel):
     track_count: int = 0
     total_duration: int = 0
     cover_url: Optional[str] = None
+    is_public: bool = False
+    owner_id: Optional[int] = None
+    owner_name: Optional[str] = None
     created_at: datetime
     
     class Config:
@@ -133,6 +138,7 @@ async def get_my_playlists(
             track_count=track_count,
             total_duration=total_duration,
             cover_url=cover_url,
+            is_public=playlist.is_public,
             created_at=playlist.created_at,
         ))
     
@@ -155,6 +161,7 @@ async def create_playlist(
         owner_id=user.id,
         name=data.name,
         description=data.description,
+        is_public=data.is_public,
     )
     db.add(playlist)
     await db.flush()
@@ -166,6 +173,7 @@ async def create_playlist(
         track_count=0,
         total_duration=0,
         cover_url=None,
+        is_public=playlist.is_public,
         created_at=playlist.created_at,
     )
 
@@ -177,9 +185,20 @@ async def get_playlist(
     db: AsyncSession = Depends(get_db),
 ):
     """Get playlist with tracks"""
-    playlist = await db.get(Playlist, playlist_id)
+    result = await db.execute(
+        select(Playlist, User)
+        .join(User, User.id == Playlist.owner_id)
+        .where(Playlist.id == playlist_id)
+    )
+    row = result.first()
     
-    if not playlist or playlist.owner_id != user.id:
+    if not row:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    
+    playlist, owner = row
+    
+    # Allow access if owner or if playlist is public
+    if playlist.owner_id != user.id and not playlist.is_public:
         raise HTTPException(status_code=404, detail="Playlist not found")
     
     # Get tracks with library entries for response
@@ -215,6 +234,9 @@ async def get_playlist(
         track_count=track_count,
         total_duration=total_duration,
         cover_url=cover_url,
+        is_public=playlist.is_public,
+        owner_id=owner.id,
+        owner_name=owner.display_name,
         created_at=playlist.created_at,
         tracks=tracks_response,
     )
@@ -271,6 +293,8 @@ async def update_playlist(
         playlist.name = data.name
     if data.description is not None:
         playlist.description = data.description
+    if data.is_public is not None:
+        playlist.is_public = data.is_public
     
     await db.commit()
     
@@ -283,6 +307,7 @@ async def update_playlist(
         track_count=track_count,
         total_duration=total_duration,
         cover_url=cover_url,
+        is_public=playlist.is_public,
         created_at=playlist.created_at,
     )
 
@@ -416,3 +441,116 @@ async def reorder_playlist(
     await db.commit()
     
     return {"status": "reordered"}
+
+
+# ============== Public Playlists ==============
+
+@router.get("/public/explore", response_model=PlaylistsListResponse)
+async def get_public_playlists(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=100),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get all public playlists from all users"""
+    # Count public playlists
+    total = await db.scalar(
+        select(func.count(Playlist.id))
+        .where(Playlist.is_public == True)
+    ) or 0
+    
+    # Get playlists with owner info
+    offset = (page - 1) * per_page
+    result = await db.execute(
+        select(Playlist, User)
+        .join(User, User.id == Playlist.owner_id)
+        .where(Playlist.is_public == True)
+        .order_by(Playlist.created_at.desc())
+        .offset(offset)
+        .limit(per_page)
+    )
+    rows = result.all()
+    
+    items = []
+    for playlist, owner in rows:
+        track_count, total_duration, cover_url = await get_playlist_info(db, playlist.id)
+        items.append(PlaylistResponse(
+            id=playlist.id,
+            name=playlist.name,
+            description=playlist.description,
+            track_count=track_count,
+            total_duration=total_duration,
+            cover_url=cover_url,
+            is_public=playlist.is_public,
+            owner_id=owner.id,
+            owner_name=owner.display_name,
+            created_at=playlist.created_at,
+        ))
+    
+    return PlaylistsListResponse(
+        items=items,
+        total=total,
+        page=page,
+        per_page=per_page,
+    )
+
+
+@router.get("/user/{user_id}", response_model=PlaylistsListResponse)
+async def get_user_public_playlists(
+    user_id: int,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=100),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get public playlists of a specific user"""
+    # If viewing own playlists, show all
+    is_own = user_id == user.id
+    
+    query = select(Playlist).where(Playlist.owner_id == user_id)
+    if not is_own:
+        query = query.where(Playlist.is_public == True)
+    
+    # Count
+    total = await db.scalar(
+        select(func.count(Playlist.id))
+        .where(Playlist.owner_id == user_id)
+        .where(True if is_own else Playlist.is_public == True)
+    ) or 0
+    
+    # Get owner info
+    owner = await db.get(User, user_id)
+    if not owner:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get playlists
+    offset = (page - 1) * per_page
+    result = await db.execute(
+        query.order_by(Playlist.created_at.desc())
+        .offset(offset)
+        .limit(per_page)
+    )
+    playlists = result.scalars().all()
+    
+    items = []
+    for playlist in playlists:
+        track_count, total_duration, cover_url = await get_playlist_info(db, playlist.id)
+        items.append(PlaylistResponse(
+            id=playlist.id,
+            name=playlist.name,
+            description=playlist.description,
+            track_count=track_count,
+            total_duration=total_duration,
+            cover_url=cover_url,
+            is_public=playlist.is_public,
+            owner_id=owner.id,
+            owner_name=owner.display_name,
+            created_at=playlist.created_at,
+        ))
+    
+    return PlaylistsListResponse(
+        items=items,
+        total=total,
+        page=page,
+        per_page=per_page,
+    )

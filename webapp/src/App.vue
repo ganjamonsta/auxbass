@@ -29,17 +29,17 @@
           <span class="nav-icon">🎵</span>
           <span class="nav-label">Библиотека</span>
         </router-link>
-        <router-link to="/albums" class="nav-item" :class="{ active: isRoute('/albums') }">
+        <router-link to="/collections" class="nav-item" :class="{ active: isRoute('/collections') || isRoute('/albums') || isRoute('/playlists') }">
           <span class="nav-icon">💿</span>
-          <span class="nav-label">Альбомы</span>
+          <span class="nav-label">Коллекции</span>
         </router-link>
         <router-link to="/artists" class="nav-item" :class="{ active: isRoute('/artists') }">
           <span class="nav-icon">🎤</span>
           <span class="nav-label">Артисты</span>
         </router-link>
-        <router-link to="/playlists" class="nav-item" :class="{ active: isRoute('/playlists') }">
-          <span class="nav-icon">📁</span>
-          <span class="nav-label">Плейлисты</span>
+        <router-link to="/friends" class="nav-item" :class="{ active: isRoute('/friends') }">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">Кенты</span>
         </router-link>
         <router-link to="/settings" class="nav-item" :class="{ active: isRoute('/settings') }">
           <span class="nav-icon">⚙️</span>
@@ -138,12 +138,14 @@ const showHeader = computed(() => {
 
 const pageTitle = computed(() => {
   const titles = {
+    collections: 'Коллекции',
     albums: 'Альбомы',
     'album-detail': route.params?.name || 'Альбом',
     artists: 'Исполнители',
     'artist-detail': decodeURIComponent(route.params?.name || 'Артист'),
     playlists: 'Плейлисты',
     'playlist-detail': 'Плейлист',
+    friends: 'Кенты',
     settings: 'Настройки',
   }
   return titles[route.name] || ''

@@ -1,0 +1,941 @@
+<template>
+  <div class="friends-view">
+    <!-- Tab switcher -->
+    <div class="tabs-header">
+      <button 
+        class="tab-btn" 
+        :class="{ active: activeTab === 'following' }"
+        @click="activeTab = 'following'"
+      >
+        Подписки
+      </button>
+      <button 
+        class="tab-btn" 
+        :class="{ active: activeTab === 'followers' }"
+        @click="activeTab = 'followers'"
+      >
+        Подписчики
+      </button>
+      <button 
+        class="tab-btn" 
+        :class="{ active: activeTab === 'search' }"
+        @click="activeTab = 'search'"
+      >
+        🔍
+      </button>
+    </div>
+
+    <!-- Following Tab -->
+    <div v-show="activeTab === 'following'" class="tab-content">
+      <div v-if="loading" class="loading">
+        <div class="spinner"></div>
+      </div>
+
+      <div v-else-if="following.length === 0" class="empty-state">
+        <span class="empty-icon">👥</span>
+        <p>Вы пока ни на кого не подписаны</p>
+        <button class="action-btn" @click="activeTab = 'search'">
+          Найти друзей
+        </button>
+      </div>
+
+      <div v-else class="users-list">
+        <div 
+          v-for="user in following" 
+          :key="user.id"
+          class="user-card"
+          @click="viewUserProfile(user)"
+        >
+          <div class="user-avatar">
+            {{ getInitials(user) }}
+          </div>
+          <div class="user-info">
+            <div class="user-name">{{ user.display_name }}</div>
+            <div class="user-meta">
+              {{ user.track_count }} треков • {{ user.playlist_count }} плейлистов
+            </div>
+          </div>
+          <button 
+            class="unfollow-btn" 
+            @click.stop="unfollowUser(user)"
+          >
+            ✓ Подписан
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Followers Tab -->
+    <div v-show="activeTab === 'followers'" class="tab-content">
+      <div v-if="loading" class="loading">
+        <div class="spinner"></div>
+      </div>
+
+      <div v-else-if="followers.length === 0" class="empty-state">
+        <span class="empty-icon">👤</span>
+        <p>Пока никто не подписался на вас</p>
+      </div>
+
+      <div v-else class="users-list">
+        <div 
+          v-for="user in followers" 
+          :key="user.id"
+          class="user-card"
+          @click="viewUserProfile(user)"
+        >
+          <div class="user-avatar">
+            {{ getInitials(user) }}
+          </div>
+          <div class="user-info">
+            <div class="user-name">{{ user.display_name }}</div>
+            <div class="user-meta">
+              {{ user.track_count }} треков • {{ user.playlist_count }} плейлистов
+            </div>
+          </div>
+          <button 
+            v-if="!user.is_following"
+            class="follow-btn" 
+            @click.stop="followUser(user)"
+          >
+            Подписаться
+          </button>
+          <button 
+            v-else
+            class="unfollow-btn" 
+            @click.stop="unfollowUser(user)"
+          >
+            ✓ Подписан
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search Tab -->
+    <div v-show="activeTab === 'search'" class="tab-content">
+      <div class="search-box">
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Поиск по имени или @username"
+          @input="debouncedSearch"
+        />
+      </div>
+
+      <div v-if="searching" class="loading">
+        <div class="spinner"></div>
+      </div>
+
+      <div v-else-if="searchQuery && searchResults.length === 0" class="empty-state">
+        <span class="empty-icon">🔍</span>
+        <p>Никого не найдено</p>
+      </div>
+
+      <div v-else-if="searchResults.length" class="users-list">
+        <div 
+          v-for="user in searchResults" 
+          :key="user.id"
+          class="user-card"
+          @click="viewUserProfile(user)"
+        >
+          <div class="user-avatar">
+            {{ getInitials(user) }}
+          </div>
+          <div class="user-info">
+            <div class="user-name">{{ user.display_name }}</div>
+            <div class="user-meta">
+              <span v-if="user.username">@{{ user.username }}</span>
+              <span v-else>{{ user.track_count }} треков</span>
+            </div>
+          </div>
+          <button 
+            v-if="!user.is_following"
+            class="follow-btn" 
+            @click.stop="followUser(user)"
+          >
+            Подписаться
+          </button>
+          <button 
+            v-else
+            class="unfollow-btn" 
+            @click.stop="unfollowUser(user)"
+          >
+            ✓ Подписан
+          </button>
+        </div>
+      </div>
+
+      <div v-else-if="!searchQuery" class="search-hint">
+        <span class="hint-icon">💡</span>
+        <p>Введите имя или username друга</p>
+      </div>
+    </div>
+
+    <!-- User Profile Modal -->
+    <div v-if="selectedUser" class="modal-overlay" @click.self="closeProfile">
+      <div class="profile-modal">
+        <div class="profile-header">
+          <div class="profile-avatar">
+            {{ getInitials(selectedUser) }}
+          </div>
+          <div class="profile-info">
+            <h2>{{ selectedUser.display_name }}</h2>
+            <p v-if="selectedUser.username">@{{ selectedUser.username }}</p>
+          </div>
+          <button class="close-btn" @click="closeProfile">✕</button>
+        </div>
+
+        <div class="profile-stats">
+          <div class="stat">
+            <span class="stat-value">{{ selectedUser.track_count }}</span>
+            <span class="stat-label">треков</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value">{{ selectedUser.playlist_count }}</span>
+            <span class="stat-label">плейлистов</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value">{{ selectedUser.followers_count }}</span>
+            <span class="stat-label">подписчиков</span>
+          </div>
+        </div>
+
+        <div class="profile-actions">
+          <button 
+            v-if="!selectedUser.is_following"
+            class="action-btn primary"
+            @click="followUser(selectedUser)"
+          >
+            Подписаться
+          </button>
+          <button 
+            v-else
+            class="action-btn secondary"
+            @click="unfollowUser(selectedUser)"
+          >
+            Отписаться
+          </button>
+        </div>
+
+        <div class="profile-content">
+          <!-- Tabs for user content -->
+          <div class="content-tabs">
+            <button 
+              :class="{ active: profileTab === 'library' }"
+              @click="profileTab = 'library'; loadUserLibrary()"
+            >
+              🎵 Библиотека
+            </button>
+            <button 
+              :class="{ active: profileTab === 'playlists' }"
+              @click="profileTab = 'playlists'; loadUserPlaylists()"
+            >
+              📁 Плейлисты
+            </button>
+            <button 
+              :class="{ active: profileTab === 'albums' }"
+              @click="profileTab = 'albums'; loadUserAlbums()"
+            >
+              💿 Альбомы
+            </button>
+          </div>
+
+          <div v-if="loadingUserContent" class="loading">
+            <div class="spinner"></div>
+          </div>
+
+          <!-- Library tracks -->
+          <div v-else-if="profileTab === 'library'" class="tracks-list">
+            <div 
+              v-for="track in userTracks" 
+              :key="track.id"
+              class="track-item"
+              @click="playTrack(track)"
+            >
+              <div class="track-cover">
+                <img v-if="track.cover_url" :src="track.cover_url" />
+                <span v-else>🎵</span>
+              </div>
+              <div class="track-info">
+                <div class="track-title">{{ track.title || 'Без названия' }}</div>
+                <div class="track-artist">{{ track.artist || 'Неизвестен' }}</div>
+              </div>
+            </div>
+            <p v-if="userTracks.length === 0" class="empty-hint">Нет треков</p>
+          </div>
+
+          <!-- Playlists -->
+          <div v-else-if="profileTab === 'playlists'" class="playlists-list">
+            <div 
+              v-for="playlist in userPlaylists" 
+              :key="playlist.id"
+              class="playlist-item"
+              @click="$router.push(`/playlist/${playlist.id}`); closeProfile()"
+            >
+              <div class="playlist-icon">📁</div>
+              <div class="playlist-info">
+                <div class="playlist-name">{{ playlist.name }}</div>
+                <div class="playlist-meta">{{ playlist.track_count }} треков</div>
+              </div>
+            </div>
+            <p v-if="userPlaylists.length === 0" class="empty-hint">Нет публичных плейлистов</p>
+          </div>
+
+          <!-- Albums -->
+          <div v-else-if="profileTab === 'albums'" class="albums-grid-small">
+            <div 
+              v-for="album in userAlbums" 
+              :key="album.id"
+              class="album-item"
+              @click="$router.push(`/album/${album.id}`); closeProfile()"
+            >
+              <img v-if="album.cover_url" :src="album.cover_url" />
+              <div v-else class="album-placeholder">💿</div>
+              <div class="album-name">{{ album.name }}</div>
+            </div>
+            <p v-if="userAlbums.length === 0" class="empty-hint">Нет альбомов</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { usePlayerStore } from '@/stores/player'
+import api from '@/api/client'
+
+const router = useRouter()
+const playerStore = usePlayerStore()
+
+// Tab state
+const activeTab = ref('following')
+
+// Data
+const following = ref([])
+const followers = ref([])
+const searchResults = ref([])
+const loading = ref(false)
+const searching = ref(false)
+const searchQuery = ref('')
+
+// Selected user profile
+const selectedUser = ref(null)
+const profileTab = ref('library')
+const loadingUserContent = ref(false)
+const userTracks = ref([])
+const userPlaylists = ref([])
+const userAlbums = ref([])
+
+// Debounce timer
+let searchTimer = null
+
+const getInitials = (user) => {
+  if (user.first_name) {
+    return user.first_name.charAt(0).toUpperCase()
+  }
+  if (user.username) {
+    return user.username.charAt(0).toUpperCase()
+  }
+  return '?'
+}
+
+const loadFollowing = async () => {
+  loading.value = true
+  try {
+    const response = await api.get('/social/following')
+    following.value = response.data.items || []
+  } catch (error) {
+    console.error('Failed to load following:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+const loadFollowers = async () => {
+  loading.value = true
+  try {
+    const response = await api.get('/social/followers')
+    followers.value = response.data.items || []
+  } catch (error) {
+    console.error('Failed to load followers:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+const debouncedSearch = () => {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(searchUsers, 300)
+}
+
+const searchUsers = async () => {
+  if (!searchQuery.value || searchQuery.value.length < 2) {
+    searchResults.value = []
+    return
+  }
+  
+  searching.value = true
+  try {
+    const response = await api.get('/social/search', {
+      params: { q: searchQuery.value }
+    })
+    searchResults.value = response.data.items || []
+  } catch (error) {
+    console.error('Search failed:', error)
+  } finally {
+    searching.value = false
+  }
+}
+
+const followUser = async (user) => {
+  try {
+    await api.post('/social/follow', { user_id: user.id })
+    user.is_following = true
+    // Add to following list if not there
+    if (!following.value.find(u => u.id === user.id)) {
+      following.value.unshift(user)
+    }
+  } catch (error) {
+    console.error('Failed to follow:', error)
+  }
+}
+
+const unfollowUser = async (user) => {
+  try {
+    await api.post('/social/unfollow', { user_id: user.id })
+    user.is_following = false
+    // Remove from following list
+    following.value = following.value.filter(u => u.id !== user.id)
+  } catch (error) {
+    console.error('Failed to unfollow:', error)
+  }
+}
+
+const viewUserProfile = async (user) => {
+  selectedUser.value = user
+  profileTab.value = 'library'
+  loadUserLibrary()
+}
+
+const closeProfile = () => {
+  selectedUser.value = null
+  userTracks.value = []
+  userPlaylists.value = []
+  userAlbums.value = []
+}
+
+const loadUserLibrary = async () => {
+  if (!selectedUser.value) return
+  loadingUserContent.value = true
+  try {
+    const response = await api.get(`/social/user/${selectedUser.value.id}/library`, {
+      params: { per_page: 20 }
+    })
+    userTracks.value = response.data.items || []
+  } catch (error) {
+    console.error('Failed to load user library:', error)
+  } finally {
+    loadingUserContent.value = false
+  }
+}
+
+const loadUserPlaylists = async () => {
+  if (!selectedUser.value) return
+  loadingUserContent.value = true
+  try {
+    const response = await api.get(`/playlists/user/${selectedUser.value.id}`)
+    userPlaylists.value = response.data.items || []
+  } catch (error) {
+    console.error('Failed to load user playlists:', error)
+  } finally {
+    loadingUserContent.value = false
+  }
+}
+
+const loadUserAlbums = async () => {
+  if (!selectedUser.value) return
+  loadingUserContent.value = true
+  try {
+    const response = await api.get(`/social/user/${selectedUser.value.id}/albums`, {
+      params: { per_page: 20 }
+    })
+    userAlbums.value = response.data.items || []
+  } catch (error) {
+    console.error('Failed to load user albums:', error)
+  } finally {
+    loadingUserContent.value = false
+  }
+}
+
+const playTrack = (track) => {
+  playerStore.playTrack(track, userTracks.value)
+}
+
+// Load data on tab change
+watch(activeTab, (tab) => {
+  if (tab === 'following') {
+    loadFollowing()
+  } else if (tab === 'followers') {
+    loadFollowers()
+  }
+})
+
+onMounted(() => {
+  loadFollowing()
+})
+</script>
+
+<style scoped>
+.friends-view {
+  padding: 16px;
+  padding-bottom: 120px;
+}
+
+.tabs-header {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding: 4px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab-btn.active {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+/* Search */
+.search-box {
+  margin-bottom: 20px;
+}
+
+.search-box input {
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.search-box input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.search-hint {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-secondary);
+}
+
+.hint-icon {
+  font-size: 32px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+/* Users list */
+.users-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.user-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.user-card:active {
+  background: var(--bg-highlight);
+}
+
+.user-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #8b5cf6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.user-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.user-meta {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.follow-btn, .unfollow-btn {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+}
+
+.follow-btn {
+  background: var(--accent);
+  color: #000;
+}
+
+.unfollow-btn {
+  background: var(--bg-highlight);
+  color: var(--text-secondary);
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-secondary);
+}
+
+.empty-icon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 16px;
+}
+
+.action-btn {
+  margin-top: 16px;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 20px;
+  padding: 12px 24px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Profile Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.profile-modal {
+  background: var(--bg-secondary);
+  border-radius: 24px 24px 0 0;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+  padding-bottom: 16px;
+}
+
+.profile-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #8b5cf6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.profile-info {
+  flex: 1;
+}
+
+.profile-info h2 {
+  margin: 0;
+  font-size: 20px;
+  color: var(--text-primary);
+}
+
+.profile-info p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  border: none;
+  color: var(--text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.profile-stats {
+  display: flex;
+  justify-content: space-around;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.stat {
+  text-align: center;
+}
+
+.stat-value {
+  display: block;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.profile-actions {
+  padding: 16px 24px;
+  display: flex;
+  gap: 12px;
+}
+
+.action-btn.primary {
+  flex: 1;
+  background: var(--accent);
+  color: #000;
+}
+
+.action-btn.secondary {
+  flex: 1;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.profile-content {
+  padding: 0 16px 24px;
+}
+
+.content-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+
+.content-tabs button {
+  padding: 8px 16px;
+  background: var(--bg-elevated);
+  border: none;
+  border-radius: 20px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.content-tabs button.active {
+  background: var(--accent);
+  color: #000;
+}
+
+/* Tracks list */
+.tracks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.track-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: var(--bg-elevated);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.track-cover {
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  background: var(--bg-highlight);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.track-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.track-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.track-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track-artist {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Playlists list */
+.playlists-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.playlist-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-elevated);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.playlist-icon {
+  font-size: 24px;
+}
+
+.playlist-info {
+  flex: 1;
+}
+
+.playlist-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.playlist-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Albums grid small */
+.albums-grid-small {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.album-item {
+  cursor: pointer;
+}
+
+.album-item img,
+.album-placeholder {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--bg-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+}
+
+.album-item .album-name {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty-hint {
+  text-align: center;
+  color: var(--text-tertiary);
+  padding: 24px;
+  font-size: 14px;
+}
+
+/* Loading */
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--bg-highlight);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+</style>

@@ -28,6 +28,7 @@ from api.routers.albums import router as albums_router
 from api.routers.artists import router as artists_router
 from api.routers.playlists import router as playlists_router
 from api.routers.player import router as player_router, close_http_session
+from api.routers.social import router as social_router
 
 
 settings = get_settings()
@@ -110,6 +111,7 @@ app.include_router(albums_router, prefix="/api/albums", tags=["Albums"])
 app.include_router(artists_router, prefix="/api/artists", tags=["Artists"])
 app.include_router(playlists_router, prefix="/api/playlists", tags=["Playlists"])
 app.include_router(player_router, prefix="/api/player", tags=["Player"])
+app.include_router(social_router, prefix="/api", tags=["Social"])
 
 
 # ============== Static Files & SPA Fallback ==============

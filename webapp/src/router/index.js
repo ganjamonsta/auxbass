@@ -5,6 +5,8 @@ import LibraryView from '@/views/LibraryView.vue'
 import AlbumsView from '@/views/AlbumsView.vue'
 import ArtistsView from '@/views/ArtistsView.vue'
 import PlaylistsView from '@/views/PlaylistsView.vue'
+import CollectionsView from '@/views/CollectionsView.vue'
+import FriendsView from '@/views/FriendsView.vue'
 import AlbumDetailView from '@/views/AlbumDetailView.vue'
 import ArtistDetailView from '@/views/ArtistDetailView.vue'
 import PlaylistDetailView from '@/views/PlaylistDetailView.vue'
@@ -19,6 +21,12 @@ const routes = [
     path: '/',
     name: 'library',
     component: LibraryView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/collections',
+    name: 'collections',
+    component: CollectionsView,
     meta: { requiresAuth: true }
   },
   {
@@ -55,6 +63,12 @@ const routes = [
     path: '/playlist/:id',
     name: 'playlist-detail',
     component: PlaylistDetailView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/friends',
+    name: 'friends',
+    component: FriendsView,
     meta: { requiresAuth: true }
   },
   {
