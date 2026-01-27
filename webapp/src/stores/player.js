@@ -1112,9 +1112,19 @@ export const usePlayerStore = defineStore('player', () => {
       }
       
       // === PRIORITY 2: Preloaded Audio element (already buffering) ===
+      // First check if the URL token is still valid (not expired)
+      const preloadedUrlStillValid = getCachedUrl(track.id) !== null
       const preloadedAudio = getPreloadedAudio(track.id)
-      if (preloadedAudio && preloadedAudio.readyState >= 2) {
-        console.log('[Play] Using preloaded Audio element - fast start')
+      
+      // Only use preloaded audio if:
+      // 1. Audio exists and has data (readyState >= 2 = HAVE_CURRENT_DATA)
+      // 2. URL token is still valid in cache
+      // 3. networkState is good (NETWORK_IDLE=1 or NETWORK_LOADING=2)
+      if (preloadedAudio && 
+          preloadedAudio.readyState >= 2 && 
+          preloadedUrlStillValid &&
+          (preloadedAudio.networkState === 1 || preloadedAudio.networkState === 2)) {
+        console.log(`[Play] Using preloaded Audio element - fast start (readyState=${preloadedAudio.readyState}, networkState=${preloadedAudio.networkState})`)
         
         // Swap audio elements
         if (audio.value) {
@@ -1130,17 +1140,32 @@ export const usePlayerStore = defineStore('player', () => {
         // Reattach event listeners to new audio element
         reattachAudioListeners()
         
-        await audio.value.play()
-        loading.value = false
-        
-        // Recycle old audio for next preload
-        recyclePreloadAudio(oldAudio)
-        
-        persistState()
-        startStateSaving()
-        nextTrackPreloaded.value = null
-        preloadNextTracks()
-        return
+        try {
+          await audio.value.play()
+          loading.value = false
+          
+          // Recycle old audio for next preload
+          recyclePreloadAudio(oldAudio)
+          
+          persistState()
+          startStateSaving()
+          nextTrackPreloaded.value = null
+          preloadNextTracks()
+          return
+        } catch (e) {
+          console.error('[Play] Failed to play preloaded audio, falling back:', e)
+          // Restore old audio and continue to next priority
+          audio.value = oldAudio
+          if (oldAudio) {
+            reattachAudioListeners()
+          }
+          // Clear the broken preload
+          clearPreloadAudio()
+          // Continue to Priority 3 below
+        }
+      } else if (preloadedAudio && !preloadedUrlStillValid) {
+        console.log('[Play] Preloaded audio exists but URL token expired, clearing')
+        clearPreloadAudio()
       }
       
       // === PRIORITY 3: Cached URL token (skip first API call) ===
@@ -1513,12 +1538,18 @@ export const usePlayerStore = defineStore('player', () => {
     const preloadedUrlStillValid = getCachedUrl(nextTrack.id) !== null
     const preloadedAudio = getPreloadedAudio(nextTrack.id)
     
-    if (preloadedAudio && preloadedAudio.readyState >= 2) {
+    // Only use preloaded audio if:
+    // 1. Audio exists and has data (readyState >= 2)
+    // 2. URL token is still valid
+    // 3. networkState is good (NETWORK_IDLE=1 or NETWORK_LOADING=2)
+    const networkStateOk = preloadedAudio && (preloadedAudio.networkState === 1 || preloadedAudio.networkState === 2)
+    
+    if (preloadedAudio && preloadedAudio.readyState >= 2 && networkStateOk) {
       if (!preloadedUrlStillValid) {
         console.log('[Next] Preloaded audio exists but URL token expired, skipping to fetch new URL')
         clearPreloadAudio()
       } else {
-        console.log('[Next] Using preloaded Audio element, readyState:', preloadedAudio.readyState)
+        console.log(`[Next] Using preloaded Audio element, readyState: ${preloadedAudio.readyState}, networkState: ${preloadedAudio.networkState}`)
       
         if (audio.value) {
           audio.value.pause()
@@ -1559,6 +1590,10 @@ export const usePlayerStore = defineStore('player', () => {
           clearPreloadAudio()
         }
       }
+    } else if (preloadedAudio && !networkStateOk) {
+      // Preloaded audio has bad network state, clear it
+      console.log(`[Next] Preloaded audio has bad networkState: ${preloadedAudio.networkState}, clearing`)
+      clearPreloadAudio()
     }
     
     // Priority 3: Use cached URL for instant start
