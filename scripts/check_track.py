@@ -14,7 +14,7 @@ cursor = conn.cursor()
 
 cursor.execute("""
     SELECT t.id, t.title, t.artist, t.enrichment_status,
-           e.album_name, e.cover_url, e.genre, e.source, e.enriched_at
+           e.album_name, e.cover_url, e.genre, e.enriched_at
     FROM tracks t 
     LEFT JOIN track_enrichments e ON t.id = e.track_id 
     WHERE t.id = ?
@@ -27,7 +27,6 @@ if row:
     print(f"  album_name: {row['album_name']}")
     print(f"  cover_url: {row['cover_url'][:50] if row['cover_url'] else None}...")
     print(f"  genre: {row['genre']}")
-    print(f"  source: {row['source']}")
     print(f"  enriched_at: {row['enriched_at']}")
 else:
     print(f"Track #{track_id} not found")
