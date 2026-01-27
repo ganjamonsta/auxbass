@@ -463,7 +463,19 @@ export const usePlayerStore = defineStore('player', () => {
       // Sometimes browsers fire 'waiting' momentarily during seek
       if (audio.value.readyState < 3) { 
         loading.value = true
+        console.log(`[Audio Waiting] readyState=${audio.value.readyState}, currentTime=${audio.value.currentTime.toFixed(2)}, buffered=${buffered.value.toFixed(2)}`)
       }
+    })
+    
+    // stalled event - network stall detection
+    audio.value.addEventListener('stalled', () => {
+      const track = currentTrack.value
+      console.warn(`[Audio Stalled] Network stall detected! track=${track?.id}, title="${track?.title}", currentTime=${audio.value.currentTime.toFixed(2)}, readyState=${audio.value.readyState}, networkState=${audio.value.networkState}`)
+    })
+    
+    // suspend event - browser stopped fetching
+    audio.value.addEventListener('suspend', () => {
+      console.log(`[Audio Suspend] Browser paused fetching, buffered=${buffered.value.toFixed(2)}s, duration=${duration.value.toFixed(2)}s`)
     })
     
     audio.value.addEventListener('timeupdate', () => {
@@ -517,6 +529,9 @@ export const usePlayerStore = defineStore('player', () => {
     audio.value.addEventListener('play', () => {
       isPlaying.value = true
       isSkipping = false  // Reset skip flag on successful playback
+      consecutiveSkipCount = 0  // Reset skip counter on successful play
+      const track = currentTrack.value
+      console.log(`[Audio Play] Starting playback: id=${track?.id}, title="${track?.title}", readyState=${audio.value.readyState}`)
       updatePlaybackState()
       startStateSaving()
     })
@@ -569,11 +584,23 @@ export const usePlayerStore = defineStore('player', () => {
       // Auto-skip on audio element errors (network issues, decode errors, etc.)
       // Error codes: 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED
       if (errorCode && errorCode >= 2) {
-        console.warn(`[Audio Error] Code ${errorCode}: ${errorMsg}, auto-skipping (${consecutiveSkipCount}/${MAX_CONSECUTIVE_SKIPS})`)
+        const errorNames = { 2: 'NETWORK', 3: 'DECODE', 4: 'SRC_NOT_SUPPORTED' }
+        const track = currentTrack.value
+        console.warn(`[Audio Error] Code ${errorCode} (${errorNames[errorCode] || 'UNKNOWN'}): ${errorMsg}`)
+        console.warn(`[Audio Error] Track: id=${track?.id}, title="${track?.title}", artist="${track?.artist}"`)
+        console.warn(`[Audio Error] State: currentTime=${audio.value?.currentTime?.toFixed(3) || 0}s, duration=${duration.value.toFixed(2)}s, readyState=${audio.value?.readyState}, networkState=${audio.value?.networkState}`)
+        console.warn(`[Audio Error] Auto-skipping (${consecutiveSkipCount}/${MAX_CONSECUTIVE_SKIPS})`)
+        
         lastError.value = {
           type: 'audio_error',
           track: currentTrack.value,
-          message: `Ошибка аудио: ${errorMsg}`
+          message: `Ошибка аудио: ${errorNames[errorCode] || errorCode} - ${errorMsg}`,
+          details: {
+            errorCode,
+            currentTime: audio.value?.currentTime,
+            readyState: audio.value?.readyState,
+            networkState: audio.value?.networkState
+          }
         }
         // Auto-skip to keep music playing
         isSkipping = true
@@ -633,7 +660,14 @@ export const usePlayerStore = defineStore('player', () => {
     audio.value.addEventListener('waiting', () => {
       if (audio.value.readyState < 3) {
         loading.value = true
+        console.log(`[Audio Waiting] (reattached) readyState=${audio.value.readyState}, currentTime=${audio.value.currentTime.toFixed(2)}`)
       }
+    })
+    
+    // stalled event - network stall detection (reattached)
+    audio.value.addEventListener('stalled', () => {
+      const track = currentTrack.value
+      console.warn(`[Audio Stalled] (reattached) Network stall! track=${track?.id}, currentTime=${audio.value.currentTime.toFixed(2)}, networkState=${audio.value.networkState}`)
     })
     
     audio.value.addEventListener('timeupdate', () => {
@@ -1197,10 +1231,13 @@ export const usePlayerStore = defineStore('player', () => {
       // Preload is now triggered by canplaythrough event for faster start
       
     } catch (error) {
-      console.error('Failed to play track:', error)
+      console.error('[Play Error] Failed to play track:', error)
+      console.error(`[Play Error] Track: id=${track?.id}, title="${track?.title}", artist="${track?.artist}"`)
       
       const statusCode = error.response?.status
       const errorDetail = error.response?.data?.detail || error.message || 'Ошибка воспроизведения'
+      
+      console.error(`[Play Error] Status: ${statusCode}, Detail: ${errorDetail}`)
       
       // Protection against cascading skips
       const now = Date.now()
@@ -1211,8 +1248,10 @@ export const usePlayerStore = defineStore('player', () => {
       }
       lastSkipTime = now
       
+      console.warn(`[Play Error] Consecutive skip count: ${consecutiveSkipCount}/${MAX_CONSECUTIVE_SKIPS}`)
+      
       if (consecutiveSkipCount > MAX_CONSECUTIVE_SKIPS) {
-        console.warn(`[Play] Too many consecutive errors (${consecutiveSkipCount}), stopping playback`)
+        console.warn(`[Play Error] Too many consecutive errors (${consecutiveSkipCount}), stopping playback`)
         lastError.value = {
           type: 'cascade_error',
           track: track,
@@ -1250,10 +1289,11 @@ export const usePlayerStore = defineStore('player', () => {
         }
         
         // Auto-skip to next track
+        console.log('[Play Error] Auto-skip in 1.5s (503 unavailable)')
         setTimeout(() => next(), 1500)
       } else if (statusCode === 401) {
         // Token expired - clear URL cache and retry once, or skip
-        console.warn('[Play] Stream token expired, clearing cache and skipping')
+        console.warn('[Play Error] 401 - Stream token expired, clearing cache and skipping')
         urlCache.delete(track.id)
         lastError.value = {
           type: 'auth_expired',
@@ -1263,6 +1303,7 @@ export const usePlayerStore = defineStore('player', () => {
         setTimeout(() => next(), 500)
       } else if (statusCode === 404) {
         // Track/file not found
+        console.warn('[Play Error] 404 - Track/file not found')
         lastError.value = {
           type: 'not_found',
           track: track,
@@ -1277,7 +1318,7 @@ export const usePlayerStore = defineStore('player', () => {
         setTimeout(() => next(), 1000)
       } else {
         // Any other error (network, etc) - just skip to keep music playing
-        console.warn('[Play] Unknown error, auto-skipping:', statusCode, errorDetail)
+        console.warn(`[Play Error] HTTP ${statusCode || 'unknown'} - auto-skipping: ${errorDetail}`)
         lastError.value = {
           type: 'playback_error',
           track: track,
@@ -1385,6 +1426,9 @@ export const usePlayerStore = defineStore('player', () => {
 
   // Next track
   const next = async () => {
+    const prevTrack = currentTrack.value
+    console.log(`[Next] Called. Previous track: id=${prevTrack?.id}, title="${prevTrack?.title}", currentTime=${audio.value?.currentTime?.toFixed(3) || 0}s`)
+    
     // Prevent error handlers from triggering during track change
     isSkipping = true
     
@@ -1766,6 +1810,19 @@ export const usePlayerStore = defineStore('player', () => {
 
   // Handle track end
   const handleEnded = async () => {
+    const track = currentTrack.value
+    const playedDuration = audio.value?.currentTime || 0
+    const totalDuration = duration.value || 0
+    
+    // Detect suspicious early endings (less than 5 seconds or less than 10% of track)
+    const isSuspiciousEnd = playedDuration < 5 || (totalDuration > 0 && playedDuration < totalDuration * 0.1)
+    
+    if (isSuspiciousEnd) {
+      console.warn(`[Track Ended] SUSPICIOUS EARLY END! track=${track?.id}, title="${track?.title}", played=${playedDuration.toFixed(3)}s, duration=${totalDuration.toFixed(2)}s (${((playedDuration/totalDuration)*100).toFixed(1)}%)`)
+    } else {
+      console.log(`[Track Ended] Normal end. track=${track?.id}, title="${track?.title}", played=${playedDuration.toFixed(2)}s, duration=${totalDuration.toFixed(2)}s`)
+    }
+    
     // Record play completion
     if (currentTrack.value) {
       try {
@@ -1776,9 +1833,11 @@ export const usePlayerStore = defineStore('player', () => {
     }
     
     if (repeat.value === 'one') {
+      console.log('[Track Ended] Repeat one - restarting track')
       seek(0)
       audio.value.play()
     } else {
+      console.log('[Track Ended] Moving to next track')
       next()
     }
   }

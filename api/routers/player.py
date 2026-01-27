@@ -15,6 +15,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import aiohttp
+import asyncio
 
 import sys
 from pathlib import Path
@@ -187,10 +188,12 @@ async def get_stream_url(
         # Check if file is too large (>20MB limit for standard Bot API)
         file_size_mb = (track.file_size or 0) / (1024 * 1024)
         if file_size_mb > 20:
+            logger.warning(f"[Stream Request] Track {track_id} too large: {file_size_mb:.1f} MB")
             raise HTTPException(
                 status_code=503,
                 detail=f"Файл слишком большой ({file_size_mb:.1f} MB). Telegram Bot API поддерживает скачивание только файлов до 20 MB. Используйте кнопку 'Скачать' в боте."
             )
+        logger.warning(f"[Stream Request] Track {track_id} file unavailable from Telegram")
         raise HTTPException(
             status_code=503,
             detail="Не удалось получить файл от Telegram. Файл возможно удалён или недоступен."
@@ -204,6 +207,8 @@ async def get_stream_url(
     proxy_url = f"/api/player/audio/{token}"
     
     expires_at = int(time.time()) + STREAM_TOKEN_TTL
+    
+    logger.info(f"[Stream Request] Generated token for track_id={track_id}, user_id={user.id}, file_size={track.file_size or 0} bytes")
     
     return StreamUrlResponse(
         url=proxy_url,
@@ -227,9 +232,11 @@ async def stream_audio(
     # Validate token - now includes cached file_path (saves ~300ms Telegram API call)
     token_data = validate_stream_token(token)
     if not token_data:
+        logger.warning(f"[Audio Stream] Invalid/expired token: {token[:20]}...")
         raise HTTPException(status_code=401, detail="Invalid or expired stream token")
     
     track_id, user_id, file_path = token_data
+    logger.debug(f"[Audio Stream] Token validated: track_id={track_id}, user_id={user_id}")
     
     # Get track for metadata (file_path already validated and cached in token)
     # Note: user_id in token is just for logging, access was validated when token was created
@@ -238,10 +245,12 @@ async def stream_audio(
     )
     
     if not track:
+        logger.warning(f"[Audio Stream] Track not found: track_id={track_id}")
         raise HTTPException(status_code=404, detail="Track not found")
     
     # file_path is already in token - no need for second Telegram API call!
     if not file_path:
+        logger.error(f"[Audio Stream] Empty file_path for track_id={track_id}")
         raise HTTPException(status_code=503, detail="File unavailable")
     
     # Stream from Telegram through our proxy
@@ -304,11 +313,44 @@ async def stream_audio(
     actual_content_length = telegram_response.headers.get("Content-Length")
     telegram_content_range = telegram_response.headers.get("Content-Range")
     
+    # Diagnostic: log stream start
+    stream_start_time = time.time()
+    expected_bytes = int(actual_content_length) if actual_content_length else 0
+    logger.info(f"[Stream Start] track_id={track_id}, expected_bytes={expected_bytes}, range={range or 'full'}")
+    
     async def stream_generator():
-        """Stream audio from already-opened Telegram response"""
+        """Stream audio from already-opened Telegram response with diagnostic logging"""
+        bytes_sent = 0
+        chunk_count = 0
         try:
             async for chunk in telegram_response.content.iter_chunked(64 * 1024):
+                bytes_sent += len(chunk)
+                chunk_count += 1
                 yield chunk
+            
+            # Stream completed successfully
+            elapsed = time.time() - stream_start_time
+            speed_kbps = (bytes_sent / 1024) / elapsed if elapsed > 0 else 0
+            logger.info(f"[Stream Complete] track_id={track_id}, bytes_sent={bytes_sent}, chunks={chunk_count}, elapsed={elapsed:.2f}s, speed={speed_kbps:.1f}KB/s")
+            
+        except asyncio.CancelledError:
+            # Client disconnected (normal - seek, track change, etc.)
+            elapsed = time.time() - stream_start_time
+            logger.info(f"[Stream Cancelled] track_id={track_id}, bytes_sent={bytes_sent}/{expected_bytes}, elapsed={elapsed:.2f}s (client disconnected)")
+            raise
+            
+        except aiohttp.ClientPayloadError as e:
+            # Telegram closed connection unexpectedly
+            elapsed = time.time() - stream_start_time
+            logger.error(f"[Stream Error] track_id={track_id}, bytes_sent={bytes_sent}/{expected_bytes}, elapsed={elapsed:.2f}s, error=ClientPayloadError: {e}")
+            raise
+            
+        except Exception as e:
+            # Any other error
+            elapsed = time.time() - stream_start_time
+            logger.error(f"[Stream Error] track_id={track_id}, bytes_sent={bytes_sent}/{expected_bytes}, elapsed={elapsed:.2f}s, error={type(e).__name__}: {e}")
+            raise
+            
         finally:
             await telegram_response.release()
     
@@ -721,3 +763,77 @@ async def download_playlist(
             logger.error(f"HTTP error sending media group: {e}")
     
     return {"success": True, "sent": total_sent, "total": len(tracks)}
+
+
+@router.get("/diagnostics")
+async def get_player_diagnostics():
+    """
+    Get diagnostic information about player streaming system.
+    Useful for debugging streaming issues.
+    """
+    global _http_session, _file_path_cache, _stream_tokens
+    
+    now = time.time()
+    
+    # Count active/expired tokens
+    active_tokens = sum(1 for v in _stream_tokens.values() if v[3] > now)
+    expired_tokens = len(_stream_tokens) - active_tokens
+    
+    # Count cached file paths
+    active_paths = sum(1 for v in _file_path_cache.values() if v[1] > now)
+    expired_paths = len(_file_path_cache) - active_paths
+    
+    # HTTP session stats
+    session_stats = None
+    if _http_session and not _http_session.closed:
+        connector = _http_session.connector
+        if connector:
+            session_stats = {
+                "closed": _http_session.closed,
+                "limit": getattr(connector, '_limit', None),
+                "limit_per_host": getattr(connector, '_limit_per_host', None),
+            }
+    
+    # Test Telegram API connectivity
+    telegram_status = "unknown"
+    telegram_latency_ms = None
+    try:
+        session = await get_http_session()
+        base_url = settings.telegram_api_url.rstrip('/')
+        api_url = f"{base_url}/bot{settings.bot_token}/getMe"
+        
+        start = time.time()
+        async with session.get(api_url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+            telegram_latency_ms = round((time.time() - start) * 1000, 1)
+            if resp.status == 200:
+                data = await resp.json()
+                if data.get("ok"):
+                    telegram_status = "ok"
+                else:
+                    telegram_status = f"error: {data.get('description', 'unknown')}"
+            else:
+                telegram_status = f"http_{resp.status}"
+    except asyncio.TimeoutError:
+        telegram_status = "timeout"
+    except Exception as e:
+        telegram_status = f"error: {type(e).__name__}"
+    
+    return {
+        "timestamp": datetime.utcnow().isoformat(),
+        "stream_tokens": {
+            "active": active_tokens,
+            "expired": expired_tokens,
+            "ttl_seconds": STREAM_TOKEN_TTL,
+        },
+        "file_path_cache": {
+            "active": active_paths,
+            "expired": expired_paths,
+            "ttl_seconds": FILE_PATH_CACHE_TTL,
+        },
+        "http_session": session_stats,
+        "telegram_api": {
+            "status": telegram_status,
+            "latency_ms": telegram_latency_ms,
+            "base_url": settings.telegram_api_url,
+        }
+    }
