@@ -9,7 +9,7 @@
         <input
           v-model="searchQuery"
           type="text"
-          placeholder="Поиск треков..."
+          :placeholder="searchPlaceholder"
           @input="debouncedSearch"
         />
         <button v-if="searchQuery" class="clear-search" @click="clearSearch">
@@ -20,293 +20,84 @@
       </div>
     </div>
 
-    <!-- Quick Access Grid -->
-    <div class="quick-grid" v-if="!searchQuery">
-      <!-- Liked tracks -->
-      <div class="quick-item liked-quick" @click="$router.push('/liked')">
-        <div class="quick-icon liked-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-          </svg>
-        </div>
-        <span class="quick-title">Любимое</span>
-      </div>
-      
-      <!-- Albums -->
-      <div class="quick-item" @click="$router.push('/albums')">
-        <div class="quick-icon albums-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"/>
-          </svg>
-        </div>
-        <span class="quick-title">Альбомы</span>
-      </div>
-      
-      <!-- Artists -->
-      <div class="quick-item" @click="$router.push('/artists')">
-        <div class="quick-icon artists-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-          </svg>
-        </div>
-        <span class="quick-title">Артисты</span>
-      </div>
-      
-      <!-- Playlists -->
-      <div class="quick-item" @click="$router.push('/playlists')">
-        <div class="quick-icon playlists-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9h-4v4h-2v-4H9V9h4V5h2v4h4v2z"/>
-          </svg>
-        </div>
-        <span class="quick-title">Плейлисты</span>
-      </div>
-    </div>
-
-    <!-- Sort options -->
-    <div class="sort-options">
-      <button class="shuffle-all-btn" @click="shuffleAll" :disabled="!total">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
-        </svg>
-        <span>Перемешать ({{ total }})</span>
+    <!-- Type Switcher (Tabs) -->
+    <div class="library-tabs">
+      <button 
+        v-for="tab in tabs" 
+        :key="tab.id"
+        class="tab-btn"
+        :class="{ active: currentTabId === tab.id }"
+        @click="currentTabId = tab.id"
+      >
+        {{ tab.label }}
       </button>
-      <SortChips
-        :currentOption="currentOption"
-        :sortOrder="sortOrder"
-        @next="onNextSort"
-        @toggle-order="onToggleOrder"
-      />
     </div>
 
-    <!-- Track list -->
-    <div class="track-list" ref="trackListRef">
-      <div v-if="loading && !tracks.length" class="loading">
-        <div class="spinner"></div>
-        <span>Загрузка...</span>
-      </div>
-      
-      <template v-else>
-        <TrackItem
-          v-for="track in tracks"
-          :key="track.id"
-          :track="track"
-          :isPlaying="playerStore.currentTrack?.id === track.id"
-          :isActive="playerStore.isPlaying && playerStore.currentTrack?.id === track.id"
-          :isLiked="track.is_liked"
-          @click="playTrack(track)"
-          @like="handleLikeTrack(track)"
-          @menu="openTrackMenu(track)"
-        />
-        
-        <div v-if="hasMore" class="load-more">
-          <button @click="loadMore" :disabled="loading">
-            {{ loading ? 'Загрузка...' : 'Загрузить ещё' }}
-          </button>
-        </div>
-        
-        <div v-if="!tracks.length" class="empty-state">
-          <span class="empty-icon">🎵</span>
-          <h3>Библиотека пуста</h3>
-          <p>Отправьте аудио боту, чтобы добавить треки</p>
-        </div>
-      </template>
+    <!-- Dynamic Content Window -->
+    <div class="library-content">
+       <component 
+          :is="currentTabComponent" 
+          :searchQuery="debouncedQuery"
+       />
     </div>
-    
-    <!-- Track context menu -->
-    <TrackMenu
-      :show="showMenu"
-      :track="menuTrack"
-      :current-user-id="authStore.user?.id"
-      context="library"
-      @close="closeMenu"
-      @goToArtist="handleGoToArtist"
-      @goToAlbum="handleGoToAlbum"
-      @addToPlaylist="handleAddToPlaylist"
-      @edit="handleEditTrack"
-      @download="handleDownloadTrack"
-      @delete="handleDeleteTrack"
-      @removeFromLibrary="handleRemoveFromLibrary"
-    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { useLibraryStore } from '@/stores/library'
-import { usePlayerStore } from '@/stores/player'
-import { useAuthStore } from '@/stores/auth'
-import { useSort } from '@/composables'
-import TrackItem from '@/components/TrackItem.vue'
-import TrackMenu from '@/components/TrackMenu.vue'
-import SortChips from '@/components/SortChips.vue'
-import api, { playerApi } from '@/api/client'
+import { ref, computed, watch, onMounted } from 'vue'
+import LibraryTracks from '@/components/library/LibraryTracks.vue'
+import LibraryAlbums from '@/components/library/LibraryAlbums.vue'
+import LibraryArtists from '@/components/library/LibraryArtists.vue'
+import LibraryPlaylists from '@/components/library/LibraryPlaylists.vue'
 
-const router = useRouter()
-const libraryStore = useLibraryStore()
-const playerStore = usePlayerStore()
-const authStore = useAuthStore()
+const tabs = [
+  { id: 'tracks', label: 'Треки', component: LibraryTracks, placeholder: 'Поиск треков...' },
+  { id: 'albums', label: 'Альбомы', component: LibraryAlbums, placeholder: 'Поиск альбомов...' },
+  { id: 'artists', label: 'Артисты', component: LibraryArtists, placeholder: 'Поиск исполнителей...' },
+  { id: 'playlists', label: 'Плейлисты', component: LibraryPlaylists, placeholder: 'Поиск плейлистов...' },
+]
 
-// Sort state (persisted to localStorage)
-const { 
-  sortBy, 
-  sortOrder, 
-  currentOption, 
-  nextSort, 
-  toggleOrder 
-} = useSort('library-sort', 'library', { sortBy: 'added_at', sortOrder: 'desc' })
+// Tab State configuration
+const STORAGE_KEY = 'library_active_tab'
+const currentTabId = ref(localStorage.getItem(STORAGE_KEY) || 'tracks')
 
+const currentTab = computed(() => tabs.find(t => t.id === currentTabId.value) || tabs[0])
+const currentTabComponent = computed(() => currentTab.value.component)
+const searchPlaceholder = computed(() => currentTab.value.placeholder)
+
+// Persist tab selection
+watch(currentTabId, (newVal) => {
+  localStorage.setItem(STORAGE_KEY, newVal)
+  // Clear search on tab switch maybe? 
+  // User might expect search to persist if relevant (e.g. searching "Linkin Park" works for all)
+  // But if I list tracks and switch to playlists, "Linkin Park" might verify emptiness. 
+  // I'll keep it.
+})
+
+// Search State
 const searchQuery = ref('')
-const loading = ref(false)
-const tracks = ref([])
-const page = ref(1)
-const total = ref(0)
-const perPage = 50
-
+const debouncedQuery = ref('')
 let searchTimeout = null
-
-const hasMore = computed(() => tracks.value.length < total.value)
-
-const loadTracks = async () => {
-  loading.value = true
-  try {
-    await libraryStore.fetchTracks({
-      page: page.value,
-      per_page: perPage,
-      search: searchQuery.value || undefined,
-      sort_by: sortBy.value,
-      sort_order: sortOrder.value,
-    })
-    
-    tracks.value = libraryStore.tracks
-    total.value = libraryStore.total
-  } finally {
-    loading.value = false
-  }
-}
-
-const loadMore = async () => {
-  page.value++
-  await loadTracks()
-}
 
 const debouncedSearch = () => {
   if (searchTimeout) clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => {
-    page.value = 1
-    loadTracks()
+    debouncedQuery.value = searchQuery.value
   }, 300)
 }
 
 const clearSearch = () => {
   searchQuery.value = ''
-  page.value = 1
-  loadTracks()
+  debouncedQuery.value = ''
 }
 
-// Sort change handlers
-const onNextSort = () => {
-  nextSort()
-  page.value = 1
-  loadTracks()
-}
-
-const onToggleOrder = () => {
-  toggleOrder()
-  page.value = 1
-  loadTracks()
-}
-
-// Like track
-const handleLikeTrack = async (track) => {
-  const newLikedState = await libraryStore.toggleLike(track.id)
-  // Update local track state
-  const idx = tracks.value.findIndex(t => t.id === track.id)
-  if (idx !== -1) {
-    tracks.value[idx].is_liked = newLikedState
-  }
-}
-
-const playTrack = (track) => {
-  playerStore.playTrack(track, tracks.value)
-}
-
-// Shuffle all library tracks using lazy loading
-const shuffleAll = async () => {
-  await playerStore.playShuffleAll('library')
-}
-
-// Track menu state
-const menuTrack = ref(null)
-const showMenu = ref(false)
-
-const openTrackMenu = (track) => {
-  menuTrack.value = track
-  showMenu.value = true
-}
-
-const closeMenu = () => {
-  showMenu.value = false
-  menuTrack.value = null
-}
-
-// Menu handlers
-const handleGoToArtist = (artist) => {
-  router.push(`/artist/${encodeURIComponent(artist)}`)
-}
-
-const handleGoToAlbum = (albumId) => {
-  if (albumId) {
-    router.push(`/album/${albumId}`)
-  }
-  closeMenu()
-}
-
-const handleAddToPlaylist = (track) => {
-  // TODO: Show playlist picker
-  closeMenu()
-}
-
-const handleEditTrack = (track) => {
-  // TODO: Show edit modal
-  closeMenu()
-}
-
-const handleDownloadTrack = async (track) => {
-  try {
-    await playerApi.download(track.id)
-  } catch (error) {
-    console.error('Failed to download track:', error)
-  }
-  closeMenu()
-}
-
-const handleDeleteTrack = async (track) => {
-  if (confirm('Удалить трек полностью?')) {
-    await libraryStore.deleteTrack(track.id)
-    tracks.value = tracks.value.filter(t => t.id !== track.id)
-  }
-  closeMenu()
-}
-
-const handleRemoveFromLibrary = async (track) => {
-  await libraryStore.removeFromLibrary(track.id)
-  tracks.value = tracks.value.filter(t => t.id !== track.id)
-  closeMenu()
-}
-
-onMounted(() => {
-  loadTracks()
-  libraryStore.fetchPlaylists()
-  libraryStore.fetchArtists()
-})
 </script>
 
 <style scoped>
 .library-view {
   padding: 16px;
   padding-bottom: 120px; /* Space for player */
+  min-height: 100vh;
 }
 
 .search-section {
@@ -343,159 +134,47 @@ onMounted(() => {
   padding: 4px;
 }
 
-.quick-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.quick-item {
+/* Tabs Styles */
+.library-tabs {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  background: var(--bg-elevated);
-  border-radius: 6px;
-  padding: 0;
-  cursor: pointer;
-  overflow: hidden;
-  height: 56px;
-  transition: background 0.2s;
-}
-
-.quick-item:active {
-  background: var(--bg-highlight);
-}
-
-.quick-icon {
-  width: 56px;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.liked-icon {
-  background: linear-gradient(135deg, #7c3aed, #a855f7);
-  color: white;
-}
-
-.albums-icon {
-  background: linear-gradient(135deg, #0891b2, #22d3ee);
-  color: white;
-}
-
-.artists-icon {
-  background: linear-gradient(135deg, #059669, #34d399);
-  color: white;
-}
-
-.playlists-icon {
-  background: linear-gradient(135deg, #d97706, #fbbf24);
-  color: white;
-}
-
-.quick-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.sort-options {
-  display: flex;
-  align-items: center;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  overflow-x: auto;
+  padding-bottom: 4px; /* for scrollbar */
+  scrollbar-width: none; /* Firefox */
 }
 
-.shuffle-all-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--accent);
-  color: #000;
+.library-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-btn {
+  background: transparent;
   border: none;
-  border-radius: 20px;
+  color: var(--text-secondary);
+  font-size: 15px;
+  font-weight: 500;
   padding: 8px 16px;
-  font-weight: 600;
-  font-size: 13px;
+  border-radius: 20px;
   cursor: pointer;
   white-space: nowrap;
+  transition: all 0.2s;
 }
 
-.shuffle-all-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.shuffle-all-btn svg {
-  flex-shrink: 0;
-}
-
-.loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px;
-  color: var(--text-secondary);
-}
-
-.spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--bg-highlight);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin-bottom: 12px;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.load-more {
-  display: flex;
-  justify-content: center;
-  padding: 16px;
-}
-
-.load-more button {
-  background: var(--accent);
-  color: #000;
-  border: none;
-  border-radius: 20px;
-  padding: 10px 24px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.load-more button:disabled {
-  opacity: 0.5;
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px 24px;
-  text-align: center;
-}
-
-.empty-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-}
-
-.empty-state h3 {
+.tab-btn:hover {
   color: var(--text-primary);
-  margin-bottom: 8px;
+  background: var(--bg-elevated);
 }
 
-.empty-state p {
-  color: var(--text-secondary);
+.tab-btn.active {
+  background: var(--text-primary); /* High contrast active state like pills */
+  color: var(--bg-card); /* Inverted text for active */
+  font-weight: 600;
 }
+
+/* Make it look more "Apple Music" or "Spotify" style: 
+   or the "Albums Design" as presumably requested (usually simple text or pill).
+   I went with Pill style for clear indication. */
+
 </style>
+
