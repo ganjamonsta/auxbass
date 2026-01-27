@@ -82,7 +82,7 @@ const sortedTracks = computed(() => {
 const loadLikedTracks = async () => {
   loading.value = true
   try {
-    const response = await api.get('/library/liked')
+    const response = await api.get('/tracks/liked')
     tracks.value = response.data.items || response.data || []
   } catch (error) {
     console.error('Failed to load liked tracks:', error)
@@ -110,7 +110,7 @@ const shufflePlay = () => {
 
 const unlikeTrack = async (track) => {
   try {
-    await api.delete(`/library/${track.id}/like`)
+    await api.delete(`/tracks/${track.id}/like`)
     tracks.value = tracks.value.filter(t => t.id !== track.id)
     // Also update in library store if track exists there
     const storeTrack = libraryStore.tracks.find(t => t.id === track.id)
