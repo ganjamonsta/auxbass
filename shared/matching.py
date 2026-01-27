@@ -529,21 +529,25 @@ def generate_hashtags(
     tags = []
     
     if artist:
-        # Normalize: remove spaces, special chars
+        # Normalize: remove spaces, special chars, keep as one tag
         tag = re.sub(r'[^\w]', '', normalize_artist(artist))
         if tag and len(tag) > 1:
             tags.append(tag)
     
     if album:
-        tag = re.sub(r'[^\w]', '', normalize_album(album).split()[0] if normalize_album(album) else '')
-        if tag and len(tag) > 2:
-            tags.append(tag)
+        # Use full album name without spaces/special chars
+        normalized = normalize_album(album)
+        if normalized:
+            tag = re.sub(r'[^\w]', '', normalized)
+            # Skip generic/short tags
+            if tag and len(tag) > 3 and tag.lower() not in ('single', 'album', 'the', 'vol'):
+                tags.append(tag)
     
     if genre:
         normalized = normalize_genre(genre)
         if normalized:
             tag = re.sub(r'[^\w]', '', normalized.lower())
-            if tag:
+            if tag and len(tag) > 2:
                 tags.append(tag)
     
     if extra_tags:
