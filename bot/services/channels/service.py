@@ -353,6 +353,137 @@ class ChannelService:
             logger.info(f"Updated {updated} channel messages for track {track_id}")
             return updated
     
+    async def sync_all_tracks(
+        self,
+        user_id: int,
+        bot: Optional[Bot] = None,
+        progress_callback=None,
+    ) -> dict:
+        """
+        Sync all user's library tracks to their channel.
+        Only sends tracks that haven't been sent yet.
+        
+        Args:
+            user_id: User ID
+            bot: Bot instance
+            progress_callback: Optional async callback(current, total) for progress updates
+        
+        Returns:
+            Dict with sync results: {synced, skipped, failed, total}
+        """
+        use_bot = bot or self.bot
+        if not use_bot:
+            logger.error("No bot instance available for sync")
+            return {"synced": 0, "skipped": 0, "failed": 0, "total": 0}
+        
+        async with get_session() as session:
+            # Get channel
+            channel = await session.scalar(
+                select(UserChannel).where(
+                    UserChannel.user_id == user_id,
+                    UserChannel.is_active == True
+                )
+            )
+            
+            if not channel:
+                return {"synced": 0, "skipped": 0, "failed": 0, "total": 0, "error": "No channel"}
+            
+            # Get all user's tracks from library
+            from shared.models import UserLibrary
+            result = await session.execute(
+                select(Track)
+                .join(UserLibrary, UserLibrary.track_id == Track.id)
+                .where(UserLibrary.user_id == user_id)
+                .order_by(UserLibrary.added_at.asc())
+            )
+            tracks = result.scalars().all()
+            
+            # Get already synced track IDs
+            synced_result = await session.execute(
+                select(ChannelMessage.track_id).where(
+                    ChannelMessage.channel_id == channel.id
+                )
+            )
+            synced_track_ids = set(synced_result.scalars().all())
+            
+            stats = {"synced": 0, "skipped": 0, "failed": 0, "total": len(tracks)}
+            
+            for i, track in enumerate(tracks):
+                # Skip already synced
+                if track.id in synced_track_ids:
+                    stats["skipped"] += 1
+                    continue
+                
+                # Progress callback
+                if progress_callback:
+                    try:
+                        await progress_callback(i + 1, len(tracks))
+                    except:
+                        pass
+                
+                try:
+                    # Generate hashtags
+                    hashtags = []
+                    if channel.include_hashtags:
+                        enrichment = track.enrichment
+                        hashtags = generate_hashtags(
+                            artist=track.artist,
+                            album=enrichment.album_name if enrichment else None,
+                            genre=enrichment.genre if enrichment else None,
+                        )
+                    
+                    # Build caption
+                    caption_parts = []
+                    if track.title:
+                        caption_parts.append(f"🎵 {track.title}")
+                    if track.artist:
+                        caption_parts.append(f"👤 {track.artist}")
+                    if track.enrichment and track.enrichment.album_name:
+                        caption_parts.append(f"💿 {track.enrichment.album_name}")
+                    
+                    if hashtags:
+                        caption_parts.append("")
+                        caption_parts.append(format_hashtags(hashtags))
+                    
+                    caption = "\n".join(caption_parts) if caption_parts else None
+                    
+                    # Send audio
+                    sent_message = await use_bot.send_audio(
+                        chat_id=channel.channel_id,
+                        audio=track.file_id,
+                        caption=caption,
+                        parse_mode="HTML",
+                    )
+                    
+                    # Save message record
+                    channel_message = ChannelMessage(
+                        channel_id=channel.id,
+                        track_id=track.id,
+                        message_id=sent_message.message_id,
+                        hashtags=json.dumps(hashtags) if hashtags else None,
+                    )
+                    session.add(channel_message)
+                    
+                    stats["synced"] += 1
+                    
+                    # Small delay to avoid rate limiting
+                    import asyncio
+                    await asyncio.sleep(0.5)
+                    
+                except TelegramForbiddenError:
+                    channel.is_active = False
+                    stats["failed"] += 1
+                    break  # Stop sync if access lost
+                    
+                except TelegramBadRequest as e:
+                    logger.error(f"Failed to sync track {track.id}: {e}")
+                    stats["failed"] += 1
+                    continue
+            
+            await session.commit()
+            logger.info(f"Sync completed for user {user_id}: {stats}")
+            return stats
+    
     async def verify_channel_access(
         self,
         channel_id: int,

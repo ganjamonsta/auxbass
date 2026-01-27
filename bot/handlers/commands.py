@@ -294,17 +294,43 @@ async def cmd_sync(message: Message):
         )
         return
     
-    await message.answer(
-        "🔄 Синхронизация начата...\n\n"
+    status_msg = await message.answer(
+        "🔄 <b>Синхронизация начата...</b>\n\n"
         "Это может занять некоторое время."
     )
     
-    # TODO: Implement sync
-    synced = 0  # await channel_service.sync_all_tracks(user_id, message.bot)
+    # Progress callback to update message
+    last_update = [0]
+    async def progress_callback(current, total):
+        # Update every 10 tracks or 10%
+        if current - last_update[0] >= max(10, total // 10):
+            last_update[0] = current
+            try:
+                await status_msg.edit_text(
+                    f"🔄 <b>Синхронизация...</b>\n\n"
+                    f"📊 Обработано: {current}/{total} треков"
+                )
+            except:
+                pass
     
-    await message.answer(
-        f"✅ Синхронизация завершена!\n\n"
-        f"Добавлено в канал: {synced} треков"
+    result = await channel_service.sync_all_tracks(
+        user_id=user_id,
+        bot=message.bot,
+        progress_callback=progress_callback
+    )
+    
+    if result.get("error"):
+        await status_msg.edit_text(
+            f"❌ Ошибка синхронизации: {result['error']}"
+        )
+        return
+    
+    await status_msg.edit_text(
+        f"✅ <b>Синхронизация завершена!</b>\n\n"
+        f"📤 Добавлено в канал: <b>{result['synced']}</b>\n"
+        f"⏭️ Уже было в канале: <b>{result['skipped']}</b>\n"
+        f"❌ Ошибок: <b>{result['failed']}</b>\n"
+        f"📊 Всего треков: <b>{result['total']}</b>"
     )
 
 
