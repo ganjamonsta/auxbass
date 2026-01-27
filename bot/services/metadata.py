@@ -782,6 +782,71 @@ class MetadataService:
         
         return result
 
+    async def search_deezer_artist(self, artist_name: str) -> Optional[Dict]:
+        """
+        Search Deezer for artist info (for artist avatar).
+        Returns: dict with name, picture_url
+        """
+        if not artist_name:
+            return None
+        
+        await self._rate_limit()
+        session = await self._get_session()
+        
+        clean_artist = self._clean_string(artist_name)
+        
+        try:
+            async with session.get(
+                f"{self.DEEZER_API}/search/artist",
+                params={"q": clean_artist, "limit": 5}
+            ) as resp:
+                if resp.status != 200:
+                    logger.warning(f"Deezer artist search failed: {resp.status}")
+                    return None
+                
+                data = await resp.json()
+                
+                if not data.get("data"):
+                    return None
+                
+                # Find best matching artist
+                artists = data["data"]
+                for artist in artists:
+                    deezer_artist_name = artist.get("name", "")
+                    if self._artist_matches(artist_name, deezer_artist_name):
+                        picture = (
+                            artist.get("picture_xl") or 
+                            artist.get("picture_big") or 
+                            artist.get("picture_medium") or 
+                            artist.get("picture")
+                        )
+                        return {
+                            "name": deezer_artist_name,
+                            "picture_url": picture,
+                            "deezer_id": artist.get("id"),
+                        }
+                
+                # Fallback to first result if no exact match
+                first = artists[0]
+                picture = (
+                    first.get("picture_xl") or 
+                    first.get("picture_big") or 
+                    first.get("picture_medium") or 
+                    first.get("picture")
+                )
+                return {
+                    "name": first.get("name"),
+                    "picture_url": picture,
+                    "deezer_id": first.get("id"),
+                }
+                
+        except asyncio.TimeoutError:
+            logger.error("Deezer artist search timeout")
+            return None
+        except Exception as e:
+            logger.error(f"Deezer artist search error: {e}")
+            return None
+
 
 # Global instance
 metadata_service = MetadataService()

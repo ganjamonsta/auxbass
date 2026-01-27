@@ -5,23 +5,28 @@ Artist-related endpoints.
 Artists are not stored separately - derived from tracks.
 Uses normalization to group variations (BLADEE, Bladee, Bladee & Ecco2k -> Bladee)
 """
+import sys
+import logging
+from pathlib import Path
 from typing import Optional, List
 from collections import defaultdict
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+# Add parent directory to path for shared/bot imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select, func, desc, asc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.database import get_db
 from shared.models import (
     Track, Album, AlbumTrack, UserLibrary
 )
 from shared.matching import normalize_artist
+
+from bot.services.enrichment.lastfm import lastfm_client
+from bot.services.metadata import metadata_service
 
 from api.routers.auth import get_current_user
 from api.schemas_v2.artists import (
@@ -31,6 +36,8 @@ from api.schemas_v2.artists import (
 )
 from api.schemas_v2.common import TelegramUser
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Artists"])
 
@@ -139,17 +146,18 @@ async def get_my_artists(
     offset = (page - 1) * per_page
     page_items = aggregated[offset:offset + per_page]
     
-    # Get covers for each artist
+    # Get covers for each artist (from latest album by release_date)
     items = []
     for artist_data in page_items:
         cover_url = None
         
-        # Try to get cover from albums (check any matching artist name)
+        # Try to get cover from latest album (by release_date) for any matching artist name
         for name in artist_data["all_names"][:5]:  # Limit lookups
             cover_result = await db.execute(
                 select(Album.cover_url)
                 .where(func.lower(Album.artist) == name.lower())
                 .where(Album.cover_url.isnot(None))
+                .order_by(Album.release_date.desc().nullslast())
                 .limit(1)
             )
             cover_url = cover_result.scalar_one_or_none()
@@ -290,3 +298,105 @@ async def get_artist_track_ids(
     ]
     
     return {"ids": matching_ids, "total": len(matching_ids)}
+
+
+# Last.fm placeholder image hash (indicates no real image)
+LASTFM_PLACEHOLDER_HASH = "2a96cbd8b46e442fc41c2b86b821562f"
+
+
+@router.get("/{artist_name}/image")
+async def get_artist_image(
+    artist_name: str,
+    response: Response,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get artist image URL with fallback priority:
+    1. Last.fm artist image
+    2. Deezer artist picture
+    3. Latest album cover from library (by release_date)
+    
+    Returns: {"artist": str, "image_url": str | null, "source": str}
+    """
+    # Cache for 24 hours - artist images rarely change
+    response.headers["Cache-Control"] = "public, max-age=86400, stale-while-revalidate=604800"
+    
+    normalized_search = normalize_artist(artist_name)
+    
+    # Priority 1: Try Last.fm
+    try:
+        if lastfm_client.is_configured:
+            lastfm_info = await lastfm_client.get_artist_info(artist_name)
+            if lastfm_info and lastfm_info.get("image_url"):
+                image_url = lastfm_info["image_url"]
+                # Check if it's not the Last.fm placeholder image
+                if LASTFM_PLACEHOLDER_HASH not in image_url:
+                    logger.debug(f"Artist image from Last.fm: {artist_name}")
+                    return {
+                        "artist": artist_name,
+                        "image_url": image_url,
+                        "source": "lastfm"
+                    }
+    except Exception as e:
+        logger.warning(f"Last.fm artist lookup failed: {e}")
+    
+    # Priority 2: Try Deezer
+    try:
+        deezer_info = await metadata_service.search_deezer_artist(artist_name)
+        if deezer_info and deezer_info.get("picture_url"):
+            logger.debug(f"Artist image from Deezer: {artist_name}")
+            return {
+                "artist": artist_name,
+                "image_url": deezer_info["picture_url"],
+                "source": "deezer"
+            }
+    except Exception as e:
+        logger.warning(f"Deezer artist lookup failed: {e}")
+    
+    # Priority 3: Latest album cover from library (by release_date)
+    try:
+        # Get all albums for this artist, sorted by release_date desc
+        albums_result = await db.execute(
+            select(Album)
+            .where(Album.cover_url.isnot(None))
+            .where(Album.release_date.isnot(None))
+            .order_by(Album.release_date.desc())
+        )
+        all_albums = albums_result.scalars().all()
+        
+        # Find albums matching this artist
+        for album in all_albums:
+            if normalize_artist(album.artist) == normalized_search:
+                logger.debug(f"Artist image from album '{album.name}': {artist_name}")
+                return {
+                    "artist": artist_name,
+                    "image_url": album.cover_url,
+                    "source": "album",
+                    "album_name": album.name
+                }
+        
+        # Also try albums without release_date as last resort
+        albums_no_date = await db.execute(
+            select(Album)
+            .where(Album.cover_url.isnot(None))
+            .where(Album.release_date.is_(None))
+        )
+        for album in albums_no_date.scalars().all():
+            if normalize_artist(album.artist) == normalized_search:
+                logger.debug(f"Artist image from album (no date) '{album.name}': {artist_name}")
+                return {
+                    "artist": artist_name,
+                    "image_url": album.cover_url,
+                    "source": "album",
+                    "album_name": album.name
+                }
+    except Exception as e:
+        logger.warning(f"Album cover lookup failed: {e}")
+    
+    # No image found
+    return {
+        "artist": artist_name,
+        "image_url": None,
+        "source": None
+    }
