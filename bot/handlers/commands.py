@@ -296,7 +296,13 @@ async def cmd_sync(message: Message):
     
     status_msg = await message.answer(
         "🔄 <b>Синхронизация начата...</b>\n\n"
-        "Это может занять некоторое время."
+        "Это может занять некоторое время.",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="⛔ Прервать",
+                callback_data="channel:sync_cancel"
+            )]
+        ])
     )
     
     # Progress callback to update message
@@ -308,7 +314,13 @@ async def cmd_sync(message: Message):
             try:
                 await status_msg.edit_text(
                     f"🔄 <b>Синхронизация...</b>\n\n"
-                    f"📊 Обработано: {current}/{total} треков"
+                    f"📊 Обработано: {current}/{total} треков",
+                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                        [InlineKeyboardButton(
+                            text="⛔ Прервать",
+                            callback_data="channel:sync_cancel"
+                        )]
+                    ])
                 )
             except:
                 pass
@@ -322,6 +334,14 @@ async def cmd_sync(message: Message):
     if result.get("error"):
         await status_msg.edit_text(
             f"❌ Ошибка синхронизации: {result['error']}"
+        )
+        return
+    
+    if result.get("cancelled"):
+        await status_msg.edit_text(
+            f"⛔ <b>Синхронизация прервана</b>\n\n"
+            f"📤 Успешно отправлено: <b>{result['synced']}</b>\n"
+            f"⏭️ Уже было в канале: <b>{result['skipped']}</b>"
         )
         return
     

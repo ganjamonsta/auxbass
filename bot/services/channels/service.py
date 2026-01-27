@@ -37,10 +37,23 @@ class ChannelService:
     
     def __init__(self):
         self.bot: Optional[Bot] = None
+        self._cancel_sync: dict[int, bool] = {}  # user_id -> cancel flag
     
     def set_bot(self, bot: Bot):
         """Set bot instance for sending messages"""
         self.bot = bot
+    
+    def request_cancel_sync(self, user_id: int):
+        """Request cancellation of ongoing sync for user"""
+        self._cancel_sync[user_id] = True
+    
+    def is_sync_cancelled(self, user_id: int) -> bool:
+        """Check if sync is cancelled for user"""
+        return self._cancel_sync.get(user_id, False)
+    
+    def clear_cancel_flag(self, user_id: int):
+        """Clear cancel flag for user"""
+        self._cancel_sync.pop(user_id, None)
     
     async def setup_channel(
         self,
@@ -421,9 +434,18 @@ class ChannelService:
             )
             synced_track_ids = set(synced_result.scalars().all())
             
-            stats = {"synced": 0, "skipped": 0, "failed": 0, "total": len(tracks)}
+            stats = {"synced": 0, "skipped": 0, "failed": 0, "total": len(tracks), "cancelled": False}
+            
+            # Clear any previous cancel flag
+            self.clear_cancel_flag(user_id)
             
             for i, track in enumerate(tracks):
+                # Check for cancellation
+                if self.is_sync_cancelled(user_id):
+                    stats["cancelled"] = True
+                    self.clear_cancel_flag(user_id)
+                    break
+                
                 # Skip already synced
                 if track.id in synced_track_ids:
                     stats["skipped"] += 1

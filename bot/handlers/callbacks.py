@@ -195,6 +195,167 @@ async def handle_channel_settings(callback: CallbackQuery):
     await callback.answer()
 
 
+@router.callback_query(F.data == "channel:main")
+async def handle_channel_main(callback: CallbackQuery):
+    """Show main channel status"""
+    user_id = callback.from_user.id
+    channel = await channel_service.get_user_channel(user_id)
+    
+    if not channel:
+        # No channel - show setup
+        from bot.handlers.keyboards import get_channel_setup_keyboard
+        await callback.message.edit_text(
+            "☁️ <b>Настройка канала для бекапа</b>\n\n"
+            "Создайте приватный канал в Telegram и добавьте меня администратором.\n\n"
+            "<b>Инструкция:</b>\n"
+            "1. Создайте новый канал (приватный)\n"
+            "2. Добавьте бота как администратора\n"
+            "3. Дайте права на публикацию сообщений\n"
+            "4. Перешлите мне любое сообщение из канала",
+            reply_markup=get_channel_setup_keyboard()
+        )
+    else:
+        # Has channel - show status
+        msg_count = await channel_service.get_channel_message_count(user_id)
+        await callback.message.edit_text(
+            f"☁️ <b>Бекап в канал</b>\n\n"
+            f"📢 {channel.channel_title or 'Канал'}\n"
+            f"🎵 Сохранено: <b>{msg_count}</b> треков\n"
+            f"#️⃣ Хэштеги: {'✅' if channel.include_hashtags else '❌'}\n\n"
+            "Все новые треки автоматически отправляются в канал.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(
+                    text="⚙️ Настройки",
+                    callback_data="channel:settings"
+                )],
+            ])
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "channel:sync")
+async def handle_channel_sync(callback: CallbackQuery):
+    """Start sync from inline button"""
+    user_id = callback.from_user.id
+    
+    channel = await channel_service.get_user_channel(user_id)
+    if not channel:
+        await callback.answer("Канал не найден", show_alert=True)
+        return
+    
+    # Show sync started with cancel button
+    await callback.message.edit_text(
+        "🔄 <b>Синхронизация начата...</b>\n\n"
+        "Это может занять некоторое время.",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="⛔ Прервать",
+                callback_data="channel:sync_cancel"
+            )]
+        ])
+    )
+    await callback.answer()
+    
+    # Progress callback to update message
+    last_update = [0]
+    async def progress_callback(current, total):
+        if current - last_update[0] >= max(10, total // 10):
+            last_update[0] = current
+            try:
+                await callback.message.edit_text(
+                    f"🔄 <b>Синхронизация...</b>\n\n"
+                    f"📊 Обработано: {current}/{total} треков",
+                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                        [InlineKeyboardButton(
+                            text="⛔ Прервать",
+                            callback_data="channel:sync_cancel"
+                        )]
+                    ])
+                )
+            except:
+                pass
+    
+    result = await channel_service.sync_all_tracks(
+        user_id=user_id,
+        bot=callback.bot,
+        progress_callback=progress_callback
+    )
+    
+    if result.get("error"):
+        await callback.message.edit_text(
+            f"❌ Ошибка синхронизации: {result['error']}",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="channel:settings")]
+            ])
+        )
+        return
+    
+    if result.get("cancelled"):
+        await callback.message.edit_text(
+            f"⛔ <b>Синхронизация прервана</b>\n\n"
+            f"📤 Успешно отправлено: <b>{result['synced']}</b>\n"
+            f"⏭️ Уже было в канале: <b>{result['skipped']}</b>",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="channel:settings")]
+            ])
+        )
+        return
+    
+    await callback.message.edit_text(
+        f"✅ <b>Синхронизация завершена!</b>\n\n"
+        f"📤 Добавлено в канал: <b>{result['synced']}</b>\n"
+        f"⏭️ Уже было в канале: <b>{result['skipped']}</b>\n"
+        f"❌ Ошибок: <b>{result['failed']}</b>\n"
+        f"📊 Всего треков: <b>{result['total']}</b>",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="channel:settings")]
+        ])
+    )
+
+
+@router.callback_query(F.data == "channel:sync_cancel")
+async def handle_channel_sync_cancel(callback: CallbackQuery):
+    """Cancel ongoing sync"""
+    user_id = callback.from_user.id
+    channel_service.request_cancel_sync(user_id)
+    await callback.answer("⛔ Прерывание синхронизации...", show_alert=True)
+
+
+@router.callback_query(F.data == "channel:disconnect_confirm")
+async def handle_channel_disconnect_confirm(callback: CallbackQuery):
+    """Show disconnect confirmation"""
+    await callback.message.edit_text(
+        "⚠️ <b>Отключить канал?</b>\n\n"
+        "Треки останутся в канале, но новые не будут отправляться.\n"
+        "Записи о синхронизированных треках будут удалены.",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="❌ Да, отключить",
+                callback_data="channel:disconnect"
+            )],
+            [InlineKeyboardButton(
+                text="◀️ Отмена",
+                callback_data="channel:settings"
+            )]
+        ])
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "channel:disconnect")
+async def handle_channel_disconnect(callback: CallbackQuery):
+    """Disconnect channel"""
+    user_id = callback.from_user.id
+    
+    await channel_service.disable_channel(user_id)
+    
+    await callback.message.edit_text(
+        "✅ Канал отключён.\n\n"
+        "Используйте /channel для подключения нового канала."
+    )
+    await callback.answer("Канал отключён")
+
+
 # ========== Playlist Creation Callbacks ==========
 
 @router.callback_query(F.data == "playlist:finish")
