@@ -208,6 +208,8 @@ async def test_forward_dry_run(user_id: int, track_id: int):
         if channel.include_hashtags:
             hashtags = generate_hashtags(
                 artist=track.artist,
+                title=track.title,
+                album=track.enrichment.album_name if track.enrichment else None,
                 genre=track.enrichment.genre if track.enrichment else None,
             )
         

@@ -130,6 +130,80 @@ def remove_featuring(text: str) -> str:
     return text.strip()
 
 
+def extract_featured_artists(title: str, main_artist: Optional[str] = None) -> List[str]:
+    """
+    Extract featured/remix/prod artists from track title.
+    
+    Examples:
+        "X Rated (Space Laces Remix)" -> ["Space Laces"]
+        "Track feat. Artist1 & Artist2" -> ["Artist1", "Artist2"]
+        "Song (Prod. Producer)" -> ["Producer"]
+        "Battle vs. Other" -> ["Other"]
+    
+    Returns:
+        List of additional artist names
+    """
+    if not title:
+        return []
+    
+    artists = []
+    
+    # Pattern for remix: "(Artist Remix)" or "(Artist's Remix)" or "[Artist Remix]"
+    remix_patterns = [
+        r'[\(\[]([^\)\]]+?)(?:\'s)?\s+(?:Remix|Rmx|Mix|Edit|Bootleg|Rework|Flip|VIP)[\)\]]',
+        r'\(Remix\s+by\s+([^\)]+)\)',
+        r'\[Remix\s+by\s+([^\]]+)\]',
+    ]
+    for pattern in remix_patterns:
+        matches = re.findall(pattern, title, flags=re.IGNORECASE)
+        for match in matches:
+            artist = match.strip()
+            if artist and len(artist) > 1:
+                artists.append(artist)
+    
+    # Pattern for feat.: "feat. Artist" or "ft. Artist"
+    feat_match = re.search(r'(?:feat\.?|ft\.?|featuring)\s+([^\(\)\[\]]+?)(?:\s*[\(\[]|$)', title, flags=re.IGNORECASE)
+    if feat_match:
+        feat_part = feat_match.group(1).strip()
+        # Split by & , and
+        feat_artists = re.split(r'\s*(?:&|,|\band\b)\s*', feat_part)
+        for fa in feat_artists:
+            fa = fa.strip()
+            if fa and len(fa) > 1:
+                artists.append(fa)
+    
+    # Pattern for prod: "prod. Producer" or "(Prod. by Producer)"
+    prod_patterns = [
+        r'(?:prod\.?|produced\s+by)\s+([^\(\)\[\]]+?)(?:\s*[\(\[]|$)',
+        r'[\(\[](?:prod\.?|produced\s+by)\s+([^\)\]]+)[\)\]]',
+    ]
+    for pattern in prod_patterns:
+        matches = re.findall(pattern, title, flags=re.IGNORECASE)
+        for match in matches:
+            artist = match.strip()
+            if artist and len(artist) > 1:
+                artists.append(artist)
+    
+    # Pattern for vs: "vs. Artist" or "vs Artist"
+    vs_match = re.search(r'\bvs\.?\s+([^\(\)\[\]]+?)(?:\s*[\(\[]|$)', title, flags=re.IGNORECASE)
+    if vs_match:
+        artist = vs_match.group(1).strip()
+        if artist and len(artist) > 1:
+            artists.append(artist)
+    
+    # Clean up: remove duplicates and main artist
+    main_artist_lower = main_artist.lower() if main_artist else None
+    unique = []
+    seen = set()
+    for a in artists:
+        a_lower = a.lower()
+        if a_lower not in seen and (not main_artist_lower or a_lower != main_artist_lower):
+            seen.add(a_lower)
+            unique.append(a)
+    
+    return unique
+
+
 # ============== Artist Normalization ==============
 
 @lru_cache(maxsize=1000)
@@ -515,6 +589,7 @@ def sanitize_search_query(query: str, max_length: int = 100) -> str:
 
 def generate_hashtags(
     artist: Optional[str] = None,
+    title: Optional[str] = None,
     album: Optional[str] = None,
     genre: Optional[str] = None,
     extra_tags: Optional[List[str]] = None
@@ -528,12 +603,25 @@ def generate_hashtags(
     """
     tags = []
     
+    def artist_to_tag(name: str) -> Optional[str]:
+        """Convert artist name to hashtag."""
+        tag = name.replace('!', 'I').replace(' ', '')
+        tag = re.sub(r'[^\w]', '', tag)
+        return tag if tag and len(tag) > 1 else None
+    
     if artist:
         # Keep original case, replace ! with I (common stylization), remove other special chars
-        tag = artist.replace('!', 'I').replace(' ', '')
-        tag = re.sub(r'[^\w]', '', tag)
-        if tag and len(tag) > 1:
+        tag = artist_to_tag(artist)
+        if tag:
             tags.append(tag)
+    
+    # Extract featured artists from title (remixers, feat., prod., vs.)
+    if title:
+        featured = extract_featured_artists(title, main_artist=artist)
+        for fa in featured:
+            tag = artist_to_tag(fa)
+            if tag:
+                tags.append(tag)
     
     if album:
         # Use full album name without spaces/special chars

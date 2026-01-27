@@ -223,6 +223,7 @@ class ChannelService:
                     enrichment = track.enrichment
                     hashtags = generate_hashtags(
                         artist=track.artist,
+                        title=track.title,
                         album=enrichment.album_name if enrichment else None,
                         genre=enrichment.genre if enrichment else None,
                     )
@@ -322,6 +323,7 @@ class ChannelService:
                 # Generate new hashtags
                 new_hashtags = generate_hashtags(
                     artist=track.artist,
+                    title=track.title,
                     album=track.enrichment.album_name if track.enrichment else None,
                     genre=track.enrichment.genre if track.enrichment else None,
                 )
@@ -441,6 +443,7 @@ class ChannelService:
                         enrichment = track.enrichment
                         hashtags = generate_hashtags(
                             artist=track.artist,
+                            title=track.title,
                             album=enrichment.album_name if enrichment else None,
                             genre=enrichment.genre if enrichment else None,
                         )
