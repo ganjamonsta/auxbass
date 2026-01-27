@@ -69,7 +69,7 @@
           :isLiked="track.is_liked"
           @click="playTrack(track)"
           @like="handleLikeTrack(track)"
-          @menu="showTrackMenu($event, track)"
+          @menu="openTrackMenu(track)"
         />
         
         <div v-if="hasMore" class="load-more">
@@ -191,7 +191,7 @@ const playTrack = (track) => {
 const menuTrack = ref(null)
 const showMenu = ref(false)
 
-const showTrackMenu = (event, track) => {
+const openTrackMenu = (track) => {
   menuTrack.value = track
   showMenu.value = true
 }

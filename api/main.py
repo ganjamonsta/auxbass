@@ -158,7 +158,10 @@ async def spa_fallback(full_path: str):
     
     index_path = WEBAPP_DIST / "index.html"
     if index_path.exists():
-        return FileResponse(index_path)
+        # Read into memory to avoid BaseHTTPMiddleware conflict with FileResponse
+        from fastapi.responses import Response
+        content = index_path.read_bytes()
+        return Response(content=content, media_type="text/html")
     
     return {"error": "webapp not built", "hint": "run: cd webapp && npm run build"}
 
