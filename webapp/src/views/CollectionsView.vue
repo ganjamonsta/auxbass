@@ -20,6 +20,24 @@
 
     <!-- Albums Tab -->
     <div v-show="activeTab === 'albums'" class="tab-content">
+      <!-- Scope switcher for albums -->
+      <div class="scope-tabs">
+        <button 
+          class="scope-tab" 
+          :class="{ active: albumScope === 'library' }"
+          @click="changeAlbumScope('library')"
+        >
+          Моя библиотека
+        </button>
+        <button 
+          class="scope-tab" 
+          :class="{ active: albumScope === 'global' }"
+          @click="changeAlbumScope('global')"
+        >
+          Общая
+        </button>
+      </div>
+
       <div class="view-header">
         <div class="header-left">
           <span class="count">{{ albumsTotal }} альбомов</span>
@@ -192,6 +210,17 @@ const libraryStore = useLibraryStore()
 // Tab state
 const activeTab = ref('albums')
 
+// Scope state for albums
+const ALBUM_SCOPE_KEY = 'albums-scope'
+const albumScope = ref(localStorage.getItem(ALBUM_SCOPE_KEY) || 'library')
+
+const changeAlbumScope = (newScope) => {
+  albumScope.value = newScope
+  localStorage.setItem(ALBUM_SCOPE_KEY, newScope)
+  albumsPage.value = 1
+  loadAlbums()
+}
+
 // Albums state
 const albums = ref([])
 const albumsTotal = ref(0)
@@ -218,12 +247,14 @@ const nameInput = ref(null)
 const loadAlbums = async () => {
   loadingAlbums.value = true
   try {
-    const response = await api.get('/albums', {
+    const endpoint = albumScope.value === 'global' ? '/albums/global' : '/albums'
+    const response = await api.get(endpoint, {
       params: {
         offset: (albumsPage.value - 1) * 30,
         limit: 30,
         sort_by: albumSortBy.value,
-        sort_order: albumSortOrder.value
+        sort_order: albumSortOrder.value,
+        min_tracks: albumScope.value === 'global' ? 1 : 2
       }
     })
     albums.value = response.data.items || []
@@ -377,6 +408,30 @@ onMounted(() => {
 .tab-btn.active {
   background: var(--bg-elevated);
   color: var(--text-primary);
+}
+
+.scope-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.scope-tab {
+  flex: 1;
+  padding: 10px 16px;
+  background: var(--bg-elevated);
+  border: none;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.scope-tab.active {
+  background: var(--accent);
+  color: white;
 }
 
 .view-header {

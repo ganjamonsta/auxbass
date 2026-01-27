@@ -136,8 +136,18 @@ export const playlistsApi = {
   removeTrack: (playlistId, trackId) => api.delete(`/playlists/${playlistId}/tracks/${trackId}`),
 }
 
+// Artists
+export const artistsApi = {
+  getAll: (params = {}) => api.get('/artists', { params }),
+  getGlobal: (params = {}) => api.get('/artists/global', { params }),
+  getOne: (artistName) => api.get(`/artists/${encodeURIComponent(artistName)}`),
+  getImage: (artistName) => api.get(`/artists/${encodeURIComponent(artistName)}/image`),
+}
+
 // Albums
 export const albumsApi = {
+  getAll: (params = {}) => api.get('/albums', { params }),
+  getGlobal: (params = {}) => api.get('/albums/global', { params }),
   getOne: (id) => api.get(`/albums/${id}`),
   getIds: (id, params = {}) => api.get(`/albums/${id}/ids`, { params }),
 }

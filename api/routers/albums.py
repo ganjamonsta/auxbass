@@ -149,6 +149,101 @@ async def get_my_albums(
     )
 
 
+# ============== Global Library ==============
+
+@router.get("/global", response_model=AlbumsListResponse)
+async def get_global_albums(
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    search: Optional[str] = None,
+    artist: Optional[str] = None,
+    sort_by: str = Query("name", pattern="^(name|artist|release_date)$"),
+    sort_order: str = Query("asc", pattern="^(asc|desc)$"),
+    min_tracks: int = Query(1, ge=1, description="Minimum tracks to show album"),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get albums from global public library.
+    
+    Shows albums that have at least min_tracks public tracks.
+    """
+    # Subquery: album IDs with public track count >= min_tracks
+    album_track_counts = (
+        select(
+            AlbumTrack.album_id,
+            func.count(AlbumTrack.track_id).label("track_count")
+        )
+        .join(Track, Track.id == AlbumTrack.track_id)
+        .where(Track.is_public == True)
+        .where(Track.is_unavailable == False)
+        .group_by(AlbumTrack.album_id)
+        .having(func.count(AlbumTrack.track_id) >= min_tracks)
+        .subquery()
+    )
+    
+    # Base query - join with filtered album IDs
+    query = (
+        select(Album, album_track_counts.c.track_count)
+        .join(album_track_counts, Album.id == album_track_counts.c.album_id)
+    )
+    count_query = (
+        select(func.count(Album.id))
+        .join(album_track_counts, Album.id == album_track_counts.c.album_id)
+    )
+    
+    # Apply search
+    if search:
+        search_term = f"%{search.lower()}%"
+        search_filter = (
+            func.lower(Album.name).like(search_term) |
+            func.lower(Album.artist).like(search_term)
+        )
+        query = query.where(search_filter)
+        count_query = count_query.where(search_filter)
+    
+    # Apply artist filter
+    if artist:
+        artist_lower = artist.lower()
+        query = query.where(func.lower(Album.artist) == artist_lower)
+        count_query = count_query.where(func.lower(Album.artist) == artist_lower)
+    
+    # Count total
+    total = await db.scalar(count_query) or 0
+    
+    # Sorting
+    if sort_by == "artist":
+        sort_column = Album.artist
+    elif sort_by == "release_date":
+        sort_column = Album.release_date
+    else:
+        sort_column = Album.name
+    
+    if sort_order == "desc":
+        query = query.order_by(desc(sort_column).nullslast())
+    else:
+        query = query.order_by(asc(sort_column).nullsfirst())
+    
+    # Pagination
+    query = query.offset(offset).limit(limit)
+    
+    result = await db.execute(query)
+    rows = result.all()
+    
+    # Build response
+    items = [
+        album_to_response(album, track_count)
+        for album, track_count in rows
+    ]
+    
+    return AlbumsListResponse(
+        items=items,
+        total=total,
+        offset=offset,
+        limit=limit,
+    )
+
+
 @router.get("/{album_id}", response_model=AlbumDetailResponse)
 async def get_album(
     album_id: int,

@@ -219,6 +219,135 @@ async def get_my_artists(
     )
 
 
+# ============== Global Library ==============
+
+@router.get("/global", response_model=ArtistsListResponse)
+async def get_global_artists(
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    search: Optional[str] = None,
+    sort_by: str = Query("name", pattern="^(name|track_count|album_count|latest_release)$"),
+    sort_order: str = Query("asc", pattern="^(asc|desc)$"),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get artists from global public library.
+    
+    Shows all artists that have public tracks in the system.
+    """
+    # Get all artist names from public tracks
+    query = (
+        select(Track.artist)
+        .where(Track.is_public == True)
+        .where(Track.is_unavailable == False)
+        .where(Track.artist.isnot(None))
+        .where(Track.artist != "")
+    )
+    
+    result = await db.execute(query)
+    all_artists = [row[0] for row in result.all()]
+    
+    # Group by normalized name
+    artist_groups: dict[str, list[str]] = defaultdict(list)
+    
+    for artist in all_artists:
+        normalized = normalize_artist(artist)
+        if normalized:
+            artist_groups[normalized].append(artist)
+    
+    # Pre-fetch all albums for counting and getting release dates
+    albums_result = await db.execute(
+        select(Album)
+        .where(Album.artist.isnot(None))
+    )
+    all_albums = albums_result.scalars().all()
+    
+    # Build album lookup by normalized artist
+    albums_by_artist: dict[str, list] = defaultdict(list)
+    for album in all_albums:
+        norm = normalize_artist(album.artist)
+        if norm:
+            albums_by_artist[norm].append(album)
+    
+    # Build aggregated list with album info
+    aggregated = []
+    for normalized, names in artist_groups.items():
+        display_name = get_best_display_name(names)
+        track_count = len(names)
+        
+        artist_albums = albums_by_artist.get(normalized, [])
+        album_count = len(artist_albums)
+        
+        latest_release = None
+        for album in sorted(artist_albums, key=lambda a: a.release_date or "", reverse=True):
+            if album.release_date:
+                latest_release = album.release_date
+                break
+        
+        aggregated.append({
+            "normalized": normalized,
+            "name": display_name,
+            "track_count": track_count,
+            "album_count": album_count,
+            "latest_release_date": latest_release,
+            "albums": artist_albums,
+        })
+    
+    # Apply search filter
+    if search:
+        search_lower = search.lower()
+        aggregated = [
+            a for a in aggregated 
+            if search_lower in a["normalized"] or search_lower in a["name"].lower()
+        ]
+    
+    total = len(aggregated)
+    
+    # Sort
+    reverse = (sort_order == "desc")
+    if sort_by == "track_count":
+        aggregated.sort(key=lambda x: x["track_count"], reverse=reverse)
+    elif sort_by == "album_count":
+        aggregated.sort(key=lambda x: x["album_count"], reverse=reverse)
+    elif sort_by == "latest_release":
+        aggregated.sort(
+            key=lambda x: x["latest_release_date"] or "",
+            reverse=reverse
+        )
+    else:  # name
+        aggregated.sort(key=lambda x: x["name"].lower(), reverse=reverse)
+    
+    # Paginate
+    page_items = aggregated[offset:offset + limit]
+    page = (offset // limit) + 1 if limit > 0 else 1
+    
+    # Build response items
+    items = []
+    for artist_data in page_items:
+        cover_url = None
+        for album in sorted(artist_data["albums"], key=lambda a: a.release_date or "", reverse=True):
+            if album.cover_url:
+                cover_url = cover_url or album.cover_url
+                break
+        
+        items.append(ArtistResponse(
+            name=artist_data["name"],
+            track_count=artist_data["track_count"],
+            album_count=artist_data["album_count"],
+            cover_url=cover_url,
+            image_url=cover_url,
+            latest_release_date=artist_data["latest_release_date"],
+        ))
+    
+    return ArtistsListResponse(
+        items=items,
+        total=total,
+        page=page,
+        per_page=limit,
+    )
+
+
 @router.get("/{artist_name}", response_model=ArtistDetailResponse)
 async def get_artist(
     artist_name: str,

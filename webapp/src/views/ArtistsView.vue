@@ -1,5 +1,23 @@
 <template>
   <div class="artists-view">
+    <!-- Scope tabs -->
+    <div class="scope-tabs">
+      <button 
+        class="scope-tab" 
+        :class="{ active: scope === 'library' }"
+        @click="changeScope('library')"
+      >
+        Моя библиотека
+      </button>
+      <button 
+        class="scope-tab" 
+        :class="{ active: scope === 'global' }"
+        @click="changeScope('global')"
+      >
+        Общая
+      </button>
+    </div>
+
     <!-- Search -->
     <div class="search-bar">
       <input
@@ -64,9 +82,19 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSort } from '@/composables'
 import SortChips from '@/components/SortChips.vue'
-import api from '@/api/client'
+import { artistsApi } from '@/api/client'
 
 const router = useRouter()
+
+// Scope state
+const SCOPE_KEY = 'artists-scope'
+const scope = ref(localStorage.getItem(SCOPE_KEY) || 'library')
+
+const changeScope = (newScope) => {
+  scope.value = newScope
+  localStorage.setItem(SCOPE_KEY, newScope)
+  reset()
+}
 
 // Sort state (persisted to localStorage)
 const { 
@@ -101,18 +129,21 @@ const loadArtists = async (append = false) => {
   loading.value = true
   
   try {
-    const params = new URLSearchParams({
-      offset: append ? offset.value.toString() : '0',
-      limit: limit.toString(),
+    const params = {
+      offset: append ? offset.value : 0,
+      limit: limit,
       sort_by: sortBy.value,
       sort_order: sortOrder.value
-    })
-    
-    if (searchQuery.value) {
-      params.set('search', searchQuery.value)
     }
     
-    const response = await api.get(`/artists?${params}`)
+    if (searchQuery.value) {
+      params.search = searchQuery.value
+    }
+    
+    // Use global or library endpoint based on scope
+    const response = scope.value === 'global' 
+      ? await artistsApi.getGlobal(params)
+      : await artistsApi.getAll(params)
     const data = response.data
     
     if (append) {
@@ -212,6 +243,30 @@ onUnmounted(() => {
 .artists-view {
   padding: 16px;
   padding-bottom: 120px;
+}
+
+.scope-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.scope-tab {
+  flex: 1;
+  padding: 10px 16px;
+  background: var(--bg-elevated);
+  border: none;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.scope-tab.active {
+  background: var(--accent);
+  color: white;
 }
 
 .search-bar {
