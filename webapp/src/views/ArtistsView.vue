@@ -28,19 +28,6 @@
       </div>
     </div>
 
-    <!-- Top pagination (shows when not on first page) -->
-    <PaginationNav
-      v-if="!isFirstPage"
-      :currentPage="currentPage"
-      :totalPages="totalPages"
-      :pageInfo="pageInfo"
-      :isFirstPage="isFirstPage"
-      :isLastPage="isLastPage"
-      :loading="loading"
-      position="top"
-      @goToFirst="goToFirst"
-    />
-
     <!-- Artist grid -->
     <div class="artist-grid" v-if="artists.length">
       <div
@@ -67,38 +54,29 @@
       <p v-else>Нет исполнителей</p>
     </div>
 
-    <!-- Loading -->
+    <!-- Loading indicator -->
     <div v-if="loading" class="loading">
       <div class="spinner"></div>
     </div>
 
-    <!-- Bottom pagination -->
-    <PaginationNav
-      v-if="totalPages > 1 && !loading"
-      :currentPage="currentPage"
-      :totalPages="totalPages"
-      :pageInfo="pageInfo"
-      :isFirstPage="isFirstPage"
-      :isLastPage="isLastPage"
-      :loading="loading"
-      position="bottom"
-      @goToPage="goToPage"
-      @goToFirst="goToFirst"
-      @goToLast="goToLast"
-      @prevPage="prevPage"
-      @nextPage="nextPage"
-    />
+    <!-- Infinite scroll trigger -->
+    <div ref="loadTrigger" class="load-trigger" v-show="hasMore && !loading"></div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { usePagination } from '@/composables'
-import PaginationNav from '@/components/PaginationNav.vue'
 import api from '@/api/client'
 
 const router = useRouter()
+
+// Data state
+const artists = ref([])
+const total = ref(0)
+const loading = ref(false)
+const offset = ref(0)
+const limit = 30
 
 // Search state
 const searchQuery = ref('')
@@ -108,53 +86,76 @@ let searchTimeout = null
 const sortBy = ref('name')
 const sortOrder = ref('asc')
 
-// Pagination with unified composable (windowed mode for memory optimization)
-const { 
-  items: artists, 
-  total, 
-  loading,
-  currentPage,
-  totalPages,
-  isFirstPage,
-  isLastPage,
-  pageInfo,
-  setParams,
-  goToPage,
-  goToFirst,
-  goToLast,
-  prevPage,
-  nextPage
-} = usePagination({
-  fetchFn: async ({ offset, limit, search, sort_by, sort_order }) => {
-    const params = new URLSearchParams({
-      offset: offset.toString(),
-      limit: limit.toString(),
-      sort_by: sort_by || 'name',
-      sort_order: sort_order || 'asc'
-    })
-    if (search) {
-      params.set('search', search)
-    }
-    const response = await api.get(`/artists?${params}`)
-    return response.data
-  },
-  limit: 30,
-  mode: 'windowed',  // Memory optimized - only current page in memory
-  initialParams: {
-    sort_by: 'name',
-    sort_order: 'asc'
-  }
-})
+// Infinite scroll
+const loadTrigger = ref(null)
+let observer = null
 
+const hasMore = ref(true)
+
+// Load artists
+const loadArtists = async (append = false) => {
+  if (loading.value) return
+  
+  loading.value = true
+  
+  try {
+    const params = new URLSearchParams({
+      offset: append ? offset.value.toString() : '0',
+      limit: limit.toString(),
+      sort_by: sortBy.value,
+      sort_order: sortOrder.value
+    })
+    
+    if (searchQuery.value) {
+      params.set('search', searchQuery.value)
+    }
+    
+    const response = await api.get(`/artists?${params}`)
+    const data = response.data
+    
+    if (append) {
+      artists.value.push(...data.items)
+    } else {
+      artists.value = data.items
+      offset.value = 0
+    }
+    
+    total.value = data.total
+    offset.value += data.items.length
+    hasMore.value = artists.value.length < total.value
+    
+  } catch (error) {
+    console.error('Failed to load artists:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+// Load more (for infinite scroll)
+const loadMore = () => {
+  if (hasMore.value && !loading.value) {
+    loadArtists(true)
+  }
+}
+
+// Reset and reload
+const reset = () => {
+  offset.value = 0
+  hasMore.value = true
+  loadArtists(false)
+}
+
+// Debounced search
 const debouncedSearch = () => {
   if (searchTimeout) {
     clearTimeout(searchTimeout)
   }
   searchTimeout = setTimeout(() => {
-    setParams({ search: searchQuery.value || undefined })
+    reset()
   }, 300)
 }
 
+// Sort change handlers
 const onSortChange = () => {
   // Set default order based on sort type
   if (sortBy.value === 'name') {
@@ -162,17 +163,52 @@ const onSortChange = () => {
   } else {
     sortOrder.value = 'desc'
   }
-  setParams({ sort_by: sortBy.value, sort_order: sortOrder.value })
+  reset()
 }
 
 const toggleSortOrder = () => {
   sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
-  setParams({ sort_order: sortOrder.value })
+  reset()
 }
 
+// Navigation
 const goToArtist = (artist) => {
   router.push(`/artist/${encodeURIComponent(artist.name)}`)
 }
+
+// Setup infinite scroll with IntersectionObserver
+onMounted(() => {
+  loadArtists()
+  
+  observer = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting) {
+        loadMore()
+      }
+    },
+    { rootMargin: '200px' }
+  )
+  
+  if (loadTrigger.value) {
+    observer.observe(loadTrigger.value)
+  }
+})
+
+// Watch for trigger element changes
+watch(loadTrigger, (el) => {
+  if (el && observer) {
+    observer.observe(el)
+  }
+})
+
+onUnmounted(() => {
+  if (observer) {
+    observer.disconnect()
+  }
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+  }
+})
 </script>
 
 <style scoped>
@@ -327,23 +363,7 @@ const goToArtist = (artist) => {
   to { transform: rotate(360deg); }
 }
 
-.load-more {
-  display: flex;
-  justify-content: center;
-  padding: 24px;
-}
-
-.load-more button {
-  padding: 12px 24px;
-  background: var(--bg-elevated);
-  border: none;
-  border-radius: 20px;
-  color: var(--text-primary);
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.load-more button:hover {
-  background: var(--bg-highlight);
+.load-trigger {
+  height: 1px;
 }
 </style>
