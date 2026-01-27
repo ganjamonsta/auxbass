@@ -50,8 +50,8 @@ def album_to_response(album: Album, track_count: Optional[int] = None) -> AlbumR
 
 @router.get("", response_model=AlbumsListResponse)
 async def get_my_albums(
-    page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
     search: Optional[str] = None,
     artist: Optional[str] = None,
     sort_by: str = Query("name", pattern="^(name|artist|release_date)$"),
@@ -111,8 +111,7 @@ async def get_my_albums(
         query = query.order_by(asc(sort_column).nullsfirst())
     
     # Pagination
-    offset = (page - 1) * per_page
-    query = query.offset(offset).limit(per_page)
+    query = query.offset(offset).limit(limit)
     
     result = await db.execute(query)
     albums = result.scalars().all()
@@ -141,8 +140,8 @@ async def get_my_albums(
     return AlbumsListResponse(
         items=items,
         total=total,
-        page=page,
-        per_page=per_page,
+        offset=offset,
+        limit=limit,
     )
 
 

@@ -18,8 +18,11 @@ class TelegramUser(BaseModel):
 class PaginatedResponse(BaseModel):
     """Base for paginated responses"""
     total: int
-    page: int
-    per_page: int
+    # Support both offset/limit and page/per_page
+    offset: Optional[int] = None
+    limit: Optional[int] = None
+    page: Optional[int] = None
+    per_page: Optional[int] = None
 
 
 class StatusResponse(BaseModel):
