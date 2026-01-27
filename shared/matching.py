@@ -213,12 +213,14 @@ def normalize_artist(artist: str) -> str:
     
     - Takes first artist from collaborations
     - Removes feat./prod. suffixes
+    - Removes "и др." (Russian for "and others")
     - Normalizes case and special chars
     
     Examples:
         "A$AP Rocky" -> "asap rocky"
         "Drake, Future" -> "drake"
         "Artist feat. Other" -> "artist"
+        "BLADEE и др." -> "bladee"
     """
     if not artist:
         return ""
@@ -226,6 +228,10 @@ def normalize_artist(artist: str) -> str:
     artist = normalize_unicode(artist).lower()
     artist = remove_parenthetical(artist)
     artist = remove_featuring(artist)
+    
+    # Remove Russian "и др." / "и другие" (and others)
+    artist = re.sub(r'\s+и\s+др\.?$', '', artist, flags=re.IGNORECASE)
+    artist = re.sub(r'\s+и\s+други[ех]?$', '', artist, flags=re.IGNORECASE)
     
     # Take first artist from collaborations
     # Separators: comma, ampersand, plus, x, and, with
