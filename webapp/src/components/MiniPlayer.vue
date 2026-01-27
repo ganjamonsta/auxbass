@@ -1,5 +1,5 @@
 <template>
-  <div class="mini-player" @click="$emit('expand')">
+  <div class="mini-player" @click="$emit('expand')" @contextmenu.prevent="openTrackMenu">
     <!-- LCD Screen -->
     <div class="lcd-screen">
       <div class="lcd-row lcd-row-main">
@@ -45,11 +45,38 @@
         </svg>
       </button>
     </div>
+
+    <!-- Track context menu -->
+    <TrackMenu
+      :show="showTrackMenu"
+      :track="track"
+      :current-user-id="authStore.user?.id"
+      @close="closeTrackMenu"
+      @goToArtist="handleGoToArtist"
+      @goToAlbum="handleGoToAlbum"
+      @addToPlaylist="handleAddToPlaylist"
+      @edit="handleEditTrack"
+      @download="handleDownloadTrack"
+      @delete="handleDeleteTrack"
+      @removeFromLibrary="handleRemoveFromLibrary"
+    />
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, inject } from 'vue'
+import { useRouter } from 'vue-router'
+import { usePlayerStore } from '@/stores/player'
+import { useLibraryStore } from '@/stores/library'
+import { useAuthStore } from '@/stores/auth'
+import { playerApi } from '@/api/client'
+import TrackMenu from '@/components/TrackMenu.vue'
+
+const router = useRouter()
+const playerStore = usePlayerStore()
+const libraryStore = useLibraryStore()
+const authStore = useAuthStore()
+const telegram = inject('telegram')
 
 const props = defineProps({
   track: {
@@ -79,6 +106,63 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['expand', 'toggle', 'next'])
+
+// Track menu state
+const showTrackMenu = ref(false)
+
+const openTrackMenu = () => {
+  telegram?.HapticFeedback?.impactOccurred?.('light')
+  showTrackMenu.value = true
+}
+
+const closeTrackMenu = () => {
+  showTrackMenu.value = false
+}
+
+// Menu handlers
+const handleGoToArtist = (artist) => {
+  closeTrackMenu()
+  router.push(`/artist/${encodeURIComponent(artist)}`)
+}
+
+const handleGoToAlbum = (albumId) => {
+  if (albumId) {
+    closeTrackMenu()
+    router.push(`/album/${albumId}`)
+  }
+}
+
+const handleAddToPlaylist = (track) => {
+  // TODO: Show playlist picker
+  closeTrackMenu()
+}
+
+const handleEditTrack = (track) => {
+  // TODO: Show edit modal
+  closeTrackMenu()
+}
+
+const handleDownloadTrack = async (track) => {
+  try {
+    await playerApi.download(props.track.id)
+  } catch (error) {
+    console.error('Failed to download track:', error)
+  }
+  closeTrackMenu()
+}
+
+const handleDeleteTrack = async (track) => {
+  if (confirm('Удалить трек полностью?')) {
+    await libraryStore.deleteTrack(props.track.id)
+    playerStore.next()
+  }
+  closeTrackMenu()
+}
+
+const handleRemoveFromLibrary = async (track) => {
+  await libraryStore.removeFromLibrary(props.track.id)
+  closeTrackMenu()
+}
 
 const progressPercent = computed(() => {
   const dur = props.duration || props.track?.duration
