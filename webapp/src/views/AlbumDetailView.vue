@@ -8,10 +8,13 @@
       </div>
       <div class="album-info">
         <h1>{{ album.name }}</h1>
-        <p class="artist" @click="goToArtist">{{ album.artist_name }}</p>
+        <p class="artist" @click="goToArtist">{{ album.artist }}</p>
         <p class="meta">
           <span v-if="album.release_date">{{ formatYear(album.release_date) }} • </span>
-          {{ album.track_count }} треков
+          <span v-if="album.total_tracks">
+            {{ album.track_count }}/{{ album.total_tracks }} треков
+          </span>
+          <span v-else>{{ album.track_count }} треков</span>
         </p>
       </div>
     </div>
@@ -27,20 +30,98 @@
       </button>
     </div>
 
-    <!-- Track list -->
+    <!-- Track list - show full_tracklist if available, otherwise just user's tracks -->
     <div class="track-list">
-      <TrackItem
-        v-for="(track, index) in album.tracks"
-        :key="track.id"
-        :track="track"
-        :trackNumber="index + 1"
-        :isPlaying="playerStore.currentTrack?.id === track.id"
-        :isLiked="track.is_liked"
-        :hideCover="true"
-        @click="playTrack(track, index)"
-        @like="handleLikeTrack(track)"
-        @menu="openTrackMenu(track)"
-      />
+      <!-- Full tracklist mode: shows all album tracks with availability status -->
+      <template v-if="album.full_tracklist && album.full_tracklist.length">
+        <div
+          v-for="item in album.full_tracklist"
+          :key="item.track_number"
+          class="tracklist-item"
+          :class="{ 'missing': !item.in_library, 'has-track': item.in_library }"
+          @click="item.in_library ? playTrackItem(item) : handleMissingTrack(item)"
+        >
+          <span class="track-number">{{ item.track_number }}</span>
+          
+          <div class="track-info">
+            <span class="track-title" :class="{ 'missing-title': !item.in_library }">
+              {{ item.title }}
+            </span>
+            <span v-if="item.artist && item.artist !== album.artist" class="track-artist">
+              {{ item.artist }}
+            </span>
+          </div>
+          
+          <span class="track-duration">{{ formatDuration(item.duration) }}</span>
+          
+          <!-- Status indicator -->
+          <button
+            v-if="!item.in_library"
+            class="add-btn"
+            @click.stop="handleMissingTrack(item)"
+            title="Добавить трек"
+          >
+            +
+          </button>
+          <span v-else-if="playerStore.currentTrack?.id === item.track_id" class="playing-indicator">
+            🎵
+          </span>
+        </div>
+      </template>
+      
+      <!-- Simple mode: just user's tracks (fallback when no full_tracklist) -->
+      <template v-else>
+        <TrackItem
+          v-for="(track, index) in album.tracks"
+          :key="track.id"
+          :track="track"
+          :trackNumber="index + 1"
+          :isPlaying="playerStore.currentTrack?.id === track.id"
+          :isLiked="track.is_liked"
+          :hideCover="true"
+          @click="playTrack(track, index)"
+          @like="handleLikeTrack(track)"
+          @menu="openTrackMenu(track)"
+        />
+      </template>
+    </div>
+    
+    <!-- Missing track modal -->
+    <div v-if="showMissingModal" class="modal-overlay" @click="closeMissingModal">
+      <div class="modal-content" @click.stop>
+        <h3>{{ missingTrackItem?.title }}</h3>
+        
+        <div v-if="searchingTrack" class="modal-loading">
+          <div class="spinner"></div>
+          <p>Ищем трек...</p>
+        </div>
+        
+        <div v-else-if="foundTrack" class="modal-found">
+          <p class="success-message">✅ {{ searchResult?.message }}</p>
+          <div class="found-track-info">
+            <strong>{{ foundTrack.title }}</strong>
+            <span>{{ foundTrack.artist }}</span>
+          </div>
+          <button
+            v-if="!searchResult?.in_library"
+            class="primary-btn"
+            @click="addFoundTrack"
+            :disabled="addingTrack"
+          >
+            {{ addingTrack ? 'Добавляем...' : 'Добавить в библиотеку' }}
+          </button>
+          <button v-else class="secondary-btn" @click="closeMissingModal">
+            Уже в библиотеке
+          </button>
+        </div>
+        
+        <div v-else class="modal-not-found">
+          <p class="info-message">{{ searchResult?.message }}</p>
+          <p class="hint">Скинь этот трек боту в Telegram, и он появится в библиотеке.</p>
+        </div>
+        
+        <button class="close-btn" @click="closeMissingModal">✕</button>
+      </div>
     </div>
     
     <!-- Track context menu -->
@@ -61,7 +142,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import TrackItem from '@/components/TrackItem.vue'
@@ -77,6 +158,24 @@ const loading = ref(true)
 const showMenu = ref(false)
 const menuTrack = ref(null)
 
+// Missing track modal state
+const showMissingModal = ref(false)
+const missingTrackItem = ref(null)
+const searchingTrack = ref(false)
+const searchResult = ref(null)
+const foundTrack = ref(null)
+const addingTrack = ref(false)
+
+// Get only tracks that are in library (for playback)
+const playableTracks = computed(() => {
+  if (album.value?.full_tracklist) {
+    return album.value.full_tracklist
+      .filter(item => item.in_library && item.track)
+      .map(item => item.track)
+  }
+  return album.value?.tracks || []
+})
+
 const loadAlbum = async () => {
   loading.value = true
   try {
@@ -88,14 +187,14 @@ const loadAlbum = async () => {
 }
 
 const playAll = () => {
-  if (album.value?.tracks?.length) {
-    playerStore.playTrack(album.value.tracks[0], album.value.tracks)
+  if (playableTracks.value.length) {
+    playerStore.playTrack(playableTracks.value[0], playableTracks.value)
   }
 }
 
 const shufflePlay = () => {
-  if (album.value?.tracks?.length) {
-    const shuffled = [...album.value.tracks].sort(() => Math.random() - 0.5)
+  if (playableTracks.value.length) {
+    const shuffled = [...playableTracks.value].sort(() => Math.random() - 0.5)
     playerStore.playTrack(shuffled[0], shuffled)
   }
 }
@@ -104,8 +203,67 @@ const playTrack = (track, index) => {
   playerStore.playTrack(track, album.value.tracks, index)
 }
 
+const playTrackItem = (item) => {
+  if (item.track) {
+    const index = playableTracks.value.findIndex(t => t.id === item.track_id)
+    playerStore.playTrack(item.track, playableTracks.value, index >= 0 ? index : 0)
+  }
+}
+
+// Handle clicking on missing track
+const handleMissingTrack = async (item) => {
+  missingTrackItem.value = item
+  showMissingModal.value = true
+  searchingTrack.value = true
+  searchResult.value = null
+  foundTrack.value = null
+  
+  try {
+    const response = await api.post(`/albums/${album.value.id}/find-track`, null, {
+      params: {
+        title: item.title,
+        artist: item.artist || album.value.artist
+      }
+    })
+    searchResult.value = response.data
+    if (response.data.found && response.data.track) {
+      foundTrack.value = response.data.track
+    }
+  } catch (error) {
+    searchResult.value = {
+      found: false,
+      message: 'Ошибка поиска. Попробуй скинуть трек боту.'
+    }
+  } finally {
+    searchingTrack.value = false
+  }
+}
+
+const addFoundTrack = async () => {
+  if (!searchResult.value?.track_id) return
+  
+  addingTrack.value = true
+  try {
+    await api.post(`/albums/${album.value.id}/add-track/${searchResult.value.track_id}`)
+    // Reload album to reflect changes
+    await loadAlbum()
+    closeMissingModal()
+  } catch (error) {
+    console.error('Failed to add track:', error)
+  } finally {
+    addingTrack.value = false
+  }
+}
+
+const closeMissingModal = () => {
+  showMissingModal.value = false
+  missingTrackItem.value = null
+  searchResult.value = null
+  foundTrack.value = null
+}
+
 const goToArtist = () => {
-  router.push(`/artist/${encodeURIComponent(album.value.artist_name)}`)
+  router.push(`/artist/${encodeURIComponent(album.value.artist)}`)
 }
 
 // Track menu handlers
@@ -277,6 +435,211 @@ onMounted(() => {
   flex-direction: column;
 }
 
+/* Full tracklist item styles */
+.tracklist-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.tracklist-item:hover {
+  background: var(--bg-elevated);
+}
+
+.tracklist-item.missing {
+  opacity: 0.6;
+}
+
+.tracklist-item.missing:hover {
+  opacity: 0.9;
+}
+
+.track-number {
+  width: 24px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+.track-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.track-title {
+  font-size: 15px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-title.missing-title {
+  color: var(--text-secondary);
+}
+
+.track-artist {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-duration {
+  color: var(--text-tertiary);
+  font-size: 13px;
+  min-width: 40px;
+  text-align: right;
+}
+
+.add-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.add-btn:hover {
+  transform: scale(1.1);
+}
+
+.playing-indicator {
+  font-size: 16px;
+}
+
+/* Modal styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.modal-content {
+  background: var(--bg-elevated);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 400px;
+  width: 100%;
+  position: relative;
+}
+
+.modal-content h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  padding-right: 24px;
+}
+
+.modal-loading {
+  text-align: center;
+  padding: 24px 0;
+}
+
+.modal-loading p {
+  margin-top: 12px;
+  color: var(--text-secondary);
+}
+
+.modal-found,
+.modal-not-found {
+  padding: 8px 0;
+}
+
+.success-message {
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+
+.info-message {
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.hint {
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+.found-track-info {
+  background: var(--bg-base);
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.found-track-info strong {
+  color: var(--text-primary);
+}
+
+.found-track-info span {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.primary-btn {
+  width: 100%;
+  padding: 12px;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.secondary-btn {
+  width: 100%;
+  padding: 12px;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.close-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+/* Loading */
 .loading {
   display: flex;
   justify-content: center;

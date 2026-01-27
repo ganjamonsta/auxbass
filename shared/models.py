@@ -259,6 +259,10 @@ class Album(Base):
     release_date: Mapped[Optional[str]] = mapped_column(String(20))  # YYYY-MM-DD
     total_tracks: Mapped[Optional[int]] = mapped_column(Integer)
     
+    # Full tracklist from Deezer (JSON array)
+    # Format: [{"track_number": 1, "title": "...", "artist": "...", "duration": 123, "deezer_id": 456}, ...]
+    full_tracklist: Mapped[Optional[str]] = mapped_column(Text)
+    
     # External IDs
     deezer_album_id: Mapped[Optional[int]] = mapped_column(BigInteger, unique=True)
     

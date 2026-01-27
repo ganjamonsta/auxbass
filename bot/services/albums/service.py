@@ -4,6 +4,7 @@ TG Player - Album Assembly Service v2
 Handles automatic and manual album grouping for tracks.
 Uses new model structure with AlbumTrack association.
 """
+import json
 import logging
 from typing import Optional, List, Tuple
 from datetime import datetime
@@ -55,6 +56,7 @@ class AlbumService:
         release_date: Optional[str] = None,  # YYYY-MM-DD string
         deezer_album_id: Optional[int] = None,
         total_tracks: Optional[int] = None,
+        full_tracklist: Optional[List[dict]] = None,  # Full album tracklist from Deezer
     ) -> int:
         """
         Find existing album or create new one.
@@ -78,7 +80,7 @@ class AlbumService:
                 if album:
                     # Update with any new info
                     await self._update_album_if_needed(
-                        album, cover_url, release_date
+                        album, cover_url, release_date, full_tracklist
                     )
                     return album.id
             
@@ -93,7 +95,7 @@ class AlbumService:
             for candidate in candidates:
                 if fuzzy_match_album(album_name, candidate.name):
                     await self._update_album_if_needed(
-                        candidate, cover_url, release_date
+                        candidate, cover_url, release_date, full_tracklist
                     )
                     if deezer_album_id and not candidate.deezer_album_id:
                         candidate.deezer_album_id = deezer_album_id
@@ -109,6 +111,7 @@ class AlbumService:
                 release_date=release_date,
                 deezer_album_id=deezer_album_id,
                 total_tracks=total_tracks,
+                full_tracklist=json.dumps(full_tracklist) if full_tracklist else None,
             )
             session.add(album)
             await session.flush()
@@ -121,12 +124,15 @@ class AlbumService:
         album: Album,
         cover_url: Optional[str],
         release_date: Optional[str],
+        full_tracklist: Optional[List[dict]] = None,
     ):
         """Update album with new info if current is missing"""
         if cover_url and not album.cover_url:
             album.cover_url = cover_url
         if release_date and not album.release_date:
             album.release_date = release_date
+        if full_tracklist and not album.full_tracklist:
+            album.full_tracklist = json.dumps(full_tracklist)
         album.updated_at = datetime.utcnow()
     
     async def assign_track_to_album(
@@ -197,6 +203,7 @@ class AlbumService:
     async def auto_assign_album_from_enrichment(self, track_id: int) -> Optional[int]:
         """
         Automatically assign track to album based on enrichment data.
+        Also loads full album tracklist from Deezer if available.
         
         Returns:
             Album ID if assigned, None otherwise
@@ -217,6 +224,14 @@ class AlbumService:
             if not enrichment.album_name:
                 return None
             
+            # Load full tracklist from Deezer if we have album ID
+            full_tracklist = None
+            total_tracks = None
+            if enrichment.deezer_album_id:
+                full_tracklist = await self._fetch_album_tracklist(enrichment.deezer_album_id)
+                if full_tracklist:
+                    total_tracks = len(full_tracklist)
+            
             # Find or create album
             album_id = await self.find_or_create_album(
                 album_name=enrichment.album_name,
@@ -224,6 +239,8 @@ class AlbumService:
                 cover_url=enrichment.cover_url,
                 release_date=enrichment.release_date,
                 deezer_album_id=enrichment.deezer_album_id,
+                total_tracks=total_tracks,
+                full_tracklist=full_tracklist,
             )
             
             # Assign track
@@ -234,6 +251,41 @@ class AlbumService:
             )
             
             return album_id
+    
+    async def _fetch_album_tracklist(self, deezer_album_id: int) -> Optional[List[dict]]:
+        """
+        Fetch full album tracklist from Deezer.
+        
+        Returns list of track info dicts with:
+        - track_number: position in album
+        - title: track title
+        - artist: artist name
+        - duration: duration in seconds
+        - deezer_id: Deezer track ID
+        """
+        try:
+            from bot.services.enrichment.deezer import deezer_client
+            
+            tracks = await deezer_client.get_album_tracks(deezer_album_id)
+            if not tracks:
+                return None
+            
+            tracklist = []
+            for i, t in enumerate(tracks, 1):
+                tracklist.append({
+                    "track_number": i,
+                    "title": t.get("title", ""),
+                    "artist": t.get("artist", {}).get("name", ""),
+                    "duration": t.get("duration", 0),
+                    "deezer_id": t.get("id"),
+                })
+            
+            logger.info(f"Loaded tracklist for Deezer album {deezer_album_id}: {len(tracklist)} tracks")
+            return tracklist
+            
+        except Exception as e:
+            logger.error(f"Failed to fetch album tracklist: {e}")
+            return None
     
     async def find_album_candidates(
         self,

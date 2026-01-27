@@ -29,11 +29,22 @@
           <img v-if="album.cover_url" :src="album.cover_url" :alt="album.name" />
           <div v-else class="cover-placeholder">💿</div>
           <button class="play-btn" @click.stop="playAlbum(album)">▶</button>
+          <!-- Progress indicator if we have total_tracks -->
+          <div v-if="album.total_tracks && album.track_count < album.total_tracks" class="progress-badge">
+            {{ album.track_count }}/{{ album.total_tracks }}
+          </div>
         </div>
         <div class="album-info">
           <span class="album-name">{{ album.name }}</span>
-          <span class="album-artist">{{ album.artist_name }}</span>
-          <span class="track-count">{{ album.track_count }} треков</span>
+          <span class="album-artist">{{ album.artist }}</span>
+          <span class="track-count">
+            <template v-if="album.total_tracks">
+              {{ album.track_count }}/{{ album.total_tracks }} треков
+            </template>
+            <template v-else>
+              {{ album.track_count }} треков
+            </template>
+          </span>
         </div>
       </div>
     </div>
@@ -190,6 +201,18 @@ const playAlbum = async (album) => {
 .album-card:hover .play-btn {
   opacity: 1;
   transform: translateY(0);
+}
+
+.progress-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 12px;
 }
 
 .album-info {
