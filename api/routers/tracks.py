@@ -798,7 +798,7 @@ async def like_track(
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Like a track"""
+    """Like a track - auto-adds to library if not already there"""
     result = await db.execute(
         select(UserLibrary)
         .where(UserLibrary.track_id == track_id)
@@ -806,14 +806,34 @@ async def like_track(
     )
     entry = result.scalar_one_or_none()
     
-    if not entry:
-        raise HTTPException(status_code=404, detail="Track not found in your library")
+    added_to_library = False
     
-    entry.is_liked = True
-    entry.liked_at = datetime.utcnow()
+    if not entry:
+        # Track not in library - check if track exists and is public, then auto-add
+        track = await db.scalar(
+            select(Track).where(Track.id == track_id, Track.is_public == True)
+        )
+        if not track:
+            raise HTTPException(status_code=404, detail="Track not found")
+        
+        # Auto-add to library
+        entry = UserLibrary(
+            user_id=user.id,
+            track_id=track_id,
+            source=LibrarySource.ADDED,
+            is_liked=True,
+            liked_at=datetime.utcnow(),
+        )
+        db.add(entry)
+        added_to_library = True
+        logger.info(f"Track {track_id} auto-added to library and liked by user {user.id}")
+    else:
+        entry.is_liked = True
+        entry.liked_at = datetime.utcnow()
+    
     await db.commit()
     
-    return {"status": "liked", "track_id": track_id}
+    return {"status": "liked", "track_id": track_id, "added_to_library": added_to_library}
 
 
 @router.delete("/{track_id}/like")
