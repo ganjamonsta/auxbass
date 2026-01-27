@@ -134,8 +134,8 @@ class MetadataService:
         # Replace $ with s (for A$AP -> ASAP), then remove other special characters
         artist = artist.replace('$', 's')
         artist = re.sub(r'[^\w\s]', '', artist)
-        # Remove extra whitespace
-        artist = ' '.join(artist.split())
+        # Remove ALL whitespace for comparison (fixes Глюк'oZa vs Глюк'oza issue)
+        artist = re.sub(r'\s+', '', artist)
         return artist.strip()
     
     def _artist_matches(self, source_artist: str, deezer_artist: str, threshold: float = 0.75) -> bool:
