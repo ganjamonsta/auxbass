@@ -13,6 +13,7 @@ import json
 import logging
 
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from aiogram import Bot
 from aiogram.types import Message
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
@@ -204,8 +205,13 @@ class ChannelService:
             if not channel or not channel.auto_forward:
                 return False
             
-            # Get track with enrichment
-            track = await session.get(Track, track_id)
+            # Get track with enrichment (eager load)
+            result = await session.execute(
+                select(Track)
+                .options(selectinload(Track.enrichment))
+                .where(Track.id == track_id)
+            )
+            track = result.scalar_one_or_none()
             if not track:
                 return False
             
@@ -284,8 +290,13 @@ class ChannelService:
             return 0
         
         async with get_session() as session:
-            # Get track with enrichment
-            track = await session.get(Track, track_id)
+            # Get track with enrichment (eager load)
+            result = await session.execute(
+                select(Track)
+                .options(selectinload(Track.enrichment))
+                .where(Track.id == track_id)
+            )
+            track = result.scalar_one_or_none()
             if not track:
                 return 0
             
@@ -388,10 +399,11 @@ class ChannelService:
             if not channel:
                 return {"synced": 0, "skipped": 0, "failed": 0, "total": 0, "error": "No channel"}
             
-            # Get all user's tracks from library
+            # Get all user's tracks from library with enrichment
             from shared.models import UserLibrary
             result = await session.execute(
                 select(Track)
+                .options(selectinload(Track.enrichment))
                 .join(UserLibrary, UserLibrary.track_id == Track.id)
                 .where(UserLibrary.user_id == user_id)
                 .order_by(UserLibrary.added_at.asc())
