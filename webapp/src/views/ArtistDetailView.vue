@@ -69,6 +69,7 @@
     <TrackMenu
       :show="showMenu"
       :track="menuTrack"
+      context="artist"
       @close="closeMenu"
       @goToAlbum="handleGoToAlbum"
       @addToPlaylist="handleAddToPlaylist"

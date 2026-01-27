@@ -54,6 +54,7 @@
       :show="showMenu"
       :track="menuTrack"
       :inPlaylist="true"
+      context="playlist"
       @close="closeMenu"
       @goToArtist="handleGoToArtist"
       @goToAlbum="handleGoToAlbum"

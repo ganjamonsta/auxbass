@@ -123,6 +123,7 @@
       :show="showMenu"
       :track="menuTrack"
       :current-user-id="authStore.user?.id"
+      context="library"
       @close="closeMenu"
       @goToArtist="handleGoToArtist"
       @goToAlbum="handleGoToAlbum"

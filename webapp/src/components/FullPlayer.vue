@@ -250,6 +250,7 @@
       :show="showTrackMenu"
       :track="track"
       :current-user-id="authStore.user?.id"
+      context="player"
       @close="closeTrackMenu"
       @goToArtist="handleGoToArtist"
       @goToAlbum="handleGoToAlbum"

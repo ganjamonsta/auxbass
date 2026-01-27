@@ -45,6 +45,7 @@
     <TrackMenu
       :show="showMenu"
       :track="menuTrack"
+      context="liked"
       @close="closeMenu"
       @goToArtist="handleGoToArtist"
       @goToAlbum="handleGoToAlbum"
