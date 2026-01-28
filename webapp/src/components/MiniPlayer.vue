@@ -4,8 +4,6 @@
     <div class="lcd-screen">
       <div class="lcd-row lcd-row-main">
         <span class="lcd-status">{{ isPlaying ? '▶' : '■' }}</span>
-        <span v-if="playerStore.shuffle" class="lcd-indicator" title="Перемешивание">🔀</span>
-        <span v-if="playerStore.repeatMode !== 'none'" class="lcd-indicator" :title="playerStore.repeatMode === 'one' ? 'Повтор трека' : 'Повтор всего'">{{ playerStore.repeatMode === 'one' ? '🔂' : '🔁' }}</span>
         <div class="lcd-title-container">
           <div class="lcd-title-track" :class="{ 'marquee': shouldMarquee }">
             <span class="lcd-title">{{ displayText }}</span>
@@ -15,6 +13,10 @@
       </div>
       <div class="lcd-row lcd-row-sub">
         <span class="lcd-time">{{ formatTime(progress) }}/{{ formatTime(duration || track.duration) }}</span>
+        <div class="lcd-indicators">
+          <span v-if="playerStore.shuffle" class="lcd-indicator" title="Перемешивание">SHF</span>
+          <span v-if="playerStore.repeatMode !== 'none'" class="lcd-indicator" :title="playerStore.repeatMode === 'one' ? 'Повтор трека' : 'Повтор всего'">{{ playerStore.repeatMode === 'one' ? 'RP1' : 'RPT' }}</span>
+        </div>
       </div>
       <!-- LED Progress dots -->
       <div class="lcd-progress">
@@ -374,10 +376,20 @@ const formatTime = (seconds) => {
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
+.lcd-indicators {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
 .lcd-indicator {
-  font-size: 10px;
-  flex-shrink: 0;
-  opacity: 0.8;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: 'Consolas', 'Monaco', monospace;
+  letter-spacing: 0.5px;
+  color: var(--lcd-text);
+  text-shadow: 0 0 6px var(--lcd-text-glow);
+  opacity: 0.9;
 }
 
 @keyframes pulse-glow {
