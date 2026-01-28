@@ -15,6 +15,7 @@ import {
 import {
   getCachedUrl,
   setCachedUrl,
+  deleteCachedUrl,
   getCachedAudio,
   setCachedAudio,
   preloadTrackWithAudio,
@@ -1325,7 +1326,7 @@ export const usePlayerStore = defineStore('player', () => {
       } else if (statusCode === 401) {
         // Token expired - clear URL cache and retry once, or skip
         console.warn('[Play Error] 401 - Stream token expired, clearing cache and skipping')
-        urlCache.delete(track.id)
+        deleteCachedUrl(track.id)
         lastError.value = {
           type: 'auth_expired',
           track: track,
@@ -1698,7 +1699,7 @@ export const usePlayerStore = defineStore('player', () => {
         return
       } catch (e) {
         console.error('[Next] Failed to play from cached URL, falling back:', e)
-        urlCache.delete(nextTrack.id)
+        deleteCachedUrl(nextTrack.id)
       }
     }
     
@@ -1827,7 +1828,7 @@ export const usePlayerStore = defineStore('player', () => {
         return
       } catch (e) {
         console.error('[Prev] Failed to play from cached URL, falling back:', e)
-        urlCache.delete(prevTrack.id)
+        deleteCachedUrl(prevTrack.id)
       } finally {
         loading.value = false
       }

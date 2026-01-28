@@ -58,6 +58,13 @@ export const clearUrlCache = () => {
   urlCache.clear()
 }
 
+/**
+ * Delete a single URL from cache
+ */
+export const deleteCachedUrl = (trackId) => {
+  urlCache.delete(trackId)
+}
+
 
 // ============== Audio Blob Cache ==============
 // Stores blob URLs for already loaded tracks
