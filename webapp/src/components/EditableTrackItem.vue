@@ -2,8 +2,8 @@
   <div 
     class="editable-track"
     :class="{ 'is-dragging': isDragging, 'drag-over': isDragOver, 'is-playing': isCurrentTrack }"
-    draggable="true"
-    @dragstart="$emit('dragstart', $event)"
+    :draggable="!isSeeking"
+    @dragstart="handleTrackDragStart"
     @dragend="$emit('dragend')"
     @dragover.prevent="$emit('dragover', $event)"
     @drop="$emit('drop', $event)"
@@ -37,13 +37,15 @@
       <div 
         v-if="isCurrentTrack" 
         class="progress" 
+        :class="{ 'is-seeking': isSeeking }"
         draggable="false"
         @click.stop="seek" 
-        @mousedown.stop="startDrag"
+        @mousedown.stop.prevent="startDrag"
+        @touchstart.stop.prevent="startTouchDrag"
         @dragstart.stop.prevent
       >
-        <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
-        <div class="progress-thumb" :style="{ left: progressPercent + '%' }"></div>
+        <div class="progress-fill" :style="{ width: displayPercent + '%' }"></div>
+        <div class="progress-thumb" :style="{ left: displayPercent + '%' }"></div>
       </div>
     </div>
     
@@ -58,7 +60,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 
 const props = defineProps({
@@ -69,17 +71,26 @@ const props = defineProps({
   allTracks: { type: Array, default: () => [] }
 })
 
-defineEmits(['dragstart', 'dragend', 'dragover', 'drop', 'remove'])
+const emit = defineEmits(['dragstart', 'dragend', 'dragover', 'drop', 'remove'])
 
 const playerStore = usePlayerStore()
 const isCurrentTrack = computed(() => playerStore.currentTrack?.id === props.track.id)
 const progressPercent = computed(() => (playerStore.progress / playerStore.duration) * 100 || 0)
 
+// Seeking state
+const isSeeking = ref(false)
+const seekPercent = ref(0)
+
+// Show local position during drag, otherwise show actual progress
+const displayPercent = computed(() => isSeeking.value ? seekPercent.value : progressPercent.value)
+
 const displayTime = computed(() => {
-  const seconds = playerStore.progress
-  if (!seconds || isNaN(seconds)) return '0:00'
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
+  const totalSeconds = isSeeking.value 
+    ? (seekPercent.value / 100) * playerStore.duration 
+    : playerStore.progress
+  if (!totalSeconds || isNaN(totalSeconds)) return '0:00'
+  const mins = Math.floor(totalSeconds / 60)
+  const secs = Math.floor(totalSeconds % 60)
   return `${mins}:${secs.toString().padStart(2, '0')}`
 })
 
@@ -91,6 +102,14 @@ const togglePlay = () => {
   }
 }
 
+const handleTrackDragStart = (event) => {
+  if (isSeeking.value) {
+    event.preventDefault()
+    return
+  }
+  emit('dragstart', event)
+}
+
 const seek = (event) => {
   if (!isCurrentTrack.value) return
   const rect = event.currentTarget.getBoundingClientRect()
@@ -98,27 +117,58 @@ const seek = (event) => {
   playerStore.seek(percent * playerStore.duration)
 }
 
-let isDraggingProgress = false
 const startDrag = (event) => {
   if (!isCurrentTrack.value) return
-  isDraggingProgress = true
+  
+  isSeeking.value = true
   const progressBar = event.currentTarget
   
+  // Initial position
+  const rect = progressBar.getBoundingClientRect()
+  seekPercent.value = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100))
+  
   const onMouseMove = (e) => {
-    if (!isDraggingProgress) return
     const rect = progressBar.getBoundingClientRect()
-    const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-    playerStore.seek(percent * playerStore.duration)
+    seekPercent.value = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100))
   }
   
   const onMouseUp = () => {
-    isDraggingProgress = false
+    // Apply seek on release
+    playerStore.seek((seekPercent.value / 100) * playerStore.duration)
+    isSeeking.value = false
     document.removeEventListener('mousemove', onMouseMove)
     document.removeEventListener('mouseup', onMouseUp)
   }
   
   document.addEventListener('mousemove', onMouseMove)
   document.addEventListener('mouseup', onMouseUp)
+}
+
+const startTouchDrag = (event) => {
+  if (!isCurrentTrack.value) return
+  
+  isSeeking.value = true
+  const progressBar = event.currentTarget
+  const touch = event.touches[0]
+  
+  const rect = progressBar.getBoundingClientRect()
+  seekPercent.value = Math.max(0, Math.min(100, ((touch.clientX - rect.left) / rect.width) * 100))
+  
+  const onTouchMove = (e) => {
+    const touch = e.touches[0]
+    const rect = progressBar.getBoundingClientRect()
+    seekPercent.value = Math.max(0, Math.min(100, ((touch.clientX - rect.left) / rect.width) * 100))
+  }
+  
+  const onTouchEnd = () => {
+    playerStore.seek((seekPercent.value / 100) * playerStore.duration)
+    isSeeking.value = false
+    document.removeEventListener('touchmove', onTouchMove)
+    document.removeEventListener('touchend', onTouchEnd)
+  }
+  
+  document.addEventListener('touchmove', onTouchMove)
+  document.addEventListener('touchend', onTouchEnd)
 }
 </script>
 
@@ -274,6 +324,7 @@ const startDrag = (event) => {
 }
 
 .progress:hover .progress-thumb { opacity: 1; }
+.progress.is-seeking .progress-thumb { opacity: 1; }
 
 .time {
   font-size: 12px;
