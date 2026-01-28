@@ -615,19 +615,15 @@ class ChannelService:
         stats = {"checked": 0, "updated": 0, "failed": 0}
         
         async with get_session() as session:
-            from shared.models import EnrichmentStatus
-            
-            # Build query for channel messages where:
-            # 1. Track has completed enrichment
-            # 2. Track has album_name or genre in enrichment
-            # 3. Channel message may have incomplete hashtags
+            # Build query for ALL channel messages for this user
+            # We'll check each message and update if hashtags differ from expected
+            # This covers: incomplete enrichment, new enrichment data, featured artists from title
             query = (
                 select(ChannelMessage)
                 .join(Track, ChannelMessage.track_id == Track.id)
-                .join(TrackEnrichment, Track.id == TrackEnrichment.track_id)
                 .join(UserChannel, ChannelMessage.channel_id == UserChannel.id)
+                .outerjoin(TrackEnrichment, Track.id == TrackEnrichment.track_id)
                 .where(
-                    Track.enrichment_status == EnrichmentStatus.COMPLETED,
                     UserChannel.is_active == True,
                     UserChannel.include_hashtags == True,
                 )
@@ -646,21 +642,21 @@ class ChannelService:
             total = len(messages)
             logger.info(f"Checking {total} channel messages for incomplete hashtags")
             
+            last_progress_update = 0
             for i, msg in enumerate(messages):
                 stats["checked"] += 1
                 
-                if progress_callback and i % 10 == 0:
+                # Update progress every 5 messages or every 2 seconds worth of work
+                if progress_callback and (i - last_progress_update >= 5 or i == 0):
                     try:
                         await progress_callback(i, total, stats["updated"])
+                        last_progress_update = i
                     except:
                         pass
                 
                 track = msg.track
                 channel = msg.channel
                 enrichment = track.enrichment
-                
-                if not enrichment:
-                    continue
                 
                 # Parse current hashtags
                 current_hashtags = []
@@ -670,12 +666,12 @@ class ChannelService:
                     except:
                         current_hashtags = []
                 
-                # Generate what hashtags should be
+                # Generate what hashtags should be (works even without enrichment)
                 expected_hashtags = generate_hashtags(
                     artist=track.artist,
                     title=track.title,
-                    album=enrichment.album_name,
-                    genre=enrichment.genre,
+                    album=enrichment.album_name if enrichment else None,
+                    genre=enrichment.genre if enrichment else None,
                 )
                 
                 # Check if update needed (compare sets to ignore order)
@@ -688,7 +684,7 @@ class ChannelService:
                     caption_parts.append(f"🎵 {track.title}")
                 if track.artist:
                     caption_parts.append(f"👤 {track.artist}")
-                if enrichment.album_name:
+                if enrichment and enrichment.album_name:
                     caption_parts.append(f"💿 {enrichment.album_name}")
                 
                 if expected_hashtags:
@@ -728,6 +724,13 @@ class ChannelService:
                     logger.warning(f"Rate limited, waiting {e.retry_after}s")
                     await asyncio.sleep(e.retry_after + 1)
                     # Don't count as failed, will be caught next time
+            
+            # Final progress update
+            if progress_callback:
+                try:
+                    await progress_callback(total, total, stats["updated"])
+                except:
+                    pass
             
             await session.commit()
         

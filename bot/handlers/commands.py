@@ -318,24 +318,50 @@ async def cmd_sync(message: Message):
     
     if stats["to_sync"] == 0:
         # All synced, but check for incomplete hashtags
-        await message.answer(
+        status_msg = await message.answer(
             f"✅ <b>Все треки уже синхронизированы!</b>\n\n"
             f"📢 {stats['channel_title']}\n"
             f"🎵 В канале: <b>{stats['already_synced']}</b> треков\n"
             f"📚 В библиотеке: <b>{stats['total_tracks']}</b> треков\n\n"
-            f"🔍 Проверяю хештеги..."
+            f"🔍 Проверяю хештеги... 0/{stats['already_synced']}"
         )
+        
+        # Progress callback for hashtag updates
+        async def hashtag_progress(current, total, updated):
+            try:
+                await status_msg.edit_text(
+                    f"✅ <b>Все треки уже синхронизированы!</b>\n\n"
+                    f"📢 {stats['channel_title']}\n"
+                    f"🎵 В канале: <b>{stats['already_synced']}</b> треков\n"
+                    f"📚 В библиотеке: <b>{stats['total_tracks']}</b> треков\n\n"
+                    f"🔍 Проверяю хештеги... {current}/{total}\n"
+                    f"✏️ Обновлено: {updated}"
+                )
+            except:
+                pass
         
         # Update incomplete hashtags
         update_result = await channel_service.update_incomplete_messages(
             user_id=user_id,
             bot=message.bot,
+            progress_callback=hashtag_progress,
         )
         
         if update_result["updated"] > 0:
-            await message.answer(
-                f"🏷️ <b>Обновлены хештеги</b>\n\n"
-                f"✏️ Обновлено: <b>{update_result['updated']}</b> треков"
+            await status_msg.edit_text(
+                f"✅ <b>Синхронизация завершена!</b>\n\n"
+                f"📢 {stats['channel_title']}\n"
+                f"🎵 В канале: <b>{stats['already_synced']}</b> треков\n\n"
+                f"🏷️ Обновлено хештегов: <b>{update_result['updated']}</b>\n"
+                f"📊 Проверено: <b>{update_result['checked']}</b>"
+            )
+        else:
+            await status_msg.edit_text(
+                f"✅ <b>Всё актуально!</b>\n\n"
+                f"📢 {stats['channel_title']}\n"
+                f"🎵 В канале: <b>{stats['already_synced']}</b> треков\n"
+                f"📊 Проверено: <b>{update_result['checked']}</b>\n\n"
+                f"Все хештеги уже обновлены."
             )
         return
     
@@ -394,16 +420,33 @@ async def cmd_sync(message: Message):
         return
     
     # Sync completed, now update incomplete hashtags
+    synced_count = result['synced']
+    skipped_count = result['skipped']
+    
     await status_msg.edit_text(
         f"✅ <b>Треки отправлены!</b>\n\n"
-        f"📤 Добавлено в канал: <b>{result['synced']}</b>\n"
-        f"⏭️ Уже было в канале: <b>{result['skipped']}</b>\n\n"
+        f"📤 Добавлено в канал: <b>{synced_count}</b>\n"
+        f"⏭️ Уже было в канале: <b>{skipped_count}</b>\n\n"
         f"🔍 Обновляю хештеги..."
     )
+    
+    # Progress callback for hashtag updates after sync
+    async def hashtag_progress_after_sync(current, total, updated):
+        try:
+            await status_msg.edit_text(
+                f"✅ <b>Треки отправлены!</b>\n\n"
+                f"📤 Добавлено в канал: <b>{synced_count}</b>\n"
+                f"⏭️ Уже было в канале: <b>{skipped_count}</b>\n\n"
+                f"🔍 Обновляю хештеги... {current}/{total}\n"
+                f"✏️ Обновлено: {updated}"
+            )
+        except:
+            pass
     
     update_result = await channel_service.update_incomplete_messages(
         user_id=user_id,
         bot=message.bot,
+        progress_callback=hashtag_progress_after_sync,
     )
     
     # Final result message
