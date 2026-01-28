@@ -250,6 +250,12 @@ const handleGoToUser = (user) => {
   })
 }
 
+// Handle auth:logout event (triggered by API interceptor on 401)
+const handleAuthLogout = () => {
+  playerStore.stop()
+  router.replace('/login')
+}
+
 // Initialize auth on mount
 onMounted(async () => {
   // Initialize Telegram WebApp
@@ -260,6 +266,9 @@ onMounted(async () => {
   
   // Add resize listener for responsive detection
   window.addEventListener('resize', updateDesktopState)
+  
+  // Listen for auth:logout events from API interceptor
+  window.addEventListener('auth:logout', handleAuthLogout)
   
   // Initialize auth
   if (authStore.isAuthenticated && !authStore.initialized) {
@@ -287,6 +296,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', updateDesktopState)
+  window.removeEventListener('auth:logout', handleAuthLogout)
 })
 </script>
 

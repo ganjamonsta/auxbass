@@ -133,8 +133,11 @@ const verifyCode = async () => {
   try {
     await authStore.loginWithCode(code.value)
     
+    // Wait for next tick to ensure auth state is updated
+    await nextTick()
+    
     const redirect = route.query.redirect || '/'
-    router.push(redirect)
+    await router.replace(redirect)
   } catch (err) {
     error.value = 'Неверный или истёкший код'
     // Clear inputs

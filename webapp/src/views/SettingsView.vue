@@ -266,9 +266,11 @@ const toggleRepeat = () => {
   playerStore.repeatMode = modes[(currentIndex + 1) % modes.length]
 }
 
-const logout = () => {
+const logout = async () => {
+  // Stop playback before logout
+  playerStore.stop()
   authStore.logout()
-  router.push('/login')
+  await router.replace('/login')
 }
 
 const clearCache = () => {
