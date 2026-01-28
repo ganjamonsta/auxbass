@@ -738,6 +738,12 @@ onMounted(() => {
   flex-direction: column;
 }
 
+/* Ensure track items fill width */
+.track-list :deep(.track-item) {
+  flex: 1;
+  margin-right: 0;
+}
+
 .empty-state {
   text-align: center;
   padding: 48px 16px;
@@ -1184,8 +1190,14 @@ onMounted(() => {
 .draggable-track {
   display: flex;
   align-items: center;
+  width: 100%;
   position: relative;
   transition: background 0.2s, transform 0.15s;
+}
+
+.draggable-track :deep(.track-item) {
+  flex: 1;
+  min-width: 0;
 }
 
 .draggable-track:hover {
