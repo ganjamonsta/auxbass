@@ -16,14 +16,9 @@ from shared.database import engine
 async def migrate():
     """Add privacy columns to users table"""
     async with engine.begin() as conn:
-        # Check if columns exist first
-        result = await conn.execute(text("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'users' 
-            AND column_name IN ('hide_from_search', 'hide_profile')
-        """))
-        existing_columns = {row[0] for row in result.fetchall()}
+        # Check if columns exist first (SQLite uses PRAGMA table_info)
+        result = await conn.execute(text("PRAGMA table_info(users)"))
+        existing_columns = {row[1] for row in result.fetchall()}  # row[1] is column name
         
         if 'hide_from_search' not in existing_columns:
             print("Adding hide_from_search column...")
