@@ -206,7 +206,7 @@ const playerStore = usePlayerStore()
 
 const stats = ref(null)
 const darkMode = ref(true)
-const botUsername = ref('tg_player_bot')  // Default, will be updated from config
+const botUsername = ref('auxbassbot')  // Default, will be updated from config
 const privacySettings = ref({
   hide_from_search: false,
   hide_profile: false,
