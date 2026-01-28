@@ -23,7 +23,7 @@ from shared.models import (
 )
 from shared.matching import normalize_artist, normalize_title
 
-from api.routers.auth import get_current_user
+from api.routers.auth import get_current_user, require_premium
 from api.schemas_v2.tracks import (
     TrackResponse,
     TracksListResponse,
@@ -470,11 +470,11 @@ async def update_track(
 @router.delete("/{track_id}")
 async def remove_from_library(
     track_id: int,
-    user: TelegramUser = Depends(get_current_user),
+    user: TelegramUser = Depends(require_premium),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Remove a track from user's library.
+    Remove a track from user's library. Requires connected channel.
     
     If user is the uploader and no one else has the track,
     the track itself is deleted.
@@ -536,10 +536,10 @@ async def trigger_enrichment(
 @router.post("/{track_id}/like")
 async def like_track(
     track_id: int,
-    user: TelegramUser = Depends(get_current_user),
+    user: TelegramUser = Depends(require_premium),
     db: AsyncSession = Depends(get_db),
 ):
-    """Toggle like status for a track - auto-adds to library if not already there"""
+    """Toggle like status for a track - auto-adds to library if not already there. Requires connected channel."""
     result = await db.execute(
         select(UserLibrary)
         .where(UserLibrary.track_id == track_id, UserLibrary.user_id == user.id)

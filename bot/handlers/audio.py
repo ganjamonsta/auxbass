@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.config import get_settings
 from shared.database import get_session
-from shared.models import User, Track, LibrarySource, ForwardSourceType
+from shared.models import User, Track, LibrarySource, ForwardSourceType, UserChannel
 from shared.utils import format_duration
 
 from bot.services import track_service, channel_service
@@ -85,14 +85,40 @@ async def handle_audio(message: Message):
     Handle incoming audio files.
     
     Flow:
-    1. Save track using track_service (handles deduplication)
-    2. If new track: schedule enrichment
-    3. If user has channel: forward to channel
-    4. Show result to user
+    1. Check if user has connected channel (required for saving)
+    2. Save track using track_service (handles deduplication)
+    3. If new track: schedule enrichment
+    4. If user has channel: forward to channel
+    5. Show result to user
     """
     audio = message.audio
     user = message.from_user
     user_id = user.id
+    
+    # Check if user has connected channel (required to save tracks)
+    async with get_session() as session:
+        from sqlalchemy import select
+        channel = await session.scalar(
+            select(UserChannel).where(
+                UserChannel.user_id == user_id,
+                UserChannel.is_active == True
+            )
+        )
+        
+        if not channel:
+            await message.reply(
+                "🔒 <b>Подключите канал для сохранения музыки</b>\n\n"
+                "Чтобы загружать треки и пользоваться библиотекой, "
+                "нужно подключить ваш Telegram-канал.\n\n"
+                "Используйте команду /channel для подключения.\n\n"
+                "<i>После подключения вы сможете:</i>\n"
+                "• 📁 Загружать треки в библиотеку\n"
+                "• ❤️ Лайкать и сохранять музыку\n"
+                "• 📋 Создавать плейлисты\n"
+                "• ☁️ Автоматический бэкап в канал",
+                parse_mode="HTML"
+            )
+            return
     
     # Extract metadata
     title = audio.title or "Без названия"

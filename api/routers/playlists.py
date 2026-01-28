@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from shared.database import get_db
 from shared.models import Playlist, PlaylistTrack, Track, UserLibrary, AlbumTrack, User
 
-from api.routers.auth import get_current_user
+from api.routers.auth import get_current_user, require_premium
 from api.routers.library import track_to_response
 from api.schemas_v2.common import TelegramUser, PaginatedResponse
 from api.schemas_v2.tracks import TrackResponse
@@ -153,10 +153,10 @@ async def get_my_playlists(
 @router.post("", response_model=PlaylistResponse)
 async def create_playlist(
     data: PlaylistCreate,
-    user: TelegramUser = Depends(get_current_user),
+    user: TelegramUser = Depends(require_premium),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a new playlist"""
+    """Create a new playlist. Requires connected channel."""
     playlist = Playlist(
         owner_id=user.id,
         name=data.name,
@@ -280,10 +280,10 @@ async def get_playlist_track_ids(
 async def update_playlist(
     playlist_id: int,
     data: PlaylistUpdate,
-    user: TelegramUser = Depends(get_current_user),
+    user: TelegramUser = Depends(require_premium),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update playlist"""
+    """Update playlist. Requires connected channel."""
     playlist = await db.get(Playlist, playlist_id)
     
     if not playlist or playlist.owner_id != user.id:
@@ -315,10 +315,10 @@ async def update_playlist(
 @router.delete("/{playlist_id}")
 async def delete_playlist(
     playlist_id: int,
-    user: TelegramUser = Depends(get_current_user),
+    user: TelegramUser = Depends(require_premium),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete playlist"""
+    """Delete playlist. Requires connected channel."""
     playlist = await db.get(Playlist, playlist_id)
     
     if not playlist or playlist.owner_id != user.id:
@@ -339,10 +339,10 @@ async def delete_playlist(
 async def add_track_to_playlist(
     playlist_id: int,
     data: AddTrackRequest,
-    user: TelegramUser = Depends(get_current_user),
+    user: TelegramUser = Depends(require_premium),
     db: AsyncSession = Depends(get_db),
 ):
-    """Add track to playlist"""
+    """Add track to playlist. Requires connected channel."""
     playlist = await db.get(Playlist, playlist_id)
     
     if not playlist or playlist.owner_id != user.id:
@@ -388,10 +388,10 @@ async def add_track_to_playlist(
 async def remove_track_from_playlist(
     playlist_id: int,
     track_id: int,
-    user: TelegramUser = Depends(get_current_user),
+    user: TelegramUser = Depends(require_premium),
     db: AsyncSession = Depends(get_db),
 ):
-    """Remove track from playlist"""
+    """Remove track from playlist. Requires connected channel."""
     playlist = await db.get(Playlist, playlist_id)
     
     if not playlist or playlist.owner_id != user.id:
@@ -418,10 +418,10 @@ async def remove_track_from_playlist(
 async def reorder_playlist(
     playlist_id: int,
     data: ReorderRequest,
-    user: TelegramUser = Depends(get_current_user),
+    user: TelegramUser = Depends(require_premium),
     db: AsyncSession = Depends(get_db),
 ):
-    """Reorder tracks in playlist"""
+    """Reorder tracks in playlist. Requires connected channel."""
     playlist = await db.get(Playlist, playlist_id)
     
     if not playlist or playlist.owner_id != user.id:

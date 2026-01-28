@@ -25,7 +25,7 @@ from shared.models import (
 )
 from shared.matching import normalize_artist
 
-from api.routers.auth import get_current_user
+from api.routers.auth import get_current_user, require_premium
 from api.routers.library import track_to_response
 from api.schemas_v2.tracks import (
     TrackResponse,
@@ -795,10 +795,10 @@ async def delete_track(
 @router.post("/{track_id}/like")
 async def like_track(
     track_id: int,
-    user: TelegramUser = Depends(get_current_user),
+    user: TelegramUser = Depends(require_premium),
     db: AsyncSession = Depends(get_db),
 ):
-    """Like a track - auto-adds to library if not already there"""
+    """Like a track - auto-adds to library if not already there. Requires connected channel."""
     result = await db.execute(
         select(UserLibrary)
         .where(UserLibrary.track_id == track_id)
@@ -839,10 +839,10 @@ async def like_track(
 @router.delete("/{track_id}/like")
 async def unlike_track(
     track_id: int,
-    user: TelegramUser = Depends(get_current_user),
+    user: TelegramUser = Depends(require_premium),
     db: AsyncSession = Depends(get_db),
 ):
-    """Unlike a track"""
+    """Unlike a track. Requires connected channel."""
     result = await db.execute(
         select(UserLibrary)
         .where(UserLibrary.track_id == track_id)
@@ -896,10 +896,10 @@ async def mark_unavailable(
 @router.post("/{track_id}/add-to-library")
 async def add_to_library(
     track_id: int,
-    user: TelegramUser = Depends(get_current_user),
+    user: TelegramUser = Depends(require_premium),
     db: AsyncSession = Depends(get_db),
 ):
-    """Add a global track to user's library"""
+    """Add a global track to user's library. Requires connected channel."""
     # Check track exists and is public
     result = await db.execute(
         select(Track).where(Track.id == track_id).where(Track.is_public == True)
@@ -933,10 +933,10 @@ async def add_to_library(
 @router.delete("/{track_id}/remove-from-library")
 async def remove_from_library(
     track_id: int,
-    user: TelegramUser = Depends(get_current_user),
+    user: TelegramUser = Depends(require_premium),
     db: AsyncSession = Depends(get_db),
 ):
-    """Remove a track from user's library"""
+    """Remove a track from user's library. Requires connected channel."""
     result = await db.execute(
         select(UserLibrary)
         .where(UserLibrary.track_id == track_id)

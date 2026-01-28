@@ -19,9 +19,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.config import get_settings
-from shared.database import get_session
-from shared.models import User
-from api.schemas_v2.common import TelegramUser
+from shared.database import get_session, get_db
+from shared.models import User, UserChannel
+from api.schemas_v2.common import TelegramUser, UserStatusResponse
 from api.schemas_v2.auth import (
     AuthResult,
     CodeRequest,
@@ -203,6 +203,61 @@ async def ensure_user_in_db(user: TelegramUser):
             session.add(db_user)
 
 
+# ============== Premium/Channel Check ==============
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+
+async def has_channel_connected(user_id: int, db: AsyncSession) -> bool:
+    """
+    Check if user has connected backup channel.
+    Users with channel = premium features (save, library, playlists).
+    """
+    result = await db.execute(
+        select(UserChannel.id).where(
+            UserChannel.user_id == user_id,
+            UserChannel.is_active == True
+        )
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def get_user_channel_info(user_id: int, db: AsyncSession) -> Optional[dict]:
+    """Get user's channel info if connected"""
+    result = await db.execute(
+        select(UserChannel).where(
+            UserChannel.user_id == user_id,
+            UserChannel.is_active == True
+        )
+    )
+    channel = result.scalar_one_or_none()
+    if channel:
+        return {
+            "channel_id": channel.channel_id,
+            "channel_username": channel.channel_username,
+            "channel_title": channel.channel_title,
+            "auto_forward": channel.auto_forward,
+        }
+    return None
+
+
+async def require_premium(
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> TelegramUser:
+    """
+    Dependency that requires user to have connected channel (premium).
+    Use this for endpoints that modify library: add tracks, create playlists, like, etc.
+    """
+    if not await has_channel_connected(user.id, db):
+        raise HTTPException(
+            status_code=403,
+            detail="Подключите канал для доступа к этой функции. Перейдите в бота и используйте команду /channel"
+        )
+    return user
+
+
 # ============== API Endpoints ==============
 
 @router.post("/validate", response_model=AuthResult)
@@ -246,6 +301,26 @@ async def validate_auth(
 async def get_me(user: TelegramUser = Depends(get_current_user)):
     """Get current user info"""
     return user
+
+
+@router.get("/status", response_model=UserStatusResponse)
+async def get_user_status(
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get current user status with premium features info.
+    Returns whether user has connected channel and can save tracks.
+    """
+    has_channel = await has_channel_connected(user.id, db)
+    channel_info = await get_user_channel_info(user.id, db) if has_channel else None
+    
+    return UserStatusResponse(
+        user=user,
+        has_channel=has_channel,
+        can_save=has_channel,  # Can save = has channel
+        channel_info=channel_info,
+    )
 
 
 @router.post("/generate-code", response_model=CodeGenerated)
