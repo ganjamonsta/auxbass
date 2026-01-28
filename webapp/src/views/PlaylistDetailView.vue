@@ -171,8 +171,24 @@
             v-for="track in searchResults" 
             :key="track.id" 
             class="search-result-item"
-            :class="{ 'already-added': isTrackInPlaylist(track.id) }"
+            :class="{ 
+              'already-added': isTrackInPlaylist(track.id),
+              'is-playing': playerStore.currentTrack?.id === track.id && playerStore.isPlaying
+            }"
           >
+            <!-- Play/Pause button -->
+            <button 
+              class="preview-play-btn"
+              @click.stop="togglePreviewPlay(track)"
+              :class="{ 'is-playing': playerStore.currentTrack?.id === track.id && playerStore.isPlaying }"
+            >
+              <svg v-if="playerStore.currentTrack?.id === track.id && playerStore.isPlaying" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+              </svg>
+              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z"/>
+              </svg>
+            </button>
             <div class="result-cover">
               <img v-if="track.cover_url" :src="track.cover_url" />
               <span v-else>🎵</span>
@@ -495,6 +511,17 @@ const addTrackToPlaylist = async (track) => {
     console.error('Failed to add track:', error)
   } finally {
     addingTrackId.value = null
+  }
+}
+
+// Preview play/pause for track selection
+const togglePreviewPlay = (track) => {
+  if (playerStore.currentTrack?.id === track.id) {
+    // Toggle play/pause for current track
+    playerStore.togglePlay()
+  } else {
+    // Play new track (use search results as queue for preview)
+    playerStore.playTrack(track, searchResults.value)
   }
 }
 
@@ -959,6 +986,37 @@ onMounted(() => {
 
 .search-result-item.already-added {
   opacity: 0.6;
+}
+
+.search-result-item.is-playing {
+  background: rgba(29, 185, 84, 0.1);
+}
+
+.preview-play-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: transparent;
+  border: 2px solid var(--text-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.preview-play-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: scale(1.1);
+}
+
+.preview-play-btn.is-playing {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #000;
 }
 
 .result-cover {
