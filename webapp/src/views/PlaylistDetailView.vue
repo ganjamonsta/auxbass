@@ -26,24 +26,23 @@
 
     <!-- Actions -->
     <div class="playlist-actions">
-      <div class="action-buttons" v-if="playlist.tracks?.length">
-        <button class="action-btn play-btn" @click="playAll">
+      <div class="action-buttons">
+        <button class="action-btn play-btn" @click="playAll" :disabled="!playlist.tracks?.length">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
             <path d="M8 5v14l11-7z"/>
           </svg>
         </button>
-        <button class="action-btn shuffle-btn" @click="shufflePlay">
+        <button class="action-btn shuffle-btn" @click="shufflePlay" :disabled="!playlist.tracks?.length">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
             <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
           </svg>
         </button>
+        <button v-if="isOwner" class="action-btn edit-btn" @click="openEditModal">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+          </svg>
+        </button>
       </div>
-      <button v-if="isOwner" class="edit-playlist-btn" @click="openEditModal">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-        </svg>
-        Редактировать
-      </button>
     </div>
 
     <!-- Track list -->
@@ -867,10 +866,6 @@ onMounted(() => {
   right: 0;
 }
 
-.action-btn.shuffle-btn::after {
-  display: none;
-}
-
 .action-btn:active {
   background: rgba(0, 0, 0, 0.1);
   box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.15);
@@ -880,39 +875,22 @@ onMounted(() => {
   margin-left: 2px;
 }
 
-.edit-btn,
-.delete-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: var(--bg-elevated);
-  border: none;
-  font-size: 18px;
-  cursor: pointer;
+.action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
-/* Edit playlist button */
-.edit-playlist-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-color, rgba(255,255,255,0.1));
-  border-radius: 20px;
-  color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
+.action-btn.shuffle-btn::after {
+  right: 0;
 }
 
-.edit-playlist-btn:hover {
-  background: var(--bg-highlight);
+.action-btn.edit-btn::after {
+  display: none;
 }
 
-.edit-playlist-btn svg {
-  opacity: 0.8;
+/* Hide separator when edit button not shown (not owner) */
+.action-buttons:not(:has(.edit-btn)) .shuffle-btn::after {
+  display: none;
 }
 
 .track-wrapper {
