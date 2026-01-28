@@ -42,9 +42,9 @@ class EnrichmentProcessor:
     Processes track enrichment using multiple APIs.
     
     Strategy:
-    1. Try Deezer first (has album covers, track numbers)
-    2. Fall back to Last.fm for genres/tags
-    3. Combine results for best coverage
+    1. Try Last.fm first (richer database, better for albums/genres)
+    2. Enhance with Deezer (covers, track numbers, deezer IDs)
+    3. Fallback to tracklist matching if album still not found
     """
     
     async def enrich_track(
@@ -67,46 +67,56 @@ class EnrichmentProcessor:
         
         result = EnrichmentResult(success=False, confidence=0, source="none")
         
-        # Try Deezer first
-        deezer_data = await self._enrich_from_deezer(title, artist)
-        
-        if deezer_data:
-            result.success = True
-            result.source = "deezer"
-            result.confidence = deezer_data.get("confidence", 70)
-            result.album_name = deezer_data.get("album")
-            result.cover_url = deezer_data.get("cover_url")
-            result.track_number = deezer_data.get("track_number")
-            result.deezer_track_id = deezer_data.get("deezer_track_id")
-            result.deezer_album_id = deezer_data.get("deezer_album_id")
-            result.release_date = deezer_data.get("release_date")
-        
-        # Try Last.fm for additional data (especially genres)
+        # 1. Try Last.fm first (richer database, priority source)
         if lastfm_client.is_configured:
             lastfm_data = await self._enrich_from_lastfm(title, artist)
             
             if lastfm_data:
-                if not result.success:
-                    result.success = True
-                    result.source = "lastfm"
-                    result.confidence = 50
-                else:
-                    result.source = "combined"
-                    result.confidence = min(100, result.confidence + 20)
+                result.success = True
+                result.source = "lastfm"
+                result.confidence = 70
                 
-                # Use Last.fm album if we don't have one
-                if not result.album_name and lastfm_data.get("album"):
+                if lastfm_data.get("album"):
                     result.album_name = lastfm_data["album"]
                 
-                # Last.fm has better genre/tag data
                 if lastfm_data.get("genre"):
                     result.genre = lastfm_data["genre"]
                 
                 if lastfm_data.get("lastfm_url"):
                     result.lastfm_url = lastfm_data["lastfm_url"]
         
-        # FALLBACK: If still no album found, try tracklist matching
-        # This searches through artist album tracklists to find the track
+        # 2. Enhance with Deezer (covers, track numbers, IDs)
+        deezer_data = await self._enrich_from_deezer(title, artist)
+        
+        if deezer_data:
+            if not result.success:
+                result.success = True
+                result.source = "deezer"
+                result.confidence = 60
+            else:
+                result.source = "lastfm+deezer"
+                result.confidence = min(100, result.confidence + 20)
+            
+            # Deezer provides covers and track numbers
+            if deezer_data.get("cover_url"):
+                result.cover_url = deezer_data["cover_url"]
+            
+            if deezer_data.get("track_number"):
+                result.track_number = deezer_data["track_number"]
+            
+            # Use Deezer album only if Last.fm didn't find one
+            if not result.album_name and deezer_data.get("album"):
+                result.album_name = deezer_data["album"]
+            
+            # Always take Deezer IDs
+            result.deezer_track_id = deezer_data.get("deezer_track_id")
+            result.deezer_album_id = deezer_data.get("deezer_album_id")
+            
+            if deezer_data.get("release_date"):
+                result.release_date = deezer_data["release_date"]
+        
+        # 3. FALLBACK: If still no album found, try tracklist matching
+        # Searches through artist album tracklists (from Last.fm) to find the track
         if not result.album_name and artist and lastfm_client.is_configured:
             tracklist_match = await self._enrich_from_tracklist(title, artist)
             
