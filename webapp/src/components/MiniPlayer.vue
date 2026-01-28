@@ -14,8 +14,8 @@
       <div class="lcd-row lcd-row-sub">
         <span class="lcd-time">{{ formatTime(progress) }}/{{ formatTime(duration || track.duration) }}</span>
         <div class="lcd-indicators">
-          <span v-if="playerStore.shuffle" class="lcd-indicator" title="Перемешивание">SHF</span>
-          <span v-if="playerStore.repeatMode !== 'none'" class="lcd-indicator" :title="playerStore.repeatMode === 'one' ? 'Повтор трека' : 'Повтор всего'">{{ playerStore.repeatMode === 'one' ? 'RP1' : 'RPT' }}</span>
+          <span class="lcd-indicator" :class="{ active: playerStore.shuffle }" title="Перемешивание">SHF</span>
+          <span class="lcd-indicator" :class="{ active: playerStore.repeatMode !== 'none' }" :title="repeatTitle">{{ repeatLabel }}</span>
         </div>
       </div>
       <!-- LED Progress dots -->
@@ -272,6 +272,22 @@ const shouldMarquee = computed(() => {
   return displayText.value.length > 25
 })
 
+const repeatLabel = computed(() => {
+  switch (playerStore.repeatMode) {
+    case 'one': return 'RPT1'
+    case 'all': return 'RPTA'
+    default: return 'RPT0'
+  }
+})
+
+const repeatTitle = computed(() => {
+  switch (playerStore.repeatMode) {
+    case 'one': return 'Повтор трека'
+    case 'all': return 'Повтор всего'
+    default: return 'Повтор выключен'
+  }
+})
+
 const formatTime = (seconds) => {
   if (!seconds) return '0:00'
   const mins = Math.floor(seconds / 60)
@@ -387,9 +403,13 @@ const formatTime = (seconds) => {
   font-weight: 700;
   font-family: 'Consolas', 'Monaco', monospace;
   letter-spacing: 0.5px;
+  color: var(--lcd-dot-inactive);
+  transition: color 0.2s, text-shadow 0.2s;
+}
+
+.lcd-indicator.active {
   color: var(--lcd-text);
   text-shadow: 0 0 6px var(--lcd-text-glow);
-  opacity: 0.9;
 }
 
 @keyframes pulse-glow {
