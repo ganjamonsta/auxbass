@@ -62,7 +62,7 @@ async def get_my_albums(
     limit: int = Query(50, ge=1, le=100),
     search: Optional[str] = None,
     artist: Optional[str] = None,
-    sort_by: str = Query("name", pattern="^(name|artist|release_date)$"),
+    sort_by: str = Query("name", pattern="^(name|artist|release_date|track_count)$"),
     sort_order: str = Query("asc", pattern="^(asc|desc)$"),
     min_tracks: int = Query(MIN_USER_TRACKS_FOR_ALBUM, ge=1, description="Minimum tracks in library to show album"),
     user: TelegramUser = Depends(get_current_user),
@@ -121,6 +121,8 @@ async def get_my_albums(
         sort_column = Album.artist
     elif sort_by == "release_date":
         sort_column = Album.release_date
+    elif sort_by == "track_count":
+        sort_column = album_track_counts.c.track_count
     else:
         sort_column = Album.name
     
@@ -157,7 +159,7 @@ async def get_global_albums(
     limit: int = Query(50, ge=1, le=100),
     search: Optional[str] = None,
     artist: Optional[str] = None,
-    sort_by: str = Query("name", pattern="^(name|artist|release_date)$"),
+    sort_by: str = Query("name", pattern="^(name|artist|release_date|track_count)$"),
     sort_order: str = Query("asc", pattern="^(asc|desc)$"),
     min_tracks: int = Query(1, ge=1, description="Minimum tracks to show album"),
     user: TelegramUser = Depends(get_current_user),
@@ -216,6 +218,8 @@ async def get_global_albums(
         sort_column = Album.artist
     elif sort_by == "release_date":
         sort_column = Album.release_date
+    elif sort_by == "track_count":
+        sort_column = album_track_counts.c.track_count
     else:
         sort_column = Album.name
     

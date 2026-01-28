@@ -80,6 +80,7 @@
         v-if="albumsTotalPages > 1 && !loadingAlbums"
         :currentPage="albumsPage"
         :totalPages="albumsTotalPages"
+        :pageInfo="albumsPageInfo"
         :isFirstPage="albumsPage === 1"
         :isLastPage="albumsPage >= albumsTotalPages"
         :loading="loadingAlbums"
@@ -246,6 +247,18 @@ const albumSortOrder = ref('desc')
 const albumSortOption = computed(() => {
   return ALBUM_SORT_OPTIONS.find(opt => opt.value === albumSortBy.value) || ALBUM_SORT_OPTIONS[0]
 })
+const ALBUMS_PER_PAGE = 30
+
+// Computed page info for pagination
+const albumsPageInfo = computed(() => {
+  const itemsFrom = (albumsPage.value - 1) * ALBUMS_PER_PAGE + 1
+  const itemsTo = Math.min(albumsPage.value * ALBUMS_PER_PAGE, albumsTotal.value)
+  return {
+    itemsFrom,
+    itemsTo,
+    itemsTotal: albumsTotal.value
+  }
+})
 
 // Playlists state
 const playlists = ref([])
@@ -275,8 +288,8 @@ const loadAlbums = async () => {
     const endpoint = albumScope.value === 'global' ? '/albums/global' : '/albums'
     const response = await api.get(endpoint, {
       params: {
-        offset: (albumsPage.value - 1) * 30,
-        limit: 30,
+        offset: (albumsPage.value - 1) * ALBUMS_PER_PAGE,
+        limit: ALBUMS_PER_PAGE,
         sort_by: albumSortBy.value,
         sort_order: albumSortOrder.value,
         min_tracks: albumScope.value === 'global' ? 1 : 2
@@ -284,7 +297,7 @@ const loadAlbums = async () => {
     })
     albums.value = response.data.items || []
     albumsTotal.value = response.data.total || 0
-    albumsTotalPages.value = Math.ceil(albumsTotal.value / 30)
+    albumsTotalPages.value = Math.ceil(albumsTotal.value / ALBUMS_PER_PAGE)
   } finally {
     loadingAlbums.value = false
   }
