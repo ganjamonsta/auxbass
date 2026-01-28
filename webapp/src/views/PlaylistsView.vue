@@ -222,13 +222,38 @@ const openModal = async () => {
 }
 
 .liked-icon {
-  font-size: 48px;
+  font-size: 40px;
 }
 
 .playlists-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 400px) {
+  .playlists-grid {
+    gap: 16px;
+  }
+}
+
+@media (min-width: 500px) {
+  .playlists-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (min-width: 700px) {
+  .playlists-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 20px;
+  }
+}
+
+@media (min-width: 900px) {
+  .playlists-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
 }
 
 .playlist-card {
@@ -264,22 +289,22 @@ const openModal = async () => {
   justify-content: center;
   width: 100%;
   height: 100%;
-  font-size: 48px;
+  font-size: 40px;
 }
 
 .playlist-name {
   color: var(--text-primary);
-  font-weight: 500;
-  font-size: 15px;
+  font-weight: 600;
+  font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .playlist-meta {
   color: var(--text-tertiary);
-  font-size: 13px;
+  font-size: 11px;
 }
 
 .empty-state {

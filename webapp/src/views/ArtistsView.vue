@@ -319,8 +319,33 @@ onUnmounted(() => {
 
 .artist-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 400px) {
+  .artist-grid {
+    gap: 16px;
+  }
+}
+
+@media (min-width: 500px) {
+  .artist-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (min-width: 700px) {
+  .artist-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 20px;
+  }
+}
+
+@media (min-width: 900px) {
+  .artist-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
 }
 
 .artist-card {
@@ -334,7 +359,7 @@ onUnmounted(() => {
   border-radius: 50%;
   overflow: hidden;
   background: var(--bg-elevated);
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .artist-image img {
@@ -349,22 +374,23 @@ onUnmounted(() => {
   justify-content: center;
   width: 100%;
   height: 100%;
-  font-size: 48px;
+  font-size: 40px;
 }
 
 .artist-name {
   color: var(--text-primary);
-  font-weight: 500;
-  font-size: 15px;
+  font-weight: 600;
+  font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .artist-meta {
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 1.3;
 }
 
 .empty-state {

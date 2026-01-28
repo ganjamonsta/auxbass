@@ -199,8 +199,33 @@ onMounted(() => {
 /* Reusing PlaylistsView styles */
 .playlists-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 400px) {
+  .playlists-grid {
+    gap: 16px;
+  }
+}
+
+@media (min-width: 500px) {
+  .playlists-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (min-width: 700px) {
+  .playlists-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 20px;
+  }
+}
+
+@media (min-width: 900px) {
+  .playlists-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
 }
 
 .playlist-card {
@@ -227,7 +252,7 @@ onMounted(() => {
   justify-content: center;
   width: 100%;
   height: 100%;
-  font-size: 32px;
+  font-size: 40px;
 }
 
 .cover-grid {
@@ -252,20 +277,21 @@ onMounted(() => {
 }
 
 .liked-icon {
-  font-size: 32px;
+  font-size: 40px;
 }
 
 .playlist-name {
   font-weight: 600;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  margin-bottom: 2px;
 }
 
 .playlist-meta {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
 }
 

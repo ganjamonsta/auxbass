@@ -38,6 +38,16 @@
         </button>
       </div>
 
+      <!-- Search -->
+      <div class="search-bar">
+        <input
+          v-model="albumSearchQuery"
+          type="text"
+          placeholder="Поиск альбомов..."
+          @input="debouncedAlbumSearch"
+        />
+      </div>
+
       <div class="view-header">
         <div class="header-left">
           <span class="count">{{ albumsTotal }} альбомов</span>
@@ -95,15 +105,24 @@
 
     <!-- Playlists Tab -->
     <div v-show="activeTab === 'playlists'" class="tab-content">
+      <!-- Search for playlists -->
+      <div class="search-bar">
+        <input
+          v-model="playlistSearchQuery"
+          type="text"
+          placeholder="Поиск плейлистов..."
+        />
+      </div>
+
       <div class="view-header">
-        <span class="count">{{ playlists.length }} плейлистов</span>
+        <span class="count">{{ filteredPlaylists.length }} плейлистов</span>
         <button class="create-btn" @click="handleCreatePlaylist">
           ➕ Создать
         </button>
       </div>
 
       <!-- Liked tracks special card -->
-      <div class="special-playlists">
+      <div class="special-playlists" v-if="!playlistSearchQuery">
         <div class="playlist-card liked-card" @click="$router.push('/liked')">
           <div class="playlist-cover liked-cover">
             <span class="liked-icon">❤️</span>
@@ -113,9 +132,9 @@
         </div>
       </div>
 
-      <div class="playlists-grid" v-if="playlists.length">
+      <div class="playlists-grid" v-if="filteredPlaylists.length">
         <div
-          v-for="playlist in playlists"
+          v-for="playlist in filteredPlaylists"
           :key="playlist.id"
           class="playlist-card"
           @click="$router.push(`/playlist/${playlist.id}`)"
@@ -130,12 +149,17 @@
         </div>
       </div>
 
-      <div v-else-if="!loadingPlaylists" class="empty-state">
+      <div v-else-if="!loadingPlaylists && !playlistSearchQuery" class="empty-state">
         <span class="empty-icon">📝</span>
         <p>У вас пока нет плейлистов</p>
         <button class="create-first-btn" @click="handleCreatePlaylist">
           Создать плейлист
         </button>
+      </div>
+      
+      <div v-else-if="!loadingPlaylists && playlistSearchQuery && filteredPlaylists.length === 0" class="empty-state">
+        <span class="empty-icon">🔍</span>
+        <p>Ничего не найдено</p>
       </div>
 
       <div v-if="loadingPlaylists" class="loading">
@@ -143,7 +167,7 @@
       </div>
 
       <!-- Public playlists section -->
-      <div v-if="publicPlaylists.length" class="public-section">
+      <div v-if="filteredPublicPlaylists.length && !playlistSearchQuery" class="public-section">
         <h3>🌐 Публичные плейлисты</h3>
         <div class="playlists-grid">
           <div
@@ -244,6 +268,21 @@ const albumsTotalPages = ref(1)
 const loadingAlbums = ref(false)
 const albumSortBy = ref('release_date')
 const albumSortOrder = ref('desc')
+
+// Album search state
+const albumSearchQuery = ref('')
+let albumSearchTimeout = null
+
+// Debounced album search
+const debouncedAlbumSearch = () => {
+  if (albumSearchTimeout) {
+    clearTimeout(albumSearchTimeout)
+  }
+  albumSearchTimeout = setTimeout(() => {
+    albumsPage.value = 1
+    loadAlbums()
+  }, 300)
+}
 const albumSortOption = computed(() => {
   return ALBUM_SORT_OPTIONS.find(opt => opt.value === albumSortBy.value) || ALBUM_SORT_OPTIONS[0]
 })
@@ -266,6 +305,32 @@ const publicPlaylists = ref([])
 const loadingPlaylists = ref(false)
 const likedCount = ref(0)
 
+// Playlist search state
+const playlistSearchQuery = ref('')
+
+// Filtered playlists computed
+const filteredPlaylists = computed(() => {
+  if (!playlistSearchQuery.value) {
+    return playlists.value
+  }
+  const query = playlistSearchQuery.value.toLowerCase()
+  return playlists.value.filter(p => 
+    p.name.toLowerCase().includes(query)
+  )
+})
+
+// Filtered public playlists computed
+const filteredPublicPlaylists = computed(() => {
+  if (!playlistSearchQuery.value) {
+    return publicPlaylists.value
+  }
+  const query = playlistSearchQuery.value.toLowerCase()
+  return publicPlaylists.value.filter(p => 
+    p.name.toLowerCase().includes(query) ||
+    (p.owner_name && p.owner_name.toLowerCase().includes(query))
+  )
+})
+
 // Create modal
 const showCreateModal = ref(false)
 const newPlaylistName = ref('')
@@ -286,15 +351,19 @@ const loadAlbums = async () => {
   loadingAlbums.value = true
   try {
     const endpoint = albumScope.value === 'global' ? '/albums/global' : '/albums'
-    const response = await api.get(endpoint, {
-      params: {
-        offset: (albumsPage.value - 1) * ALBUMS_PER_PAGE,
-        limit: ALBUMS_PER_PAGE,
-        sort_by: albumSortBy.value,
-        sort_order: albumSortOrder.value,
-        min_tracks: albumScope.value === 'global' ? 1 : 2
-      }
-    })
+    const params = {
+      offset: (albumsPage.value - 1) * ALBUMS_PER_PAGE,
+      limit: ALBUMS_PER_PAGE,
+      sort_by: albumSortBy.value,
+      sort_order: albumSortOrder.value,
+      min_tracks: albumScope.value === 'global' ? 1 : 2
+    }
+    
+    if (albumSearchQuery.value) {
+      params.search = albumSearchQuery.value
+    }
+    
+    const response = await api.get(endpoint, { params })
     albums.value = response.data.items || []
     albumsTotal.value = response.data.total || 0
     albumsTotalPages.value = Math.ceil(albumsTotal.value / ALBUMS_PER_PAGE)
@@ -496,6 +565,25 @@ onMounted(() => {
   color: white;
 }
 
+/* Search bar */
+.search-bar {
+  margin-bottom: 16px;
+}
+
+.search-bar input {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--bg-elevated);
+  border: none;
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.search-bar input::placeholder {
+  color: var(--text-tertiary);
+}
+
 .view-header {
   display: flex;
   align-items: center;
@@ -523,8 +611,33 @@ onMounted(() => {
 /* Albums grid */
 .albums-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 400px) {
+  .albums-grid {
+    gap: 16px;
+  }
+}
+
+@media (min-width: 500px) {
+  .albums-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (min-width: 700px) {
+  .albums-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 20px;
+  }
+}
+
+@media (min-width: 900px) {
+  .albums-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
 }
 
 .album-card {
@@ -610,7 +723,7 @@ onMounted(() => {
 }
 
 .album-artist {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -624,8 +737,33 @@ onMounted(() => {
 
 .playlists-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 400px) {
+  .playlists-grid {
+    gap: 16px;
+  }
+}
+
+@media (min-width: 500px) {
+  .playlists-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (min-width: 700px) {
+  .playlists-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 20px;
+  }
+}
+
+@media (min-width: 900px) {
+  .playlists-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
 }
 
 .playlist-card {
@@ -663,7 +801,7 @@ onMounted(() => {
 }
 
 .liked-icon {
-  font-size: 48px;
+  font-size: 40px;
 }
 
 .public-badge {
@@ -680,10 +818,11 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  margin-bottom: 2px;
 }
 
 .playlist-meta {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
 }
 
