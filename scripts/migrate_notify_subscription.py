@@ -12,11 +12,12 @@ import sys
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from shared.config import settings
+from shared.config import get_settings
 
 def migrate():
     """Add notify_subscription column to users table if not exists."""
-    db_path = settings.DATABASE_URL.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
+    settings = get_settings()
+    db_path = settings.database_url.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
     
     print(f"Connecting to database: {db_path}")
     
