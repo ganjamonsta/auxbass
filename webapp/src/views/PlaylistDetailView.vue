@@ -129,6 +129,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
+import { useLibraryStore } from '@/stores/library'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackMenu from '@/components/TrackMenu.vue'
 import api from '@/api/client'
@@ -137,6 +138,7 @@ const route = useRoute()
 const router = useRouter()
 const playerStore = usePlayerStore()
 const authStore = useAuthStore()
+const libraryStore = useLibraryStore()
 
 const playlist = ref(null)
 const loading = ref(true)
@@ -218,17 +220,8 @@ const closeMenu = () => {
 }
 
 const handleLikeTrack = async (track) => {
-  try {
-    if (track.is_liked) {
-      await api.delete(`/tracks/${track.id}/like`)
-      track.is_liked = false
-    } else {
-      await api.post(`/tracks/${track.id}/like`)
-      track.is_liked = true
-    }
-  } catch (error) {
-    console.error('Failed to toggle like:', error)
-  }
+  const newLikedState = await libraryStore.toggleLike(track.id)
+  track.is_liked = newLikedState
 }
 
 const handleGoToArtist = () => {

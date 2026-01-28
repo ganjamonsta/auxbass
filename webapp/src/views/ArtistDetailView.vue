@@ -184,25 +184,14 @@ const closeMenu = () => {
 }
 
 const handleLikeTrack = async (track) => {
-  try {
-    if (track.is_liked) {
-      await api.delete(`/tracks/${track.id}/like`)
-      track.is_liked = false
-    } else {
-      await api.post(`/tracks/${track.id}/like`)
-      track.is_liked = true
-    }
-  } catch (error) {
-    console.error('Failed to toggle like:', error)
-  }
+  const newLikedState = await libraryStore.toggleLike(track.id)
+  track.is_liked = newLikedState
 }
 
 const handleAddToLibrary = async (track) => {
-  try {
-    await libraryStore.addToLibrary(track.id)
+  const success = await libraryStore.addToLibrary(track.id)
+  if (success) {
     track.in_library = true
-  } catch (error) {
-    console.error('Failed to add to library:', error)
   }
 }
 

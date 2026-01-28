@@ -253,11 +253,9 @@ const handleTracklistItemClick = (item) => {
 // Add track to library from tracklist (global mode)
 const handleAddToLibraryFromTracklist = async (item) => {
   if (!item.track_id) return
-  try {
-    await libraryStore.addToLibrary(item.track_id)
+  const success = await libraryStore.addToLibrary(item.track_id)
+  if (success) {
     item.in_library = true
-  } catch (error) {
-    console.error('Failed to add to library:', error)
   }
 }
 
@@ -330,25 +328,14 @@ const closeMenu = () => {
 }
 
 const handleLikeTrack = async (track) => {
-  try {
-    if (track.is_liked) {
-      await api.delete(`/tracks/${track.id}/like`)
-      track.is_liked = false
-    } else {
-      await api.post(`/tracks/${track.id}/like`)
-      track.is_liked = true
-    }
-  } catch (error) {
-    console.error('Failed to toggle like:', error)
-  }
+  const newLikedState = await libraryStore.toggleLike(track.id)
+  track.is_liked = newLikedState
 }
 
 const handleAddToLibrary = async (track) => {
-  try {
-    await libraryStore.addToLibrary(track.id)
+  const success = await libraryStore.addToLibrary(track.id)
+  if (success) {
     track.in_library = true
-  } catch (error) {
-    console.error('Failed to add to library:', error)
   }
 }
 

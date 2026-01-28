@@ -599,6 +599,12 @@ export const useLibraryStore = defineStore('library', () => {
       return true
     } catch (error) {
       console.error('Failed to add to library:', error)
+      // Handle 403 - show channel banner
+      if (error.response?.status === 403) {
+        const { useAuthStore } = await import('./auth')
+        const authStore = useAuthStore()
+        authStore.promptChannelSetup()
+      }
       return false
     }
   }
@@ -621,6 +627,12 @@ export const useLibraryStore = defineStore('library', () => {
       return true
     } catch (error) {
       console.error('Failed to remove from library:', error)
+      // Handle 403 - show channel banner
+      if (error.response?.status === 403) {
+        const { useAuthStore } = await import('./auth')
+        const authStore = useAuthStore()
+        authStore.promptChannelSetup()
+      }
       return false
     }
   }
