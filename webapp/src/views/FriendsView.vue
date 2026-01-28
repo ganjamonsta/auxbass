@@ -317,12 +317,13 @@
 
 <script setup>
 import { ref, watch, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/api/client'
 
 const router = useRouter()
+const route = useRoute()
 const playerStore = usePlayerStore()
 const authStore = useAuthStore()
 
@@ -514,6 +515,20 @@ const playTrack = (track) => {
   playerStore.playTrack(track, userTracks.value)
 }
 
+// Load user by ID (for direct navigation from NowPlayingSidebar)
+const loadUserById = async (userId) => {
+  try {
+    const response = await api.get(`/social/user/${userId}`)
+    if (response.data) {
+      selectedUser.value = response.data
+      profileTab.value = 'library'
+      loadUserLibrary()
+    }
+  } catch (error) {
+    console.error('Failed to load user:', error)
+  }
+}
+
 // Load data on tab change
 watch(activeTab, (tab) => {
   if (tab === 'following') {
@@ -525,6 +540,13 @@ watch(activeTab, (tab) => {
 
 onMounted(() => {
   loadFollowing()
+  
+  // Check if we need to open a user profile from query params
+  if (route.query.viewUser) {
+    loadUserById(route.query.viewUser)
+    // Clear the query param
+    router.replace({ name: 'friends' })
+  }
 })
 </script>
 

@@ -85,7 +85,10 @@
       </div>
 
       <!-- Desktop: Now Playing Sidebar -->
-      <NowPlayingSidebar v-if="isDesktop && playerStore.currentTrack && authStore.isAuthenticated" />
+      <NowPlayingSidebar 
+        v-if="isDesktop && playerStore.currentTrack && authStore.isAuthenticated"
+        @goToUser="handleGoToUser"
+      />
 
       <!-- Desktop: Bottom Player -->
       <DesktopPlayer 
@@ -234,6 +237,17 @@ const handleToggleLike = async () => {
   if (playerStore.currentTrack?.id) {
     await libraryStore.toggleLike(playerStore.currentTrack.id)
   }
+}
+
+// Handle navigation to user profile
+const handleGoToUser = (user) => {
+  if (!user?.id) return
+  showFullPlayer.value = false
+  // Navigate to friends page and pass user info via query
+  router.push({ 
+    name: 'friends',
+    query: { viewUser: user.id }
+  })
 }
 
 // Initialize auth on mount

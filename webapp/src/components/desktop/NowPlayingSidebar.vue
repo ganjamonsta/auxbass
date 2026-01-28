@@ -62,13 +62,17 @@
     <div v-if="track?.uploader || track?.forward_source" class="source-info">
       <h3 class="section-title">Источник</h3>
 
-      <!-- Uploader -->
-      <div v-if="track?.uploader" class="info-text uploader-text">
+      <!-- Uploader (clickable) -->
+      <button 
+        v-if="track?.uploader" 
+        class="info-link uploader-link"
+        @click="goToUploader"
+      >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
         </svg>
-        <span>Загрузил: {{ uploaderName }}</span>
-      </div>
+        <span>{{ uploaderName }}</span>
+      </button>
 
       <!-- Forward source -->
       <a 
@@ -133,14 +137,83 @@
         <span>{{ isLiked ? 'В любимом' : 'Нравится' }}</span>
       </button>
     </div>
+
+    <!-- Divider -->
+    <div class="sidebar-divider"></div>
+
+    <!-- Queue Section -->
+    <div class="queue-section">
+      <div class="section-header">
+        <h3 class="section-title">Очередь</h3>
+        <span class="queue-count">{{ queueLength }} треков</span>
+      </div>
+
+      <div v-if="upcomingTracks.length === 0" class="empty-queue">
+        <span>Очередь пуста</span>
+      </div>
+
+      <div v-else class="queue-list">
+        <div 
+          v-for="(queueTrack, index) in upcomingTracks" 
+          :key="queueTrack.id"
+          class="queue-item"
+          :class="{ current: index === 0 }"
+          @click="playFromQueueHandler(index)"
+        >
+          <div class="queue-item-number">
+            <svg v-if="index === 0 && isPlaying" class="playing-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="4" y="4" width="4" height="16" rx="1">
+                <animate attributeName="height" values="16;8;16" dur="0.5s" repeatCount="indefinite"/>
+                <animate attributeName="y" values="4;8;4" dur="0.5s" repeatCount="indefinite"/>
+              </rect>
+              <rect x="10" y="4" width="4" height="16" rx="1">
+                <animate attributeName="height" values="8;16;8" dur="0.5s" repeatCount="indefinite"/>
+                <animate attributeName="y" values="8;4;8" dur="0.5s" repeatCount="indefinite"/>
+              </rect>
+              <rect x="16" y="4" width="4" height="16" rx="1">
+                <animate attributeName="height" values="12;8;12" dur="0.5s" repeatCount="indefinite"/>
+                <animate attributeName="y" values="6;8;6" dur="0.5s" repeatCount="indefinite"/>
+              </rect>
+            </svg>
+            <span v-else-if="index === 0">▶</span>
+            <span v-else>{{ index }}</span>
+          </div>
+          <div class="queue-item-cover">
+            <img 
+              v-if="queueTrack.cover_url" 
+              :src="queueTrack.cover_url" 
+              alt=""
+              class="queue-cover-image"
+            />
+            <span v-else class="queue-cover-placeholder">♪</span>
+          </div>
+          <div class="queue-item-info">
+            <div class="queue-item-title">{{ queueTrack.title || 'Без названия' }}</div>
+            <div class="queue-item-artist">{{ queueTrack.artist || 'Неизвестный' }}</div>
+          </div>
+          <button 
+            v-if="index > 0"
+            class="queue-item-remove"
+            @click.stop="removeFromQueueHandler(index)"
+            title="Убрать из очереди"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
   </aside>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, defineEmits } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
+
+const emit = defineEmits(['goToUser'])
 
 const router = useRouter()
 const playerStore = usePlayerStore()
@@ -149,6 +222,18 @@ const libraryStore = useLibraryStore()
 // Computed from stores
 const track = computed(() => playerStore.currentTrack)
 const isPlaying = computed(() => playerStore.isPlaying)
+
+// Queue computed
+const queue = computed(() => playerStore.queue || [])
+const queueIndex = computed(() => playerStore.queueIndex ?? -1)
+const queueLength = computed(() => queue.value.length)
+
+// Get upcoming tracks (current + next 10)
+const upcomingTracks = computed(() => {
+  if (queue.value.length === 0) return []
+  const startIdx = Math.max(0, queueIndex.value)
+  return queue.value.slice(startIdx, startIdx + 11)
+})
 
 const isLiked = computed(() => {
   if (!track.value?.id) return false
@@ -220,6 +305,31 @@ const goToAlbum = () => {
   const albumId = track.value?.album?.id || track.value?.album_id
   if (albumId) {
     router.push(`/album/${albumId}`)
+  }
+}
+
+// Go to uploader profile
+const goToUploader = () => {
+  if (track.value?.uploader) {
+    emit('goToUser', track.value.uploader)
+  }
+}
+
+// Queue actions
+const playFromQueueHandler = (index) => {
+  // index is position in upcomingTracks (0 = current, 1 = next, etc.)
+  // playFromQueue expects relative index from current+1
+  // so for current track (index 0), we need relativeIndex = -1
+  // for next track (index 1), we need relativeIndex = 0
+  playerStore.playFromQueue(index - 1)
+}
+
+const removeFromQueueHandler = (index) => {
+  // index is position in upcomingTracks (0 = current, 1 = next, etc.)
+  // removeFromQueue expects relative index from current+1
+  // so for index 1 (first upcoming), relativeIndex = 0
+  if (index > 0) {
+    playerStore.removeFromQueue(index - 1)
   }
 }
 
@@ -526,6 +636,159 @@ const handleToggleLike = async () => {
 
 .action-btn.active svg {
   fill: #ff4081;
+}
+
+/* Queue Section */
+.queue-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.queue-count {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.empty-queue {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+}
+
+.queue-list {
+  flex: 1;
+  overflow-y: auto;
+  margin: 0 -8px;
+  padding: 0 8px;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.queue-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.queue-item.current {
+  background: rgba(29, 185, 84, 0.1);
+}
+
+.queue-item.current .queue-item-title {
+  color: #1DB954;
+}
+
+.queue-item-number {
+  width: 20px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  text-align: center;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.queue-item.current .queue-item-number {
+  color: #1DB954;
+}
+
+.playing-icon {
+  fill: #1DB954;
+}
+
+.queue-item-cover {
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.queue-cover-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.queue-cover-placeholder {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.queue-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.queue-item-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-item-artist {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-item-remove {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.queue-item:hover .queue-item-remove {
+  opacity: 1;
+}
+
+.queue-item-remove:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Uploader link */
+.uploader-link:hover {
+  color: #29b6f6;
 }
 
 /* Scrollbar */
