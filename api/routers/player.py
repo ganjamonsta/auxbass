@@ -85,7 +85,7 @@ FILE_PATH_CACHE_TTL = 3000  # 50 minutes
 # Secure token cache: maps temporary token -> (track_id, user_id, file_path, expires)
 # file_path is cached to avoid second Telegram API call when streaming
 _stream_tokens: dict[str, tuple[int, int, str, float]] = {}
-STREAM_TOKEN_TTL = 300  # 5 minutes for token validity
+STREAM_TOKEN_TTL = 3600  # 1 hour for token validity (was 5 min - too short for long tracks/pauses)
 
 
 def generate_stream_token(track_id: int, user_id: int, file_path: str) -> str:
