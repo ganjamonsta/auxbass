@@ -431,11 +431,13 @@ async def refresh_token(user: TelegramUser = Depends(get_current_user)):
 class PrivacySettingsRequest(BaseModel):
     hide_from_search: Optional[bool] = None
     hide_profile: Optional[bool] = None
+    notify_subscription: Optional[bool] = None
 
 
 class PrivacySettingsResponse(BaseModel):
     hide_from_search: bool
     hide_profile: bool
+    notify_subscription: bool
 
 
 @router.get("/privacy", response_model=PrivacySettingsResponse)
@@ -471,10 +473,14 @@ async def update_privacy_settings(
     if settings_data.hide_profile is not None:
         db_user.hide_profile = settings_data.hide_profile
     
+    if settings_data.notify_subscription is not None:
+        db_user.notify_subscription = settings_data.notify_subscription
+    
     await db.commit()
     await db.refresh(db_user)
     
     return PrivacySettingsResponse(
         hide_from_search=db_user.hide_from_search,
         hide_profile=db_user.hide_profile,
+        notify_subscription=db_user.notify_subscription,
     )

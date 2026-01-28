@@ -129,6 +129,26 @@
       </div>
     </section>
 
+    <!-- Notification settings -->
+    <section class="section">
+      <h2>🔔 Уведомления</h2>
+      
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-name">Уведомления о подписках</span>
+          <span class="setting-desc">Получать уведомления, когда кто-то подписывается на вас или ваши плейлисты</span>
+        </div>
+        <label class="toggle">
+          <input 
+            type="checkbox" 
+            v-model="privacySettings.notify_subscription" 
+            @change="updatePrivacy('notify_subscription', $event.target.checked)"
+          />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </section>
+
     <!-- Cache section -->
     <section class="section">
       <h2>Кэш</h2>
@@ -166,6 +186,7 @@ const botUsername = ref('tg_player_bot')  // Default, will be updated from confi
 const privacySettings = ref({
   hide_from_search: false,
   hide_profile: false,
+  notify_subscription: true,
 })
 
 const repeatModeText = computed(() => {

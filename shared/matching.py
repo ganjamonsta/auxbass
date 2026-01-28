@@ -610,16 +610,30 @@ def generate_hashtags(
     tags = []
     
     def artist_to_tag(name: str) -> Optional[str]:
-        """Convert artist name to hashtag."""
-        tag = name.replace('!', 'I').replace(' ', '')
+        """Convert single artist name to hashtag."""
+        name = name.strip()
+        if not name:
+            return None
+        # Replace ! with I (common stylization like Deadmau5 -> Deadmau5)
+        tag = name.replace('!', 'I')
+        # Remove spaces and special chars, keep only word characters
         tag = re.sub(r'[^\w]', '', tag)
         return tag if tag and len(tag) > 1 else None
     
+    def split_artists(artist_str: str) -> List[str]:
+        """Split artist string into individual artists."""
+        # Split by common separators: comma, &, x, vs, feat, ft
+        # But be careful with "x" - it should have spaces around it
+        parts = re.split(r'\s*[,&]\s*|\s+(?:vs\.?|x|feat\.?|ft\.?)\s+', artist_str, flags=re.IGNORECASE)
+        return [p.strip() for p in parts if p.strip()]
+    
     if artist:
-        # Keep original case, replace ! with I (common stylization), remove other special chars
-        tag = artist_to_tag(artist)
-        if tag:
-            tags.append(tag)
+        # Split multiple artists and create separate hashtags for each
+        artists = split_artists(artist)
+        for single_artist in artists:
+            tag = artist_to_tag(single_artist)
+            if tag:
+                tags.append(tag)
     
     # Extract featured artists from title (remixers, feat., prod., vs.)
     if title:

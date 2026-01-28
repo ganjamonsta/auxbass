@@ -84,6 +84,9 @@ class User(Base):
     hide_from_search: Mapped[bool] = mapped_column(Boolean, default=False)  # Hide from user search, keep library visible
     hide_profile: Mapped[bool] = mapped_column(Boolean, default=False)  # Hide library and albums from others
     
+    # Notification settings
+    notify_subscription: Mapped[bool] = mapped_column(Boolean, default=True)  # Notify when subscription event occurs
+    
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

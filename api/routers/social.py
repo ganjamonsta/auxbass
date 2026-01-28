@@ -3,10 +3,12 @@ TG Player API v2 - Social Router
 
 User following, friends library access.
 """
+import logging
 from typing import Optional, List
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy import select, func, delete, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -16,6 +18,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+from shared.config import get_settings
 from shared.database import get_db
 from shared.models import (
     User, UserFollow, UserLibrary, Track, TrackEnrichment,
@@ -23,6 +26,8 @@ from shared.models import (
 )
 
 from api.routers.auth import get_current_user, require_premium
+
+logger = logging.getLogger(__name__)
 from api.routers.library import track_to_response
 from api.schemas_v2.common import TelegramUser, PaginatedResponse
 from api.schemas_v2.tracks import TrackResponse
@@ -107,11 +112,54 @@ async def is_following(db: AsyncSession, follower_id: int, following_id: int) ->
     return result is not None
 
 
+# ============== Notification Helper ==============
+
+async def send_subscription_notification(
+    target_user_id: int,
+    follower_name: str,
+    follower_username: Optional[str] = None
+):
+    """
+    Send notification to user about new follower via Telegram Bot API.
+    This runs in background to not block the API response.
+    """
+    settings = get_settings()
+    
+    # Build notification message
+    if follower_username:
+        follower_link = f"<a href='https://t.me/{follower_username}'>{follower_name}</a>"
+    else:
+        follower_link = f"<b>{follower_name}</b>"
+    
+    message_text = (
+        f"👤 <b>Новый подписчик!</b>\n\n"
+        f"{follower_link} подписался на вашу медиатеку."
+    )
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{settings.telegram_api_url}/bot{settings.bot_token}/sendMessage",
+                json={
+                    "chat_id": target_user_id,
+                    "text": message_text,
+                    "parse_mode": "HTML",
+                    "disable_notification": False
+                },
+                timeout=10.0
+            )
+            if response.status_code != 200:
+                logger.warning(f"Failed to send notification: {response.text}")
+    except Exception as e:
+        logger.error(f"Error sending subscription notification: {e}")
+
+
 # ============== Following Endpoints ==============
 
 @router.post("/follow")
 async def follow_user(
     data: FollowRequest,
+    background_tasks: BackgroundTasks,
     user: TelegramUser = Depends(require_premium),
     db: AsyncSession = Depends(get_db),
 ):
@@ -142,6 +190,20 @@ async def follow_user(
     )
     db.add(follow)
     await db.commit()
+    
+    # Send notification if target user has notifications enabled
+    if target.notify_subscription:
+        # Get follower info for notification
+        follower = await db.get(User, user.id)
+        if follower:
+            follower_name = follower.display_name
+            follower_username = follower.username
+            background_tasks.add_task(
+                send_subscription_notification,
+                target.id,
+                follower_name,
+                follower_username
+            )
     
     return {"status": "followed", "user_id": data.user_id}
 
