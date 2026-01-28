@@ -2243,6 +2243,7 @@ export const usePlayerStore = defineStore('player', () => {
     playTrack: play,  // Alias for backwards compatibility
     playShuffleAll,
     toggle,
+    togglePlay: toggle,  // Alias for component compatibility
     next,
     prev,
     seek,

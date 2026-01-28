@@ -1,221 +1,153 @@
+#!/usr/bin/env python3
 """
-Migration script to merge duplicate auto-album playlists and deduplicate tracks.
-Finds albums with same name (case-insensitive) and merges them into one.
-Also removes duplicate tracks (same title) within each album.
+Merge duplicate album playlists.
+
+This script finds and merges duplicate auto-album playlists that exist due to:
+- Different album name spellings (D&G vs D & G)
+- Some tracks having deezer_album_id, others not
+- Different artist capitalization (BLADEE vs Bladee)
+
+After running this script, the improved album grouping logic will prevent
+future duplicates from being created.
 """
 import asyncio
 import sys
 from pathlib import Path
-from collections import defaultdict
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from shared.database import get_session, init_db
-from shared.models import Playlist, PlaylistTrack, Track
-from sqlalchemy import select, func, delete
+from sqlalchemy import select, func
+from shared.database import get_session
+from shared.models import Playlist, PlaylistTrack, User
+from bot.services.albums import album_service, normalize_album_name
 
 
-async def deduplicate_album_tracks():
-    """Remove duplicate tracks (by title) from all auto-album playlists"""
+async def find_all_users_with_albums() -> list[int]:
+    """Get all user IDs that have auto-album playlists."""
     async with get_session() as session:
-        # Get all auto-album playlists
         result = await session.execute(
-            select(Playlist).where(Playlist.is_auto_album == True)
+            select(Playlist.user_id)
+            .where(Playlist.is_auto_album == True)
+            .distinct()
         )
-        all_albums = list(result.scalars().all())
-        
-        total_removed = 0
-        
-        for album in all_albums:
-            # Get all tracks in this playlist with their info
-            result = await session.execute(
-                select(PlaylistTrack, Track)
-                .join(Track, PlaylistTrack.track_id == Track.id)
-                .where(PlaylistTrack.playlist_id == album.id)
-                .order_by(PlaylistTrack.position)
+        return [row[0] for row in result.all()]
+
+
+async def analyze_duplicates(user_id: int) -> list[list[dict]]:
+    """
+    Analyze duplicate album playlists for a user.
+    Returns groups of duplicates with their info.
+    """
+    async with get_session() as session:
+        result = await session.execute(
+            select(Playlist)
+            .where(
+                Playlist.user_id == user_id,
+                Playlist.is_auto_album == True
             )
-            playlist_tracks = list(result.all())
-            
-            # Find duplicates by title (case-insensitive)
-            seen_titles = {}
-            duplicates_to_remove = []
-            
-            for pt, track in playlist_tracks:
-                title_key = track.title.lower().strip() if track.title else str(track.id)
-                
-                if title_key in seen_titles:
-                    # This is a duplicate
-                    existing_pt, existing_track = seen_titles[title_key]
-                    
-                    # Decide which to keep - prefer one with cover_url
-                    if not existing_track.cover_url and track.cover_url:
-                        # Remove the existing one, keep this one
-                        duplicates_to_remove.append(existing_pt.id)
-                        seen_titles[title_key] = (pt, track)
-                    else:
-                        # Remove this one
-                        duplicates_to_remove.append(pt.id)
-                else:
-                    seen_titles[title_key] = (pt, track)
-            
-            if duplicates_to_remove:
-                print(f"Album '{album.name}': removing {len(duplicates_to_remove)} duplicate track(s)")
-                
-                # Remove duplicates
-                await session.execute(
-                    delete(PlaylistTrack)
-                    .where(PlaylistTrack.id.in_(duplicates_to_remove))
-                )
-                
-                total_removed += len(duplicates_to_remove)
-                
-                # Update track count in description
-                new_count = len(playlist_tracks) - len(duplicates_to_remove)
-                album.description = f"Автоальбом • {new_count} треков"
-        
-        await session.commit()
-        return total_removed
-
-
-async def merge_duplicate_albums():
-    """Find and merge duplicate auto-album playlists"""
-    await init_db()
-    
-    async with get_session() as session:
-        # Get all auto-album playlists
-        result = await session.execute(
-            select(Playlist).where(Playlist.is_auto_album == True)
         )
-        all_albums = list(result.scalars().all())
+        playlists = list(result.scalars().all())
         
-        # Group by user_id and album name (case-insensitive)
-        user_albums = defaultdict(lambda: defaultdict(list))
-        for album in all_albums:
-            name_key = album.name.lower().strip() if album.name else ""
-            if name_key:
-                user_albums[album.user_id][name_key].append(album)
+        # Get track counts for each playlist
+        playlist_info = []
+        for pl in playlists:
+            track_count = await session.scalar(
+                select(func.count(PlaylistTrack.id))
+                .where(PlaylistTrack.playlist_id == pl.id)
+            ) or 0
+            
+            playlist_info.append({
+                "id": pl.id,
+                "name": pl.name,
+                "album_artist": pl.album_artist,
+                "deezer_album_id": pl.deezer_album_id,
+                "cover_url": pl.cover_url,
+                "track_count": track_count,
+                "album_norm": normalize_album_name(pl.name) if pl.name else "",
+                "playlist": pl
+            })
         
-        merged_count = 0
-        deleted_count = 0
+        # Group by normalized album name and deezer_album_id
+        groups: dict[str, list] = {}
         
-        for user_id, albums_by_name in user_albums.items():
-            for name_key, playlists in albums_by_name.items():
-                if len(playlists) <= 1:
-                    continue
-                
-                # Sort by track count descending - keep the one with most tracks
-                playlists_with_counts = []
-                for pl in playlists:
-                    count_result = await session.execute(
-                        select(func.count(PlaylistTrack.id))
-                        .where(PlaylistTrack.playlist_id == pl.id)
-                    )
-                    count = count_result.scalar() or 0
-                    playlists_with_counts.append((pl, count))
-                
-                playlists_with_counts.sort(key=lambda x: x[1], reverse=True)
-                
-                # Keep first (most tracks), merge others into it
-                main_playlist, main_count = playlists_with_counts[0]
-                print(f"\nMerging duplicates for '{main_playlist.name}' (user {user_id}):")
-                print(f"  Main playlist: id={main_playlist.id}, tracks={main_count}")
-                
-                # Get existing track IDs in main playlist
-                result = await session.execute(
-                    select(PlaylistTrack.track_id)
-                    .where(PlaylistTrack.playlist_id == main_playlist.id)
-                )
-                existing_track_ids = {row[0] for row in result.all()}
-                
-                # Get max position in main playlist
-                result = await session.execute(
-                    select(func.max(PlaylistTrack.position))
-                    .where(PlaylistTrack.playlist_id == main_playlist.id)
-                )
-                max_pos = result.scalar() or 0
-                
-                # Collect all unique artists from all playlists
-                all_artists = set()
-                if main_playlist.album_artist:
-                    for artist in main_playlist.album_artist.split(" & "):
-                        all_artists.add(artist.replace(" и др.", "").strip())
-                
-                # Process duplicate playlists
-                for dup_playlist, dup_count in playlists_with_counts[1:]:
-                    print(f"  Merging: id={dup_playlist.id}, tracks={dup_count}")
-                    
-                    # Collect artists
-                    if dup_playlist.album_artist:
-                        for artist in dup_playlist.album_artist.split(" & "):
-                            all_artists.add(artist.replace(" и др.", "").strip())
-                    
-                    # Get tracks from duplicate playlist
-                    result = await session.execute(
-                        select(PlaylistTrack)
-                        .where(PlaylistTrack.playlist_id == dup_playlist.id)
-                        .order_by(PlaylistTrack.position)
-                    )
-                    dup_tracks = list(result.scalars().all())
-                    
-                    # Move unique tracks to main playlist
-                    added = 0
-                    for pt in dup_tracks:
-                        if pt.track_id not in existing_track_ids:
-                            max_pos += 1
-                            new_pt = PlaylistTrack(
-                                playlist_id=main_playlist.id,
-                                track_id=pt.track_id,
-                                position=max_pos
-                            )
-                            session.add(new_pt)
-                            existing_track_ids.add(pt.track_id)
-                            added += 1
-                    
-                    print(f"    Added {added} unique tracks to main playlist")
-                    
-                    # Delete duplicate playlist tracks
-                    await session.execute(
-                        delete(PlaylistTrack)
-                        .where(PlaylistTrack.playlist_id == dup_playlist.id)
-                    )
-                    
-                    # Delete duplicate playlist
-                    await session.delete(dup_playlist)
-                    deleted_count += 1
-                
-                # Update main playlist with all artists
-                if all_artists:
-                    artists_list = sorted(all_artists)
-                    if len(artists_list) > 2:
-                        main_playlist.album_artist = f"{artists_list[0]} и др."
-                    elif len(artists_list) == 2:
-                        main_playlist.album_artist = " & ".join(artists_list)
-                    else:
-                        main_playlist.album_artist = artists_list[0]
-                
-                # Update description with new track count
-                main_playlist.description = f"Автоальбом • {len(existing_track_ids)} треков"
-                
-                # Update cover if missing
-                if not main_playlist.cover_url:
-                    for dup_playlist, _ in playlists_with_counts[1:]:
-                        if dup_playlist.cover_url:
-                            main_playlist.cover_url = dup_playlist.cover_url
-                            break
-                
-                merged_count += 1
+        for info in playlist_info:
+            if info["deezer_album_id"]:
+                key = f"deezer:{info['deezer_album_id']}"
+            else:
+                key = f"album:{info['album_norm']}"
+            
+            if key not in groups:
+                groups[key] = []
+            groups[key].append(info)
         
-        await session.commit()
-        
-        print(f"\n=== Merge Summary ===")
-        print(f"Album groups merged: {merged_count}")
-        print(f"Duplicate playlists deleted: {deleted_count}")
+        # Return only groups with duplicates
+        return [g for g in groups.values() if len(g) > 1]
+
+
+async def main():
+    print("=" * 70)
+    print("MERGE DUPLICATE ALBUM PLAYLISTS")
+    print("=" * 70)
     
-    # Now deduplicate tracks within each album
-    print("\n=== Deduplicating tracks within albums ===")
-    removed = await deduplicate_album_tracks()
-    print(f"\nTotal duplicate tracks removed: {removed}")
+    # Get all users with albums
+    print("\n1. Finding users with auto-albums...")
+    user_ids = await find_all_users_with_albums()
+    print(f"   Found {len(user_ids)} users with auto-album playlists")
+    
+    total_duplicates = 0
+    all_duplicate_groups = []
+    
+    # Analyze each user
+    print("\n2. Analyzing duplicates...")
+    for user_id in user_ids:
+        duplicates = await analyze_duplicates(user_id)
+        if duplicates:
+            all_duplicate_groups.append((user_id, duplicates))
+            for group in duplicates:
+                total_duplicates += len(group) - 1  # Count extras, not the survivor
+    
+    if total_duplicates == 0:
+        print("\n✓ No duplicate album playlists found!")
+        return
+    
+    # Show duplicates
+    print(f"\n   Found {total_duplicates} duplicate playlists to merge:\n")
+    
+    for user_id, groups in all_duplicate_groups:
+        print(f"   User {user_id}:")
+        for group in groups:
+            print(f"      Group (will merge into 1):")
+            for info in group:
+                deezer = f" [deezer:{info['deezer_album_id']}]" if info['deezer_album_id'] else ""
+                cover = " 🖼️" if info['cover_url'] else ""
+                print(f"         - [{info['id']}] {info['name']} ({info['track_count']} tracks){deezer}{cover}")
+            print()
+    
+    # Confirm
+    confirm = input("Proceed with merge? [y/N]: ").strip().lower()
+    if confirm != 'y':
+        print("Aborted.")
+        return
+    
+    # Execute merges
+    print("\n3. Merging duplicates...")
+    merged_count = 0
+    
+    for user_id, groups in all_duplicate_groups:
+        for group in groups:
+            playlists = [info["playlist"] for info in group]
+            try:
+                survivor = await album_service.merge_duplicate_playlists(playlists)
+                if survivor:
+                    merged_count += len(group) - 1
+                    print(f"   ✓ Merged {len(group)} playlists into '{survivor.name}'")
+            except Exception as e:
+                print(f"   ✗ Error merging group: {e}")
+    
+    print("\n" + "=" * 70)
+    print(f"DONE! Merged {merged_count} duplicate playlists.")
+    print("=" * 70)
 
 
 if __name__ == "__main__":
-    asyncio.run(merge_duplicate_albums())
+    asyncio.run(main())
