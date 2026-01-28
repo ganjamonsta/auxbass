@@ -317,13 +317,16 @@ const likedCount = ref(0)
 // Playlist search state
 const playlistSearchQuery = ref('')
 
-// Filtered playlists computed
+// Filtered playlists computed - only public playlists
 const filteredPlaylists = computed(() => {
+  // Filter only public playlists first
+  const publicOnly = playlists.value.filter(p => p.is_public)
+  
   if (!playlistSearchQuery.value) {
-    return playlists.value
+    return publicOnly
   }
   const query = playlistSearchQuery.value.toLowerCase()
-  return playlists.value.filter(p => 
+  return publicOnly.filter(p => 
     p.name.toLowerCase().includes(query)
   )
 })
