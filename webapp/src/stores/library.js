@@ -454,6 +454,13 @@ export const useLibraryStore = defineStore('library', () => {
       return !isLiked
     } catch (error) {
       console.error('Failed to toggle like:', error)
+      // Handle 403 - show channel banner
+      if (error.response?.status === 403) {
+        // Import auth store dynamically to avoid circular dependency
+        const { useAuthStore } = await import('./auth')
+        const authStore = useAuthStore()
+        authStore.promptChannelSetup()
+      }
       return isLiked
     }
   }

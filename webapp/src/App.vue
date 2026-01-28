@@ -96,6 +96,9 @@
         @playFromQueue="playerStore.playFromQueue($event)"
         @like="handleToggleLike"
       />
+      
+      <!-- Channel setup banner -->
+      <ChannelBanner />
     </template>
   </div>
 </template>
@@ -109,6 +112,7 @@ import { useLibraryStore } from '@/stores/library'
 import PageHeader from '@/components/PageHeader.vue'
 import MiniPlayer from '@/components/MiniPlayer.vue'
 import FullPlayer from '@/components/FullPlayer.vue'
+import ChannelBanner from '@/components/ChannelBanner.vue'
 
 const route = useRoute()
 const router = useRouter()

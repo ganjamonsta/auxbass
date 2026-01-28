@@ -2,6 +2,56 @@
   <div class="settings-view">
     <h1>Настройки</h1>
 
+    <!-- Channel section (Premium) -->
+    <section id="channel" class="section channel-section" :class="{ 'not-connected': !authStore.hasChannel }">
+      <h2>📢 Канал для бэкапа</h2>
+      
+      <template v-if="authStore.hasChannel">
+        <div class="channel-connected">
+          <div class="channel-info">
+            <div class="channel-icon">✓</div>
+            <div class="channel-details">
+              <span class="channel-title">{{ authStore.channelInfo?.channel_title || 'Канал подключён' }}</span>
+              <span class="channel-username" v-if="authStore.channelInfo?.channel_username">
+                @{{ authStore.channelInfo.channel_username }}
+              </span>
+            </div>
+          </div>
+          <div class="channel-features">
+            <div class="feature-item">✓ Сохранение треков</div>
+            <div class="feature-item">✓ Создание плейлистов</div>
+            <div class="feature-item">✓ Автобэкап в канал</div>
+          </div>
+        </div>
+      </template>
+      
+      <template v-else>
+        <div class="channel-not-connected">
+          <p class="channel-desc">
+            Подключите Telegram-канал, чтобы разблокировать все функции:
+          </p>
+          <ul class="feature-list">
+            <li>📁 Загрузка и сохранение треков</li>
+            <li>❤️ Лайки и избранное</li>
+            <li>📋 Создание плейлистов</li>
+            <li>☁️ Автоматический бэкап музыки</li>
+          </ul>
+          <div class="setup-steps">
+            <h3>Как подключить:</h3>
+            <ol>
+              <li>Создайте приватный канал в Telegram</li>
+              <li>Добавьте бота <strong>@{{ botUsername }}</strong> админом канала</li>
+              <li>Напишите боту команду <code>/channel</code></li>
+              <li>Перешлите любое сообщение из канала боту</li>
+            </ol>
+          </div>
+          <button class="refresh-btn" @click="refreshStatus">
+            🔄 Обновить статус
+          </button>
+        </div>
+      </template>
+    </section>
+
     <!-- User section -->
     <section class="section">
       <h2>Аккаунт</h2>
@@ -109,17 +159,19 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
-import api from '@/api/client'
+import api, { authApi } from '@/api/client'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const playerStore = usePlayerStore()
 
 const stats = ref(null)
 const darkMode = ref(true)
+const botUsername = ref('tg_player_bot')  // Default, will be updated from config
 
 const repeatModeText = computed(() => {
   const modes = {
@@ -146,6 +198,21 @@ const loadStats = async () => {
   } catch (error) {
     console.error('Failed to load stats:', error)
   }
+}
+
+const loadBotConfig = async () => {
+  try {
+    const response = await authApi.getConfig()
+    if (response.data?.bot_username) {
+      botUsername.value = response.data.bot_username
+    }
+  } catch (error) {
+    console.error('Failed to load bot config:', error)
+  }
+}
+
+const refreshStatus = async () => {
+  await authStore.fetchStatus()
 }
 
 const formatDuration = (seconds) => {
@@ -178,6 +245,14 @@ const clearCache = () => {
 
 onMounted(() => {
   loadStats()
+  loadBotConfig()
+  
+  // Scroll to channel section if hash is #channel
+  if (route.hash === '#channel') {
+    setTimeout(() => {
+      document.getElementById('channel')?.scrollIntoView({ behavior: 'smooth' })
+    }, 100)
+  }
 })
 </script>
 
@@ -391,5 +466,146 @@ h1 {
 .about-desc {
   color: var(--text-tertiary) !important;
   font-size: 14px;
+}
+
+/* Channel Section */
+.channel-section {
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.channel-section.not-connected {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
+  border: 1px solid rgba(102, 126, 234, 0.3);
+}
+
+.channel-connected {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.channel-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.channel-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.channel-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.channel-title {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.channel-username {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.channel-features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.feature-item {
+  background: rgba(29, 185, 84, 0.2);
+  color: var(--accent);
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+.channel-not-connected {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.channel-desc {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.feature-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.feature-list li {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.setup-steps {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 8px;
+}
+
+.setup-steps h3 {
+  color: var(--text-primary);
+  font-size: 14px;
+  margin: 0 0 8px 0;
+}
+
+.setup-steps ol {
+  padding-left: 20px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.setup-steps strong {
+  color: var(--accent);
+}
+
+.setup-steps code {
+  background: var(--bg-highlight);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  color: var(--text-primary);
+}
+
+.refresh-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: opacity 0.2s;
+}
+
+.refresh-btn:hover {
+  opacity: 0.9;
 }
 </style>

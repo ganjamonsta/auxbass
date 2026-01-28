@@ -8,6 +8,12 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(false)
   const initialized = ref(false)
   const error = ref(null)
+  
+  // Channel/Premium status
+  const hasChannel = ref(false)
+  const canSave = ref(false)
+  const channelInfo = ref(null)
+  const showChannelBanner = ref(false)  // Show banner when user tries premium action
 
   // Getters
   const isAuthenticated = computed(() => authStorage.isAuthenticated())
@@ -28,6 +34,9 @@ export const useAuthStore = defineStore('auth', () => {
         authStorage.setUser(response.data.user)
       }
       initialized.value = true
+      
+      // Fetch channel status after auth
+      await fetchStatus()
     } catch (err) {
       // Auth failed - clear storage
       authStorage.clear()
@@ -36,6 +45,26 @@ export const useAuthStore = defineStore('auth', () => {
     } finally {
       loading.value = false
     }
+  }
+  
+  async function fetchStatus() {
+    try {
+      const response = await authApi.status()
+      hasChannel.value = response.data.has_channel || false
+      canSave.value = response.data.can_save || false
+      channelInfo.value = response.data.channel_info || null
+    } catch (err) {
+      console.error('Failed to fetch status:', err)
+      // Don't fail initialization for status fetch
+    }
+  }
+  
+  function promptChannelSetup() {
+    showChannelBanner.value = true
+  }
+  
+  function dismissChannelBanner() {
+    showChannelBanner.value = false
   }
 
   async function loginWithCode(code) {
@@ -93,6 +122,10 @@ export const useAuthStore = defineStore('auth', () => {
     loading,
     initialized,
     error,
+    hasChannel,
+    canSave,
+    channelInfo,
+    showChannelBanner,
     // Getters
     isAuthenticated,
     isTelegramWebApp,
@@ -100,6 +133,9 @@ export const useAuthStore = defineStore('auth', () => {
     initialize,
     loginWithCode,
     logout,
-    refreshUser
+    refreshUser,
+    fetchStatus,
+    promptChannelSetup,
+    dismissChannelBanner
   }
 })

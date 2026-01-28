@@ -84,6 +84,7 @@ export default api
 export const authApi = {
   validate: () => api.post('/auth/validate'),
   me: () => api.get('/auth/me'),
+  status: () => api.get('/auth/status'),  // Get user status with channel info
   getConfig: () => api.get('/auth/config'),
   verifyCode: (data) => api.post('/auth/verify-code', data),
   refresh: () => api.post('/auth/refresh'),
