@@ -137,6 +137,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
+const uiStore = useUIStore()
 const telegram = inject('telegram')
 
 const showFullPlayer = ref(false)
@@ -204,7 +205,25 @@ onMounted(async () => {
   // Initialize auth
   if (authStore.isAuthenticated && !authStore.initialized) {
     await authStore.initialize()
+    
+    // Initialize library after auth
+    await libraryStore.init()
+    
+    // Restore player state if available (persisted queue, track, position)
+    if (playerStore.hasSavedState()) {
+      await playerStore.restoreState()
+    }
   }
+  
+  // Handle unavailable tracks - show notification with helpful message
+  playerStore.setOnTrackUnavailable((track, message, isLargeFile) => {
+    if (isLargeFile) {
+      const sizeMB = track.file_size ? (track.file_size / 1024 / 1024).toFixed(1) : '20+'
+      console.warn(`[Player] Track too large for streaming: ${sizeMB} MB`)
+    } else {
+      console.warn('[Player] Track unavailable:', message)
+    }
+  })
 })
 </script>
 
