@@ -86,6 +86,15 @@
       @addToPlaylist="handleAddToPlaylist"
       @download="handleDownloadTrack"
     />
+    
+    <!-- Playlist picker modal -->
+    <PlaylistPicker
+      :show="showPlaylistPicker"
+      :track="menuTrack"
+      @close="showPlaylistPicker = false; closeMenu()"
+      @createNew="showPlaylistPicker = false; closeMenu()"
+      @added="handlePlaylistAdded"
+    />
     </template>
   </div>
 </template>
@@ -99,6 +108,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackMenu from '@/components/TrackMenu.vue'
+import PlaylistPicker from '@/components/PlaylistPicker.vue'
 import api, { playerApi } from '@/api/client'
 
 const router = useRouter()
@@ -190,8 +200,12 @@ const handleGoToAlbum = () => {
 }
 
 const handleAddToPlaylist = () => {
-  closeMenu()
-  // TODO: implement playlist picker
+  showPlaylistPicker.value = true
+}
+
+const showPlaylistPicker = ref(false)
+const handlePlaylistAdded = (playlist) => {
+  uiStore.toast.success('Добавлено', `Трек добавлен в плейлист "${playlist.name}"`)
 }
 
 const handleDownloadTrack = async () => {

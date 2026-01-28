@@ -280,10 +280,10 @@ async def get_playlist_track_ids(
 async def update_playlist(
     playlist_id: int,
     data: PlaylistUpdate,
-    user: TelegramUser = Depends(require_premium),
+    user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update playlist. Requires connected channel."""
+    """Update playlist."""
     playlist = await db.get(Playlist, playlist_id)
     
     if not playlist or playlist.owner_id != user.id:
@@ -315,10 +315,10 @@ async def update_playlist(
 @router.delete("/{playlist_id}")
 async def delete_playlist(
     playlist_id: int,
-    user: TelegramUser = Depends(require_premium),
+    user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete playlist. Requires connected channel."""
+    """Delete playlist."""
     playlist = await db.get(Playlist, playlist_id)
     
     if not playlist or playlist.owner_id != user.id:
@@ -339,22 +339,19 @@ async def delete_playlist(
 async def add_track_to_playlist(
     playlist_id: int,
     data: AddTrackRequest,
-    user: TelegramUser = Depends(require_premium),
+    user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Add track to playlist. Requires connected channel."""
+    """Add track to playlist."""
     playlist = await db.get(Playlist, playlist_id)
     
     if not playlist or playlist.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Playlist not found")
     
-    # Check track exists and user has it in library
-    lib_entry = await db.scalar(
-        select(UserLibrary)
-        .where(UserLibrary.track_id == data.track_id, UserLibrary.user_id == user.id)
-    )
-    if not lib_entry:
-        raise HTTPException(status_code=404, detail="Track not found in your library")
+    # Check track exists - allow both library tracks and global tracks
+    track = await db.get(Track, data.track_id)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
     
     # Check if already in playlist
     existing = await db.scalar(
@@ -388,10 +385,10 @@ async def add_track_to_playlist(
 async def remove_track_from_playlist(
     playlist_id: int,
     track_id: int,
-    user: TelegramUser = Depends(require_premium),
+    user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Remove track from playlist. Requires connected channel."""
+    """Remove track from playlist."""
     playlist = await db.get(Playlist, playlist_id)
     
     if not playlist or playlist.owner_id != user.id:
@@ -418,10 +415,10 @@ async def remove_track_from_playlist(
 async def reorder_playlist(
     playlist_id: int,
     data: ReorderRequest,
-    user: TelegramUser = Depends(require_premium),
+    user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Reorder tracks in playlist. Requires connected channel."""
+    """Reorder tracks in playlist."""
     playlist = await db.get(Playlist, playlist_id)
     
     if not playlist or playlist.owner_id != user.id:

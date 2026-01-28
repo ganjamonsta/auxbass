@@ -99,6 +99,15 @@
       @download="handleDownloadTrack"
       @removeFromPlaylist="handleRemoveFromPlaylist"
     />
+    
+    <!-- Playlist picker modal -->
+    <PlaylistPicker
+      :show="showPlaylistPickerForMenu"
+      :track="menuTrack"
+      @close="showPlaylistPickerForMenu = false; closeMenu()"
+      @createNew="showPlaylistPickerForMenu = false; closeMenu()"
+      @added="handlePlaylistAdded"
+    />
 
     <!-- Edit modal -->
     <div v-if="showEditModal" class="modal-overlay" @click.self="showEditModal = false">
@@ -216,6 +225,7 @@ import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackMenu from '@/components/TrackMenu.vue'
+import PlaylistPicker from '@/components/PlaylistPicker.vue'
 import api, { playerApi } from '@/api/client'
 
 const route = useRoute()
@@ -336,8 +346,12 @@ const handleGoToAlbum = () => {
 }
 
 const handleAddToPlaylist = () => {
-  closeMenu()
-  // TODO: implement playlist picker
+  showPlaylistPickerForMenu.value = true
+}
+
+const showPlaylistPickerForMenu = ref(false)
+const handlePlaylistAdded = (playlist) => {
+  uiStore.toast.success('Добавлено', `Трек добавлен в плейлист "${playlist.name}"`)
 }
 
 const handleDownloadTrack = async () => {
@@ -392,10 +406,15 @@ const savePlaylist = async () => {
 
 const deletePlaylist = async () => {
   try {
-    await api.delete(`/playlists/${playlist.value.id}`)
+    const playlistId = playlist.value.id
+    await api.delete(`/playlists/${playlistId}`)
+    // Update library store to remove playlist from cache
+    await libraryStore.deletePlaylist(playlistId)
+    uiStore.toast.success('Удалено', 'Плейлист удален')
     router.push('/playlists')
   } catch (error) {
     console.error('Failed to delete playlist:', error)
+    uiStore.toast.error('Ошибка', 'Не удалось удалить плейлист')
   }
 }
 

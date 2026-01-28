@@ -161,6 +161,15 @@
       @addToPlaylist="handleAddToPlaylist"
       @download="handleDownloadTrack"
     />
+    
+    <!-- Playlist picker modal -->
+    <PlaylistPicker
+      :show="showPlaylistPicker"
+      :track="menuTrack"
+      @close="showPlaylistPicker = false; closeMenu()"
+      @createNew="showPlaylistPicker = false; closeMenu()"
+      @added="handlePlaylistAdded"
+    />
   </div>
 
   <div v-else-if="loading" class="loading">
@@ -176,6 +185,7 @@ import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackMenu from '@/components/TrackMenu.vue'
+import PlaylistPicker from '@/components/PlaylistPicker.vue'
 import api, { playerApi } from '@/api/client'
 
 const route = useRoute()
@@ -354,8 +364,12 @@ const handleGoToArtist = () => {
 }
 
 const handleAddToPlaylist = () => {
-  closeMenu()
-  // TODO: implement playlist picker
+  showPlaylistPicker.value = true
+}
+
+const showPlaylistPicker = ref(false)
+const handlePlaylistAdded = (playlist) => {
+  uiStore.toast.success('Добавлено', `Трек добавлен в плейлист "${playlist.name}"`)
 }
 
 // Direct download from TrackItem download button (for HD/large files)
