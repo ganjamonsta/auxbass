@@ -108,6 +108,7 @@
           @like="handleLikeTrack(track)"
           @addToLibrary="handleAddToLibrary(track)"
           @menu="openTrackMenu(track)"
+          @download="handleDirectDownload(track)"
         />
       </template>
     </div>
@@ -355,19 +356,36 @@ const handleAddToPlaylist = () => {
   // TODO: implement playlist picker
 }
 
-const handleDownloadTrack = async () => {
-  if (!menuTrack.value) return
+// Direct download from TrackItem download button (for HD/large files)
+const handleDirectDownload = async (track) => {
+  if (!track) return
+  
+  const fileSizeMB = track.file_size ? track.file_size / (1024 * 1024) : 0
+  
+  // For large files, show message to use Telegram bot
+  if (fileSizeMB > 20) {
+    alert(`Файл "${track.title}" слишком большой (${fileSizeMB.toFixed(1)} MB) для скачивания через веб.\n\nИспользуйте Telegram бота для скачивания HD версии.`)
+    return
+  }
+  
   try {
-    const response = await api.get(`/player/stream/${menuTrack.value.id}`, { responseType: 'blob' })
+    const response = await api.get(`/player/stream/${track.id}`, { responseType: 'blob' })
     const url = window.URL.createObjectURL(response.data)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${menuTrack.value.artist} - ${menuTrack.value.title}.mp3`
+    a.download = `${track.artist} - ${track.title}.mp3`
     a.click()
     window.URL.revokeObjectURL(url)
   } catch (error) {
     console.error('Failed to download:', error)
+    const errorMsg = error.response?.data?.detail || 'Ошибка скачивания'
+    alert(`Не удалось скачать: ${errorMsg}\n\nИспользуйте Telegram бота для скачивания.`)
   }
+}
+
+const handleDownloadTrack = async () => {
+  if (!menuTrack.value) return
+  await handleDirectDownload(menuTrack.value)
   closeMenu()
 }
 

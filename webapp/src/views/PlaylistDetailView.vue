@@ -74,6 +74,7 @@
           @click="playTrack(track, index)"
           @like="handleLikeTrack(track)"
           @menu="openTrackMenu(track)"
+          @download="handleDirectDownload(track)"
         />
       </div>
     </div>
@@ -351,6 +352,31 @@ const handleDownloadTrack = async () => {
     console.error('Failed to download:', error)
   }
   closeMenu()
+}
+
+// Handle direct download from TrackItem (for large/HD files)
+const handleDirectDownload = async (track) => {
+  const isLargeFile = track.file_size && track.file_size > 20 * 1024 * 1024
+  const hdMimeTypes = ['audio/flac', 'audio/x-flac', 'audio/wav', 'audio/x-wav', 'audio/aiff', 'audio/x-aiff']
+  const isHd = track.mime_type && hdMimeTypes.includes(track.mime_type.toLowerCase())
+  
+  if (isLargeFile || isHd) {
+    alert('Файл слишком большой для скачивания через браузер. Используйте Telegram бота для скачивания.')
+    return
+  }
+  
+  try {
+    const response = await api.get(`/player/stream/${track.id}`, { responseType: 'blob' })
+    const url = window.URL.createObjectURL(response.data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${track.artist} - ${track.title}.mp3`
+    a.click()
+    window.URL.revokeObjectURL(url)
+  } catch (error) {
+    console.error('Failed to download:', error)
+    alert('Ошибка при скачивании. Попробуйте через Telegram бота.')
+  }
 }
 
 const handleRemoveFromPlaylist = async () => {

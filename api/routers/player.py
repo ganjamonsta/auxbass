@@ -438,31 +438,42 @@ async def get_stream_url(
         raise HTTPException(status_code=403, detail="This track is private")
     
     # HD track handling: find MP3 alternative
+    # Check both mime_type AND file size (large files are often HD even without proper mime_type)
     track = original_track
     hd_track_info = None
     
-    if not is_streamable(original_track.mime_type):
-        # This is an HD track - try to find MP3 alternative
-        logger.info(f"[Stream Request] Track {track_id} is HD format ({original_track.mime_type}), searching for MP3 alternative...")
+    file_size_mb = (original_track.file_size or 0) / (1024 * 1024)
+    is_track_hd = not is_streamable(original_track.mime_type)
+    is_track_too_large = file_size_mb > 20
+    
+    if is_track_hd or is_track_too_large:
+        # This is an HD track or too large - try to find MP3 alternative
+        reason = f"HD format ({original_track.mime_type})" if is_track_hd else f"too large ({file_size_mb:.1f} MB)"
+        logger.info(f"[Stream Request] Track {track_id} is {reason}, searching for MP3 alternative...")
         
         mp3_alt = await find_streamable_alternative(original_track, db)
         
         if mp3_alt:
             # Found MP3 alternative - use it for streaming, save HD info
-            logger.info(f"[Stream Request] Found MP3 alternative: track {mp3_alt.id} for HD track {track_id}")
+            logger.info(f"[Stream Request] Found MP3 alternative: track {mp3_alt.id} for HD/large track {track_id}")
             track = mp3_alt
             hd_track_info = {
                 "id": original_track.id,
                 "title": original_track.title,
             }
         else:
-            # No MP3 alternative - can't stream HD
-            file_size_mb = (original_track.file_size or 0) / (1024 * 1024)
-            logger.warning(f"[Stream Request] HD track {track_id} ({original_track.mime_type}) has no MP3 alternative")
-            raise HTTPException(
-                status_code=503,
-                detail=f"Трек в формате высокого качества ({original_track.mime_type or 'HD'}, {file_size_mb:.1f} MB) недоступен для стриминга. MP3 версия не найдена. Используйте кнопку 'Скачать' в боте для загрузки HD версии."
-            )
+            # No MP3 alternative - can't stream
+            logger.warning(f"[Stream Request] Track {track_id} ({reason}) has no MP3 alternative")
+            if is_track_hd:
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Трек в формате высокого качества ({original_track.mime_type or 'HD'}, {file_size_mb:.1f} MB) недоступен для стриминга. MP3 версия не найдена. Используйте кнопку 'Скачать' в боте для загрузки HD версии."
+                )
+            else:
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Файл слишком большой ({file_size_mb:.1f} MB). MP3 версия не найдена. Используйте кнопку 'Скачать' в боте."
+                )
     
     # Verify file is accessible (pre-cache the path)
     file_path = await get_telegram_file_path(track.file_id)
@@ -471,7 +482,7 @@ async def get_stream_url(
         # Check if file is too large (>20MB limit for standard Bot API)
         file_size_mb = (track.file_size or 0) / (1024 * 1024)
         if file_size_mb > 20:
-            logger.warning(f"[Stream Request] Track {track_id} too large: {file_size_mb:.1f} MB")
+            logger.warning(f"[Stream Request] Track {track.id} too large: {file_size_mb:.1f} MB")
             raise HTTPException(
                 status_code=503,
                 detail=f"Файл слишком большой ({file_size_mb:.1f} MB). Telegram Bot API поддерживает скачивание только файлов до 20 MB. Используйте кнопку 'Скачать' в боте."

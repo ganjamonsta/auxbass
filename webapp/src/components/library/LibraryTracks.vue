@@ -34,6 +34,7 @@
           @click="playTrack(track)"
           @like="handleLikeTrack(track)"
           @menu="openTrackMenu(track)"
+          @download="handleDirectDownload(track)"
         />
         
         <div v-if="hasMore" class="load-more">
@@ -291,12 +292,20 @@ const handleTrackSaved = (updatedTrack) => {
 }
 
 const handleDownloadTrack = async (track) => {
+  await handleDirectDownload(track)
+  closeMenu()
+}
+
+// Direct download from TrackItem button - sends file via Telegram bot
+const handleDirectDownload = async (track) => {
   try {
     await playerApi.download(track.id)
+    alert('Трек отправлен вам в Telegram!')
   } catch (error) {
     console.error('Failed to download track:', error)
+    const errorMsg = error.response?.data?.detail || 'Ошибка отправки'
+    alert(`Не удалось отправить трек: ${errorMsg}`)
   }
-  closeMenu()
 }
 
 const handleDeleteTrack = async (track) => {
