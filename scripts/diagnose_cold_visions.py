@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import requests
+import aiohttp
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
@@ -27,17 +27,18 @@ from shared.matching import normalize_artist, normalize_title
 settings = Settings()
 
 
-def get_lastfm_tracklist(artist: str, album: str) -> list:
+async def get_lastfm_tracklist(artist: str, album: str) -> list:
     """Получить треклист альбома из Last.fm"""
-    r = requests.get('https://ws.audioscrobbler.com/2.0/', params={
-        'method': 'album.getinfo',
-        'artist': artist,
-        'album': album,
-        'api_key': settings.lastfm_api_key,
-        'format': 'json'
-    })
+    async with aiohttp.ClientSession() as session:
+        async with session.get('https://ws.audioscrobbler.com/2.0/', params={
+            'method': 'album.getinfo',
+            'artist': artist,
+            'album': album,
+            'api_key': settings.lastfm_api_key,
+            'format': 'json'
+        }) as resp:
+            data = await resp.json()
     
-    data = r.json()
     if 'album' not in data:
         print(f"Ошибка Last.fm: {data}")
         return []
@@ -59,7 +60,7 @@ async def diagnose():
     # Получить треклист из Last.fm
     print("\n1. ТРЕКЛИСТ ИЗ LAST.FM:")
     print("-" * 40)
-    lastfm_tracks = get_lastfm_tracklist("Bladee", "Cold Visions")
+    lastfm_tracks = await get_lastfm_tracklist("Bladee", "Cold Visions")
     print(f"   Всего треков в Last.fm: {len(lastfm_tracks)}")
     for i, t in enumerate(lastfm_tracks, 1):
         print(f"   {i:2}. {t}")

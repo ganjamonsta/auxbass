@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import requests
+import aiohttp
 from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 
@@ -24,17 +24,18 @@ from shared.matching import normalize_title, fuzzy_match_title
 settings = Settings()
 
 
-def get_lastfm_album_info(artist: str, album: str) -> dict:
+async def get_lastfm_album_info(artist: str, album: str) -> dict:
     """Получить информацию об альбоме из Last.fm"""
-    r = requests.get('https://ws.audioscrobbler.com/2.0/', params={
-        'method': 'album.getinfo',
-        'artist': artist,
-        'album': album,
-        'api_key': settings.lastfm_api_key,
-        'format': 'json'
-    })
+    async with aiohttp.ClientSession() as session:
+        async with session.get('https://ws.audioscrobbler.com/2.0/', params={
+            'method': 'album.getinfo',
+            'artist': artist,
+            'album': album,
+            'api_key': settings.lastfm_api_key,
+            'format': 'json'
+        }) as resp:
+            data = await resp.json()
     
-    data = r.json()
     if 'album' not in data:
         print(f"Ошибка Last.fm: {data}")
         return {}
@@ -77,7 +78,7 @@ async def fix_cold_visions_tracks():
     print("=" * 80)
     
     # Получить информацию об альбоме
-    album_info = get_lastfm_album_info("Bladee", "Cold Visions")
+    album_info = await get_lastfm_album_info("Bladee", "Cold Visions")
     
     if not album_info:
         print("Не удалось получить информацию об альбоме")
