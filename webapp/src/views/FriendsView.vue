@@ -558,48 +558,72 @@ onMounted(() => {
 
 .tabs-header {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   margin-bottom: 20px;
   padding: 4px;
-  background: var(--bg-secondary);
-  border-radius: 12px;
+  background: var(--c-bg-0);
+  border-radius: var(--r-md);
+  box-shadow:
+    inset 2px 2px 4px var(--sh-inset-dark),
+    inset -1px -1px 3px var(--sh-inset-light);
 }
 
 .tab-btn {
   flex: 1;
-  padding: 12px 16px;
+  padding: 10px 14px;
   background: transparent;
   border: none;
-  border-radius: 10px;
-  color: var(--text-secondary);
+  border-radius: calc(var(--r-md) - 2px);
+  color: var(--c-text-2);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.tab-btn:hover {
+  color: var(--c-text-1);
 }
 
 .tab-btn.active {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
+  background: var(--c-bg-2);
+  color: var(--c-text-1);
+  font-weight: 600;
+  box-shadow:
+    2px 2px 4px var(--sh-dark),
+    -1px -1px 2px var(--sh-light);
 }
 
-/* Search */
+/* Search - neumorphic inset style */
 .search-box {
   margin-bottom: 20px;
 }
 
 .search-box input {
   width: 100%;
-  padding: 14px 16px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  color: var(--text-primary);
+  padding: 14px 18px;
+  background: var(--c-bg-0);
+  border: none;
+  border-radius: var(--r-lg);
+  color: var(--c-text-1);
   font-size: 16px;
+  box-shadow:
+    inset 3px 3px 6px var(--sh-inset-dark),
+    inset -2px -2px 4px var(--sh-inset-light);
+  outline: none;
+  transition: box-shadow 0.2s ease;
+}
+
+.search-box input:focus {
+  box-shadow:
+    inset 3px 3px 6px var(--sh-inset-dark),
+    inset -2px -2px 4px var(--sh-inset-light),
+    0 0 0 2px var(--accent-glow);
 }
 
 .search-box input::placeholder {
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
 }
 
 .search-hint {

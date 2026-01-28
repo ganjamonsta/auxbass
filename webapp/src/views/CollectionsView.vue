@@ -545,72 +545,110 @@ onMounted(() => {
 .tab-switcher {
   display: flex;
   gap: 4px;
-  background: var(--bg-secondary);
-  border-radius: 8px;
-  padding: 3px;
+  background: var(--c-bg-0);
+  border-radius: var(--r-md);
+  padding: 4px;
+  box-shadow:
+    inset 2px 2px 4px var(--sh-inset-dark),
+    inset -1px -1px 3px var(--sh-inset-light);
 }
 
 .tab-btn {
-  padding: 6px 12px;
+  padding: 8px 14px;
   background: transparent;
   border: none;
-  border-radius: 6px;
-  color: var(--text-secondary);
+  border-radius: calc(var(--r-md) - 2px);
+  color: var(--c-text-2);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
   display: flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
+}
+
+.tab-btn:hover {
+  color: var(--c-text-1);
 }
 
 .tab-btn.active {
-  background: var(--accent);
-  color: #fff;
+  background: var(--c-bg-2);
+  color: var(--c-text-1);
+  font-weight: 600;
+  box-shadow:
+    2px 2px 4px var(--sh-dark),
+    -1px -1px 2px var(--sh-light);
 }
 
 .scope-tabs {
   display: flex;
-  gap: 8px;
+  gap: 4px;
+  padding: 4px;
   margin-bottom: 16px;
+  background: var(--c-bg-0);
+  border-radius: var(--r-md);
+  box-shadow:
+    inset 2px 2px 4px var(--sh-inset-dark),
+    inset -1px -1px 3px var(--sh-inset-light);
 }
 
 .scope-tab {
   flex: 1;
-  padding: 10px 16px;
-  background: var(--bg-elevated);
+  padding: 10px 14px;
+  background: transparent;
   border: none;
-  border-radius: 8px;
-  color: var(--text-secondary);
+  border-radius: calc(var(--r-md) - 2px);
+  color: var(--c-text-2);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
+}
+
+.scope-tab:hover {
+  color: var(--c-text-1);
 }
 
 .scope-tab.active {
   background: var(--accent);
   color: white;
+  font-weight: 600;
+  box-shadow:
+    2px 2px 4px var(--sh-dark),
+    0 0 10px var(--accent-glow);
 }
 
-/* Search bar */
+/* Search bar - neumorphic inset style */
 .search-bar {
   margin-bottom: 16px;
 }
 
 .search-bar input {
   width: 100%;
-  padding: 12px 16px;
-  background: var(--bg-elevated);
+  padding: 14px 18px;
+  background: var(--c-bg-0);
   border: none;
-  border-radius: 10px;
-  color: var(--text-primary);
+  border-radius: var(--r-lg);
+  color: var(--c-text-1);
   font-size: 15px;
+  box-shadow:
+    inset 3px 3px 6px var(--sh-inset-dark),
+    inset -2px -2px 4px var(--sh-inset-light);
+  outline: none;
+  transition: box-shadow 0.2s ease;
+}
+
+.search-bar input:focus {
+  box-shadow:
+    inset 3px 3px 6px var(--sh-inset-dark),
+    inset -2px -2px 4px var(--sh-inset-light),
+    0 0 0 2px var(--accent-glow);
 }
 
 .search-bar input::placeholder {
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
 }
 
 .view-header {

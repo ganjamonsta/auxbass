@@ -99,6 +99,22 @@
   --z-overlay: 50;
   --z-modal: 100;
   --z-toast: 200;
+  
+  /* ─── Legacy Variable Aliases ─── */
+  /* App.vue uses these names - map to design system tokens */
+  --bg-primary: var(--c-bg-1);
+  --bg-secondary: var(--c-bg-2);
+  --bg-elevated: var(--c-bg-3);
+  --bg-highlight: var(--c-bg-4);
+  --bg-card: var(--c-bg-2);
+  --text-primary: var(--c-text-1);
+  --text-secondary: var(--c-text-2);
+  --text-tertiary: var(--c-text-3);
+  --danger: var(--c-error);
+  --border: var(--c-bg-4);
+  
+  /* Accent glow - uses --accent which can be overridden by App.vue */
+  --accent-glow: rgba(29, 185, 84, 0.4);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -911,4 +927,265 @@
 
 .gradient-surface {
   background: linear-gradient(180deg, var(--c-bg-2) 0%, var(--c-bg-0) 100%);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   § 16. TAB BARS & CHIPS
+   Unified neumorphic tab/chip components
+   ═══════════════════════════════════════════════════════════ */
+
+/* Container for tab bar - neumorphic inset well */
+.neu-tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  background: var(--c-bg-0);
+  border-radius: var(--r-lg);
+  box-shadow:
+    inset 3px 3px 6px var(--sh-inset-dark),
+    inset -2px -2px 4px var(--sh-inset-light);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.neu-tab-bar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Individual tab button - raised pill style */
+.neu-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: max-content;
+  padding: 10px 18px;
+  background: var(--c-bg-2);
+  border: none;
+  border-radius: var(--r-md);
+  color: var(--c-text-2);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.15s ease;
+  box-shadow:
+    3px 3px 6px var(--sh-dark),
+    -2px -2px 4px var(--sh-light);
+}
+
+.neu-tab:hover {
+  color: var(--c-text-1);
+}
+
+.neu-tab:active {
+  transform: scale(0.97);
+  box-shadow:
+    inset 2px 2px 4px var(--sh-inset-dark),
+    inset -1px -1px 2px var(--sh-inset-light);
+}
+
+.neu-tab.active {
+  background: var(--accent, var(--c-accent));
+  color: white;
+  font-weight: 600;
+  box-shadow:
+    3px 3px 6px var(--sh-dark),
+    -2px -2px 4px var(--sh-light),
+    0 0 12px var(--accent-glow, var(--c-accent-glow));
+}
+
+.neu-tab.active:active {
+  transform: scale(0.97);
+  box-shadow:
+    inset 2px 2px 4px rgba(0, 0, 0, 0.3),
+    0 0 8px var(--accent-glow, var(--c-accent-glow));
+}
+
+/* Simple pill tabs (without inset container) */
+.neu-tabs-simple {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.neu-tabs-simple::-webkit-scrollbar {
+  display: none;
+}
+
+.neu-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: max-content;
+  padding: 8px 16px;
+  background: var(--c-bg-2);
+  border: none;
+  border-radius: var(--r-full);
+  color: var(--c-text-2);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.15s ease;
+  box-shadow:
+    3px 3px 6px var(--sh-dark),
+    -2px -2px 4px var(--sh-light);
+}
+
+.neu-pill:hover {
+  color: var(--c-text-1);
+}
+
+.neu-pill:active {
+  transform: scale(0.97);
+  box-shadow:
+    inset 2px 2px 4px var(--sh-inset-dark),
+    inset -1px -1px 2px var(--sh-inset-light);
+}
+
+.neu-pill.active {
+  background: var(--accent, var(--c-accent));
+  color: white;
+  font-weight: 600;
+  box-shadow:
+    3px 3px 6px var(--sh-dark),
+    -2px -2px 4px var(--sh-light),
+    0 0 10px var(--accent-glow, var(--c-accent-glow));
+}
+
+/* Compact scope switcher */
+.neu-scope-bar {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  background: var(--c-bg-0);
+  border-radius: var(--r-md);
+  box-shadow:
+    inset 2px 2px 4px var(--sh-inset-dark),
+    inset -1px -1px 3px var(--sh-inset-light);
+}
+
+.neu-scope-btn {
+  flex: 1;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--r-md) - 2px);
+  color: var(--c-text-2);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.neu-scope-btn:hover {
+  color: var(--c-text-1);
+}
+
+.neu-scope-btn.active {
+  background: var(--c-bg-2);
+  color: var(--c-text-1);
+  font-weight: 600;
+  box-shadow:
+    2px 2px 4px var(--sh-dark),
+    -1px -1px 2px var(--sh-light);
+}
+
+/* Segmented control (iOS style) */
+.neu-segmented {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--c-bg-0);
+  border-radius: var(--r-sm);
+  box-shadow:
+    inset 2px 2px 4px var(--sh-inset-dark),
+    inset -1px -1px 3px var(--sh-inset-light);
+}
+
+.neu-segment {
+  flex: 1;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--r-sm) - 2px);
+  color: var(--c-text-2);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.neu-segment.active {
+  background: var(--accent, var(--c-accent));
+  color: white;
+  font-weight: 600;
+  box-shadow:
+    2px 2px 4px var(--sh-dark),
+    0 0 8px var(--accent-glow, var(--c-accent-glow));
+}
+
+/* Sort chip with order toggle */
+.neu-sort-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--c-bg-2);
+  border: none;
+  border-radius: var(--r-full);
+  color: var(--c-text-2);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+  box-shadow:
+    3px 3px 6px var(--sh-dark),
+    -2px -2px 4px var(--sh-light);
+}
+
+.neu-sort-chip:hover {
+  color: var(--c-text-1);
+}
+
+.neu-sort-chip:active {
+  transform: scale(0.97);
+}
+
+.neu-sort-chip.active {
+  background: var(--accent, var(--c-accent));
+  color: white;
+}
+
+.neu-sort-chip .order-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: var(--r-full);
+  font-size: 12px;
+  transition: transform 0.15s ease;
+}
+
+.neu-sort-chip .order-icon:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.neu-sort-chip:not(.active) .order-icon {
+  background: var(--c-bg-4);
 }

@@ -32,12 +32,12 @@
       </div>
     </div>
 
-    <!-- Type Switcher (Tabs) -->
-    <div class="library-tabs">
+    <!-- Type Switcher (Tabs) - Neumorphic style -->
+    <div class="neu-tab-bar library-tabs">
       <button 
         v-for="tab in tabs" 
         :key="tab.id"
-        class="tab-btn"
+        class="neu-tab"
         :class="{ active: currentTabId === tab.id }"
         @click="currentTabId = tab.id"
       >
@@ -126,72 +126,64 @@ const clearSearch = () => {
   margin-bottom: 16px;
 }
 
+/* Search bar - neumorphic style */
 .search-bar {
   display: flex;
   align-items: center;
-  background: var(--bg-elevated);
-  border-radius: 8px;
-  padding: 8px 12px;
-  gap: 8px;
+  background: var(--c-bg-0);
+  border-radius: var(--r-lg);
+  padding: 10px 14px;
+  gap: 10px;
+  box-shadow:
+    inset 3px 3px 6px var(--sh-inset-dark),
+    inset -2px -2px 4px var(--sh-inset-light);
+  transition: box-shadow 0.2s ease;
+}
+
+.search-bar:focus-within {
+  box-shadow:
+    inset 3px 3px 6px var(--sh-inset-dark),
+    inset -2px -2px 4px var(--sh-inset-light),
+    0 0 0 2px var(--accent-glow);
 }
 
 .search-bar input {
   flex: 1;
   background: transparent;
   border: none;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   font-size: 16px;
   outline: none;
 }
 
+.search-bar input::placeholder {
+  color: var(--c-text-3);
+}
+
 .search-icon {
-  color: var(--text-secondary);
+  color: var(--c-text-3);
+  flex-shrink: 0;
 }
 
 .clear-search {
   background: none;
   border: none;
-  color: var(--text-secondary);
+  color: var(--c-text-3);
   cursor: pointer;
   padding: 4px;
-}
-
-/* Tabs Styles */
-.library-tabs {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Tabs Styles - use design system */
+.library-tabs {
   margin-bottom: 20px;
-  overflow-x: auto;
-  padding-bottom: 4px; /* for scrollbar */
-  scrollbar-width: none; /* Firefox */
 }
 
-.library-tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.tab-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 15px;
-  font-weight: 500;
-  padding: 8px 16px;
-  border-radius: 20px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.2s;
-}
-
-.tab-btn:hover {
-  color: var(--text-primary);
-  background: var(--bg-elevated);
-}
-
-.tab-btn.active {
-  background: var(--text-primary); /* High contrast active state like pills */
-  color: var(--bg-card); /* Inverted text for active */
-  font-weight: 600;
+/* Override base .neu-tab-bar for this specific use case */
+.library-tabs.neu-tab-bar {
+  padding: 4px;
 }
 
 /* No channel prompt */
