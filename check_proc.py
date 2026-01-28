@@ -1,0 +1,1 @@
+with open("bot/services/enrichment/processor.py","r",encoding="utf-8") as f:\n    lines = f.readlines()\n    for i, line in enumerate(lines[126:140], 127):\n        print(f"{i}: {repr(line)}")

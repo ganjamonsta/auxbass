@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 from .deezer import deezer_client
 from .lastfm import lastfm_client
+from .tracklist_matcher import album_tracklist_matcher
 from shared.matching import normalize_genre, GENRE_MAPPINGS
 
 logger = logging.getLogger(__name__)
@@ -104,6 +105,30 @@ class EnrichmentProcessor:
                 if lastfm_data.get("lastfm_url"):
                     result.lastfm_url = lastfm_data["lastfm_url"]
         
+        # FALLBACK: If still no album found, try tracklist matching
+        # This searches through artist album tracklists to find the track
+        if not result.album_name and artist and lastfm_client.is_configured:
+            tracklist_match = await self._enrich_from_tracklist(title, artist)
+            
+            if tracklist_match:
+                result.success = True
+                result.album_name = tracklist_match.get("album_name")
+                result.track_number = tracklist_match.get("track_number")
+                
+                if tracklist_match.get("cover_url") and not result.cover_url:
+                    result.cover_url = tracklist_match["cover_url"]
+                
+                if result.source == "none":
+                    result.source = "tracklist"
+                else:
+                    result.source = f"{result.source}+tracklist"
+                
+                result.confidence = max(result.confidence, 60)
+                logger.info(
+                    f"Found album via tracklist: {title} -> {result.album_name} "
+                    f"(track #{result.track_number})"
+                )
+        
         # Normalize genre
         if result.genre:
             result.genre = normalize_genre(result.genre)
@@ -197,6 +222,35 @@ class EnrichmentProcessor:
             logger.error(f"Last.fm enrichment error: {e}")
             return None
     
+    async def _enrich_from_tracklist(
+        self,
+        title: str,
+        artist: str,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Find album by searching through artist album tracklists.
+        Used as fallback when direct track search fails.
+        """
+        try:
+            match = await album_tracklist_matcher.find_album_for_track(
+                track_title=title,
+                artist=artist,
+                match_threshold=0.75
+            )
+            
+            if match:
+                return {
+                    "album_name": match.get("album_name"),
+                    "cover_url": match.get("cover_url"),
+                    "track_number": match.get("track_number"),
+                }
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Tracklist matching error: {e}")
+            return None
+    
     async def get_artist_image(self, artist: str) -> Optional[str]:
         """
         Get artist image URL.
@@ -218,6 +272,7 @@ class EnrichmentProcessor:
         """Close all API clients"""
         await deezer_client.close()
         await lastfm_client.close()
+        await album_tracklist_matcher.close()
 
 
 # Global instance
