@@ -118,6 +118,47 @@
       </div>
     </div>
 
+    <!-- Divider -->
+    <div v-if="displayedAlbums.length > 0 && displayedPlaylists.length > 0" class="sidebar-divider"></div>
+
+    <!-- Playlists List -->
+    <div v-if="displayedPlaylists.length > 0" class="sidebar-section playlists-section">
+      <div class="section-header clickable" @click="$router.push('/playlists')">
+        <span>Плейлисты</span>
+        <span class="section-count">{{ userPlaylists.length }}</span>
+      </div>
+
+      <div class="playlists-list">
+        <div 
+          v-for="playlist in displayedPlaylists" 
+          :key="playlist.id"
+          class="nav-item playlist-item"
+          :class="{ active: $route.params.id == playlist.id && $route.name === 'playlist-detail' }"
+          @click="$router.push(`/playlist/${playlist.id}`)"
+        >
+          <div class="playlist-cover" :style="getPlaylistCoverStyle(playlist)">
+            <img v-if="playlist.cover_url" :src="playlist.cover_url" alt="" />
+            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
+            </svg>
+          </div>
+          <div class="playlist-info">
+            <span class="playlist-name">{{ playlist.name }}</span>
+          </div>
+          <span class="nav-count">{{ playlist.track_count }}</span>
+        </div>
+        
+        <!-- Show more link -->
+        <div 
+          v-if="hasMorePlaylists"
+          class="nav-item show-more-btn"
+          @click="$router.push('/playlists')"
+        >
+          <span class="show-more-text">Показать все {{ userPlaylists.length }}</span>
+        </div>
+      </div>
+    </div>
+
     <!-- User Section (bottom) -->
     <div class="sidebar-footer">
       <div class="user-info">
@@ -172,7 +213,15 @@ const hasMoreAlbums = computed(() => {
 })
 
 const userPlaylists = computed(() => {
-  return playlists.value.filter(p => !p.is_auto_album && !p.is_auto_source).slice(0, 10)
+  return playlists.value.filter(p => !p.is_auto_album && !p.is_auto_source)
+})
+
+const displayedPlaylists = computed(() => {
+  return userPlaylists.value.slice(0, 5)
+})
+
+const hasMorePlaylists = computed(() => {
+  return userPlaylists.value.length > 5
 })
 
 // Format large numbers
