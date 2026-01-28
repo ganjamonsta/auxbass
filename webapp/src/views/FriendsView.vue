@@ -1,5 +1,17 @@
 <template>
   <div class="friends-view">
+    <!-- No channel - show setup prompt -->
+    <div v-if="!authStore.hasChannel" class="no-channel-prompt">
+      <div class="prompt-icon">👥</div>
+      <h2>Кенты</h2>
+      <p>Подключите Telegram-канал, чтобы находить друзей и подписываться на их музыку</p>
+      <button class="setup-btn" @click="goToChannelSetup">
+        Подключить канал
+      </button>
+    </div>
+
+    <!-- Has channel - show friends -->
+    <template v-else>
     <!-- Tab switcher -->
     <div class="tabs-header">
       <button 
@@ -287,6 +299,7 @@
             <div 
               v-for="album in userAlbums" 
               :key="album.id"
+    </template>
               class="album-item"
               @click="$router.push(`/album/${album.id}`); closeProfile()"
             >
@@ -301,7 +314,12 @@
     </div>
   </div>
 </template>
+Navigate to channel setup
+const goToChannelSetup = () => {
+  router.push({ name: 'settings', query: { section: 'channel' } })
+}
 
+// 
 <script setup>
 import { ref, watch, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
@@ -949,6 +967,54 @@ onMounted(() => {
   padding: 24px;
 }
 
+
+/* No channel prompt */
+.no-channel-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+  padding: 32px 24px;
+}
+
+.no-channel-prompt .prompt-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.no-channel-prompt h2 {
+  color: var(--text-primary);
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 12px 0;
+}
+
+.no-channel-prompt p {
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 0 0 24px 0;
+  max-width: 300px;
+}
+
+.no-channel-prompt .setup-btn {
+  background: linear-gradient(135deg, var(--accent) 0%, #00c853 100%);
+  border: none;
+  border-radius: 24px;
+  color: #000;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 14px 32px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.no-channel-prompt .setup-btn:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 16px rgba(0, 230, 118, 0.3);
+}
 .spinner {
   width: 32px;
   height: 32px;
