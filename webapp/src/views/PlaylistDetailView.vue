@@ -95,209 +95,14 @@
     />
 
     <!-- Edit modal -->
-    <div v-if="showEditModal" class="modal-overlay" @click.self="closeEditModal">
-      <div class="modal edit-playlist-modal">
-        <!-- Header with playlist settings -->
-        <div class="edit-header">
-          <h2>Редактирование</h2>
-          <button class="close-modal-btn" @click="closeEditModal">✕</button>
-        </div>
-        
-        <!-- Playlist name and settings -->
-        <div class="edit-settings">
-          <input
-            v-model="editName"
-            type="text"
-            placeholder="Название плейлиста"
-            class="edit-name-input"
-          />
-          <div class="edit-options">
-            <label class="checkbox-label compact">
-              <input type="checkbox" v-model="editIsPublic" />
-              <span>Публичный</span>
-            </label>
-          </div>
-        </div>
-        
-        <!-- Search input -->
-        <div class="search-input-wrapper">
-          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-          </svg>
-          <input
-            v-model="trackSearchQuery"
-            type="text"
-            placeholder="Поиск треков для добавления..."
-            @input="debouncedTrackSearch"
-            ref="trackSearchInput"
-          />
-          <div v-if="searchingTracks" class="search-spinner"></div>
-        </div>
-        
-        <!-- Content area: search results or current tracks -->
-        <div class="edit-content">
-          <!-- Search results -->
-          <div v-if="trackSearchQuery && searchResults.length" class="search-results">
-            <div class="section-label">Результаты поиска</div>
-            <div 
-              v-for="track in searchResults" 
-              :key="'search-' + track.id" 
-              class="search-result-item"
-              :class="{ 
-                'already-added': isTrackInPlaylist(track.id),
-                'is-playing': playerStore.currentTrack?.id === track.id
-              }"
-            >
-              <div class="result-cover-wrapper" @click.stop="togglePreviewPlay(track)">
-                <div class="result-cover">
-                  <img v-if="track.cover_url" :src="track.cover_url" />
-                  <span v-else>🎵</span>
-                </div>
-                <div class="cover-play-overlay" :class="{ 'is-playing': playerStore.currentTrack?.id === track.id && playerStore.isPlaying }">
-                  <svg v-if="playerStore.currentTrack?.id === track.id && playerStore.isPlaying" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-                  </svg>
-                  <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M8 5v14l11-7z"/>
-                  </svg>
-                </div>
-              </div>
-              <div class="result-content">
-                <div class="result-info">
-                  <div class="result-artist">{{ track.artist }}</div>
-                  <div class="result-title">{{ track.title }}</div>
-                </div>
-                <div 
-                  v-if="playerStore.currentTrack?.id === track.id" 
-                  class="result-progress"
-                  @click="seekProgress($event, track)"
-                  @mousedown="startDrag($event, track)"
-                >
-                  <div 
-                    class="result-progress-fill" 
-                    :style="{ width: `${(playerStore.progress / playerStore.duration) * 100 || 0}%` }"
-                  ></div>
-                  <div 
-                    class="result-progress-thumb"
-                    :style="{ left: `${(playerStore.progress / playerStore.duration) * 100 || 0}%` }"
-                  ></div>
-                </div>
-              </div>
-              <div class="result-time">
-                <template v-if="playerStore.currentTrack?.id === track.id">
-                  {{ formatTime(playerStore.progress) }}
-                </template>
-                <template v-else>
-                  {{ formatTime(track.duration) }}
-                </template>
-              </div>
-              <button 
-                v-if="!isTrackInPlaylist(track.id)"
-                class="add-track-btn"
-                @click="addTrackToPlaylist(track)"
-                :disabled="addingTrackId === track.id"
-              >
-                <span v-if="addingTrackId === track.id">...</span>
-                <span v-else>+</span>
-              </button>
-              <button 
-                v-else
-                class="remove-track-btn"
-                @click="removeTrackFromPlaylistModal(track)"
-                :disabled="removingTrackId === track.id"
-                title="Удалить из плейлиста"
-              >
-                <span v-if="removingTrackId === track.id">...</span>
-                <span v-else>✓</span>
-              </button>
-            </div>
-          </div>
-          
-          <div v-else-if="trackSearchQuery && !searchingTracks" class="no-results">
-            Ничего не найдено
-          </div>
-          
-          <!-- Current playlist tracks (when no search) -->
-          <div v-else class="current-tracks">
-            <div class="section-label">Треки в плейлисте ({{ editTracks.length }})</div>
-            <div v-if="editTracks.length" class="tracks-editor">
-              <div 
-                v-for="(track, index) in editTracks" 
-                :key="'edit-' + track.id"
-                class="editable-track"
-                :class="{ 
-                  'is-dragging': dragIndex === index, 
-                  'drag-over': dragOverIndex === index,
-                  'is-playing': playerStore.currentTrack?.id === track.id
-                }"
-                draggable="true"
-                @dragstart="handleDragStart($event, index)"
-                @dragend="handleDragEnd"
-                @dragover.prevent="handleDragOver($event, index)"
-                @drop="onDrop($event, index)"
-              >
-                <div class="drag-handle">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M3 15h18v-2H3v2zm0 4h18v-2H3v2zm0-8h18V9H3v2zm0-6v2h18V5H3z"/>
-                  </svg>
-                </div>
-                <div class="track-number">{{ index + 1 }}</div>
-                <div class="result-cover-wrapper small" @click.stop="togglePreviewPlayEdit(track)">
-                  <div class="result-cover">
-                    <img v-if="track.cover_url" :src="track.cover_url" />
-                    <span v-else>🎵</span>
-                  </div>
-                  <div class="cover-play-overlay" :class="{ 'is-playing': playerStore.currentTrack?.id === track.id && playerStore.isPlaying }">
-                    <svg v-if="playerStore.currentTrack?.id === track.id && playerStore.isPlaying" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-                    </svg>
-                    <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M8 5v14l11-7z"/>
-                    </svg>
-                  </div>
-                </div>
-                <div class="track-info">
-                  <div class="track-title">{{ track.title }}</div>
-                  <div class="track-artist">{{ track.artist }}</div>
-                </div>
-                <button 
-                  class="remove-btn"
-                  @click="removeTrackFromEdit(track, index)"
-                  title="Удалить"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div v-else class="empty-playlist-hint">
-              <span>🎵</span>
-              <p>Плейлист пуст</p>
-              <p class="hint">Найдите треки через поиск выше</p>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Footer actions -->
-        <div class="edit-footer">
-          <button class="delete-playlist-btn" @click="showDeleteConfirm = true">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-            </svg>
-            Удалить плейлист
-          </button>
-          <button 
-            class="save-btn" 
-            @click="savePlaylist"
-            :disabled="!editName.trim() || saving"
-          >
-            <span v-if="saving">Сохранение...</span>
-            <span v-else>Сохранить</span>
-          </button>
-        </div>
-      </div>
-    </div>
+    <EditPlaylistModal
+      :show="showEditModal"
+      :playlist="playlist"
+      @close="showEditModal = false"
+      @save="handleSavePlaylist"
+      @delete="showDeleteConfirm = true"
+      @update:tracks="handleTracksUpdate"
+    />
 
     <!-- Delete confirm -->
     <ConfirmDialog
@@ -324,11 +129,11 @@ import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
 import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
-import { useDragReorder } from '@/composables/useDragReorder'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackMenu from '@/components/TrackMenu.vue'
 import PlaylistPicker from '@/components/PlaylistPicker.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import EditPlaylistModal from '@/components/EditPlaylistModal.vue'
 import api, { playerApi } from '@/api/client'
 
 const route = useRoute()
@@ -338,40 +143,16 @@ const authStore = useAuthStore()
 const libraryStore = useLibraryStore()
 const uiStore = useUIStore()
 
+// State
 const playlist = ref(null)
 const loading = ref(true)
 const showEditModal = ref(false)
 const showDeleteConfirm = ref(false)
-const editName = ref('')
-const editIsPublic = ref(false)
 const showMenu = ref(false)
 const menuTrack = ref(null)
+const showPlaylistPickerForMenu = ref(false)
 
-// Track search state
-const trackSearchQuery = ref('')
-const searchResults = ref([])
-const searchingTracks = ref(false)
-const addingTrackId = ref(null)
-const removingTrackId = ref(null)
-const trackSearchInput = ref(null)
-const saving = ref(false)
-const editTracks = ref([])
-let searchTimeout = null
-
-// Drag and drop for track reordering
-const onTracksReorder = async (reordered) => {
-  editTracks.value = reordered
-  playlist.value.tracks = [...reordered]
-  try {
-    await api.put(`/playlists/${playlist.value.id}/reorder`, {
-      track_ids: reordered.map(t => t.id)
-    })
-  } catch (error) {
-    console.error('Failed to reorder tracks:', error)
-  }
-}
-const { dragIndex, dragOverIndex, handleDragStart, handleDragEnd, handleDragOver, handleDrop } = useDragReorder()
-
+// Computed
 const isOwner = computed(() => {
   if (!playlist.value || !authStore.user) return true
   return playlist.value.owner_id === authStore.user.id || !playlist.value.owner_id
@@ -379,40 +160,21 @@ const isOwner = computed(() => {
 
 const coverImages = computed(() => {
   if (!playlist.value?.tracks) return []
-  const covers = playlist.value.tracks
-    .filter(t => t.cover_url)
-    .slice(0, 4)
-    .map(t => t.cover_url)
-  return covers
+  return playlist.value.tracks.filter(t => t.cover_url).slice(0, 4).map(t => t.cover_url)
 })
 
+// Data loading
 const loadPlaylist = async () => {
   loading.value = true
   try {
     const response = await api.get(`/playlists/${route.params.id}`)
     playlist.value = response.data
-    editName.value = playlist.value.name
-    editIsPublic.value = playlist.value.is_public || false
   } finally {
     loading.value = false
   }
 }
 
-const openEditModal = () => {
-  editName.value = playlist.value.name
-  editIsPublic.value = playlist.value.is_public || false
-  editTracks.value = [...(playlist.value.tracks || [])]
-  trackSearchQuery.value = ''
-  searchResults.value = []
-  showEditModal.value = true
-}
-
-const closeEditModal = () => {
-  showEditModal.value = false
-  trackSearchQuery.value = ''
-  searchResults.value = []
-}
-
+// Playback
 const playAll = () => {
   if (playlist.value?.tracks?.length) {
     playerStore.playTrack(playlist.value.tracks[0], playlist.value.tracks)
@@ -430,17 +192,7 @@ const playTrack = (track, index) => {
   playerStore.playTrack(track, playlist.value.tracks, index)
 }
 
-const removeTrack = async (track) => {
-  try {
-    await api.delete(`/playlists/${playlist.value.id}/tracks/${track.id}`)
-    playlist.value.tracks = playlist.value.tracks.filter(t => t.id !== track.id)
-    playlist.value.track_count--
-  } catch (error) {
-    console.error('Failed to remove track:', error)
-  }
-}
-
-// Track menu handlers
+// Track menu
 const openTrackMenu = (track) => {
   menuTrack.value = track
   showMenu.value = true
@@ -452,8 +204,7 @@ const closeMenu = () => {
 }
 
 const handleLikeTrack = async (track) => {
-  const newLikedState = await libraryStore.toggleLike(track.id)
-  track.is_liked = newLikedState
+  track.is_liked = await libraryStore.toggleLike(track.id)
 }
 
 const handleGoToArtist = () => {
@@ -464,18 +215,15 @@ const handleGoToArtist = () => {
 const handleGoToAlbum = () => {
   closeMenu()
   const albumId = menuTrack.value?.album?.id || menuTrack.value?.album_id
-  if (albumId) {
-    router.push(`/album/${albumId}`)
-  }
+  if (albumId) router.push(`/album/${albumId}`)
 }
 
 const handleAddToPlaylist = () => {
   showPlaylistPickerForMenu.value = true
 }
 
-const showPlaylistPickerForMenu = ref(false)
-const handlePlaylistAdded = (playlist) => {
-  uiStore.toast.success('Добавлено', `Трек добавлен в плейлист "${playlist.name}"`)
+const handlePlaylistAdded = (pl) => {
+  uiStore.toast.success('Добавлено', `Трек добавлен в плейлист "${pl.name}"`)
 }
 
 const handleDownloadTrack = async () => {
@@ -494,13 +242,11 @@ const handleDownloadTrack = async () => {
   closeMenu()
 }
 
-// Handle direct download from TrackItem (for large/HD files)
 const handleDirectDownload = async (track) => {
   try {
     await playerApi.download(track.id)
     uiStore.toast.success('Трек отправлен', 'Проверьте сообщения в Telegram')
   } catch (error) {
-    console.error('Failed to download track:', error)
     const errorMsg = error.response?.data?.detail || 'Ошибка отправки'
     uiStore.toast.error('Не удалось отправить', errorMsg)
   }
@@ -508,37 +254,33 @@ const handleDirectDownload = async (track) => {
 
 const handleRemoveFromPlaylist = async () => {
   if (!menuTrack.value) return
-  await removeTrack(menuTrack.value)
+  try {
+    await api.delete(`/playlists/${playlist.value.id}/tracks/${menuTrack.value.id}`)
+    playlist.value.tracks = playlist.value.tracks.filter(t => t.id !== menuTrack.value.id)
+    playlist.value.track_count--
+  } catch (error) {
+    console.error('Failed to remove track:', error)
+  }
   closeMenu()
 }
 
-const savePlaylist = async () => {
-  if (!editName.value.trim() || saving.value) return
-  
-  saving.value = true
-  try {
-    await api.put(`/playlists/${playlist.value.id}`, {
-      name: editName.value.trim(),
-      is_public: editIsPublic.value
-    })
-    playlist.value.name = editName.value.trim()
-    playlist.value.is_public = editIsPublic.value
-    uiStore.toast.success('Сохранено', 'Плейлист обновлён')
-    showEditModal.value = false
-  } catch (error) {
-    console.error('Failed to update playlist:', error)
-    uiStore.toast.error('Ошибка', 'Не удалось сохранить')
-  } finally {
-    saving.value = false
-  }
+// Edit modal handlers
+const handleSavePlaylist = ({ name, isPublic }) => {
+  playlist.value.name = name
+  playlist.value.is_public = isPublic
+  showEditModal.value = false
+  uiStore.toast.success('Сохранено', 'Плейлист обновлён')
+}
+
+const handleTracksUpdate = (tracks) => {
+  playlist.value.tracks = tracks
+  playlist.value.track_count = tracks.length
 }
 
 const deletePlaylist = async () => {
   try {
-    const playlistId = playlist.value.id
-    await api.delete(`/playlists/${playlistId}`)
-    // Update library store to remove playlist from cache
-    await libraryStore.deletePlaylist(playlistId)
+    await api.delete(`/playlists/${playlist.value.id}`)
+    await libraryStore.deletePlaylist(playlist.value.id)
     uiStore.toast.success('Удалено', 'Плейлист удален')
     router.push('/playlists')
   } catch (error) {
@@ -547,179 +289,7 @@ const deletePlaylist = async () => {
   }
 }
 
-// Add tracks modal functions
-const isTrackInPlaylist = (trackId) => {
-  return editTracks.value?.some(t => t.id === trackId) || false
-}
-
-const debouncedTrackSearch = () => {
-  if (searchTimeout) {
-    clearTimeout(searchTimeout)
-  }
-  searchTimeout = setTimeout(() => {
-    searchTracks()
-  }, 300)
-}
-
-const searchTracks = async () => {
-  if (!trackSearchQuery.value.trim()) {
-    searchResults.value = []
-    return
-  }
-  
-  searchingTracks.value = true
-  try {
-    // Search in personal library first
-    const libraryResponse = await api.get('/library', {
-      params: {
-        search: trackSearchQuery.value,
-        per_page: 20
-      }
-    })
-    const libraryTracks = libraryResponse.data.items || []
-    
-    // Then search in global library
-    const globalResponse = await api.get('/tracks/global', {
-      params: {
-        search: trackSearchQuery.value,
-        per_page: 20
-      }
-    })
-    const globalTracks = globalResponse.data.items || []
-    
-    // Merge results, avoiding duplicates (by track id)
-    const seenIds = new Set(libraryTracks.map(t => t.id))
-    const uniqueGlobalTracks = globalTracks.filter(t => !seenIds.has(t.id))
-    
-    searchResults.value = [...libraryTracks, ...uniqueGlobalTracks].slice(0, 30)
-  } catch (error) {
-    console.error('Failed to search tracks:', error)
-    searchResults.value = []
-  } finally {
-    searchingTracks.value = false
-  }
-}
-
-const addTrackToPlaylist = async (track) => {
-  if (addingTrackId.value) return
-  
-  addingTrackId.value = track.id
-  try {
-    await api.post(`/playlists/${playlist.value.id}/tracks`, {
-      track_id: track.id
-    })
-    // Add track to edit list and main playlist
-    editTracks.value.push(track)
-    if (!playlist.value.tracks) {
-      playlist.value.tracks = []
-    }
-    playlist.value.tracks.push(track)
-    playlist.value.track_count = (playlist.value.track_count || 0) + 1
-  } catch (error) {
-    console.error('Failed to add track:', error)
-  } finally {
-    addingTrackId.value = null
-  }
-}
-
-const removeTrackFromPlaylistModal = async (track) => {
-  if (removingTrackId.value) return
-  
-  removingTrackId.value = track.id
-  try {
-    await api.delete(`/playlists/${playlist.value.id}/tracks/${track.id}`)
-    // Remove track from edit list and main playlist
-    editTracks.value = editTracks.value.filter(t => t.id !== track.id)
-    playlist.value.tracks = playlist.value.tracks.filter(t => t.id !== track.id)
-    playlist.value.track_count = Math.max(0, (playlist.value.track_count || 1) - 1)
-  } catch (error) {
-    console.error('Failed to remove track:', error)
-  } finally {
-    removingTrackId.value = null
-  }
-}
-
-const removeTrackFromEdit = async (track, index) => {
-  try {
-    await api.delete(`/playlists/${playlist.value.id}/tracks/${track.id}`)
-    editTracks.value.splice(index, 1)
-    playlist.value.tracks = playlist.value.tracks.filter(t => t.id !== track.id)
-    playlist.value.track_count = Math.max(0, (playlist.value.track_count || 1) - 1)
-  } catch (error) {
-    console.error('Failed to remove track:', error)
-  }
-}
-
-// Preview play/pause for track selection
-const togglePreviewPlay = (track) => {
-  if (playerStore.currentTrack?.id === track.id) {
-    playerStore.togglePlay()
-  } else {
-    playerStore.playTrack(track, searchResults.value)
-  }
-}
-
-const togglePreviewPlayEdit = (track) => {
-  if (playerStore.currentTrack?.id === track.id) {
-    playerStore.togglePlay()
-  } else {
-    playerStore.playTrack(track, editTracks.value)
-  }
-}
-
-// Format time in MM:SS
-const formatTime = (seconds) => {
-  if (!seconds || isNaN(seconds)) return '--:--'
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  return `${mins}:${secs.toString().padStart(2, '0')}`
-}
-
-// Seek progress bar
-const seekProgress = (event, track) => {
-  if (playerStore.currentTrack?.id !== track.id) return
-  const rect = event.currentTarget.getBoundingClientRect()
-  const percent = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width))
-  const newTime = percent * playerStore.duration
-  playerStore.seek(newTime)
-}
-
-// Drag handling for progress bar
-let isDragging = false
-const startDrag = (event, track) => {
-  if (playerStore.currentTrack?.id !== track.id) return
-  isDragging = true
-  
-  const onMouseMove = (e) => {
-    if (!isDragging) return
-    const progressBar = event.currentTarget
-    const rect = progressBar.getBoundingClientRect()
-    const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-    const newTime = percent * playerStore.duration
-    playerStore.seek(newTime)
-  }
-  
-  const onMouseUp = () => {
-    isDragging = false
-    document.removeEventListener('mousemove', onMouseMove)
-    document.removeEventListener('mouseup', onMouseUp)
-  }
-  
-  document.addEventListener('mousemove', onMouseMove)
-  document.addEventListener('mouseup', onMouseUp)
-}
-
-// Handle drop with reorder callback
-const onDrop = async (event, toIndex) => {
-  const reordered = await handleDrop(event, toIndex, editTracks.value)
-  if (reordered) {
-    await onTracksReorder(reordered)
-  }
-}
-
-onMounted(() => {
-  loadPlaylist()
-})
+onMounted(loadPlaylist)
 </script>
 
 <style scoped>
@@ -911,59 +481,6 @@ onMounted(() => {
   to { transform: rotate(360deg); }
 }
 
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 16px;
-}
-
-.modal {
-  background: var(--bg-elevated);
-  border-radius: 16px;
-  padding: 24px;
-  width: 100%;
-  max-width: 360px;
-}
-
-.modal h2 {
-  margin: 0 0 16px 0;
-  font-size: 20px;
-  color: var(--text-primary);
-}
-
-.modal p {
-  color: var(--text-secondary);
-  margin: 0 0 20px 0;
-}
-
-.modal input {
-  width: 100%;
-  padding: 14px 16px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  color: var(--text-primary);
-  font-size: 16px;
-  margin-bottom: 20px;
-}
-
-.modal input::placeholder {
-  color: var(--text-tertiary);
-}
-
-.modal input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
 .public-badge {
   display: inline-block;
   margin-left: 8px;
@@ -975,649 +492,5 @@ onMounted(() => {
   font-size: 13px;
   color: var(--text-tertiary);
   margin-top: 4px;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--text-secondary);
-  font-size: 14px;
-  margin-bottom: 12px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.checkbox-label input[type="checkbox"] {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 44px;
-  height: 24px;
-  background: var(--bg-highlight);
-  border-radius: 12px;
-  position: relative;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.checkbox-label input[type="checkbox"]::before {
-  content: '';
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: white;
-  top: 2px;
-  left: 2px;
-  transition: transform 0.2s;
-}
-
-.checkbox-label input[type="checkbox"]:checked {
-  background: var(--accent);
-}
-
-.checkbox-label input[type="checkbox"]:checked::before {
-  transform: translateX(20px);
-}
-
-.checkbox-label.compact {
-  margin-bottom: 0;
-}
-
-.checkbox-label.compact input[type="checkbox"] {
-  width: 36px;
-  height: 20px;
-}
-
-.checkbox-label.compact input[type="checkbox"]::before {
-  width: 16px;
-  height: 16px;
-}
-
-.checkbox-label.compact input[type="checkbox"]:checked::before {
-  transform: translateX(16px);
-}
-
-/* Edit playlist modal */
-.edit-playlist-modal {
-  height: 85vh;
-  max-height: 700px;
-  min-height: 500px;
-  width: 100%;
-  max-width: 450px;
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  overflow: hidden;
-}
-
-@media (min-width: 768px) {
-  .edit-playlist-modal {
-    max-width: 550px;
-    height: 80vh;
-    max-height: 750px;
-  }
-}
-
-.edit-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px 20px 16px;
-  border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.1));
-}
-
-.edit-header h2 {
-  margin: 0;
-  font-size: 18px;
-  color: var(--text-primary);
-}
-
-.close-modal-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--bg-highlight);
-  border: none;
-  color: var(--text-secondary);
-  font-size: 16px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-
-.close-modal-btn:hover {
-  background: var(--bg-primary);
-  color: var(--text-primary);
-}
-
-.edit-settings {
-  padding: 16px 20px;
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.1));
-}
-
-.edit-name-input {
-  flex: 1;
-  padding: 10px 14px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color, rgba(255,255,255,0.1));
-  border-radius: 8px;
-  color: var(--text-primary);
-  font-size: 15px;
-  margin: 0 !important;
-}
-
-.edit-name-input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.edit-options {
-  flex-shrink: 0;
-}
-
-.edit-playlist-modal .search-input-wrapper {
-  padding: 16px 20px;
-  margin: 0;
-}
-
-.edit-playlist-modal .search-input-wrapper input {
-  padding-left: 40px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color, rgba(255,255,255,0.1));
-}
-
-.search-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-tertiary);
-  pointer-events: none;
-}
-
-.edit-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0 20px;
-}
-
-.section-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 12px;
-  padding-top: 8px;
-}
-
-.current-tracks {
-  padding-bottom: 16px;
-}
-
-.tracks-editor {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.editable-track {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px;
-  border-radius: 8px;
-  transition: all 0.15s;
-  background: transparent;
-}
-
-.editable-track:hover {
-  background: var(--bg-elevated);
-}
-
-.editable-track.is-dragging {
-  opacity: 0.5;
-  transform: scale(0.98);
-}
-
-.editable-track.drag-over {
-  background: var(--bg-highlight);
-}
-
-.editable-track.drag-over::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--accent);
-}
-
-.editable-track.is-playing {
-  background: rgba(29, 185, 84, 0.1);
-}
-
-.editable-track .drag-handle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 32px;
-  cursor: grab;
-  color: var(--text-tertiary);
-  flex-shrink: 0;
-}
-
-.editable-track .drag-handle:active {
-  cursor: grabbing;
-}
-
-.track-number {
-  width: 20px;
-  text-align: center;
-  font-size: 12px;
-  color: var(--text-tertiary);
-  flex-shrink: 0;
-}
-
-.result-cover-wrapper.small {
-  width: 36px;
-  height: 36px;
-}
-
-.track-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.track-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.track-artist {
-  font-size: 12px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.remove-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: transparent;
-  border: none;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: all 0.2s;
-  opacity: 0;
-}
-
-.editable-track:hover .remove-btn {
-  opacity: 1;
-}
-
-.remove-btn:hover {
-  background: var(--danger, #e53935);
-  color: #fff;
-}
-
-.empty-playlist-hint {
-  text-align: center;
-  padding: 32px 16px;
-  color: var(--text-tertiary);
-}
-
-.empty-playlist-hint span {
-  font-size: 36px;
-  display: block;
-  margin-bottom: 12px;
-}
-
-.empty-playlist-hint p {
-  margin: 0;
-}
-
-.empty-playlist-hint .hint {
-  font-size: 13px;
-  margin-top: 4px;
-}
-
-.edit-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px 20px;
-  border-top: 1px solid var(--border-color, rgba(255,255,255,0.1));
-  background: var(--bg-elevated);
-}
-
-.delete-playlist-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 14px;
-  background: transparent;
-  border: 1px solid var(--danger, #e53935);
-  border-radius: 8px;
-  color: var(--danger, #e53935);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.delete-playlist-btn:hover {
-  background: var(--danger, #e53935);
-  color: #fff;
-}
-
-.save-btn {
-  padding: 12px 24px;
-  background: var(--accent);
-  border: none;
-  border-radius: 8px;
-  color: #000;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.save-btn:hover {
-  transform: scale(1.02);
-}
-
-.save-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.search-input-wrapper {
-  position: relative;
-  margin-bottom: 16px;
-}
-
-.search-input-wrapper input {
-  width: 100%;
-  padding: 12px 40px 12px 16px;
-  background: var(--bg-elevated);
-  border: none;
-  border-radius: 10px;
-  color: var(--text-primary);
-  font-size: 15px;
-}
-
-.search-input-wrapper input::placeholder {
-  color: var(--text-tertiary);
-}
-
-.search-spinner {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--bg-highlight);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-.search-results {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 200px;
-  margin-bottom: 16px;
-}
-
-.search-result-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px;
-  border-radius: 8px;
-  transition: background 0.2s;
-}
-
-.search-result-item:hover {
-  background: var(--bg-elevated);
-}
-
-.search-result-item.already-added {
-  opacity: 0.6;
-}
-
-.search-result-item.is-playing {
-  background: rgba(29, 185, 84, 0.1);
-}
-
-/* Cover wrapper with play overlay */
-.result-cover-wrapper {
-  position: relative;
-  width: 48px;
-  height: 48px;
-  flex-shrink: 0;
-  cursor: pointer;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.result-cover-wrapper:hover .cover-play-overlay {
-  opacity: 1;
-}
-
-.result-cover-wrapper:hover .result-cover img {
-  filter: brightness(0.6);
-}
-
-.result-cover {
-  width: 100%;
-  height: 100%;
-  background: var(--bg-highlight);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.result-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: filter 0.2s;
-}
-
-.cover-play-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.4);
-  opacity: 0;
-  transition: opacity 0.2s;
-  color: #fff;
-}
-
-.cover-play-overlay.is-playing {
-  opacity: 1;
-  background: rgba(0, 0, 0, 0.3);
-}
-
-/* Track content with info and progress */
-.result-content {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.result-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.result-title {
-  font-weight: 500;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 14px;
-}
-
-.result-artist {
-  font-size: 12px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Progress bar spanning full width */
-.result-progress {
-  position: relative;
-  width: 100%;
-  height: 12px;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  padding: 4px 0;
-}
-
-.result-progress::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 2px;
-}
-
-.result-progress-fill {
-  position: absolute;
-  left: 0;
-  height: 3px;
-  background: var(--accent);
-  border-radius: 2px;
-  transition: width 0.05s linear;
-  pointer-events: none;
-}
-
-.result-progress-thumb {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  background: var(--accent);
-  border-radius: 50%;
-  transform: translateX(-50%);
-  opacity: 0;
-  transition: opacity 0.15s;
-  pointer-events: none;
-}
-
-.result-progress:hover .result-progress-thumb,
-.result-progress:active .result-progress-thumb {
-  opacity: 1;
-}
-
-.result-time {
-  font-size: 13px;
-  color: var(--text-tertiary);
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-  min-width: 40px;
-  text-align: right;
-}
-
-.search-result-item.is-playing .result-time {
-  color: var(--accent);
-}
-
-.add-track-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--accent);
-  border: none;
-  color: #000;
-  font-size: 18px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: transform 0.2s;
-}
-
-.add-track-btn:hover {
-  transform: scale(1.1);
-}
-
-.add-track-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.remove-track-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--accent);
-  border: none;
-  color: #000;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: all 0.2s;
-}
-
-.remove-track-btn:hover {
-  background: var(--danger, #e53935);
-  color: #fff;
-}
-
-.remove-track-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.no-results {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 32px 16px;
-  color: var(--text-tertiary);
-  min-height: 120px;
 }
 </style>
