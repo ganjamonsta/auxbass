@@ -1,16 +1,16 @@
 <template>
   <div class="collections-view">
-    <!-- Tab switcher -->
-    <div class="tabs-header">
+    <!-- Inline tab toggle (appears right after header) -->
+    <div class="inline-toggle">
       <button 
-        class="tab-btn" 
+        class="toggle-btn" 
         :class="{ active: activeTab === 'albums' }"
         @click="activeTab = 'albums'"
       >
         💿 Альбомы
       </button>
       <button 
-        class="tab-btn" 
+        class="toggle-btn" 
         :class="{ active: activeTab === 'playlists' }"
         @click="activeTab = 'playlists'"
       >
@@ -510,35 +510,37 @@ onMounted(() => {
 
 <style scoped>
 .collections-view {
-  padding: 16px;
-  padding-bottom: 120px;
+  padding: 8px 16px 120px 16px;
 }
 
-.tabs-header {
+.inline-toggle {
   display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
-  padding: 4px;
+  gap: 4px;
+  margin-bottom: 16px;
   background: var(--bg-secondary);
-  border-radius: 12px;
+  border-radius: 8px;
+  padding: 3px;
+  width: fit-content;
 }
 
-.tab-btn {
-  flex: 1;
-  padding: 12px 16px;
+.toggle-btn {
+  padding: 8px 14px;
   background: transparent;
   border: none;
-  border-radius: 10px;
+  border-radius: 6px;
   color: var(--text-secondary);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.tab-btn.active {
-  background: var(--bg-elevated);
-  color: var(--text-primary);
+.toggle-btn.active {
+  background: var(--accent-color, #1db954);
+  color: #fff;
 }
 
 .scope-tabs {
