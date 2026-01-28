@@ -635,6 +635,82 @@ class ChannelService:
         except TelegramBadRequest as e:
             return False, None, f"Ошибка: {e}"
 
+    async def delete_track_from_channel(
+        self,
+        user_id: int,
+        track_id: int,
+        bot: Optional[Bot] = None,
+    ) -> bool:
+        """
+        Delete a track message from user's channel.
+        
+        Args:
+            user_id: User who owns the channel
+            track_id: Track ID to delete
+            bot: Bot instance for deleting
+        
+        Returns:
+            True if deleted successfully, False otherwise
+        """
+        use_bot = bot or self.bot
+        if not use_bot:
+            logger.error("No bot instance available for deleting")
+            return False
+        
+        async with get_session() as session:
+            # Get channel
+            channel = await session.scalar(
+                select(UserChannel).where(
+                    UserChannel.user_id == user_id,
+                    UserChannel.is_active == True
+                )
+            )
+            
+            if not channel:
+                return False
+            
+            # Get channel message record
+            result = await session.execute(
+                select(ChannelMessage).where(
+                    ChannelMessage.channel_id == channel.id,
+                    ChannelMessage.track_id == track_id
+                )
+            )
+            channel_message = result.scalar_one_or_none()
+            
+            if not channel_message:
+                # No message to delete
+                return False
+            
+            try:
+                # Delete message from Telegram
+                await use_bot.delete_message(
+                    chat_id=channel.channel_id,
+                    message_id=channel_message.message_id
+                )
+                
+                # Delete record from database
+                await session.delete(channel_message)
+                await session.commit()
+                
+                logger.info(f"Track {track_id} message deleted from channel {channel.channel_id}")
+                return True
+                
+            except TelegramForbiddenError:
+                logger.warning(f"Bot removed from channel {channel.channel_id}")
+                return False
+                
+            except TelegramBadRequest as e:
+                # Message might already be deleted
+                if "message to delete not found" in str(e).lower():
+                    # Still delete the record
+                    await session.delete(channel_message)
+                    await session.commit()
+                    logger.info(f"Track {track_id} message record deleted (message already gone)")
+                    return True
+                logger.error(f"Failed to delete message from channel: {e}")
+                return False
+
 
 # Global singleton instance
 channel_service: ChannelService = ChannelService()

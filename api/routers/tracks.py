@@ -958,7 +958,7 @@ async def remove_from_library(
     user: TelegramUser = Depends(require_premium),
     db: AsyncSession = Depends(get_db),
 ):
-    """Remove a track from user's library. Requires connected channel."""
+    """Remove a track from user's library and delete from channel."""
     result = await db.execute(
         select(UserLibrary)
         .where(UserLibrary.track_id == track_id)
@@ -969,10 +969,24 @@ async def remove_from_library(
     if not entry:
         raise HTTPException(status_code=404, detail="Track not found in your library")
     
+    # Check if track was added from global library (not uploaded by user)
+    is_added = entry.source == LibrarySource.ADDED
+    
     await db.delete(entry)
     await db.commit()
     
-    return {"status": "removed", "track_id": track_id}
+    # Delete from channel if it was added from global library
+    deleted_from_channel = False
+    if is_added:
+        try:
+            channel_service = get_channel_service()
+            deleted_from_channel = await channel_service.delete_track_from_channel(user.id, track_id)
+            if deleted_from_channel:
+                logger.info(f"Track {track_id} message deleted from channel for user {user.id}")
+        except Exception as e:
+            logger.warning(f"Failed to delete track {track_id} from channel: {e}")
+    
+    return {"status": "removed", "track_id": track_id, "deleted_from_channel": deleted_from_channel}
 
 
 # ============== Get all tracks (alias for backwards compat) ==============
