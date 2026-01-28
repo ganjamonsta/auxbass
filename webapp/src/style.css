@@ -2,465 +2,78 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════════════════════════════════
+   🎵 TG PLAYER - ROOT STYLES
+   ═══════════════════════════════════════════════════════════════════════════════
+   
+   Design system is in: ./styles/design-system.css
+   This file contains app-specific overrides and legacy compatibility aliases.
+   
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
 :root {
   --tg-viewport-height: 100dvh;
   --tg-viewport-stable-height: 100dvh;
   
-  /* ═══════════════════════════════════════════════════════════
-     🎵 NOKIA XPRESSMUSIC NEUMORPHIC DESIGN SYSTEM
-     Inspired by Nokia 5700 XpressMusic + Modern Neumorphism
-     ═══════════════════════════════════════════════════════════ */
+  /* ─────────────────────────────────────────────────────────────────────────────
+     Legacy Variable Aliases
+     Map old variable names to new design system tokens (from design-system.css)
+     ───────────────────────────────────────────────────────────────────────────── */
   
-  /* ─── Core Palette ─── */
-  --xm-accent: #E53935;           /* Nokia XpressMusic red */
-  --xm-accent-light: #FF6F60;
-  --xm-accent-dark: #AB000D;
-  --xm-accent-glow: rgba(229, 57, 53, 0.4);
+  /* XpressMusic aliases → Design System */
+  --xm-accent: var(--c-accent);
+  --xm-accent-light: var(--c-accent-light);
+  --xm-accent-dark: var(--c-accent-dark);
+  --xm-accent-glow: var(--c-accent-glow);
+  --xm-secondary: var(--c-secondary);
+  --xm-secondary-glow: var(--c-secondary-glow);
   
-  --xm-secondary: #00BCD4;        /* Cyan for contrast */
-  --xm-secondary-glow: rgba(0, 188, 212, 0.3);
+  --xm-bg-deep: var(--c-bg-0);
+  --xm-bg-base: var(--c-bg-1);
+  --xm-bg-elevated: var(--c-bg-2);
+  --xm-bg-surface: var(--c-bg-3);
+  --xm-bg-hover: var(--c-bg-4);
+  --xm-bg-card: var(--c-bg-2);
   
-  /* ─── Surface Colors ─── */
-  --xm-bg-deep: #0D0D0D;          /* Deepest background */
-  --xm-bg-base: #141414;          /* Main background */
-  --xm-bg-elevated: #1A1A1A;      /* Cards, elevated surfaces */
-  --xm-bg-surface: #222222;       /* Interactive surfaces */
-  --xm-bg-hover: #2A2A2A;         /* Hover states */
+  --xm-text-primary: var(--c-text-1);
+  --xm-text-secondary: var(--c-text-2);
+  --xm-text-muted: var(--c-text-3);
+  --xm-text-disabled: var(--c-text-4);
   
-  /* ─── Text Colors ─── */
-  --xm-text-primary: #FFFFFF;
-  --xm-text-secondary: #B0B0B0;
-  --xm-text-muted: #666666;
-  --xm-text-disabled: #444444;
+  /* Spotify legacy aliases */
+  --spotify-green: var(--c-accent);
+  --spotify-green-dark: var(--c-accent-dark);
+  --spotify-black: var(--c-bg-1);
+  --spotify-gray-dark: var(--c-bg-2);
+  --spotify-gray: var(--c-bg-3);
+  --spotify-gray-light: var(--c-bg-4);
+  --spotify-text: var(--c-text-1);
+  --spotify-text-secondary: var(--c-text-2);
+  --spotify-text-muted: var(--c-text-3);
   
-  /* ─── Neumorphic Shadows ─── */
-  --neu-shadow-dark: rgba(0, 0, 0, 0.5);
-  --neu-shadow-light: rgba(255, 255, 255, 0.04);
-  --neu-shadow-inset-dark: rgba(0, 0, 0, 0.6);
-  --neu-shadow-inset-light: rgba(255, 255, 255, 0.03);
+  /* Neumorphic legacy aliases */
+  --neu-bg: var(--c-bg-2);
+  --neu-radius: var(--r-lg);
+  --neu-radius-sm: var(--r-sm);
+  --neu-radius-md: var(--r-md);
+  --neu-radius-lg: var(--r-lg);
+  --neu-radius-xl: var(--r-xl);
+  --neu-radius-full: var(--r-full);
   
-  /* ─── Neumorphic Presets ─── */
-  --neu-radius-sm: 8px;
-  --neu-radius-md: 12px;
-  --neu-radius-lg: 16px;
-  --neu-radius-xl: 24px;
-  --neu-radius-full: 9999px;
-  
-  /* ─── LCD Screen (Nokia inspired) ─── */
-  --lcd-bg: linear-gradient(180deg, #0a1520 0%, #051015 100%);
-  --lcd-text: #4DC3FF;
-  --lcd-text-glow: rgba(77, 195, 255, 0.6);
-  --lcd-dot-active: #00CCFF;
-  --lcd-dot-inactive: #0a2035;
-  
-  /* ─── Rubber Button (Nokia style) ─── */
-  --rubber-bg: linear-gradient(180deg, #3a3a3a 0%, #252525 50%, #1a1a1a 100%);
-  --rubber-bg-pressed: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 50%, #151515 100%);
-  --rubber-border: #0a0a0a;
-  
-  /* ─── Legacy compatibility (Spotify aliases) ─── */
-  --spotify-green: var(--xm-accent);
-  --spotify-green-dark: var(--xm-accent-dark);
-  --spotify-black: var(--xm-bg-base);
-  --spotify-gray-dark: var(--xm-bg-elevated);
-  --spotify-gray: var(--xm-bg-surface);
-  --spotify-gray-light: var(--xm-bg-hover);
-  --spotify-text: var(--xm-text-primary);
-  --spotify-text-secondary: var(--xm-text-secondary);
-  --spotify-text-muted: var(--xm-text-muted);
-  
-  /* ─── Neumorphism tokens (legacy) ─── */
-  --neu-bg: var(--xm-bg-elevated);
-  --neu-radius: var(--neu-radius-lg);
+  --neu-shadow-dark: var(--sh-dark);
+  --neu-shadow-light: var(--sh-light);
+  --neu-shadow-inset-dark: var(--sh-inset-dark);
+  --neu-shadow-inset-light: var(--sh-inset-light);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   BASE STYLES
+   ═══════════════════════════════════════════════════════════ */
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-}
-
-/* ═══════════════════════════════════════════════════════════
-   🔘 NEUMORPHIC UTILITY CLASSES
-   Reusable components for consistent UI
-   ═══════════════════════════════════════════════════════════ */
-
-/* ─── Raised Surface (Cards, Panels) ─── */
-.neu-raised {
-  background: var(--xm-bg-elevated);
-  border-radius: var(--neu-radius-lg);
-  box-shadow: 
-    6px 6px 12px var(--neu-shadow-dark),
-    -3px -3px 8px var(--neu-shadow-light);
-  border: 1px solid rgba(255, 255, 255, 0.02);
-}
-
-/* ─── Inset Surface (Inputs, Progress bars) ─── */
-.neu-inset {
-  background: var(--xm-bg-deep);
-  border-radius: var(--neu-radius-md);
-  box-shadow: 
-    inset 4px 4px 8px var(--neu-shadow-inset-dark),
-    inset -2px -2px 6px var(--neu-shadow-inset-light);
-}
-
-/* ─── Circle Button (Icon buttons) ─── */
-.neu-btn-circle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
-  border-radius: var(--neu-radius-full);
-  background: var(--xm-bg-elevated);
-  color: var(--xm-text-primary);
-  border: none;
-  cursor: pointer;
-  box-shadow: 
-    5px 5px 10px var(--neu-shadow-dark),
-    -2px -2px 5px var(--neu-shadow-light);
-  transition: all 0.15s ease;
-}
-
-.neu-btn-circle:active {
-  transform: scale(0.95);
-  box-shadow: 
-    inset 3px 3px 6px var(--neu-shadow-inset-dark),
-    inset -2px -2px 4px var(--neu-shadow-inset-light);
-}
-
-.neu-btn-circle.active {
-  color: var(--xm-accent);
-  box-shadow: 
-    inset 3px 3px 6px var(--neu-shadow-inset-dark),
-    inset -2px -2px 4px var(--neu-shadow-inset-light),
-    0 0 12px var(--xm-accent-glow);
-}
-
-/* ─── Primary Action Button (Play, Submit) ─── */
-.neu-btn-primary {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 14px 24px;
-  border-radius: var(--neu-radius-lg);
-  background: linear-gradient(145deg, var(--xm-accent), var(--xm-accent-dark));
-  color: white;
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-  box-shadow: 
-    6px 6px 12px var(--neu-shadow-dark),
-    -2px -2px 6px var(--neu-shadow-light),
-    0 0 20px var(--xm-accent-glow);
-  transition: all 0.15s ease;
-}
-
-.neu-btn-primary:active {
-  transform: scale(0.97);
-  box-shadow: 
-    inset 2px 2px 5px rgba(0, 0, 0, 0.4),
-    0 0 15px var(--xm-accent-glow);
-}
-
-/* ─── Secondary Button ─── */
-.neu-btn-secondary {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 14px 24px;
-  border-radius: var(--neu-radius-lg);
-  background: var(--xm-bg-elevated);
-  color: var(--xm-text-primary);
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-  box-shadow: 
-    4px 4px 8px var(--neu-shadow-dark),
-    -2px -2px 5px var(--neu-shadow-light);
-  transition: all 0.15s ease;
-}
-
-.neu-btn-secondary:active {
-  transform: scale(0.97);
-  box-shadow: 
-    inset 2px 2px 4px var(--neu-shadow-inset-dark),
-    inset -1px -1px 3px var(--neu-shadow-inset-light);
-}
-
-/* ─── Nokia Rubber Button Style ─── */
-.neu-btn-rubber {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  color: var(--xm-text-primary);
-  transition: all 0.15s ease;
-  position: relative;
-  background: var(--rubber-bg);
-  box-shadow: 
-    0 2px 4px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--rubber-border);
-}
-
-.neu-btn-rubber::before {
-  content: '';
-  position: absolute;
-  inset: 4px;
-  background: 
-    radial-gradient(circle at 20% 30%, rgba(255,255,255,0.08) 0%, transparent 40%),
-    radial-gradient(circle at 80% 30%, rgba(255,255,255,0.08) 0%, transparent 40%);
-  border-radius: 4px;
-  pointer-events: none;
-}
-
-.neu-btn-rubber:active {
-  transform: scale(0.96);
-  background: var(--rubber-bg-pressed);
-  box-shadow: 
-    0 1px 2px rgba(0, 0, 0, 0.5),
-    inset 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.neu-btn-rubber:active svg,
-.neu-btn-rubber:active .btn-icon {
-  color: var(--xm-accent);
-}
-
-/* ─── Input Field ─── */
-.neu-input {
-  width: 100%;
-  padding: 14px 18px;
-  border: none;
-  border-radius: var(--neu-radius-lg);
-  background: var(--xm-bg-deep);
-  color: var(--xm-text-primary);
-  font-size: 16px;
-  box-shadow: 
-    inset 3px 3px 6px var(--neu-shadow-inset-dark),
-    inset -2px -2px 4px var(--neu-shadow-inset-light);
-  outline: none;
-  transition: box-shadow 0.2s ease;
-}
-
-.neu-input:focus {
-  box-shadow: 
-    inset 3px 3px 6px var(--neu-shadow-inset-dark),
-    inset -2px -2px 4px var(--neu-shadow-inset-light),
-    0 0 0 2px var(--xm-accent-glow);
-}
-
-.neu-input::placeholder {
-  color: var(--xm-text-muted);
-}
-
-/* ─── Slider/Range ─── */
-.neu-slider {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 6px;
-  border-radius: var(--neu-radius-full);
-  background: var(--xm-bg-surface);
-  outline: none;
-  cursor: pointer;
-  box-shadow: 
-    inset 2px 2px 4px var(--neu-shadow-inset-dark),
-    inset -1px -1px 3px var(--neu-shadow-inset-light);
-}
-
-.neu-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: var(--neu-radius-full);
-  background: linear-gradient(145deg, var(--xm-accent), var(--xm-accent-dark));
-  cursor: pointer;
-  box-shadow: 
-    3px 3px 6px var(--neu-shadow-dark),
-    -1px -1px 3px var(--neu-shadow-light),
-    0 0 8px var(--xm-accent-glow);
-  transition: transform 0.1s ease;
-}
-
-.neu-slider:active::-webkit-slider-thumb {
-  transform: scale(1.15);
-}
-
-/* ─── Cover/Thumbnail with shadow ─── */
-.neu-cover {
-  border-radius: var(--neu-radius-md);
-  overflow: hidden;
-  box-shadow: 
-    3px 3px 6px var(--neu-shadow-dark),
-    -1px -1px 3px var(--neu-shadow-light);
-}
-
-.neu-cover-lg {
-  border-radius: var(--neu-radius-xl);
-  box-shadow: 
-    12px 12px 24px var(--neu-shadow-dark),
-    -6px -6px 12px var(--neu-shadow-light);
-  border: 2px solid rgba(255, 255, 255, 0.03);
-}
-
-/* ─── LCD Screen Container (Nokia style) ─── */
-.neu-lcd {
-  background: var(--lcd-bg);
-  border-radius: var(--neu-radius-md);
-  padding: 8px 12px;
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  border: 1px solid #1a2a40;
-  box-shadow: 
-    inset 0 2px 8px rgba(0, 0, 0, 0.8),
-    0 1px 0 rgba(100, 150, 255, 0.1);
-}
-
-.neu-lcd-text {
-  color: var(--lcd-text);
-  text-shadow: 0 0 8px var(--lcd-text-glow);
-}
-
-/* ─── Progress Dots (LED style) ─── */
-.neu-led-dots {
-  display: flex;
-  gap: 3px;
-}
-
-.neu-led-dot {
-  width: 100%;
-  height: 3px;
-  background: var(--lcd-dot-inactive);
-  border-radius: 1px;
-  flex: 1;
-  transition: background 0.1s ease;
-}
-
-.neu-led-dot.active {
-  background: var(--lcd-dot-active);
-  box-shadow: 0 0 4px rgba(0, 204, 255, 0.8);
-}
-
-/* ─── Floating Sheet (Bottom sheets, Modals) ─── */
-.neu-sheet {
-  background: var(--xm-bg-elevated);
-  border-radius: var(--neu-radius-xl) var(--neu-radius-xl) 0 0;
-  box-shadow: 
-    0 -8px 24px var(--neu-shadow-dark),
-    0 -2px 8px var(--neu-shadow-light);
-  border: 1px solid rgba(255, 255, 255, 0.03);
-  border-bottom: none;
-}
-
-/* ─── Card with Glow on Active ─── */
-.neu-card-interactive {
-  background: var(--xm-bg-elevated);
-  border-radius: var(--neu-radius-md);
-  padding: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 
-    4px 4px 8px var(--neu-shadow-dark),
-    -2px -2px 4px var(--neu-shadow-light);
-}
-
-.neu-card-interactive:active {
-  transform: scale(0.98);
-  box-shadow: 
-    inset 2px 2px 4px var(--neu-shadow-inset-dark),
-    inset -1px -1px 2px var(--neu-shadow-inset-light);
-}
-
-.neu-card-interactive.playing {
-  box-shadow: 
-    4px 4px 8px var(--neu-shadow-dark),
-    -2px -2px 4px var(--neu-shadow-light),
-    0 0 20px var(--xm-accent-glow);
-}
-
-/* ─── Divider ─── */
-.neu-divider {
-  height: 1px;
-  background: linear-gradient(90deg, 
-    transparent 0%, 
-    var(--xm-bg-hover) 20%, 
-    var(--xm-bg-hover) 80%, 
-    transparent 100%);
-  margin: 8px 0;
-}
-
-/* ═══════════════════════════════════════════════════════════
-   Legacy Neumorphic Classes (for backward compatibility)
-   ═══════════════════════════════════════════════════════════ */
-
-/* 1. Raised Element (Cards, Buttons) */
-.neu-outset {
-  background: var(--neu-bg);
-  box-shadow: 
-    6px 6px 12px var(--neu-shadow-dark),
-    -3px -3px 8px var(--neu-shadow-light);
-  border-radius: var(--neu-radius);
-  border: 1px solid rgba(255, 255, 255, 0.02);
-}
-
-/* 2. Pressed Element (Active buttons, Inputs) */
-.neu-inset-legacy {
-  background: var(--xm-bg-deep);
-  box-shadow: 
-    inset 4px 4px 8px var(--neu-shadow-dark),
-    inset -2px -2px 6px var(--neu-shadow-light);
-  border-radius: var(--neu-radius);
-}
-
-/* 3. Icon Button Wrapper */
-.neu-icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: var(--neu-bg);
-  color: var(--xm-text-primary);
-  border: none;
-  cursor: pointer;
-  box-shadow: 
-    5px 5px 10px var(--neu-shadow-dark),
-    -2px -2px 5px var(--neu-shadow-light);
-  transition: all 0.2s ease;
-}
-
-.neu-icon-btn:active {
-  transform: scale(0.95);
-  box-shadow: 
-    inset 3px 3px 6px var(--neu-shadow-dark),
-    inset -2px -2px 4px var(--neu-shadow-light);
-}
-
-.neu-icon-btn.active {
-  color: var(--xm-accent);
-  box-shadow: 
-    inset 3px 3px 6px var(--neu-shadow-dark),
-    inset -2px -2px 4px var(--neu-shadow-light);
-}
-
-/* 4. Action Button (Play) - Now red XpressMusic style */
-.neu-action-btn {
-  background: linear-gradient(145deg, var(--xm-accent), var(--xm-accent-dark));
-  color: white;
-  box-shadow: 
-    6px 6px 12px rgba(0,0,0,0.5),
-    -2px -2px 6px rgba(255,255,255,0.1),
-    0 0 20px var(--xm-accent-glow);
-}
-
-.neu-action-btn:active {
-  transform: scale(0.95);
-  box-shadow: inset 2px 2px 5px rgba(0,0,0,0.3);
 }
 
 html, body {
@@ -469,21 +82,11 @@ html, body {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-  background-color: var(--spotify-black);
-  color: var(--spotify-text);
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  background-color: var(--c-bg-1);
+  color: var(--c-text-1);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-/* Override Telegram theme with Spotify colors */
-body.spotify-theme {
-  --tg-theme-bg-color: var(--spotify-black);
-  --tg-theme-secondary-bg-color: var(--spotify-gray);
-  --tg-theme-text-color: var(--spotify-text);
-  --tg-theme-hint-color: var(--spotify-text-secondary);
-  --tg-theme-button-color: var(--spotify-green);
-  --tg-theme-button-text-color: #000000;
 }
 
 #app {
@@ -493,21 +96,32 @@ body.spotify-theme {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background-color: var(--spotify-black);
+  background-color: var(--c-bg-1);
 }
 
 /* ═══════════════════════════════════════════════════════════
-   🔲 OVERLAY SCROLLBAR (doesn't take layout space)
+   TELEGRAM THEME OVERRIDE
    ═══════════════════════════════════════════════════════════ */
 
-/* Enable overlay scrollbars globally */
+body.spotify-theme {
+  --tg-theme-bg-color: var(--c-bg-1);
+  --tg-theme-secondary-bg-color: var(--c-bg-3);
+  --tg-theme-text-color: var(--c-text-1);
+  --tg-theme-hint-color: var(--c-text-2);
+  --tg-theme-button-color: var(--c-accent);
+  --tg-theme-button-text-color: #000000;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   GLOBAL SCROLLBAR STYLES
+   ═══════════════════════════════════════════════════════════ */
+
 * {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
-  scrollbar-gutter: auto; /* Don't reserve space for scrollbar */
+  scrollbar-gutter: auto;
 }
 
-/* WebKit (Chrome, Safari, Edge) overlay scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -521,14 +135,13 @@ body.spotify-theme {
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.25);
   border-radius: 3px;
-  transition: background 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.45);
 }
 
-/* Hide scrollbar by default, show on hover/scroll */
+/* Overlay scroll behavior */
 .overlay-scroll {
   overflow-y: auto;
   overflow-x: hidden;
@@ -543,29 +156,24 @@ body.spotify-theme {
   background: rgba(255, 255, 255, 0.25);
 }
 
-/* Force overlay behavior on scrollable containers */
-[style*="overflow: auto"],
-[style*="overflow-y: auto"],
-[style*="overflow-y: scroll"],
-.overflow-auto,
-.overflow-y-auto,
-.overflow-y-scroll {
-  overflow-y: overlay !important; /* Deprecated but works in Chromium */
-}
+/* ═══════════════════════════════════════════════════════════
+   UTILITY CLASSES
+   ═══════════════════════════════════════════════════════════ */
 
-/* Disable text selection on UI elements */
 .no-select {
   -webkit-user-select: none;
   user-select: none;
 }
 
-/* Touch feedback */
 .touch-active:active {
   transform: scale(0.98);
   opacity: 0.9;
 }
 
-/* Animation utilities */
+/* ═══════════════════════════════════════════════════════════
+   VUE TRANSITIONS
+   ═══════════════════════════════════════════════════════════ */
+
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.2s ease;
@@ -586,15 +194,191 @@ body.spotify-theme {
   transform: translateY(100%);
 }
 
-/* One UI style large header */
+/* ═══════════════════════════════════════════════════════════
+   LEGACY CLASS ALIASES
+   These map old class names to design-system equivalents.
+   Prefer using design-system classes directly in new code.
+   ═══════════════════════════════════════════════════════════ */
+
+/* Surface classes - Legacy support */
+.neu-raised,
+.neu-outset {
+  background: var(--c-bg-2);
+  border-radius: var(--r-lg);
+  box-shadow: 
+    5px 5px 10px var(--sh-dark),
+    -3px -3px 6px var(--sh-light);
+  border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.neu-inset,
+.neu-inset-legacy {
+  background: var(--c-bg-0);
+  border-radius: var(--r-md);
+  box-shadow: 
+    inset 3px 3px 6px var(--sh-inset-dark),
+    inset -2px -2px 4px var(--sh-inset-light);
+}
+
+/* Button classes - Legacy support */
+.neu-icon-btn,
+.neu-btn-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--r-full);
+  background: var(--c-bg-2);
+  color: var(--c-text-1);
+  border: none;
+  cursor: pointer;
+  box-shadow: 
+    5px 5px 10px var(--sh-dark),
+    -2px -2px 5px var(--sh-light);
+  transition: all 0.15s ease;
+}
+
+.neu-icon-btn:active,
+.neu-btn-circle:active {
+  transform: scale(0.95);
+  box-shadow: 
+    inset 3px 3px 6px var(--sh-inset-dark),
+    inset -2px -2px 4px var(--sh-inset-light);
+}
+
+.neu-icon-btn.active,
+.neu-btn-circle.active {
+  color: var(--c-accent);
+  box-shadow: 
+    inset 3px 3px 6px var(--sh-inset-dark),
+    inset -2px -2px 4px var(--sh-inset-light),
+    0 0 12px var(--c-accent-glow);
+}
+
+.neu-action-btn {
+  background: linear-gradient(145deg, var(--c-accent), var(--c-accent-dark));
+  color: white;
+  box-shadow: 
+    6px 6px 12px var(--sh-dark),
+    -2px -2px 6px var(--sh-light),
+    0 0 20px var(--c-accent-glow);
+}
+
+.neu-action-btn:active {
+  transform: scale(0.95);
+  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+/* Card classes - Legacy support */
+.neu-card-interactive {
+  background: var(--c-bg-2);
+  border-radius: var(--r-md);
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 
+    4px 4px 8px var(--sh-dark),
+    -2px -2px 4px var(--sh-light);
+}
+
+.neu-card-interactive:active {
+  transform: scale(0.98);
+  box-shadow: 
+    inset 2px 2px 4px var(--sh-inset-dark),
+    inset -1px -1px 2px var(--sh-inset-light);
+}
+
+.neu-card-interactive.playing {
+  box-shadow: 
+    4px 4px 8px var(--sh-dark),
+    -2px -2px 4px var(--sh-light),
+    0 0 20px var(--c-accent-glow);
+}
+
+/* Divider */
+.neu-divider {
+  height: 1px;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    var(--c-bg-4) 20%, 
+    var(--c-bg-4) 80%, 
+    transparent 100%);
+  margin: 8px 0;
+}
+
+/* LCD components - Legacy support */
+.neu-lcd {
+  background: var(--lcd-bg);
+  border-radius: var(--r-md);
+  padding: 8px 12px;
+  font-family: var(--font-sans);
+  border: 1px solid #1a2a40;
+  box-shadow: 
+    inset 0 2px 8px rgba(0, 0, 0, 0.8),
+    0 1px 0 rgba(100, 150, 255, 0.1);
+}
+
+.neu-lcd-text {
+  color: var(--lcd-text);
+  text-shadow: 0 0 8px var(--lcd-glow);
+}
+
+.neu-led-dots {
+  display: flex;
+  gap: 3px;
+}
+
+.neu-led-dot {
+  flex: 1;
+  height: 3px;
+  background: var(--lcd-dot-off);
+  border-radius: 1px;
+  transition: all 0.1s ease;
+}
+
+.neu-led-dot.active {
+  background: var(--lcd-dot-on);
+  box-shadow: 0 0 4px rgba(0, 204, 255, 0.8);
+}
+
+/* Sheet - Legacy support */
+.neu-sheet {
+  background: var(--c-bg-2);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  box-shadow: 
+    0 -8px 24px var(--sh-dark),
+    0 -2px 8px var(--sh-light);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-bottom: none;
+}
+
+/* Cover shadows - Legacy support */
+.neu-cover {
+  border-radius: var(--r-md);
+  overflow: hidden;
+  box-shadow: 
+    3px 3px 6px var(--sh-dark),
+    -1px -1px 3px var(--sh-light);
+}
+
+.neu-cover-lg {
+  border-radius: var(--r-xl);
+  box-shadow: 
+    12px 12px 24px var(--sh-dark),
+    -6px -6px 12px var(--sh-light);
+  border: 2px solid rgba(255, 255, 255, 0.03);
+}
+
+/* Header - Legacy support */
 .oneui-header {
   padding: 60px 24px 16px;
-  background: linear-gradient(180deg, var(--spotify-gray-dark) 0%, var(--spotify-black) 100%);
+  background: linear-gradient(180deg, var(--c-bg-2) 0%, var(--c-bg-1) 100%);
 }
 
 .oneui-header h1 {
   font-size: 32px;
   font-weight: 700;
   letter-spacing: -0.5px;
-  color: var(--spotify-text);
+  color: var(--c-text-1);
 }

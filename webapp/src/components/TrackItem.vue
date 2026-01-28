@@ -1,7 +1,7 @@
 <template>
   <div 
     class="track-item" 
-    :class="{ playing: isPlaying, compact: compact, unavailable: track.is_unavailable, 'too-large': isLargeFile && !track.is_unavailable }" 
+    :class="{ playing: isPlaying, compact: compact, unavailable: track.is_unavailable }" 
     @click="handleClick"
     @contextmenu.prevent="$emit('menu')"
   >
@@ -26,13 +26,6 @@
         <div class="bar"></div>
       </div>
       
-      <!-- Large file indicator (not unavailable, just too big for streaming) -->
-      <div v-if="isLargeFile && !track.is_unavailable" class="large-file-overlay" title="Файл слишком большой для стриминга. Используйте Скачать.">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-        </svg>
-      </div>
-      
       <!-- Unavailable overlay -->
       <div v-if="track.is_unavailable" class="unavailable-overlay">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -55,12 +48,26 @@
       <div class="track-meta">
         <span v-if="!hideArtist" class="track-artist">{{ track.artist || 'Неизвестный' }}</span>
         <span v-if="showAlbum && albumName" class="track-album">{{ albumName }}</span>
-        <span v-if="isLargeFile" class="large-file-badge">{{ fileSizeMB }} MB</span>
         <span v-else-if="track.play_count && !hideArtist" class="play-count">• {{ track.play_count }} прослушиваний</span>
       </div>
     </div>
     
-    <div class="track-duration">
+    <!-- Large file: show size + download button instead of duration -->
+    <template v-if="isLargeFile && !track.is_unavailable">
+      <span class="track-filesize">{{ fileSizeMB }} MB</span>
+      <button 
+        class="track-download" 
+        @click.stop="$emit('download')"
+        title="Скачать файл"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+        </svg>
+      </button>
+    </template>
+    
+    <!-- Normal tracks: show duration -->
+    <div v-else class="track-duration">
       {{ formatDuration(track.duration) }}
     </div>
     
@@ -147,7 +154,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['click', 'menu', 'like', 'addToLibrary'])
+const emit = defineEmits(['click', 'menu', 'like', 'addToLibrary', 'download'])
 
 const handleClick = () => {
   if (props.track.is_unavailable) {
@@ -354,6 +361,46 @@ const albumName = computed(() => {
   font-variant-numeric: tabular-nums;
 }
 
+/* ─── File Size (for large files) ─── */
+.track-filesize {
+  width: 52px;
+  text-align: right;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-warning, #FFA000);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Download Button ─── */
+.track-download {
+  width: 32px;
+  height: 32px;
+  background: var(--xm-bg-surface);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-warning, #FFA000);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  border-radius: var(--neu-radius-sm);
+  box-shadow: 
+    2px 2px 4px var(--neu-shadow-dark),
+    -1px -1px 2px var(--neu-shadow-light);
+}
+
+.track-download:hover,
+.track-download:active {
+  background: var(--c-warning, #FFA000);
+  color: #000;
+  transform: scale(0.95);
+  box-shadow: 
+    inset 1px 1px 2px rgba(0, 0, 0, 0.2),
+    0 0 8px rgba(255, 160, 0, 0.4);
+}
+
 /* ─── Like Button ─── */
 .track-like {
   width: 32px;
@@ -464,34 +511,7 @@ const albumName = computed(() => {
   color: var(--xm-accent);
 }
 
-/* ─── Large File (too big for streaming, but downloadable) ─── */
-.track-item.too-large {
-  opacity: 0.7;
-}
 
-.large-file-overlay {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 20px;
-  height: 20px;
-  background: rgba(0, 0, 0, 0.8);
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #FFA000;
-}
-
-/* ─── Large File Badge ─── */
-.large-file-badge {
-  font-size: 10px;
-  color: #FFA000;
-  background: rgba(255, 160, 0, 0.15);
-  padding: 2px 6px;
-  border-radius: 4px;
-  margin-left: 4px;
-}
 
 /* ─── Track Number ─── */
 .track-number {

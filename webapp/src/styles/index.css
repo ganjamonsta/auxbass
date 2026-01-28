@@ -1,14 +1,22 @@
-/* ================================
+/* ════════════════════════════════════════════════════════════════════
    App Vue Styles - Main Index
    Import this file to get all App.vue styles
-   ================================ */
+   ════════════════════════════════════════════════════════════════════ */
 
-@import './app.css';
+/* 1. Design System (tokens, utilities, base components) */
+@import './design-system.css';
+
+/* 2. Layout & Structure */
 @import './app-layout.css';
+
+/* 3. App Components */
+@import './app.css';
 @import './app-header.css';
 @import './app-components.css';
 @import './app-feed.css';
 @import './app-search.css';
 @import './app-playlists.css';
 @import './app-tabs-modal.css';
+
+/* 4. Animations (last to allow overrides) */
 @import './app-animations.css';
