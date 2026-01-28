@@ -487,15 +487,38 @@ class ChannelService:
             )
             tracks = result.scalars().all()
             
-            # Get already synced track IDs
+            # Get already synced track IDs and messages
             synced_result = await session.execute(
-                select(ChannelMessage.track_id).where(
+                select(ChannelMessage).where(
                     ChannelMessage.channel_id == channel.id
                 )
             )
-            synced_track_ids = set(synced_result.scalars().all())
+            synced_messages = synced_result.scalars().all()
+            synced_track_ids = {msg.track_id for msg in synced_messages}
             
-            stats = {"synced": 0, "skipped": 0, "failed": 0, "total": len(tracks), "cancelled": False}
+            # Find tracks to delete (in channel but not in library anymore)
+            library_track_ids = {t.id for t in tracks}
+            tracks_to_delete = [msg for msg in synced_messages if msg.track_id not in library_track_ids]
+            
+            stats = {"synced": 0, "skipped": 0, "failed": 0, "deleted": 0, "total": len(tracks), "cancelled": False}
+            
+            # Delete tracks that were removed from library
+            for msg in tracks_to_delete:
+                try:
+                    await use_bot.delete_message(
+                        chat_id=channel.channel_id,
+                        message_id=msg.message_id
+                    )
+                except (TelegramBadRequest, TelegramForbiddenError) as e:
+                    logger.debug(f"Could not delete message {msg.message_id}: {e}")
+                
+                # Always delete the record (message may have been deleted manually)
+                await session.delete(msg)
+                stats["deleted"] += 1
+            
+            if tracks_to_delete:
+                await session.commit()
+                logger.info(f"Deleted {len(tracks_to_delete)} removed tracks from channel for user {user_id}")
             
             # Calculate tracks to sync
             to_sync_count = len([t for t in tracks if t.id not in synced_track_ids])
