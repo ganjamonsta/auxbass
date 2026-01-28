@@ -201,10 +201,16 @@
               <div 
                 v-if="playerStore.currentTrack?.id === track.id" 
                 class="result-progress"
+                @click="seekProgress($event, track)"
+                @mousedown="startDrag($event, track)"
               >
                 <div 
                   class="result-progress-fill" 
                   :style="{ width: `${(playerStore.progress / playerStore.duration) * 100 || 0}%` }"
+                ></div>
+                <div 
+                  class="result-progress-thumb"
+                  :style="{ left: `${(playerStore.progress / playerStore.duration) * 100 || 0}%` }"
                 ></div>
               </div>
             </div>
@@ -226,7 +232,16 @@
               <span v-if="addingTrackId === track.id">...</span>
               <span v-else>+</span>
             </button>
-            <span v-else class="added-badge">✓</span>
+            <button 
+              v-else
+              class="remove-track-btn"
+              @click="removeTrackFromPlaylistModal(track)"
+              :disabled="removingTrackId === track.id"
+              title="Удалить из плейлиста"
+            >
+              <span v-if="removingTrackId === track.id">...</span>
+              <span v-else>✓</span>
+            </button>
           </div>
         </div>
         
@@ -286,6 +301,7 @@ const trackSearchQuery = ref('')
 const searchResults = ref([])
 const searchingTracks = ref(false)
 const addingTrackId = ref(null)
+const removingTrackId = ref(null)
 const trackSearchInput = ref(null)
 let searchTimeout = null
 
@@ -534,6 +550,22 @@ const addTrackToPlaylist = async (track) => {
   }
 }
 
+const removeTrackFromPlaylistModal = async (track) => {
+  if (removingTrackId.value) return
+  
+  removingTrackId.value = track.id
+  try {
+    await api.delete(`/playlists/${playlist.value.id}/tracks/${track.id}`)
+    // Remove track from local playlist
+    playlist.value.tracks = playlist.value.tracks.filter(t => t.id !== track.id)
+    playlist.value.track_count = Math.max(0, (playlist.value.track_count || 1) - 1)
+  } catch (error) {
+    console.error('Failed to remove track:', error)
+  } finally {
+    removingTrackId.value = null
+  }
+}
+
 // Preview play/pause for track selection
 const togglePreviewPlay = (track) => {
   if (playerStore.currentTrack?.id === track.id) {
@@ -551,6 +583,40 @@ const formatTime = (seconds) => {
   const mins = Math.floor(seconds / 60)
   const secs = Math.floor(seconds % 60)
   return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+// Seek progress bar
+const seekProgress = (event, track) => {
+  if (playerStore.currentTrack?.id !== track.id) return
+  const rect = event.currentTarget.getBoundingClientRect()
+  const percent = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width))
+  const newTime = percent * playerStore.duration
+  playerStore.seek(newTime)
+}
+
+// Drag handling for progress bar
+let isDragging = false
+const startDrag = (event, track) => {
+  if (playerStore.currentTrack?.id !== track.id) return
+  isDragging = true
+  
+  const onMouseMove = (e) => {
+    if (!isDragging) return
+    const progressBar = event.currentTarget
+    const rect = progressBar.getBoundingClientRect()
+    const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+    const newTime = percent * playerStore.duration
+    playerStore.seek(newTime)
+  }
+  
+  const onMouseUp = () => {
+    isDragging = false
+    document.removeEventListener('mousemove', onMouseMove)
+    document.removeEventListener('mouseup', onMouseUp)
+  }
+  
+  document.addEventListener('mousemove', onMouseMove)
+  document.addEventListener('mouseup', onMouseUp)
 }
 
 // Drag and drop functions
@@ -1088,7 +1154,7 @@ onMounted(() => {
 
 .cover-play-overlay.is-playing {
   opacity: 1;
-  background: rgba(29, 185, 84, 0.6);
+  background: rgba(0, 0, 0, 0.3);
 }
 
 /* Track content with info and progress */
@@ -1125,18 +1191,50 @@ onMounted(() => {
 
 /* Progress bar spanning full width */
 .result-progress {
+  position: relative;
   width: 100%;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.result-progress::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
   height: 3px;
   background: rgba(255, 255, 255, 0.15);
   border-radius: 2px;
-  overflow: hidden;
 }
 
 .result-progress-fill {
-  height: 100%;
+  position: absolute;
+  left: 0;
+  height: 3px;
   background: var(--accent);
   border-radius: 2px;
-  transition: width 0.1s linear;
+  transition: width 0.05s linear;
+  pointer-events: none;
+}
+
+.result-progress-thumb {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: var(--accent);
+  border-radius: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+
+.result-progress:hover .result-progress-thumb,
+.result-progress:active .result-progress-thumb {
+  opacity: 1;
 }
 
 .result-time {
@@ -1179,14 +1277,31 @@ onMounted(() => {
   transform: none;
 }
 
-.added-badge {
+.remove-track-btn {
   width: 32px;
   height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  color: #000;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--accent);
-  font-size: 16px;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.remove-track-btn:hover {
+  background: var(--danger, #e53935);
+  color: #fff;
+}
+
+.remove-track-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .no-results, .search-hint {
