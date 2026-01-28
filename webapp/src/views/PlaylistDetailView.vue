@@ -205,6 +205,15 @@
               <div class="result-title">{{ track.title }}</div>
               <div class="result-artist">{{ track.artist }}</div>
             </div>
+            <!-- Duration / Current time -->
+            <div class="result-time">
+              <template v-if="playerStore.currentTrack?.id === track.id">
+                {{ formatTime(playerStore.progress) }}
+              </template>
+              <template v-else>
+                {{ formatTime(track.duration) }}
+              </template>
+            </div>
             <button 
               v-if="!isTrackInPlaylist(track.id)"
               class="add-track-btn"
@@ -531,6 +540,14 @@ const togglePreviewPlay = (track) => {
     // Play new track (use search results as queue for preview)
     playerStore.playTrack(track, searchResults.value)
   }
+}
+
+// Format time in MM:SS
+const formatTime = (seconds) => {
+  if (!seconds || isNaN(seconds)) return '--:--'
+  const mins = Math.floor(seconds / 60)
+  const secs = Math.floor(seconds % 60)
+  return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 
 // Drag and drop functions
@@ -1100,6 +1117,19 @@ onMounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.result-time {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  min-width: 40px;
+  text-align: right;
+}
+
+.search-result-item.is-playing .result-time {
+  color: var(--accent);
 }
 
 .add-track-btn {
