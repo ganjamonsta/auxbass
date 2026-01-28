@@ -265,6 +265,10 @@ const handleRemoveFromPlaylist = async () => {
 }
 
 // Edit modal handlers
+const openEditModal = () => {
+  showEditModal.value = true
+}
+
 const handleSavePlaylist = ({ name, isPublic }) => {
   playlist.value.name = name
   playlist.value.is_public = isPublic
