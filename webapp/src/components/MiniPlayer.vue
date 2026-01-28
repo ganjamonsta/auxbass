@@ -4,6 +4,8 @@
     <div class="lcd-screen">
       <div class="lcd-row lcd-row-main">
         <span class="lcd-status">{{ isPlaying ? '▶' : '■' }}</span>
+        <span v-if="playerStore.shuffle" class="lcd-indicator" title="Перемешивание">🔀</span>
+        <span v-if="playerStore.repeatMode !== 'none'" class="lcd-indicator" :title="playerStore.repeatMode === 'one' ? 'Повтор трека' : 'Повтор всего'">{{ playerStore.repeatMode === 'one' ? '🔂' : '🔁' }}</span>
         <div class="lcd-title-container">
           <div class="lcd-title-track" :class="{ 'marquee': shouldMarquee }">
             <span class="lcd-title">{{ displayText }}</span>
@@ -370,6 +372,12 @@ const formatTime = (seconds) => {
   text-shadow: 0 0 8px var(--xm-accent-glow);
   flex-shrink: 0;
   animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.lcd-indicator {
+  font-size: 10px;
+  flex-shrink: 0;
+  opacity: 0.8;
 }
 
 @keyframes pulse-glow {

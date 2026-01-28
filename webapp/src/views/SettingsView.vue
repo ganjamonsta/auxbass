@@ -94,50 +94,6 @@
       </div>
     </section>
 
-    <!-- Playback settings -->
-    <section class="section">
-      <h2>Воспроизведение</h2>
-      
-      <div class="setting-row">
-        <div class="setting-info">
-          <span class="setting-name">Перемешивание</span>
-          <span class="setting-desc">Случайный порядок воспроизведения</span>
-        </div>
-        <label class="toggle">
-          <input type="checkbox" v-model="playerStore.shuffle" />
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-
-      <div class="setting-row">
-        <div class="setting-info">
-          <span class="setting-name">Повтор</span>
-          <span class="setting-desc">
-            {{ repeatModeText }}
-          </span>
-        </div>
-        <button class="repeat-btn" @click="toggleRepeat">
-          {{ repeatModeIcon }}
-        </button>
-      </div>
-    </section>
-
-    <!-- Appearance -->
-    <section class="section">
-      <h2>Оформление</h2>
-      
-      <div class="setting-row">
-        <div class="setting-info">
-          <span class="setting-name">Тёмная тема</span>
-          <span class="setting-desc">Включена по умолчанию</span>
-        </div>
-        <label class="toggle">
-          <input type="checkbox" v-model="darkMode" />
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-    </section>
-
     <!-- Privacy settings -->
     <section class="section">
       <h2>🔒 Приватность</h2>
@@ -193,7 +149,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
@@ -206,7 +162,7 @@ const playerStore = usePlayerStore()
 
 const stats = ref(null)
 const darkMode = ref(true)
-const botUsername = ref('auxbassbot')  // Default, will be updated from config
+const botUsername = ref('tg_player_bot')  // Default, will be updated from config
 const privacySettings = ref({
   hide_from_search: false,
   hide_profile: false,
@@ -301,10 +257,20 @@ const clearCache = () => {
   alert('Кэш очищен')
 }
 
+// Watch dark mode toggle
+watch(darkMode, (isDark) => {
+  document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light')
+  localStorage.setItem('theme', isDark ? 'dark' : 'light')
+})
+
 onMounted(() => {
   loadStats()
   loadBotConfig()
   loadPrivacySettings()
+  
+  // Load saved theme preference
+  const savedTheme = localStorage.getItem('theme')
+  darkMode.value = savedTheme !== 'light'
   
   // Scroll to channel section if hash is #channel
   if (route.hash === '#channel') {
