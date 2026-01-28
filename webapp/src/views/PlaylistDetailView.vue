@@ -38,14 +38,11 @@
           </svg>
         </button>
       </div>
-      <button v-if="isOwner" class="add-tracks-btn" @click="showAddTracksModal = true">
-        ➕ Добавить
-      </button>
-      <button v-if="isOwner" class="edit-btn" @click="openEditModal">
-        ✏️
-      </button>
-      <button v-if="isOwner" class="delete-btn" @click="showDeleteConfirm = true">
-        🗑️
+      <button v-if="isOwner" class="edit-playlist-btn" @click="openEditModal">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+        </svg>
+        Редактировать
       </button>
     </div>
 
@@ -54,19 +51,8 @@
       <div
         v-for="(track, index) in playlist.tracks"
         :key="track.id"
-        class="draggable-track"
-        :class="{ 'is-dragging': dragIndex === index, 'drag-over': dragOverIndex === index }"
-        :draggable="isOwner"
-        @dragstart="handleDragStart($event, index)"
-        @dragend="handleDragEnd"
-        @dragover.prevent="handleDragOver($event, index)"
-        @drop="handleDrop($event, index)"
+        class="track-wrapper"
       >
-        <div v-if="isOwner" class="drag-handle">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M3 15h18v-2H3v2zm0 4h18v-2H3v2zm0-8h18V9H3v2zm0-6v2h18V5H3z"/>
-          </svg>
-        </div>
         <TrackItem
           :track="track"
           :isPlaying="playerStore.currentTrack?.id === track.id"
@@ -110,152 +96,219 @@
     />
 
     <!-- Edit modal -->
-    <div v-if="showEditModal" class="modal-overlay" @click.self="showEditModal = false">
-      <div class="modal">
-        <h2>Редактировать плейлист</h2>
-        <input
-          v-model="editName"
-          type="text"
-          placeholder="Название плейлиста"
-          @keyup.enter="savePlaylist"
-        />
-        <label class="checkbox-label">
-          <input type="checkbox" v-model="editIsPublic" />
-          <span>Публичный плейлист</span>
-        </label>
-        <p class="hint-text">Публичные плейлисты видны другим пользователям</p>
-        <div class="modal-actions">
-          <button class="cancel-btn" @click="showEditModal = false">Отмена</button>
-          <button 
-            class="confirm-btn" 
-            @click="savePlaylist"
-            :disabled="!editName.trim()"
-          >
-            Сохранить
-          </button>
+    <div v-if="showEditModal" class="modal-overlay" @click.self="closeEditModal">
+      <div class="modal edit-playlist-modal">
+        <!-- Header with playlist settings -->
+        <div class="edit-header">
+          <h2>Редактирование</h2>
+          <button class="close-modal-btn" @click="closeEditModal">✕</button>
         </div>
-      </div>
-    </div>
-
-    <!-- Delete confirm -->
-    <div v-if="showDeleteConfirm" class="modal-overlay" @click.self="showDeleteConfirm = false">
-      <div class="modal">
-        <h2>Удалить плейлист?</h2>
-        <p>Вы уверены, что хотите удалить "{{ playlist.name }}"?</p>
-        <div class="modal-actions">
-          <button class="cancel-btn" @click="showDeleteConfirm = false">Отмена</button>
-          <button class="delete-confirm-btn" @click="deletePlaylist">
-            Удалить
-          </button>
+        
+        <!-- Playlist name and settings -->
+        <div class="edit-settings">
+          <input
+            v-model="editName"
+            type="text"
+            placeholder="Название плейлиста"
+            class="edit-name-input"
+          />
+          <div class="edit-options">
+            <label class="checkbox-label compact">
+              <input type="checkbox" v-model="editIsPublic" />
+              <span>Публичный</span>
+            </label>
+          </div>
         </div>
-      </div>
-    </div>
-
-    <!-- Add tracks modal -->
-    <div v-if="showAddTracksModal" class="modal-overlay" @click.self="closeAddTracksModal">
-      <div class="modal add-tracks-modal">
-        <h2>Добавить треки</h2>
+        
+        <!-- Search input -->
         <div class="search-input-wrapper">
+          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+          </svg>
           <input
             v-model="trackSearchQuery"
             type="text"
-            placeholder="Поиск треков..."
+            placeholder="Поиск треков для добавления..."
             @input="debouncedTrackSearch"
             ref="trackSearchInput"
           />
           <div v-if="searchingTracks" class="search-spinner"></div>
         </div>
         
-        <div class="search-results" v-if="searchResults.length">
-          <div 
-            v-for="track in searchResults" 
-            :key="track.id" 
-            class="search-result-item"
-            :class="{ 
-              'already-added': isTrackInPlaylist(track.id),
-              'is-playing': playerStore.currentTrack?.id === track.id
-            }"
-          >
-            <!-- Cover with Play/Pause overlay -->
-            <div class="result-cover-wrapper" @click.stop="togglePreviewPlay(track)">
-              <div class="result-cover">
-                <img v-if="track.cover_url" :src="track.cover_url" />
-                <span v-else>🎵</span>
+        <!-- Content area: search results or current tracks -->
+        <div class="edit-content">
+          <!-- Search results -->
+          <div v-if="trackSearchQuery && searchResults.length" class="search-results">
+            <div class="section-label">Результаты поиска</div>
+            <div 
+              v-for="track in searchResults" 
+              :key="'search-' + track.id" 
+              class="search-result-item"
+              :class="{ 
+                'already-added': isTrackInPlaylist(track.id),
+                'is-playing': playerStore.currentTrack?.id === track.id
+              }"
+            >
+              <div class="result-cover-wrapper" @click.stop="togglePreviewPlay(track)">
+                <div class="result-cover">
+                  <img v-if="track.cover_url" :src="track.cover_url" />
+                  <span v-else>🎵</span>
+                </div>
+                <div class="cover-play-overlay" :class="{ 'is-playing': playerStore.currentTrack?.id === track.id && playerStore.isPlaying }">
+                  <svg v-if="playerStore.currentTrack?.id === track.id && playerStore.isPlaying" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                  </svg>
+                  <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8 5v14l11-7z"/>
+                  </svg>
+                </div>
               </div>
-              <div class="cover-play-overlay" :class="{ 'is-playing': playerStore.currentTrack?.id === track.id && playerStore.isPlaying }">
-                <svg v-if="playerStore.currentTrack?.id === track.id && playerStore.isPlaying" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-                </svg>
-                <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8 5v14l11-7z"/>
-                </svg>
+              <div class="result-content">
+                <div class="result-info">
+                  <div class="result-artist">{{ track.artist }}</div>
+                  <div class="result-title">{{ track.title }}</div>
+                </div>
+                <div 
+                  v-if="playerStore.currentTrack?.id === track.id" 
+                  class="result-progress"
+                  @click="seekProgress($event, track)"
+                  @mousedown="startDrag($event, track)"
+                >
+                  <div 
+                    class="result-progress-fill" 
+                    :style="{ width: `${(playerStore.progress / playerStore.duration) * 100 || 0}%` }"
+                  ></div>
+                  <div 
+                    class="result-progress-thumb"
+                    :style="{ left: `${(playerStore.progress / playerStore.duration) * 100 || 0}%` }"
+                  ></div>
+                </div>
               </div>
-            </div>
-            <!-- Track info with progress bar -->
-            <div class="result-content">
-              <div class="result-info">
-                <div class="result-artist">{{ track.artist }}</div>
-                <div class="result-title">{{ track.title }}</div>
+              <div class="result-time">
+                <template v-if="playerStore.currentTrack?.id === track.id">
+                  {{ formatTime(playerStore.progress) }}
+                </template>
+                <template v-else>
+                  {{ formatTime(track.duration) }}
+                </template>
               </div>
-              <!-- Progress bar spanning full width -->
-              <div 
-                v-if="playerStore.currentTrack?.id === track.id" 
-                class="result-progress"
-                @click="seekProgress($event, track)"
-                @mousedown="startDrag($event, track)"
+              <button 
+                v-if="!isTrackInPlaylist(track.id)"
+                class="add-track-btn"
+                @click="addTrackToPlaylist(track)"
+                :disabled="addingTrackId === track.id"
               >
-                <div 
-                  class="result-progress-fill" 
-                  :style="{ width: `${(playerStore.progress / playerStore.duration) * 100 || 0}%` }"
-                ></div>
-                <div 
-                  class="result-progress-thumb"
-                  :style="{ left: `${(playerStore.progress / playerStore.duration) * 100 || 0}%` }"
-                ></div>
+                <span v-if="addingTrackId === track.id">...</span>
+                <span v-else>+</span>
+              </button>
+              <button 
+                v-else
+                class="remove-track-btn"
+                @click="removeTrackFromPlaylistModal(track)"
+                :disabled="removingTrackId === track.id"
+                title="Удалить из плейлиста"
+              >
+                <span v-if="removingTrackId === track.id">...</span>
+                <span v-else>✓</span>
+              </button>
+            </div>
+          </div>
+          
+          <div v-else-if="trackSearchQuery && !searchingTracks" class="no-results">
+            Ничего не найдено
+          </div>
+          
+          <!-- Current playlist tracks (when no search) -->
+          <div v-else class="current-tracks">
+            <div class="section-label">Треки в плейлисте ({{ editTracks.length }})</div>
+            <div v-if="editTracks.length" class="tracks-editor">
+              <div 
+                v-for="(track, index) in editTracks" 
+                :key="'edit-' + track.id"
+                class="editable-track"
+                :class="{ 
+                  'is-dragging': dragIndex === index, 
+                  'drag-over': dragOverIndex === index,
+                  'is-playing': playerStore.currentTrack?.id === track.id
+                }"
+                draggable="true"
+                @dragstart="handleDragStart($event, index)"
+                @dragend="handleDragEnd"
+                @dragover.prevent="handleDragOver($event, index)"
+                @drop="handleDrop($event, index)"
+              >
+                <div class="drag-handle">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M3 15h18v-2H3v2zm0 4h18v-2H3v2zm0-8h18V9H3v2zm0-6v2h18V5H3z"/>
+                  </svg>
+                </div>
+                <div class="track-number">{{ index + 1 }}</div>
+                <div class="result-cover-wrapper small" @click.stop="togglePreviewPlayEdit(track)">
+                  <div class="result-cover">
+                    <img v-if="track.cover_url" :src="track.cover_url" />
+                    <span v-else>🎵</span>
+                  </div>
+                  <div class="cover-play-overlay" :class="{ 'is-playing': playerStore.currentTrack?.id === track.id && playerStore.isPlaying }">
+                    <svg v-if="playerStore.currentTrack?.id === track.id && playerStore.isPlaying" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                    </svg>
+                    <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M8 5v14l11-7z"/>
+                    </svg>
+                  </div>
+                </div>
+                <div class="track-info">
+                  <div class="track-title">{{ track.title }}</div>
+                  <div class="track-artist">{{ track.artist }}</div>
+                </div>
+                <button 
+                  class="remove-btn"
+                  @click="removeTrackFromEdit(track, index)"
+                  title="Удалить"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                  </svg>
+                </button>
               </div>
             </div>
-            <!-- Duration / Current time -->
-            <div class="result-time">
-              <template v-if="playerStore.currentTrack?.id === track.id">
-                {{ formatTime(playerStore.progress) }}
-              </template>
-              <template v-else>
-                {{ formatTime(track.duration) }}
-              </template>
+            <div v-else class="empty-playlist-hint">
+              <span>🎵</span>
+              <p>Плейлист пуст</p>
+              <p class="hint">Найдите треки через поиск выше</p>
             </div>
-            <button 
-              v-if="!isTrackInPlaylist(track.id)"
-              class="add-track-btn"
-              @click="addTrackToPlaylist(track)"
-              :disabled="addingTrackId === track.id"
-            >
-              <span v-if="addingTrackId === track.id">...</span>
-              <span v-else>+</span>
-            </button>
-            <button 
-              v-else
-              class="remove-track-btn"
-              @click="removeTrackFromPlaylistModal(track)"
-              :disabled="removingTrackId === track.id"
-              title="Удалить из плейлиста"
-            >
-              <span v-if="removingTrackId === track.id">...</span>
-              <span v-else>✓</span>
-            </button>
           </div>
         </div>
         
-        <div v-else-if="trackSearchQuery && !searchingTracks" class="no-results">
-          Ничего не найдено
+        <!-- Footer actions -->
+        <div class="edit-footer">
+          <button class="delete-playlist-btn" @click="showDeleteConfirm = true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+            </svg>
+            Удалить плейлист
+          </button>
+          <button 
+            class="save-btn" 
+            @click="savePlaylist"
+            :disabled="!editName.trim() || saving"
+          >
+            <span v-if="saving">Сохранение...</span>
+            <span v-else>Сохранить</span>
+          </button>
         </div>
-        
-        <div v-else class="search-hint">
-          Введите название трека или артиста
-        </div>
-        
+      </div>
+    </div>
+
+    <!-- Delete confirm -->
+    <div v-if="showDeleteConfirm" class="modal-overlay delete-overlay" @click.self="showDeleteConfirm = false">
+      <div class="modal delete-modal">
+        <h2>Удалить плейлист?</h2>
+        <p>Вы уверены, что хотите удалить "{{ playlist.name }}"?</p>
         <div class="modal-actions">
-          <button class="confirm-btn" @click="closeAddTracksModal">
-            Готово
+          <button class="cancel-btn" @click="showDeleteConfirm = false">Отмена</button>
+          <button class="delete-confirm-btn" @click="deletePlaylist">
+            Удалить
           </button>
         </div>
       </div>
@@ -303,6 +356,8 @@ const searchingTracks = ref(false)
 const addingTrackId = ref(null)
 const removingTrackId = ref(null)
 const trackSearchInput = ref(null)
+const saving = ref(false)
+const editTracks = ref([])
 let searchTimeout = null
 
 // Drag and drop state
@@ -338,7 +393,16 @@ const loadPlaylist = async () => {
 const openEditModal = () => {
   editName.value = playlist.value.name
   editIsPublic.value = playlist.value.is_public || false
+  editTracks.value = [...(playlist.value.tracks || [])]
+  trackSearchQuery.value = ''
+  searchResults.value = []
   showEditModal.value = true
+}
+
+const closeEditModal = () => {
+  showEditModal.value = false
+  trackSearchQuery.value = ''
+  searchResults.value = []
 }
 
 const playAll = () => {
@@ -441,8 +505,9 @@ const handleRemoveFromPlaylist = async () => {
 }
 
 const savePlaylist = async () => {
-  if (!editName.value.trim()) return
+  if (!editName.value.trim() || saving.value) return
   
+  saving.value = true
   try {
     await api.put(`/playlists/${playlist.value.id}`, {
       name: editName.value.trim(),
@@ -450,9 +515,13 @@ const savePlaylist = async () => {
     })
     playlist.value.name = editName.value.trim()
     playlist.value.is_public = editIsPublic.value
+    uiStore.toast.success('Сохранено', 'Плейлист обновлён')
     showEditModal.value = false
   } catch (error) {
     console.error('Failed to update playlist:', error)
+    uiStore.toast.error('Ошибка', 'Не удалось сохранить')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -472,7 +541,7 @@ const deletePlaylist = async () => {
 
 // Add tracks modal functions
 const isTrackInPlaylist = (trackId) => {
-  return playlist.value?.tracks?.some(t => t.id === trackId) || false
+  return editTracks.value?.some(t => t.id === trackId) || false
 }
 
 const closeAddTracksModal = () => {
@@ -537,7 +606,8 @@ const addTrackToPlaylist = async (track) => {
     await api.post(`/playlists/${playlist.value.id}/tracks`, {
       track_id: track.id
     })
-    // Add track to local playlist
+    // Add track to edit list and main playlist
+    editTracks.value.push(track)
     if (!playlist.value.tracks) {
       playlist.value.tracks = []
     }
@@ -556,7 +626,8 @@ const removeTrackFromPlaylistModal = async (track) => {
   removingTrackId.value = track.id
   try {
     await api.delete(`/playlists/${playlist.value.id}/tracks/${track.id}`)
-    // Remove track from local playlist
+    // Remove track from edit list and main playlist
+    editTracks.value = editTracks.value.filter(t => t.id !== track.id)
     playlist.value.tracks = playlist.value.tracks.filter(t => t.id !== track.id)
     playlist.value.track_count = Math.max(0, (playlist.value.track_count || 1) - 1)
   } catch (error) {
@@ -566,14 +637,31 @@ const removeTrackFromPlaylistModal = async (track) => {
   }
 }
 
+const removeTrackFromEdit = async (track, index) => {
+  try {
+    await api.delete(`/playlists/${playlist.value.id}/tracks/${track.id}`)
+    editTracks.value.splice(index, 1)
+    playlist.value.tracks = playlist.value.tracks.filter(t => t.id !== track.id)
+    playlist.value.track_count = Math.max(0, (playlist.value.track_count || 1) - 1)
+  } catch (error) {
+    console.error('Failed to remove track:', error)
+  }
+}
+
 // Preview play/pause for track selection
 const togglePreviewPlay = (track) => {
   if (playerStore.currentTrack?.id === track.id) {
-    // Toggle play/pause for current track
     playerStore.togglePlay()
   } else {
-    // Play new track (use search results as queue for preview)
     playerStore.playTrack(track, searchResults.value)
+  }
+}
+
+const togglePreviewPlayEdit = (track) => {
+  if (playerStore.currentTrack?.id === track.id) {
+    playerStore.togglePlay()
+  } else {
+    playerStore.playTrack(track, editTracks.value)
   }
 }
 
@@ -619,7 +707,7 @@ const startDrag = (event, track) => {
   document.addEventListener('mouseup', onMouseUp)
 }
 
-// Drag and drop functions
+// Drag and drop functions for edit mode
 const handleDragStart = (event, index) => {
   dragIndex.value = index
   event.dataTransfer.effectAllowed = 'move'
@@ -645,11 +733,14 @@ const handleDrop = async (event, toIndex) => {
     return
   }
   
-  // Reorder locally first
-  const tracks = [...playlist.value.tracks]
+  // Reorder in edit tracks
+  const tracks = [...editTracks.value]
   const [movedTrack] = tracks.splice(fromIndex, 1)
   tracks.splice(toIndex, 0, movedTrack)
-  playlist.value.tracks = tracks
+  editTracks.value = tracks
+  
+  // Also update main playlist
+  playlist.value.tracks = [...tracks]
   
   handleDragEnd()
   
@@ -660,8 +751,6 @@ const handleDrop = async (event, toIndex) => {
     })
   } catch (error) {
     console.error('Failed to reorder tracks:', error)
-    // Reload playlist on error
-    loadPlaylist()
   }
 }
 
@@ -800,6 +889,36 @@ onMounted(() => {
   border: none;
   font-size: 18px;
   cursor: pointer;
+}
+
+/* Edit playlist button */
+.edit-playlist-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color, rgba(255,255,255,0.1));
+  border-radius: 20px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.edit-playlist-btn:hover {
+  background: var(--bg-highlight);
+}
+
+.edit-playlist-btn svg {
+  opacity: 0.8;
+}
+
+.track-wrapper {
+  display: flex;
+  align-items: center;
+  width: 100%;
 }
 
 .track-list {
@@ -1002,6 +1121,24 @@ onMounted(() => {
   transform: translateX(20px);
 }
 
+.checkbox-label.compact {
+  margin-bottom: 0;
+}
+
+.checkbox-label.compact input[type="checkbox"] {
+  width: 36px;
+  height: 20px;
+}
+
+.checkbox-label.compact input[type="checkbox"]::before {
+  width: 16px;
+  height: 16px;
+}
+
+.checkbox-label.compact input[type="checkbox"]:checked::before {
+  transform: translateX(16px);
+}
+
 .hint-text {
   font-size: 12px;
   color: var(--text-tertiary);
@@ -1025,7 +1162,329 @@ onMounted(() => {
   background: var(--bg-highlight);
 }
 
-/* Add tracks modal */
+/* Edit playlist modal */
+.edit-playlist-modal {
+  height: 85vh;
+  max-height: 700px;
+  min-height: 500px;
+  width: 100%;
+  max-width: 450px;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .edit-playlist-modal {
+    max-width: 550px;
+    height: 80vh;
+    max-height: 750px;
+  }
+}
+
+.edit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.1));
+}
+
+.edit-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--text-primary);
+}
+
+.close-modal-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--bg-highlight);
+  border: none;
+  color: var(--text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.close-modal-btn:hover {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.edit-settings {
+  padding: 16px 20px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.1));
+}
+
+.edit-name-input {
+  flex: 1;
+  padding: 10px 14px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color, rgba(255,255,255,0.1));
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 15px;
+  margin: 0 !important;
+}
+
+.edit-name-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.edit-options {
+  flex-shrink: 0;
+}
+
+.edit-playlist-modal .search-input-wrapper {
+  padding: 16px 20px;
+  margin: 0;
+}
+
+.edit-playlist-modal .search-input-wrapper input {
+  padding-left: 40px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color, rgba(255,255,255,0.1));
+}
+
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+
+.edit-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 20px;
+}
+
+.section-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+  padding-top: 8px;
+}
+
+.current-tracks {
+  padding-bottom: 16px;
+}
+
+.tracks-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.editable-track {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  transition: all 0.15s;
+  background: transparent;
+}
+
+.editable-track:hover {
+  background: var(--bg-elevated);
+}
+
+.editable-track.is-dragging {
+  opacity: 0.5;
+  transform: scale(0.98);
+}
+
+.editable-track.drag-over {
+  background: var(--bg-highlight);
+}
+
+.editable-track.drag-over::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+}
+
+.editable-track.is-playing {
+  background: rgba(29, 185, 84, 0.1);
+}
+
+.editable-track .drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 32px;
+  cursor: grab;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.editable-track .drag-handle:active {
+  cursor: grabbing;
+}
+
+.track-number {
+  width: 20px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.result-cover-wrapper.small {
+  width: 36px;
+  height: 36px;
+}
+
+.track-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.track-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-artist {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.remove-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+  opacity: 0;
+}
+
+.editable-track:hover .remove-btn {
+  opacity: 1;
+}
+
+.remove-btn:hover {
+  background: var(--danger, #e53935);
+  color: #fff;
+}
+
+.empty-playlist-hint {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--text-tertiary);
+}
+
+.empty-playlist-hint span {
+  font-size: 36px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.empty-playlist-hint p {
+  margin: 0;
+}
+
+.empty-playlist-hint .hint {
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.edit-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-color, rgba(255,255,255,0.1));
+  background: var(--bg-elevated);
+}
+
+.delete-playlist-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  background: transparent;
+  border: 1px solid var(--danger, #e53935);
+  border-radius: 8px;
+  color: var(--danger, #e53935);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.delete-playlist-btn:hover {
+  background: var(--danger, #e53935);
+  color: #fff;
+}
+
+.save-btn {
+  padding: 12px 24px;
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  color: #000;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.save-btn:hover {
+  transform: scale(1.02);
+}
+
+.save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.delete-overlay {
+  z-index: 1010;
+}
+
+.delete-modal {
+  max-width: 340px;
+}
+
+/* Add tracks modal - legacy, keeping for reference */
 .add-tracks-modal {
   height: 70vh;
   max-height: 600px;
@@ -1304,77 +1763,18 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
+.search-results {
+  padding-bottom: 16px;
+}
+
 .no-results, .search-hint {
-  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
   padding: 32px 16px;
   color: var(--text-tertiary);
-  min-height: 200px;
-}
-
-/* Drag and drop styles */
-.draggable-track {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  position: relative;
-  transition: background 0.2s, transform 0.15s;
-}
-
-.draggable-track :deep(.track-item) {
-  flex: 1;
-  min-width: 0;
-}
-
-.draggable-track:hover {
-  background: var(--bg-elevated);
-}
-
-.draggable-track.is-dragging {
-  opacity: 0.5;
-  transform: scale(0.98);
-}
-
-.draggable-track.drag-over {
-  background: var(--bg-highlight);
-}
-
-.draggable-track.drag-over::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--accent);
-}
-
-.drag-handle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 44px;
-  cursor: grab;
-  color: var(--text-tertiary);
-  flex-shrink: 0;
-  transition: color 0.2s;
-}
-
-.drag-handle:hover {
-  color: var(--text-secondary);
-}
-
-.drag-handle:active {
-  cursor: grabbing;
-}
-
-.drag-handle svg {
-  width: 16px;
-  height: 16px;
+  min-height: 120px;
 }
 
 @keyframes spin {
