@@ -299,7 +299,6 @@
             <div 
               v-for="album in userAlbums" 
               :key="album.id"
-    </template>
               class="album-item"
               @click="$router.push(`/album/${album.id}`); closeProfile()"
             >
@@ -313,13 +312,9 @@
       </div>
     </div>
   </div>
+    </template>
 </template>
-Navigate to channel setup
-const goToChannelSetup = () => {
-  router.push({ name: 'settings', query: { section: 'channel' } })
-}
 
-// 
 <script setup>
 import { ref, watch, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
@@ -330,6 +325,11 @@ import api from '@/api/client'
 const router = useRouter()
 const playerStore = usePlayerStore()
 const authStore = useAuthStore()
+
+// Navigate to channel setup
+const goToChannelSetup = () => {
+  router.push({ name: 'settings', query: { section: 'channel' } })
+}
 
 // Check if user can use social features
 const canUseSocial = computed(() => authStore.hasChannel)
