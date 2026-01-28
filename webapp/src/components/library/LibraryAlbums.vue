@@ -1,5 +1,18 @@
 <template>
   <div class="library-albums">
+    <!-- Sort options (Stats + SortChips) -->
+    <div class="sort-options">
+      <div class="stats">
+        {{ total }} альбомов
+      </div>
+      <SortChips
+        :currentOption="currentOption"
+        :sortOrder="sortOrder"
+        @next="onNextSort"
+        @toggle-order="onToggleOrder"
+      />
+    </div>
+
     <!-- Top pagination (shows when not on first page) -->
     <PaginationNav
       v-if="!isFirstPage"
@@ -76,8 +89,9 @@
 <script setup>
 import { watch } from 'vue'
 import { usePlayerStore } from '@/stores/player'
-import { usePagination } from '@/composables'
+import { usePagination, useSort } from '@/composables'
 import PaginationNav from '@/components/PaginationNav.vue'
+import SortChips from '@/components/SortChips.vue'
 import api from '@/api/client'
 
 const props = defineProps({
@@ -88,6 +102,26 @@ const props = defineProps({
 })
 
 const playerStore = usePlayerStore()
+
+// Sort state (persisted to localStorage)
+const { 
+  sortBy, 
+  sortOrder, 
+  currentOption, 
+  nextSort, 
+  toggleOrder 
+} = useSort('library-albums-sort', 'albums', { sortBy: 'release_date', sortOrder: 'desc' })
+
+// Sort handlers
+const onNextSort = () => {
+  nextSort()
+  goToFirst()
+}
+
+const onToggleOrder = () => {
+  toggleOrder()
+  goToFirst()
+}
 
 // Pagination with unified composable
 const { 
@@ -104,12 +138,15 @@ const {
   goToLast,
   prevPage,
   nextPage,
-  refresh // Assuming refresh or reload exists, or I can just re-trigger fetch
+  refresh
 } = usePagination({
   fetchFn: async ({ offset, limit }) => {
-    // Pass search query if API supports it, currently backend might not.
-    // If backend ignores extra params, this is safe.
-    const params = { offset, limit }
+    const params = { 
+      offset, 
+      limit,
+      sort_by: sortBy.value,
+      sort_order: sortOrder.value
+    }
     if (props.searchQuery) {
       params.search = props.searchQuery
     }
@@ -122,7 +159,12 @@ const {
 
 // Watch search query to reload
 watch(() => props.searchQuery, () => {
-    goToFirst()
+  goToFirst()
+})
+
+// Watch sort changes to refresh data
+watch([sortBy, sortOrder], () => {
+  refresh()
 })
 
 const playAlbum = async (album) => {
@@ -139,7 +181,20 @@ const playAlbum = async (album) => {
 
 <style scoped>
 .library-albums {
-    padding-bottom: 20px;
+  padding-bottom: 20px;
+}
+
+.sort-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.stats {
+  color: var(--text-secondary);
+  font-size: 14px;
 }
 
 .albums-grid {

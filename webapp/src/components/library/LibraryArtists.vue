@@ -72,7 +72,7 @@ const {
   currentOption, 
   nextSort, 
   toggleOrder 
-} = useSort('artists-sort', 'artists', { sortBy: 'name', sortOrder: 'asc' })
+} = useSort('library-artists-sort', 'artists', { sortBy: 'name', sortOrder: 'asc' })
 
 // Data state
 const artists = ref([])
