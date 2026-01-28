@@ -21,13 +21,18 @@
 
     <!-- Actions -->
     <div class="album-actions">
-      <button class="play-all-btn" @click="playAll">
-        <span>▶</span>
-        Слушать
-      </button>
-      <button class="shuffle-btn" @click="shufflePlay">
-        🔀
-      </button>
+      <div class="action-buttons">
+        <button class="action-btn play-btn" @click="playAll">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+        </button>
+        <button class="action-btn shuffle-btn" @click="shufflePlay">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
+          </svg>
+        </button>
+      </div>
     </div>
 
     <!-- Track list - show full_tracklist if available, otherwise just user's tracks -->
@@ -455,28 +460,55 @@ onMounted(() => {
   margin-bottom: 24px;
 }
 
-.play-all-btn {
+.action-buttons {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  border-radius: 28px;
   background: var(--accent);
-  color: #000;
-  border: none;
-  border-radius: 20px;
-  padding: 12px 32px;
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
+  box-shadow: 
+    6px 6px 12px rgba(0, 0, 0, 0.3),
+    -3px -3px 8px rgba(255, 255, 255, 0.1),
+    inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  overflow: hidden;
 }
 
-.shuffle-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: var(--bg-elevated);
+.action-btn {
+  width: 48px;
+  height: 48px;
   border: none;
-  font-size: 18px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000;
   cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.action-btn::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  width: 1px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.action-btn.play-btn::after {
+  right: 0;
+}
+
+.action-btn.shuffle-btn::after {
+  display: none;
+}
+
+.action-btn:active {
+  background: rgba(0, 0, 0, 0.1);
+  box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.action-btn.play-btn svg {
+  margin-left: 2px;
 }
 
 .track-list {
