@@ -1,5 +1,5 @@
 <template>
-  <div class="app spotify-theme" :class="{ 'has-player': playerStore.currentTrack }">
+  <div class="app spotify-theme" :class="appClasses">
     <!-- Auth checking state -->
     <div v-if="authStore.loading && !authStore.initialized" class="auth-loading">
       <div class="auth-spinner"></div>
@@ -7,78 +7,93 @@
 
     <!-- Main content with router -->
     <template v-else>
-      <!-- Header for authenticated pages -->
-      <PageHeader 
-        v-if="showHeader"
-        :title="pageTitle"
-        @goBack="goBack"
-      >
-        <template v-if="route.name === 'collections'" #toggle>
-          <button 
-            class="toggle-btn" 
-            :class="{ active: uiStore.collectionsTab === 'albums' }"
-            @click="uiStore.setCollectionsTab('albums')"
-          >
-            💿 Альбомы
-          </button>
-          <button 
-            class="toggle-btn" 
-            :class="{ active: uiStore.collectionsTab === 'playlists' }"
-            @click="uiStore.setCollectionsTab('playlists')"
-          >
-            📁 Плейлисты
-          </button>
-        </template>
-      </PageHeader>
+      <!-- Desktop Sidebar -->
+      <Sidebar v-if="isDesktop && authStore.isAuthenticated" />
 
-      <!-- Router view -->
-      <main class="main-content">
-        <router-view v-slot="{ Component }">
-          <keep-alive :include="['LibraryView', 'AlbumsView', 'ArtistsView', 'PlaylistsView']">
-            <component :is="Component" />
-          </keep-alive>
-        </router-view>
-      </main>
+      <!-- Main Content Wrapper -->
+      <div class="main-content-wrapper">
+        <!-- Header for authenticated pages (mobile + desktop detail pages) -->
+        <PageHeader 
+          v-if="showHeader"
+          :title="pageTitle"
+          @goBack="goBack"
+        >
+          <template v-if="route.name === 'collections'" #toggle>
+            <button 
+              class="toggle-btn" 
+              :class="{ active: uiStore.collectionsTab === 'albums' }"
+              @click="uiStore.setCollectionsTab('albums')"
+            >
+              💿 Альбомы
+            </button>
+            <button 
+              class="toggle-btn" 
+              :class="{ active: uiStore.collectionsTab === 'playlists' }"
+              @click="uiStore.setCollectionsTab('playlists')"
+            >
+              📁 Плейлисты
+            </button>
+          </template>
+        </PageHeader>
 
-      <!-- Bottom navigation -->
-      <nav v-if="showNav" class="bottom-nav">
-        <router-link to="/" class="nav-item" :class="{ active: isRoute('/') }">
-          <span class="nav-icon">🎵</span>
-          <span class="nav-label">Библиотека</span>
-        </router-link>
-        <router-link to="/collections" class="nav-item" :class="{ active: isRoute('/collections') || isRoute('/albums') || isRoute('/playlists') }">
-          <span class="nav-icon">💿</span>
-          <span class="nav-label">Коллекции</span>
-        </router-link>
-        <router-link to="/artists" class="nav-item" :class="{ active: isRoute('/artists') }">
-          <span class="nav-icon">🎤</span>
-          <span class="nav-label">Артисты</span>
-        </router-link>
-        <router-link to="/friends" class="nav-item" :class="{ active: isRoute('/friends') }">
-          <span class="nav-icon">👥</span>
-          <span class="nav-label">Кенты</span>
-        </router-link>
-        <router-link to="/settings" class="nav-item" :class="{ active: isRoute('/settings') }">
-          <span class="nav-icon">⚙️</span>
-          <span class="nav-label">Настройки</span>
-        </router-link>
-      </nav>
+        <!-- Router view -->
+        <main class="main-content">
+          <router-view v-slot="{ Component }">
+            <keep-alive :include="['LibraryView', 'AlbumsView', 'ArtistsView', 'PlaylistsView']">
+              <component :is="Component" />
+            </keep-alive>
+          </router-view>
+        </main>
 
-      <!-- Mini player -->
-      <MiniPlayer 
-        v-if="playerStore.currentTrack && showNav" 
-        :track="playerStore.currentTrack"
-        :is-playing="playerStore.isPlaying"
-        :loading="playerStore.loading"
-        :progress="playerStore.progress"
-        :duration="playerStore.duration"
-        :buffered="playerStore.buffered"
+        <!-- Bottom navigation (mobile only) -->
+        <nav v-if="showNav && !isDesktop" class="bottom-nav">
+          <router-link to="/" class="nav-item" :class="{ active: isRoute('/') }">
+            <span class="nav-icon">🎵</span>
+            <span class="nav-label">Библиотека</span>
+          </router-link>
+          <router-link to="/collections" class="nav-item" :class="{ active: isRoute('/collections') || isRoute('/albums') || isRoute('/playlists') }">
+            <span class="nav-icon">💿</span>
+            <span class="nav-label">Коллекции</span>
+          </router-link>
+          <router-link to="/artists" class="nav-item" :class="{ active: isRoute('/artists') }">
+            <span class="nav-icon">🎤</span>
+            <span class="nav-label">Артисты</span>
+          </router-link>
+          <router-link to="/friends" class="nav-item" :class="{ active: isRoute('/friends') }">
+            <span class="nav-icon">👥</span>
+            <span class="nav-label">Кенты</span>
+          </router-link>
+          <router-link to="/settings" class="nav-item" :class="{ active: isRoute('/settings') }">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-label">Настройки</span>
+          </router-link>
+        </nav>
+
+        <!-- Mini player (mobile only) -->
+        <MiniPlayer 
+          v-if="playerStore.currentTrack && showNav && !isDesktop" 
+          :track="playerStore.currentTrack"
+          :is-playing="playerStore.isPlaying"
+          :loading="playerStore.loading"
+          :progress="playerStore.progress"
+          :duration="playerStore.duration"
+          :buffered="playerStore.buffered"
+          @expand="showFullPlayer = true"
+          @toggle="playerStore.togglePlay()"
+          @next="playerStore.next()"
+        />
+      </div>
+
+      <!-- Desktop: Now Playing Sidebar -->
+      <NowPlayingSidebar v-if="isDesktop && playerStore.currentTrack && authStore.isAuthenticated" />
+
+      <!-- Desktop: Bottom Player -->
+      <DesktopPlayer 
+        v-if="isDesktop && playerStore.currentTrack && authStore.isAuthenticated"
         @expand="showFullPlayer = true"
-        @toggle="playerStore.togglePlay()"
-        @next="playerStore.next()"
       />
 
-      <!-- Full player modal -->
+      <!-- Full player modal (both mobile and desktop) -->
       <FullPlayer 
         v-if="showFullPlayer"
         :track="playerStore.currentTrack"
@@ -121,7 +136,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, inject } from 'vue'
+import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
@@ -131,6 +146,10 @@ import PageHeader from '@/components/PageHeader.vue'
 import MiniPlayer from '@/components/MiniPlayer.vue'
 import FullPlayer from '@/components/FullPlayer.vue'
 import ChannelBanner from '@/components/ChannelBanner.vue'
+// Desktop components
+import Sidebar from '@/components/desktop/Sidebar.vue'
+import DesktopPlayer from '@/components/desktop/DesktopPlayer.vue'
+import NowPlayingSidebar from '@/components/desktop/NowPlayingSidebar.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -141,6 +160,19 @@ const uiStore = useUIStore()
 const telegram = inject('telegram')
 
 const showFullPlayer = ref(false)
+
+// Responsive detection
+const isDesktop = ref(window.innerWidth >= 1024)
+const updateDesktopState = () => {
+  isDesktop.value = window.innerWidth >= 1024
+}
+
+// App classes for layout
+const appClasses = computed(() => ({
+  'has-player': playerStore.currentTrack,
+  'desktop-layout': isDesktop.value && authStore.isAuthenticated,
+  'has-now-playing': isDesktop.value && playerStore.currentTrack && authStore.isAuthenticated
+}))
 
 // Computed property for like state based on libraryStore.likedTracks
 const isCurrentTrackLiked = computed(() => {
@@ -155,6 +187,12 @@ const showNav = computed(() => {
 })
 
 const showHeader = computed(() => {
+  // On desktop, show header only for detail pages (not main navigation pages)
+  if (isDesktop.value) {
+    const detailRoutes = ['album-detail', 'artist-detail', 'playlist-detail', 'liked', 'settings']
+    return authStore.isAuthenticated && detailRoutes.includes(route.name)
+  }
+  // On mobile, show header for all pages except login and library
   const noHeaderRoutes = ['login', 'library']
   return authStore.isAuthenticated && !noHeaderRoutes.includes(route.name)
 })
@@ -202,6 +240,9 @@ onMounted(async () => {
     telegram.expand()
   }
   
+  // Add resize listener for responsive detection
+  window.addEventListener('resize', updateDesktopState)
+  
   // Initialize auth
   if (authStore.isAuthenticated && !authStore.initialized) {
     await authStore.initialize()
@@ -225,6 +266,10 @@ onMounted(async () => {
     }
   })
 })
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateDesktopState)
+})
 </script>
 
 <style>
@@ -242,6 +287,9 @@ onMounted(async () => {
   --border: #282828;
   --nav-height: 60px;
   --player-height: 64px;
+  --desktop-player-height: 100px;
+  --sidebar-width: 280px;
+  --now-playing-width: 320px;
 }
 
 * {
@@ -266,6 +314,59 @@ html, body {
   min-height: 100dvh;
 }
 
+/* Desktop Layout - CSS Grid */
+.app.desktop-layout {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  grid-template-rows: 1fr var(--desktop-player-height);
+  grid-template-areas:
+    "sidebar main"
+    "player player";
+  height: 100vh;
+  max-height: 100vh;
+}
+
+.app.desktop-layout.has-now-playing {
+  grid-template-columns: var(--sidebar-width) 1fr var(--now-playing-width);
+  grid-template-areas:
+    "sidebar main nowplaying"
+    "player player player";
+}
+
+.app.desktop-layout :deep(.sidebar) {
+  grid-area: sidebar;
+  height: 100%;
+}
+
+.app.desktop-layout .main-content-wrapper {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+}
+
+.app.desktop-layout :deep(.now-playing-sidebar) {
+  grid-area: nowplaying;
+  height: 100%;
+}
+
+.app.desktop-layout :deep(.desktop-player) {
+  grid-area: player;
+  width: 100%;
+  height: var(--desktop-player-height);
+  overflow: visible;
+}
+
+/* Mobile layout wrapper */
+.main-content-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
 .main-content {
   flex: 1;
   overflow-y: auto;
@@ -274,6 +375,15 @@ html, body {
 
 .app.has-player .main-content {
   padding-bottom: calc(var(--nav-height) + var(--player-height));
+}
+
+/* Desktop: no extra padding needed, grid handles it */
+.app.desktop-layout .main-content {
+  padding-bottom: 20px;
+}
+
+.app.desktop-layout.has-player .main-content {
+  padding-bottom: 20px;
 }
 
 .auth-loading {
@@ -296,7 +406,7 @@ html, body {
   to { transform: rotate(360deg); }
 }
 
-/* Bottom Navigation */
+/* Bottom Navigation (mobile) */
 .bottom-nav {
   position: fixed;
   bottom: 0;
@@ -336,8 +446,27 @@ html, body {
   font-weight: 500;
 }
 
-/* Has mini player adjustment - nav stays at bottom, mini player is above it */
-.app.has-player .bottom-nav {
-  /* Mini player now has position: fixed and sits above nav */
+/* Desktop adjustments */
+@media (min-width: 1024px) {
+  .app.desktop-layout .main-content {
+    padding: 0 24px 20px;
+  }
+  
+  /* Improve track items on desktop */
+  .app.desktop-layout :deep(.track-item) {
+    border-radius: 8px;
+    margin-bottom: 2px;
+  }
+  
+  .app.desktop-layout :deep(.track-item:hover) {
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+
+@media (min-width: 1440px) {
+  .app.desktop-layout .main-content {
+    padding: 0 40px 20px;
+    max-width: 1600px;
+  }
 }
 </style>
