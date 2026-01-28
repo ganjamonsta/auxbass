@@ -12,7 +12,24 @@
         v-if="showHeader"
         :title="pageTitle"
         @goBack="goBack"
-      />
+      >
+        <template v-if="route.name === 'collections'" #toggle>
+          <button 
+            class="toggle-btn" 
+            :class="{ active: uiStore.collectionsTab === 'albums' }"
+            @click="uiStore.setCollectionsTab('albums')"
+          >
+            💿 Альбомы
+          </button>
+          <button 
+            class="toggle-btn" 
+            :class="{ active: uiStore.collectionsTab === 'playlists' }"
+            @click="uiStore.setCollectionsTab('playlists')"
+          >
+            📁 Плейлисты
+          </button>
+        </template>
+      </PageHeader>
 
       <!-- Router view -->
       <main class="main-content">
@@ -109,6 +126,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
+import { useUIStore } from '@/stores/ui'
 import PageHeader from '@/components/PageHeader.vue'
 import MiniPlayer from '@/components/MiniPlayer.vue'
 import FullPlayer from '@/components/FullPlayer.vue'

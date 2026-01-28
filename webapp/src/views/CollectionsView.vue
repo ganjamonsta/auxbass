@@ -1,23 +1,5 @@
 <template>
   <div class="collections-view">
-    <!-- Inline tab toggle (appears right after header) -->
-    <div class="inline-toggle">
-      <button 
-        class="toggle-btn" 
-        :class="{ active: activeTab === 'albums' }"
-        @click="activeTab = 'albums'"
-      >
-        💿 Альбомы
-      </button>
-      <button 
-        class="toggle-btn" 
-        :class="{ active: activeTab === 'playlists' }"
-        @click="activeTab = 'playlists'"
-      >
-        📁 Плейлисты
-      </button>
-    </div>
-
     <!-- Albums Tab -->
     <div v-show="activeTab === 'albums'" class="tab-content">
       <!-- Scope switcher for albums -->
@@ -225,6 +207,7 @@ import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useAuthStore } from '@/stores/auth'
+import { useUiStore } from '@/stores/ui'
 import PaginationNav from '@/components/PaginationNav.vue'
 import SortChips from '@/components/SortChips.vue'
 import api from '@/api/client'
@@ -233,9 +216,10 @@ const router = useRouter()
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
 const authStore = useAuthStore()
+const uiStore = useUiStore()
 
-// Tab state
-const activeTab = ref('albums')
+// Tab state from uiStore
+const activeTab = computed(() => uiStore.collectionsTab)
 
 // Scope state for albums
 const ALBUM_SCOPE_KEY = 'albums-scope'
@@ -513,36 +497,6 @@ onMounted(() => {
   padding: 8px 16px 120px 16px;
 }
 
-.inline-toggle {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 16px;
-  background: var(--bg-secondary);
-  border-radius: 8px;
-  padding: 3px;
-  width: fit-content;
-}
-
-.toggle-btn {
-  padding: 8px 14px;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.toggle-btn.active {
-  background: var(--accent-color, #1db954);
-  color: #fff;
-}
-
 .scope-tabs {
   display: flex;
   gap: 8px;
@@ -645,6 +599,7 @@ onMounted(() => {
 .album-card {
   cursor: pointer;
   transition: transform 0.2s;
+  min-width: 0;
 }
 
 .album-card:active {
@@ -654,6 +609,7 @@ onMounted(() => {
 .album-cover {
   position: relative;
   aspect-ratio: 1;
+  width: 100%;
   border-radius: 8px;
   overflow: hidden;
   background: var(--bg-elevated);
@@ -664,6 +620,7 @@ onMounted(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
 
 .cover-placeholder {
