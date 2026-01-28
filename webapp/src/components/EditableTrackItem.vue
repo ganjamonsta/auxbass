@@ -34,7 +34,14 @@
     <div class="track-info">
       <div class="track-title">{{ track.title }}</div>
       <div class="track-artist">{{ track.artist }}</div>
-      <div v-if="isCurrentTrack" class="progress" @click="seek" @mousedown="startDrag">
+      <div 
+        v-if="isCurrentTrack" 
+        class="progress" 
+        draggable="false"
+        @click.stop="seek" 
+        @mousedown.stop="startDrag"
+        @dragstart.stop.prevent
+      >
         <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
         <div class="progress-thumb" :style="{ left: progressPercent + '%' }"></div>
       </div>
