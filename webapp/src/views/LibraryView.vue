@@ -1,7 +1,19 @@
 <template>
   <div class="library-view">
-    <!-- Search bar -->
-    <div class="search-section">
+    <!-- No channel - show setup prompt -->
+    <div v-if="!authStore.hasChannel" class="no-channel-prompt">
+      <div class="prompt-icon">📚</div>
+      <h2>Ваша библиотека</h2>
+      <p>Подключите Telegram-канал, чтобы сохранять треки и создавать свою коллекцию музыки</p>
+      <button class="setup-btn" @click="goToChannelSetup">
+        Подключить канал
+      </button>
+    </div>
+
+    <!-- Has channel - show library -->
+    <template v-else>
+      <!-- Search bar -->
+      <div class="search-section">
       <div class="search-bar">
         <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
           <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
@@ -40,15 +52,25 @@
           :searchQuery="debouncedQuery"
        />
     </div>
+    </template>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import LibraryTracks from '@/components/library/LibraryTracks.vue'
 import LibraryAlbums from '@/components/library/LibraryAlbums.vue'
 import LibraryArtists from '@/components/library/LibraryArtists.vue'
 import LibraryPlaylists from '@/components/library/LibraryPlaylists.vue'
+
+const router = useRouter()
+const authStore = useAuthStore()
+
+const goToChannelSetup = () => {
+  router.push('/settings#channel')
+}
 
 const tabs = [
   { id: 'tracks', label: 'Треки', component: LibraryTracks, placeholder: 'Поиск треков...' },
@@ -170,6 +192,54 @@ const clearSearch = () => {
   background: var(--text-primary); /* High contrast active state like pills */
   color: var(--bg-card); /* Inverted text for active */
   font-weight: 600;
+}
+
+/* No channel prompt */
+.no-channel-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+  padding: 32px 24px;
+}
+
+.no-channel-prompt .prompt-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.no-channel-prompt h2 {
+  color: var(--text-primary);
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 12px 0;
+}
+
+.no-channel-prompt p {
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 0 0 24px 0;
+  max-width: 300px;
+}
+
+.no-channel-prompt .setup-btn {
+  background: linear-gradient(135deg, var(--accent) 0%, #00c853 100%);
+  border: none;
+  border-radius: 24px;
+  color: #000;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 14px 32px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.no-channel-prompt .setup-btn:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 16px rgba(0, 230, 118, 0.3);
 }
 
 /* Make it look more "Apple Music" or "Spotify" style: 

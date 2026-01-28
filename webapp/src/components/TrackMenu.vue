@@ -89,6 +89,7 @@
 <script setup>
 import { inject, computed } from 'vue'
 import { usePlayerStore } from '../stores/player'
+import { useAuthStore } from '../stores/auth'
 
 const props = defineProps({
   show: Boolean,
@@ -105,6 +106,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'addToPlaylist', 'edit', 'delete', 'removeFromLibrary', 'download', 'goToArtist', 'goToAlbum', 'removeFromPlaylist'])
 
 const player = usePlayerStore()
+const authStore = useAuthStore()
 const telegram = inject('telegram')
 
 // Computed properties for navigation availability
@@ -170,6 +172,11 @@ const handleGoToAlbum = () => {
 }
 
 const handlePlayNext = () => {
+  if (!authStore.hasChannel) {
+    authStore.promptChannelSetup()
+    emit('close')
+    return
+  }
   if (props.track) {
     player.playNext(props.track)
     haptic('light')
@@ -178,6 +185,11 @@ const handlePlayNext = () => {
 }
 
 const handleAddToQueue = () => {
+  if (!authStore.hasChannel) {
+    authStore.promptChannelSetup()
+    emit('close')
+    return
+  }
   if (props.track) {
     player.addToQueue(props.track)
     haptic('light')
@@ -186,6 +198,11 @@ const handleAddToQueue = () => {
 }
 
 const handleAddToPlaylist = () => {
+  if (!authStore.hasChannel) {
+    authStore.promptChannelSetup()
+    emit('close')
+    return
+  }
   haptic('light')
   emit('addToPlaylist', props.track)
   emit('close')

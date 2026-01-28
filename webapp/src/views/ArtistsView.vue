@@ -80,17 +80,24 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import { useSort } from '@/composables'
 import SortChips from '@/components/SortChips.vue'
 import { artistsApi } from '@/api/client'
 
 const router = useRouter()
+const authStore = useAuthStore()
 
 // Scope state
 const SCOPE_KEY = 'artists-scope'
 const scope = ref(localStorage.getItem(SCOPE_KEY) || 'library')
 
 const changeScope = (newScope) => {
+  // If trying to access library without channel, show prompt
+  if (newScope === 'library' && !authStore.hasChannel) {
+    authStore.promptChannelSetup()
+    return
+  }
   scope.value = newScope
   localStorage.setItem(SCOPE_KEY, newScope)
   reset()
@@ -210,6 +217,12 @@ const goToArtist = (artist) => {
 
 // Setup infinite scroll with IntersectionObserver
 onMounted(() => {
+  // If no channel and scope is library, switch to global
+  if (!authStore.hasChannel && scope.value === 'library') {
+    scope.value = 'global'
+    localStorage.setItem(SCOPE_KEY, 'global')
+  }
+  
   loadArtists()
   
   observer = new IntersectionObserver(

@@ -80,6 +80,10 @@ class User(Base):
     last_name: Mapped[Optional[str]] = mapped_column(String(255))
     is_premium: Mapped[bool] = mapped_column(Boolean, default=False)
     
+    # Privacy settings
+    hide_from_search: Mapped[bool] = mapped_column(Boolean, default=False)  # Hide from user search, keep library visible
+    hide_profile: Mapped[bool] = mapped_column(Boolean, default=False)  # Hide library and albums from others
+    
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

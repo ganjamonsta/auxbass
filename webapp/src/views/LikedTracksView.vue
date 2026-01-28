@@ -1,7 +1,18 @@
 <template>
   <div class="liked-tracks-view">
-    <!-- Header -->
-    <div class="liked-header">
+    <!-- No channel - show setup prompt -->
+    <div v-if="!authStore.hasChannel" class="no-channel-prompt">
+      <div class="prompt-icon">❤️</div>
+      <h2>Понравившиеся</h2>
+      <p>Подключите Telegram-канал, чтобы сохранять понравившиеся треки</p>
+      <button class="setup-btn" @click="goToChannelSetup">
+        Подключить канал
+      </button>
+    </div>
+
+    <template v-else>
+      <!-- Header -->
+      <div class="liked-header">
       <div class="liked-cover">
         <span class="liked-icon">❤️</span>
       </div>
@@ -59,6 +70,7 @@
       @addToPlaylist="handleAddToPlaylist"
       @download="handleDownloadTrack"
     />
+    </template>
   </div>
 </template>
 
@@ -67,6 +79,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
+import { useAuthStore } from '@/stores/auth'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackMenu from '@/components/TrackMenu.vue'
 import api from '@/api/client'
@@ -74,6 +87,11 @@ import api from '@/api/client'
 const router = useRouter()
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
+const authStore = useAuthStore()
+
+const goToChannelSetup = () => {
+  router.push('/settings#channel')
+}
 
 const tracks = ref([])
 const loading = ref(true)
@@ -313,5 +331,53 @@ onMounted(() => {
 .empty-state .hint {
   font-size: 13px;
   color: var(--text-tertiary);
+}
+
+/* No channel prompt */
+.no-channel-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+  padding: 32px 24px;
+}
+
+.no-channel-prompt .prompt-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.no-channel-prompt h2 {
+  color: var(--text-primary);
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 12px 0;
+}
+
+.no-channel-prompt p {
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 0 0 24px 0;
+  max-width: 300px;
+}
+
+.no-channel-prompt .setup-btn {
+  background: linear-gradient(135deg, #ff4564 0%, #ff6b8a 100%);
+  border: none;
+  border-radius: 24px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 14px 32px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.no-channel-prompt .setup-btn:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 16px rgba(255, 69, 100, 0.3);
 }
 </style>

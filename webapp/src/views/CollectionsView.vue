@@ -96,7 +96,7 @@
     <div v-show="activeTab === 'playlists'" class="tab-content">
       <div class="view-header">
         <span class="count">{{ playlists.length }} плейлистов</span>
-        <button class="create-btn" @click="showCreateModal = true">
+        <button class="create-btn" @click="handleCreatePlaylist">
           ➕ Создать
         </button>
       </div>
@@ -132,7 +132,7 @@
       <div v-else-if="!loadingPlaylists" class="empty-state">
         <span class="empty-icon">📝</span>
         <p>У вас пока нет плейлистов</p>
-        <button class="create-first-btn" @click="showCreateModal = true">
+        <button class="create-first-btn" @click="handleCreatePlaylist">
           Создать плейлист
         </button>
       </div>
@@ -199,6 +199,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
+import { useAuthStore } from '@/stores/auth'
 import PaginationNav from '@/components/PaginationNav.vue'
 import SortChips from '@/components/SortChips.vue'
 import api from '@/api/client'
@@ -206,6 +207,7 @@ import api from '@/api/client'
 const router = useRouter()
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
+const authStore = useAuthStore()
 
 // Tab state
 const activeTab = ref('albums')
@@ -215,6 +217,11 @@ const ALBUM_SCOPE_KEY = 'albums-scope'
 const albumScope = ref(localStorage.getItem(ALBUM_SCOPE_KEY) || 'library')
 
 const changeAlbumScope = (newScope) => {
+  // If trying to access library without channel, show prompt
+  if (newScope === 'library' && !authStore.hasChannel) {
+    authStore.promptChannelSetup()
+    return
+  }
   albumScope.value = newScope
   localStorage.setItem(ALBUM_SCOPE_KEY, newScope)
   albumsPage.value = 1
@@ -251,6 +258,15 @@ const showCreateModal = ref(false)
 const newPlaylistName = ref('')
 const newPlaylistPublic = ref(false)
 const nameInput = ref(null)
+
+// Handle create playlist - check for channel
+const handleCreatePlaylist = () => {
+  if (!authStore.hasChannel) {
+    authStore.promptChannelSetup()
+    return
+  }
+  showCreateModal.value = true
+}
 
 // Albums functions
 const loadAlbums = async () => {
@@ -393,6 +409,12 @@ watch(activeTab, (tab) => {
 })
 
 onMounted(() => {
+  // If no channel and scope is library, switch to global
+  if (!authStore.hasChannel && albumScope.value === 'library') {
+    albumScope.value = 'global'
+    localStorage.setItem(ALBUM_SCOPE_KEY, 'global')
+  }
+  
   // Load initial tab data
   if (activeTab.value === 'albums') {
     loadAlbums()

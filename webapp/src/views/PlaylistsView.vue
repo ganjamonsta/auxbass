@@ -3,7 +3,7 @@
     <!-- Header with create button -->
     <div class="header">
       <h1>Плейлисты</h1>
-      <button class="create-btn" @click="showCreateModal = true">
+      <button class="create-btn" @click="handleCreatePlaylist">
         ➕ Создать
       </button>
     </div>
@@ -46,7 +46,7 @@
     <div v-else-if="!loading" class="empty-state">
       <span class="empty-icon">📝</span>
       <p>У вас пока нет плейлистов</p>
-      <button class="create-first-btn" @click="showCreateModal = true">
+      <button class="create-first-btn" @click="handleCreatePlaylist">
         Создать плейлист
       </button>
     </div>
@@ -86,10 +86,12 @@
 import { ref, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
+import { useAuthStore } from '@/stores/auth'
 import api from '@/api/client'
 
 const router = useRouter()
 const libraryStore = useLibraryStore()
+const authStore = useAuthStore()
 
 const playlists = ref([])
 const loading = ref(false)
@@ -97,6 +99,15 @@ const showCreateModal = ref(false)
 const newPlaylistName = ref('')
 const nameInput = ref(null)
 const likedCount = ref(0)
+
+// Handle create playlist - check for channel
+const handleCreatePlaylist = () => {
+  if (!authStore.hasChannel) {
+    authStore.promptChannelSetup()
+    return
+  }
+  showCreateModal.value = true
+}
 
 const loadPlaylists = async () => {
   loading.value = true

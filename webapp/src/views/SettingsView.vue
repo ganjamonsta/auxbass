@@ -138,6 +138,41 @@
       </div>
     </section>
 
+    <!-- Privacy settings -->
+    <section class="section">
+      <h2>🔒 Приватность</h2>
+      
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-name">Скрыть из поиска</span>
+          <span class="setting-desc">Вас не найдут другие пользователи, но ваша медиатека останется доступна по прямой ссылке</span>
+        </div>
+        <label class="toggle">
+          <input 
+            type="checkbox" 
+            v-model="privacySettings.hide_from_search" 
+            @change="updatePrivacy('hide_from_search', $event.target.checked)"
+          />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-name">Скрыть профиль полностью</span>
+          <span class="setting-desc">Ваша медиатека и альбомы будут скрыты от других. Приватность плейлистов сохранится</span>
+        </div>
+        <label class="toggle">
+          <input 
+            type="checkbox" 
+            v-model="privacySettings.hide_profile" 
+            @change="updatePrivacy('hide_profile', $event.target.checked)"
+          />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </section>
+
     <!-- Cache section -->
     <section class="section">
       <h2>Кэш</h2>
@@ -172,6 +207,10 @@ const playerStore = usePlayerStore()
 const stats = ref(null)
 const darkMode = ref(true)
 const botUsername = ref('tg_player_bot')  // Default, will be updated from config
+const privacySettings = ref({
+  hide_from_search: false,
+  hide_profile: false,
+})
 
 const repeatModeText = computed(() => {
   const modes = {
@@ -215,6 +254,25 @@ const refreshStatus = async () => {
   await authStore.fetchStatus()
 }
 
+const loadPrivacySettings = async () => {
+  try {
+    const response = await api.get('/auth/privacy')
+    privacySettings.value = response.data
+  } catch (error) {
+    console.error('Failed to load privacy settings:', error)
+  }
+}
+
+const updatePrivacy = async (field, value) => {
+  try {
+    await api.put('/auth/privacy', { [field]: value })
+  } catch (error) {
+    console.error('Failed to update privacy:', error)
+    // Revert on error
+    privacySettings.value[field] = !value
+  }
+}
+
 const formatDuration = (seconds) => {
   if (!seconds) return '0:00'
   const hours = Math.floor(seconds / 3600)
@@ -246,6 +304,7 @@ const clearCache = () => {
 onMounted(() => {
   loadStats()
   loadBotConfig()
+  loadPrivacySettings()
   
   // Scroll to channel section if hash is #channel
   if (route.hash === '#channel') {

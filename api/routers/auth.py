@@ -12,6 +12,7 @@ from typing import Optional
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Header, Depends
+from pydantic import BaseModel
 import jwt
 
 import sys
@@ -423,3 +424,57 @@ async def refresh_token(user: TelegramUser = Depends(get_current_user)):
     """Refresh JWT token"""
     token = create_jwt_token(user)
     return AuthResult(valid=True, user=user, token=token)
+
+
+# ============== Privacy Settings ==============
+
+class PrivacySettingsRequest(BaseModel):
+    hide_from_search: Optional[bool] = None
+    hide_profile: Optional[bool] = None
+
+
+class PrivacySettingsResponse(BaseModel):
+    hide_from_search: bool
+    hide_profile: bool
+
+
+@router.get("/privacy", response_model=PrivacySettingsResponse)
+async def get_privacy_settings(
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get user's privacy settings"""
+    db_user = await db.get(User, user.id)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return PrivacySettingsResponse(
+        hide_from_search=db_user.hide_from_search,
+        hide_profile=db_user.hide_profile,
+    )
+
+
+@router.put("/privacy", response_model=PrivacySettingsResponse)
+async def update_privacy_settings(
+    settings_data: PrivacySettingsRequest,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update user's privacy settings"""
+    db_user = await db.get(User, user.id)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if settings_data.hide_from_search is not None:
+        db_user.hide_from_search = settings_data.hide_from_search
+    
+    if settings_data.hide_profile is not None:
+        db_user.hide_profile = settings_data.hide_profile
+    
+    await db.commit()
+    await db.refresh(db_user)
+    
+    return PrivacySettingsResponse(
+        hide_from_search=db_user.hide_from_search,
+        hide_profile=db_user.hide_profile,
+    )

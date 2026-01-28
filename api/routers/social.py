@@ -307,6 +307,10 @@ async def get_user_library(
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
     
+    # Check if user has hidden their profile
+    if target.hide_profile and user_id != user.id:
+        raise HTTPException(status_code=403, detail="Пользователь скрыл свой профиль")
+    
     # Count tracks
     total = await db.scalar(
         select(func.count(UserLibrary.id))
@@ -365,6 +369,10 @@ async def get_user_albums(
     target = await db.get(User, user_id)
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
+    
+    # Check if user has hidden their profile
+    if target.hide_profile and user_id != user.id:
+        raise HTTPException(status_code=403, detail="Пользователь скрыл свой профиль")
     
     # Get unique albums from user's library
     offset = (page - 1) * per_page
@@ -432,10 +440,12 @@ async def search_users(
     """Search users by username or name"""
     search_pattern = f"%{q}%"
     
-    # Count matching users
+    # Count matching users (exclude hidden users)
     total = await db.scalar(
         select(func.count(User.id))
         .where(
+            User.hide_from_search == False,
+            User.id != user.id,  # Exclude self
             or_(
                 User.username.ilike(search_pattern),
                 User.first_name.ilike(search_pattern),
@@ -444,11 +454,13 @@ async def search_users(
         )
     ) or 0
     
-    # Get matching users
+    # Get matching users (exclude hidden users)
     offset = (page - 1) * per_page
     result = await db.execute(
         select(User)
         .where(
+            User.hide_from_search == False,
+            User.id != user.id,  # Exclude self
             or_(
                 User.username.ilike(search_pattern),
                 User.first_name.ilike(search_pattern),
