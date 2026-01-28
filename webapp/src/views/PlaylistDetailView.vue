@@ -412,13 +412,29 @@ const searchTracks = async () => {
   
   searchingTracks.value = true
   try {
-    const response = await api.get('/library/tracks', {
+    // Search in personal library first
+    const libraryResponse = await api.get('/library', {
       params: {
         search: trackSearchQuery.value,
-        limit: 20
+        per_page: 20
       }
     })
-    searchResults.value = response.data.items || []
+    const libraryTracks = libraryResponse.data.items || []
+    
+    // Then search in global library
+    const globalResponse = await api.get('/tracks/global', {
+      params: {
+        search: trackSearchQuery.value,
+        per_page: 20
+      }
+    })
+    const globalTracks = globalResponse.data.items || []
+    
+    // Merge results, avoiding duplicates (by track id)
+    const seenIds = new Set(libraryTracks.map(t => t.id))
+    const uniqueGlobalTracks = globalTracks.filter(t => !seenIds.has(t.id))
+    
+    searchResults.value = [...libraryTracks, ...uniqueGlobalTracks].slice(0, 30)
   } catch (error) {
     console.error('Failed to search tracks:', error)
     searchResults.value = []

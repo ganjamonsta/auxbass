@@ -193,7 +193,30 @@ onMounted(() => {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 16px;
-    display: none; /* Hide top header if we use Grid for Liked */
+}
+
+.liked-quick-access {
+    display: none; /* Hide in header, show in grid instead */
+}
+
+.create-btn {
+    padding: 10px 16px;
+    background: var(--accent);
+    border: none;
+    border-radius: 20px;
+    color: #000;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s, opacity 0.2s;
+}
+
+.create-btn:hover {
+    opacity: 0.9;
+}
+
+.create-btn:active {
+    transform: scale(0.97);
 }
 
 /* Reusing PlaylistsView styles */
