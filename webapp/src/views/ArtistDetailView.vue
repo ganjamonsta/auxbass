@@ -7,9 +7,19 @@
         <div v-else class="image-placeholder">👤</div>
       </div>
       <div class="artist-info">
-        <h1>{{ artist.name }}</h1>
+        <h1 
+          class="artist-name-link" 
+          @click="toggleScope"
+          :title="isGlobal ? 'Перейти в личную библиотеку' : 'Посмотреть всю музыку артиста'"
+        >
+          {{ artist.name }}
+          <span class="scope-indicator">{{ isGlobal ? '🌍' : '📚' }}</span>
+        </h1>
         <p class="meta">
           {{ artist.track_count }} треков • {{ artist.album_count }} альбомов
+          <span v-if="!isGlobal" class="global-link" @click.stop="goToGlobal">
+            → вся музыка
+          </span>
         </p>
       </div>
     </div>
@@ -142,6 +152,23 @@ const goToAlbum = (album) => {
   router.push({ path: `/album/${album.id}`, query })
 }
 
+// Toggle between library and global scope
+const toggleScope = () => {
+  const newScope = isGlobal.value ? 'library' : 'global'
+  router.push({ 
+    path: route.path, 
+    query: newScope === 'library' ? {} : { scope: 'global' } 
+  })
+}
+
+// Go directly to global scope
+const goToGlobal = () => {
+  router.push({ 
+    path: route.path, 
+    query: { scope: 'global' } 
+  })
+}
+
 // Track menu handlers
 const openTrackMenu = (track) => {
   menuTrack.value = track
@@ -270,6 +297,32 @@ onMounted(() => {
   color: var(--text-primary);
   margin: 0 0 8px 0;
   line-height: 1.2;
+}
+
+.artist-name-link {
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.artist-name-link:hover {
+  color: var(--accent-color);
+}
+
+.scope-indicator {
+  font-size: 16px;
+  margin-left: 8px;
+  opacity: 0.7;
+}
+
+.global-link {
+  color: var(--accent-color);
+  cursor: pointer;
+  margin-left: 8px;
+  font-weight: 500;
+}
+
+.global-link:hover {
+  text-decoration: underline;
 }
 
 .meta {
