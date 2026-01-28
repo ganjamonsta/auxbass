@@ -17,11 +17,18 @@
           {{ artist.track_count }} треков • {{ formatPlayCount(artist.total_plays) }}
         </p>
       </div>
-      <button class="play-all-btn" @click="playAll" v-if="artist.tracks?.length">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M8 5v14l11-7z"/>
-        </svg>
-      </button>
+      <div class="action-buttons" v-if="artist.tracks?.length">
+        <button class="action-btn play-btn" @click="playAll">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+        </button>
+        <button class="action-btn shuffle-btn" @click="shufflePlay">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
+          </svg>
+        </button>
+      </div>
     </div>
 
     <!-- Albums Section -->
@@ -163,6 +170,13 @@ const playAll = () => {
     emit('play', props.artist.tracks[0], props.artist.tracks)
   }
 }
+
+const shufflePlay = () => {
+  if (props.artist.tracks?.length) {
+    const shuffled = [...props.artist.tracks].sort(() => Math.random() - 0.5)
+    emit('play', shuffled[0], shuffled)
+  }
+}
 </script>
 
 <style scoped>
@@ -226,27 +240,56 @@ const playAll = () => {
   margin: 0;
 }
 
-.play-all-btn {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
+/* ─── Neumorphic Action Buttons ─── */
+.action-buttons {
+  display: flex;
+  flex-shrink: 0;
+  border-radius: 28px;
   background: var(--spotify-green);
+  box-shadow: 
+    6px 6px 12px rgba(0, 0, 0, 0.3),
+    -3px -3px 8px rgba(255, 255, 255, 0.1),
+    inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+
+.action-btn {
+  width: 48px;
+  height: 48px;
   border: none;
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
   cursor: pointer;
-  flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(29, 185, 84, 0.4);
-  transition: transform 0.15s ease;
+  transition: all 0.15s ease;
+  position: relative;
 }
 
-.play-all-btn:active {
-  transform: scale(0.92);
+.action-btn::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.2);
 }
 
-.play-all-btn svg {
+.action-btn.play-btn::after {
+  right: 0;
+}
+
+.action-btn.shuffle-btn::after {
+  display: none;
+}
+
+.action-btn:active {
+  background: rgba(0, 0, 0, 0.15);
+  box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.action-btn.play-btn svg {
   margin-left: 2px;
 }
 
