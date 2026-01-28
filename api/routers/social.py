@@ -22,7 +22,7 @@ from shared.models import (
     Playlist, PlaylistTrack, Album, AlbumTrack
 )
 
-from api.routers.auth import get_current_user
+from api.routers.auth import get_current_user, require_premium
 from api.routers.library import track_to_response
 from api.schemas_v2.common import TelegramUser, PaginatedResponse
 from api.schemas_v2.tracks import TrackResponse
@@ -112,10 +112,10 @@ async def is_following(db: AsyncSession, follower_id: int, following_id: int) ->
 @router.post("/follow")
 async def follow_user(
     data: FollowRequest,
-    user: TelegramUser = Depends(get_current_user),
+    user: TelegramUser = Depends(require_premium),
     db: AsyncSession = Depends(get_db),
 ):
-    """Follow a user"""
+    """Follow a user. Requires connected channel."""
     if data.user_id == user.id:
         raise HTTPException(status_code=400, detail="Cannot follow yourself")
     
@@ -149,10 +149,10 @@ async def follow_user(
 @router.post("/unfollow")
 async def unfollow_user(
     data: FollowRequest,
-    user: TelegramUser = Depends(get_current_user),
+    user: TelegramUser = Depends(require_premium),
     db: AsyncSession = Depends(get_db),
 ):
-    """Unfollow a user"""
+    """Unfollow a user. Requires connected channel."""
     result = await db.execute(
         delete(UserFollow)
         .where(

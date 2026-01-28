@@ -17,6 +17,7 @@
         Подписчики
       </button>
       <button 
+        v-if="canUseSocial"
         class="tab-btn" 
         :class="{ active: activeTab === 'search' }"
         @click="activeTab = 'search'"
@@ -34,9 +35,10 @@
       <div v-else-if="following.length === 0" class="empty-state">
         <span class="empty-icon">👥</span>
         <p>Вы пока ни на кого не подписаны</p>
-        <button class="action-btn" @click="activeTab = 'search'">
+        <button v-if="canUseSocial" class="action-btn" @click="activeTab = 'search'">
           Найти друзей
         </button>
+        <p v-else class="hint">Подключите канал для поиска друзей</p>
       </div>
 
       <div v-else class="users-list">
@@ -301,13 +303,18 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
+import { useAuthStore } from '@/stores/auth'
 import api from '@/api/client'
 
 const router = useRouter()
 const playerStore = usePlayerStore()
+const authStore = useAuthStore()
+
+// Check if user can use social features
+const canUseSocial = computed(() => authStore.hasChannel)
 
 // Tab state
 const activeTab = ref('following')
@@ -390,6 +397,10 @@ const searchUsers = async () => {
 }
 
 const followUser = async (user) => {
+  if (!canUseSocial.value) {
+    authStore.promptChannelSetup()
+    return
+  }
   try {
     await api.post('/social/follow', { user_id: user.id })
     user.is_following = true
@@ -398,18 +409,30 @@ const followUser = async (user) => {
       following.value.unshift(user)
     }
   } catch (error) {
-    console.error('Failed to follow:', error)
+    if (error.response?.status === 403) {
+      authStore.promptChannelSetup()
+    } else {
+      console.error('Failed to follow:', error)
+    }
   }
 }
 
 const unfollowUser = async (user) => {
+  if (!canUseSocial.value) {
+    authStore.promptChannelSetup()
+    return
+  }
   try {
     await api.post('/social/unfollow', { user_id: user.id })
     user.is_following = false
     // Remove from following list
     following.value = following.value.filter(u => u.id !== user.id)
   } catch (error) {
-    console.error('Failed to unfollow:', error)
+    if (error.response?.status === 403) {
+      authStore.promptChannelSetup()
+    } else {
+      console.error('Failed to unfollow:', error)
+    }
   }
 }
 
