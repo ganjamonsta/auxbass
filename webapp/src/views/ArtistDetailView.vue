@@ -247,6 +247,11 @@ const formatYear = (date) => {
 onMounted(() => {
   loadArtist()
 })
+
+// Reload when scope changes
+watch(scope, () => {
+  loadArtist()
+})
 </script>
 
 <style scoped>
