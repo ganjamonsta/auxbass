@@ -154,7 +154,8 @@
 
       <div v-else-if="!loadingPlaylists && !playlistSearchQuery" class="empty-state">
         <span class="empty-icon">📝</span>
-        <p>У вас пока нет плейлистов</p>
+        <p>У вас пока нет публичных плейлистов</p>
+        <p class="hint-text">Создайте плейлист и сделайте его публичным</p>
         <button class="create-first-btn" @click="handleCreatePlaylist">
           Создать плейлист
         </button>
@@ -207,6 +208,7 @@
           <input type="checkbox" v-model="newPlaylistPublic" />
           <span>Публичный плейлист</span>
         </label>
+        <p class="hint-text">Публичные плейлисты видны в разделе «Коллекции»</p>
         <div class="modal-actions">
           <button class="cancel-btn" @click="closeModal">Отмена</button>
           <button 
@@ -934,17 +936,50 @@ onMounted(() => {
 .checkbox-label {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   color: var(--text-secondary);
   font-size: 14px;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
   cursor: pointer;
+  user-select: none;
 }
 
 .checkbox-label input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--accent);
+  appearance: none;
+  -webkit-appearance: none;
+  width: 44px;
+  height: 24px;
+  background: var(--bg-highlight);
+  border-radius: 12px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.checkbox-label input[type="checkbox"]::before {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: white;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s;
+}
+
+.checkbox-label input[type="checkbox"]:checked {
+  background: var(--accent);
+}
+
+.checkbox-label input[type="checkbox"]:checked::before {
+  transform: translateX(20px);
+}
+
+.hint-text {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-bottom: 16px;
 }
 
 .modal-actions {

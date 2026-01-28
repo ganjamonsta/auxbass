@@ -38,6 +38,9 @@
           </svg>
         </button>
       </div>
+      <button v-if="isOwner" class="add-tracks-btn" @click="showAddTracksModal = true">
+        ➕ Добавить
+      </button>
       <button v-if="isOwner" class="edit-btn" @click="openEditModal">
         ✏️
       </button>
@@ -48,23 +51,38 @@
 
     <!-- Track list -->
     <div class="track-list" v-if="playlist.tracks?.length">
-      <TrackItem
+      <div
         v-for="(track, index) in playlist.tracks"
         :key="track.id"
-        :track="track"
-        :isPlaying="playerStore.currentTrack?.id === track.id"
-        :isLiked="track.is_liked"
-        @click="playTrack(track, index)"
-        @like="handleLikeTrack(track)"
-        @menu="openTrackMenu(track)"
-      />
+        class="draggable-track"
+        :class="{ 'is-dragging': dragIndex === index, 'drag-over': dragOverIndex === index }"
+        :draggable="isOwner"
+        @dragstart="handleDragStart($event, index)"
+        @dragend="handleDragEnd"
+        @dragover.prevent="handleDragOver($event, index)"
+        @drop="handleDrop($event, index)"
+      >
+        <div v-if="isOwner" class="drag-handle">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 15h18v-2H3v2zm0 4h18v-2H3v2zm0-8h18V9H3v2zm0-6v2h18V5H3z"/>
+          </svg>
+        </div>
+        <TrackItem
+          :track="track"
+          :isPlaying="playerStore.currentTrack?.id === track.id"
+          :isLiked="track.is_liked"
+          @click="playTrack(track, index)"
+          @like="handleLikeTrack(track)"
+          @menu="openTrackMenu(track)"
+        />
+      </div>
     </div>
 
     <!-- Empty state -->
     <div v-else class="empty-state">
       <span class="empty-icon">🎵</span>
       <p>Плейлист пуст</p>
-      <p class="hint">Добавляйте треки из библиотеки</p>
+      <p class="hint">Нажмите «Добавить» чтобы добавить треки</p>
     </div>
     
     <!-- Track context menu -->
@@ -122,6 +140,65 @@
         </div>
       </div>
     </div>
+
+    <!-- Add tracks modal -->
+    <div v-if="showAddTracksModal" class="modal-overlay" @click.self="closeAddTracksModal">
+      <div class="modal add-tracks-modal">
+        <h2>Добавить треки</h2>
+        <div class="search-input-wrapper">
+          <input
+            v-model="trackSearchQuery"
+            type="text"
+            placeholder="Поиск треков..."
+            @input="debouncedTrackSearch"
+            ref="trackSearchInput"
+          />
+          <div v-if="searchingTracks" class="search-spinner"></div>
+        </div>
+        
+        <div class="search-results" v-if="searchResults.length">
+          <div 
+            v-for="track in searchResults" 
+            :key="track.id" 
+            class="search-result-item"
+            :class="{ 'already-added': isTrackInPlaylist(track.id) }"
+          >
+            <div class="result-cover">
+              <img v-if="track.cover_url" :src="track.cover_url" />
+              <span v-else>🎵</span>
+            </div>
+            <div class="result-info">
+              <div class="result-title">{{ track.title }}</div>
+              <div class="result-artist">{{ track.artist }}</div>
+            </div>
+            <button 
+              v-if="!isTrackInPlaylist(track.id)"
+              class="add-track-btn"
+              @click="addTrackToPlaylist(track)"
+              :disabled="addingTrackId === track.id"
+            >
+              <span v-if="addingTrackId === track.id">...</span>
+              <span v-else>+</span>
+            </button>
+            <span v-else class="added-badge">✓</span>
+          </div>
+        </div>
+        
+        <div v-else-if="trackSearchQuery && !searchingTracks" class="no-results">
+          Ничего не найдено
+        </div>
+        
+        <div v-else class="search-hint">
+          Введите название трека или артиста
+        </div>
+        
+        <div class="modal-actions">
+          <button class="confirm-btn" @click="closeAddTracksModal">
+            Готово
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div v-else-if="loading" class="loading">
@@ -153,6 +230,19 @@ const editName = ref('')
 const editIsPublic = ref(false)
 const showMenu = ref(false)
 const menuTrack = ref(null)
+
+// Add tracks modal state
+const showAddTracksModal = ref(false)
+const trackSearchQuery = ref('')
+const searchResults = ref([])
+const searchingTracks = ref(false)
+const addingTrackId = ref(null)
+const trackSearchInput = ref(null)
+let searchTimeout = null
+
+// Drag and drop state
+const dragIndex = ref(null)
+const dragOverIndex = ref(null)
 
 const isOwner = computed(() => {
   if (!playlist.value || !authStore.user) return true
@@ -291,6 +381,116 @@ const deletePlaylist = async () => {
     router.push('/playlists')
   } catch (error) {
     console.error('Failed to delete playlist:', error)
+  }
+}
+
+// Add tracks modal functions
+const isTrackInPlaylist = (trackId) => {
+  return playlist.value?.tracks?.some(t => t.id === trackId) || false
+}
+
+const closeAddTracksModal = () => {
+  showAddTracksModal.value = false
+  trackSearchQuery.value = ''
+  searchResults.value = []
+}
+
+const debouncedTrackSearch = () => {
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+  }
+  searchTimeout = setTimeout(() => {
+    searchTracks()
+  }, 300)
+}
+
+const searchTracks = async () => {
+  if (!trackSearchQuery.value.trim()) {
+    searchResults.value = []
+    return
+  }
+  
+  searchingTracks.value = true
+  try {
+    const response = await api.get('/library/tracks', {
+      params: {
+        search: trackSearchQuery.value,
+        limit: 20
+      }
+    })
+    searchResults.value = response.data.items || []
+  } catch (error) {
+    console.error('Failed to search tracks:', error)
+    searchResults.value = []
+  } finally {
+    searchingTracks.value = false
+  }
+}
+
+const addTrackToPlaylist = async (track) => {
+  if (addingTrackId.value) return
+  
+  addingTrackId.value = track.id
+  try {
+    await api.post(`/playlists/${playlist.value.id}/tracks`, {
+      track_id: track.id
+    })
+    // Add track to local playlist
+    if (!playlist.value.tracks) {
+      playlist.value.tracks = []
+    }
+    playlist.value.tracks.push(track)
+    playlist.value.track_count = (playlist.value.track_count || 0) + 1
+  } catch (error) {
+    console.error('Failed to add track:', error)
+  } finally {
+    addingTrackId.value = null
+  }
+}
+
+// Drag and drop functions
+const handleDragStart = (event, index) => {
+  dragIndex.value = index
+  event.dataTransfer.effectAllowed = 'move'
+  event.dataTransfer.setData('text/plain', index.toString())
+}
+
+const handleDragEnd = () => {
+  dragIndex.value = null
+  dragOverIndex.value = null
+}
+
+const handleDragOver = (event, index) => {
+  event.preventDefault()
+  dragOverIndex.value = index
+}
+
+const handleDrop = async (event, toIndex) => {
+  event.preventDefault()
+  const fromIndex = dragIndex.value
+  
+  if (fromIndex === null || fromIndex === toIndex) {
+    handleDragEnd()
+    return
+  }
+  
+  // Reorder locally first
+  const tracks = [...playlist.value.tracks]
+  const [movedTrack] = tracks.splice(fromIndex, 1)
+  tracks.splice(toIndex, 0, movedTrack)
+  playlist.value.tracks = tracks
+  
+  handleDragEnd()
+  
+  // Send to server
+  try {
+    await api.put(`/playlists/${playlist.value.id}/reorder`, {
+      track_ids: tracks.map(t => t.id)
+    })
+  } catch (error) {
+    console.error('Failed to reorder tracks:', error)
+    // Reload playlist on error
+    loadPlaylist()
   }
 }
 
@@ -585,22 +785,271 @@ onMounted(() => {
 .checkbox-label {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   color: var(--text-secondary);
   font-size: 14px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   cursor: pointer;
+  user-select: none;
 }
 
 .checkbox-label input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--accent);
+  appearance: none;
+  -webkit-appearance: none;
+  width: 44px;
+  height: 24px;
+  background: var(--bg-highlight);
+  border-radius: 12px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.checkbox-label input[type="checkbox"]::before {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: white;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s;
+}
+
+.checkbox-label input[type="checkbox"]:checked {
+  background: var(--accent);
+}
+
+.checkbox-label input[type="checkbox"]:checked::before {
+  transform: translateX(20px);
 }
 
 .hint-text {
   font-size: 12px;
   color: var(--text-tertiary);
   margin: 0 0 16px 0;
+}
+
+/* Add tracks button */
+.add-tracks-btn {
+  padding: 10px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color, rgba(255,255,255,0.1));
+  border-radius: 20px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.add-tracks-btn:hover {
+  background: var(--bg-highlight);
+}
+
+/* Add tracks modal */
+.add-tracks-modal {
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.search-input-wrapper {
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.search-input-wrapper input {
+  width: 100%;
+  padding: 12px 40px 12px 16px;
+  background: var(--bg-elevated);
+  border: none;
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.search-input-wrapper input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.search-spinner {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--bg-highlight);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.search-results {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 400px;
+  margin-bottom: 16px;
+}
+
+.search-result-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.search-result-item:hover {
+  background: var(--bg-elevated);
+}
+
+.search-result-item.already-added {
+  opacity: 0.6;
+}
+
+.result-cover {
+  width: 44px;
+  height: 44px;
+  border-radius: 4px;
+  background: var(--bg-highlight);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.result-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.result-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.result-title {
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.result-artist {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.add-track-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  color: #000;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+.add-track-btn:hover {
+  transform: scale(1.1);
+}
+
+.add-track-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.added-badge {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  font-size: 16px;
+}
+
+.no-results, .search-hint {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--text-tertiary);
+}
+
+/* Drag and drop styles */
+.draggable-track {
+  display: flex;
+  align-items: center;
+  position: relative;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.draggable-track:hover {
+  background: var(--bg-elevated);
+}
+
+.draggable-track.is-dragging {
+  opacity: 0.5;
+  transform: scale(0.98);
+}
+
+.draggable-track.drag-over {
+  background: var(--bg-highlight);
+}
+
+.draggable-track.drag-over::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+}
+
+.drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 44px;
+  cursor: grab;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  transition: color 0.2s;
+}
+
+.drag-handle:hover {
+  color: var(--text-secondary);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.drag-handle svg {
+  width: 16px;
+  height: 16px;
+}
+
+@keyframes spin {
+  to { transform: translateY(-50%) rotate(360deg); }
 }
 </style>
