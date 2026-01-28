@@ -283,17 +283,25 @@ const save = async () => {
   border-radius: 16px;
   height: 85vh;
   max-height: 700px;
-  min-height: 500px;
-  width: 100%;
-  max-width: 450px;
+  min-height: 400px;
+  width: calc(100% - 32px);
+  max-width: 480px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 600px) {
   .edit-playlist-modal {
-    max-width: 550px;
+    width: 85vw;
+    max-width: 520px;
+  }
+}
+
+@media (min-width: 900px) {
+  .edit-playlist-modal {
+    width: 50vw;
+    max-width: 580px;
     height: 80vh;
     max-height: 750px;
   }
@@ -490,17 +498,18 @@ const save = async () => {
   gap: 6px;
   padding: 10px 14px;
   background: transparent;
-  border: 1px solid var(--danger, #e53935);
+  border: 1px solid var(--text-tertiary);
   border-radius: 8px;
-  color: var(--danger, #e53935);
+  color: var(--text-secondary);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
+  transition: all 0.2s;
 }
 
 .delete-playlist-btn:hover {
-  background: var(--danger, #e53935);
-  color: #fff;
+  border-color: var(--danger, #e53935);
+  color: var(--danger, #e53935);
 }
 
 .save-btn {
