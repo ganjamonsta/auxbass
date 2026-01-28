@@ -173,25 +173,33 @@
             class="search-result-item"
             :class="{ 
               'already-added': isTrackInPlaylist(track.id),
-              'is-playing': playerStore.currentTrack?.id === track.id && playerStore.isPlaying
+              'is-playing': playerStore.currentTrack?.id === track.id
             }"
           >
-            <!-- Play/Pause button -->
-            <button 
-              class="preview-play-btn"
-              @click.stop="togglePreviewPlay(track)"
-              :class="{ 'is-playing': playerStore.currentTrack?.id === track.id && playerStore.isPlaying }"
-            >
-              <svg v-if="playerStore.currentTrack?.id === track.id && playerStore.isPlaying" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-              </svg>
-              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M8 5v14l11-7z"/>
-              </svg>
-            </button>
-            <div class="result-cover">
-              <img v-if="track.cover_url" :src="track.cover_url" />
-              <span v-else>🎵</span>
+            <!-- Cover with Play/Pause overlay -->
+            <div class="result-cover-wrapper" @click.stop="togglePreviewPlay(track)">
+              <div class="result-cover">
+                <img v-if="track.cover_url" :src="track.cover_url" />
+                <span v-else>🎵</span>
+              </div>
+              <div class="cover-play-overlay" :class="{ 'is-playing': playerStore.currentTrack?.id === track.id && playerStore.isPlaying }">
+                <svg v-if="playerStore.currentTrack?.id === track.id && playerStore.isPlaying" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                </svg>
+                <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+              </div>
+              <!-- Progress bar for playing track -->
+              <div 
+                v-if="playerStore.currentTrack?.id === track.id" 
+                class="cover-progress"
+              >
+                <div 
+                  class="cover-progress-fill" 
+                  :style="{ width: `${(playerStore.progress / playerStore.duration) * 100 || 0}%` }"
+                ></div>
+              </div>
             </div>
             <div class="result-info">
               <div class="result-title">{{ track.title }}</div>
@@ -927,9 +935,22 @@ onMounted(() => {
 
 /* Add tracks modal */
 .add-tracks-modal {
-  max-height: 80vh;
+  height: 70vh;
+  max-height: 600px;
+  min-height: 400px;
+  width: 100%;
+  max-width: 400px;
   display: flex;
   flex-direction: column;
+}
+
+/* Desktop: wider modal */
+@media (min-width: 768px) {
+  .add-tracks-modal {
+    max-width: 550px;
+    height: 75vh;
+    max-height: 700px;
+  }
 }
 
 .search-input-wrapper {
@@ -967,7 +988,7 @@ onMounted(() => {
 .search-results {
   flex: 1;
   overflow-y: auto;
-  max-height: 400px;
+  min-height: 200px;
   margin-bottom: 16px;
 }
 
@@ -992,49 +1013,72 @@ onMounted(() => {
   background: rgba(29, 185, 84, 0.1);
 }
 
-.preview-play-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: transparent;
-  border: 2px solid var(--text-secondary);
-  color: var(--text-secondary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* Cover wrapper with play overlay */
+.result-cover-wrapper {
+  position: relative;
+  width: 48px;
+  height: 48px;
   flex-shrink: 0;
-  transition: all 0.2s;
+  cursor: pointer;
+  border-radius: 6px;
+  overflow: hidden;
 }
 
-.preview-play-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  transform: scale(1.1);
+.result-cover-wrapper:hover .cover-play-overlay {
+  opacity: 1;
 }
 
-.preview-play-btn.is-playing {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: #000;
+.result-cover-wrapper:hover .result-cover img {
+  filter: brightness(0.6);
 }
 
 .result-cover {
-  width: 44px;
-  height: 44px;
-  border-radius: 4px;
+  width: 100%;
+  height: 100%;
   background: var(--bg-highlight);
-  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
 }
 
 .result-cover img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: filter 0.2s;
+}
+
+.cover-play-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transition: opacity 0.2s;
+  color: #fff;
+}
+
+.cover-play-overlay.is-playing {
+  opacity: 1;
+  background: rgba(29, 185, 84, 0.6);
+}
+
+/* Progress bar at bottom of cover */
+.cover-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.cover-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.1s linear;
 }
 
 .result-info {
@@ -1096,9 +1140,14 @@ onMounted(() => {
 }
 
 .no-results, .search-hint {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   padding: 32px 16px;
   color: var(--text-tertiary);
+  min-height: 200px;
 }
 
 /* Drag and drop styles */
