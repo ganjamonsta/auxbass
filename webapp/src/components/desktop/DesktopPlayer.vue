@@ -21,7 +21,7 @@
     <!-- Center - LCD Display -->
     <div class="lcd-panel">
       <div class="lcd-frame">
-        <div class="lcd-screen">
+        <div class="lcd-screen" @click="handleLcdClick">
           <!-- Title row -->
           <div class="lcd-title-row">
             <span class="lcd-status">{{ isPlaying ? '▶' : '■' }}</span>
@@ -139,6 +139,15 @@ const isLiked = computed(() => {
   if (!track.value?.id) return false
   return libraryStore.isTrackLiked(track.value.id)
 })
+
+// Handle LCD click - open full player (but not on progress bar)
+const handleLcdClick = (e) => {
+  // Don't trigger if clicking on progress bar
+  if (e.target.closest('.lcd-progress') || e.target.closest('.lcd-progress-row')) {
+    return
+  }
+  emit('expand')
+}
 
 // Volume knob
 const isAdjustingVolume = ref(false)
@@ -418,6 +427,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  cursor: pointer;
 }
 
 .lcd-title-row {
