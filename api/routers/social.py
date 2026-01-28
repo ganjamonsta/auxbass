@@ -7,7 +7,7 @@ import logging
 from typing import Optional, List
 from datetime import datetime
 
-import httpx
+import aiohttp
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy import select, func, delete, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -137,8 +137,8 @@ async def send_subscription_notification(
     )
     
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
                 f"{settings.telegram_api_url}/bot{settings.bot_token}/sendMessage",
                 json={
                     "chat_id": target_user_id,
@@ -146,10 +146,11 @@ async def send_subscription_notification(
                     "parse_mode": "HTML",
                     "disable_notification": False
                 },
-                timeout=10.0
-            )
-            if response.status_code != 200:
-                logger.warning(f"Failed to send notification: {response.text}")
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as response:
+                if response.status != 200:
+                    text = await response.text()
+                    logger.warning(f"Failed to send notification: {text}")
     except Exception as e:
         logger.error(f"Error sending subscription notification: {e}")
 
