@@ -59,6 +59,10 @@
     <div class="player-info">
       <div class="track-info-row">
         <h2 class="track-title">{{ track?.title || 'Без названия' }}</h2>
+        <!-- HD indicator badge -->
+        <span v-if="playerStore.hdTrackInfo" class="hd-badge" title="HD версия доступна для скачивания">
+          HD
+        </span>
         <button 
           class="like-btn" 
           :class="{ liked: isLiked }" 
@@ -839,6 +843,30 @@ const formatTime = (seconds) => {
   box-shadow: 
     4px 4px 8px var(--neu-shadow-dark),
     -2px -2px 4px var(--neu-shadow-light);
+}
+
+/* HD Badge - shows when HD version is available */
+.hd-badge {
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: linear-gradient(135deg, #ffd700, #ff8c00);
+  color: #1a1a2e;
+  border-radius: 4px;
+  margin-left: 8px;
+  flex-shrink: 0;
+  animation: hd-badge-pulse 2s ease-in-out infinite;
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+}
+
+@keyframes hd-badge-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+  }
+  50% { 
+    box-shadow: 0 0 16px rgba(255, 215, 0, 0.8);
+  }
 }
 
 .like-btn:active {

@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Header, Response
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 import aiohttp
 import asyncio
@@ -24,8 +24,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from shared.config import get_settings
 from shared.database import get_db
 from shared.models import Track, UserLibrary, ChannelMessage, UserChannel
+from shared.matching import normalize_title, normalize_artist
 
 from .auth import get_current_user
+from .library import is_streamable, is_hd_format, STREAMABLE_MIME_TYPES, HD_MIME_TYPES
 from api.schemas_v2.player import StreamUrlResponse, DownloadPlaylistRequest
 from api.schemas_v2.common import TelegramUser
 
@@ -113,6 +115,105 @@ def validate_stream_token(token: str) -> Optional[tuple[int, int, str]]:
         return None
     
     return (track_id, user_id, file_path)
+
+
+async def find_streamable_alternative(track: Track, db: AsyncSession) -> Optional[Track]:
+    """
+    Find a streamable (MP3) alternative for an HD track.
+    Matches by normalized title and artist.
+    """
+    if not track.title:
+        return None
+    
+    # Normalize for matching
+    norm_title = normalize_title(track.title).lower()
+    norm_artist = normalize_artist(track.artist or "").lower() if track.artist else None
+    
+    # Find MP3 tracks with similar title/artist
+    # Using func.lower() for case-insensitive search in DB
+    query = (
+        select(Track)
+        .where(Track.id != track.id)
+        .where(Track.is_unavailable == False)
+        .where(
+            or_(
+                Track.mime_type == "audio/mpeg",
+                Track.mime_type == "audio/mp3",
+                Track.mime_type == None,  # Legacy tracks without mime_type are usually MP3
+            )
+        )
+    )
+    
+    result = await db.execute(query)
+    candidates = result.scalars().all()
+    
+    # Find best match
+    for candidate in candidates:
+        if not candidate.title:
+            continue
+        
+        cand_norm_title = normalize_title(candidate.title).lower()
+        cand_norm_artist = normalize_artist(candidate.artist or "").lower() if candidate.artist else None
+        
+        # Match title (must be similar)
+        if norm_title != cand_norm_title:
+            continue
+        
+        # Match artist if both have artist
+        if norm_artist and cand_norm_artist:
+            if norm_artist != cand_norm_artist:
+                continue
+        
+        # Found a match - prefer smaller file (more likely to stream well)
+        return candidate
+    
+    return None
+
+
+async def find_hd_alternative(track: Track, db: AsyncSession) -> Optional[Track]:
+    """
+    Find an HD (FLAC/WAV) alternative for an MP3 track.
+    Useful to show user that HD version is available.
+    """
+    if not track.title:
+        return None
+    
+    # Normalize for matching
+    norm_title = normalize_title(track.title).lower()
+    norm_artist = normalize_artist(track.artist or "").lower() if track.artist else None
+    
+    # Find HD tracks with similar title/artist
+    hd_mime_list = list(HD_MIME_TYPES)
+    query = (
+        select(Track)
+        .where(Track.id != track.id)
+        .where(Track.is_unavailable == False)
+        .where(Track.mime_type.in_(hd_mime_list))
+    )
+    
+    result = await db.execute(query)
+    candidates = result.scalars().all()
+    
+    # Find best match
+    for candidate in candidates:
+        if not candidate.title:
+            continue
+        
+        cand_norm_title = normalize_title(candidate.title).lower()
+        cand_norm_artist = normalize_artist(candidate.artist or "").lower() if candidate.artist else None
+        
+        # Match title (must be similar)
+        if norm_title != cand_norm_title:
+            continue
+        
+        # Match artist if both have artist
+        if norm_artist and cand_norm_artist:
+            if norm_artist != cand_norm_artist:
+                continue
+        
+        return candidate
+    
+    return None
 
 
 async def get_telegram_file_path(file_id: str) -> Optional[str]:
@@ -317,21 +418,51 @@ async def get_stream_url(
     Returns a temporary token-based URL that proxies through our server.
     Bot token is NEVER exposed to the client.
     
+    For HD tracks (FLAC, WAV), automatically finds MP3 alternative if available.
+    Returns info about HD version so user knows high quality is available.
+    
     Users can stream:
     - Any public track (from global library)
     - Their own private tracks
     """
     # Get track (any track, we'll check permissions)
-    track = await db.scalar(
+    original_track = await db.scalar(
         select(Track).where(Track.id == track_id)
     )
     
-    if not track:
+    if not original_track:
         raise HTTPException(status_code=404, detail="Track not found")
     
     # Check access: public tracks are accessible to everyone, private only to uploader
-    if not track.is_public and track.uploader_id != user.id:
+    if not original_track.is_public and original_track.uploader_id != user.id:
         raise HTTPException(status_code=403, detail="This track is private")
+    
+    # HD track handling: find MP3 alternative
+    track = original_track
+    hd_track_info = None
+    
+    if not is_streamable(original_track.mime_type):
+        # This is an HD track - try to find MP3 alternative
+        logger.info(f"[Stream Request] Track {track_id} is HD format ({original_track.mime_type}), searching for MP3 alternative...")
+        
+        mp3_alt = await find_streamable_alternative(original_track, db)
+        
+        if mp3_alt:
+            # Found MP3 alternative - use it for streaming, save HD info
+            logger.info(f"[Stream Request] Found MP3 alternative: track {mp3_alt.id} for HD track {track_id}")
+            track = mp3_alt
+            hd_track_info = {
+                "id": original_track.id,
+                "title": original_track.title,
+            }
+        else:
+            # No MP3 alternative - can't stream HD
+            file_size_mb = (original_track.file_size or 0) / (1024 * 1024)
+            logger.warning(f"[Stream Request] HD track {track_id} ({original_track.mime_type}) has no MP3 alternative")
+            raise HTTPException(
+                status_code=503,
+                detail=f"Трек в формате высокого качества ({original_track.mime_type or 'HD'}, {file_size_mb:.1f} MB) недоступен для стриминга. MP3 версия не найдена. Используйте кнопку 'Скачать' в боте для загрузки HD версии."
+            )
     
     # Verify file is accessible (pre-cache the path)
     file_path = await get_telegram_file_path(track.file_id)
@@ -375,7 +506,7 @@ async def get_stream_url(
             )
     
     # Generate secure temporary token with cached file_path
-    token = generate_stream_token(track_id, user.id, file_path)
+    token = generate_stream_token(track.id, user.id, file_path)
     
     # Return relative URL to avoid Mixed Content issues (HTTP vs HTTPS)
     # The frontend will resolve this against its own origin
@@ -383,12 +514,33 @@ async def get_stream_url(
     
     expires_at = int(time.time()) + STREAM_TOKEN_TTL
     
-    logger.info(f"[Stream Request] Generated token for track_id={track_id}, user_id={user.id}, file_size={track.file_size or 0} bytes")
+    # Log with info about whether we're using alternative
+    if hd_track_info:
+        logger.info(f"[Stream Request] Streaming MP3 track {track.id} (for HD {original_track.id}), user_id={user.id}")
+    else:
+        logger.info(f"[Stream Request] Generated token for track_id={track.id}, user_id={user.id}, file_size={track.file_size or 0} bytes")
+    
+    # Check if original track is MP3 and HD alternative exists
+    hd_alt_info = None
+    if hd_track_info is None and is_streamable(original_track.mime_type):
+        # This is MP3 - check if HD version exists
+        hd_alt = await find_hd_alternative(original_track, db)
+        if hd_alt:
+            hd_alt_info = {
+                "id": hd_alt.id,
+                "title": hd_alt.title,
+            }
+            logger.info(f"[Stream Request] HD alternative found for track {original_track.id}: HD track {hd_alt.id}")
     
     return StreamUrlResponse(
         url=proxy_url,
         expires_at=expires_at,
-        track_id=track_id,
+        track_id=track.id,
+        # HD info: when playing MP3 alternative, tell about original HD
+        # OR when playing MP3 and HD alternative exists
+        hd_track_id=hd_track_info["id"] if hd_track_info else (hd_alt_info["id"] if hd_alt_info else None),
+        hd_track_title=hd_track_info["title"] if hd_track_info else (hd_alt_info["title"] if hd_alt_info else None),
+        is_hd_available=hd_track_info is not None or hd_alt_info is not None,
     )
 
 

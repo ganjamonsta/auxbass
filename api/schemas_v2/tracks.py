@@ -23,8 +23,14 @@ class TrackResponse(BaseModel):
     artist: Optional[str] = None
     duration: Optional[int] = None
     file_size: Optional[int] = None
+    mime_type: Optional[str] = None  # audio/mpeg, audio/flac, etc.
     library_source: Optional[str] = None
     enrichment_status: Optional[str] = None
+    
+    # Streaming compatibility
+    is_streamable: bool = True  # False for HD formats (FLAC, WAV, etc.)
+    streamable_id: Optional[int] = None  # MP3 alternative if this is HD
+    hd_id: Optional[int] = None  # HD alternative if this is MP3
     
     # From enrichment
     album: Optional[AlbumInfo] = None

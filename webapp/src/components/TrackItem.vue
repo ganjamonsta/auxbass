@@ -52,8 +52,9 @@
       </div>
     </div>
     
-    <!-- Large file: show size + download button instead of duration -->
+    <!-- Large file or HD: show size + download button instead of duration -->
     <template v-if="isLargeFile && !track.is_unavailable">
+      <span v-if="isHdFormat" class="hd-badge-mini" title="Высокое качество (FLAC/WAV)">HD</span>
       <span class="track-filesize">{{ fileSizeMB }} MB</span>
       <button 
         class="track-download" 
@@ -169,9 +170,29 @@ const coverStyle = computed(() => getTrackCoverStyle(props.track))
 
 const coverInitials = computed(() => getTrackInitials(props.track))
 
-// Check if file is too large for streaming (>20MB)
+// HD MIME types that cannot be streamed
+const HD_MIME_TYPES = ['audio/flac', 'audio/x-flac', 'audio/wav', 'audio/x-wav', 'audio/aiff', 'audio/x-aiff']
+
+// Check if track is HD format (FLAC, WAV, etc.)
+const isHdFormat = computed(() => {
+  if (!props.track?.mime_type) return false
+  return HD_MIME_TYPES.includes(props.track.mime_type.toLowerCase())
+})
+
+// Check if track is not streamable (HD or too large >20MB)
+const isNotStreamable = computed(() => {
+  // HD format
+  if (isHdFormat.value) return true
+  // Too large
+  if (props.track?.file_size && props.track.file_size > 20 * 1024 * 1024) return true
+  // Explicitly marked as not streamable
+  if (props.track?.is_streamable === false) return true
+  return false
+})
+
+// Check if file is too large for streaming (>20MB) - legacy, now uses isNotStreamable
 const isLargeFile = computed(() => {
-  return props.track?.file_size && props.track.file_size > 20 * 1024 * 1024
+  return isNotStreamable.value
 })
 
 const fileSizeMB = computed(() => {
@@ -359,6 +380,19 @@ const albumName = computed(() => {
   color: var(--xm-text-muted);
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
+}
+
+/* ─── HD Badge (for FLAC/WAV files) ─── */
+.hd-badge-mini {
+  padding: 2px 5px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  background: linear-gradient(135deg, #ffd700, #ff8c00);
+  color: #1a1a2e;
+  border-radius: 3px;
+  flex-shrink: 0;
+  box-shadow: 0 0 4px rgba(255, 215, 0, 0.4);
 }
 
 /* ─── File Size (for large files) ─── */

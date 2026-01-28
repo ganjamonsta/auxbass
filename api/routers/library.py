@@ -38,6 +38,51 @@ from api.schemas_v2.common import TelegramUser
 router = APIRouter(tags=["Library"])
 
 
+# ============== Streaming Format Helpers ==============
+
+# MIME types that can be streamed in web player (standard audio player compatible)
+STREAMABLE_MIME_TYPES = {
+    "audio/mpeg",      # MP3
+    "audio/mp3",       # MP3 (alternative)
+    "audio/ogg",       # OGG
+    "audio/aac",       # AAC
+    "audio/mp4",       # M4A
+    "audio/x-m4a",     # M4A (alternative)
+}
+
+# HD/Lossless MIME types that cannot be streamed (file too large or format unsupported)
+HD_MIME_TYPES = {
+    "audio/flac",      # FLAC
+    "audio/x-flac",    # FLAC (alternative)
+    "audio/wav",       # WAV
+    "audio/x-wav",     # WAV (alternative)
+    "audio/aiff",      # AIFF
+    "audio/x-aiff",    # AIFF (alternative)
+}
+
+
+def is_streamable(mime_type: Optional[str]) -> bool:
+    """Check if track format can be streamed in web player"""
+    if not mime_type:
+        return True  # Assume streamable if unknown (legacy data)
+    
+    mime_lower = mime_type.lower()
+    
+    # Explicitly HD - not streamable
+    if mime_lower in HD_MIME_TYPES:
+        return False
+    
+    # Known streamable or unknown (assume streamable)
+    return True
+
+
+def is_hd_format(mime_type: Optional[str]) -> bool:
+    """Check if track is HD/lossless format"""
+    if not mime_type:
+        return False
+    return mime_type.lower() in HD_MIME_TYPES
+
+
 def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None) -> TrackResponse:
     """Convert Track model to response"""
     # Safe access to relationships - check if loaded to avoid lazy loading errors
@@ -76,8 +121,10 @@ def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None)
         artist=track.artist,
         duration=track.duration,
         file_size=track.file_size,
+        mime_type=track.mime_type,
         library_source=source,
         enrichment_status=track.enrichment_status.value if track.enrichment_status else None,
+        is_streamable=is_streamable(track.mime_type),
         album=album_info,
         album_name=album_info["name"] if album_info else None,
         cover_url=enrichment.cover_url if enrichment else None,
@@ -117,8 +164,10 @@ def track_to_response_global(track: Track, in_library: bool = False) -> TrackRes
         artist=track.artist,
         duration=track.duration,
         file_size=track.file_size,
+        mime_type=track.mime_type,
         library_source="global",
         enrichment_status=track.enrichment_status.value if track.enrichment_status else None,
+        is_streamable=is_streamable(track.mime_type),
         album=album_info,
         album_name=album_info["name"] if album_info else None,
         cover_url=enrichment.cover_url if enrichment else None,

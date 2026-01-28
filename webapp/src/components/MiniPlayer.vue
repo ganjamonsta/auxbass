@@ -14,6 +14,7 @@
       <div class="lcd-row lcd-row-sub">
         <span class="lcd-time">{{ formatTime(progress) }}/{{ formatTime(duration || track.duration) }}</span>
         <div class="lcd-indicators">
+          <span v-if="playerStore.hdTrackInfo" class="lcd-indicator hd-indicator active" title="HD версия доступна для скачивания">HD</span>
           <span class="lcd-indicator" :class="{ active: playerStore.shuffle }" title="Перемешивание">SHF</span>
           <span class="lcd-indicator" :class="{ active: playerStore.repeatMode !== 'none' }" :title="repeatTitle">{{ repeatLabel }}</span>
         </div>
@@ -410,6 +411,24 @@ const formatTime = (seconds) => {
 .lcd-indicator.active {
   color: var(--lcd-text);
   text-shadow: 0 0 6px var(--lcd-text-glow);
+}
+
+/* HD indicator - special golden color to highlight quality */
+.lcd-indicator.hd-indicator.active {
+  color: #ffd700;
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.8);
+  animation: hd-pulse 2s ease-in-out infinite;
+}
+
+@keyframes hd-pulse {
+  0%, 100% { 
+    opacity: 1; 
+    text-shadow: 0 0 8px rgba(255, 215, 0, 0.8);
+  }
+  50% { 
+    opacity: 0.85; 
+    text-shadow: 0 0 12px rgba(255, 215, 0, 1);
+  }
 }
 
 @keyframes pulse-glow {

@@ -63,6 +63,9 @@ export const usePlayerStore = defineStore('player', () => {
   const lastError = ref(null)  // For error notifications
   const stateRestored = ref(false) // Flag to track if state was restored
   
+  // HD track info - when HD version is available
+  const hdTrackInfo = ref(null)  // { id, title } of HD version if available
+  
   // Lazy shuffle mode - when shuffling full library/playlist with IDs only
   const lazyShuffleIds = ref([])      // Array of track IDs in shuffle order
   const lazyShuffleIndex = ref(-1)    // Current position in lazyShuffleIds
@@ -1150,6 +1153,7 @@ export const usePlayerStore = defineStore('player', () => {
         audio.value.load()
         await audio.value.play()
         loading.value = false
+        hdTrackInfo.value = null  // Clear HD info when using cache
         persistState()
         startStateSaving()
         nextTrackPreloaded.value = null
@@ -1218,6 +1222,7 @@ export const usePlayerStore = defineStore('player', () => {
       
       // === PRIORITY 3: Cached URL token (skip first API call) ===
       let streamUrl = getCachedUrl(track.id)
+      let hdInfo = null
       
       if (streamUrl) {
         console.log('[Play] Using cached URL token - skip API call')
@@ -1228,7 +1233,19 @@ export const usePlayerStore = defineStore('player', () => {
         streamUrl = response.data.url
         // Cache for potential retry
         setCachedUrl(track.id, streamUrl, response.data.expires_at)
+        
+        // Check if HD version is available
+        if (response.data.is_hd_available) {
+          hdInfo = {
+            id: response.data.hd_track_id,
+            title: response.data.hd_track_title
+          }
+          console.log('[Play] HD version available:', hdInfo)
+        }
       }
+      
+      // Update HD info state
+      hdTrackInfo.value = hdInfo
       
       // Stream directly
       audio.value.src = streamUrl
@@ -2217,6 +2234,7 @@ export const usePlayerStore = defineStore('player', () => {
     buffered,
     lastError,
     stateRestored,
+    hdTrackInfo,  // HD version info if available
     lazyShuffleContext,
     lazyShuffleIndex,
     lazyShuffleIds,
