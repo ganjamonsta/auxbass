@@ -18,8 +18,14 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from aiogram import Bot
+from aiogram.enums import ParseMode
+from aiogram.client.default import DefaultBotProperties
+
 from shared.config import get_settings
 from shared.database import init_db, close_db
+
+from bot.services.channels import init_channel_service, get_channel_service
 
 from api.routers import auth
 from api.routers.library import router as library_router
@@ -32,6 +38,9 @@ from api.routers.social import router as social_router
 
 
 settings = get_settings()
+
+# Global bot instance for API
+api_bot: Bot = None
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -74,8 +83,22 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
+    global api_bot
+    
     await init_db()
+    
+    # Initialize bot for channel service
+    api_bot = Bot(
+        token=settings.bot_token,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+    )
+    init_channel_service(api_bot)
+    
     yield
+    
+    # Cleanup
+    if api_bot:
+        await api_bot.session.close()
     await close_http_session()
     await close_db()
 

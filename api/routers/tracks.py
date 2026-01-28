@@ -25,6 +25,8 @@ from shared.models import (
 )
 from shared.matching import normalize_artist
 
+from bot.services.channels import get_channel_service
+
 from api.routers.auth import get_current_user, require_premium
 from api.routers.library import track_to_response
 from api.schemas_v2.tracks import (
@@ -807,6 +809,7 @@ async def like_track(
     entry = result.scalar_one_or_none()
     
     added_to_library = False
+    forwarded = False
     
     if not entry:
         # Track not in library - check if track exists and is public, then auto-add
@@ -827,13 +830,22 @@ async def like_track(
         db.add(entry)
         added_to_library = True
         logger.info(f"Track {track_id} auto-added to library and liked by user {user.id}")
+        
+        # Forward to user's channel (if auto_forward is enabled)
+        await db.commit()  # Commit first so track is in library
+        try:
+            channel_service = get_channel_service()
+            forwarded = await channel_service.forward_track_to_channel(user.id, track_id)
+            if forwarded:
+                logger.info(f"Track {track_id} forwarded to channel for user {user.id}")
+        except Exception as e:
+            logger.warning(f"Failed to forward track {track_id} to channel: {e}")
     else:
         entry.is_liked = True
         entry.liked_at = datetime.utcnow()
+        await db.commit()
     
-    await db.commit()
-    
-    return {"status": "liked", "track_id": track_id, "added_to_library": added_to_library}
+    return {"status": "liked", "track_id": track_id, "added_to_library": added_to_library, "forwarded": forwarded}
 
 
 @router.delete("/{track_id}/like")
@@ -899,7 +911,7 @@ async def add_to_library(
     user: TelegramUser = Depends(require_premium),
     db: AsyncSession = Depends(get_db),
 ):
-    """Add a global track to user's library. Requires connected channel."""
+    """Add a global track to user's library and forward to user's channel."""
     # Check track exists and is public
     result = await db.execute(
         select(Track).where(Track.id == track_id).where(Track.is_public == True)
@@ -927,7 +939,17 @@ async def add_to_library(
     db.add(entry)
     await db.commit()
     
-    return {"status": "added", "track_id": track_id}
+    # Forward to user's channel (if auto_forward is enabled)
+    forwarded = False
+    try:
+        channel_service = get_channel_service()
+        forwarded = await channel_service.forward_track_to_channel(user.id, track_id)
+        if forwarded:
+            logger.info(f"Track {track_id} forwarded to channel for user {user.id}")
+    except Exception as e:
+        logger.warning(f"Failed to forward track {track_id} to channel: {e}")
+    
+    return {"status": "added", "track_id": track_id, "forwarded": forwarded}
 
 
 @router.delete("/{track_id}/remove-from-library")
