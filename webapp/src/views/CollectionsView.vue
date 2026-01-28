@@ -1,5 +1,26 @@
 <template>
   <div class="collections-view">
+    <!-- Section header with tab switcher -->
+    <div class="section-header">
+      <h1>Коллекции</h1>
+      <div class="tab-switcher">
+        <button 
+          class="tab-btn" 
+          :class="{ active: activeTab === 'albums' }"
+          @click="setActiveTab('albums')"
+        >
+          💿 Альбомы
+        </button>
+        <button 
+          class="tab-btn" 
+          :class="{ active: activeTab === 'playlists' }"
+          @click="setActiveTab('playlists')"
+        >
+          📁 Плейлисты
+        </button>
+      </div>
+    </div>
+
     <!-- Albums Tab -->
     <div v-show="activeTab === 'albums'" class="tab-content">
       <!-- Scope switcher for albums -->
@@ -220,6 +241,10 @@ const uiStore = useUIStore()
 
 // Tab state from uiStore
 const activeTab = computed(() => uiStore.collectionsTab)
+
+const setActiveTab = (tab) => {
+  uiStore.setCollectionsTab(tab)
+}
 
 // Scope state for albums
 const ALBUM_SCOPE_KEY = 'albums-scope'
@@ -495,6 +520,49 @@ onMounted(() => {
 <style scoped>
 .collections-view {
   padding: 8px 16px 120px 16px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.section-header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.tab-switcher {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.tab-btn {
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tab-btn.active {
+  background: var(--accent);
+  color: #fff;
 }
 
 .scope-tabs {
