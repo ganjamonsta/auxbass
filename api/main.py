@@ -25,7 +25,7 @@ from aiogram.client.default import DefaultBotProperties
 from shared.config import get_settings
 from shared.database import init_db, close_db
 
-from bot.services.channels import init_channel_service, get_channel_service
+from bot.services.channels import init_channel_service, get_channel_service, start_channel_service, stop_channel_service
 
 from api.routers import auth
 from api.routers.library import router as library_router
@@ -94,9 +94,13 @@ async def lifespan(app: FastAPI):
     )
     init_channel_service(api_bot)
     
+    # Start channel service queue worker for auto-forwarding liked tracks
+    await start_channel_service()
+    
     yield
     
     # Cleanup
+    await stop_channel_service()
     if api_bot:
         await api_bot.session.close()
     await close_http_session()
