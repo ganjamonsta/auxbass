@@ -96,14 +96,16 @@ import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useAuthStore } from '@/stores/auth'
+import { useUIStore } from '@/stores/ui'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackMenu from '@/components/TrackMenu.vue'
-import api from '@/api/client'
+import api, { playerApi } from '@/api/client'
 
 const router = useRouter()
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
 const authStore = useAuthStore()
+const uiStore = useUIStore()
 
 const goToChannelSetup = () => {
   router.push('/settings#channel')
@@ -210,26 +212,13 @@ const handleDownloadTrack = async () => {
 
 // Handle direct download from TrackItem (for large/HD files)
 const handleDirectDownload = async (track) => {
-  const isLargeFile = track.file_size && track.file_size > 20 * 1024 * 1024
-  const hdMimeTypes = ['audio/flac', 'audio/x-flac', 'audio/wav', 'audio/x-wav', 'audio/aiff', 'audio/x-aiff']
-  const isHd = track.mime_type && hdMimeTypes.includes(track.mime_type.toLowerCase())
-  
-  if (isLargeFile || isHd) {
-    alert('Файл слишком большой для скачивания через браузер. Используйте Telegram бота для скачивания.')
-    return
-  }
-  
   try {
-    const response = await api.get(`/player/stream/${track.id}`, { responseType: 'blob' })
-    const url = window.URL.createObjectURL(response.data)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${track.artist} - ${track.title}.mp3`
-    a.click()
-    window.URL.revokeObjectURL(url)
+    await playerApi.download(track.id)
+    uiStore.toast.success('Трек отправлен', 'Проверьте сообщения в Telegram')
   } catch (error) {
-    console.error('Failed to download:', error)
-    alert('Ошибка при скачивании. Попробуйте через Telegram бота.')
+    console.error('Failed to download track:', error)
+    const errorMsg = error.response?.data?.detail || 'Ошибка отправки'
+    uiStore.toast.error('Не удалось отправить', errorMsg)
   }
 }
 

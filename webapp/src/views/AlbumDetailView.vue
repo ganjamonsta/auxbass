@@ -173,14 +173,16 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
+import { useUIStore } from '@/stores/ui'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackMenu from '@/components/TrackMenu.vue'
-import api from '@/api/client'
+import api, { playerApi } from '@/api/client'
 
 const route = useRoute()
 const router = useRouter()
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
+const uiStore = useUIStore()
 
 const album = ref(null)
 const loading = ref(true)
@@ -360,26 +362,13 @@ const handleAddToPlaylist = () => {
 const handleDirectDownload = async (track) => {
   if (!track) return
   
-  const fileSizeMB = track.file_size ? track.file_size / (1024 * 1024) : 0
-  
-  // For large files, show message to use Telegram bot
-  if (fileSizeMB > 20) {
-    alert(`Файл "${track.title}" слишком большой (${fileSizeMB.toFixed(1)} MB) для скачивания через веб.\n\nИспользуйте Telegram бота для скачивания HD версии.`)
-    return
-  }
-  
   try {
-    const response = await api.get(`/player/stream/${track.id}`, { responseType: 'blob' })
-    const url = window.URL.createObjectURL(response.data)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${track.artist} - ${track.title}.mp3`
-    a.click()
-    window.URL.revokeObjectURL(url)
+    await playerApi.download(track.id)
+    uiStore.toast.success('Трек отправлен', 'Проверьте сообщения в Telegram')
   } catch (error) {
-    console.error('Failed to download:', error)
-    const errorMsg = error.response?.data?.detail || 'Ошибка скачивания'
-    alert(`Не удалось скачать: ${errorMsg}\n\nИспользуйте Telegram бота для скачивания.`)
+    console.error('Failed to download track:', error)
+    const errorMsg = error.response?.data?.detail || 'Ошибка отправки'
+    uiStore.toast.error('Не удалось отправить', errorMsg)
   }
 }
 

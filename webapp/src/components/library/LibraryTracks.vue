@@ -86,6 +86,7 @@ import { useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
+import { useUIStore } from '@/stores/ui'
 import { useSort } from '@/composables'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackMenu from '@/components/TrackMenu.vue'
@@ -104,6 +105,7 @@ const router = useRouter()
 const libraryStore = useLibraryStore()
 const playerStore = usePlayerStore()
 const authStore = useAuthStore()
+const uiStore = useUIStore()
 
 // Sort state (persisted to localStorage)
 const { 
@@ -300,11 +302,11 @@ const handleDownloadTrack = async (track) => {
 const handleDirectDownload = async (track) => {
   try {
     await playerApi.download(track.id)
-    alert('Трек отправлен вам в Telegram!')
+    uiStore.toast.success('Трек отправлен', 'Проверьте сообщения в Telegram')
   } catch (error) {
     console.error('Failed to download track:', error)
     const errorMsg = error.response?.data?.detail || 'Ошибка отправки'
-    alert(`Не удалось отправить трек: ${errorMsg}`)
+    uiStore.toast.error('Не удалось отправить', errorMsg)
   }
 }
 
