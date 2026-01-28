@@ -207,7 +207,7 @@ import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useAuthStore } from '@/stores/auth'
-import { useUiStore } from '@/stores/ui'
+import { useUIStore } from '@/stores/ui'
 import PaginationNav from '@/components/PaginationNav.vue'
 import SortChips from '@/components/SortChips.vue'
 import api from '@/api/client'
@@ -216,7 +216,7 @@ const router = useRouter()
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
 const authStore = useAuthStore()
-const uiStore = useUiStore()
+const uiStore = useUIStore()
 
 // Tab state from uiStore
 const activeTab = computed(() => uiStore.collectionsTab)
