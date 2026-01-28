@@ -224,13 +224,23 @@ class AlbumService:
             if not enrichment.album_name:
                 return None
             
-            # Load full tracklist from Deezer if we have album ID
+            # Load full tracklist - Last.fm first (richer database), Deezer fallback
             full_tracklist = None
             total_tracks = None
-            if enrichment.deezer_album_id:
+            
+            # Try Last.fm first (richer database, more albums)
+            if track.artist:
+                full_tracklist = await self._fetch_album_tracklist_lastfm(
+                    album_name=enrichment.album_name,
+                    artist_name=track.artist,
+                )
+            
+            # Fallback to Deezer if Last.fm unavailable
+            if not full_tracklist and enrichment.deezer_album_id:
                 full_tracklist = await self._fetch_album_tracklist(enrichment.deezer_album_id)
-                if full_tracklist:
-                    total_tracks = len(full_tracklist)
+            
+            if full_tracklist:
+                total_tracks = len(full_tracklist)
             
             # Find or create album
             album_id = await self.find_or_create_album(
@@ -285,6 +295,57 @@ class AlbumService:
             
         except Exception as e:
             logger.error(f"Failed to fetch album tracklist: {e}")
+            return None
+    
+    async def _fetch_album_tracklist_lastfm(
+        self,
+        album_name: str,
+        artist_name: str,
+    ) -> Optional[List[dict]]:
+        """
+        Fetch album tracklist from Last.fm (fallback when Deezer unavailable).
+        
+        Returns list of track info dicts with:
+        - track_number: position in album
+        - title: track title
+        - artist: artist name
+        - duration: duration in seconds
+        """
+        try:
+            from bot.services.enrichment.lastfm import lastfm_client
+            
+            if not lastfm_client.is_configured:
+                return None
+            
+            album_info = await lastfm_client.get_album_info(artist_name, album_name)
+            if not album_info:
+                return None
+            
+            tracks = album_info.get("tracks", [])
+            if not tracks:
+                return None
+            
+            tracklist = []
+            for i, t in enumerate(tracks, 1):
+                duration = 0
+                if t.get("duration"):
+                    try:
+                        duration = int(t["duration"])
+                    except (ValueError, TypeError):
+                        pass
+                
+                tracklist.append({
+                    "track_number": i,
+                    "title": t.get("name", ""),
+                    "artist": artist_name,
+                    "duration": duration,
+                })
+            
+            logger.info(f"Loaded tracklist from Last.fm: {album_name} - {len(tracklist)} tracks")
+            return tracklist
+            
+        except Exception as e:
+            logger.error(f"Failed to fetch Last.fm tracklist: {e}")
             return None
     
     async def find_album_candidates(

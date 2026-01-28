@@ -211,11 +211,26 @@ class LastFmClient:
         if isinstance(tag_data, list):
             tags = [t["name"] for t in tag_data[:5] if t.get("name")]
         
+        # Extract tracks
+        tracks = []
+        tracks_data = album_data.get("tracks", {}).get("track", [])
+        if isinstance(tracks_data, dict):
+            tracks_data = [tracks_data]
+        if isinstance(tracks_data, list):
+            for t in tracks_data:
+                if t.get("name"):
+                    tracks.append({
+                        "name": t.get("name"),
+                        "duration": t.get("duration"),
+                        "url": t.get("url"),
+                    })
+        
         return {
             "name": album_data.get("name"),
             "artist": album_data.get("artist"),
             "image_url": image_url,
             "tags": tags,
+            "tracks": tracks,
             "release_date": album_data.get("wiki", {}).get("published"),
             "url": album_data.get("url"),
         }
