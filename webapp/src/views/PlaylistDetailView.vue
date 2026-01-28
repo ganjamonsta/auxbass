@@ -234,7 +234,7 @@
                 @dragstart="handleDragStart($event, index)"
                 @dragend="handleDragEnd"
                 @dragover.prevent="handleDragOver($event, index)"
-                @drop="handleDrop($event, index)"
+                @drop="onDrop($event, index)"
               >
                 <div class="drag-handle">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -300,18 +300,16 @@
     </div>
 
     <!-- Delete confirm -->
-    <div v-if="showDeleteConfirm" class="modal-overlay delete-overlay" @click.self="showDeleteConfirm = false">
-      <div class="modal delete-modal">
-        <h2>Удалить плейлист?</h2>
-        <p>Вы уверены, что хотите удалить "{{ playlist.name }}"?</p>
-        <div class="modal-actions">
-          <button class="cancel-btn" @click="showDeleteConfirm = false">Отмена</button>
-          <button class="delete-confirm-btn" @click="deletePlaylist">
-            Удалить
-          </button>
-        </div>
-      </div>
-    </div>
+    <ConfirmDialog
+      :show="showDeleteConfirm"
+      type="danger"
+      title="Удалить плейлист?"
+      :message="`Вы уверены, что хотите удалить '${playlist?.name}'?`"
+      confirmText="Удалить"
+      cancelText="Отмена"
+      @confirm="deletePlaylist"
+      @cancel="showDeleteConfirm = false"
+    />
   </div>
 
   <div v-else-if="loading" class="loading">
@@ -326,9 +324,11 @@ import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
 import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
+import { useDragReorder } from '@/composables/useDragReorder'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackMenu from '@/components/TrackMenu.vue'
 import PlaylistPicker from '@/components/PlaylistPicker.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import api, { playerApi } from '@/api/client'
 
 const route = useRoute()
@@ -347,8 +347,7 @@ const editIsPublic = ref(false)
 const showMenu = ref(false)
 const menuTrack = ref(null)
 
-// Add tracks modal state
-const showAddTracksModal = ref(false)
+// Track search state
 const trackSearchQuery = ref('')
 const searchResults = ref([])
 const searchingTracks = ref(false)
@@ -359,9 +358,19 @@ const saving = ref(false)
 const editTracks = ref([])
 let searchTimeout = null
 
-// Drag and drop state
-const dragIndex = ref(null)
-const dragOverIndex = ref(null)
+// Drag and drop for track reordering
+const onTracksReorder = async (reordered) => {
+  editTracks.value = reordered
+  playlist.value.tracks = [...reordered]
+  try {
+    await api.put(`/playlists/${playlist.value.id}/reorder`, {
+      track_ids: reordered.map(t => t.id)
+    })
+  } catch (error) {
+    console.error('Failed to reorder tracks:', error)
+  }
+}
+const { dragIndex, dragOverIndex, handleDragStart, handleDragEnd, handleDragOver, handleDrop } = useDragReorder()
 
 const isOwner = computed(() => {
   if (!playlist.value || !authStore.user) return true
@@ -543,12 +552,6 @@ const isTrackInPlaylist = (trackId) => {
   return editTracks.value?.some(t => t.id === trackId) || false
 }
 
-const closeAddTracksModal = () => {
-  showAddTracksModal.value = false
-  trackSearchQuery.value = ''
-  searchResults.value = []
-}
-
 const debouncedTrackSearch = () => {
   if (searchTimeout) {
     clearTimeout(searchTimeout)
@@ -706,50 +709,11 @@ const startDrag = (event, track) => {
   document.addEventListener('mouseup', onMouseUp)
 }
 
-// Drag and drop functions for edit mode
-const handleDragStart = (event, index) => {
-  dragIndex.value = index
-  event.dataTransfer.effectAllowed = 'move'
-  event.dataTransfer.setData('text/plain', index.toString())
-}
-
-const handleDragEnd = () => {
-  dragIndex.value = null
-  dragOverIndex.value = null
-}
-
-const handleDragOver = (event, index) => {
-  event.preventDefault()
-  dragOverIndex.value = index
-}
-
-const handleDrop = async (event, toIndex) => {
-  event.preventDefault()
-  const fromIndex = dragIndex.value
-  
-  if (fromIndex === null || fromIndex === toIndex) {
-    handleDragEnd()
-    return
-  }
-  
-  // Reorder in edit tracks
-  const tracks = [...editTracks.value]
-  const [movedTrack] = tracks.splice(fromIndex, 1)
-  tracks.splice(toIndex, 0, movedTrack)
-  editTracks.value = tracks
-  
-  // Also update main playlist
-  playlist.value.tracks = [...tracks]
-  
-  handleDragEnd()
-  
-  // Send to server
-  try {
-    await api.put(`/playlists/${playlist.value.id}/reorder`, {
-      track_ids: tracks.map(t => t.id)
-    })
-  } catch (error) {
-    console.error('Failed to reorder tracks:', error)
+// Handle drop with reorder callback
+const onDrop = async (event, toIndex) => {
+  const reordered = await handleDrop(event, toIndex, editTracks.value)
+  if (reordered) {
+    await onTracksReorder(reordered)
   }
 }
 
@@ -1000,49 +964,6 @@ onMounted(() => {
   border-color: var(--accent);
 }
 
-.modal-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.cancel-btn {
-  flex: 1;
-  padding: 12px;
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  color: var(--text-primary);
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.confirm-btn {
-  flex: 1;
-  padding: 12px;
-  background: var(--accent);
-  border: none;
-  border-radius: 10px;
-  color: #000;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.confirm-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.delete-confirm-btn {
-  flex: 1;
-  padding: 12px;
-  background: var(--danger);
-  border: none;
-  border-radius: 10px;
-  color: #fff;
-  font-weight: 600;
-  cursor: pointer;
-}
-
 .public-badge {
   display: inline-block;
   margin-left: 8px;
@@ -1115,29 +1036,6 @@ onMounted(() => {
 
 .checkbox-label.compact input[type="checkbox"]:checked::before {
   transform: translateX(16px);
-}
-
-.hint-text {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  margin: 0 0 16px 0;
-}
-
-/* Add tracks button */
-.add-tracks-btn {
-  padding: 10px 16px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-color, rgba(255,255,255,0.1));
-  border-radius: 20px;
-  color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.add-tracks-btn:hover {
-  background: var(--bg-highlight);
 }
 
 /* Edit playlist modal */
@@ -1454,34 +1352,6 @@ onMounted(() => {
   transform: none;
 }
 
-.delete-overlay {
-  z-index: 1010;
-}
-
-.delete-modal {
-  max-width: 340px;
-}
-
-/* Add tracks modal - legacy, keeping for reference */
-.add-tracks-modal {
-  height: 70vh;
-  max-height: 600px;
-  min-height: 400px;
-  width: 100%;
-  max-width: 400px;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Desktop: wider modal */
-@media (min-width: 768px) {
-  .add-tracks-modal {
-    max-width: 550px;
-    height: 75vh;
-    max-height: 700px;
-  }
-}
-
 .search-input-wrapper {
   position: relative;
   margin-bottom: 16px;
@@ -1741,11 +1611,7 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
-.search-results {
-  padding-bottom: 16px;
-}
-
-.no-results, .search-hint {
+.no-results {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1753,9 +1619,5 @@ onMounted(() => {
   padding: 32px 16px;
   color: var(--text-tertiary);
   min-height: 120px;
-}
-
-@keyframes spin {
-  to { transform: translateY(-50%) rotate(360deg); }
 }
 </style>
