@@ -160,7 +160,7 @@
     <!-- About -->
     <section class="section about">
       <h2>О приложении</h2>
-      <p>TG Player v2.0</p>
+      <p>{{ authStore.appName }} v2.0</p>
       <p class="about-desc">
         Музыкальный плеер с хранением в Telegram
       </p>

@@ -14,6 +14,9 @@ export const useAuthStore = defineStore('auth', () => {
   const canSave = ref(false)
   const channelInfo = ref(null)
   const showChannelBanner = ref(false)  // Show banner when user tries premium action
+  
+  // App config
+  const appName = ref('TG Player')  // Default, will be overridden by bot_username
 
   // Getters
   const isAuthenticated = computed(() => authStorage.isAuthenticated())
@@ -35,8 +38,8 @@ export const useAuthStore = defineStore('auth', () => {
       }
       initialized.value = true
       
-      // Fetch channel status after auth
-      await fetchStatus()
+      // Fetch channel status and config after auth
+      await Promise.all([fetchStatus(), fetchConfig()])
     } catch (err) {
       // Auth failed - clear storage
       authStorage.clear()
@@ -56,6 +59,17 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (err) {
       console.error('Failed to fetch status:', err)
       // Don't fail initialization for status fetch
+    }
+  }
+  
+  async function fetchConfig() {
+    try {
+      const response = await authApi.getConfig()
+      if (response.data?.bot_username) {
+        appName.value = response.data.bot_username
+      }
+    } catch (err) {
+      console.error('Failed to fetch config:', err)
     }
   }
   
@@ -126,6 +140,7 @@ export const useAuthStore = defineStore('auth', () => {
     canSave,
     channelInfo,
     showChannelBanner,
+    appName,
     // Getters
     isAuthenticated,
     isTelegramWebApp,
@@ -135,6 +150,7 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     refreshUser,
     fetchStatus,
+    fetchConfig,
     promptChannelSetup,
     dismissChannelBanner
   }

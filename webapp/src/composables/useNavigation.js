@@ -48,10 +48,10 @@ export function useNavigation() {
    */
   const headerTitle = computed(() => {
     switch (currentView.value) {
-      case 'library': return 'TG Player'
+      case 'library': return 'Главная'
       case 'playlist': return currentPlaylist.value?.name || 'Плейлист'
       case 'artist': return 'Артист'
-      default: return 'TG Player'
+      default: return 'Музыка'
     }
   })
 

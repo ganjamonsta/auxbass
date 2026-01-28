@@ -4,7 +4,7 @@
       <div class="logo">
         🎵
       </div>
-      <h1>TG Player</h1>
+      <h1>{{ appName }}</h1>
       <p class="subtitle">Музыкальный плеер с хранением в Telegram</p>
 
       <div v-if="!showCodeInput" class="auth-info">
@@ -58,6 +58,7 @@
 import { ref, computed, nextTick, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { authApi } from '@/api/client'
 
 const router = useRouter()
 const route = useRoute()
@@ -68,10 +69,11 @@ const codeInputs = ref([])
 const codeDigits = ref(['', '', '', '', '', ''])
 const loading = ref(false)
 const error = ref('')
+const appName = ref('TG Player')
+const botUsername = ref('')
 
 const botLink = computed(() => {
-  // Replace with your bot username
-  return 'https://t.me/your_bot_username'
+  return botUsername.value ? `https://t.me/${botUsername.value}` : 'https://t.me/your_bot_username'
 })
 
 const code = computed(() => codeDigits.value.join(''))
@@ -146,7 +148,18 @@ const verifyCode = async () => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  // Load app config (bot username for display and link)
+  try {
+    const response = await authApi.getConfig()
+    if (response.data?.bot_username) {
+      appName.value = response.data.bot_username
+      botUsername.value = response.data.bot_username
+    }
+  } catch (err) {
+    console.error('Failed to load config:', err)
+  }
+  
   // Check if already authenticated
   if (authStore.isAuthenticated) {
     router.push('/')
