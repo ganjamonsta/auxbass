@@ -351,6 +351,7 @@ onUnmounted(() => {
 .artist-card {
   text-align: center;
   cursor: pointer;
+  min-width: 0;
 }
 
 .artist-image {
@@ -366,6 +367,7 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
 
 .image-placeholder {
