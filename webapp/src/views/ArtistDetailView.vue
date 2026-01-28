@@ -7,19 +7,9 @@
         <div v-else class="image-placeholder">👤</div>
       </div>
       <div class="artist-info">
-        <h1 
-          class="artist-name-link" 
-          @click="toggleScope"
-          :title="isGlobal ? 'Перейти в личную библиотеку' : 'Посмотреть всю музыку артиста'"
-        >
-          {{ artist.name }}
-          <span class="scope-indicator">{{ isGlobal ? '🌍' : '📚' }}</span>
-        </h1>
+        <h1>{{ artist.name }}</h1>
         <p class="meta">
           {{ artist.track_count }} треков • {{ artist.album_count }} альбомов
-          <span v-if="!isGlobal" class="global-link" @click.stop="goToGlobal">
-            → вся музыка
-          </span>
         </p>
       </div>
     </div>
@@ -90,6 +80,18 @@
     />
   </div>
 
+  <!-- Not in library - offer to view global -->
+  <div v-else-if="notInLibrary" class="not-in-library">
+    <div class="not-in-library-content">
+      <div class="icon">👤</div>
+      <h2>{{ decodeURIComponent(route.params.name) }}</h2>
+      <p>Артист не найден в вашей библиотеке</p>
+      <button class="primary-btn" @click="goToGlobal">
+        🌍 Посмотреть всю музыку артиста
+      </button>
+    </div>
+  </div>
+
   <div v-else-if="loading" class="loading">
     <div class="spinner"></div>
   </div>
@@ -113,6 +115,7 @@ const artist = ref(null)
 const loading = ref(true)
 const showMenu = ref(false)
 const menuTrack = ref(null)
+const notInLibrary = ref(false)
 
 // Get scope from query param
 const scope = computed(() => route.query.scope || 'library')
@@ -120,11 +123,20 @@ const isGlobal = computed(() => scope.value === 'global')
 
 const loadArtist = async () => {
   loading.value = true
+  notInLibrary.value = false
   try {
     const name = decodeURIComponent(route.params.name)
     const params = { scope: scope.value }
     const response = await api.get(`/artists/${encodeURIComponent(name)}`, { params })
     artist.value = response.data
+  } catch (error) {
+    // If artist not found in library, show option to view global
+    if (error.response?.status === 404 && !isGlobal.value) {
+      notInLibrary.value = true
+      artist.value = null
+    } else {
+      console.error('Failed to load artist:', error)
+    }
   } finally {
     loading.value = false
   }
@@ -152,16 +164,7 @@ const goToAlbum = (album) => {
   router.push({ path: `/album/${album.id}`, query })
 }
 
-// Toggle between library and global scope
-const toggleScope = () => {
-  const newScope = isGlobal.value ? 'library' : 'global'
-  router.push({ 
-    path: route.path, 
-    query: newScope === 'library' ? {} : { scope: 'global' } 
-  })
-}
-
-// Go directly to global scope
+// Go to global scope (used when artist not in library)
 const goToGlobal = () => {
   router.push({ 
     path: route.path, 
@@ -260,6 +263,53 @@ watch(scope, () => {
   padding-bottom: 120px;
 }
 
+.not-in-library {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 16px;
+}
+
+.not-in-library-content {
+  text-align: center;
+}
+
+.not-in-library-content .icon {
+  font-size: 80px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.not-in-library-content h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+}
+
+.not-in-library-content p {
+  color: var(--text-secondary);
+  margin: 0 0 24px 0;
+}
+
+.not-in-library-content .primary-btn {
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 24px;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+.not-in-library-content .primary-btn:hover {
+  opacity: 0.9;
+  transform: scale(1.02);
+}
+
 .artist-header {
   display: flex;
   gap: 16px;
@@ -302,32 +352,6 @@ watch(scope, () => {
   color: var(--text-primary);
   margin: 0 0 8px 0;
   line-height: 1.2;
-}
-
-.artist-name-link {
-  cursor: pointer;
-  transition: color 0.2s;
-}
-
-.artist-name-link:hover {
-  color: var(--accent-color);
-}
-
-.scope-indicator {
-  font-size: 16px;
-  margin-left: 8px;
-  opacity: 0.7;
-}
-
-.global-link {
-  color: var(--accent-color);
-  cursor: pointer;
-  margin-left: 8px;
-  font-weight: 500;
-}
-
-.global-link:hover {
-  text-decoration: underline;
 }
 
 .meta {
