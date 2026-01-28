@@ -36,46 +36,44 @@
         <span>Моя музыка</span>
       </div>
 
-      <div class="nav-items-wrap">
-        <router-link to="/liked" class="nav-item" :class="{ active: isActive('/liked') }">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-          </svg>
-          <span>Любимое</span>
-          <span v-if="likedCount" class="nav-count">{{ formatCount(likedCount) }}</span>
-        </router-link>
+      <router-link to="/liked" class="nav-item" :class="{ active: isActive('/liked') }">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+        </svg>
+        <span>Любимое</span>
+        <span v-if="likedCount" class="nav-count">{{ formatCount(likedCount) }}</span>
+      </router-link>
 
-        <router-link to="/artists" class="nav-item" :class="{ active: isActive('/artists') }">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-          </svg>
-          <span>Артисты</span>
-          <span v-if="artistCount" class="nav-count">{{ formatCount(artistCount) }}</span>
-        </router-link>
+      <router-link to="/artists" class="nav-item" :class="{ active: isActive('/artists') }">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+        </svg>
+        <span>Артисты</span>
+        <span v-if="artistCount" class="nav-count">{{ formatCount(artistCount) }}</span>
+      </router-link>
 
-        <router-link to="/albums" class="nav-item" :class="{ active: isActive('/albums') }">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"/>
-          </svg>
-          <span>Альбомы</span>
-          <span v-if="albums.length" class="nav-count">{{ albums.length }}</span>
-        </router-link>
+      <router-link to="/albums" class="nav-item" :class="{ active: isActive('/albums') }">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"/>
+        </svg>
+        <span>Альбомы</span>
+        <span v-if="albums.length" class="nav-count">{{ albums.length }}</span>
+      </router-link>
 
-        <router-link to="/playlists" class="nav-item" :class="{ active: isActive('/playlists') }">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
-          </svg>
-          <span>Плейлисты</span>
-          <span v-if="userPlaylists.length" class="nav-count">{{ userPlaylists.length }}</span>
-        </router-link>
+      <router-link to="/playlists" class="nav-item" :class="{ active: isActive('/playlists') }">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
+        </svg>
+        <span>Плейлисты</span>
+        <span v-if="userPlaylists.length" class="nav-count">{{ userPlaylists.length }}</span>
+      </router-link>
 
-        <router-link to="/friends" class="nav-item" :class="{ active: isActive('/friends') }">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
-          </svg>
-          <span>Кенты</span>
-        </router-link>
-      </div>
+      <router-link to="/friends" class="nav-item" :class="{ active: isActive('/friends') }">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+        </svg>
+        <span>Кенты</span>
+      </router-link>
     </div>
 
     <!-- Divider -->
@@ -301,19 +299,6 @@ const getPlaylistCoverStyle = (playlist) => {
   overflow-x: hidden;
 }
 
-/* Wider sidebar on large screens */
-@media (min-width: 1600px) {
-  .sidebar {
-    width: 360px;
-  }
-}
-
-@media (min-width: 1920px) {
-  .sidebar {
-    width: 420px;
-  }
-}
-
 .sidebar::-webkit-scrollbar {
   width: 6px;
 }
@@ -353,13 +338,11 @@ const getPlaylistCoverStyle = (playlist) => {
 
 .sidebar-nav {
   padding: 8px 8px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
 }
 
 .nav-item {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 12px;
   width: 100%;
@@ -374,15 +357,6 @@ const getPlaylistCoverStyle = (playlist) => {
   transition: all 0.15s ease;
   text-align: left;
   text-decoration: none;
-}
-
-/* Wide sidebar - horizontal nav items */
-@media (min-width: 1600px) {
-  .sidebar-nav .nav-item {
-    width: auto;
-    flex: 0 0 auto;
-    padding: 10px 16px;
-  }
 }
 
 .nav-item:hover {
@@ -404,8 +378,16 @@ const getPlaylistCoverStyle = (playlist) => {
   opacity: 0.8;
 }
 
+.nav-item > span:not(.nav-count) {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .nav-count {
   margin-left: auto;
+  flex-shrink: 0;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.4);
   background: rgba(255, 255, 255, 0.1);
@@ -421,26 +403,6 @@ const getPlaylistCoverStyle = (playlist) => {
 
 .sidebar-section {
   padding: 8px;
-}
-
-.nav-items-wrap {
-  display: flex;
-  flex-direction: column;
-}
-
-/* Wide sidebar - horizontal nav items */
-@media (min-width: 1600px) {
-  .nav-items-wrap {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-  
-  .nav-items-wrap .nav-item {
-    width: auto;
-    flex: 0 0 auto;
-    padding: 10px 14px;
-  }
 }
 
 .section-header {
@@ -495,6 +457,8 @@ const getPlaylistCoverStyle = (playlist) => {
 
 .playlist-item {
   padding: 8px 16px;
+  flex-direction: row;
+  align-items: center;
 }
 
 .playlist-cover {
@@ -553,10 +517,14 @@ const getPlaylistCoverStyle = (playlist) => {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  overflow: hidden;
 }
 
 .playlist-info .playlist-name {
   flex: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .playlist-artist {
