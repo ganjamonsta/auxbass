@@ -34,7 +34,13 @@
     <div class="track-info">
       <div class="track-title">{{ track.title }}</div>
       <div class="track-artist">{{ track.artist }}</div>
+      <div v-if="isCurrentTrack" class="progress" @click="seek" @mousedown="startDrag">
+        <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
+        <div class="progress-thumb" :style="{ left: progressPercent + '%' }"></div>
+      </div>
     </div>
+    
+    <div class="time" v-if="isCurrentTrack">{{ displayTime }}</div>
     
     <button class="remove-btn" @click="$emit('remove')" title="Удалить">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -60,6 +66,15 @@ defineEmits(['dragstart', 'dragend', 'dragover', 'drop', 'remove'])
 
 const playerStore = usePlayerStore()
 const isCurrentTrack = computed(() => playerStore.currentTrack?.id === props.track.id)
+const progressPercent = computed(() => (playerStore.progress / playerStore.duration) * 100 || 0)
+
+const displayTime = computed(() => {
+  const seconds = playerStore.progress
+  if (!seconds || isNaN(seconds)) return '0:00'
+  const mins = Math.floor(seconds / 60)
+  const secs = Math.floor(seconds % 60)
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+})
 
 const togglePlay = () => {
   if (isCurrentTrack.value) {
@@ -67,6 +82,36 @@ const togglePlay = () => {
   } else {
     playerStore.playTrack(props.track, props.allTracks.length ? props.allTracks : [props.track])
   }
+}
+
+const seek = (event) => {
+  if (!isCurrentTrack.value) return
+  const rect = event.currentTarget.getBoundingClientRect()
+  const percent = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width))
+  playerStore.seek(percent * playerStore.duration)
+}
+
+let isDraggingProgress = false
+const startDrag = (event) => {
+  if (!isCurrentTrack.value) return
+  isDraggingProgress = true
+  const progressBar = event.currentTarget
+  
+  const onMouseMove = (e) => {
+    if (!isDraggingProgress) return
+    const rect = progressBar.getBoundingClientRect()
+    const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+    playerStore.seek(percent * playerStore.duration)
+  }
+  
+  const onMouseUp = () => {
+    isDraggingProgress = false
+    document.removeEventListener('mousemove', onMouseMove)
+    document.removeEventListener('mouseup', onMouseUp)
+  }
+  
+  document.addEventListener('mousemove', onMouseMove)
+  document.addEventListener('mouseup', onMouseUp)
 }
 </script>
 
@@ -178,6 +223,58 @@ const togglePlay = () => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.progress {
+  position: relative;
+  width: 100%;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 4px 0;
+  margin-top: 4px;
+}
+
+.progress::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+}
+
+.progress-fill {
+  position: absolute;
+  left: 0;
+  height: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.progress-thumb {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: var(--accent);
+  border-radius: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.progress:hover .progress-thumb { opacity: 1; }
+
+.time {
+  font-size: 12px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  min-width: 36px;
+  text-align: right;
+  flex-shrink: 0;
 }
 
 .remove-btn {

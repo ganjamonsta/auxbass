@@ -301,7 +301,7 @@ const save = async () => {
 @media (min-width: 900px) {
   .edit-playlist-modal {
     width: 50vw;
-    max-width: 580px;
+    max-width: 760px;
     height: 80vh;
     max-height: 750px;
   }
