@@ -453,6 +453,7 @@ async def get_privacy_settings(
     return PrivacySettingsResponse(
         hide_from_search=db_user.hide_from_search,
         hide_profile=db_user.hide_profile,
+        notify_subscription=db_user.notify_subscription,
     )
 
 
