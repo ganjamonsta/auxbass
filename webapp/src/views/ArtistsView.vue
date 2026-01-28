@@ -43,21 +43,12 @@
 
     <!-- Artist grid -->
     <div class="artist-grid" v-if="artists.length">
-      <div
+      <ArtistGridCard
         v-for="artist in artists"
         :key="artist.name"
-        class="artist-card"
-        @click="goToArtist(artist)"
-      >
-        <div class="artist-image">
-          <img v-if="artist.image_url" :src="artist.image_url" :alt="artist.name" />
-          <div v-else class="image-placeholder">👤</div>
-        </div>
-        <div class="artist-name">{{ artist.name }}</div>
-        <div class="artist-meta">
-          {{ artist.track_count }} треков • {{ artist.album_count }} альбомов
-        </div>
-      </div>
+        :artist="artist"
+        @click="goToArtist"
+      />
     </div>
 
     <!-- Empty state -->
@@ -83,6 +74,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSort } from '@/composables'
 import SortChips from '@/components/SortChips.vue'
+import ArtistGridCard from '@/components/ArtistGridCard.vue'
 import { artistsApi } from '@/api/client'
 
 const router = useRouter()
@@ -346,53 +338,6 @@ onUnmounted(() => {
   .artist-grid {
     grid-template-columns: repeat(6, 1fr);
   }
-}
-
-.artist-card {
-  text-align: center;
-  cursor: pointer;
-  min-width: 0;
-}
-
-.artist-image {
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  overflow: hidden;
-  background: var(--bg-elevated);
-  margin-bottom: 8px;
-}
-
-.artist-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.image-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  font-size: 40px;
-}
-
-.artist-name {
-  color: var(--text-primary);
-  font-weight: 600;
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-bottom: 2px;
-}
-
-.artist-meta {
-  color: var(--text-tertiary);
-  font-size: 11px;
-  line-height: 1.3;
 }
 
 .empty-state {

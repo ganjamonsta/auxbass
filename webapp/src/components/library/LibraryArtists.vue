@@ -15,21 +15,12 @@
 
     <!-- Artist grid -->
     <div class="artist-grid" v-if="artists.length">
-      <div
+      <ArtistGridCard
         v-for="artist in artists"
         :key="artist.name"
-        class="artist-card"
-        @click="goToArtist(artist)"
-      >
-        <div class="artist-image">
-          <img v-if="artist.image_url" :src="artist.image_url" :alt="artist.name" />
-          <div v-else class="image-placeholder">👤</div>
-        </div>
-        <div class="artist-name">{{ artist.name }}</div>
-        <div class="artist-meta">
-          {{ artist.track_count }} треков • {{ artist.album_count }} альбомов
-        </div>
-      </div>
+        :artist="artist"
+        @click="goToArtist"
+      />
     </div>
 
     <!-- Empty state -->
@@ -54,6 +45,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSort } from '@/composables'
 import SortChips from '@/components/SortChips.vue'
+import ArtistGridCard from '@/components/ArtistGridCard.vue'
 import api from '@/api/client'
 
 const props = defineProps({
@@ -242,51 +234,6 @@ onUnmounted(() => {
   }
 }
 
-.artist-card {
-  text-align: center;
-  cursor: pointer;
-}
-
-.artist-image {
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  overflow: hidden;
-  background: var(--bg-elevated);
-  margin-bottom: 8px;
-}
-
-.artist-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.image-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  font-size: 40px;
-}
-
-.artist-name {
-  color: var(--text-primary);
-  font-weight: 600;
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-bottom: 2px;
-}
-
-.artist-meta {
-  color: var(--text-tertiary);
-  font-size: 11px;
-  line-height: 1.3;
-}
-
 .empty-state {
   text-align: center;
   padding: 48px 16px;
@@ -312,5 +259,13 @@ onUnmounted(() => {
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.load-trigger {
+  height: 1px;
 }
 </style>
