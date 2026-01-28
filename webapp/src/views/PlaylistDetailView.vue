@@ -190,20 +190,23 @@
                   <path d="M8 5v14l11-7z"/>
                 </svg>
               </div>
-              <!-- Progress bar for playing track -->
+            </div>
+            <!-- Track info with progress bar -->
+            <div class="result-content">
+              <div class="result-info">
+                <div class="result-artist">{{ track.artist }}</div>
+                <div class="result-title">{{ track.title }}</div>
+              </div>
+              <!-- Progress bar spanning full width -->
               <div 
                 v-if="playerStore.currentTrack?.id === track.id" 
-                class="cover-progress"
+                class="result-progress"
               >
                 <div 
-                  class="cover-progress-fill" 
+                  class="result-progress-fill" 
                   :style="{ width: `${(playerStore.progress / playerStore.duration) * 100 || 0}%` }"
                 ></div>
               </div>
-            </div>
-            <div class="result-info">
-              <div class="result-title">{{ track.title }}</div>
-              <div class="result-artist">{{ track.artist }}</div>
             </div>
             <!-- Duration / Current time -->
             <div class="result-time">
@@ -1088,25 +1091,19 @@ onMounted(() => {
   background: rgba(29, 185, 84, 0.6);
 }
 
-/* Progress bar at bottom of cover */
-.cover-progress {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.3);
-}
-
-.cover-progress-fill {
-  height: 100%;
-  background: var(--accent);
-  transition: width 0.1s linear;
+/* Track content with info and progress */
+.result-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .result-info {
-  flex: 1;
-  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .result-title {
@@ -1115,14 +1112,31 @@ onMounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 14px;
 }
 
 .result-artist {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Progress bar spanning full width */
+.result-progress {
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.result-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.1s linear;
 }
 
 .result-time {
