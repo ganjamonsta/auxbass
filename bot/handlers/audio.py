@@ -165,10 +165,10 @@ async def handle_audio(message: Message):
     track_id = result.track_id
     is_new = result.is_new
     
-    # If user has backup channel, forward track
-    channel_forwarded = False
+    # If user has backup channel, queue track for forwarding
+    channel_queued = False
     try:
-        channel_forwarded = await channel_service.forward_track_to_channel(
+        channel_queued = await channel_service.forward_track_to_channel(
             user_id=user_id,
             track_id=track_id,
             bot=message.bot,
@@ -192,10 +192,14 @@ async def handle_audio(message: Message):
         }.get(forward_info["source_type"], "📁")
         source_note = f"\n{source_emoji} Источник: <b>{forward_info['source_name']}</b>"
     
-    # Channel backup note
+    # Channel backup note - now shows queued status
     channel_note = ""
-    if channel_forwarded:
-        channel_note = "\n☁️ <i>Сохранено в ваш канал</i>"
+    if channel_queued:
+        queue_size = channel_service.get_queue_size(user_id)
+        if queue_size > 1:
+            channel_note = f"\n☁️ <i>В очереди на бекап ({queue_size})</i>"
+        else:
+            channel_note = "\n☁️ <i>Сохраняется в ваш канал...</i>"
     
     # Status
     if not is_new:

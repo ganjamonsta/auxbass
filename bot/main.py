@@ -25,7 +25,7 @@ from bot.handlers.callbacks import router as callbacks_router
 from bot.handlers.download import router as download_router
 
 from bot.services.enrichment import enrichment_worker
-from bot.services.channels import init_channel_service
+from bot.services.channels import init_channel_service, start_channel_service, stop_channel_service
 
 
 # Configure logging
@@ -60,6 +60,10 @@ async def main():
     # Initialize channel service with bot
     init_channel_service(bot)
     
+    # Start channel forward queue worker
+    logger.info("Starting channel forward queue worker...")
+    await start_channel_service()
+    
     # Initialize dispatcher with FSM storage
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
@@ -76,6 +80,7 @@ async def main():
         await dp.start_polling(bot)
     finally:
         logger.info("Shutting down...")
+        await stop_channel_service()
         await enrichment_worker.stop()
         await close_db()
         await bot.session.close()

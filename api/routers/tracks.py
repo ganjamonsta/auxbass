@@ -939,17 +939,17 @@ async def add_to_library(
     db.add(entry)
     await db.commit()
     
-    # Forward to user's channel (if auto_forward is enabled)
-    forwarded = False
+    # Forward to user's channel (if auto_forward is enabled) - uses queue
+    queued = False
     try:
         channel_service = get_channel_service()
-        forwarded = await channel_service.forward_track_to_channel(user.id, track_id)
-        if forwarded:
-            logger.info(f"Track {track_id} forwarded to channel for user {user.id}")
+        queued = await channel_service.forward_track_to_channel(user.id, track_id)
+        if queued:
+            logger.info(f"Track {track_id} queued for channel forward for user {user.id}")
     except Exception as e:
-        logger.warning(f"Failed to forward track {track_id} to channel: {e}")
+        logger.warning(f"Failed to queue track {track_id} for channel: {e}")
     
-    return {"status": "added", "track_id": track_id, "forwarded": forwarded}
+    return {"status": "added", "track_id": track_id, "queued_for_channel": queued}
 
 
 @router.delete("/{track_id}/remove-from-library")

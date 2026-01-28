@@ -3,12 +3,14 @@ TG Player - User Channel Service
 
 Handles backup of user's music library to their Telegram channel.
 Features:
-- Forward tracks to user's channel
+- Forward tracks to user's channel with rate-limiting queue
 - Generate hashtags for easy searching
 - Update messages when enrichment completes
 """
 from typing import Optional, List
 from datetime import datetime
+from collections import deque
+from dataclasses import dataclass
 import json
 import logging
 
@@ -32,17 +34,93 @@ from shared.database import get_session
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class ForwardQueueItem:
+    """Item in the forward queue"""
+    user_id: int
+    track_id: int
+    added_at: datetime
+
+
 class ChannelService:
     """Service for managing user channels and messages"""
+    
+    # Delay between forwarding tracks (seconds) - Telegram allows ~20 msg/min
+    FORWARD_DELAY = 3.0
     
     def __init__(self):
         self.bot: Optional[Bot] = None
         self._cancel_sync: dict[int, bool] = {}  # user_id -> cancel flag
         self._active_sync: dict[int, dict] = {}  # user_id -> sync status info
+        
+        # Forward queue for rate-limited sending
+        self._forward_queue: deque[ForwardQueueItem] = deque()
+        self._queue_worker_task: Optional[asyncio.Task] = None
+        self._queue_running = False
     
     def set_bot(self, bot: Bot):
         """Set bot instance for sending messages"""
         self.bot = bot
+    
+    async def start_queue_worker(self):
+        """Start background queue worker for rate-limited forwarding"""
+        if self._queue_running:
+            return
+        
+        self._queue_running = True
+        self._queue_worker_task = asyncio.create_task(self._queue_worker_loop())
+        logger.info("Channel forward queue worker started")
+    
+    async def stop_queue_worker(self):
+        """Stop background queue worker"""
+        self._queue_running = False
+        if self._queue_worker_task:
+            self._queue_worker_task.cancel()
+            try:
+                await self._queue_worker_task
+            except asyncio.CancelledError:
+                pass
+        logger.info("Channel forward queue worker stopped")
+    
+    async def _queue_worker_loop(self):
+        """Main loop for processing forward queue with rate limiting"""
+        while self._queue_running:
+            try:
+                if self._forward_queue:
+                    item = self._forward_queue.popleft()
+                    await self._forward_track_immediately(
+                        user_id=item.user_id,
+                        track_id=item.track_id,
+                    )
+                    # Delay to avoid rate limiting
+                    await asyncio.sleep(self.FORWARD_DELAY)
+                else:
+                    # No items in queue, sleep briefly
+                    await asyncio.sleep(0.5)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Forward queue worker error: {e}")
+                await asyncio.sleep(1)
+    
+    def queue_track_for_forward(self, user_id: int, track_id: int):
+        """
+        Add track to forward queue for rate-limited sending.
+        Uses the same mechanism as manual sync.
+        """
+        item = ForwardQueueItem(
+            user_id=user_id,
+            track_id=track_id,
+            added_at=datetime.utcnow(),
+        )
+        self._forward_queue.append(item)
+        logger.debug(f"Track {track_id} queued for forward (queue size: {len(self._forward_queue)})")
+    
+    def get_queue_size(self, user_id: Optional[int] = None) -> int:
+        """Get current queue size, optionally filtered by user"""
+        if user_id is None:
+            return len(self._forward_queue)
+        return sum(1 for item in self._forward_queue if item.user_id == user_id)
     
     def request_cancel_sync(self, user_id: int):
         """Request cancellation of ongoing sync for user"""
@@ -251,9 +329,60 @@ class ChannelService:
         user_id: int,
         track_id: int,
         bot: Optional[Bot] = None,
+        immediate: bool = False,
     ) -> bool:
         """
-        Forward a track to user's channel with hashtags.
+        Queue a track for forwarding to user's channel with hashtags.
+        Uses rate-limited queue to avoid Telegram flood limits.
+        
+        Args:
+            user_id: User who owns the channel
+            track_id: Track ID to forward
+            bot: Bot instance for sending (used if immediate=True)
+            immediate: If True, send immediately without queue (for sync)
+        
+        Returns:
+            True if queued/forwarded successfully, False otherwise
+        """
+        if immediate:
+            return await self._forward_track_immediately(user_id, track_id, bot)
+        
+        # Check if channel exists and auto_forward is enabled before queuing
+        async with get_session() as session:
+            channel = await session.scalar(
+                select(UserChannel).where(
+                    UserChannel.user_id == user_id,
+                    UserChannel.is_active == True
+                )
+            )
+            
+            if not channel or not channel.auto_forward:
+                return False
+            
+            # Check if track already sent to channel
+            existing = await session.scalar(
+                select(ChannelMessage).where(
+                    ChannelMessage.channel_id == channel.id,
+                    ChannelMessage.track_id == track_id,
+                )
+            )
+            if existing:
+                logger.debug(f"Track {track_id} already in channel, skipping queue")
+                return True  # Already sent, consider success
+        
+        # Add to queue for rate-limited sending
+        self.queue_track_for_forward(user_id, track_id)
+        return True
+    
+    async def _forward_track_immediately(
+        self,
+        user_id: int,
+        track_id: int,
+        bot: Optional[Bot] = None,
+    ) -> bool:
+        """
+        Forward a track to user's channel immediately (internal use).
+        Used by queue worker and sync_all_tracks.
         
         Args:
             user_id: User who owns the channel
@@ -279,6 +408,17 @@ class ChannelService:
             
             if not channel or not channel.auto_forward:
                 return False
+            
+            # Check if already sent (avoid duplicates from queue)
+            existing = await session.scalar(
+                select(ChannelMessage).where(
+                    ChannelMessage.channel_id == channel.id,
+                    ChannelMessage.track_id == track_id,
+                )
+            )
+            if existing:
+                logger.debug(f"Track {track_id} already sent to channel, skipping")
+                return True
             
             # Get track with enrichment (eager load)
             result = await session.execute(
@@ -337,6 +477,14 @@ class ChannelService:
                 
                 logger.info(f"Track {track_id} forwarded to channel {channel.channel_id}")
                 return True
+                
+            except TelegramRetryAfter as e:
+                # Rate limited - wait and retry
+                logger.warning(f"Rate limited, waiting {e.retry_after} seconds")
+                await asyncio.sleep(e.retry_after + 1)
+                # Re-queue for retry
+                self.queue_track_for_forward(user_id, track_id)
+                return False
                 
             except TelegramForbiddenError:
                 # Bot was removed from channel
@@ -441,6 +589,151 @@ class ChannelService:
             logger.info(f"Updated {updated} channel messages for track {track_id}")
             return updated
     
+    async def update_incomplete_messages(
+        self,
+        user_id: Optional[int] = None,
+        bot: Optional[Bot] = None,
+        progress_callback=None,
+    ) -> dict:
+        """
+        Update channel messages for tracks that were synced before enrichment completed.
+        Finds messages where track now has enrichment data but message has incomplete hashtags.
+        
+        Args:
+            user_id: Specific user to update, or None for all users
+            bot: Bot instance
+            progress_callback: Optional async callback(current, total, updated)
+        
+        Returns:
+            Dict with update results: {checked, updated, failed}
+        """
+        use_bot = bot or self.bot
+        if not use_bot:
+            logger.error("No bot instance available for updating messages")
+            return {"checked": 0, "updated": 0, "failed": 0}
+        
+        stats = {"checked": 0, "updated": 0, "failed": 0}
+        
+        async with get_session() as session:
+            from shared.models import EnrichmentStatus
+            
+            # Build query for channel messages where:
+            # 1. Track has completed enrichment
+            # 2. Track has album_name or genre in enrichment
+            # 3. Channel message may have incomplete hashtags
+            query = (
+                select(ChannelMessage)
+                .join(Track, ChannelMessage.track_id == Track.id)
+                .join(TrackEnrichment, Track.id == TrackEnrichment.track_id)
+                .join(UserChannel, ChannelMessage.channel_id == UserChannel.id)
+                .where(
+                    Track.enrichment_status == EnrichmentStatus.COMPLETED,
+                    UserChannel.is_active == True,
+                    UserChannel.include_hashtags == True,
+                )
+                .options(
+                    selectinload(ChannelMessage.track).selectinload(Track.enrichment),
+                    selectinload(ChannelMessage.channel),
+                )
+            )
+            
+            if user_id:
+                query = query.where(UserChannel.user_id == user_id)
+            
+            result = await session.execute(query)
+            messages = result.scalars().all()
+            
+            total = len(messages)
+            logger.info(f"Checking {total} channel messages for incomplete hashtags")
+            
+            for i, msg in enumerate(messages):
+                stats["checked"] += 1
+                
+                if progress_callback and i % 10 == 0:
+                    try:
+                        await progress_callback(i, total, stats["updated"])
+                    except:
+                        pass
+                
+                track = msg.track
+                channel = msg.channel
+                enrichment = track.enrichment
+                
+                if not enrichment:
+                    continue
+                
+                # Parse current hashtags
+                current_hashtags = []
+                if msg.hashtags:
+                    try:
+                        current_hashtags = json.loads(msg.hashtags)
+                    except:
+                        current_hashtags = []
+                
+                # Generate what hashtags should be
+                expected_hashtags = generate_hashtags(
+                    artist=track.artist,
+                    title=track.title,
+                    album=enrichment.album_name,
+                    genre=enrichment.genre,
+                )
+                
+                # Check if update needed (compare sets to ignore order)
+                if set(current_hashtags) == set(expected_hashtags):
+                    continue  # Already up to date
+                
+                # Build new caption
+                caption_parts = []
+                if track.title:
+                    caption_parts.append(f"🎵 {track.title}")
+                if track.artist:
+                    caption_parts.append(f"👤 {track.artist}")
+                if enrichment.album_name:
+                    caption_parts.append(f"💿 {enrichment.album_name}")
+                
+                if expected_hashtags:
+                    caption_parts.append("")
+                    caption_parts.append(format_hashtags(expected_hashtags))
+                
+                caption = "\n".join(caption_parts)
+                
+                try:
+                    await use_bot.edit_message_caption(
+                        chat_id=channel.channel_id,
+                        message_id=msg.message_id,
+                        caption=caption,
+                        parse_mode="HTML",
+                    )
+                    
+                    msg.hashtags = json.dumps(expected_hashtags)
+                    msg.updated_at = datetime.utcnow()
+                    stats["updated"] += 1
+                    
+                    # Rate limiting
+                    await asyncio.sleep(0.5)
+                    
+                except TelegramBadRequest as e:
+                    if "message is not modified" in str(e):
+                        pass  # Same content
+                    elif "message to edit not found" in str(e).lower():
+                        # Message was deleted, remove record
+                        await session.delete(msg)
+                    else:
+                        logger.error(f"Failed to update message {msg.message_id}: {e}")
+                        stats["failed"] += 1
+                except TelegramForbiddenError:
+                    channel.is_active = False
+                    stats["failed"] += 1
+                except TelegramRetryAfter as e:
+                    logger.warning(f"Rate limited, waiting {e.retry_after}s")
+                    await asyncio.sleep(e.retry_after + 1)
+                    # Don't count as failed, will be caught next time
+            
+            await session.commit()
+        
+        logger.info(f"Updated incomplete messages: {stats}")
+        return stats
+
     async def sync_all_tracks(
         self,
         user_id: int,
@@ -745,6 +1038,16 @@ def init_channel_service(bot: Bot) -> ChannelService:
     channel_service.set_bot(bot)
     logger.info("Channel service initialized with bot")
     return channel_service
+
+
+async def start_channel_service():
+    """Start channel service background workers (queue worker)"""
+    await channel_service.start_queue_worker()
+
+
+async def stop_channel_service():
+    """Stop channel service background workers"""
+    await channel_service.stop_queue_worker()
 
 
 def get_channel_service() -> ChannelService:

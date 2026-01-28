@@ -6,7 +6,13 @@ from .enrichment import enrichment_worker
 
 # New service modules
 from .tracks import track_service, TrackService
-from .channels import channel_service, ChannelService, init_channel_service
+from .channels import (
+    channel_service,
+    ChannelService,
+    init_channel_service,
+    start_channel_service,
+    stop_channel_service,
+)
 from .albums import album_service, AlbumService
 
 __all__ = [
@@ -17,6 +23,8 @@ __all__ = [
     'channel_service',
     'ChannelService',
     'init_channel_service',
+    'start_channel_service',
+    'stop_channel_service',
     'album_service',
     'AlbumService',
 ]

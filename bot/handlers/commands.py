@@ -317,12 +317,26 @@ async def cmd_sync(message: Message):
         return
     
     if stats["to_sync"] == 0:
+        # All synced, but check for incomplete hashtags
         await message.answer(
             f"✅ <b>Все треки уже синхронизированы!</b>\n\n"
             f"📢 {stats['channel_title']}\n"
             f"🎵 В канале: <b>{stats['already_synced']}</b> треков\n"
-            f"📚 В библиотеке: <b>{stats['total_tracks']}</b> треков"
+            f"📚 В библиотеке: <b>{stats['total_tracks']}</b> треков\n\n"
+            f"🔍 Проверяю хештеги..."
         )
+        
+        # Update incomplete hashtags
+        update_result = await channel_service.update_incomplete_messages(
+            user_id=user_id,
+            bot=message.bot,
+        )
+        
+        if update_result["updated"] > 0:
+            await message.answer(
+                f"🏷️ <b>Обновлены хештеги</b>\n\n"
+                f"✏️ Обновлено: <b>{update_result['updated']}</b> треков"
+            )
         return
     
     status_msg = await message.answer(
@@ -379,12 +393,30 @@ async def cmd_sync(message: Message):
         )
         return
     
+    # Sync completed, now update incomplete hashtags
+    await status_msg.edit_text(
+        f"✅ <b>Треки отправлены!</b>\n\n"
+        f"📤 Добавлено в канал: <b>{result['synced']}</b>\n"
+        f"⏭️ Уже было в канале: <b>{result['skipped']}</b>\n\n"
+        f"🔍 Обновляю хештеги..."
+    )
+    
+    update_result = await channel_service.update_incomplete_messages(
+        user_id=user_id,
+        bot=message.bot,
+    )
+    
+    # Final result message
+    hashtag_note = ""
+    if update_result["updated"] > 0:
+        hashtag_note = f"\n🏷️ Обновлено хештегов: <b>{update_result['updated']}</b>"
+    
     await status_msg.edit_text(
         f"✅ <b>Синхронизация завершена!</b>\n\n"
         f"📤 Добавлено в канал: <b>{result['synced']}</b>\n"
         f"⏭️ Уже было в канале: <b>{result['skipped']}</b>\n"
         f"❌ Ошибок: <b>{result['failed']}</b>\n"
-        f"📊 Всего треков: <b>{result['total']}</b>"
+        f"📊 Всего треков: <b>{result['total']}</b>{hashtag_note}"
     )
 
 
