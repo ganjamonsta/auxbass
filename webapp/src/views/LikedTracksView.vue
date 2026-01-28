@@ -2,7 +2,11 @@
   <div class="liked-tracks-view">
     <!-- No channel - show setup prompt -->
     <div v-if="!authStore.hasChannel" class="no-channel-prompt">
-      <div class="prompt-icon">❤️</div>
+      <div class="prompt-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+        </svg>
+      </div>
       <h2>Понравившиеся</h2>
       <p>Подключите Telegram-канал, чтобы сохранять понравившиеся треки</p>
       <button class="setup-btn" @click="goToChannelSetup">
@@ -14,7 +18,9 @@
       <!-- Header -->
       <div class="liked-header">
       <div class="liked-cover">
-        <span class="liked-icon">❤️</span>
+        <svg class="liked-icon" width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+        </svg>
       </div>
       <div class="liked-info">
         <h1>Понравившиеся</h1>
@@ -59,7 +65,11 @@
 
     <!-- Empty state -->
     <div v-else class="empty-state">
-      <span class="empty-icon">❤️</span>
+      <div class="empty-icon">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+        </svg>
+      </div>
       <p>Нет понравившихся треков</p>
       <p class="hint">Нажмите ♡ на треке, чтобы добавить</p>
     </div>
@@ -226,7 +236,8 @@ onMounted(() => {
 }
 
 .liked-icon {
-  font-size: 48px;
+  color: white;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
 
 .liked-info {
@@ -337,10 +348,10 @@ onMounted(() => {
 }
 
 .empty-state .empty-icon {
-  font-size: 64px;
-  display: block;
+  display: flex;
+  justify-content: center;
   margin-bottom: 16px;
-  opacity: 0.6;
+  color: rgba(255, 69, 100, 0.4);
 }
 
 .empty-state p {
@@ -364,7 +375,7 @@ onMounted(() => {
 }
 
 .no-channel-prompt .prompt-icon {
-  font-size: 64px;
+  color: rgba(255, 69, 100, 0.8);
   margin-bottom: 16px;
 }
 
