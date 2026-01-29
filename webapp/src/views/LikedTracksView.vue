@@ -165,11 +165,8 @@ const shufflePlay = () => {
 
 const unlikeTrack = async (track) => {
   try {
-    await api.delete(`/tracks/${track.id}/like`)
+    await libraryStore.toggleLike(track.id)
     tracks.value = tracks.value.filter(t => t.id !== track.id)
-    // Also update in library store if track exists there
-    const storeTrack = libraryStore.tracks.find(t => t.id === track.id)
-    if (storeTrack) storeTrack.is_liked = false
   } catch (error) {
     console.error('Failed to unlike track:', error)
   }

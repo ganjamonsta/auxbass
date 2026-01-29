@@ -258,6 +258,11 @@ const handleRemoveFromPlaylist = async () => {
     await api.delete(`/playlists/${playlist.value.id}/tracks/${menuTrack.value.id}`)
     playlist.value.tracks = playlist.value.tracks.filter(t => t.id !== menuTrack.value.id)
     playlist.value.track_count--
+    // Update track_count in library store
+    const libraryPlaylist = libraryStore.playlists.find(p => p.id === playlist.value.id)
+    if (libraryPlaylist && libraryPlaylist.track_count > 0) {
+      libraryPlaylist.track_count--
+    }
   } catch (error) {
     console.error('Failed to remove track:', error)
   }
@@ -272,6 +277,12 @@ const openEditModal = () => {
 const handleSavePlaylist = ({ name, isPublic }) => {
   playlist.value.name = name
   playlist.value.is_public = isPublic
+  // Update in library store
+  const libraryPlaylist = libraryStore.playlists.find(p => p.id === playlist.value.id)
+  if (libraryPlaylist) {
+    libraryPlaylist.name = name
+    libraryPlaylist.is_public = isPublic
+  }
   showEditModal.value = false
   uiStore.toast.success('Сохранено', 'Плейлист обновлён')
 }
@@ -279,6 +290,11 @@ const handleSavePlaylist = ({ name, isPublic }) => {
 const handleTracksUpdate = (tracks) => {
   playlist.value.tracks = tracks
   playlist.value.track_count = tracks.length
+  // Update track_count in library store
+  const libraryPlaylist = libraryStore.playlists.find(p => p.id === playlist.value.id)
+  if (libraryPlaylist) {
+    libraryPlaylist.track_count = tracks.length
+  }
 }
 
 const deletePlaylist = async () => {

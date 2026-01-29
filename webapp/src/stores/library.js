@@ -347,6 +347,11 @@ export const useLibraryStore = defineStore('library', () => {
   const addTrackToPlaylist = async (playlistId, trackId) => {
     try {
       await playlistsApi.addTrack(playlistId, trackId)
+      // Update track_count in local state
+      const playlist = playlists.value.find(p => p.id === playlistId)
+      if (playlist) {
+        playlist.track_count = (playlist.track_count || 0) + 1
+      }
       return true
     } catch (error) {
       console.error('Failed to add track to playlist:', error)
@@ -358,6 +363,11 @@ export const useLibraryStore = defineStore('library', () => {
   const removeTrackFromPlaylist = async (playlistId, trackId) => {
     try {
       await playlistsApi.removeTrack(playlistId, trackId)
+      // Update track_count in local state
+      const playlist = playlists.value.find(p => p.id === playlistId)
+      if (playlist && playlist.track_count > 0) {
+        playlist.track_count--
+      }
       return true
     } catch (error) {
       console.error('Failed to remove track from playlist:', error)
@@ -389,7 +399,10 @@ export const useLibraryStore = defineStore('library', () => {
     try {
       await tracksApi.delete(id)
       tracks.value = tracks.value.filter(t => t.id !== id)
+      likedTracks.value = likedTracks.value.filter(t => t.id !== id)
       total.value--
+      // Refresh artists list as this track's artist may no longer have tracks
+      fetchArtists(artistScope.value)
     } catch (error) {
       console.error('Failed to delete track:', error)
     }
@@ -594,8 +607,11 @@ export const useLibraryStore = defineStore('library', () => {
         // Also add to tracks list
         if (!tracks.value.find(t => t.id === trackId)) {
           tracks.value.unshift({ ...track, in_library: true })
+          total.value = (total.value || 0) + 1
         }
       }
+      // Refresh artists list for new artist
+      fetchArtists(artistScope.value)
       return true
     } catch (error) {
       console.error('Failed to add to library:', error)
@@ -615,6 +631,8 @@ export const useLibraryStore = defineStore('library', () => {
       await tracksApi.removeFromLibrary(trackId)
       // Update local state
       tracks.value = tracks.value.filter(t => t.id !== trackId)
+      likedTracks.value = likedTracks.value.filter(t => t.id !== trackId)
+      total.value = Math.max(0, (total.value || 0) - 1)
       // Update in_library flag in global lists
       const updateInLibrary = (list) => {
         const track = list.find(t => t.id === trackId)
@@ -624,6 +642,8 @@ export const useLibraryStore = defineStore('library', () => {
       updateInLibrary(recentUploads.value)
       updateInLibrary(popularTracks.value)
       updateInLibrary(selectedUserTracks.value)
+      // Refresh artists list as this track's artist may no longer have tracks in library
+      fetchArtists(artistScope.value)
       return true
     } catch (error) {
       console.error('Failed to remove from library:', error)
