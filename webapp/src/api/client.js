@@ -162,3 +162,8 @@ export const playerApi = {
   download: (trackId) => api.post(`/player/download/${trackId}`),
   downloadPlaylist: (trackIds, playlistName) => api.post('/player/download-playlist', { track_ids: trackIds, playlist_name: playlistName }),
 }
+
+// Social
+export const socialApi = {
+  searchFriends: (search, perPage = 30) => api.get('/social/search', { params: { search, per_page: perPage } }),
+}

@@ -73,7 +73,7 @@ const goToChannelSetup = () => {
 }
 
 const tabs = [
-  { id: 'tracks', label: 'Треки', component: LibraryTracks, placeholder: 'Поиск треков...' },
+  { id: 'tracks', label: 'Треки', component: LibraryTracks, placeholder: 'Название или исполнитель...' },
   { id: 'albums', label: 'Альбомы', component: LibraryAlbums, placeholder: 'Поиск альбомов...' },
   { id: 'artists', label: 'Артисты', component: LibraryArtists, placeholder: 'Поиск исполнителей...' },
   { id: 'playlists', label: 'Плейлисты', component: LibraryPlaylists, placeholder: 'Поиск плейлистов...' },

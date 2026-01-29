@@ -51,6 +51,36 @@
           </button>
         </div>
         
+        <!-- Section: Friends' Libraries results (only when searching) -->
+        <template v-if="searchQuery && friendsTracks.length">
+          <div class="section-header friends-section">
+            <span class="section-title">👥 У друзей</span>
+            <span class="section-count">{{ friendsTracks.length }}</span>
+          </div>
+          
+          <TrackItem
+            v-for="track in friendsTracks"
+            :key="'friends-' + track.id"
+            :track="track"
+            :isPlaying="playerStore.currentTrack?.id === track.id"
+            :isActive="playerStore.isPlaying && playerStore.currentTrack?.id === track.id"
+            :isLiked="track.is_liked"
+            :showAddToLibrary="true"
+            :inLibrary="track.in_library"
+            @click="playFriendsTrack(track)"
+            @like="handleLikeTrack(track)"
+            @menu="openTrackMenu(track)"
+            @download="handleDirectDownload(track)"
+            @addToLibrary="handleAddToLibrary(track)"
+          />
+        </template>
+        
+        <!-- Loading friends results -->
+        <div v-if="searchQuery && friendsLoading" class="global-loading">
+          <div class="spinner small"></div>
+          <span>Поиск у друзей...</span>
+        </div>
+        
         <!-- Section: Global Network results (only when searching) -->
         <template v-if="searchQuery && globalTracks.length">
           <div class="section-header global-section">
@@ -81,7 +111,7 @@
           <span>Поиск в общей сети...</span>
         </div>
         
-        <div v-if="!tracks.length && !globalTracks.length && !loading && !globalLoading" class="empty-state">
+        <div v-if="!tracks.length && !friendsTracks.length && !globalTracks.length && !loading && !friendsLoading && !globalLoading" class="empty-state">
           <span class="empty-icon">🎵</span>
           <h3 v-if="searchQuery">Ничего не найдено</h3>
           <template v-else>
@@ -131,7 +161,7 @@ import TrackItem from '@/components/TrackItem.vue'
 import TrackMenu from '@/components/TrackMenu.vue'
 import EditTrackModal from '@/components/EditTrackModal.vue'
 import SortChips from '@/components/SortChips.vue'
-import api, { playerApi, tracksApi } from '@/api/client'
+import api, { playerApi, tracksApi, socialApi } from '@/api/client'
 
 const props = defineProps({
   searchQuery: {
@@ -164,6 +194,10 @@ const perPage = 50
 // Global search results
 const globalTracks = ref([])
 const globalLoading = ref(false)
+
+// Friends search results
+const friendsTracks = ref([])
+const friendsLoading = ref(false)
 
 // Edit modal state
 const showEditModal = ref(false)
@@ -263,14 +297,38 @@ const searchGlobal = async (query) => {
     
     const globalResults = response.data.items || []
     
-    // Filter out tracks that are already in user's library
+    // Filter out tracks that are already in user's library or in friends results
     const libraryIds = new Set(tracks.value.map(t => t.id))
-    globalTracks.value = globalResults.filter(t => !libraryIds.has(t.id))
+    const friendsIds = new Set(friendsTracks.value.map(t => t.id))
+    globalTracks.value = globalResults.filter(t => !libraryIds.has(t.id) && !friendsIds.has(t.id))
   } catch (error) {
     console.error('Failed to search global library:', error)
     globalTracks.value = []
   } finally {
     globalLoading.value = false
+  }
+}
+
+// Search in friends' libraries (users we follow)
+const searchFriends = async (query) => {
+  if (!query) {
+    friendsTracks.value = []
+    return
+  }
+  
+  friendsLoading.value = true
+  try {
+    const response = await socialApi.searchFriends(query, 30)
+    const friendsResults = response.data.items || []
+    
+    // Filter out tracks that are already in user's library
+    const libraryIds = new Set(tracks.value.map(t => t.id))
+    friendsTracks.value = friendsResults.filter(t => !libraryIds.has(t.id))
+  } catch (error) {
+    console.error('Failed to search friends libraries:', error)
+    friendsTracks.value = []
+  } finally {
+    friendsLoading.value = false
   }
 }
 
@@ -280,10 +338,13 @@ watch(() => props.searchQuery, async (newVal) => {
   page.value = 1
   await loadTracks()
   
-  // Also search in global library when there's a search query
+  // Also search in friends' libraries and global when there's a search query
   if (newVal) {
+    // Search friends first, then global
+    await searchFriends(newVal)
     await searchGlobal(newVal)
   } else {
+    friendsTracks.value = []
     globalTracks.value = []
   }
 })
@@ -313,24 +374,37 @@ const playTrack = (track) => {
   playerStore.playTrack(track, tracks.value)
 }
 
-// Play track from global results (combine both lists for queue)
-const playGlobalTrack = (track) => {
-  const allTracks = [...tracks.value, ...globalTracks.value]
+// Play track from friends results (combine all lists for queue)
+const playFriendsTrack = (track) => {
+  const allTracks = [...tracks.value, ...friendsTracks.value, ...globalTracks.value]
   playerStore.playTrack(track, allTracks)
 }
 
-// Add track from global library to user's library
+// Play track from global results (combine all lists for queue)
+const playGlobalTrack = (track) => {
+  const allTracks = [...tracks.value, ...friendsTracks.value, ...globalTracks.value]
+  playerStore.playTrack(track, allTracks)
+}
+
+// Add track from global/friends library to user's library
 const handleAddToLibrary = async (track) => {
   const success = await libraryStore.addToLibrary(track.id)
   if (success) {
-    // Update the track in globalTracks to show it's now in library
-    const idx = globalTracks.value.findIndex(t => t.id === track.id)
-    if (idx !== -1) {
-      globalTracks.value[idx].in_library = true
-      // Move it to the library list
-      tracks.value.unshift({ ...globalTracks.value[idx], in_library: true })
-      globalTracks.value.splice(idx, 1)
+    // Update the track in friendsTracks or globalTracks to show it's now in library
+    const friendsIdx = friendsTracks.value.findIndex(t => t.id === track.id)
+    if (friendsIdx !== -1) {
+      friendsTracks.value[friendsIdx].in_library = true
+      tracks.value.unshift({ ...friendsTracks.value[friendsIdx], in_library: true })
+      friendsTracks.value.splice(friendsIdx, 1)
     }
+    
+    const globalIdx = globalTracks.value.findIndex(t => t.id === track.id)
+    if (globalIdx !== -1) {
+      globalTracks.value[globalIdx].in_library = true
+      tracks.value.unshift({ ...globalTracks.value[globalIdx], in_library: true })
+      globalTracks.value.splice(globalIdx, 1)
+    }
+    
     uiStore.toast.success('Добавлено', 'Трек добавлен в библиотеку')
   }
 }
@@ -543,6 +617,12 @@ onMounted(() => {
 }
 
 .section-header.global-section {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+}
+
+.section-header.friends-section {
   margin-top: 24px;
   padding-top: 16px;
   border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));

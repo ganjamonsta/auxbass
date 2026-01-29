@@ -327,6 +327,89 @@ async def get_followers(
     )
 
 
+# ============== Search in Friends' Libraries ==============
+
+@router.get("/search")
+async def search_friends_libraries(
+    search: str = Query(..., min_length=1),
+    per_page: int = Query(30, ge=1, le=100),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Search tracks in libraries of users you follow.
+    Returns tracks from friends that match the search query.
+    """
+    # Get list of users we follow
+    following_result = await db.execute(
+        select(UserFollow.following_id)
+        .where(UserFollow.follower_id == user.id)
+    )
+    following_ids = [row[0] for row in following_result.all()]
+    
+    if not following_ids:
+        return {
+            "items": [],
+            "total": 0,
+        }
+    
+    # Search tracks in friends' libraries
+    search_term = f"%{search.lower()}%"
+    
+    query = (
+        select(Track, UserLibrary, User)
+        .join(UserLibrary, UserLibrary.track_id == Track.id)
+        .join(User, User.id == UserLibrary.user_id)
+        .where(UserLibrary.user_id.in_(following_ids))
+        .where(
+            or_(
+                func.lower(Track.title).like(search_term),
+                func.lower(Track.artist).like(search_term),
+            )
+        )
+        .options(
+            selectinload(Track.enrichment),
+            selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
+        )
+        .order_by(UserLibrary.added_at.desc())
+        .limit(per_page)
+    )
+    
+    result = await db.execute(query)
+    rows = result.unique().all()
+    
+    # Build response with owner info
+    items = []
+    seen_track_ids = set()  # Avoid duplicates if multiple friends have same track
+    
+    for track, lib_entry, owner in rows:
+        if track.id in seen_track_ids:
+            continue
+        seen_track_ids.add(track.id)
+        
+        # Check if current user has this track in library
+        viewer_entry = await db.scalar(
+            select(UserLibrary)
+            .where(UserLibrary.user_id == user.id, UserLibrary.track_id == track.id)
+        )
+        
+        track_data = track_to_response(track, viewer_entry)
+        # Add owner info
+        track_data_dict = track_data.model_dump() if hasattr(track_data, 'model_dump') else track_data.dict()
+        track_data_dict['owner'] = {
+            'id': owner.id,
+            'display_name': owner.display_name,
+            'username': owner.username,
+        }
+        track_data_dict['in_library'] = viewer_entry is not None
+        items.append(track_data_dict)
+    
+    return {
+        "items": items,
+        "total": len(items),
+    }
+
+
 # ============== User Profile & Library ==============
 
 @router.get("/user/{user_id}", response_model=UserProfileResponse)
