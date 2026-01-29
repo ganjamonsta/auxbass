@@ -124,17 +124,6 @@
         </button>
       </div>
 
-      <!-- Liked tracks special card -->
-      <div class="special-playlists" v-if="!playlistSearchQuery">
-        <div class="playlist-card liked-card" @click="$router.push('/liked')">
-          <div class="playlist-cover liked-cover">
-            <span class="liked-icon">❤️</span>
-          </div>
-          <div class="playlist-name">Понравившиеся</div>
-          <div class="playlist-meta">{{ likedCount }} треков</div>
-        </div>
-      </div>
-
       <div class="playlists-grid" v-if="filteredPlaylists.length">
         <div
           v-for="playlist in filteredPlaylists"
@@ -152,14 +141,7 @@
         </div>
       </div>
 
-      <div v-else-if="!loadingPlaylists && !playlistSearchQuery" class="empty-state">
-        <span class="empty-icon">📝</span>
-        <p>У вас пока нет публичных плейлистов</p>
-        <p class="hint-text">Создайте плейлист и сделайте его публичным</p>
-        <button class="create-first-btn" @click="handleCreatePlaylist">
-          Создать плейлист
-        </button>
-      </div>
+
       
       <div v-else-if="!loadingPlaylists && playlistSearchQuery && filteredPlaylists.length === 0" class="empty-state">
         <span class="empty-icon">🔍</span>
@@ -543,7 +525,7 @@ onMounted(() => {
 }
 
 .tab-switcher {
-  display: flex;
+  display: none;
   gap: 4px;
   background: var(--c-bg-0);
   border-radius: var(--r-md);
@@ -551,6 +533,13 @@ onMounted(() => {
   box-shadow:
     inset 2px 2px 4px var(--sh-inset-dark),
     inset -1px -1px 3px var(--sh-inset-light);
+}
+
+/* Show tab-switcher only on desktop */
+@media (min-width: 1024px) {
+  .tab-switcher {
+    display: flex;
+  }
 }
 
 .tab-btn {

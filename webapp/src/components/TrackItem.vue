@@ -353,6 +353,8 @@ const albumName = computed(() => {
   align-items: center;
   gap: 4px;
   margin-top: 2px;
+  overflow: hidden;
+  max-width: 100%;
 }
 
 .track-artist {
@@ -361,6 +363,8 @@ const albumName = computed(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
 }
 
 .compact .track-artist {
