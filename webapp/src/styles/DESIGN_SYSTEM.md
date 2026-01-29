@@ -30,9 +30,15 @@ webapp/src/
 --c-accent-light    /* #FF6F60 */
 --c-accent-dark     /* #AB000D */
 --c-accent-glow     /* rgba для свечения */
+--c-accent-text     /* #000000 - текст на акцентном фоне */
 
 --c-secondary       /* #00BCD4 - циан */
 --c-secondary-glow
+
+/* Динамические алиасы (перезаписываются в App.vue для зелёной темы) */
+--accent            /* #1db954 - зелёный в App.vue */
+--accent-text       /* #000000 - чёрный текст на зелёном фоне */
+--accent-glow       /* rgba(29, 185, 84, 0.4) */
 
 /* Поверхности (от тёмного к светлому) */
 --c-bg-0            /* #0D0D0D - самый тёмный */

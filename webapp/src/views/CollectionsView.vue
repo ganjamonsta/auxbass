@@ -602,7 +602,7 @@ onMounted(() => {
 
 .scope-tab.active {
   background: var(--accent);
-  color: white;
+  color: var(--accent-text, #000);
   font-weight: 600;
   box-shadow:
     2px 2px 4px var(--sh-dark),

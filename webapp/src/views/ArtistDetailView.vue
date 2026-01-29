@@ -318,7 +318,7 @@ watch(scope, () => {
 
 .not-in-library-content .primary-btn {
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-text, #000);
   border: none;
   border-radius: 24px;
   padding: 12px 24px;

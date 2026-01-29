@@ -125,7 +125,7 @@ const onPaste = async (event) => {
 }
 
 const verifyCode = async () => {
-  if (code.value.length !== 6) return
+  if (code.value.length !== 6 || loading.value) return
   
   loading.value = true
   error.value = ''
@@ -133,11 +133,10 @@ const verifyCode = async () => {
   try {
     await authStore.loginWithCode(code.value)
     
-    // Wait for next tick to ensure auth state is updated
-    await nextTick()
-    
+    // Use window.location for a cleaner transition after login
+    // to ensure all stores are properly initialized with new user data
     const redirect = route.query.redirect || '/'
-    await router.replace(redirect)
+    window.location.href = redirect
   } catch (err) {
     error.value = 'Неверный или истёкший код'
     // Clear inputs

@@ -266,8 +266,9 @@ const createPlaylist = async () => {
 
 const logout = async () => {
   if (confirm('Вы уверены, что хотите выйти?')) {
-    await authStore.logout()
-    router.push('/login')
+    authStore.logout()
+    // Force full page reload to clear all store states
+    window.location.href = '/login'
   }
 }
 

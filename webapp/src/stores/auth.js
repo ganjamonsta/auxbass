@@ -24,7 +24,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   // Actions
   async function initialize() {
-    if (initialized.value) return
+    if (initialized.value || loading.value) return
     
     loading.value = true
     error.value = null
@@ -96,6 +96,9 @@ export const useAuthStore = defineStore('auth', () => {
         authStorage.setUser(response.data.user)
       }
       
+      // Fetch channel status and config after successful login
+      await Promise.all([fetchStatus(), fetchConfig()])
+      
       initialized.value = true
       return response.data
     } catch (err) {
@@ -128,6 +131,9 @@ export const useAuthStore = defineStore('auth', () => {
   // Listen for logout events from API interceptor
   window.addEventListener('auth:logout', () => {
     logout()
+    if (window.location.pathname !== '/login') {
+      window.location.href = '/login'
+    }
   })
 
   return {

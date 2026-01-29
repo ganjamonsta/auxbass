@@ -180,7 +180,7 @@ const handleQuickJump = (event) => {
   gap: 4px;
   padding: 6px 12px;
   background: var(--accent);
-  color: white;
+  color: var(--accent-text, #000);
   border: none;
   border-radius: 6px;
   font-size: 13px;
@@ -244,7 +244,7 @@ const handleQuickJump = (event) => {
 
 .nav-btn:hover:not(:disabled) {
   background: var(--accent);
-  color: white;
+  color: var(--accent-text, #000);
 }
 
 .nav-btn:disabled {
@@ -277,7 +277,7 @@ const handleQuickJump = (event) => {
 
 .page-btn.active {
   background: var(--accent);
-  color: white;
+  color: var(--accent-text, #000);
   font-weight: 600;
 }
 

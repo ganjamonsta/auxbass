@@ -1,8 +1,13 @@
-/* ================================
+/* ════════════════════════════════════════════════════════════════════
    Header & Search Bar Styles
-   ================================ */
+   
+   NOTE: These styles are consolidated with app.css to avoid duplication.
+   Search-related styles (.search-wrapper, .search-scope-btn, .search-tag, 
+   .search-content, .search-input-inline) are now defined in app.css.
+   This file only contains header-specific styles not duplicated elsewhere.
+   ════════════════════════════════════════════════════════════════════ */
 
-/* One UI Large Header */
+/* Header title styles - unique to header */
 .oneui-header {
   flex-shrink: 0;
   padding: 8px 12px 10px;
@@ -43,89 +48,12 @@
   opacity: 0.7;
 }
 
-/* Search wrapper */
-.search-wrapper {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  height: 44px;
-  background: var(--neu-bg);
-  border-radius: 22px;
-  padding: 4px 14px;
-  gap: 10px;
-  box-shadow: 
-    inset 3px 3px 6px var(--neu-shadow-dark),
-    inset -2px -2px 4px var(--neu-shadow-light);
-  border: 1px solid rgba(255, 255, 255, 0.02);
-}
-
-.search-scope-btn {
+/* Search toggle button in header */
+.search-toggle {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: none;
-  background: var(--xm-bg-surface);
-  color: var(--spotify-text-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.search-scope-btn:active {
-  transform: scale(0.9);
-}
-
-.search-scope-btn.global {
-  background: var(--spotify-green);
-  color: white;
-  box-shadow: 0 2px 8px rgba(29, 185, 84, 0.4);
-}
-
-.search-content {
-  flex: 1;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-
-.search-tag {
-  background: var(--spotify-green);
-  color: white;
-  padding: 5px 12px;
-  border-radius: 14px;
-  font-size: 13px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(29, 185, 84, 0.3);
 }
 
 .search-icon {
   flex-shrink: 0;
   color: var(--spotify-text-muted);
-}
-
-.search-input-inline {
-  flex: 1;
-  min-width: 60px;
-  border: none;
-  background: transparent;
-  color: var(--spotify-text);
-  font-size: 16px;
-  outline: none;
-  padding: 0;
-  height: 36px;
-}
-
-.search-input-inline::placeholder {
-  color: var(--spotify-text-muted);
-}
-
-.search-toggle {
-  flex-shrink: 0;
 }

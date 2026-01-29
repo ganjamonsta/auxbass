@@ -253,7 +253,8 @@ const handleGoToUser = (user) => {
 // Handle auth:logout event (triggered by API interceptor on 401)
 const handleAuthLogout = () => {
   playerStore.stop()
-  router.replace('/login')
+  // Force full page reload to clear all store states
+  window.location.href = '/login'
 }
 
 // Initialize auth on mount
@@ -311,6 +312,8 @@ onUnmounted(() => {
   --text-tertiary: #6a6a6a;
   --accent: #1db954;
   --accent-hover: #1ed760;
+  --accent-text: #000000;
+  --accent-glow: rgba(29, 185, 84, 0.4);
   --danger: #e91429;
   --border: #282828;
   --nav-height: 60px;

@@ -100,6 +100,6 @@ defineEmits(['goBack'])
 
 .header-toggle :deep(.toggle-btn.active) {
   background: var(--accent-color, #1db954);
-  color: #fff;
+  color: var(--accent-text, #000);
 }
 </style>

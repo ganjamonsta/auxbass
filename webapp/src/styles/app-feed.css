@@ -51,7 +51,7 @@
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, var(--xm-accent) 0%, var(--xm-accent-dark) 100%);
-  color: white;
+  color: var(--accent-text, #000);
   flex-shrink: 0;
   box-shadow: 0 3px 8px var(--xm-accent-glow);
 }
@@ -187,7 +187,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--accent-text, #000);
   opacity: 0;
   transform: translateY(8px);
   transition: all 0.2s ease;

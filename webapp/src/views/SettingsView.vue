@@ -270,7 +270,8 @@ const logout = async () => {
   // Stop playback before logout
   playerStore.stop()
   authStore.logout()
-  await router.replace('/login')
+  // Force full page reload to clear all store states
+  window.location.href = '/login'
 }
 
 const clearCache = () => {
