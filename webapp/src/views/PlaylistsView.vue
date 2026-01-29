@@ -180,6 +180,7 @@ const openModal = async () => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
+  gap: 16px;
 }
 
 .header h1 {
@@ -187,6 +188,7 @@ const openModal = async () => {
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
+  flex: 1;
 }
 
 .create-btn {
@@ -198,6 +200,8 @@ const openModal = async () => {
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .special-playlists {
