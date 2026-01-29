@@ -329,7 +329,7 @@ async def get_followers(
 
 # ============== Search in Friends' Libraries ==============
 
-@router.get("/search")
+@router.get("/friends/search")
 async def search_friends_libraries(
     search: str = Query(..., min_length=1),
     per_page: int = Query(30, ge=1, le=100),
