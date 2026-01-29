@@ -374,12 +374,16 @@ const handleToggleLike = async () => {
   justify-content: center;
   margin-bottom: 20px;
   overflow: hidden;
+  flex-shrink: 0;
+  min-height: 240px;
 }
 
 .cover-wrapper {
   position: relative;
   width: 240px;
   height: 240px;
+  min-width: 240px;
+  min-height: 240px;
   overflow: hidden;
 }
 
@@ -793,20 +797,58 @@ const handleToggleLike = async () => {
 }
 
 /* Scrollbar */
+.now-playing-sidebar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
 .now-playing-sidebar::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 .now-playing-sidebar::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  margin: 8px 0;
 }
 
 .now-playing-sidebar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 .now-playing-sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.now-playing-sidebar::-webkit-scrollbar-thumb:active {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* Queue list scrollbar */
+.queue-list {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.queue-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.queue-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.queue-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+}
+
+.queue-list::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
 }
 </style>
