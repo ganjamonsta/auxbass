@@ -4,17 +4,30 @@
       class="neu-sort-chip active"
       @click="onChipClick"
     >
-      <span class="chip-icon">{{ currentOption.icon }}</span>
+      <component :is="iconComponent" :size="14" class="chip-icon" />
       <span class="chip-label">{{ currentOption.label }}</span>
       <span class="order-icon" @click.stop="toggleOrder">
-        {{ sortOrder === 'desc' ? '↓' : '↑' }}
+        <ArrowDown v-if="sortOrder === 'desc'" :size="14" />
+        <ArrowUp v-else :size="14" />
       </span>
     </button>
   </div>
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+import { Calendar, Type, User, Clock, Music, Disc3, ArrowUp, ArrowDown } from 'lucide-vue-next'
+
+const iconMap = {
+  Calendar,
+  Type,
+  User,
+  Clock,
+  Music,
+  Disc3
+}
+
+const props = defineProps({
   currentOption: {
     type: Object,
     required: true
@@ -25,6 +38,8 @@ defineProps({
   }
 })
 
+const iconComponent = computed(() => iconMap[props.currentOption.icon] || Music)
+
 const emit = defineEmits(['next', 'toggle-order'])
 
 const onChipClick = () => {
@@ -34,6 +49,7 @@ const onChipClick = () => {
 const toggleOrder = () => {
   emit('toggle-order')
 }
+</script>
 </script>
 
 <style scoped>

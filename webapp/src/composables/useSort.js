@@ -6,24 +6,24 @@ import { ref, watch, computed } from 'vue'
 export const SORT_OPTIONS = {
   // For tracks/library
   library: [
-    { key: 'added_at', label: 'Дата', icon: '📅' },
-    { key: 'title', label: 'Название', icon: '🔤' },
-    { key: 'artist', label: 'Артист', icon: '👤' },
-    { key: 'duration', label: 'Время', icon: '⏱' },
+    { key: 'added_at', label: 'Дата', icon: 'Calendar' },
+    { key: 'title', label: 'Название', icon: 'Type' },
+    { key: 'artist', label: 'Артист', icon: 'User' },
+    { key: 'duration', label: 'Время', icon: 'Clock' },
   ],
   // For artists
   artists: [
-    { key: 'name', label: 'Имя', icon: '🔤' },
-    { key: 'track_count', label: 'Треки', icon: '🎵' },
-    { key: 'album_count', label: 'Альбомы', icon: '💿' },
-    { key: 'latest_release', label: 'Релиз', icon: '📅' },
+    { key: 'name', label: 'Имя', icon: 'Type' },
+    { key: 'track_count', label: 'Треки', icon: 'Music' },
+    { key: 'album_count', label: 'Альбомы', icon: 'Disc3' },
+    { key: 'latest_release', label: 'Релиз', icon: 'Calendar' },
   ],
   // For albums
   albums: [
-    { key: 'name', label: 'Название', icon: '🔤' },
-    { key: 'artist', label: 'Артист', icon: '👤' },
-    { key: 'release_date', label: 'Дата', icon: '📅' },
-    { key: 'track_count', label: 'Треки', icon: '🎵' },
+    { key: 'name', label: 'Название', icon: 'Type' },
+    { key: 'artist', label: 'Артист', icon: 'User' },
+    { key: 'release_date', label: 'Дата', icon: 'Calendar' },
+    { key: 'track_count', label: 'Треки', icon: 'Music' },
   ],
 }
 
