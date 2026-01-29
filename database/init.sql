@@ -78,6 +78,15 @@ CREATE TABLE IF NOT EXISTS playlist_tracks (
     UNIQUE(playlist_id, track_id)
 );
 
+-- Подписки на публичные плейлисты
+CREATE TABLE IF NOT EXISTS playlist_subscriptions (
+    id SERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    playlist_id INTEGER NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+    subscribed_at TIMESTAMP DEFAULT NOW(),
+    CONSTRAINT uq_playlist_subscription UNIQUE (user_id, playlist_id)
+);
+
 -- Индексы для быстрого поиска
 CREATE INDEX IF NOT EXISTS idx_tracks_user_id ON tracks(user_id);
 CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist);
@@ -88,6 +97,8 @@ CREATE INDEX IF NOT EXISTS idx_tracks_forward_from_id ON tracks(forward_from_id)
 CREATE INDEX IF NOT EXISTS idx_playlists_user_id ON playlists(user_id);
 CREATE INDEX IF NOT EXISTS idx_playlists_auto_source ON playlists(user_id, is_auto_source, source_id) WHERE is_auto_source = TRUE;
 CREATE INDEX IF NOT EXISTS idx_playlist_tracks_playlist_id ON playlist_tracks(playlist_id);
+CREATE INDEX IF NOT EXISTS idx_playlist_subscription_user ON playlist_subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_playlist_subscription_playlist ON playlist_subscriptions(playlist_id);
 
 -- Полнотекстовый поиск (PostgreSQL)
 CREATE INDEX IF NOT EXISTS idx_tracks_search ON tracks 
