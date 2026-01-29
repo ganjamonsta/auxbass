@@ -53,7 +53,7 @@
 
     <!-- Empty state -->
     <div v-else-if="!loading" class="empty-state">
-      <span class="empty-icon">👤</span>
+      <span class="empty-icon"><User :size="48" /></span>
       <p v-if="searchQuery">Ничего не найдено</p>
       <p v-else>Нет исполнителей</p>
     </div>
@@ -76,6 +76,7 @@ import { useSort } from '@/composables'
 import SortChips from '@/components/SortChips.vue'
 import ArtistGridCard from '@/components/ArtistGridCard.vue'
 import { artistsApi } from '@/api/client'
+import { User } from 'lucide-vue-next'
 
 const router = useRouter()
 const authStore = useAuthStore()

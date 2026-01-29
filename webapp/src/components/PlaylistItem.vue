@@ -10,7 +10,7 @@
       </div>
       
       <!-- Fallback icon -->
-      <span v-else class="cover-icon">{{ coverIcon }}</span>
+      <component v-else :is="coverIcon" :size="32" class="cover-icon" />
       
       <!-- Artist overlay on cover for albums -->
       <div v-if="playlist.album_artist" class="artist-overlay">
@@ -25,6 +25,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { Bot, Megaphone, User, Folder, Disc3 } from 'lucide-vue-next'
 
 const props = defineProps({
   playlist: {
@@ -48,13 +49,13 @@ const coverClass = computed(() => ({
 const coverIcon = computed(() => {
   if (props.playlist.is_auto_source) {
     const type = props.playlist.source_type
-    if (type === 'bot') return '🤖'
-    if (type === 'channel') return '📢'
-    if (type === 'user') return '👤'
-    return '📁'
+    if (type === 'bot') return Bot
+    if (type === 'channel') return Megaphone
+    if (type === 'user') return User
+    return Folder
   }
-  if (props.playlist.is_auto_album) return '💿'
-  return '📁'
+  if (props.playlist.is_auto_album) return Disc3
+  return Folder
 })
 
 const sourceLabel = computed(() => {

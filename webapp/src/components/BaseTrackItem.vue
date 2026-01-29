@@ -27,7 +27,7 @@
     <div class="cover-wrapper" @click.stop="togglePlay">
       <div class="cover">
         <img v-if="track.cover_url" :src="track.cover_url" />
-        <span v-else>🎵</span>
+        <Music v-else :size="20" />
       </div>
       <div class="play-overlay" :class="{ 'is-playing': isCurrentTrack && playerStore.isPlaying }">
         <svg v-if="isCurrentTrack && playerStore.isPlaying" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -69,6 +69,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { usePlayerStore } from '@/stores/player'
+import { Music } from 'lucide-vue-next'
 
 const props = defineProps({
   track: { type: Object, required: true },

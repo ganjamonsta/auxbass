@@ -31,7 +31,7 @@
           :disabled="isFirstPage || loading"
           title="В начало"
         >
-          ⏮
+          <ChevronsLeft :size="18" />
         </button>
         
         <button 
@@ -40,7 +40,7 @@
           :disabled="isFirstPage || loading"
           title="Предыдущая"
         >
-          ◀
+          <ChevronLeft :size="18" />
         </button>
 
         <!-- Page numbers -->
@@ -63,7 +63,7 @@
           :disabled="isLastPage || loading"
           title="Следующая"
         >
-          ▶
+          <ChevronRight :size="18" />
         </button>
         
         <button 
@@ -72,7 +72,7 @@
           :disabled="isLastPage || loading"
           title="В конец"
         >
-          ⏭
+          <ChevronsRight :size="18" />
         </button>
       </div>
 
@@ -95,6 +95,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-vue-next'
 
 const props = defineProps({
   currentPage: { type: Number, required: true },

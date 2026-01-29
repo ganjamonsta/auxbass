@@ -4,7 +4,7 @@
     <div class="artist-header">
       <div class="artist-image">
         <img v-if="artist.image_url" :src="artist.image_url" :alt="artist.name" />
-        <div v-else class="image-placeholder">👤</div>
+        <div v-else class="image-placeholder"><User :size="48" /></div>
       </div>
       <div class="artist-info">
         <h1>{{ artist.name }}</h1>
@@ -42,7 +42,7 @@
         >
           <div class="album-cover">
             <img v-if="album.cover_url" :src="album.cover_url" :alt="album.name" />
-            <div v-else class="cover-placeholder">💿</div>
+            <div v-else class="cover-placeholder"><Disc3 :size="24" /></div>
           </div>
           <div class="album-name">{{ album.name }}</div>
           <div class="album-year" v-if="album.release_date">
@@ -98,11 +98,11 @@
   <!-- Not in library - offer to view global -->
   <div v-else-if="notInLibrary" class="not-in-library">
     <div class="not-in-library-content">
-      <div class="icon">👤</div>
+      <div class="icon"><User :size="48" /></div>
       <h2>{{ decodeURIComponent(route.params.name) }}</h2>
       <p>Артист не найден в вашей библиотеке</p>
       <button class="primary-btn" @click="goToGlobal">
-        🌍 Посмотреть всю музыку артиста
+        <Globe :size="16" /> Посмотреть всю музыку артиста
       </button>
     </div>
   </div>
@@ -122,6 +122,7 @@ import TrackItem from '@/components/TrackItem.vue'
 import TrackMenu from '@/components/TrackMenu.vue'
 import PlaylistPicker from '@/components/PlaylistPicker.vue'
 import api, { playerApi } from '@/api/client'
+import { User, Disc3, Globe } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()

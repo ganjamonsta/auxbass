@@ -3,7 +3,7 @@
     <!-- LCD Screen -->
     <div class="lcd-screen">
       <div class="lcd-row lcd-row-main">
-        <span class="lcd-status">{{ isPlaying ? '▶' : '■' }}</span>
+        <span class="lcd-status"><Play v-if="isPlaying" :size="12" /><Square v-else :size="12" /></span>
         <div class="lcd-title-container">
           <div class="lcd-title-track" :class="{ 'marquee': shouldMarquee }">
             <span class="lcd-title">{{ displayText }}</span>
@@ -97,6 +97,7 @@ import { playerApi } from '@/api/client'
 import TrackMenu from '@/components/TrackMenu.vue'
 import EditTrackModal from '@/components/EditTrackModal.vue'
 import PlaylistPicker from '@/components/PlaylistPicker.vue'
+import { Play, Square } from 'lucide-vue-next'
 
 const router = useRouter()
 const playerStore = usePlayerStore()

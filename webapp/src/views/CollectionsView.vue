@@ -9,14 +9,14 @@
           :class="{ active: activeTab === 'albums' }"
           @click="setActiveTab('albums')"
         >
-          💿 Альбомы
+          <Disc3 :size="16" /> Альбомы
         </button>
         <button 
           class="tab-btn" 
           :class="{ active: activeTab === 'playlists' }"
           @click="setActiveTab('playlists')"
         >
-          📁 Плейлисты
+          <Folder :size="16" /> Плейлисты
         </button>
       </div>
     </div>
@@ -72,8 +72,8 @@
         >
           <div class="album-cover">
             <img v-if="album.cover_url" :src="album.cover_url" :alt="album.name" />
-            <div v-else class="cover-placeholder">💿</div>
-            <button class="play-btn" @click.stop="playAlbum(album)">▶</button>
+            <div v-else class="cover-placeholder"><Disc3 :size="24" /></div>
+            <button class="play-btn" @click.stop="playAlbum(album)"><Play :size="16" /></button>
             <div v-if="album.total_tracks && album.track_count < album.total_tracks" class="progress-badge">
               {{ album.track_count }}/{{ album.total_tracks }}
             </div>
@@ -120,7 +120,7 @@
       <div class="view-header">
         <span class="count">{{ filteredPlaylists.length }} плейлистов</span>
         <button class="create-btn" @click="handleCreatePlaylist">
-          ➕ Создать
+          <Plus :size="16" /> Создать
         </button>
       </div>
 
@@ -133,8 +133,8 @@
         >
           <div class="playlist-cover">
             <img v-if="playlist.cover_url" :src="playlist.cover_url" />
-            <div v-else class="cover-placeholder">🎵</div>
-            <div v-if="playlist.is_public" class="public-badge">🌐</div>
+            <div v-else class="cover-placeholder"><Music :size="24" /></div>
+            <div v-if="playlist.is_public" class="public-badge"><Globe :size="14" /></div>
           </div>
           <div class="playlist-name">{{ playlist.name }}</div>
           <div class="playlist-meta">{{ playlist.track_count }} треков</div>
@@ -144,7 +144,7 @@
 
       
       <div v-else-if="!loadingPlaylists && playlistSearchQuery && filteredPlaylists.length === 0" class="empty-state">
-        <span class="empty-icon">🔍</span>
+        <span class="empty-icon"><Search :size="48" /></span>
         <p>Ничего не найдено</p>
       </div>
 
@@ -154,7 +154,7 @@
 
       <!-- Public playlists section -->
       <div v-if="filteredPublicPlaylists.length && !playlistSearchQuery" class="public-section">
-        <h3>🌐 Публичные плейлисты</h3>
+        <h3><Globe :size="18" /> Публичные плейлисты</h3>
         <div class="playlists-grid">
           <div
             v-for="playlist in publicPlaylists"
@@ -164,7 +164,7 @@
           >
             <div class="playlist-cover">
               <img v-if="playlist.cover_url" :src="playlist.cover_url" />
-              <div v-else class="cover-placeholder">🎵</div>
+              <div v-else class="cover-placeholder"><Music :size="24" /></div>
             </div>
             <div class="playlist-name">{{ playlist.name }}</div>
             <div class="playlist-meta">
@@ -216,6 +216,7 @@ import { useUIStore } from '@/stores/ui'
 import PaginationNav from '@/components/PaginationNav.vue'
 import SortChips from '@/components/SortChips.vue'
 import api from '@/api/client'
+import { Disc3, Folder, Plus, Music, Globe, Search, Play } from 'lucide-vue-next'
 
 const router = useRouter()
 const playerStore = usePlayerStore()
@@ -248,9 +249,9 @@ const changeAlbumScope = (newScope) => {
 
 // Sort options for albums
 const ALBUM_SORT_OPTIONS = [
-  { value: 'release_date', label: 'Дата', icon: '📅' },
-  { value: 'name', label: 'Название', icon: '🔤' },
-  { value: 'track_count', label: 'Треки', icon: '🎵' }
+  { value: 'release_date', label: 'Дата' },
+  { value: 'name', label: 'Название' },
+  { value: 'track_count', label: 'Треки' }
 ]
 
 // Albums state

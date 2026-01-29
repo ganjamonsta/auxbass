@@ -3,11 +3,11 @@
     <!-- Header with create button (if needed, or just keep it floating/top) -->
     <div class="actions-header">
        <div class="liked-quick-access" @click="goToLiked">
-        <div class="liked-icon">❤️</div>
+        <div class="liked-icon"><Heart :size="20" class="heart-icon" /></div>
         <span>Любимое ({{ likedCount }})</span>
       </div>
       <button class="create-btn" @click="showCreateModal = true">
-        ➕ Создать
+        <Plus :size="16" /> Создать
       </button>
     </div>
 
@@ -18,7 +18,7 @@
         <!-- PlaylistsView has it as a special card. Let's keep consistency. -->
       <div class="playlist-card liked-card" @click="goToLiked">
         <div class="playlist-cover liked-cover">
-          <span class="liked-icon">❤️</span>
+          <span class="liked-icon"><Heart :size="24" class="heart-icon" /></span>
         </div>
         <div class="playlist-name">Понравившиеся</div>
         <div class="playlist-meta">{{ likedCount }} треков</div>
@@ -39,8 +39,8 @@
               :src="cover"
             />
           </div>
-          <div v-else class="cover-placeholder">🎵</div>
-          <div v-if="playlist.is_subscribed" class="subscribed-badge" title="Подписан">🔗</div>
+          <div v-else class="cover-placeholder"><Music :size="24" /></div>
+          <div v-if="playlist.is_subscribed" class="subscribed-badge" title="Подписан"><Link :size="14" /></div>
         </div>
         <div class="playlist-name">{{ playlist.name }}</div>
         <div class="playlist-meta">
@@ -52,7 +52,7 @@
 
     <!-- Empty state -->
     <div v-else-if="!loading" class="empty-state">
-      <span class="empty-icon">📝</span>
+      <span class="empty-icon"><FileText :size="48" /></span>
       <h3 v-if="searchQuery">Плейлисты не найдены</h3>
       <template v-else>
          <p>У вас пока нет плейлистов</p>
@@ -98,6 +98,7 @@ import { ref, onMounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import api from '@/api/client'
+import { Heart, Plus, Music, Link, FileText } from 'lucide-vue-next'
 
 const props = defineProps({
   searchQuery: {

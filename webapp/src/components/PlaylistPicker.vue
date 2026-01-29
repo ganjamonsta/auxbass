@@ -5,7 +5,7 @@
         <div class="modal">
           <div class="modal-header">
             <h3>Добавить в плейлист</h3>
-            <button class="modal-close" @click="$emit('close')">✕</button>
+            <button class="modal-close" @click="$emit('close')"><X :size="20" /></button>
           </div>
 
           <div class="playlist-list">
@@ -14,13 +14,13 @@
               class="create-first"
               @click="$emit('createNew')"
             >
-              <span class="create-icon">➕</span>
+              <span class="create-icon"><Plus :size="18" /></span>
               <span>Создать первый плейлист</span>
             </button>
 
             <template v-else>
               <button class="playlist-option create" @click="$emit('createNew')">
-                <span class="playlist-icon">➕</span>
+                <span class="playlist-icon"><Plus :size="18" /></span>
                 <span>Новый плейлист</span>
               </button>
 
@@ -30,7 +30,7 @@
                 class="playlist-option"
                 @click="handleSelect(playlist)"
               >
-                <span class="playlist-icon">📁</span>
+                <span class="playlist-icon"><Folder :size="18" /></span>
                 <div class="playlist-info">
                   <span class="playlist-name">{{ playlist.name }}</span>
                   <span class="playlist-count">{{ playlist.track_count }} треков</span>
@@ -47,6 +47,7 @@
 <script setup>
 import { inject, computed, watch } from 'vue'
 import { useLibraryStore } from '../stores/library'
+import { X, Plus, Folder } from 'lucide-vue-next'
 
 const props = defineProps({
   show: Boolean,

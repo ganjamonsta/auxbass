@@ -41,7 +41,7 @@
     </div>
     
     <div v-if="!loading && !albums.length" class="empty-state">
-      <span class="empty-icon">💿</span>
+      <span class="empty-icon"><Disc3 :size="48" /></span>
       <h3 v-if="searchQuery">Ничего не найдено</h3>
       <p v-else>В библиотеке нет альбомов</p>
     </div>
@@ -73,6 +73,7 @@ import PaginationNav from '@/components/PaginationNav.vue'
 import SortChips from '@/components/SortChips.vue'
 import AlbumGridCard from '@/components/AlbumGridCard.vue'
 import api from '@/api/client'
+import { Disc3 } from 'lucide-vue-next'
 
 const props = defineProps({
   searchQuery: {

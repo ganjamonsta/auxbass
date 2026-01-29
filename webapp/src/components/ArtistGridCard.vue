@@ -2,7 +2,7 @@
   <div class="artist-card" @click="$emit('click', artist)">
     <div class="artist-image">
       <img v-if="artist.image_url" :src="artist.image_url" :alt="artist.name" loading="lazy" />
-      <div v-else class="image-placeholder">👤</div>
+      <div v-else class="image-placeholder"><User :size="32" /></div>
     </div>
     <div class="artist-name">{{ artist.name }}</div>
     <div class="artist-meta">
@@ -12,6 +12,8 @@
 </template>
 
 <script setup>
+import { User } from 'lucide-vue-next'
+
 defineProps({
   artist: {
     type: Object,

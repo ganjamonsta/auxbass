@@ -17,7 +17,7 @@
         class="cover-image"
         loading="lazy"
       />
-      <span v-else class="cover-text">{{ track.is_unavailable ? '✕' : coverInitials }}</span>
+      <span v-else class="cover-text">{{ track.is_unavailable ? '' : coverInitials }}<X v-if="track.is_unavailable" :size="16" /></span>
       
       <!-- Playing indicator -->
       <div v-if="isPlaying" class="playing-indicator">
@@ -97,7 +97,7 @@
       </svg>
     </button>
     <span v-else-if="showAddToLibrary && inLibrary" class="in-library-badge" title="В библиотеке">
-      ✓
+      <Check :size="16" />
     </span>
     
     <button v-if="!compact" class="track-menu" @click.stop="$emit('menu')">
@@ -111,6 +111,7 @@
 <script setup>
 import { computed } from 'vue'
 import { formatDuration, getTrackCoverStyle, getTrackInitials } from '@/utils'
+import { X, Check } from 'lucide-vue-next'
 
 const props = defineProps({
   track: {

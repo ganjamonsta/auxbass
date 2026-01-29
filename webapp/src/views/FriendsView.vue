@@ -2,7 +2,7 @@
   <div class="friends-view">
     <!-- No channel - show setup prompt -->
     <div v-if="!authStore.hasChannel" class="no-channel-prompt">
-      <div class="prompt-icon">👥</div>
+      <div class="prompt-icon"><Users :size="48" /></div>
       <h2>Кенты</h2>
       <p>Подключите Telegram-канал, чтобы находить друзей и подписываться на их музыку</p>
       <button class="setup-btn" @click="goToChannelSetup">
@@ -34,7 +34,7 @@
         :class="{ active: activeTab === 'search' }"
         @click="activeTab = 'search'"
       >
-        🔍
+        <Search :size="18" />
       </button>
     </div>
 
@@ -45,7 +45,7 @@
       </div>
 
       <div v-else-if="following.length === 0" class="empty-state">
-        <span class="empty-icon">👥</span>
+        <span class="empty-icon"><Users :size="48" /></span>
         <p>Вы пока ни на кого не подписаны</p>
         <button v-if="canUseSocial" class="action-btn" @click="activeTab = 'search'">
           Найти друзей
@@ -73,7 +73,7 @@
             class="unfollow-btn" 
             @click.stop="unfollowUser(user)"
           >
-            ✓ Подписан
+            <Check :size="14" /> Подписан
           </button>
         </div>
       </div>
@@ -86,7 +86,7 @@
       </div>
 
       <div v-else-if="followers.length === 0" class="empty-state">
-        <span class="empty-icon">👤</span>
+        <span class="empty-icon"><User :size="48" /></span>
         <p>Пока никто не подписался на вас</p>
       </div>
 
@@ -118,7 +118,7 @@
             class="unfollow-btn" 
             @click.stop="unfollowUser(user)"
           >
-            ✓ Подписан
+            <Check :size="14" /> Подписан
           </button>
         </div>
       </div>
@@ -140,7 +140,7 @@
       </div>
 
       <div v-else-if="searchQuery && searchResults.length === 0" class="empty-state">
-        <span class="empty-icon">🔍</span>
+        <span class="empty-icon"><Search :size="48" /></span>
         <p>Никого не найдено</p>
       </div>
 
@@ -173,13 +173,13 @@
             class="unfollow-btn" 
             @click.stop="unfollowUser(user)"
           >
-            ✓ Подписан
+            <Check :size="14" /> Подписан
           </button>
         </div>
       </div>
 
       <div v-else-if="!searchQuery" class="search-hint">
-        <span class="hint-icon">💡</span>
+        <span class="hint-icon"><Lightbulb :size="24" /></span>
         <p>Введите имя или username друга</p>
       </div>
     </div>
@@ -195,7 +195,7 @@
             <h2>{{ selectedUser.display_name }}</h2>
             <p v-if="selectedUser.username">@{{ selectedUser.username }}</p>
           </div>
-          <button class="close-btn" @click="closeProfile">✕</button>
+          <button class="close-btn" @click="closeProfile"><X :size="20" /></button>
         </div>
 
         <div class="profile-stats">
@@ -237,19 +237,19 @@
               :class="{ active: profileTab === 'library' }"
               @click="profileTab = 'library'; loadUserLibrary()"
             >
-              🎵 Библиотека
+              <Music :size="16" /> Библиотека
             </button>
             <button 
               :class="{ active: profileTab === 'playlists' }"
               @click="profileTab = 'playlists'; loadUserPlaylists()"
             >
-              📁 Плейлисты
+              <Folder :size="16" /> Плейлисты
             </button>
             <button 
               :class="{ active: profileTab === 'albums' }"
               @click="profileTab = 'albums'; loadUserAlbums()"
             >
-              💿 Альбомы
+              <Disc3 :size="16" /> Альбомы
             </button>
           </div>
 
@@ -267,7 +267,7 @@
             >
               <div class="track-cover">
                 <img v-if="track.cover_url" :src="track.cover_url" />
-                <span v-else>🎵</span>
+                <span v-else><Music :size="20" /></span>
               </div>
               <div class="track-info">
                 <div class="track-title">{{ track.title || 'Без названия' }}</div>
@@ -285,7 +285,7 @@
               class="playlist-item"
               @click="$router.push(`/playlist/${playlist.id}`); closeProfile()"
             >
-              <div class="playlist-icon">📁</div>
+              <div class="playlist-icon"><Folder :size="20" /></div>
               <div class="playlist-info">
                 <div class="playlist-name">{{ playlist.name }}</div>
                 <div class="playlist-meta">{{ playlist.track_count }} треков</div>
@@ -303,7 +303,7 @@
               @click="$router.push(`/album/${album.id}`); closeProfile()"
             >
               <img v-if="album.cover_url" :src="album.cover_url" />
-              <div v-else class="album-placeholder">💿</div>
+              <div v-else class="album-placeholder"><Disc3 :size="24" /></div>
               <div class="album-name">{{ album.name }}</div>
             </div>
             <p v-if="userAlbums.length === 0" class="empty-hint">Нет альбомов</p>
@@ -321,6 +321,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/api/client'
+import { Users, User, Search, Check, X, Music, Folder, Disc3, Lightbulb } from 'lucide-vue-next'
 
 const router = useRouter()
 const route = useRoute()

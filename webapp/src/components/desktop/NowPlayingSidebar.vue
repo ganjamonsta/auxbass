@@ -175,7 +175,7 @@
                 <animate attributeName="y" values="6;8;6" dur="0.5s" repeatCount="indefinite"/>
               </rect>
             </svg>
-            <span v-else-if="index === 0">▶</span>
+            <span v-else-if="index === 0"><Play :size="14" /></span>
             <span v-else>{{ index }}</span>
           </div>
           <div class="queue-item-cover">
@@ -212,6 +212,7 @@ import { computed, defineEmits } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
+import { Play } from 'lucide-vue-next'
 
 const emit = defineEmits(['goToUser'])
 

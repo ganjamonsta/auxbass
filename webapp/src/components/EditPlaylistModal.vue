@@ -4,7 +4,7 @@
       <!-- Header -->
       <div class="edit-header">
         <h2>Редактирование</h2>
-        <button class="close-modal-btn" @click="$emit('close')">✕</button>
+        <button class="close-modal-btn" @click="$emit('close')"><X :size="20" /></button>
       </div>
       
       <!-- Playlist name and settings -->
@@ -77,7 +77,7 @@
             />
           </div>
           <div v-else class="empty-playlist-hint">
-            <span>🎵</span>
+            <span><Music :size="32" /></span>
             <p>Плейлист пуст</p>
             <p class="hint">Найдите треки через поиск выше</p>
           </div>
@@ -112,6 +112,7 @@ import { useDragReorder } from '@/composables/useDragReorder'
 import api from '@/api/client'
 import TrackSearchItem from './TrackSearchItem.vue'
 import EditableTrackItem from './EditableTrackItem.vue'
+import { X, Music } from 'lucide-vue-next'
 
 const props = defineProps({
   show: Boolean,

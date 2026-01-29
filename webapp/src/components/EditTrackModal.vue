@@ -5,7 +5,7 @@
         <div class="modal">
           <div class="modal-header">
             <h3>Редактирование трека</h3>
-            <button class="modal-close" @click="$emit('close')">✕</button>
+            <button class="modal-close" @click="$emit('close')"><X :size="20" /></button>
           </div>
 
           <form @submit.prevent="handleSubmit" class="modal-form">
@@ -67,6 +67,7 @@
 <script setup>
 import { ref, watch, inject } from 'vue'
 import { useLibraryStore } from '../stores/library'
+import { X } from 'lucide-vue-next'
 
 const props = defineProps({
   show: Boolean,

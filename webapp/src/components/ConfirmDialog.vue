@@ -4,7 +4,7 @@
       <div v-if="show" class="confirm-overlay" @click.self="$emit('cancel')">
         <div class="confirm-dialog">
           <div class="confirm-icon" :class="type">
-            {{ icon }}
+            <component :is="icon" :size="32" />
           </div>
           
           <h3 class="confirm-title">{{ title }}</h3>
@@ -30,6 +30,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { Trash2, AlertTriangle, Info, HelpCircle } from 'lucide-vue-next'
 
 const props = defineProps({
   show: Boolean,
@@ -59,10 +60,10 @@ const emit = defineEmits(['confirm', 'cancel'])
 
 const icon = computed(() => {
   switch (props.type) {
-    case 'danger': return '🗑️'
-    case 'warning': return '⚠️'
-    case 'info': return 'ℹ️'
-    default: return '❓'
+    case 'danger': return Trash2
+    case 'warning': return AlertTriangle
+    case 'info': return Info
+    default: return HelpCircle
   }
 })
 </script>

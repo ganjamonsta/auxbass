@@ -4,7 +4,7 @@
     <div class="header">
       <h1>Плейлисты</h1>
       <button class="create-btn" @click="handleCreatePlaylist">
-        ➕ Создать
+        <Plus :size="16" /> Создать
       </button>
     </div>
 
@@ -12,7 +12,7 @@
     <div class="special-playlists">
       <div class="playlist-card liked-card" @click="goToLiked">
         <div class="playlist-cover liked-cover">
-          <span class="liked-icon">❤️</span>
+          <span class="liked-icon"><Heart :size="24" class="heart-icon" /></span>
         </div>
         <div class="playlist-name">Понравившиеся</div>
         <div class="playlist-meta">{{ likedCount }} треков</div>
@@ -35,7 +35,7 @@
               :src="cover"
             />
           </div>
-          <div v-else class="cover-placeholder">🎵</div>
+          <div v-else class="cover-placeholder"><Music :size="24" /></div>
         </div>
         <div class="playlist-name">{{ playlist.name }}</div>
         <div class="playlist-meta">{{ playlist.track_count }} треков</div>
@@ -44,7 +44,7 @@
 
     <!-- Empty state -->
     <div v-else-if="!loading" class="empty-state">
-      <span class="empty-icon">📝</span>
+      <span class="empty-icon"><FileText :size="48" /></span>
       <p>У вас пока нет плейлистов</p>
       <button class="create-first-btn" @click="handleCreatePlaylist">
         Создать плейлист
@@ -88,6 +88,7 @@ import { useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/api/client'
+import { Plus, Heart, Music, FileText } from 'lucide-vue-next'
 
 const router = useRouter()
 const libraryStore = useLibraryStore()

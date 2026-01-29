@@ -3,7 +3,7 @@
     <Transition name="slide-down">
       <div v-if="authStore.showChannelBanner" class="channel-banner" @click="goToSettings">
         <div class="banner-content">
-          <div class="banner-icon">🔒</div>
+          <div class="banner-icon"><Lock :size="24" /></div>
           <div class="banner-text">
             <div class="banner-title">Подключите канал</div>
             <div class="banner-subtitle">Чтобы сохранять музыку и создавать плейлисты</div>
@@ -27,6 +27,7 @@
 <script setup>
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { Lock } from 'lucide-vue-next'
 
 const router = useRouter()
 const authStore = useAuthStore()

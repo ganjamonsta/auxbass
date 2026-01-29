@@ -4,7 +4,7 @@
     <div class="album-header">
       <div class="album-cover">
         <img v-if="album.cover_url" :src="album.cover_url" :alt="album.name" />
-        <div v-else class="cover-placeholder">💿</div>
+        <div v-else class="cover-placeholder"><Disc3 :size="32" /></div>
       </div>
       <div class="album-info">
         <h1>{{ album.name }}</h1>
@@ -74,7 +74,7 @@
           </button>
           <!-- In library indicator -->
           <span v-else-if="item.track && item.in_library" class="in-library-indicator">
-            ✓
+            <Check :size="14" />
           </span>
           <!-- Missing track button - track not in database -->
           <button
@@ -87,7 +87,7 @@
           </button>
           <!-- Playing indicator -->
           <span v-if="playerStore.currentTrack?.id === item.track_id" class="playing-indicator">
-            🎵
+            <Music :size="14" />
           </span>
         </div>
       </template>
@@ -147,7 +147,7 @@
           <p class="hint">Скинь этот трек боту в Telegram, и он появится в библиотеке.</p>
         </div>
         
-        <button class="close-btn" @click="closeMissingModal">✕</button>
+        <button class="close-btn" @click="closeMissingModal"><X :size="20" /></button>
       </div>
     </div>
     
@@ -187,6 +187,7 @@ import TrackItem from '@/components/TrackItem.vue'
 import TrackMenu from '@/components/TrackMenu.vue'
 import PlaylistPicker from '@/components/PlaylistPicker.vue'
 import api, { playerApi } from '@/api/client'
+import { Disc3, Check, Music, X } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()

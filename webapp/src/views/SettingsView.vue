@@ -4,12 +4,12 @@
 
     <!-- Channel section (Premium) -->
     <section id="channel" class="section channel-section" :class="{ 'not-connected': !authStore.hasChannel }">
-      <h2>📢 Канал для бэкапа</h2>
+      <h2><Megaphone :size="20" /> Канал для бэкапа</h2>
       
       <template v-if="authStore.hasChannel">
         <div class="channel-connected">
           <div class="channel-info">
-            <div class="channel-icon">✓</div>
+            <div class="channel-icon"><Check :size="20" /></div>
             <div class="channel-details">
               <span class="channel-title">{{ authStore.channelInfo?.channel_title || 'Канал подключён' }}</span>
               <span class="channel-username" v-if="authStore.channelInfo?.channel_username">
@@ -18,9 +18,9 @@
             </div>
           </div>
           <div class="channel-features">
-            <div class="feature-item">✓ Сохранение треков</div>
-            <div class="feature-item">✓ Создание плейлистов</div>
-            <div class="feature-item">✓ Автобэкап в канал</div>
+            <div class="feature-item"><Check :size="14" /> Сохранение треков</div>
+            <div class="feature-item"><Check :size="14" /> Создание плейлистов</div>
+            <div class="feature-item"><Check :size="14" /> Автобэкап в канал</div>
           </div>
         </div>
       </template>
@@ -31,10 +31,10 @@
             Подключите Telegram-канал, чтобы разблокировать все функции:
           </p>
           <ul class="feature-list">
-            <li>📁 Загрузка и сохранение треков</li>
-            <li>❤️ Лайки и избранное</li>
-            <li>📋 Создание плейлистов</li>
-            <li>☁️ Автоматический бэкап музыки</li>
+            <li><Folder :size="16" /> Загрузка и сохранение треков</li>
+            <li><Heart :size="16" /> Лайки и избранное</li>
+            <li><ListMusic :size="16" /> Создание плейлистов</li>
+            <li><Cloud :size="16" /> Автоматический бэкап музыки</li>
           </ul>
           <div class="setup-steps">
             <h3>Как подключить:</h3>
@@ -46,7 +46,7 @@
             </ol>
           </div>
           <button class="refresh-btn" @click="refreshStatus">
-            🔄 Обновить статус
+            <RefreshCw :size="16" /> Обновить статус
           </button>
         </div>
       </template>
@@ -96,7 +96,7 @@
 
     <!-- Privacy settings -->
     <section class="section">
-      <h2>🔒 Приватность</h2>
+      <h2><Lock :size="20" /> Приватность</h2>
       
       <div class="setting-row">
         <div class="setting-info">
@@ -174,6 +174,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
 import api, { authApi } from '@/api/client'
+import { Megaphone, Check, Folder, Heart, ListMusic, Cloud, RefreshCw, Lock } from 'lucide-vue-next'
 
 const router = useRouter()
 const route = useRoute()

@@ -54,7 +54,7 @@
         <!-- Section: Friends' Libraries results (only when searching) -->
         <template v-if="searchQuery && friendsTracks.length">
           <div class="section-header friends-section">
-            <span class="section-title">👥 У друзей</span>
+            <span class="section-title"><Users :size="16" /> У друзей</span>
             <span class="section-count">{{ friendsTracks.length }}</span>
           </div>
           
@@ -84,7 +84,7 @@
         <!-- Section: Global Network results (only when searching) -->
         <template v-if="searchQuery && globalTracks.length">
           <div class="section-header global-section">
-            <span class="section-title">🌐 Общая сеть</span>
+            <span class="section-title"><Globe :size="16" /> Общая сеть</span>
             <span class="section-count">{{ globalTracks.length }}</span>
           </div>
           
@@ -112,7 +112,7 @@
         </div>
         
         <div v-if="!tracks.length && !friendsTracks.length && !globalTracks.length && !loading && !friendsLoading && !globalLoading" class="empty-state">
-          <span class="empty-icon">🎵</span>
+          <span class="empty-icon"><Music :size="48" /></span>
           <h3 v-if="searchQuery">Ничего не найдено</h3>
           <template v-else>
             <h3>Библиотека пуста</h3>
@@ -162,6 +162,7 @@ import TrackMenu from '@/components/TrackMenu.vue'
 import EditTrackModal from '@/components/EditTrackModal.vue'
 import SortChips from '@/components/SortChips.vue'
 import api, { playerApi, tracksApi, socialApi } from '@/api/client'
+import { Users, Music, Globe } from 'lucide-vue-next'
 
 const props = defineProps({
   searchQuery: {

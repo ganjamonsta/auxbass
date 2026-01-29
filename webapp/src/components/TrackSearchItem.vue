@@ -21,7 +21,7 @@
         :disabled="isRemoving"
       >
         <span v-if="isRemoving">...</span>
-        <span v-else>✓</span>
+        <span v-else><Check :size="16" /></span>
       </button>
     </template>
   </BaseTrackItem>
@@ -29,6 +29,7 @@
 
 <script setup>
 import BaseTrackItem from './BaseTrackItem.vue'
+import { Check } from 'lucide-vue-next'
 
 defineProps({
   track: { type: Object, required: true },

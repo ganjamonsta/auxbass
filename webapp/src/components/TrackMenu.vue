@@ -6,7 +6,7 @@
           <div v-if="show" class="menu-sheet" @click.stop>
             <!-- Track info header with close button -->
             <div class="menu-header">
-              <div class="menu-cover">🎵</div>
+              <div class="menu-cover"><Music :size="20" /></div>
               <div class="menu-info">
                 <div class="menu-title">{{ track?.title || 'Без названия' }}</div>
                 <div class="menu-artist">{{ track?.artist || 'Неизвестный исполнитель' }}</div>
@@ -22,12 +22,12 @@
             <div class="menu-items">
               <!-- Navigation section -->
               <button v-if="showGoToArtist" class="menu-item" @click="handleGoToArtist">
-                <span class="menu-icon">👤</span>
+                <span class="menu-icon"><User :size="18" /></span>
                 <span>Перейти к артисту</span>
               </button>
 
               <button v-if="showGoToAlbum" class="menu-item" @click="handleGoToAlbum">
-                <span class="menu-icon">💿</span>
+                <span class="menu-icon"><Disc3 :size="18" /></span>
                 <span>Перейти к альбому</span>
               </button>
 
@@ -35,29 +35,29 @@
 
               <!-- Queue actions - hide for current track or in player context -->
               <button v-if="showQueueActions" class="menu-item" @click="handlePlayNext">
-                <span class="menu-icon">▶️</span>
+                <span class="menu-icon"><Play :size="18" /></span>
                 <span>Включить следующим</span>
               </button>
 
               <button v-if="showQueueActions" class="menu-item" @click="handleAddToQueue">
-                <span class="menu-icon">📋</span>
+                <span class="menu-icon"><ListMusic :size="18" /></span>
                 <span>Добавить в очередь</span>
               </button>
 
               <button class="menu-item" @click="handleAddToPlaylist">
-                <span class="menu-icon">➕</span>
+                <span class="menu-icon"><Plus :size="18" /></span>
                 <span>Добавить в плейлист</span>
               </button>
 
               <div class="menu-divider"></div>
 
               <button class="menu-item" @click="handleEdit">
-                <span class="menu-icon">✏️</span>
+                <span class="menu-icon"><Pencil :size="18" /></span>
                 <span>Редактировать</span>
               </button>
 
               <button class="menu-item" @click="handleDownload">
-                <span class="menu-icon">📥</span>
+                <span class="menu-icon"><Download :size="18" /></span>
                 <span>Скачать</span>
               </button>
 
@@ -65,23 +65,23 @@
 
               <!-- Remove from playlist (only in playlist context) -->
               <button v-if="inPlaylist" class="menu-item danger" @click="handleRemoveFromPlaylist">
-                <span class="menu-icon">➖</span>
+                <span class="menu-icon"><Minus :size="18" /></span>
                 <span>Убрать из плейлиста</span>
               </button>
 
               <!-- Owner can fully delete -->
               <button v-if="isOwner" class="menu-item danger" @click="handleDelete">
-                <span class="menu-icon">🗑️</span>
+                <span class="menu-icon"><Trash2 :size="18" /></span>
                 <span>Удалить полностью</span>
               </button>
               <!-- If in library (but not owner) - can remove from library -->
               <button v-else-if="isInLibrary" class="menu-item" @click="handleRemoveFromLibrary">
-                <span class="menu-icon">➖</span>
+                <span class="menu-icon"><Minus :size="18" /></span>
                 <span>Убрать из библиотеки</span>
               </button>
               <!-- If not in library - can add to library -->
               <button v-else class="menu-item" @click="handleAddToLibrary">
-                <span class="menu-icon">➕</span>
+                <span class="menu-icon"><Plus :size="18" /></span>
                 <span>Добавить в библиотеку</span>
               </button>
             </div>
@@ -96,6 +96,7 @@
 import { inject, computed } from 'vue'
 import { usePlayerStore } from '../stores/player'
 import { useAuthStore } from '../stores/auth'
+import { Music, User, Disc3, Play, ListMusic, Plus, Minus, Pencil, Download, Trash2 } from 'lucide-vue-next'
 
 const props = defineProps({
   show: Boolean,

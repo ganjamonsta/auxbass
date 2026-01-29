@@ -10,13 +10,13 @@
             :src="cover"
           />
         </div>
-        <div v-else class="cover-placeholder">🎵</div>
+        <div v-else class="cover-placeholder"><Music :size="32" /></div>
       </div>
       <div class="playlist-info">
         <h1>{{ playlist.name }}</h1>
         <p class="meta">
           {{ playlist.track_count }} треков
-          <span v-if="playlist.is_public" class="public-badge">🌐 Публичный</span>
+          <span v-if="playlist.is_public" class="public-badge"><Globe :size="14" /> Публичный</span>
         </p>
         <p v-if="playlist.owner_name && !isOwner" class="owner-info">
           от {{ playlist.owner_name }}
@@ -52,8 +52,8 @@
         @click="toggleSubscription"
         :disabled="subscribing"
       >
-        <span v-if="playlist.is_subscribed">✓ В медиатеке</span>
-        <span v-else>➕ Добавить</span>
+        <span v-if="playlist.is_subscribed"><Check :size="16" /> В медиатеке</span>
+        <span v-else><Plus :size="16" /> Добавить</span>
       </button>
     </div>
 
@@ -74,7 +74,7 @@
 
     <!-- Empty state -->
     <div v-else class="empty-state">
-      <span class="empty-icon">🎵</span>
+      <span class="empty-icon"><Music :size="48" /></span>
       <p>Плейлист пуст</p>
       <p class="hint">Нажмите «Добавить» чтобы добавить треки</p>
     </div>
@@ -143,6 +143,7 @@ import PlaylistPicker from '@/components/PlaylistPicker.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import EditPlaylistModal from '@/components/EditPlaylistModal.vue'
 import api, { playerApi } from '@/api/client'
+import { Music, Check, Plus, Globe } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()

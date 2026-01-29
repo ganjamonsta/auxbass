@@ -24,7 +24,7 @@
         <div class="lcd-screen" @click="handleLcdClick">
           <!-- Title row -->
           <div class="lcd-title-row">
-            <span class="lcd-status">{{ isPlaying ? '▶' : '■' }}</span>
+            <span class="lcd-status"><Play v-if="isPlaying" :size="12" /><Square v-else :size="12" /></span>
             <div class="lcd-text-container">
               <div class="lcd-text" :class="{ scrolling: shouldScroll }">
                 <span class="segment-text">{{ displayText }}</span>
@@ -63,13 +63,13 @@
           <span class="btn-label">RND</span>
         </button>
         <button class="ctrl-btn" @click="playerStore.prev()" title="Previous">
-          <span class="btn-icon">⏮</span>
+          <span class="btn-icon"><SkipBack :size="14" /></span>
         </button>
         <button class="ctrl-btn play-btn" @click="playerStore.togglePlay()" :title="isPlaying ? 'Pause' : 'Play'">
-          <span class="btn-icon">{{ isPlaying ? '⏸' : '⏵' }}</span>
+          <span class="btn-icon"><Pause v-if="isPlaying" :size="16" /><Play v-else :size="16" /></span>
         </button>
         <button class="ctrl-btn" @click="playerStore.next()" title="Next">
-          <span class="btn-icon">⏭</span>
+          <span class="btn-icon"><SkipForward :size="14" /></span>
         </button>
         <button class="ctrl-btn mode" :class="{ active: repeat !== 'none' }" @click="playerStore.toggleRepeat()" title="Repeat">
           <span class="btn-label">{{ repeat === 'one' ? 'RPT1' : 'RPT' }}</span>
@@ -108,7 +108,7 @@
       </button>
       
       <button class="mute-btn" :class="{ muted: isMuted }" @click="playerStore.toggleMute()">
-        {{ isMuted ? '🔇' : '🔊' }}
+        <VolumeX v-if="isMuted" :size="16" /><Volume2 v-else :size="16" />
       </button>
     </div>
 
@@ -158,6 +158,7 @@ import { playerApi } from '@/api/client'
 import TrackMenu from '@/components/TrackMenu.vue'
 import EditTrackModal from '@/components/EditTrackModal.vue'
 import PlaylistPicker from '@/components/PlaylistPicker.vue'
+import { Play, Square, Pause, Volume2, VolumeX, SkipBack, SkipForward } from 'lucide-vue-next'
 
 const router = useRouter()
 const playerStore = usePlayerStore()

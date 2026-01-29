@@ -2,7 +2,7 @@
   <div class="login-view">
     <div class="login-container">
       <div class="logo">
-        🎵
+        <Music :size="48" />
       </div>
       <h1>{{ appName }}</h1>
       <p class="subtitle">Музыкальный плеер с хранением в Telegram</p>
@@ -59,6 +59,7 @@ import { ref, computed, nextTick, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { authApi } from '@/api/client'
+import { Music } from 'lucide-vue-next'
 
 const router = useRouter()
 const route = useRoute()

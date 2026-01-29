@@ -7,7 +7,7 @@
             <!-- Playlist info header with close button -->
             <div class="menu-header">
               <div class="menu-cover" :style="getCoverStyle">
-                {{ coverEmoji }}
+                <component :is="coverIcon" v-if="!props.playlist?.cover_url && !props.playlist?.cover_gradient" :size="20" />
               </div>
               <div class="menu-info">
                 <div class="menu-title">{{ playlist?.name || 'Плейлист' }}</div>
@@ -23,34 +23,34 @@
             <!-- Menu items -->
             <div class="menu-items">
               <button class="menu-item" @click="handleOpen">
-                <span class="menu-icon">📂</span>
+                <span class="menu-icon"><FolderOpen :size="18" /></span>
                 <span>Открыть</span>
               </button>
 
               <button class="menu-item" @click="handlePlayAll">
-                <span class="menu-icon">▶️</span>
+                <span class="menu-icon"><Play :size="18" /></span>
                 <span>Воспроизвести все</span>
               </button>
 
               <button class="menu-item" @click="handleShuffle">
-                <span class="menu-icon">🔀</span>
+                <span class="menu-icon"><Shuffle :size="18" /></span>
                 <span>Перемешать</span>
               </button>
 
               <button class="menu-item" @click="handleAddToQueue">
-                <span class="menu-icon">📋</span>
+                <span class="menu-icon"><ListMusic :size="18" /></span>
                 <span>Добавить в очередь</span>
               </button>
 
               <div v-if="!isAlbum" class="menu-divider"></div>
 
               <button v-if="!isAlbum" class="menu-item" @click="handleRename">
-                <span class="menu-icon">✏️</span>
+                <span class="menu-icon"><Pencil :size="18" /></span>
                 <span>Переименовать</span>
               </button>
 
               <button v-if="!isAlbum" class="menu-item danger" @click="handleDelete">
-                <span class="menu-icon">🗑️</span>
+                <span class="menu-icon"><Trash2 :size="18" /></span>
                 <span>Удалить плейлист</span>
               </button>
             </div>
@@ -64,6 +64,7 @@
 <script setup>
 import { inject, computed } from 'vue'
 import { usePlayerStore } from '../stores/player'
+import { FolderOpen, Play, Shuffle, ListMusic, Pencil, Trash2, Music, Disc3 } from 'lucide-vue-next'
 
 const props = defineProps({
   show: Boolean,
@@ -93,9 +94,9 @@ const getCoverStyle = computed(() => {
   return {}
 })
 
-const coverEmoji = computed(() => {
-  if (props.playlist?.cover_url || props.playlist?.cover_gradient) return ''
-  return isAlbum.value ? '💿' : '🎵'
+const coverIcon = computed(() => {
+  if (props.playlist?.cover_url || props.playlist?.cover_gradient) return null
+  return isAlbum.value ? Disc3 : Music
 })
 
 const subtitle = computed(() => {
