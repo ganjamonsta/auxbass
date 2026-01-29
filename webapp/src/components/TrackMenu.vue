@@ -69,14 +69,20 @@
                 <span>Убрать из плейлиста</span>
               </button>
 
-              <!-- Owner can fully delete, others can only remove from library -->
+              <!-- Owner can fully delete -->
               <button v-if="isOwner" class="menu-item danger" @click="handleDelete">
                 <span class="menu-icon">🗑️</span>
                 <span>Удалить полностью</span>
               </button>
-              <button v-else class="menu-item" @click="handleRemoveFromLibrary">
+              <!-- If in library (but not owner) - can remove from library -->
+              <button v-else-if="isInLibrary" class="menu-item" @click="handleRemoveFromLibrary">
                 <span class="menu-icon">➖</span>
                 <span>Убрать из библиотеки</span>
+              </button>
+              <!-- If not in library - can add to library -->
+              <button v-else class="menu-item" @click="handleAddToLibrary">
+                <span class="menu-icon">➕</span>
+                <span>Добавить в библиотеку</span>
               </button>
             </div>
           </div>
@@ -103,7 +109,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'addToPlaylist', 'edit', 'delete', 'removeFromLibrary', 'download', 'goToArtist', 'goToAlbum', 'removeFromPlaylist'])
+const emit = defineEmits(['close', 'addToPlaylist', 'edit', 'delete', 'removeFromLibrary', 'download', 'goToArtist', 'goToAlbum', 'removeFromPlaylist', 'addToLibrary'])
 
 const player = usePlayerStore()
 const authStore = useAuthStore()
@@ -123,6 +129,19 @@ const hasAlbum = computed(() => {
 const isOwner = computed(() => {
   if (!props.track || !props.currentUserId) return false
   return props.track.uploader?.id === props.currentUserId
+})
+
+// Check if track is in user's library
+const isInLibrary = computed(() => {
+  // If in_library is explicitly set, use it
+  if (props.track?.in_library !== undefined) {
+    return props.track.in_library
+  }
+  // In library context, assume track is in library
+  if (props.context === 'library') {
+    return true
+  }
+  return false
 })
 
 // Check if this is the currently playing track
@@ -223,6 +242,12 @@ const handleDelete = () => {
 const handleRemoveFromLibrary = () => {
   haptic('light')
   emit('removeFromLibrary', props.track)
+  emit('close')
+}
+
+const handleAddToLibrary = () => {
+  haptic('light')
+  emit('addToLibrary', props.track)
   emit('close')
 }
 

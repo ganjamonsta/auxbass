@@ -24,6 +24,14 @@
       </div>
       
       <template v-else>
+        <!-- Section: My Library results -->
+        <template v-if="searchQuery && tracks.length">
+          <div class="section-header">
+            <span class="section-title">Моя библиотека</span>
+            <span class="section-count">{{ tracks.length }}</span>
+          </div>
+        </template>
+        
         <TrackItem
           v-for="track in tracks"
           :key="track.id"
@@ -37,13 +45,43 @@
           @download="handleDirectDownload(track)"
         />
         
-        <div v-if="hasMore" class="load-more">
+        <div v-if="hasMore && !searchQuery" class="load-more">
           <button @click="loadMore" :disabled="loading">
             {{ loading ? 'Загрузка...' : 'Загрузить ещё' }}
           </button>
         </div>
         
-        <div v-if="!tracks.length" class="empty-state">
+        <!-- Section: Global Network results (only when searching) -->
+        <template v-if="searchQuery && globalTracks.length">
+          <div class="section-header global-section">
+            <span class="section-title">🌐 Общая сеть</span>
+            <span class="section-count">{{ globalTracks.length }}</span>
+          </div>
+          
+          <TrackItem
+            v-for="track in globalTracks"
+            :key="'global-' + track.id"
+            :track="track"
+            :isPlaying="playerStore.currentTrack?.id === track.id"
+            :isActive="playerStore.isPlaying && playerStore.currentTrack?.id === track.id"
+            :isLiked="track.is_liked"
+            :showAddToLibrary="true"
+            :inLibrary="track.in_library"
+            @click="playGlobalTrack(track)"
+            @like="handleLikeTrack(track)"
+            @menu="openTrackMenu(track)"
+            @download="handleDirectDownload(track)"
+            @addToLibrary="handleAddToLibrary(track)"
+          />
+        </template>
+        
+        <!-- Loading global results -->
+        <div v-if="searchQuery && globalLoading" class="global-loading">
+          <div class="spinner small"></div>
+          <span>Поиск в общей сети...</span>
+        </div>
+        
+        <div v-if="!tracks.length && !globalTracks.length && !loading && !globalLoading" class="empty-state">
           <span class="empty-icon">🎵</span>
           <h3 v-if="searchQuery">Ничего не найдено</h3>
           <template v-else>
@@ -68,6 +106,7 @@
       @download="handleDownloadTrack"
       @delete="handleDeleteTrack"
       @removeFromLibrary="handleRemoveFromLibrary"
+      @addToLibrary="handleAddToLibraryFromMenu"
     />
     
     <!-- Edit track modal -->
@@ -92,7 +131,7 @@ import TrackItem from '@/components/TrackItem.vue'
 import TrackMenu from '@/components/TrackMenu.vue'
 import EditTrackModal from '@/components/EditTrackModal.vue'
 import SortChips from '@/components/SortChips.vue'
-import api, { playerApi } from '@/api/client'
+import api, { playerApi, tracksApi } from '@/api/client'
 
 const props = defineProps({
   searchQuery: {
@@ -121,6 +160,10 @@ const tracks = ref([])
 const page = ref(1)
 const total = ref(0)
 const perPage = 50
+
+// Global search results
+const globalTracks = ref([])
+const globalLoading = ref(false)
 
 // Edit modal state
 const showEditModal = ref(false)
@@ -204,11 +247,45 @@ const loadMore = async () => {
   await loadTracks()
 }
 
+// Search global library for additional results
+const searchGlobal = async (query) => {
+  if (!query) {
+    globalTracks.value = []
+    return
+  }
+  
+  globalLoading.value = true
+  try {
+    const response = await tracksApi.getGlobal({
+      search: query,
+      per_page: 30
+    })
+    
+    const globalResults = response.data.items || []
+    
+    // Filter out tracks that are already in user's library
+    const libraryIds = new Set(tracks.value.map(t => t.id))
+    globalTracks.value = globalResults.filter(t => !libraryIds.has(t.id))
+  } catch (error) {
+    console.error('Failed to search global library:', error)
+    globalTracks.value = []
+  } finally {
+    globalLoading.value = false
+  }
+}
+
 // Watch searchQuery prop
-watch(() => props.searchQuery, (newVal) => {
+watch(() => props.searchQuery, async (newVal) => {
   // If query changes, reset page
-   page.value = 1
-   loadTracks()
+  page.value = 1
+  await loadTracks()
+  
+  // Also search in global library when there's a search query
+  if (newVal) {
+    await searchGlobal(newVal)
+  } else {
+    globalTracks.value = []
+  }
 })
 
 const onNextSort = () => {
@@ -234,6 +311,28 @@ const handleLikeTrack = async (track) => {
 
 const playTrack = (track) => {
   playerStore.playTrack(track, tracks.value)
+}
+
+// Play track from global results (combine both lists for queue)
+const playGlobalTrack = (track) => {
+  const allTracks = [...tracks.value, ...globalTracks.value]
+  playerStore.playTrack(track, allTracks)
+}
+
+// Add track from global library to user's library
+const handleAddToLibrary = async (track) => {
+  const success = await libraryStore.addToLibrary(track.id)
+  if (success) {
+    // Update the track in globalTracks to show it's now in library
+    const idx = globalTracks.value.findIndex(t => t.id === track.id)
+    if (idx !== -1) {
+      globalTracks.value[idx].in_library = true
+      // Move it to the library list
+      tracks.value.unshift({ ...globalTracks.value[idx], in_library: true })
+      globalTracks.value.splice(idx, 1)
+    }
+    uiStore.toast.success('Добавлено', 'Трек добавлен в библиотеку')
+  }
 }
 
 // Shuffle all library tracks using lazy loading
@@ -321,6 +420,12 @@ const handleDeleteTrack = async (track) => {
 const handleRemoveFromLibrary = async (track) => {
   await libraryStore.removeFromLibrary(track.id)
   tracks.value = tracks.value.filter(t => t.id !== track.id)
+  closeMenu()
+}
+
+// Handle add to library from context menu (for global tracks)
+const handleAddToLibraryFromMenu = async (track) => {
+  await handleAddToLibrary(track)
   closeMenu()
 }
 
@@ -426,5 +531,53 @@ onMounted(() => {
 
 .empty-state p {
   color: var(--text-secondary);
+}
+
+/* Section headers for search results */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0 8px;
+  margin-top: 8px;
+}
+
+.section-header.global-section {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.section-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-highlight);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.global-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.spinner.small {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+  margin-bottom: 0;
 }
 </style>
