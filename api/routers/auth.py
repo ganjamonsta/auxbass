@@ -189,6 +189,41 @@ async def get_current_user(
     )
 
 
+async def get_optional_user(
+    x_telegram_init_data: Optional[str] = Header(None, alias="X-Telegram-Init-Data"),
+    authorization: Optional[str] = Header(None),
+) -> Optional[TelegramUser]:
+    """
+    Same as get_current_user but returns None instead of raising exception.
+    Useful for endpoints that work for both authenticated and anonymous users.
+    """
+    
+    # Try Telegram Mini App auth first
+    if x_telegram_init_data:
+        parsed = validate_init_data(x_telegram_init_data, settings.bot_token)
+        if parsed:
+            user = parse_user_from_init_data(parsed)
+            if user:
+                await ensure_user_in_db(user)
+                return user
+    
+    # Try JWT auth
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization[7:]
+        payload = verify_jwt_token(token)
+        if payload:
+            user = TelegramUser(
+                id=payload["user_id"],
+                first_name=payload.get("first_name", "User"),
+                last_name=payload.get("last_name"),
+                username=payload.get("username"),
+                photo_url=payload.get("photo_url"),
+            )
+            return user
+    
+    return None
+
+
 async def ensure_user_in_db(user: TelegramUser):
     """Ensure user exists in database, create if not"""
     async with get_session() as session:

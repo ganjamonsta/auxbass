@@ -134,6 +134,7 @@ def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None)
         liked_at=liked_at,
         play_count=play_count,
         added_at=added_at,
+        in_library=True,  # Track is from user's library
     )
 
 

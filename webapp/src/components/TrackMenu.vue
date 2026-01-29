@@ -133,12 +133,17 @@ const isOwner = computed(() => {
 
 // Check if track is in user's library
 const isInLibrary = computed(() => {
-  // If in_library is explicitly set, use it
+  // If in_library is explicitly set (e.g. from global/friends search), use it
   if (props.track?.in_library !== undefined) {
     return props.track.in_library
   }
-  // In library context, assume track is in library
-  if (props.context === 'library') {
+  // If track has library_source set (not null/undefined), it's in library
+  if (props.track?.library_source && props.track.library_source !== 'global') {
+    return true
+  }
+  // Fallback: check context, but only if no explicit flag
+  // This handles tracks loaded from user's library view directly
+  if (props.context === 'library' || props.context === 'liked' || props.context === 'playlist') {
     return true
   }
   return false

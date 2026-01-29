@@ -27,8 +27,8 @@ from shared.matching import normalize_artist
 
 from bot.services.channels import get_channel_service
 
-from api.routers.auth import get_current_user, require_premium
-from api.routers.library import track_to_response
+from api.routers.auth import get_current_user, require_premium, get_optional_user
+from api.routers.library import track_to_response, track_to_response_global
 from api.schemas_v2.tracks import (
     TrackResponse,
     TracksListResponse,
@@ -525,6 +525,7 @@ async def get_global_tracks(
     per_page: int = Query(50, ge=1, le=100),
     search: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[TelegramUser] = Depends(get_optional_user),
 ):
     """Get public tracks from global library"""
     query = (
@@ -563,8 +564,16 @@ async def get_global_tracks(
     result = await db.execute(query)
     tracks = result.unique().scalars().all()
     
+    # Check which tracks are in user's library
+    user_track_ids = set()
+    if current_user:
+        lib_result = await db.execute(
+            select(UserLibrary.track_id).where(UserLibrary.user_id == current_user.id)
+        )
+        user_track_ids = set(lib_result.scalars().all())
+    
     return TracksListResponse(
-        items=[track_to_response(t) for t in tracks],
+        items=[track_to_response_global(t, in_library=(t.id in user_track_ids)) for t in tracks],
         total=total,
         page=page,
         per_page=per_page,
