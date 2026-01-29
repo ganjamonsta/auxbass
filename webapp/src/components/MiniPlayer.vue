@@ -74,6 +74,15 @@
       @close="closeEditModal"
       @saved="handleTrackSaved"
     />
+    
+    <!-- Playlist picker modal -->
+    <PlaylistPicker
+      :show="showPlaylistPicker"
+      :track="track"
+      @close="showPlaylistPicker = false"
+      @createNew="showPlaylistPicker = false"
+      @added="handlePlaylistAdded"
+    />
   </div>
 </template>
 
@@ -83,9 +92,11 @@ import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useAuthStore } from '@/stores/auth'
+import { useUIStore } from '@/stores/ui'
 import { playerApi } from '@/api/client'
 import TrackMenu from '@/components/TrackMenu.vue'
 import EditTrackModal from '@/components/EditTrackModal.vue'
+import PlaylistPicker from '@/components/PlaylistPicker.vue'
 
 const router = useRouter()
 const playerStore = usePlayerStore()
@@ -147,9 +158,18 @@ const handleGoToAlbum = (albumId) => {
   }
 }
 
-const handleAddToPlaylist = (track) => {
-  // TODO: Show playlist picker
+const handleAddToPlaylist = (trackData) => {
   closeTrackMenu()
+  showPlaylistPicker.value = true
+}
+
+// Playlist picker state
+const showPlaylistPicker = ref(false)
+const uiStore = useUIStore()
+
+const handlePlaylistAdded = (playlist) => {
+  showPlaylistPicker.value = false
+  uiStore.toast.success('Добавлено', `Трек добавлен в плейлист "${playlist.name}"`)
 }
 
 const handleEditTrack = (track) => {
