@@ -50,7 +50,6 @@ const toggleOrder = () => {
   emit('toggle-order')
 }
 </script>
-</script>
 
 <style scoped>
 .sort-chips {
