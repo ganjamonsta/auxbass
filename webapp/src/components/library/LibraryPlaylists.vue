@@ -190,7 +190,7 @@ onMounted(() => {
 }
 .actions-header {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
     margin-bottom: 16px;
 }
@@ -209,6 +209,7 @@ onMounted(() => {
     font-weight: 600;
     cursor: pointer;
     transition: transform 0.2s, opacity 0.2s;
+    flex-shrink: 0;
 }
 
 .create-btn:hover {

@@ -662,6 +662,7 @@ onMounted(() => {
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 /* Albums grid */
