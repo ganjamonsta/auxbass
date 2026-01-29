@@ -28,6 +28,7 @@
         v-for="playlist in playlists"
         :key="playlist.id"
         class="playlist-card"
+        :class="{ 'subscribed-playlist': playlist.is_subscribed }"
         @click="goToPlaylist(playlist)"
       >
         <div class="playlist-cover">
@@ -39,9 +40,13 @@
             />
           </div>
           <div v-else class="cover-placeholder">🎵</div>
+          <div v-if="playlist.is_subscribed" class="subscribed-badge" title="Подписан">🔗</div>
         </div>
         <div class="playlist-name">{{ playlist.name }}</div>
-        <div class="playlist-meta">{{ playlist.track_count }} треков</div>
+        <div class="playlist-meta">
+          <span>{{ playlist.track_count }} треков</span>
+          <span v-if="playlist.owner_name" class="owner-tag">от {{ playlist.owner_name }}</span>
+        </div>
       </div>
     </div>
 
@@ -318,6 +323,33 @@ onMounted(() => {
 .playlist-meta {
   font-size: 11px;
   color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.owner-tag {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.subscribed-playlist .playlist-cover {
+  position: relative;
+}
+
+.subscribed-badge {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .loading {

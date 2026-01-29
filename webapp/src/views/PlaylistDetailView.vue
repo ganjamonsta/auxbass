@@ -43,6 +43,18 @@
           </svg>
         </button>
       </div>
+      
+      <!-- Subscribe/Unsubscribe button for non-owner public playlists -->
+      <button 
+        v-if="!isOwner && playlist.is_public" 
+        class="subscribe-btn"
+        :class="{ subscribed: playlist.is_subscribed }"
+        @click="toggleSubscription"
+        :disabled="subscribing"
+      >
+        <span v-if="playlist.is_subscribed">✓ В медиатеке</span>
+        <span v-else>➕ Добавить</span>
+      </button>
     </div>
 
     <!-- Track list -->
@@ -151,6 +163,7 @@ const showDeleteConfirm = ref(false)
 const showMenu = ref(false)
 const menuTrack = ref(null)
 const showPlaylistPickerForMenu = ref(false)
+const subscribing = ref(false)
 
 // Computed
 const isOwner = computed(() => {
@@ -306,6 +319,34 @@ const deletePlaylist = async () => {
   } catch (error) {
     console.error('Failed to delete playlist:', error)
     uiStore.toast.error('Ошибка', 'Не удалось удалить плейлист')
+  }
+}
+
+// Subscription
+const toggleSubscription = async () => {
+  if (subscribing.value) return
+  subscribing.value = true
+  
+  try {
+    if (playlist.value.is_subscribed) {
+      // Unsubscribe
+      await api.delete(`/playlists/${playlist.value.id}/subscribe`)
+      playlist.value.is_subscribed = false
+      uiStore.toast.success('Удалено', 'Плейлист убран из медиатеки')
+    } else {
+      // Subscribe
+      await api.post(`/playlists/${playlist.value.id}/subscribe`)
+      playlist.value.is_subscribed = true
+      uiStore.toast.success('Добавлено', 'Плейлист добавлен в медиатеку')
+    }
+    // Refresh library playlists
+    await libraryStore.fetchPlaylists()
+  } catch (error) {
+    console.error('Failed to toggle subscription:', error)
+    const errorMsg = error.response?.data?.detail || 'Ошибка'
+    uiStore.toast.error('Ошибка', errorMsg)
+  } finally {
+    subscribing.value = false
   }
 }
 
@@ -512,5 +553,38 @@ onMounted(loadPlaylist)
   font-size: 13px;
   color: var(--text-tertiary);
   margin-top: 4px;
+}
+
+.subscribe-btn {
+  padding: 12px 20px;
+  border-radius: 24px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  box-shadow: 
+    4px 4px 8px rgba(0, 0, 0, 0.2),
+    -2px -2px 6px rgba(255, 255, 255, 0.05);
+}
+
+.subscribe-btn:hover {
+  opacity: 0.9;
+}
+
+.subscribe-btn:active {
+  box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.subscribe-btn.subscribed {
+  background: var(--accent);
+  color: #000;
+}
+
+.subscribe-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

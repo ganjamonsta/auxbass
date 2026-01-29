@@ -547,6 +547,30 @@ class ChannelMessage(Base):
     )
 
 
+# ============== Playlist Subscription (Follow Public Playlists) ==============
+
+class PlaylistSubscription(Base):
+    """
+    User subscription to a public playlist.
+    Allows users to add public playlists to their library.
+    The playlist content auto-updates when the original owner modifies it.
+    """
+    __tablename__ = "playlist_subscriptions"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
+    playlist_id: Mapped[int] = mapped_column(Integer, ForeignKey("playlists.id", ondelete="CASCADE"))
+    
+    # Timestamps
+    subscribed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (
+        UniqueConstraint("user_id", "playlist_id", name="uq_playlist_subscription"),
+        Index("idx_playlist_subscription_user", "user_id"),
+        Index("idx_playlist_subscription_playlist", "playlist_id"),
+    )
+
+
 # ============== User Following (Social) ==============
 
 class UserFollow(Base):

@@ -17,7 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.database import get_db
-from shared.models import Playlist, PlaylistTrack, Track, UserLibrary, AlbumTrack, User
+from shared.models import Playlist, PlaylistTrack, Track, UserLibrary, AlbumTrack, User, PlaylistSubscription
 
 from api.routers.auth import get_current_user, require_premium
 from api.routers.library import track_to_response
@@ -51,6 +51,8 @@ class PlaylistResponse(BaseModel):
     is_public: bool = False
     owner_id: Optional[int] = None
     owner_name: Optional[str] = None
+    is_subscribed: bool = False  # Whether current user is subscribed
+    is_owner: bool = False  # Whether current user is the owner
     created_at: datetime
     
     class Config:
@@ -107,17 +109,28 @@ async def get_playlist_info(db: AsyncSession, playlist_id: int) -> tuple[int, in
 async def get_my_playlists(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=100),
+    include_subscribed: bool = Query(True, description="Include subscribed playlists"),
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get user's playlists"""
-    # Count
-    total = await db.scalar(
+    """Get user's playlists (owned and subscribed)"""
+    # Count owned playlists
+    owned_count = await db.scalar(
         select(func.count(Playlist.id))
         .where(Playlist.owner_id == user.id)
     ) or 0
     
-    # Get playlists
+    # Count subscribed playlists
+    subscribed_count = 0
+    if include_subscribed:
+        subscribed_count = await db.scalar(
+            select(func.count(PlaylistSubscription.id))
+            .where(PlaylistSubscription.user_id == user.id)
+        ) or 0
+    
+    total = owned_count + subscribed_count
+    
+    # Get owned playlists
     offset = (page - 1) * per_page
     result = await db.execute(
         select(Playlist)
@@ -126,10 +139,10 @@ async def get_my_playlists(
         .offset(offset)
         .limit(per_page)
     )
-    playlists = result.scalars().all()
+    owned_playlists = result.scalars().all()
     
     items = []
-    for playlist in playlists:
+    for playlist in owned_playlists:
         track_count, total_duration, cover_url = await get_playlist_info(db, playlist.id)
         items.append(PlaylistResponse(
             id=playlist.id,
@@ -139,8 +152,44 @@ async def get_my_playlists(
             total_duration=total_duration,
             cover_url=cover_url,
             is_public=playlist.is_public,
+            is_owner=True,
+            is_subscribed=False,
             created_at=playlist.created_at,
         ))
+    
+    # Get subscribed playlists (if there's room on this page)
+    if include_subscribed and len(items) < per_page:
+        remaining = per_page - len(items)
+        subscribed_offset = max(0, offset - owned_count)
+        
+        result = await db.execute(
+            select(Playlist, User, PlaylistSubscription)
+            .join(PlaylistSubscription, PlaylistSubscription.playlist_id == Playlist.id)
+            .join(User, User.id == Playlist.owner_id)
+            .where(PlaylistSubscription.user_id == user.id)
+            .where(Playlist.is_public == True)  # Only include still-public playlists
+            .order_by(PlaylistSubscription.subscribed_at.desc())
+            .offset(subscribed_offset)
+            .limit(remaining)
+        )
+        subscribed_rows = result.all()
+        
+        for playlist, owner, subscription in subscribed_rows:
+            track_count, total_duration, cover_url = await get_playlist_info(db, playlist.id)
+            items.append(PlaylistResponse(
+                id=playlist.id,
+                name=playlist.name,
+                description=playlist.description,
+                track_count=track_count,
+                total_duration=total_duration,
+                cover_url=cover_url,
+                is_public=playlist.is_public,
+                owner_id=owner.id,
+                owner_name=owner.display_name,
+                is_owner=False,
+                is_subscribed=True,
+                created_at=playlist.created_at,
+            ))
     
     return PlaylistsListResponse(
         items=items,
@@ -227,6 +276,18 @@ async def get_playlist(
         if first_track.enrichment:
             cover_url = first_track.enrichment.cover_url
     
+    # Check if user is subscribed to this playlist
+    is_subscribed = False
+    if playlist.owner_id != user.id:
+        subscription = await db.scalar(
+            select(PlaylistSubscription)
+            .where(
+                PlaylistSubscription.user_id == user.id,
+                PlaylistSubscription.playlist_id == playlist_id
+            )
+        )
+        is_subscribed = subscription is not None
+    
     return PlaylistDetailResponse(
         id=playlist.id,
         name=playlist.name,
@@ -237,6 +298,8 @@ async def get_playlist(
         is_public=playlist.is_public,
         owner_id=owner.id,
         owner_name=owner.display_name,
+        is_owner=playlist.owner_id == user.id,
+        is_subscribed=is_subscribed,
         created_at=playlist.created_at,
         tracks=tracks_response,
     )
@@ -471,6 +534,20 @@ async def get_public_playlists(
     items = []
     for playlist, owner in rows:
         track_count, total_duration, cover_url = await get_playlist_info(db, playlist.id)
+        
+        # Check if current user is subscribed or is owner
+        is_owner = playlist.owner_id == user.id
+        is_subscribed = False
+        if not is_owner:
+            subscription = await db.scalar(
+                select(PlaylistSubscription)
+                .where(
+                    PlaylistSubscription.user_id == user.id,
+                    PlaylistSubscription.playlist_id == playlist.id
+                )
+            )
+            is_subscribed = subscription is not None
+        
         items.append(PlaylistResponse(
             id=playlist.id,
             name=playlist.name,
@@ -481,6 +558,8 @@ async def get_public_playlists(
             is_public=playlist.is_public,
             owner_id=owner.id,
             owner_name=owner.display_name,
+            is_owner=is_owner,
+            is_subscribed=is_subscribed,
             created_at=playlist.created_at,
         ))
     
@@ -532,6 +611,18 @@ async def get_user_public_playlists(
     items = []
     for playlist in playlists:
         track_count, total_duration, cover_url = await get_playlist_info(db, playlist.id)
+        # Check if current user is subscribed
+        is_subscribed = False
+        if not is_own:
+            subscription = await db.scalar(
+                select(PlaylistSubscription)
+                .where(
+                    PlaylistSubscription.user_id == user.id,
+                    PlaylistSubscription.playlist_id == playlist.id
+                )
+            )
+            is_subscribed = subscription is not None
+        
         items.append(PlaylistResponse(
             id=playlist.id,
             name=playlist.name,
@@ -542,6 +633,8 @@ async def get_user_public_playlists(
             is_public=playlist.is_public,
             owner_id=owner.id,
             owner_name=owner.display_name,
+            is_owner=is_own,
+            is_subscribed=is_subscribed,
             created_at=playlist.created_at,
         ))
     
@@ -551,3 +644,137 @@ async def get_user_public_playlists(
         page=page,
         per_page=per_page,
     )
+
+
+# ============== Playlist Subscription ==============
+
+@router.post("/{playlist_id}/subscribe")
+async def subscribe_to_playlist(
+    playlist_id: int,
+    user: TelegramUser = Depends(require_premium),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Subscribe to a public playlist.
+    Adds the playlist to user's library with auto-updates.
+    """
+    # Check playlist exists and is public
+    result = await db.execute(
+        select(Playlist, User)
+        .join(User, User.id == Playlist.owner_id)
+        .where(Playlist.id == playlist_id)
+    )
+    row = result.first()
+    
+    if not row:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    
+    playlist, owner = row
+    
+    if not playlist.is_public:
+        raise HTTPException(status_code=400, detail="Playlist is not public")
+    
+    if playlist.owner_id == user.id:
+        raise HTTPException(status_code=400, detail="Cannot subscribe to your own playlist")
+    
+    # Check if already subscribed
+    existing = await db.scalar(
+        select(PlaylistSubscription)
+        .where(
+            PlaylistSubscription.user_id == user.id,
+            PlaylistSubscription.playlist_id == playlist_id
+        )
+    )
+    if existing:
+        raise HTTPException(status_code=400, detail="Already subscribed to this playlist")
+    
+    # Create subscription
+    subscription = PlaylistSubscription(
+        user_id=user.id,
+        playlist_id=playlist_id,
+    )
+    db.add(subscription)
+    await db.commit()
+    
+    return {
+        "status": "subscribed",
+        "playlist_id": playlist_id,
+        "playlist_name": playlist.name,
+        "owner_name": owner.display_name,
+    }
+
+
+@router.delete("/{playlist_id}/subscribe")
+async def unsubscribe_from_playlist(
+    playlist_id: int,
+    user: TelegramUser = Depends(require_premium),
+    db: AsyncSession = Depends(get_db),
+):
+    """Unsubscribe from a playlist."""
+    result = await db.execute(
+        delete(PlaylistSubscription)
+        .where(
+            PlaylistSubscription.user_id == user.id,
+            PlaylistSubscription.playlist_id == playlist_id
+        )
+    )
+    
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Not subscribed to this playlist")
+    
+    await db.commit()
+    
+    return {"status": "unsubscribed", "playlist_id": playlist_id}
+
+
+@router.get("/{playlist_id}/subscribers")
+async def get_playlist_subscribers(
+    playlist_id: int,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=100),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get list of users subscribed to a playlist (owner only)."""
+    playlist = await db.get(Playlist, playlist_id)
+    
+    if not playlist:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    
+    if playlist.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="Only playlist owner can view subscribers")
+    
+    # Count
+    total = await db.scalar(
+        select(func.count(PlaylistSubscription.id))
+        .where(PlaylistSubscription.playlist_id == playlist_id)
+    ) or 0
+    
+    # Get subscribers
+    offset = (page - 1) * per_page
+    result = await db.execute(
+        select(User)
+        .join(PlaylistSubscription, PlaylistSubscription.user_id == User.id)
+        .where(PlaylistSubscription.playlist_id == playlist_id)
+        .order_by(PlaylistSubscription.subscribed_at.desc())
+        .offset(offset)
+        .limit(per_page)
+    )
+    users = result.scalars().all()
+    
+    items = [
+        {
+            "id": u.id,
+            "username": u.username,
+            "display_name": u.display_name,
+        }
+        for u in users
+    ]
+    
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+    }
+
