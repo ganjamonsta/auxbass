@@ -188,7 +188,6 @@ const openModal = async () => {
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
-  flex: 1;
 }
 
 .create-btn {
@@ -200,8 +199,8 @@ const openModal = async () => {
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
-  flex-shrink: 0;
-  white-space: nowrap;
+  width: auto !important;
+  max-width: fit-content;
 }
 
 .special-playlists {
