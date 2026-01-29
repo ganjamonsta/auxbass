@@ -59,21 +59,17 @@
 
     <!-- Track list -->
     <div class="track-list" v-if="playlist.tracks?.length">
-      <div
+      <TrackItem
         v-for="(track, index) in playlist.tracks"
         :key="track.id"
-        class="track-wrapper"
-      >
-        <TrackItem
-          :track="track"
-          :isPlaying="playerStore.currentTrack?.id === track.id"
-          :isLiked="track.is_liked"
-          @click="playTrack(track, index)"
-          @like="handleLikeTrack(track)"
-          @menu="openTrackMenu(track)"
-          @download="handleDirectDownload(track)"
-        />
-      </div>
+        :track="track"
+        :isPlaying="playerStore.currentTrack?.id === track.id"
+        :isLiked="track.is_liked"
+        @click="playTrack(track, index)"
+        @like="handleLikeTrack(track)"
+        @menu="openTrackMenu(track)"
+        @download="handleDirectDownload(track)"
+      />
     </div>
 
     <!-- Empty state -->
@@ -488,21 +484,10 @@ onMounted(loadPlaylist)
   display: none;
 }
 
-.track-wrapper {
-  display: flex;
-  align-items: center;
-  width: 100%;
-}
-
 .track-list {
   display: flex;
   flex-direction: column;
-}
-
-/* Ensure track items fill width */
-.track-list :deep(.track-item) {
-  flex: 1;
-  margin-right: 0;
+  gap: 2px;
 }
 
 .empty-state {

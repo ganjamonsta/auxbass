@@ -515,6 +515,7 @@ watch(scope, () => {
 .track-list {
   display: flex;
   flex-direction: column;
+  gap: 2px;
 }
 
 .loading {

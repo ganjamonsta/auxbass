@@ -535,6 +535,7 @@ onMounted(() => {
 .track-list {
   display: flex;
   flex-direction: column;
+  gap: 2px;
 }
 
 /* Full tracklist item styles */
