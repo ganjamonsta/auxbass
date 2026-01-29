@@ -347,6 +347,8 @@ async def search_friends_libraries(
     )
     following_ids = [row[0] for row in following_result.all()]
     
+    logger.info(f"[Social Search] User {user.id} searching '{search}', following: {following_ids}")
+    
     if not following_ids:
         return {
             "items": [],
@@ -354,7 +356,8 @@ async def search_friends_libraries(
         }
     
     # Search tracks in friends' libraries
-    search_term = f"%{search.lower()}%"
+    # Use ilike for case-insensitive search (works better with Cyrillic in PostgreSQL)
+    search_term = f"%{search}%"
     
     query = (
         select(Track, UserLibrary, User)
@@ -363,8 +366,8 @@ async def search_friends_libraries(
         .where(UserLibrary.user_id.in_(following_ids))
         .where(
             or_(
-                func.lower(Track.title).like(search_term),
-                func.lower(Track.artist).like(search_term),
+                Track.title.ilike(search_term),
+                Track.artist.ilike(search_term),
             )
         )
         .options(
@@ -377,6 +380,12 @@ async def search_friends_libraries(
     
     result = await db.execute(query)
     rows = result.unique().all()
+    
+    logger.info(f"[Social Search] Found {len(rows)} tracks for '{search}'")
+    if rows:
+        for track, lib_entry, owner in rows[:3]:
+            logger.info(f"[Social Search]   - '{track.artist}' - '{track.title}'")
+    
     
     # Build response with owner info
     items = []
@@ -407,6 +416,54 @@ async def search_friends_libraries(
     return {
         "items": items,
         "total": len(items),
+    }
+
+
+@router.get("/debug/friend-tracks/{friend_id}")
+async def debug_friend_tracks(
+    friend_id: int,
+    search: Optional[str] = None,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Debug endpoint to check tracks in friend's library.
+    Shows raw data including exact artist names.
+    """
+    # Get tracks from friend's library
+    query = (
+        select(Track.id, Track.title, Track.artist)
+        .join(UserLibrary, UserLibrary.track_id == Track.id)
+        .where(UserLibrary.user_id == friend_id)
+        .order_by(UserLibrary.added_at.desc())
+        .limit(50)
+    )
+    
+    if search:
+        search_term = f"%{search}%"
+        query = query.where(
+            or_(
+                Track.title.ilike(search_term),
+                Track.artist.ilike(search_term),
+            )
+        )
+    
+    result = await db.execute(query)
+    tracks = result.all()
+    
+    return {
+        "friend_id": friend_id,
+        "search": search,
+        "count": len(tracks),
+        "tracks": [
+            {
+                "id": t.id,
+                "title": t.title,
+                "artist": t.artist,
+                "artist_hex": t.artist.encode('utf-8').hex() if t.artist else None,
+            }
+            for t in tracks
+        ]
     }
 
 

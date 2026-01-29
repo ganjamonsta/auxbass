@@ -218,19 +218,19 @@ async def get_my_tracks(
     
     # Search filter
     if search:
-        search_term = f"%{search.lower()}%"
+        # Use ilike for case-insensitive search (works better with Cyrillic in PostgreSQL)
+        search_term = f"%{search}%"
         search_filter = or_(
-            func.lower(Track.title).like(search_term),
-            func.lower(Track.artist).like(search_term),
+            Track.title.ilike(search_term),
+            Track.artist.ilike(search_term),
         )
         query = query.where(search_filter)
         count_query = count_query.where(search_filter)
     
     # Artist filter
     if artist:
-        artist_lower = artist.lower()
-        query = query.where(func.lower(Track.artist) == artist_lower)
-        count_query = count_query.where(func.lower(Track.artist) == artist_lower)
+        query = query.where(Track.artist.ilike(artist))
+        count_query = count_query.where(Track.artist.ilike(artist))
     
     # Album filter
     if album_id:

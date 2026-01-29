@@ -539,11 +539,12 @@ async def get_global_tracks(
     )
     
     if search:
-        search_term = f"%{search.lower()}%"
+        # Use ilike for case-insensitive search (works better with Cyrillic in PostgreSQL)
+        search_term = f"%{search}%"
         query = query.where(
             or_(
-                func.lower(Track.title).like(search_term),
-                func.lower(Track.artist).like(search_term),
+                Track.title.ilike(search_term),
+                Track.artist.ilike(search_term),
             )
         )
     
@@ -551,8 +552,8 @@ async def get_global_tracks(
     if search:
         count_query = count_query.where(
             or_(
-                func.lower(Track.title).like(search_term),
-                func.lower(Track.artist).like(search_term),
+                Track.title.ilike(search_term),
+                Track.artist.ilike(search_term),
             )
         )
     
@@ -1022,11 +1023,12 @@ async def get_all_tracks(
     )
     
     if search:
-        search_term = f"%{search.lower()}%"
+        # Use ilike for case-insensitive search (works better with Cyrillic in PostgreSQL)
+        search_term = f"%{search}%"
         query = query.where(
             or_(
-                func.lower(Track.title).like(search_term),
-                func.lower(Track.artist).like(search_term),
+                Track.title.ilike(search_term),
+                Track.artist.ilike(search_term),
             )
         )
     
@@ -1038,8 +1040,8 @@ async def get_all_tracks(
     if search:
         count_query = count_query.join(Track, Track.id == UserLibrary.track_id).where(
             or_(
-                func.lower(Track.title).like(search_term),
-                func.lower(Track.artist).like(search_term),
+                Track.title.ilike(search_term),
+                Track.artist.ilike(search_term),
             )
         )
     

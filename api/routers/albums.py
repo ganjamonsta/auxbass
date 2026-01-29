@@ -99,19 +99,19 @@ async def get_my_albums(
     
     # Apply search
     if search:
-        search_term = f"%{search.lower()}%"
+        # Use ilike for case-insensitive search (works better with Cyrillic in PostgreSQL)
+        search_term = f"%{search}%"
         search_filter = (
-            func.lower(Album.name).like(search_term) |
-            func.lower(Album.artist).like(search_term)
+            Album.name.ilike(search_term) |
+            Album.artist.ilike(search_term)
         )
         query = query.where(search_filter)
         count_query = count_query.where(search_filter)
     
     # Apply artist filter
     if artist:
-        artist_lower = artist.lower()
-        query = query.where(func.lower(Album.artist) == artist_lower)
-        count_query = count_query.where(func.lower(Album.artist) == artist_lower)
+        query = query.where(Album.artist.ilike(artist))
+        count_query = count_query.where(Album.artist.ilike(artist))
     
     # Count total
     total = await db.scalar(count_query) or 0
@@ -196,19 +196,19 @@ async def get_global_albums(
     
     # Apply search
     if search:
-        search_term = f"%{search.lower()}%"
+        # Use ilike for case-insensitive search (works better with Cyrillic in PostgreSQL)
+        search_term = f"%{search}%"
         search_filter = (
-            func.lower(Album.name).like(search_term) |
-            func.lower(Album.artist).like(search_term)
+            Album.name.ilike(search_term) |
+            Album.artist.ilike(search_term)
         )
         query = query.where(search_filter)
         count_query = count_query.where(search_filter)
     
     # Apply artist filter
     if artist:
-        artist_lower = artist.lower()
-        query = query.where(func.lower(Album.artist) == artist_lower)
-        count_query = count_query.where(func.lower(Album.artist) == artist_lower)
+        query = query.where(Album.artist.ilike(artist))
+        count_query = count_query.where(Album.artist.ilike(artist))
     
     # Count total
     total = await db.scalar(count_query) or 0
