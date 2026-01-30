@@ -88,7 +88,7 @@
               <div class="metadata-grid">
                 <div class="meta-item" v-if="track?.album_title">
                   <span class="meta-label">ALBUM</span>
-                  <span class="meta-value" @click="handleGoToAlbum" class="clickable">{{ track.album_title }}</span>
+                  <span class="meta-value clickable" @click="handleGoToAlbum">{{ track.album_title }}</span>
                 </div>
                 <div class="meta-item" v-if="track?.year">
                   <span class="meta-label">YEAR</span>
