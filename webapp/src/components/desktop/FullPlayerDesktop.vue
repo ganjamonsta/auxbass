@@ -636,13 +636,13 @@ watch(() => props.isPlaying, (playing) => {
 
 <style scoped>
 :root {
-  --neu-bg: #e8ecf1;
-  --neu-shadow-light: #ffffff;
-  --neu-shadow-dark: #b8bcc4;
+  --neu-bg: #1e1e2e;
+  --neu-shadow-light: #2a2d3e;
+  --neu-shadow-dark: #141420;
   --neu-accent: #6c7ce8;
   --neu-accent-light: #8b9aff;
-  --neu-text: #2d3748;
-  --neu-text-light: #718096;
+  --neu-text: #e8ecf1;
+  --neu-text-light: #a0aec0;
 }
 
 .fullplayer-desktop {
@@ -652,7 +652,7 @@ watch(() => props.isPlaying, (playing) => {
   right: 0;
   bottom: 0;
   z-index: 10000;
-  background: linear-gradient(135deg, #e8ecf1 0%, #dde2e8 100%);
+  background: linear-gradient(135deg, #1a1a28 0%, #141420 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -665,11 +665,11 @@ watch(() => props.isPlaying, (playing) => {
   max-width: 1800px;
   height: 100%;
   max-height: 1000px;
-  background: #e8ecf1;
+  background: #1e1e2e;
   border-radius: 40px;
   box-shadow: 
-    20px 20px 60px #b8bcc4,
-    -20px -20px 60px #ffffff;
+    20px 20px 60px #0a0a10,
+    -20px -20px 60px #2a2d3e;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -681,7 +681,7 @@ watch(() => props.isPlaying, (playing) => {
   align-items: center;
   justify-content: space-between;
   padding: 25px 35px;
-  background: #e8ecf1;
+  background: #1e1e2e;
   position: relative;
   z-index: 10;
 }
@@ -714,11 +714,11 @@ watch(() => props.isPlaying, (playing) => {
   align-items: center;
   gap: 10px;
   padding: 8px 16px;
-  background: #e8ecf1;
+  background: #1e1e2e;
   border-radius: 20px;
   box-shadow: 
-    inset 4px 4px 8px #b8bcc4,
-    inset -4px -4px 8px #ffffff;
+    inset 4px 4px 8px #141420,
+    inset -4px -4px 8px #2a2d3e;
 }
 
 .status-dot {
@@ -746,7 +746,7 @@ watch(() => props.isPlaying, (playing) => {
 .hud-btn {
   width: 44px;
   height: 44px;
-  background: #e8ecf1;
+  background: #1e1e2e;
   border: none;
   border-radius: 12px;
   color: #6c7ce8;
@@ -756,21 +756,21 @@ watch(() => props.isPlaying, (playing) => {
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 
-    6px 6px 12px #b8bcc4,
-    -6px -6px 12px #ffffff;
+    6px 6px 12px #141420,
+    -6px -6px 12px #2a2d3e;
 }
 
 .hud-btn:hover {
   box-shadow: 
-    4px 4px 8px #b8bcc4,
-    -4px -4px 8px #ffffff;
+    4px 4px 8px #141420,
+    -4px -4px 8px #2a2d3e;
   transform: translateY(1px);
 }
 
 .hud-btn:active {
   box-shadow: 
-    inset 4px 4px 8px #b8bcc4,
-    inset -4px -4px 8px #ffffff;
+    inset 4px 4px 8px #141420,
+    inset -4px -4px 8px #2a2d3e;
   transform: translateY(2px);
 }
 
@@ -812,10 +812,10 @@ watch(() => props.isPlaying, (playing) => {
   aspect-ratio: 1;
   border-radius: 30px;
   overflow: hidden;
-  background: #e8ecf1;
+  background: #1e1e2e;
   box-shadow: 
-    inset 8px 8px 16px #b8bcc4,
-    inset -8px -8px 16px #ffffff;
+    inset 8px 8px 16px #141420,
+    inset -8px -8px 16px #2a2d3e;
 }
 
 .cover-wrapper {
@@ -834,8 +834,8 @@ watch(() => props.isPlaying, (playing) => {
   object-fit: cover;
   border-radius: 20px;
   box-shadow: 
-    8px 8px 20px #b8bcc4,
-    -8px -8px 20px #ffffff;
+    8px 8px 20px #0a0a10,
+    -8px -8px 20px #2a2d3e;
 }
 
 .cover-placeholder {
@@ -844,7 +844,7 @@ watch(() => props.isPlaying, (playing) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #dde2e8 0%, #cdd4dc 100%);
+  background: linear-gradient(135deg, #252838 0%, #1a1d2e 100%);
   border-radius: 20px;
 }
 
@@ -862,7 +862,7 @@ watch(() => props.isPlaying, (playing) => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(232, 236, 241, 0.95);
+  background: rgba(30, 30, 46, 0.95);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -884,12 +884,12 @@ watch(() => props.isPlaying, (playing) => {
   left: 0;
   width: 100%;
   height: 100%;
-  border: 4px solid #e8ecf1;
+  border: 4px solid #1e1e2e;
   border-top-color: #6c7ce8;
   border-radius: 50%;
   animation: spinRing 1.5s linear infinite;
   box-shadow: 
-    0 0 10px rgba(108, 124, 232, 0.3);
+    0 0 10px rgba(108, 124, 232, 0.5);
 }
 
 .spinner-ring:nth-child(2) {
@@ -931,11 +931,11 @@ watch(() => props.isPlaying, (playing) => {
   height: 80px;
   gap: 3px;
   padding: 15px;
-  background: #e8ecf1;
+  background: #1e1e2e;
   border-radius: 20px;
   box-shadow: 
-    inset 6px 6px 12px #b8bcc4,
-    inset -6px -6px 12px #ffffff;
+    inset 6px 6px 12px #141420,
+    inset -6px -6px 12px #2a2d3e;
 }
 
 .viz-bar {
@@ -961,11 +961,11 @@ watch(() => props.isPlaying, (playing) => {
 }
 
 .panel-center::-webkit-scrollbar-track {
-  background: #e8ecf1;
+  background: #1e1e2e;
   border-radius: 10px;
   box-shadow: 
-    inset 3px 3px 6px #b8bcc4,
-    inset -3px -3px 6px #ffffff;
+    inset 3px 3px 6px #141420,
+    inset -3px -3px 6px #2a2d3e;
 }
 
 .panel-center::-webkit-scrollbar-thumb {
@@ -979,12 +979,12 @@ watch(() => props.isPlaying, (playing) => {
 }
 
 .info-module {
-  background: #e8ecf1;
+  background: #1e1e2e;
   border-radius: 25px;
   padding: 25px;
   box-shadow: 
-    8px 8px 20px #b8bcc4,
-    -8px -8px 20px #ffffff;
+    8px 8px 20px #0a0a10,
+    -8px -8px 20px #2a2d3e;
 }
 
 .module-header {
@@ -993,7 +993,7 @@ watch(() => props.isPlaying, (playing) => {
   justify-content: space-between;
   margin-bottom: 18px;
   padding-bottom: 12px;
-  border-bottom: 2px solid #dde2e8;
+  border-bottom: 2px solid #2a2d3e;
 }
 
 .module-label {
@@ -1017,8 +1017,8 @@ watch(() => props.isPlaying, (playing) => {
   letter-spacing: 1px;
   font-family: 'Segoe UI', sans-serif;
   box-shadow: 
-    3px 3px 6px #b8bcc4,
-    -3px -3px 6px #ffffff;
+    3px 3px 6px #0a0a10,
+    -3px -3px 6px #2a2d3e;
 }
 
 .indicator.hd {
@@ -1039,15 +1039,15 @@ watch(() => props.isPlaying, (playing) => {
 .track-title-main {
   font-size: 32px;
   font-weight: 700;
-  color: #2d3748;
+  color: #e8ecf1;
   margin: 0 0 10px 0;
   line-height: 1.2;
-  text-shadow: 2px 2px 4px rgba(184, 188, 196, 0.2);
+  text-shadow: 2px 2px 4px rgba(20, 20, 32, 0.5);
 }
 
 .track-artist-main {
   font-size: 20px;
-  color: #718096;
+  color: #a0aec0;
   margin: 0;
   font-weight: 500;
 }
@@ -1064,11 +1064,11 @@ watch(() => props.isPlaying, (playing) => {
   flex-direction: column;
   gap: 6px;
   padding: 12px;
-  background: #e8ecf1;
+  background: #1e1e2e;
   border-radius: 12px;
   box-shadow: 
-    inset 3px 3px 6px #b8bcc4,
-    inset -3px -3px 6px #ffffff;
+    inset 3px 3px 6px #141420,
+    inset -3px -3px 6px #2a2d3e;
 }
 
 .meta-label {
@@ -1081,7 +1081,7 @@ watch(() => props.isPlaying, (playing) => {
 
 .meta-value {
   font-size: 14px;
-  color: #2d3748;
+  color: #e8ecf1;
   font-weight: 600;
 }
 
@@ -1122,12 +1122,12 @@ watch(() => props.isPlaying, (playing) => {
 .progress-track-wrapper {
   position: relative;
   height: 12px;
-  background: #e8ecf1;
+  background: #1e1e2e;
   border-radius: 10px;
   overflow: visible;
   box-shadow: 
-    inset 4px 4px 8px #b8bcc4,
-    inset -4px -4px 8px #ffffff;
+    inset 4px 4px 8px #141420,
+    inset -4px -4px 8px #2a2d3e;
 }
 
 .buffered-track {
@@ -1135,7 +1135,7 @@ watch(() => props.isPlaying, (playing) => {
   top: 0;
   left: 0;
   height: 100%;
-  background: linear-gradient(90deg, #d1d7e0 0%, #c0c6d2 100%);
+  background: linear-gradient(90deg, #2a2d3e 0%, #252838 100%);
   transition: width 0.3s ease;
   border-radius: 10px;
 }
@@ -1163,9 +1163,9 @@ watch(() => props.isPlaying, (playing) => {
   background: #6c7ce8;
   border-radius: 50%;
   box-shadow: 
-    4px 4px 10px #b8bcc4,
-    -4px -4px 10px #ffffff,
-    0 0 12px rgba(108, 124, 232, 0.5);
+    4px 4px 10px #0a0a10,
+    -4px -4px 10px #2a2d3e,
+    0 0 12px rgba(108, 124, 232, 0.7);
 }
 
 .progress-input {
@@ -1192,7 +1192,7 @@ watch(() => props.isPlaying, (playing) => {
   width: 56px;
   height: 56px;
   border: none;
-  background: #e8ecf1;
+  background: #1e1e2e;
   border-radius: 50%;
   color: #6c7ce8;
   display: flex;
@@ -1201,44 +1201,44 @@ watch(() => props.isPlaying, (playing) => {
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 
-    8px 8px 16px #b8bcc4,
-    -8px -8px 16px #ffffff;
+    8px 8px 16px #141420,
+    -8px -8px 16px #2a2d3e;
 }
 
 .control-btn:hover {
   box-shadow: 
-    6px 6px 12px #b8bcc4,
-    -6px -6px 12px #ffffff;
+    6px 6px 12px #141420,
+    -6px -6px 12px #2a2d3e;
   transform: translateY(2px);
 }
 
 .control-btn:active {
   box-shadow: 
-    inset 4px 4px 8px #b8bcc4,
-    inset -4px -4px 8px #ffffff;
+    inset 4px 4px 8px #141420,
+    inset -4px -4px 8px #2a2d3e;
   transform: translateY(3px);
 }
 
 .control-btn.play {
   width: 80px;
   height: 80px;
-  background: linear-gradient(135deg, #e8ecf1 0%, #dde2e8 100%);
+  background: linear-gradient(135deg, #1e1e2e 0%, #1a1d2e 100%);
   box-shadow: 
-    12px 12px 24px #b8bcc4,
-    -12px -12px 24px #ffffff;
+    12px 12px 24px #0a0a10,
+    -12px -12px 24px #2a2d3e;
 }
 
 .control-btn.play:hover {
   box-shadow: 
-    10px 10px 20px #b8bcc4,
-    -10px -10px 20px #ffffff;
+    10px 10px 20px #0a0a10,
+    -10px -10px 20px #2a2d3e;
   transform: translateY(2px);
 }
 
 .control-btn.play:active {
   box-shadow: 
-    inset 6px 6px 12px #b8bcc4,
-    inset -6px -6px 12px #ffffff;
+    inset 6px 6px 12px #141420,
+    inset -6px -6px 12px #2a2d3e;
   transform: translateY(4px);
 }
 
@@ -1251,9 +1251,9 @@ watch(() => props.isPlaying, (playing) => {
   background: linear-gradient(135deg, #6c7ce8 0%, #8b9aff 100%);
   color: #ffffff;
   box-shadow: 
-    8px 8px 16px #b8bcc4,
-    -8px -8px 16px #ffffff,
-    inset 0 0 20px rgba(139, 154, 255, 0.3);
+    8px 8px 16px #0a0a10,
+    -8px -8px 16px #2a2d3e,
+    inset 0 0 20px rgba(139, 154, 255, 0.4);
 }
 
 /* Action Buttons */
@@ -1268,7 +1268,7 @@ watch(() => props.isPlaying, (playing) => {
   min-width: 150px;
   padding: 12px 18px;
   border: none;
-  background: #e8ecf1;
+  background: #1e1e2e;
   border-radius: 16px;
   color: #6c7ce8;
   display: flex;
@@ -1282,21 +1282,21 @@ watch(() => props.isPlaying, (playing) => {
   font-family: 'Segoe UI', sans-serif;
   transition: all 0.3s ease;
   box-shadow: 
-    6px 6px 12px #b8bcc4,
-    -6px -6px 12px #ffffff;
+    6px 6px 12px #141420,
+    -6px -6px 12px #2a2d3e;
 }
 
 .action-btn:hover {
   box-shadow: 
-    4px 4px 8px #b8bcc4,
-    -4px -4px 8px #ffffff;
+    4px 4px 8px #141420,
+    -4px -4px 8px #2a2d3e;
   transform: translateY(1px);
 }
 
 .action-btn:active {
   box-shadow: 
-    inset 4px 4px 8px #b8bcc4,
-    inset -4px -4px 8px #ffffff;
+    inset 4px 4px 8px #141420,
+    inset -4px -4px 8px #2a2d3e;
   transform: translateY(2px);
 }
 
@@ -1304,25 +1304,25 @@ watch(() => props.isPlaying, (playing) => {
   background: linear-gradient(135deg, #ff6b9d 0%, #ff8bb3 100%);
   color: #ffffff;
   box-shadow: 
-    6px 6px 12px #b8bcc4,
-    -6px -6px 12px #ffffff,
-    inset 0 0 15px rgba(255, 107, 157, 0.3);
+    6px 6px 12px #0a0a10,
+    -6px -6px 12px #2a2d3e,
+    inset 0 0 15px rgba(255, 107, 157, 0.4);
 }
 
 .action-btn.hd {
   background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
-  color: #8b7300;
+  color: #1a1a1a;
   box-shadow: 
-    6px 6px 12px #b8bcc4,
-    -6px -6px 12px #ffffff,
-    inset 0 0 15px rgba(255, 215, 0, 0.2);
+    6px 6px 12px #0a0a10,
+    -6px -6px 12px #2a2d3e,
+    inset 0 0 15px rgba(255, 215, 0, 0.3);
 }
 
 .action-btn.hd:hover {
   box-shadow: 
-    4px 4px 8px #b8bcc4,
-    -4px -4px 8px #ffffff,
-    0 0 20px rgba(255, 215, 0, 0.4);
+    4px 4px 8px #0a0a10,
+    -4px -4px 8px #2a2d3e,
+    0 0 20px rgba(255, 215, 0, 0.5);
 }
 
 /* Volume Control */
@@ -1340,7 +1340,7 @@ watch(() => props.isPlaying, (playing) => {
   width: 48px;
   height: 48px;
   border: none;
-  background: #e8ecf1;
+  background: #1e1e2e;
   border-radius: 50%;
   color: #6c7ce8;
   display: flex;
@@ -1350,33 +1350,33 @@ watch(() => props.isPlaying, (playing) => {
   transition: all 0.3s ease;
   flex-shrink: 0;
   box-shadow: 
-    6px 6px 12px #b8bcc4,
-    -6px -6px 12px #ffffff;
+    6px 6px 12px #141420,
+    -6px -6px 12px #2a2d3e;
 }
 
 .volume-btn:hover {
   box-shadow: 
-    4px 4px 8px #b8bcc4,
-    -4px -4px 8px #ffffff;
+    4px 4px 8px #141420,
+    -4px -4px 8px #2a2d3e;
   transform: translateY(1px);
 }
 
 .volume-btn:active {
   box-shadow: 
-    inset 4px 4px 8px #b8bcc4,
-    inset -4px -4px 8px #ffffff;
+    inset 4px 4px 8px #141420,
+    inset -4px -4px 8px #2a2d3e;
 }
 
 .volume-slider-container {
   position: relative;
   flex: 1;
   height: 10px;
-  background: #e8ecf1;
+  background: #1e1e2e;
   border-radius: 10px;
   overflow: hidden;
   box-shadow: 
-    inset 4px 4px 8px #b8bcc4,
-    inset -4px -4px 8px #ffffff;
+    inset 4px 4px 8px #141420,
+    inset -4px -4px 8px #2a2d3e;
 }
 
 .volume-level {
@@ -1422,12 +1422,12 @@ watch(() => props.isPlaying, (playing) => {
 
 /* Context Module */
 .context-module {
-  background: #e8ecf1;
+  background: #1e1e2e;
   border-radius: 20px;
   padding: 18px;
   box-shadow: 
-    6px 6px 12px #b8bcc4,
-    -6px -6px 12px #ffffff;
+    6px 6px 12px #0a0a10,
+    -6px -6px 12px #2a2d3e;
 }
 
 .context-info {
@@ -1447,7 +1447,7 @@ watch(() => props.isPlaying, (playing) => {
 .context-name {
   font-size: 16px;
   font-weight: 600;
-  color: #2d3748;
+  color: #e8ecf1;
 }
 
 .context-meta {
@@ -1458,15 +1458,15 @@ watch(() => props.isPlaying, (playing) => {
 /* Queue Module */
 .queue-module {
   flex: 1;
-  background: #e8ecf1;
+  background: #1e1e2e;
   border-radius: 20px;
   padding: 18px;
   display: flex;
   flex-direction: column;
   min-height: 0;
   box-shadow: 
-    6px 6px 12px #b8bcc4,
-    -6px -6px 12px #ffffff;
+    6px 6px 12px #0a0a10,
+    -6px -6px 12px #2a2d3e;
 }
 
 .queue-count {
@@ -1485,7 +1485,7 @@ watch(() => props.isPlaying, (playing) => {
   flex: 1;
   padding: 10px;
   border: none;
-  background: #e8ecf1;
+  background: #1e1e2e;
   border-radius: 12px;
   color: #718096;
   font-size: 10px;
@@ -1495,14 +1495,14 @@ watch(() => props.isPlaying, (playing) => {
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 
-    4px 4px 8px #b8bcc4,
-    -4px -4px 8px #ffffff;
+    4px 4px 8px #141420,
+    -4px -4px 8px #2a2d3e;
 }
 
 .queue-tab:hover {
   box-shadow: 
-    3px 3px 6px #b8bcc4,
-    -3px -3px 6px #ffffff;
+    3px 3px 6px #141420,
+    -3px -3px 6px #2a2d3e;
   color: #6c7ce8;
 }
 
@@ -1510,9 +1510,9 @@ watch(() => props.isPlaying, (playing) => {
   background: linear-gradient(135deg, #6c7ce8 0%, #8b9aff 100%);
   color: #ffffff;
   box-shadow: 
-    inset 3px 3px 6px rgba(108, 124, 232, 0.3),
-    4px 4px 8px #b8bcc4,
-    -4px -4px 8px #ffffff;
+    inset 3px 3px 6px rgba(108, 124, 232, 0.4),
+    4px 4px 8px #0a0a10,
+    -4px -4px 8px #2a2d3e;
 }
 
 .queue-list {
@@ -1526,11 +1526,11 @@ watch(() => props.isPlaying, (playing) => {
 }
 
 .queue-list::-webkit-scrollbar-track {
-  background: #e8ecf1;
+  background: #1e1e2e;
   border-radius: 10px;
   box-shadow: 
-    inset 2px 2px 4px #b8bcc4,
-    inset -2px -2px 4px #ffffff;
+    inset 2px 2px 4px #141420,
+    inset -2px -2px 4px #2a2d3e;
 }
 
 .queue-list::-webkit-scrollbar-thumb {
@@ -1552,22 +1552,22 @@ watch(() => props.isPlaying, (playing) => {
   margin-bottom: 6px;
   cursor: pointer;
   transition: all 0.3s ease;
-  background: #e8ecf1;
+  background: #1e1e2e;
 }
 
 .queue-track:hover {
   box-shadow: 
-    4px 4px 8px #b8bcc4,
-    -4px -4px 8px #ffffff;
+    4px 4px 8px #0a0a10,
+    -4px -4px 8px #2a2d3e;
   transform: translateY(-1px);
 }
 
 .queue-track.active {
   background: linear-gradient(135deg, #6c7ce8 0%, #8b9aff 100%);
   box-shadow: 
-    6px 6px 12px #b8bcc4,
-    -6px -6px 12px #ffffff,
-    inset 0 0 20px rgba(139, 154, 255, 0.3);
+    6px 6px 12px #0a0a10,
+    -6px -6px 12px #2a2d3e,
+    inset 0 0 20px rgba(139, 154, 255, 0.4);
 }
 
 .queue-track.active .queue-track-title,
@@ -1600,10 +1600,10 @@ watch(() => props.isPlaying, (playing) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #dde2e8;
+  background: #2a2d3e;
   box-shadow: 
-    inset 3px 3px 6px #b8bcc4,
-    inset -3px -3px 6px #ffffff;
+    inset 3px 3px 6px #141420,
+    inset -3px -3px 6px #252838;
 }
 
 .queue-track-cover img {
@@ -1629,7 +1629,7 @@ watch(() => props.isPlaying, (playing) => {
 .queue-track-title {
   font-size: 13px;
   font-weight: 600;
-  color: #2d3748;
+  color: #e8ecf1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1655,12 +1655,12 @@ watch(() => props.isPlaying, (playing) => {
   align-items: center;
   gap: 12px;
   padding: 12px;
-  background: #e8ecf1;
+  background: #1e1e2e;
   border-radius: 12px;
   margin-top: 8px;
   box-shadow: 
-    inset 4px 4px 8px #b8bcc4,
-    inset -4px -4px 8px #ffffff;
+    inset 4px 4px 8px #141420,
+    inset -4px -4px 8px #2a2d3e;
 }
 
 .lazy-icon {
@@ -1694,12 +1694,12 @@ watch(() => props.isPlaying, (playing) => {
 
 /* Statistics Module */
 .stats-module {
-  background: #e8ecf1;
+  background: #1e1e2e;
   border-radius: 20px;
   padding: 18px;
   box-shadow: 
-    6px 6px 12px #b8bcc4,
-    -6px -6px 12px #ffffff;
+    6px 6px 12px #0a0a10,
+    -6px -6px 12px #2a2d3e;
 }
 
 .stats-grid {
@@ -1713,11 +1713,11 @@ watch(() => props.isPlaying, (playing) => {
   flex-direction: column;
   gap: 6px;
   padding: 12px;
-  background: #e8ecf1;
+  background: #1e1e2e;
   border-radius: 12px;
   box-shadow: 
-    inset 3px 3px 6px #b8bcc4,
-    inset -3px -3px 6px #ffffff;
+    inset 3px 3px 6px #141420,
+    inset -3px -3px 6px #2a2d3e;
 }
 
 .stat-label {
@@ -1731,7 +1731,7 @@ watch(() => props.isPlaying, (playing) => {
 .stat-value {
   font-size: 14px;
   font-weight: 700;
-  color: #2d3748;
+  color: #e8ecf1;
   font-family: 'Segoe UI', monospace;
 }
 
