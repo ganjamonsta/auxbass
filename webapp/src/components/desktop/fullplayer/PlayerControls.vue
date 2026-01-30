@@ -238,11 +238,6 @@ const formatTime = (seconds) => {
   height: 20px;
   background: #db2220;
   border-radius: 50%;
-  box-shadow: 
-    4px 4px 10px #000000,
-    -4px -4px 10px #1a1a28,
-    0 0 12px var(--sh-dark),
-    -4px -4px 10px var(--sh-light);
 }
 
 .progress-input {
