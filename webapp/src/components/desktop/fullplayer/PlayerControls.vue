@@ -76,7 +76,7 @@
         </button>
 
         <button 
-          class="action-btn" 
+          class="control-btn secondary" 
           :class="{ active: isLiked }" 
           @click="$emit('like')"
           title="Добавить в любимое"
@@ -88,7 +88,7 @@
           <span>FAVORITE</span>
         </button>
         
-        <button class="action-btn" @click="$emit('addToPlaylist')" title="Добавить в плейлист">
+        <button class="control-btn secondary" @click="$emit('addToPlaylist')" title="Добавить в плейлист">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
             <path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z"/>
           </svg>
@@ -163,8 +163,8 @@ const formatTime = (seconds) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 18px;
-  padding-bottom: 12px;
+  margin-bottom: 1px;
+  padding-bottom: 2px;
   border-bottom: 2px solid #1a1a28;
 }
 
@@ -324,8 +324,18 @@ const formatTime = (seconds) => {
 }
 
 .control-btn.secondary {
-  width: 48px;
+  width: auto;
+  min-width: 48px;
   height: 48px;
+  padding: 0 12px;
+  border-radius: 24px;
+  gap: 8px;
+}
+
+.control-btn.secondary span {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
 }
 
 .control-btn.active {
