@@ -48,6 +48,7 @@ class PlaylistResponse(BaseModel):
     track_count: int = 0
     total_duration: int = 0
     cover_url: Optional[str] = None
+    covers: List[str] = []  # Array of cover URLs for collage display
     is_public: bool = False
     owner_id: Optional[int] = None
     owner_name: Optional[str] = None
@@ -75,8 +76,8 @@ class ReorderRequest(BaseModel):
     track_ids: List[int]
 
 
-async def get_playlist_info(db: AsyncSession, playlist_id: int, playlist_cover_url: Optional[str] = None) -> tuple[int, int, Optional[str]]:
-    """Get track count, duration, and cover for a playlist"""
+async def get_playlist_info(db: AsyncSession, playlist_id: int, playlist_cover_url: Optional[str] = None) -> tuple[int, int, Optional[str], List[str]]:
+    """Get track count, duration, cover, and covers array for a playlist"""
     # Count and duration
     result = await db.execute(
         select(
@@ -90,22 +91,29 @@ async def get_playlist_info(db: AsyncSession, playlist_id: int, playlist_cover_u
     track_count = row[0] or 0
     total_duration = row[1] or 0
     
-    # Use playlist's own cover_url if set, otherwise fallback to first track's cover
-    cover_url = playlist_cover_url
-    if not cover_url:
-        # First track's cover from enrichment
-        cover_result = await db.execute(
-            select(Track)
-            .join(PlaylistTrack, PlaylistTrack.track_id == Track.id)
-            .where(PlaylistTrack.playlist_id == playlist_id)
-            .options(selectinload(Track.enrichment))
-            .order_by(PlaylistTrack.position)
-            .limit(1)
-        )
-        first_track = cover_result.scalar_one_or_none()
-        cover_url = first_track.enrichment.cover_url if first_track and first_track.enrichment else None
+    # Get track covers for collage (up to 4)
+    covers_result = await db.execute(
+        select(Track)
+        .join(PlaylistTrack, PlaylistTrack.track_id == Track.id)
+        .where(PlaylistTrack.playlist_id == playlist_id)
+        .options(selectinload(Track.enrichment))
+        .order_by(PlaylistTrack.position)
+        .limit(4)
+    )
+    track_covers = []
+    for track in covers_result.scalars().all():
+        if track.enrichment and track.enrichment.cover_url:
+            track_covers.append(track.enrichment.cover_url)
     
-    return track_count, total_duration, cover_url
+    # Build covers array: if playlist has own cover, use it alone; otherwise use track covers
+    if playlist_cover_url:
+        covers = [playlist_cover_url]
+        cover_url = playlist_cover_url
+    else:
+        covers = track_covers[:4]  # Up to 4 for collage
+        cover_url = track_covers[0] if track_covers else None
+    
+    return track_count, total_duration, cover_url, covers
 
 
 @router.get("", response_model=PlaylistsListResponse)
@@ -146,7 +154,7 @@ async def get_my_playlists(
     
     items = []
     for playlist in owned_playlists:
-        track_count, total_duration, cover_url = await get_playlist_info(db, playlist.id, playlist.cover_url)
+        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
         items.append(PlaylistResponse(
             id=playlist.id,
             name=playlist.name,
@@ -154,6 +162,7 @@ async def get_my_playlists(
             track_count=track_count,
             total_duration=total_duration,
             cover_url=cover_url,
+            covers=covers,
             is_public=playlist.is_public,
             is_owner=True,
             is_subscribed=False,
@@ -178,7 +187,7 @@ async def get_my_playlists(
         subscribed_rows = result.all()
         
         for playlist, owner, subscription in subscribed_rows:
-            track_count, total_duration, cover_url = await get_playlist_info(db, playlist.id, playlist.cover_url)
+            track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
             items.append(PlaylistResponse(
                 id=playlist.id,
                 name=playlist.name,
@@ -186,6 +195,7 @@ async def get_my_playlists(
                 track_count=track_count,
                 total_duration=total_duration,
                 cover_url=cover_url,
+                covers=covers,
                 is_public=playlist.is_public,
                 owner_id=owner.id,
                 owner_name=owner.display_name,
@@ -272,12 +282,19 @@ async def get_playlist(
     track_count = len(tracks_response)
     total_duration = sum(t.duration or 0 for t in [row[0] for row in rows])
     
-    # Use playlist's own cover_url if set, otherwise fallback to first track's cover
-    cover_url = playlist.cover_url
-    if not cover_url and rows:
-        first_track = rows[0][0]
-        if first_track.enrichment:
-            cover_url = first_track.enrichment.cover_url
+    # Build covers array and cover_url
+    # If playlist has own cover, use it; otherwise use track covers for collage
+    if playlist.cover_url:
+        cover_url = playlist.cover_url
+        covers = [playlist.cover_url]
+    else:
+        # Get up to 4 track covers for collage
+        track_covers = []
+        for track, _ in rows:
+            if track.enrichment and track.enrichment.cover_url and len(track_covers) < 4:
+                track_covers.append(track.enrichment.cover_url)
+        cover_url = track_covers[0] if track_covers else None
+        covers = track_covers
     
     # Check if user is subscribed to this playlist
     is_subscribed = False
@@ -298,6 +315,7 @@ async def get_playlist(
         track_count=track_count,
         total_duration=total_duration,
         cover_url=cover_url,
+        covers=covers,
         is_public=playlist.is_public,
         owner_id=owner.id,
         owner_name=owner.display_name,
@@ -364,7 +382,7 @@ async def update_playlist(
     
     await db.commit()
     
-    track_count, total_duration, cover_url = await get_playlist_info(db, playlist.id, playlist.cover_url)
+    track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
     
     return PlaylistResponse(
         id=playlist.id,
@@ -373,6 +391,7 @@ async def update_playlist(
         track_count=track_count,
         total_duration=total_duration,
         cover_url=cover_url,
+        covers=covers,
         is_public=playlist.is_public,
         created_at=playlist.created_at,
     )
@@ -536,7 +555,7 @@ async def get_public_playlists(
     
     items = []
     for playlist, owner in rows:
-        track_count, total_duration, cover_url = await get_playlist_info(db, playlist.id, playlist.cover_url)
+        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
         
         # Check if current user is subscribed or is owner
         is_owner = playlist.owner_id == user.id
@@ -558,6 +577,7 @@ async def get_public_playlists(
             track_count=track_count,
             total_duration=total_duration,
             cover_url=cover_url,
+            covers=covers,
             is_public=playlist.is_public,
             owner_id=owner.id,
             owner_name=owner.display_name,
@@ -613,7 +633,7 @@ async def get_user_public_playlists(
     
     items = []
     for playlist in playlists:
-        track_count, total_duration, cover_url = await get_playlist_info(db, playlist.id, playlist.cover_url)
+        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
         # Check if current user is subscribed
         is_subscribed = False
         if not is_own:
@@ -633,6 +653,7 @@ async def get_user_public_playlists(
             track_count=track_count,
             total_duration=total_duration,
             cover_url=cover_url,
+            covers=covers,
             is_public=playlist.is_public,
             owner_id=owner.id,
             owner_name=owner.display_name,

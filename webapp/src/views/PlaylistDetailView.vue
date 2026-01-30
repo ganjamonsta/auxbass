@@ -170,6 +170,11 @@ const isOwner = computed(() => {
 })
 
 const coverImages = computed(() => {
+  // If playlist has its own cover, use it (single image in array for consistent template)
+  if (playlist.value?.cover_url) {
+    return [playlist.value.cover_url]
+  }
+  // Fallback to track covers for collage
   if (!playlist.value?.tracks) return []
   return playlist.value.tracks.filter(t => t.cover_url).slice(0, 4).map(t => t.cover_url)
 })
