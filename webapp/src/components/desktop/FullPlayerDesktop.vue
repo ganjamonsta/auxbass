@@ -67,9 +67,12 @@
             </div>
 
             <!-- Artist Media Library -->
-            <div class="artist-library-section" v-if="track?.artist_id">
+            <div class="artist-library-section" v-if="track">
               <div class="library-header">
-                <span class="library-label">ARTIST MEDIA</span>
+                <div class="library-title-section">
+                  <span class="library-label">ARTIST MEDIA</span>
+                  <span class="library-count">{{ sortedArtistTracks.length }} tracks</span>
+                </div>
                 <div class="sort-controls">
                   <button 
                     class="sort-btn" 
@@ -141,7 +144,8 @@
                 </div>
                 
                 <div v-if="!sortedArtistTracks.length" class="artist-tracks-empty">
-                  <span>Треки не найдены</span>
+                  <span v-if="!track?.artist_id">Нет информации об артисте</span>
+                  <span v-else>Треки не найдены в библиотеке</span>
                 </div>
               </div>
             </div>
@@ -906,6 +910,22 @@ watch(() => props.isPlaying, (playing) => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 10px;
+}
+
+.panel-left::-webkit-scrollbar {
+  width: 6px;
+}
+
+.panel-left::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.panel-left::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #e85c7c 0%, #ff8ba8 100%);
+  border-radius: 3px;
 }
 
 .cover-section {
@@ -1047,14 +1067,15 @@ watch(() => props.isPlaying, (playing) => {
 
 /* Artist Media Library */
 .artist-library-section {
-  margin-top: 20px;
+  margin-top: 15px;
   background: #12121e;
   border-radius: 24px;
-  padding: 20px;
+  padding: 18px;
   box-shadow: 
     inset 6px 6px 12px #08080f,
     inset -6px -6px 12px #1a1a28;
-  height: calc(100% - 520px);
+  min-height: 250px;
+  max-height: 400px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1069,11 +1090,25 @@ watch(() => props.isPlaying, (playing) => {
   border-bottom: 1px solid rgba(232, 92, 124, 0.1);
 }
 
+.library-title-section {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
 .library-label {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 1.5px;
   color: #e85c7c;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+.library-count {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: #9ca3af;
   font-family: 'Segoe UI', sans-serif;
 }
 
