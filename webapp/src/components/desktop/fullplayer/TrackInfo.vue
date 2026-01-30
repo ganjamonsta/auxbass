@@ -1,7 +1,23 @@
 <template>
   <div class="info-module primary">
     <div class="module-header">
-      <span class="module-label">TRACK DATA</span>
+      <div class="header-left">
+        <span class="module-label">TRACK DATA</span>
+        <div class="header-tags" v-if="track">
+          <div class="header-tag" v-if="track.genre">
+            <span class="tag-label">GENRE</span>
+            <span class="tag-value">{{ track.genre }}</span>
+          </div>
+          <div class="header-tag" v-if="track.duration">
+            <span class="tag-label">DURATION</span>
+            <span class="tag-value">{{ formatTime(track.duration) }}</span>
+          </div>
+          <div class="header-tag" v-if="track.play_count !== undefined">
+            <span class="tag-label">PLAYS</span>
+            <span class="tag-value">{{ track.play_count }}</span>
+          </div>
+        </div>
+      </div>
       <div class="module-indicators">
         <span v-if="hdTrackInfo" class="indicator hd" title="HD версия доступна">HD</span>
         <span v-if="isLiked" class="indicator liked">♥</span>
@@ -23,21 +39,9 @@
         <span class="meta-label">YEAR</span>
         <span class="meta-value">{{ track.year }}</span>
       </div>
-      <div class="meta-item" v-if="track?.genre">
-        <span class="meta-label">GENRE</span>
-        <span class="meta-value">{{ track.genre }}</span>
-      </div>
-      <div class="meta-item" v-if="track?.duration">
-        <span class="meta-label">DURATION</span>
-        <span class="meta-value">{{ formatTime(track.duration) }}</span>
-      </div>
       <div class="meta-item" v-if="track?.bitrate">
         <span class="meta-label">QUALITY</span>
         <span class="meta-value">{{ track.bitrate }} kbps</span>
-      </div>
-      <div class="meta-item" v-if="track?.play_count !== undefined">
-        <span class="meta-label">PLAYS</span>
-        <span class="meta-value">{{ track.play_count }}</span>
       </div>
     </div>
   </div>
@@ -83,6 +87,43 @@ const formatTime = (seconds) => {
   letter-spacing: 2px;
   color: #db2220;
   font-family: 'Segoe UI', sans-serif;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.header-tags {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tag-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #e85c7c;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+  text-transform: uppercase;
+}
+
+.tag-label::after {
+  content: ":";
+}
+
+.tag-value {
+  font-size: 11px;
+  font-weight: 600;
+  color: #cbd5e0;
 }
 
 .module-indicators {
