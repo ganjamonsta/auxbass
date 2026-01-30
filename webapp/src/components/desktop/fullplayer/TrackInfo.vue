@@ -97,9 +97,8 @@ const formatTime = (seconds) => {
   font-weight: 700;
   letter-spacing: 1px;
   font-family: 'Segoe UI', sans-serif;
-  box-shadow: 
-    3px 3px 6px #000000,
-  @apply shadow-neu-raised-sm
+  @apply shadow-neu-raised-sm;
+}
 .indicator.hd {
   background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
   color: #8b7300;
