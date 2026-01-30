@@ -42,14 +42,11 @@
       </div>
 
       <!-- Search -->
-      <div class="search-bar">
-        <input
-          v-model="albumSearchQuery"
-          type="text"
-          placeholder="Поиск альбомов..."
-          @input="debouncedAlbumSearch"
-        />
-      </div>
+      <SearchBar
+        v-model="albumSearchQuery"
+        placeholder="Поиск альбомов..."
+        @input="debouncedAlbumSearch"
+      />
 
       <div class="view-header">
         <div class="header-left">
@@ -109,13 +106,10 @@
     <!-- Playlists Tab -->
     <div v-show="activeTab === 'playlists'" class="tab-content">
       <!-- Search for playlists -->
-      <div class="search-bar">
-        <input
-          v-model="playlistSearchQuery"
-          type="text"
-          placeholder="Поиск плейлистов..."
-        />
-      </div>
+      <SearchBar
+        v-model="playlistSearchQuery"
+        placeholder="Поиск плейлистов..."
+      />
 
       <div class="view-header">
         <span class="count">{{ filteredPlaylists.length }} плейлистов</span>
@@ -215,6 +209,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import PaginationNav from '@/components/PaginationNav.vue'
 import SortChips from '@/components/SortChips.vue'
+import SearchBar from '@/components/ui/SearchBar.vue'
 import api from '@/api/client'
 import { Disc3, Folder, Plus, Music, Globe, Search, Play } from 'lucide-vue-next'
 
@@ -610,37 +605,7 @@ onMounted(() => {
     0 0 10px var(--accent-glow);
 }
 
-/* Search bar - neumorphic inset style */
-.search-bar {
-  margin-bottom: 16px;
-}
-
-.search-bar input {
-  width: 100%;
-  height: 44px;
-  padding: 0 18px;
-  background: var(--c-bg-0);
-  border: none;
-  border-radius: var(--r-lg);
-  color: var(--c-text-1);
-  font-size: 14px;
-  box-shadow:
-    inset 3px 3px 6px var(--sh-inset-dark),
-    inset -2px -2px 4px var(--sh-inset-light);
-  outline: none;
-  transition: box-shadow 0.2s ease;
-}
-
-.search-bar input:focus {
-  box-shadow:
-    inset 3px 3px 6px var(--sh-inset-dark),
-    inset -2px -2px 4px var(--sh-inset-light),
-    0 0 0 2px var(--accent-glow);
-}
-
-.search-bar input::placeholder {
-  color: var(--c-text-3);
-}
+/* Old search bar styles removed - using SearchBar component */
 
 .view-header {
   display: flex;

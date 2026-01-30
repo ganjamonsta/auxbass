@@ -19,14 +19,11 @@
     </div>
 
     <!-- Search -->
-    <div class="search-bar">
-      <input
-        v-model="searchQuery"
-        type="text"
-        placeholder="Поиск исполнителей..."
-        @input="debouncedSearch"
-      />
-    </div>
+    <SearchBar
+      v-model="searchQuery"
+      placeholder="Поиск исполнителей..."
+      @input="debouncedSearch"
+    />
 
     <!-- Sort options -->
     <div class="sort-options">
@@ -75,6 +72,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useSort } from '@/composables'
 import SortChips from '@/components/SortChips.vue'
 import ArtistGridCard from '@/components/ArtistGridCard.vue'
+import SearchBar from '@/components/ui/SearchBar.vue'
 import { artistsApi } from '@/api/client'
 import { User } from 'lucide-vue-next'
 
@@ -294,36 +292,7 @@ onUnmounted(() => {
 }
 
 /* Search bar - neumorphic inset style */
-.search-bar {
-  margin-bottom: 16px;
-}
-
-.search-bar input {
-  width: 100%;
-  height: 44px;
-  padding: 0 18px;
-  background: var(--c-bg-0);
-  border: none;
-  border-radius: var(--r-lg);
-  color: var(--c-text-1);
-  font-size: 14px;
-  box-shadow:
-    inset 3px 3px 6px var(--sh-inset-dark),
-    inset -2px -2px 4px var(--sh-inset-light);
-  outline: none;
-  transition: box-shadow 0.2s ease;
-}
-
-.search-bar input:focus {
-  box-shadow:
-    inset 3px 3px 6px var(--sh-inset-dark),
-    inset -2px -2px 4px var(--sh-inset-light),
-    0 0 0 2px var(--accent-glow);
-}
-
-.search-bar input::placeholder {
-  color: var(--c-text-3);
-}
+/* Removed old search-bar styles in favor of SearchBar component */
 
 .stats {
   color: var(--text-secondary);

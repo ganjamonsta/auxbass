@@ -126,14 +126,11 @@
 
     <!-- Search Tab -->
     <div v-show="activeTab === 'search'" class="tab-content">
-      <div class="search-box">
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="Поиск по имени или @username"
-          @input="debouncedSearch"
-        />
-      </div>
+      <SearchBar
+        v-model="searchQuery"
+        placeholder="Поиск по имени или @username"
+        @input="debouncedSearch"
+      />
 
       <div v-if="searching" class="loading">
         <div class="spinner"></div>
@@ -321,6 +318,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
 import api from '@/api/client'
+import SearchBar from '@/components/ui/SearchBar.vue'
 import { Users, User, Search, Check, X, Music, Folder, Disc3, Lightbulb } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -597,35 +595,7 @@ onMounted(() => {
 }
 
 /* Search - neumorphic inset style */
-.search-box {
-  margin-bottom: 20px;
-}
-
-.search-box input {
-  width: 100%;
-  padding: 14px 18px;
-  background: var(--c-bg-0);
-  border: none;
-  border-radius: var(--r-lg);
-  color: var(--c-text-1);
-  font-size: 16px;
-  box-shadow:
-    inset 3px 3px 6px var(--sh-inset-dark),
-    inset -2px -2px 4px var(--sh-inset-light);
-  outline: none;
-  transition: box-shadow 0.2s ease;
-}
-
-.search-box input:focus {
-  box-shadow:
-    inset 3px 3px 6px var(--sh-inset-dark),
-    inset -2px -2px 4px var(--sh-inset-light),
-    0 0 0 2px var(--accent-glow);
-}
-
-.search-box input::placeholder {
-  color: var(--c-text-3);
-}
+/* Removed old search-box styles */
 
 .search-hint {
   text-align: center;
