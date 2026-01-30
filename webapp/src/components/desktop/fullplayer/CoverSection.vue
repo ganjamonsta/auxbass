@@ -93,18 +93,21 @@ watch(() => props.isPlaying, (playing) => {
 .cover-section {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 24px;
+  background: #12121e;
+  border-radius: 40px;
+  padding: 24px;
+  box-shadow: 
+    inset 8px 8px 16px #08080f,
+    inset -8px -8px 16px #1a1a28;
 }
 
 .cover-frame {
   position: relative;
   aspect-ratio: 1;
-  border-radius: 30px;
+  border-radius: 24px;
   overflow: hidden;
-  background: #12121e;
-  box-shadow: 
-    inset 8px 8px 16px #08080f,
-    inset -8px -8px 16px #1a1a28;
+  /* background and shadow removed for unified look */
 }
 
 .cover-wrapper {
@@ -217,14 +220,10 @@ watch(() => props.isPlaying, (playing) => {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  height: 80px;
+  height: 60px;
   gap: 3px;
-  padding: 15px;
-  background: #12121e;
-  border-radius: 20px;
-  box-shadow: 
-    inset 6px 6px 12px #08080f,
-    inset -6px -6px 12px #1a1a28;
+  padding: 0 10px;
+  /* background and shadow removed */
 }
 
 .viz-bar {
