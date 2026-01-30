@@ -477,6 +477,7 @@ h1 {
   align-items: center;
   padding: 12px 0;
   border-bottom: 1px solid var(--border);
+  gap: 16px;
 }
 
 .setting-row:last-child {
@@ -486,6 +487,8 @@ h1 {
 .setting-info {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-width: 0;
 }
 
 .setting-name {
@@ -504,6 +507,7 @@ h1 {
   display: inline-block;
   width: 48px;
   height: 28px;
+  flex-shrink: 0;
 }
 
 .toggle input {
