@@ -130,29 +130,33 @@ const formatTime = (seconds) => {
 }
 
 .metadata-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .meta-item {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   gap: 6px;
-  padding: 12px;
+  padding: 4px 10px;
   background: #12121e;
-  border-radius: 12px;
-  flex: 1 1 auto;
-  min-width: 120px;
+  border-radius: 8px;
   @apply shadow-neu-inset;
 }
 
 .meta-label {
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 1.5px;
+  letter-spacing: 1px;
   color: #e85c7c;
   font-family: 'Segoe UI', sans-serif;
+  opacity: 0.8;
+}
+
+.meta-label::after {
+  content: ":";
 }
 
 .meta-value {
