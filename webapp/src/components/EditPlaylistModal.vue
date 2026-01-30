@@ -9,6 +9,17 @@
       
       <!-- Playlist name and settings -->
       <div class="edit-settings">
+        <!-- Cover editor -->
+        <div class="edit-cover-wrapper" @click="changeCover" title="Change cover">
+            <img v-if="playlist?.cover_url" :src="playlist.cover_url" class="edit-cover-img" />
+            <div v-else class="edit-cover-placeholder">
+                <Camera :size="24" />
+            </div>
+            <div class="edit-cover-overlay">
+                <Camera :size="16" />
+            </div>
+        </div>
+
         <input
           v-model="name"
           type="text"
@@ -112,7 +123,8 @@ import { useDragReorder } from '@/composables/useDragReorder'
 import api from '@/api/client'
 import TrackSearchItem from './TrackSearchItem.vue'
 import EditableTrackItem from './EditableTrackItem.vue'
-import { X, Music } from 'lucide-vue-next'
+import { X, Music, Camera } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps({
   show: Boolean,
@@ -122,6 +134,20 @@ const props = defineProps({
 const emit = defineEmits(['close', 'save', 'delete', 'update:tracks'])
 
 const playerStore = usePlayerStore()
+const authStore = useAuthStore()
+
+const changeCover = () => {
+  if (!props.playlist?.id) return
+  
+  const botUsername = authStore.appName // Assuming appName stores bot username from config
+  const url = `https://t.me/${botUsername}?start=cover_${props.playlist.id}`
+  
+  if (window.Telegram?.WebApp) {
+    window.Telegram.WebApp.openTelegramLink(url)
+  } else {
+    window.open(url, '_blank')
+  }
+}
 
 // Form state
 const name = ref('')
@@ -337,11 +363,59 @@ const save = async () => {
 }
 
 .edit-settings {
-  padding: 16px 20px;
+  padding: 20px;
   display: flex;
-  gap: 12px;
+  flex-direction: row;
   align-items: center;
-  border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.1));
+  gap: 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color, rgba(255,255,255,0.1));
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.edit-cover-wrapper {
+    width: 48px;
+    height: 48px;
+    border-radius: 4px;
+    background: var(--bg-highlight);
+    position: relative;
+    cursor: pointer;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.edit-cover-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.edit-cover-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-tertiary);
+}
+
+.edit-cover-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+    color: white;
+}
+
+.edit-cover-wrapper:hover .edit-cover-overlay {
+    opacity: 1;
+}
 }
 
 .edit-name-input {
@@ -356,7 +430,6 @@ const save = async () => {
 
 .edit-name-input:focus {
   outline: none;
-  border-color: var(--accent);
 }
 
 .checkbox-label {

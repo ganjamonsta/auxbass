@@ -23,3 +23,4 @@ PyJWT>=2.8.0
 
 # Audio metadata (for extended ID3 parsing if needed)
 mutagen>=1.47.0
+Pillow>=10.0.0

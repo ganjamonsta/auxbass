@@ -23,6 +23,7 @@ from bot.handlers.audio import router as audio_router
 from bot.handlers.commands import router as commands_router
 from bot.handlers.callbacks import router as callbacks_router
 from bot.handlers.download import router as download_router
+from bot.handlers.playlist_cover import router as playlist_cover_router
 
 from bot.services.enrichment import enrichment_worker
 from bot.services.channels import init_channel_service, start_channel_service, stop_channel_service
@@ -69,6 +70,7 @@ async def main():
     dp = Dispatcher(storage=storage)
     
     # Register routers
+    dp.include_router(playlist_cover_router)  # Must be before commands_router to handle deep links
     dp.include_router(commands_router)
     dp.include_router(audio_router)
     dp.include_router(callbacks_router)
