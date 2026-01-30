@@ -65,9 +65,7 @@ const formatTime = (seconds) => {
   background: #12121e;
   border-radius: 25px;
   padding: 25px;
-  box-shadow: 
-    8px 8px 20px #000000,
-    -8px -8px 20px #1a1a28;
+  @apply shadow-neu-raised;
 }
 
 .module-header {
@@ -76,7 +74,7 @@ const formatTime = (seconds) => {
   justify-content: space-between;
   margin-bottom: 18px;
   padding-bottom: 12px;
-  border-bottom: 2px solid #1a1a28;
+  border-bottom: 1px solid #1a1a28;
 }
 
 .module-label {
@@ -101,9 +99,7 @@ const formatTime = (seconds) => {
   font-family: 'Segoe UI', sans-serif;
   box-shadow: 
     3px 3px 6px #000000,
-    -3px -3px 6px #1a1a28;
-}
-
+  @apply shadow-neu-raised-sm
 .indicator.hd {
   background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
   color: #8b7300;
@@ -137,6 +133,8 @@ const formatTime = (seconds) => {
 .metadata-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
+  gap: 14pxflex;
+  flex-wrap: wrap;
   gap: 14px;
 }
 
@@ -147,11 +145,9 @@ const formatTime = (seconds) => {
   padding: 12px;
   background: #12121e;
   border-radius: 12px;
-  box-shadow: 
-    inset 3px 3px 6px #08080f,
-    inset -3px -3px 6px #1a1a28;
-}
-
+  flex: 1 1 auto;
+  min-width: 120px;
+  @apply shadow-neu-inset
 .meta-label {
   font-size: 10px;
   font-weight: 600;

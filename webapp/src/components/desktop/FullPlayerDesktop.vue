@@ -306,8 +306,8 @@ const handlePlayArtistTrack = (track) => {
   background: #12121e;
   border-radius: 40px;
   box-shadow: 
-    20px 20px 60px #000000,
-    -20px -20px 60px #1a1a28;
+    20px 20px 60px var(--sh-dark),
+    -20px -20px 60px var(--sh-light);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -344,7 +344,7 @@ const handlePlayArtistTrack = (track) => {
 }
 
 .panel-left::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, #e85c7c 0%, #ff8ba8 100%);
+  background: linear-gradient(135deg, var(--c-accent) 0%, var(--c-accent-light) 100%);
   border-radius: 3px;
 }
 
@@ -360,8 +360,8 @@ const handlePlayArtistTrack = (track) => {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  overflow-y: auto;
-  padding-right: 10px;
+  overflow-y: hidden;
+  padding-right: 0;
   flex: 1;
 }
 
@@ -372,19 +372,17 @@ const handlePlayArtistTrack = (track) => {
 .panel-center-main::-webkit-scrollbar-track {
   background: #12121e;
   border-radius: 10px;
-  box-shadow: 
-    inset 3px 3px 6px #08080f,
-    inset -3px -3px 6px #1a1a28;
+  @apply shadow-neu-inset;
 }
 
 .panel-center-main::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #db2220 0%, #e85c7c 100%);
+  background: linear-gradient(180deg, var(--c-accent) 0%, var(--c-accent-light) 100%);
   border-radius: 10px;
   box-shadow: 0 2px 8px rgba(232, 92, 124, 0.4);
 }
 
 .panel-center-main::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #e85c7c 0%, #db2220 100%);
+  background: linear-gradient(180deg, var(--c-accent-light) 0%, var(--c-accent) 100%);
 }
 
 .panel-right {

@@ -44,9 +44,7 @@ defineEmits(['toggleMute', 'setVolume'])
 .info-module {
   background: #12121e;
   border-radius: 25px;
-  box-shadow: 
-    8px 8px 20px #000000,
-    -8px -8px 20px #1a1a28;
+  @apply shadow-neu-raised;
 }
 
 .info-module.volume {
@@ -77,22 +75,16 @@ defineEmits(['toggleMute', 'setVolume'])
   cursor: pointer;
   transition: all 0.3s ease;
   flex-shrink: 0;
-  box-shadow: 
-    6px 6px 12px #08080f,
-    -6px -6px 12px #1a1a28;
+  @apply shadow-neu-raised;
 }
 
 .volume-btn:hover {
-  box-shadow: 
-    4px 4px 8px #08080f,
-    -4px -4px 8px #1a1a28;
+  @apply shadow-neu-raised-sm;
   transform: translateY(1px);
 }
 
 .volume-btn:active {
-  box-shadow: 
-    inset 4px 4px 8px #08080f,
-    inset -4px -4px 8px #1a1a28;
+  @apply shadow-neu-inset;
 }
 
 .volume-slider-container {
@@ -102,9 +94,7 @@ defineEmits(['toggleMute', 'setVolume'])
   background: #12121e;
   border-radius: 10px;
   overflow: hidden;
-  box-shadow: 
-    inset 4px 4px 8px #08080f,
-    inset -4px -4px 8px #1a1a28;
+  @apply shadow-neu-inset;
 }
 
 .volume-level {

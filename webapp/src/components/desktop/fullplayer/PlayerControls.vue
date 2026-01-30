@@ -154,9 +154,7 @@ const formatTime = (seconds) => {
   background: #12121e;
   border-radius: 25px;
   padding: 25px;
-  box-shadow: 
-    8px 8px 20px #000000,
-    -8px -8px 20px #1a1a28;
+  @apply shadow-neu-raised;
 }
 
 .module-header {
@@ -165,7 +163,7 @@ const formatTime = (seconds) => {
   justify-content: space-between;
   margin-bottom: 1px;
   padding-bottom: 2px;
-  border-bottom: 2px solid #1a1a28;
+  border-bottom: 1px solid #1a1a28;
 }
 
 .module-label {
@@ -205,9 +203,7 @@ const formatTime = (seconds) => {
   background: #12121e;
   border-radius: 10px;
   overflow: visible;
-  box-shadow: 
-    inset 4px 4px 8px #08080f,
-    inset -4px -4px 8px #1a1a28;
+  @apply shadow-neu-inset;
 }
 
 .buffered-track {
@@ -245,8 +241,8 @@ const formatTime = (seconds) => {
   box-shadow: 
     4px 4px 10px #000000,
     -4px -4px 10px #1a1a28,
-    0 0 12px rgba(232, 92, 124, 0.8);
-}
+    0 0 12px rgbavar(--sh-dark),
+    -4px -4px 10px var(--sh-light)
 
 .progress-input {
   position: absolute;
@@ -283,22 +279,16 @@ const formatTime = (seconds) => {
   transition: all 0.3s ease;
   box-shadow: 
     8px 8px 16px #08080f,
-    -8px -8px 16px #1a1a28;
+  @apply shadow-neu-raised;
 }
 
 .control-btn:hover {
-  box-shadow: 
-    6px 6px 12px #08080f,
-    -6px -6px 12px #1a1a28;
+  @apply shadow-neu-raised-sm;
   transform: translateY(2px);
 }
 
 .control-btn:active {
-  box-shadow: 
-    inset 4px 4px 8px #08080f,
-    inset -4px -4px 8px #1a1a28;
-  transform: translateY(3px);
-}
+  @apply shadow-neu-inset
 
 .control-btn.play {
   width: 80px;
