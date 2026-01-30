@@ -5,7 +5,7 @@
         class="sort-btn mode-btn"
         @click="onChipClick"
       >
-        <component :is="iconComponent" :size="16" fill="currentColor" class="chip-icon" />
+        <component :is="iconComponent" :size="16" class="chip-icon" />
       </button>
       <button 
         class="sort-btn order-btn"
