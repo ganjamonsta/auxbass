@@ -144,8 +144,8 @@
                 </div>
                 
                 <div v-if="!sortedArtistTracks.length" class="artist-tracks-empty">
-                  <span v-if="!track?.artist_id">Нет информации об артисте</span>
-                  <span v-else>Треки не найдены в библиотеке</span>
+                  <span v-if="!track?.artist">Нет информации об артисте</span>
+                  <span v-else>Треки {{ track.artist }} не найдены в библиотеке</span>
                 </div>
               </div>
             </div>
@@ -605,8 +605,12 @@ const playModeText = computed(() => {
 })
 
 const artistTracks = computed(() => {
-  if (!props.track?.artist_id) return []
-  return libraryStore.tracks.filter(t => t.artist_id === props.track.artist_id)
+  if (!props.track?.artist) return []
+  // Filter by artist name, normalized for comparison
+  const currentArtist = props.track.artist.toLowerCase().trim()
+  return libraryStore.tracks.filter(t => 
+    t.artist && t.artist.toLowerCase().trim() === currentArtist
+  )
 })
 
 const sortedArtistTracks = computed(() => {
@@ -721,7 +725,7 @@ const handleTrackSaved = () => {
 }
 
 const handlePlayArtistTrack = (track) => {
-  playerStore.playTrack(track, { type: 'artist', artistId: props.track.artist_id })
+  playerStore.playTrack(track, { type: 'artist', artist: props.track.artist })
 }
 
 // Lifecycle
