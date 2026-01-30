@@ -58,6 +58,13 @@ export const usePlayerStore = defineStore('player', () => {
   const isMuted = ref(savedSettings.isMuted ?? false)
   const shuffle = ref(savedSettings.shuffle ?? false)
   const repeat = ref(savedSettings.repeat ?? 'none') // none, one, all
+  
+  // Audio Enhancer State
+  const enhancerEnabled = ref(savedSettings.enhancerEnabled ?? false)
+  const bassGain = ref(savedSettings.bassGain ?? 0) // -10 to 10 dB
+  const trebleGain = ref(savedSettings.trebleGain ?? 0) // -10 to 10 dB
+  const autoGain = ref(savedSettings.autoGain ?? false) // Compressor/Limiter
+  
   const loading = ref(false)
   const buffered = ref(0) // buffered endpoint in seconds
   const nextTrackPreloaded = ref(null)
@@ -435,15 +442,155 @@ export const usePlayerStore = defineStore('player', () => {
   // Track for position update throttling
   let lastPositionUpdate = 0
 
+  // ============== Audio Enhancer Engine ==============
+  let audioCtx = null
+  let sourceNode = null
+  let bassNode = null
+  let trebleNode = null
+  let compressorNode = null
+  let masterGainNode = null
+  
+  const initAudioContext = () => {
+     if (audioCtx) return
+
+     try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext
+        audioCtx = new AudioContext()
+        
+        // Create Effects Nodes
+        bassNode = audioCtx.createBiquadFilter()
+        bassNode.type = 'lowshelf'
+        bassNode.frequency.value = 200 // Bass cutoff
+        
+        trebleNode = audioCtx.createBiquadFilter()
+        trebleNode.type = 'highshelf'
+        trebleNode.frequency.value = 3000 // Treble cutoff
+        
+        compressorNode = audioCtx.createDynamicsCompressor()
+        // Compressor settings for "Mastering" feel
+        compressorNode.threshold.value = -24
+        compressorNode.knee.value = 30
+        compressorNode.ratio.value = 12
+        compressorNode.attack.value = 0.003
+        compressorNode.release.value = 0.25
+        
+        masterGainNode = audioCtx.createGain()
+        masterGainNode.gain.value = 1.0
+
+        // Chain: Bass -> Treble -> Comp -> Gain -> Destination
+        // Source will connect to Bass
+        bassNode.connect(trebleNode)
+        trebleNode.connect(compressorNode)
+        compressorNode.connect(masterGainNode)
+        masterGainNode.connect(audioCtx.destination)
+        
+        updateEnhancerParams()
+        console.log('[Audio Enhancer] Context Initialized')
+     } catch (e) {
+        console.error('[Audio Enhancer] Not supported', e)
+     }
+  }
+
+  const connectAudioSource = () => {
+      if (!audioCtx || !audio.value) return
+      
+      // If we already have a source for this exact element, do nothing?
+      // Actually sourceNode is 1:1 with media element.
+      // If audio.value changes, we need a NEW source node.
+      
+      try {
+          if (sourceNode) {
+              sourceNode.disconnect()
+          }
+          
+          // Create new source for current audio element
+          // Note: createMediaElementSource can only be called ONCE per element.
+          // We need to attach a property to checking if it's already source-ified?
+          // But browsers throw error if we try again.
+          
+          // Helper to check if element already has source (we can't easily, 
+          // so we wrap in try/catch or store map)
+          // Since we swap elements, the old one goes away.
+          
+          sourceNode = audioCtx.createMediaElementSource(audio.value)
+          sourceNode.connect(bassNode)
+          
+          if (audioCtx.state === 'suspended') {
+              audioCtx.resume()
+          }
+          console.log('[Audio Enhancer] Source connected')
+      } catch (e) {
+          // Usually means this element already has a source node (reused element)
+          // If so, we just ensure the graph is right. 
+          // Actually if we reuse the element, the old source node is still valid!
+          // But we lost reference to it? 
+          // Ideally we store sourceNode on the element itself: audio.value._sourceNode
+          if (audio.value._sourceNode) {
+             sourceNode = audio.value._sourceNode
+             // Reconnect just in case
+             try { sourceNode.connect(bassNode) } catch(err) {} 
+          }
+           console.log('[Audio Enhancer] Connect skipped/reused', e)
+      }
+      
+      // Store source on element to prevent re-creation error
+      if (sourceNode) {
+          audio.value._sourceNode = sourceNode
+      }
+  }
+  
+  const updateEnhancerParams = () => {
+      if (!audioCtx) return
+      
+      if (enhancerEnabled.value) {
+          try {
+            bassNode.gain.setTargetAtTime(bassGain.value, audioCtx.currentTime, 0.1)
+            trebleNode.gain.setTargetAtTime(trebleGain.value, audioCtx.currentTime, 0.1)
+            
+            // AutoGain / Compressor toggle
+            if (autoGain.value) {
+                // Connect Treble -> Comp -> Gain
+                // Disconnect direct bypass if any (not implemented yet, simple chain)
+                 trebleNode.disconnect()
+                 trebleNode.connect(compressorNode)
+            } else {
+                 // Bypass Compressor: Treble -> Gain
+                 trebleNode.disconnect()
+                 trebleNode.connect(masterGainNode)
+            }
+          } catch (e) { console.error(e) }
+      } else {
+          // Disable effects (set gains to 0, bypass comp)
+          try {
+            bassNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1)
+            trebleNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1)
+            
+            trebleNode.disconnect()
+            trebleNode.connect(masterGainNode)
+          } catch(e) {}
+      }
+  }
+  
+  // Watchers for enhancer
+  watch([enhancerEnabled, bassGain, trebleGain, autoGain], () => {
+      updateEnhancerParams()
+      persistSettings()
+  })
+
   // Initialize audio element
   const initAudio = () => {
     if (audio.value) return
     
     audio.value = new Audio()
+    audio.value.crossOrigin = 'anonymous'
     audio.value.volume = volume.value
     // Use 'auto' for faster startup - browser will buffer intelligently
     // The slow start issue was due to sequential API calls, not buffering
     audio.value.preload = 'auto' 
+    
+    // Initialize Enhancer
+    initAudioContext()
+    connectAudioSource()
     
     // Setup Media Session handlers once (for lock screen, notification controls, etc.)
     setupMediaSession()
@@ -1192,6 +1339,7 @@ export const usePlayerStore = defineStore('player', () => {
         
         // Reattach event listeners to new audio element
         reattachAudioListeners()
+        connectAudioSource() // Connect Enhancer
         
         try {
           await audio.value.play()
@@ -1641,6 +1789,7 @@ export const usePlayerStore = defineStore('player', () => {
         audio.value.muted = isMuted.value
       
         reattachAudioListeners()
+        connectAudioSource() // Connect Enhancer
       
         loading.value = true
         currentTrack.value = nextTrack
@@ -1969,6 +2118,10 @@ export const usePlayerStore = defineStore('player', () => {
       isMuted: isMuted.value,
       shuffle: shuffle.value,
       repeat: repeat.value,
+      enhancerEnabled: enhancerEnabled.value,
+      bassGain: bassGain.value,
+      trebleGain: trebleGain.value,
+      autoGain: autoGain.value
     })
   }
   
@@ -2231,6 +2384,13 @@ export const usePlayerStore = defineStore('player', () => {
     isMuted,
     shuffle,
     repeat,
+    
+    // Enhancer
+    enhancerEnabled,
+    bassGain,
+    trebleGain,
+    autoGain,
+    
     loading,
     buffered,
     lastError,

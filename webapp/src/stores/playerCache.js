@@ -109,6 +109,7 @@ let preloadTrackId = null
 const getPreloadAudio = () => {
   if (!preloadAudio) {
     preloadAudio = new Audio()
+    preloadAudio.crossOrigin = 'anonymous'
     preloadAudio.preload = 'auto'
     preloadAudio.volume = 0 // Silent preload
   }
