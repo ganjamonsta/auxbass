@@ -132,8 +132,6 @@ const formatTime = (seconds) => {
 .metadata-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 14pxflex;
-  flex-wrap: wrap;
   gap: 14px;
 }
 
@@ -146,7 +144,9 @@ const formatTime = (seconds) => {
   border-radius: 12px;
   flex: 1 1 auto;
   min-width: 120px;
-  @apply shadow-neu-inset
+  @apply shadow-neu-inset;
+}
+
 .meta-label {
   font-size: 10px;
   font-weight: 600;
