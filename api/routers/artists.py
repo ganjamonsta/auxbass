@@ -386,7 +386,7 @@ async def get_artist(
     scope=global: all public tracks
     """
     normalized_search = normalize_artist(artist_name)
-    artist_matches_track(track.artist, normalized_search)
+    
     # Build query based on scope
     if scope == "global":
         # Global: get public tracks
@@ -409,7 +409,7 @@ async def get_artist(
         album_track_counts = {}
         
         for track in all_tracks_raw:
-            if normalize_artist(track.artist) == normalized_search:
+            if artist_matches_track(track.artist, normalized_search):
                 matching_tracks.append(track)
                 artist_names_seen.add(track.artist)
                 for at in track.album_tracks:
