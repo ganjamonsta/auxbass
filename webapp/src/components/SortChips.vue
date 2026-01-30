@@ -1,16 +1,21 @@
 <template>
   <div class="sort-chips">
-    <button 
-      class="neu-sort-chip active"
-      @click="onChipClick"
-    >
-      <component :is="iconComponent" :size="14" class="chip-icon" />
-      <span class="chip-label">{{ currentOption.label }}</span>
-      <span class="order-icon" @click.stop="toggleOrder">
-        <ArrowDown v-if="sortOrder === 'desc'" :size="14" />
-        <ArrowUp v-else :size="14" />
-      </span>
-    </button>
+    <div class="sort-buttons">
+      <button 
+        class="sort-btn mode-btn"
+        @click="onChipClick"
+      >
+        <component :is="iconComponent" :size="16" fill="currentColor" class="chip-icon" />
+        <span class="chip-label">{{ currentOption.label }}</span>
+      </button>
+      <button 
+        class="sort-btn order-btn"
+        @click="toggleOrder"
+      >
+        <ArrowDown v-if="sortOrder === 'desc'" :size="16" />
+        <ArrowUp v-else :size="16" />
+      </button>
+    </div>
   </div>
 </template>
 
@@ -38,7 +43,11 @@ const props = defineProps({
   }
 })
 
-const iconComponent = computed(() => iconMap[props.currentOption.icon] || Music)
+const iconComponent = computed(() => {
+  // Support both 'icon' field from options (useSort uses this)
+  // and fallback to Music if not provided
+  return iconMap[props.currentOption.icon] || Music
+})
 
 const emit = defineEmits(['next', 'toggle-order'])
 
@@ -58,11 +67,63 @@ const toggleOrder = () => {
   gap: 8px;
 }
 
+.sort-buttons {
+  display: flex;
+  border-radius: 28px;
+  background: var(--accent);
+  box-shadow: 
+    6px 6px 12px rgba(0, 0, 0, 0.3),
+    -3px -3px 8px rgba(255, 255, 255, 0.1),
+    inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+
+.sort-btn {
+  height: 40px;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #000;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.sort-btn:active {
+  background: rgba(0, 0, 0, 0.1);
+  box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.mode-btn {
+  padding: 0 14px 0 12px;
+}
+
+.mode-btn::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  right: 0;
+  width: 1px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.order-btn {
+  width: 40px;
+  padding: 0;
+}
+
 .chip-icon {
-  font-size: 14px;
+  flex-shrink: 0;
 }
 
 .chip-label {
   font-weight: 500;
+  white-space: nowrap;
 }
 </style>

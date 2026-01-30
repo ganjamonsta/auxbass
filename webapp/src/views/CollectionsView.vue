@@ -244,9 +244,9 @@ const changeAlbumScope = (newScope) => {
 
 // Sort options for albums
 const ALBUM_SORT_OPTIONS = [
-  { value: 'release_date', label: 'Дата' },
-  { value: 'name', label: 'Название' },
-  { value: 'track_count', label: 'Треки' }
+  { value: 'release_date', label: 'Дата', icon: 'Calendar' },
+  { value: 'name', label: 'Название', icon: 'Type' },
+  { value: 'track_count', label: 'Треки', icon: 'Music' }
 ]
 
 // Albums state
