@@ -7,6 +7,7 @@ Uses normalization to group variations (BLADEE, Bladee, Bladee & Ecco2k -> Blade
 """
 import sys
 import logging
+import re
 from pathlib import Path
 from typing import Optional, List
 from collections import defaultdict
@@ -40,6 +41,29 @@ from api.schemas_v2.common import TelegramUser
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Artists"])
+
+
+def artist_matches_track(track_artist: str, normalized_search: str) -> bool:
+    """
+    Check if normalized search artist is present in track artist string.
+    Handles 'Artist A feat. Artist B', 'Artist A & Artist C', etc.
+    """
+    if not track_artist:
+        return False
+        
+    # Quick check using standard normalization (handles main artist)
+    if normalize_artist(track_artist) == normalized_search:
+        return True
+        
+    # Check parts: split by common separators
+    # Note: 'x' must be surrounded by spaces to avoid splitting inside words
+    parts = re.split(r'\s*(?:,|&|\+|\bx\b|\band\b|\bwith\b|feat\.?|ft\.?|featuring|prod\.?|produced\s+by|vs\.?)\s*', track_artist, flags=re.IGNORECASE)
+    
+    for part in parts:
+        if part and normalize_artist(part) == normalized_search:
+            return True
+            
+    return False
 
 
 def get_best_display_name(artist_names: list[str]) -> str:
@@ -362,7 +386,7 @@ async def get_artist(
     scope=global: all public tracks
     """
     normalized_search = normalize_artist(artist_name)
-    
+    artist_matches_track(track.artist, normalized_search)
     # Build query based on scope
     if scope == "global":
         # Global: get public tracks
@@ -430,7 +454,7 @@ async def get_artist(
         album_track_counts = {}
         
         for track, lib_entry in all_tracks:
-            if normalize_artist(track.artist) == normalized_search:
+            if artist_matches_track(track.artist, normalized_search):
                 matching_tracks.append((track, lib_entry))
                 artist_names_seen.add(track.artist)
                 for at in track.album_tracks:
@@ -455,7 +479,7 @@ async def get_artist(
         .order_by(Album.release_date.desc().nullslast())
     )
     all_albums = albums_result.scalars().all()
-    all_artist_albums = [a for a in all_albums if normalize_artist(a.artist) == normalized_search]
+    all_artist_albums = [a for a in all_albums if artist_matches_track(a.artist, normalized_search)]
     
     # For library scope, only show albums that have tracks in user's library
     if scope == "library":
@@ -522,7 +546,7 @@ async def get_artist_track_ids(
     
     matching_ids = [
         row[0] for row in artist_result.all()
-        if normalize_artist(row[1]) == normalized_search
+        if artist_matches_track(row[1], normalized_search)
     ]
     
     return {"ids": matching_ids, "total": len(matching_ids)}
@@ -595,7 +619,7 @@ async def get_artist_image(
         
         # Find albums matching this artist
         for album in all_albums:
-            if normalize_artist(album.artist) == normalized_search:
+            if artist_matches_track(album.artist, normalized_search):
                 logger.debug(f"Artist image from album '{album.name}': {artist_name}")
                 return {
                     "artist": artist_name,
@@ -611,7 +635,7 @@ async def get_artist_image(
             .where(Album.release_date.is_(None))
         )
         for album in albums_no_date.scalars().all():
-            if normalize_artist(album.artist) == normalized_search:
+            if artist_matches_track(album.artist, normalized_search):
                 logger.debug(f"Artist image from album (no date) '{album.name}': {artist_name}")
                 return {
                     "artist": artist_name,
