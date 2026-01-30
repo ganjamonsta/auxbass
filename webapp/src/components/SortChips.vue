@@ -6,7 +6,6 @@
         @click="onChipClick"
       >
         <component :is="iconComponent" :size="16" fill="currentColor" class="chip-icon" />
-        <span class="chip-label">{{ currentOption.label }}</span>
       </button>
       <button 
         class="sort-btn order-btn"
@@ -100,7 +99,8 @@ const toggleOrder = () => {
 }
 
 .mode-btn {
-  padding: 0 14px 0 12px;
+  width: 40px;
+  padding: 0;
 }
 
 .mode-btn::after {
@@ -120,10 +120,5 @@ const toggleOrder = () => {
 
 .chip-icon {
   flex-shrink: 0;
-}
-
-.chip-label {
-  font-weight: 500;
-  white-space: nowrap;
 }
 </style>

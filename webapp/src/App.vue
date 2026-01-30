@@ -96,9 +96,45 @@
         @expand="showFullPlayer = true"
       />
 
-      <!-- Full player modal (both mobile and desktop) -->
+      <!-- Full player modal - Desktop version -->
+      <FullPlayerDesktop
+        v-if="showFullPlayer && isDesktop"
+        :show="showFullPlayer"
+        :track="playerStore.currentTrack"
+        :is-playing="playerStore.isPlaying"
+        :loading="playerStore.loading"
+        :progress="playerStore.progress"
+        :duration="playerStore.duration"
+        :buffered="playerStore.buffered"
+        :volume="playerStore.volume"
+        :is-muted="playerStore.isMuted"
+        :shuffle="playerStore.shuffle"
+        :repeat="playerStore.repeat"
+        :is-liked="isCurrentTrackLiked"
+        :upcoming-queue="upcomingTracks"
+        :queue-length="playerStore.queue.length"
+        :history-tracks="historyTracks"
+        :hd-track-info="playerStore.hdTrackInfo"
+        :lazy-shuffle-mode="playerStore.isLazyShuffleMode()"
+        :lazy-shuffle-total="playerStore.lazyShuffleIds?.length || 0"
+        :lazy-shuffle-index="playerStore.lazyShuffleIndex"
+        :context-info="playerStore.lazyShuffleContext"
+        @close="showFullPlayer = false"
+        @toggle="playerStore.togglePlay()"
+        @next="playerStore.next()"
+        @prev="playerStore.prev()"
+        @seek="playerStore.seek($event)"
+        @setVolume="playerStore.setVolume($event)"
+        @toggleMute="playerStore.toggleMute()"
+        @toggleShuffle="playerStore.toggleShuffle()"
+        @toggleRepeat="playerStore.toggleRepeat()"
+        @playFromQueue="playerStore.playFromQueue($event)"
+        @like="handleToggleLike"
+      />
+
+      <!-- Full player modal - Mobile version (original) -->
       <FullPlayer 
-        v-if="showFullPlayer"
+        v-if="showFullPlayer && !isDesktop"
         :track="playerStore.currentTrack"
         :is-playing="playerStore.isPlaying"
         :loading="playerStore.loading"
@@ -121,6 +157,7 @@
         @toggle="playerStore.togglePlay()"
         @next="playerStore.next()"
         @prev="playerStore.prev()"
+import FullPlayerDesktop from '@/components/desktop/FullPlayerDesktop.vue'
         @seek="playerStore.seek($event)"
         @setVolume="playerStore.setVolume($event)"
         @toggleMute="playerStore.toggleMute()"
@@ -217,6 +254,36 @@ const pageTitle = computed(() => {
     settings: 'Настройки',
   }
   return titles[route.name] || ''
+})
+
+// Queue computeds for desktop player
+const upcomingTracks = computed(() => {
+  if (playerStore.shuffle) {
+    // In shuffle mode, use shuffle order
+    const currentShuffleIdx = playerStore.shuffleIndex
+    return playerStore.shuffleOrder
+      .slice(currentShuffleIdx + 1)
+      .map(idx => playerStore.queue[idx])
+      .filter(t => t)
+  } else {
+    // In normal mode, use queue order
+    return playerStore.queue.slice(playerStore.queueIndex + 1)
+  }
+})
+
+const historyTracks = computed(() => {
+  if (playerStore.shuffle) {
+    // In shuffle mode, get previous tracks from shuffle order
+    const currentShuffleIdx = playerStore.shuffleIndex
+    return playerStore.shuffleOrder
+      .slice(0, currentShuffleIdx)
+      .map(idx => playerStore.queue[idx])
+      .filter(t => t)
+      .reverse()
+  } else {
+    // In normal mode, get previous tracks
+    return playerStore.queue.slice(0, playerStore.queueIndex).reverse()
+  }
 })
 
 const isRoute = (path) => {
