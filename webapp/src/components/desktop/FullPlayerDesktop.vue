@@ -118,35 +118,40 @@
               </div>
               
               <div class="artist-tracks-list">
-                <div 
-                  v-for="(t, idx) in sortedArtistTracks" 
-                  :key="`artist-${t.id}-${idx}`"
-                  class="artist-track-item"
-                  :class="{ active: t.id === track?.id }"
-                  @click="handlePlayArtistTrack(t)"
-                >
-                  <div class="artist-track-number">{{ idx + 1 }}</div>
-                  <div class="artist-track-cover" :style="getTrackCoverStyle(t)">
-                    <img v-if="t.cover_url" :src="t.cover_url" alt="" />
-                    <span v-else>{{ getTrackInitials(t) }}</span>
-                  </div>
-                  <div class="artist-track-info">
-                    <div class="artist-track-title">{{ t.title || 'Unknown' }}</div>
-                    <div class="artist-track-meta">
-                      <span v-if="t.album_title">{{ t.album_title }}</span>
-                      <span v-if="t.year" class="track-year">{{ t.year }}</span>
+                <div v-if="isLoadingArtistTracks" class="artist-tracks-empty">
+                  <span>Загрузка...</span>
+                </div>
+                <template v-else>
+                  <div 
+                    v-for="(t, idx) in sortedArtistTracks" 
+                    :key="`artist-${t.id}-${idx}`"
+                    class="artist-track-item"
+                    :class="{ active: t.id === track?.id }"
+                    @click="handlePlayArtistTrack(t)"
+                  >
+                    <div class="artist-track-number">{{ idx + 1 }}</div>
+                    <div class="artist-track-cover" :style="getTrackCoverStyle(t)">
+                      <img v-if="t.cover_url" :src="t.cover_url" alt="" />
+                      <span v-else>{{ getTrackInitials(t) }}</span>
+                    </div>
+                    <div class="artist-track-info">
+                      <div class="artist-track-title">{{ t.title || 'Unknown' }}</div>
+                      <div class="artist-track-meta">
+                        <span v-if="t.album_title">{{ t.album_title }}</span>
+                        <span v-if="t.year" class="track-year">{{ t.year }}</span>
+                      </div>
+                    </div>
+                    <div class="artist-track-stats">
+                      <span v-if="t.play_count" class="plays" title="Прослушиваний">{{ t.play_count }}</span>
+                      <span class="duration">{{ formatTime(t.duration) }}</span>
                     </div>
                   </div>
-                  <div class="artist-track-stats">
-                    <span v-if="t.play_count" class="plays" title="Прослушиваний">{{ t.play_count }}</span>
-                    <span class="duration">{{ formatTime(t.duration) }}</span>
+                  
+                  <div v-if="!sortedArtistTracks.length" class="artist-tracks-empty">
+                    <span v-if="!track?.artist">Нет информации об артисте</span>
+                    <span v-else>Треки {{ track.artist }} не найдены в библиотеке</span>
                   </div>
-                </div>
-                
-                <div v-if="!sortedArtistTracks.length" class="artist-tracks-empty">
-                  <span v-if="!track?.artist">Нет информации об артисте</span>
-                  <span v-else>Треки {{ track.artist }} не найдены в библиотеке</span>
-                </div>
+                </template>
               </div>
             </div>
           </div>
@@ -517,6 +522,7 @@ import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useAuthStore } from '@/stores/auth'
+import { tracksApi } from '@/api/client'
 import { getTrackCoverStyle, getTrackInitials } from '@/utils'
 import TrackMenu from '@/components/TrackMenu.vue'
 import EditTrackModal from '@/components/EditTrackModal.vue'
@@ -604,14 +610,34 @@ const playModeText = computed(() => {
   return 'NORMAL'
 })
 
-const artistTracks = computed(() => {
-  if (!props.track?.artist) return []
-  // Filter by artist name, normalized for comparison
-  const currentArtist = props.track.artist.toLowerCase().trim()
-  return libraryStore.tracks.filter(t => 
-    t.artist && t.artist.toLowerCase().trim() === currentArtist
-  )
-})
+const artistTracks = ref([])
+const isLoadingArtistTracks = ref(false)
+
+const loadArtistTracks = async () => {
+  if (!props.track?.artist) {
+    artistTracks.value = []
+    return
+  }
+  
+  isLoadingArtistTracks.value = true
+  try {
+    const { data } = await tracksApi.getArtistDetail(props.track.artist, 'library')
+    artistTracks.value = data.tracks || []
+  } catch (e) {
+    console.error('Failed to load artist tracks:', e)
+    artistTracks.value = []
+  } finally {
+    isLoadingArtistTracks.value = false
+  }
+}
+
+watch(() => props.track?.artist, (newVal) => {
+  if (newVal) {
+    loadArtistTracks()
+  } else {
+    artistTracks.value = []
+  }
+}, { immediate: true })
 
 const sortedArtistTracks = computed(() => {
   const tracks = [...artistTracks.value]
