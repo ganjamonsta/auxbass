@@ -241,8 +241,9 @@ const formatTime = (seconds) => {
   box-shadow: 
     4px 4px 10px #000000,
     -4px -4px 10px #1a1a28,
-    0 0 12px rgbavar(--sh-dark),
-    -4px -4px 10px var(--sh-light)
+    0 0 12px var(--sh-dark),
+    -4px -4px 10px var(--sh-light);
+}
 
 .progress-input {
   position: absolute;
@@ -278,7 +279,7 @@ const formatTime = (seconds) => {
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 
-    8px 8px 16px #08080f,
+    8px 8px 16px #08080f;
   @apply shadow-neu-raised;
 }
 
@@ -288,7 +289,8 @@ const formatTime = (seconds) => {
 }
 
 .control-btn:active {
-  @apply shadow-neu-inset
+  @apply shadow-neu-inset;
+}
 
 .control-btn.play {
   width: 80px;
