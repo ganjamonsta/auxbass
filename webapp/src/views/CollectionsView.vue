@@ -52,14 +52,12 @@
         <div class="header-left">
           <span class="count">{{ albumsTotal }} альбомов</span>
         </div>
-        <div class="header-right">
-          <SortChips
-            :currentOption="albumSortOption"
-            :sortOrder="albumSortOrder"
-            @next="onNextAlbumSort"
-            @toggle-order="onToggleAlbumOrder"
-          />
-        </div>
+        <SortChips
+          :currentOption="albumSortOption"
+          :sortOrder="albumSortOrder"
+          @next="onNextAlbumSort"
+          @toggle-order="onToggleAlbumOrder"
+        />
       </div>
 
       <div class="albums-grid">
@@ -615,15 +613,6 @@ onMounted(() => {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 16px;
-}
-
-.header-left {
-  flex: 0 0 auto;
-}
-
-.header-right {
-  flex: 0 0 auto;
-  margin-left: auto;
 }
 
 .count {
