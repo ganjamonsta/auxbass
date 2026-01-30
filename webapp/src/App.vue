@@ -157,7 +157,6 @@
         @toggle="playerStore.togglePlay()"
         @next="playerStore.next()"
         @prev="playerStore.prev()"
-import FullPlayerDesktop from '@/components/desktop/FullPlayerDesktop.vue'
         @seek="playerStore.seek($event)"
         @setVolume="playerStore.setVolume($event)"
         @toggleMute="playerStore.toggleMute()"
@@ -194,6 +193,7 @@ import ToastContainer from '@/components/ToastContainer.vue'
 import Sidebar from '@/components/desktop/Sidebar.vue'
 import DesktopPlayer from '@/components/desktop/DesktopPlayer.vue'
 import NowPlayingSidebar from '@/components/desktop/NowPlayingSidebar.vue'
+import FullPlayerDesktop from '@/components/desktop/FullPlayerDesktop.vue'
 
 const route = useRoute()
 const router = useRouter()
