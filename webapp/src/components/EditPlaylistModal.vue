@@ -10,8 +10,8 @@
       <!-- Playlist name and settings -->
       <div class="edit-settings">
         <!-- Cover editor -->
-        <div class="edit-cover-wrapper" @click="changeCover" title="Change cover">
-            <img v-if="playlist?.cover_url" :src="playlist.cover_url" class="edit-cover-img" />
+        <div class="edit-cover-wrapper" @click="changeCover" title="Изменить обложку">
+            <img v-if="currentCoverUrl" :src="currentCoverUrl" class="edit-cover-img" />
             <div v-else class="edit-cover-placeholder">
                 <Camera :size="24" />
             </div>
@@ -117,7 +117,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { useDragReorder } from '@/composables/useDragReorder'
 import api from '@/api/client'
@@ -131,16 +131,23 @@ const props = defineProps({
   playlist: Object
 })
 
-const emit = defineEmits(['close', 'save', 'delete', 'update:tracks'])
+const emit = defineEmits(['close', 'save', 'delete', 'update:tracks', 'refresh'])
 
 const playerStore = usePlayerStore()
 const authStore = useAuthStore()
 
+// Track if we opened the cover upload link
+const pendingCoverUpload = ref(false)
+// Current cover URL (local state for refresh)
+const currentCoverUrl = ref(null)
+
 const changeCover = () => {
     if (!props.playlist?.id) return
   
-    const botUsername = authStore.appName // Assuming appName stores bot username from config
+    const botUsername = authStore.appName
     const url = `https://t.me/${botUsername}?start=cover_${props.playlist.id}`
+  
+    pendingCoverUpload.value = true
   
     if (window.Telegram?.WebApp) {
         window.Telegram.WebApp.openTelegramLink(url)
@@ -148,6 +155,39 @@ const changeCover = () => {
         window.open(url, '_blank')
     }
 }
+
+// Refresh cover when returning from Telegram
+const refreshCover = async () => {
+    if (!pendingCoverUpload.value || !props.playlist?.id) return
+    
+    try {
+        const response = await api.get(`/playlists/${props.playlist.id}`)
+        if (response.data?.cover_url && response.data.cover_url !== currentCoverUrl.value) {
+            currentCoverUrl.value = response.data.cover_url
+            emit('refresh', response.data)
+        }
+    } catch (error) {
+        console.error('Failed to refresh cover:', error)
+    } finally {
+        pendingCoverUpload.value = false
+    }
+}
+
+// Handle visibility change (when user returns from Telegram)
+const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible' && pendingCoverUpload.value) {
+        // Small delay to allow Telegram to process the upload
+        setTimeout(refreshCover, 1000)
+    }
+}
+
+onMounted(() => {
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+})
+
+onUnmounted(() => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange)
+})
 
 // Form state
 const name = ref('')
@@ -191,6 +231,7 @@ watch(() => props.playlist, (pl) => {
     name.value = pl.name || ''
     isPublic.value = pl.is_public || false
     tracks.value = [...(pl.tracks || [])]
+    currentCoverUrl.value = pl.cover_url || null
   }
 }, { immediate: true })
 
@@ -198,6 +239,7 @@ watch(() => props.show, (show) => {
   if (!show) {
     searchQuery.value = ''
     searchResults.value = []
+    pendingCoverUpload.value = false
   }
 })
 

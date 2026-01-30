@@ -110,6 +110,7 @@
       @save="handleSavePlaylist"
       @delete="showDeleteConfirm = true"
       @update:tracks="handleTracksUpdate"
+      @refresh="handlePlaylistRefresh"
     />
 
     <!-- Delete confirm -->
@@ -295,6 +296,18 @@ const handleSavePlaylist = ({ name, isPublic }) => {
   }
   showEditModal.value = false
   uiStore.toast.success('Сохранено', 'Плейлист обновлён')
+}
+
+const handlePlaylistRefresh = (updatedPlaylist) => {
+  // Update cover and other fields from refresh
+  if (updatedPlaylist.cover_url) {
+    playlist.value.cover_url = updatedPlaylist.cover_url
+  }
+  // Update in library store
+  const libraryPlaylist = libraryStore.playlists.find(p => p.id === playlist.value.id)
+  if (libraryPlaylist && updatedPlaylist.cover_url) {
+    libraryPlaylist.cover_url = updatedPlaylist.cover_url
+  }
 }
 
 const handleTracksUpdate = (tracks) => {
