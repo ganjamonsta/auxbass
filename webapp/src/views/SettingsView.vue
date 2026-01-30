@@ -151,6 +151,71 @@
 
     <!-- Cache section -->
     <section class="section">
+      <h2>🎛️ Аудио (Enhancer)</h2>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-name">Включить обработку</span>
+          <span class="setting-desc">Улучшение звука в реальном времени (Bass, Treble, Compressor)</span>
+        </div>
+        <label class="toggle">
+          <input 
+            type="checkbox" 
+            v-model="playerStore.enhancerEnabled" 
+          />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <template v-if="playerStore.enhancerEnabled">
+        <div class="setting-row slider-row">
+            <div class="setting-info">
+              <span class="setting-name">Bass (Низкие)</span>
+              <span class="setting-value">{{ playerStore.bassGain }} dB</span>
+            </div>
+            <input 
+              type="range" 
+              min="-10" 
+              max="10" 
+              step="1"
+              v-model.number="playerStore.bassGain"
+              class="range-slider"
+            />
+        </div>
+
+        <div class="setting-row slider-row">
+            <div class="setting-info">
+              <span class="setting-name">Treble (Высокие)</span>
+              <span class="setting-value">{{ playerStore.trebleGain }} dB</span>
+            </div>
+            <input 
+              type="range" 
+              min="-10" 
+              max="10" 
+              step="1"
+              v-model.number="playerStore.trebleGain"
+              class="range-slider"
+            />
+        </div>
+
+        <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-name">Auto Gain (Компрессор)</span>
+              <span class="setting-desc">Автоматическое выравнивание громкости</span>
+            </div>
+            <label class="toggle">
+              <input 
+                type="checkbox" 
+                v-model="playerStore.autoGain" 
+              />
+              <span class="toggle-slider"></span>
+            </label>
+        </div>
+      </template>
+    </section>
+
+    <!-- Cache section -->
+    <section class="section">
       <h2>Кэш</h2>
       <button class="clear-cache-btn" @click="clearCache">
         Очистить кэш
@@ -657,5 +722,49 @@ h1 {
 
 .refresh-btn:hover {
   opacity: 0.9;
+}
+
+/* Range slider styles */
+.slider-row {
+  flex-direction: column;
+  align-items: stretch !important;
+  gap: 15px;
+  padding-bottom: 20px;
+}
+
+.slider-row .setting-info {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.range-slider {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.range-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.setting-value {
+  color: var(--accent);
+  font-weight: 500;
+  font-size: 14px;
 }
 </style>

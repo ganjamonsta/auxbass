@@ -26,32 +26,34 @@
 
           <!-- Center Panel: Main Information Display -->
           <div class="panel-center">
-            <TrackInfo 
-              :track="track"
-              :hdTrackInfo="hdTrackInfo"
-              :isLiked="isLiked"
-              @goToAlbum="handleGoToAlbum"
-            />
+            <div class="panel-center-main">
+              <TrackInfo 
+                :track="track"
+                :hdTrackInfo="hdTrackInfo"
+                :isLiked="isLiked"
+                @goToAlbum="handleGoToAlbum"
+              />
 
-            <PlayerControls 
-              :isPlaying="isPlaying"
-              :progress="progress"
-              :duration="duration"
-              :buffered="buffered"
-              :shuffle="shuffle"
-              :repeat="repeat"
-              :isLiked="isLiked"
-              :hdTrackInfo="hdTrackInfo"
-              @seek="$emit('seek', $event)"
-              @toggle="$emit('toggle')"
-              @prev="$emit('prev')"
-              @next="$emit('next')"
-              @toggleShuffle="$emit('toggleShuffle')"
-              @toggleRepeat="$emit('toggleRepeat')"
-              @like="$emit('like')"
-              @addToPlaylist="handleAddToPlaylist"
-              @downloadHD="handleDownloadHD"
-            />
+              <PlayerControls 
+                :isPlaying="isPlaying"
+                :progress="progress"
+                :duration="duration"
+                :buffered="buffered"
+                :shuffle="shuffle"
+                :repeat="repeat"
+                :isLiked="isLiked"
+                :hdTrackInfo="hdTrackInfo"
+                @seek="$emit('seek', $event)"
+                @toggle="$emit('toggle')"
+                @prev="$emit('prev')"
+                @next="$emit('next')"
+                @toggleShuffle="$emit('toggleShuffle')"
+                @toggleRepeat="$emit('toggleRepeat')"
+                @like="$emit('like')"
+                @addToPlaylist="handleAddToPlaylist"
+                @downloadHD="handleDownloadHD"
+              />
+            </div>
 
             <VolumeControl 
               :volume="volume"
@@ -348,17 +350,26 @@ const handlePlayArtistTrack = (track) => {
 
 .panel-center {
   display: flex;
+  flex-direction: row;
+  gap: 18px;
+  overflow: hidden;
+  padding-right: 0;
+}
+
+.panel-center-main {
+  display: flex;
   flex-direction: column;
   gap: 18px;
   overflow-y: auto;
   padding-right: 10px;
+  flex: 1;
 }
 
-.panel-center::-webkit-scrollbar {
+.panel-center-main::-webkit-scrollbar {
   width: 8px;
 }
 
-.panel-center::-webkit-scrollbar-track {
+.panel-center-main::-webkit-scrollbar-track {
   background: #12121e;
   border-radius: 10px;
   box-shadow: 
@@ -366,13 +377,13 @@ const handlePlayArtistTrack = (track) => {
     inset -3px -3px 6px #1a1a28;
 }
 
-.panel-center::-webkit-scrollbar-thumb {
+.panel-center-main::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg, #db2220 0%, #e85c7c 100%);
   border-radius: 10px;
   box-shadow: 0 2px 8px rgba(232, 92, 124, 0.4);
 }
 
-.panel-center::-webkit-scrollbar-thumb:hover {
+.panel-center-main::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, #e85c7c 0%, #db2220 100%);
 }
 
