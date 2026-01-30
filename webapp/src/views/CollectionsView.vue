@@ -617,6 +617,15 @@ onMounted(() => {
   margin-bottom: 16px;
 }
 
+.header-left {
+  flex: 0 0 auto;
+}
+
+.header-right {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
 .count {
   font-size: 14px;
   color: var(--text-secondary);
