@@ -6,17 +6,24 @@ User playlist management.
 from typing import Optional, List
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy import select, func, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel
+from PIL import Image, ImageOps
+from io import BytesIO
+from aiogram import Bot
+from aiogram.types import BufferedInputFile
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
 
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.database import get_db
+from shared.config import get_settings
 from shared.models import Playlist, PlaylistTrack, Track, UserLibrary, AlbumTrack, User, PlaylistSubscription
 
 from api.routers.auth import get_current_user, require_premium
@@ -225,6 +232,82 @@ async def create_playlist(
         is_public=playlist.is_public,
         created_at=playlist.created_at,
     )
+
+
+@router.post("/{playlist_id}/cover", response_model=PlaylistResponse)
+async def upload_playlist_cover(
+    playlist_id: int,
+    file: UploadFile = File(...),
+    user: TelegramUser = Depends(require_premium),
+    db: AsyncSession = Depends(get_db),
+):
+    """Upload playlist cover"""
+    playlist = await db.get(Playlist, playlist_id)
+    if not playlist:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+        
+    if playlist.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="Not owner")
+
+    # Validate image
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Invalid file type")
+
+    try:
+        # Process image
+        content = await file.read()
+        img = Image.open(BytesIO(content))
+        
+        # Center crop to square
+        min_side = min(img.size)
+        img = ImageOps.fit(img, (min_side, min_side), method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
+        
+        # Optimize size (max 800x800)
+        if min_side > 800:
+            img.thumbnail((800, 800), Image.Resampling.LANCZOS)
+            
+        output = BytesIO()
+        img.save(output, format="JPEG", quality=85)
+        output.seek(0)
+        
+        # Get settings for bot token & api url
+        settings = get_settings()
+
+        # Upload to Telegram via Bot
+        # We send it to the user's chat to get a file_id
+        async with Bot(
+            token=settings.bot_token,
+            default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+        ) as bot:
+            # Send photo to user (as a "storage" mechanic)
+            msg = await bot.send_photo(
+                chat_id=user.id,
+                photo=BufferedInputFile(output.read(), filename="cover.jpg"),
+                caption=f"🖼 Обложка для плейлиста <b>{playlist.name}</b> обновлена"
+            )
+            
+            final_file_id = msg.photo[-1].file_id
+            
+            # Construct URL
+            cover_url = f"{settings.api_url}/api/images/{final_file_id}"
+            
+            # Update DB
+            playlist.cover_url = cover_url
+            await db.commit()
+            
+            return PlaylistResponse(
+                id=playlist.id,
+                name=playlist.name,
+                description=playlist.description,
+                track_count=0, 
+                total_duration=0,
+                cover_url=playlist.cover_url,
+                is_public=playlist.is_public,
+                created_at=playlist.created_at,
+            )
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process image: {str(e)}")
 
 
 @router.get("/{playlist_id}", response_model=PlaylistDetailResponse)

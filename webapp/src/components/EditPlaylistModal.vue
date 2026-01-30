@@ -10,14 +10,26 @@
       <!-- Playlist name and settings -->
       <div class="edit-settings">
         <!-- Cover editor -->
-        <div class="edit-cover-wrapper" @click="changeCover" title="Change cover">
-            <img v-if="playlist?.cover_url" :src="playlist.cover_url" class="edit-cover-img" />
-            <div v-else class="edit-cover-placeholder">
-                <Camera :size="24" />
+        <div class="edit-cover-wrapper" @click="triggerCoverUpload" title="Change cover">
+            <input 
+                type="file" 
+                ref="fileInput" 
+                style="display: none" 
+                accept="image/*"
+                @change="handleFileChange"
+            />
+            <div v-if="uploadingCover" class="edit-cover-loading">
+                <div class="spinner"></div>
             </div>
-            <div class="edit-cover-overlay">
-                <Camera :size="16" />
-            </div>
+            <template v-else>
+                <img v-if="playlist?.cover_url" :src="playlist.cover_url" class="edit-cover-img" />
+                <div v-else class="edit-cover-placeholder">
+                    <Camera :size="24" />
+                </div>
+                <div class="edit-cover-overlay">
+                    <Camera :size="16" />
+                </div>
+            </template>
         </div>
 
         <input
@@ -136,17 +148,46 @@ const emit = defineEmits(['close', 'save', 'delete', 'update:tracks'])
 const playerStore = usePlayerStore()
 const authStore = useAuthStore()
 
-const changeCover = () => {
-  if (!props.playlist?.id) return
-  
-  const botUsername = authStore.appName // Assuming appName stores bot username from config
-  const url = `https://t.me/${botUsername}?start=cover_${props.playlist.id}`
-  
-  if (window.Telegram?.WebApp) {
-    window.Telegram.WebApp.openTelegramLink(url)
-  } else {
-    window.open(url, '_blank')
-  }
+const fileInput = ref(null)
+const uploadingCover = ref(false)
+
+const triggerCoverUpload = () => {
+    fileInput.value.click()
+}
+
+const handleFileChange = async (event) => {
+    const file = event.target.files[0]
+    if (!file) return
+    
+    // Validations (e.g. size/type)
+    if (!file.type.startsWith('image/')) {
+        alert('Please select an image file')
+        return
+    }
+
+    uploadingCover.value = true
+    try {
+        const formData = new FormData()
+        formData.append('file', file)
+        
+        const response = await api.post(`/playlists/${props.playlist.id}/cover`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        })
+        
+        // Update playlist cover in parent
+        if (response.data.cover_url) {
+            props.playlist.cover_url = response.data.cover_url
+        }
+    } catch (error) {
+        console.error('Failed to upload cover:', error)
+        alert('Failed to upload cover')
+    } finally {
+        uploadingCover.value = false
+        // Reset input
+        event.target.value = ''
+    }
 }
 
 // Form state
@@ -415,6 +456,24 @@ const save = async () => {
 
 .edit-cover-wrapper:hover .edit-cover-overlay {
     opacity: 1;
+}
+
+.edit-cover-loading {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.edit-cover-loading .spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 1s linear infinite;
 }
 
 .edit-name-input {
