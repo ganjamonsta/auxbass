@@ -639,8 +639,8 @@ watch(() => props.isPlaying, (playing) => {
   --neu-bg: #12121e;
   --neu-shadow-light: #1a1a28;
   --neu-shadow-dark: #08080f;
-  --neu-accent: #e85c7c;
-  --neu-accent-light: #ff8ba8;
+  --neu-accent: #db2220;
+  --neu-accent-light: #e85c7c;
   --neu-text: #e8ecf1;
   --neu-text-light: #9ca3af;
 }
@@ -703,7 +703,7 @@ watch(() => props.isPlaying, (playing) => {
   font-size: 22px;
   font-weight: 700;
   letter-spacing: 2px;
-  background: linear-gradient(135deg, #e85c7c 0%, #ff8ba8 100%);
+  background: linear-gradient(135deg, #db2220 0%, #e85c7c 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   font-family: 'Segoe UI', -apple-system, sans-serif;
@@ -725,7 +725,7 @@ watch(() => props.isPlaying, (playing) => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #e85c7c 0%, #ff8ba8 100%);
+  background: linear-gradient(135deg, #db2220 0%, #e85c7c 100%);
   box-shadow: 0 2px 8px rgba(232, 92, 124, 0.6);
   animation: statusPulse 2s ease-in-out infinite;
 }
@@ -739,7 +739,7 @@ watch(() => props.isPlaying, (playing) => {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 1.5px;
-  color: #e85c7c;
+  color: #db2220;
   font-family: 'Segoe UI', sans-serif;
 }
 
@@ -749,7 +749,7 @@ watch(() => props.isPlaying, (playing) => {
   background: #12121e;
   border: none;
   border-radius: 12px;
-  color: #e85c7c;
+  color: #db2220;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -851,7 +851,7 @@ watch(() => props.isPlaying, (playing) => {
 .cover-initials {
   font-size: 80px;
   font-weight: 700;
-  color: #e85c7c;
+  color: #db2220;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
   font-family: 'Segoe UI', sans-serif;
 }
@@ -885,7 +885,7 @@ watch(() => props.isPlaying, (playing) => {
   width: 100%;
   height: 100%;
   border: 4px solid #12121e;
-  border-top-color: #e85c7c;
+  border-top-color: #db2220;
   border-radius: 50%;
   animation: spinRing 1.5s linear infinite;
   box-shadow: 
@@ -893,7 +893,7 @@ watch(() => props.isPlaying, (playing) => {
 }
 
 .spinner-ring:nth-child(2) {
-  border-top-color: #ff8ba8;
+  border-top-color: #e85c7c;
   animation-delay: 0.5s;
   width: 80%;
   height: 80%;
@@ -902,7 +902,7 @@ watch(() => props.isPlaying, (playing) => {
 }
 
 .spinner-ring:nth-child(3) {
-  border-top-color: #e85c7c;
+  border-top-color: #db2220;
   animation-delay: 1s;
   width: 60%;
   height: 60%;
@@ -919,7 +919,7 @@ watch(() => props.isPlaying, (playing) => {
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 2px;
-  color: #e85c7c;
+  color: #db2220;
   font-family: 'Segoe UI', sans-serif;
 }
 
@@ -940,7 +940,7 @@ watch(() => props.isPlaying, (playing) => {
 
 .viz-bar {
   flex: 1;
-  background: linear-gradient(to top, #e85c7c 0%, #ff8ba8 100%);
+  background: linear-gradient(to top, #db2220 0%, #e85c7c 100%);
   min-height: 8px;
   border-radius: 4px;
   transition: height 0.1s ease;
@@ -969,13 +969,13 @@ watch(() => props.isPlaying, (playing) => {
 }
 
 .panel-center::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #e85c7c 0%, #ff8ba8 100%);
+  background: linear-gradient(180deg, #db2220 0%, #e85c7c 100%);
   border-radius: 10px;
   box-shadow: 0 2px 8px rgba(232, 92, 124, 0.4);
 }
 
 .panel-center::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #ff8ba8 0%, #e85c7c 100%);
+  background: linear-gradient(180deg, #e85c7c 0%, #db2220 100%);
 }
 
 .info-module {
@@ -1000,7 +1000,7 @@ watch(() => props.isPlaying, (playing) => {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 2px;
-  color: #e85c7c;
+  color: #db2220;
   font-family: 'Segoe UI', sans-serif;
 }
 
@@ -1075,7 +1075,7 @@ watch(() => props.isPlaying, (playing) => {
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 1.5px;
-  color: #ff8ba8;
+  color: #e85c7c;
   font-family: 'Segoe UI', sans-serif;
 }
 
@@ -1087,12 +1087,12 @@ watch(() => props.isPlaying, (playing) => {
 
 .meta-value.clickable {
   cursor: pointer;
-  color: #e85c7c;
+  color: #db2220;
   transition: all 0.2s ease;
 }
 
 .meta-value.clickable:hover {
-  color: #ff8ba8;
+  color: #e85c7c;
   text-shadow: 0 2px 4px rgba(232, 92, 124, 0.3);
 }
 
@@ -1111,7 +1111,7 @@ watch(() => props.isPlaying, (playing) => {
   gap: 10px;
   font-family: 'Segoe UI', monospace;
   font-size: 18px;
-  color: #e85c7c;
+  color: #db2220;
   font-weight: 600;
 }
 
@@ -1145,7 +1145,7 @@ watch(() => props.isPlaying, (playing) => {
   top: 0;
   left: 0;
   height: 100%;
-  background: linear-gradient(90deg, #e85c7c 0%, #ff8ba8 100%);
+  background: linear-gradient(90deg, #db2220 0%, #e85c7c 100%);
   box-shadow: 0 2px 8px rgba(232, 92, 124, 0.5);
   transition: width 0.1s linear;
   border-radius: 10px;
@@ -1160,7 +1160,7 @@ watch(() => props.isPlaying, (playing) => {
   transform: translateY(-50%);
   width: 20px;
   height: 20px;
-  background: #e85c7c;
+  background: #db2220;
   border-radius: 50%;
   box-shadow: 
     4px 4px 10px #000000,
@@ -1194,7 +1194,7 @@ watch(() => props.isPlaying, (playing) => {
   border: none;
   background: #12121e;
   border-radius: 50%;
-  color: #e85c7c;
+  color: #db2220;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1248,7 +1248,7 @@ watch(() => props.isPlaying, (playing) => {
 }
 
 .control-btn.active {
-  background: linear-gradient(135deg, #e85c7c 0%, #ff8ba8 100%);
+  background: linear-gradient(135deg, #db2220 0%, #e85c7c 100%);
   color: #ffffff;
   box-shadow: 
     8px 8px 16px #000000,
@@ -1270,7 +1270,7 @@ watch(() => props.isPlaying, (playing) => {
   border: none;
   background: #12121e;
   border-radius: 16px;
-  color: #e85c7c;
+  color: #db2220;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1301,7 +1301,7 @@ watch(() => props.isPlaying, (playing) => {
 }
 
 .action-btn.active {
-  background: linear-gradient(135deg, #e85c7c 0%, #ff8ba8 100%);
+  background: linear-gradient(135deg, #db2220 0%, #e85c7c 100%);
   color: #ffffff;
   box-shadow: 
     6px 6px 12px #000000,
@@ -1342,7 +1342,7 @@ watch(() => props.isPlaying, (playing) => {
   border: none;
   background: #12121e;
   border-radius: 50%;
-  color: #e85c7c;
+  color: #db2220;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1384,7 +1384,7 @@ watch(() => props.isPlaying, (playing) => {
   top: 0;
   left: 0;
   height: 100%;
-  background: linear-gradient(90deg, #e85c7c 0%, #ff8ba8 100%);
+  background: linear-gradient(90deg, #db2220 0%, #e85c7c 100%);
   transition: width 0.1s ease;
   pointer-events: none;
   border-radius: 10px;
@@ -1406,7 +1406,7 @@ watch(() => props.isPlaying, (playing) => {
 .volume-value {
   font-size: 14px;
   font-weight: 600;
-  color: #e85c7c;
+  color: #db2220;
   font-family: 'Segoe UI', monospace;
   min-width: 50px;
   text-align: right;
@@ -1440,7 +1440,7 @@ watch(() => props.isPlaying, (playing) => {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 2px;
-  color: #ff8ba8;
+  color: #e85c7c;
   font-family: 'Segoe UI', sans-serif;
 }
 
@@ -1503,11 +1503,11 @@ watch(() => props.isPlaying, (playing) => {
   box-shadow: 
     3px 3px 6px #08080f,
     -3px -3px 6px #1a1a28;
-  color: #e85c7c;
+  color: #db2220;
 }
 
 .queue-tab.active {
-  background: linear-gradient(135deg, #e85c7c 0%, #ff8ba8 100%);
+  background: linear-gradient(135deg, #db2220 0%, #e85c7c 100%);
   color: #ffffff;
   box-shadow: 
     inset 3px 3px 6px rgba(232, 92, 124, 0.4),
@@ -1534,13 +1534,13 @@ watch(() => props.isPlaying, (playing) => {
 }
 
 .queue-list::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #e85c7c 0%, #ff8ba8 100%);
+  background: linear-gradient(180deg, #db2220 0%, #e85c7c 100%);
   border-radius: 10px;
   box-shadow: 0 2px 6px rgba(232, 92, 124, 0.4);
 }
 
 .queue-list::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #ff8ba8 0%, #e85c7c 100%);
+  background: linear-gradient(180deg, #e85c7c 0%, #db2220 100%);
 }
 
 .queue-track {
@@ -1563,7 +1563,7 @@ watch(() => props.isPlaying, (playing) => {
 }
 
 .queue-track.active {
-  background: linear-gradient(135deg, #e85c7c 0%, #ff8ba8 100%);
+  background: linear-gradient(135deg, #db2220 0%, #e85c7c 100%);
   box-shadow: 
     6px 6px 12px #000000,
     -6px -6px 12px #1a1a28,
@@ -1586,7 +1586,7 @@ watch(() => props.isPlaying, (playing) => {
   text-align: center;
   font-size: 12px;
   font-weight: 600;
-  color: #e85c7c;
+  color: #db2220;
   font-family: 'Segoe UI', monospace;
   flex-shrink: 0;
 }
@@ -1615,7 +1615,7 @@ watch(() => props.isPlaying, (playing) => {
 .queue-track-cover span {
   font-size: 14px;
   font-weight: 600;
-  color: #e85c7c;
+  color: #db2220;
 }
 
 .queue-track-info {
@@ -1672,13 +1672,13 @@ watch(() => props.isPlaying, (playing) => {
   flex-direction: column;
   gap: 4px;
   font-size: 12px;
-  color: #e85c7c;
+  color: #db2220;
   font-weight: 600;
 }
 
 .lazy-progress {
   font-size: 10px;
-  color: #ff8ba8;
+  color: #e85c7c;
   font-family: 'Segoe UI', monospace;
 }
 
@@ -1724,7 +1724,7 @@ watch(() => props.isPlaying, (playing) => {
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 1.2px;
-  color: #ff8ba8;
+  color: #e85c7c;
   font-family: 'Segoe UI', sans-serif;
 }
 
