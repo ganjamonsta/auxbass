@@ -52,12 +52,14 @@
         <div class="header-left">
           <span class="count">{{ albumsTotal }} альбомов</span>
         </div>
-        <SortChips
-          :currentOption="albumSortOption"
-          :sortOrder="albumSortOrder"
-          @next="onNextAlbumSort"
-          @toggle-order="onToggleAlbumOrder"
-        />
+        <div class="header-right">
+          <SortChips
+            :currentOption="albumSortOption"
+            :sortOrder="albumSortOrder"
+            @next="onNextAlbumSort"
+            @toggle-order="onToggleAlbumOrder"
+          />
+        </div>
       </div>
 
       <div class="albums-grid">
