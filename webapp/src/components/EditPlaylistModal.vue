@@ -416,7 +416,6 @@ const save = async () => {
 .edit-cover-wrapper:hover .edit-cover-overlay {
     opacity: 1;
 }
-}
 
 .edit-name-input {
   flex: 1;
