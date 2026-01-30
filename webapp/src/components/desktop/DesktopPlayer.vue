@@ -24,7 +24,6 @@
         <div class="lcd-screen" @click="handleLcdClick">
           <!-- Title row -->
           <div class="lcd-title-row">
-            <span class="lcd-status"><Play v-if="isPlaying" :size="12" /><Square v-else :size="12" /></span>
             <div class="lcd-text-container">
               <div class="lcd-text" :class="{ scrolling: shouldScroll }">
                 <span class="segment-text">{{ displayText }}</span>
@@ -35,6 +34,7 @@
 
           <!-- Progress row -->
           <div class="lcd-progress-row">
+            <span class="lcd-status" style="margin-right: 4px; display: flex; align-items: center;"><Play v-if="isPlaying" :size="10" fill="currentColor" /><Square v-else :size="10" fill="currentColor" /></span>
             <span class="lcd-time">{{ formatTime(progress) }}</span>
             <div class="lcd-progress" @click="handleProgressClick" @mousedown="startSeek">
               <div class="progress-bar">
@@ -66,7 +66,7 @@
           <span class="btn-icon"><SkipBack :size="14" /></span>
         </button>
         <button class="ctrl-btn play-btn" @click="playerStore.togglePlay()" :title="isPlaying ? 'Pause' : 'Play'">
-          <span class="btn-icon"><Pause v-if="isPlaying" :size="16" /><Play v-else :size="16" /></span>
+          <span class="btn-icon"><Pause v-if="isPlaying" :size="16" fill="currentColor" /><Play v-else :size="16" fill="currentColor" /></span>
         </button>
         <button class="ctrl-btn" @click="playerStore.next()" title="Next">
           <span class="btn-icon"><SkipForward :size="14" /></span>

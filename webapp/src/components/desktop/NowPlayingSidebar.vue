@@ -175,7 +175,7 @@
                 <animate attributeName="y" values="6;8;6" dur="0.5s" repeatCount="indefinite"/>
               </rect>
             </svg>
-            <span v-else-if="index === 0"><Play :size="14" /></span>
+            <span v-else-if="index === 0"><Play :size="14" fill="currentColor" /></span>
             <span v-else>{{ index }}</span>
           </div>
           <div class="queue-item-cover">

@@ -41,7 +41,7 @@
         :class="{ active: currentTabId === tab.id }"
         @click="currentTabId = tab.id"
       >
-        {{ tab.label }}
+        <span class="neu-tab-content" :data-text="tab.label">{{ tab.label }}</span>
       </button>
     </div>
 
@@ -132,7 +132,8 @@ const clearSearch = () => {
   align-items: center;
   background: var(--c-bg-0);
   border-radius: var(--r-lg);
-  padding: 10px 14px;
+  padding: 0 14px;
+  height: 44px;
   gap: 10px;
   box-shadow:
     inset 3px 3px 6px var(--sh-inset-dark),
@@ -152,7 +153,7 @@ const clearSearch = () => {
   background: transparent;
   border: none;
   color: var(--c-text-1);
-  font-size: 16px;
+  font-size: 14px;
   outline: none;
 }
 
@@ -184,6 +185,23 @@ const clearSearch = () => {
 /* Override base .neu-tab-bar for this specific use case */
 .library-tabs.neu-tab-bar {
   padding: 4px;
+}
+
+.neu-tab-content {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.neu-tab-content::after {
+  content: attr(data-text);
+  height: 0;
+  visibility: hidden;
+  overflow: hidden;
+  user-select: none;
+  pointer-events: none;
+  font-weight: 600;
 }
 
 /* No channel prompt */

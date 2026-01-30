@@ -300,12 +300,13 @@ onUnmounted(() => {
 
 .search-bar input {
   width: 100%;
-  padding: 14px 18px;
+  height: 44px;
+  padding: 0 18px;
   background: var(--c-bg-0);
   border: none;
   border-radius: var(--r-lg);
   color: var(--c-text-1);
-  font-size: 15px;
+  font-size: 14px;
   box-shadow:
     inset 3px 3px 6px var(--sh-inset-dark),
     inset -2px -2px 4px var(--sh-inset-light);

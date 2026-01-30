@@ -28,7 +28,7 @@
               </button>
 
               <button class="menu-item" @click="handlePlayAll">
-                <span class="menu-icon"><Play :size="18" /></span>
+                <span class="menu-icon"><Play :size="18" fill="currentColor" /></span>
                 <span>Воспроизвести все</span>
               </button>
 

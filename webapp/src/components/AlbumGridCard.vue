@@ -3,7 +3,7 @@
     <div class="album-cover">
       <img v-if="album.cover_url" :src="album.cover_url" :alt="album.name" loading="lazy" />
       <div v-else class="cover-placeholder"><Disc3 :size="32" /></div>
-      <button class="play-btn" @click.stop="$emit('play', album)"><Play :size="20" /></button>
+      <button class="play-btn" @click.stop="$emit('play', album)"><Play :size="20" fill="currentColor" /></button>
       <!-- Progress indicator if we have total_tracks -->
       <div v-if="album.total_tracks && album.track_count < album.total_tracks" class="progress-badge">
         {{ album.track_count }}/{{ album.total_tracks }}

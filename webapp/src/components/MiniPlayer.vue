@@ -3,7 +3,6 @@
     <!-- LCD Screen -->
     <div class="lcd-screen">
       <div class="lcd-row lcd-row-main">
-        <span class="lcd-status"><Play v-if="isPlaying" :size="12" /><Square v-else :size="12" /></span>
         <div class="lcd-title-container">
           <div class="lcd-title-track" :class="{ 'marquee': shouldMarquee }">
             <span class="lcd-title">{{ displayText }}</span>
@@ -21,6 +20,11 @@
       </div>
       <!-- LED Progress dots -->
       <div class="lcd-progress">
+        <span class="lcd-status" style="margin-right: 6px; display: flex;">
+          <Play v-if="isPlaying" :size="10" fill="currentColor" />
+          <Pause v-else-if="isPaused" :size="10" fill="currentColor" />
+          <Square v-else :size="10" fill="currentColor" />
+        </span>
         <span 
           class="lcd-dot" 
           v-for="i in 16" 
@@ -97,7 +101,7 @@ import { playerApi } from '@/api/client'
 import TrackMenu from '@/components/TrackMenu.vue'
 import EditTrackModal from '@/components/EditTrackModal.vue'
 import PlaylistPicker from '@/components/PlaylistPicker.vue'
-import { Play, Square } from 'lucide-vue-next'
+import { Play, Square, Pause } from 'lucide-vue-next'
 
 const router = useRouter()
 const playerStore = usePlayerStore()
@@ -288,6 +292,10 @@ const displayText = computed(() => {
   const artist = props.track?.artist || '---'
   const title = props.track?.title || 'NO TRACK'
   return `${artist} — ${title}`
+})
+
+const isPaused = computed(() => {
+  return !props.isPlaying && props.progress > 0
 })
 
 const shouldMarquee = computed(() => {
@@ -513,6 +521,7 @@ const formatTime = (seconds) => {
 /* ─── LED Progress Dots ─── */
 .lcd-progress {
   display: flex;
+  align-items: center;
   gap: 3px;
 }
 

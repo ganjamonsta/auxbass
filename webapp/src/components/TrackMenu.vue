@@ -35,7 +35,7 @@
 
               <!-- Queue actions - hide for current track or in player context -->
               <button v-if="showQueueActions" class="menu-item" @click="handlePlayNext">
-                <span class="menu-icon"><Play :size="18" /></span>
+                <span class="menu-icon"><Play :size="18" fill="currentColor" /></span>
                 <span>Включить следующим</span>
               </button>
 

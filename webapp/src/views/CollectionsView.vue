@@ -73,7 +73,7 @@
           <div class="album-cover">
             <img v-if="album.cover_url" :src="album.cover_url" :alt="album.name" />
             <div v-else class="cover-placeholder"><Disc3 :size="24" /></div>
-            <button class="play-btn" @click.stop="playAlbum(album)"><Play :size="16" /></button>
+            <button class="play-btn" @click.stop="playAlbum(album)"><Play :size="16" fill="currentColor" /></button>
             <div v-if="album.total_tracks && album.track_count < album.total_tracks" class="progress-badge">
               {{ album.track_count }}/{{ album.total_tracks }}
             </div>
@@ -617,12 +617,13 @@ onMounted(() => {
 
 .search-bar input {
   width: 100%;
-  padding: 14px 18px;
+  height: 44px;
+  padding: 0 18px;
   background: var(--c-bg-0);
   border: none;
   border-radius: var(--r-lg);
   color: var(--c-text-1);
-  font-size: 15px;
+  font-size: 14px;
   box-shadow:
     inset 3px 3px 6px var(--sh-inset-dark),
     inset -2px -2px 4px var(--sh-inset-light);
