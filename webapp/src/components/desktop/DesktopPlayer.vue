@@ -223,7 +223,8 @@ const stopVolumeAdjust = () => {
 }
 
 const handleVolumeWheel = (e) => {
-  const delta = e.deltaY > 0 ? -0.05 : 0.05
+  const step = e.shiftKey ? 0.01 : 0.05
+  const delta = e.deltaY > 0 ? -step : step
   const newVolume = Math.max(0, Math.min(1, volume.value + delta))
   playerStore.setVolume(newVolume)
 }
