@@ -39,30 +39,35 @@ defineEmits(['dragstart', 'dragend', 'dragover', 'drop', 'remove'])
 
 <style scoped>
 .remove-btn {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: var(--bg-highlight);
+  background: var(--accent);
   border: none;
-  color: var(--text-tertiary);
+  color: #000;
+  font-size: 18px;
+  font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: all 0.2s;
-  opacity: 1;
+  transition: all 0.15s;
 }
 
 .remove-btn:hover { 
   background: var(--danger, #e53935); 
-  color: #fff; 
+  color: #fff;
+  transform: scale(1.1);
 }
 
-/* Active state for touch devices */
 .remove-btn:active {
-  background: var(--danger, #e53935);
-  color: #fff;
   transform: scale(0.95);
+}
+
+.remove-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 </style>
