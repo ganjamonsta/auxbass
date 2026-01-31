@@ -50,10 +50,37 @@ defineEmits(['dragstart', 'dragend', 'dragover', 'drop', 'remove'])
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  opacity: 0;
   transition: all 0.2s;
 }
 
-:deep(.base-track-item:hover) .remove-btn { opacity: 1; }
-.remove-btn:hover { background: var(--danger, #e53935); color: #fff; }
+/* On desktop, show on hover */
+@media (hover: hover) {
+  .remove-btn {
+    opacity: 0;
+  }
+  
+  :deep(.base-track-item:hover) .remove-btn { 
+    opacity: 1; 
+  }
+}
+
+/* On touch devices, always visible */
+@media (hover: none) {
+  .remove-btn {
+    opacity: 1;
+    background: var(--bg-highlight);
+  }
+}
+
+.remove-btn:hover { 
+  background: var(--danger, #e53935); 
+  color: #fff; 
+}
+
+/* Active state for touch devices */
+.remove-btn:active {
+  background: var(--danger, #e53935);
+  color: #fff;
+  transform: scale(0.95);
+}
 </style>
