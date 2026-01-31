@@ -24,7 +24,7 @@ from shared.database import get_db
 from shared.models import (
     Track, Album, AlbumTrack, UserLibrary
 )
-from shared.matching import normalize_artist
+from shared.matching import normalize_artist, extract_featured_artists
 
 from bot.services.enrichment.lastfm import lastfm_client
 from bot.services.metadata import metadata_service
@@ -43,26 +43,31 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Artists"])
 
 
-def artist_matches_track(track_artist: str, normalized_search: str) -> bool:
+def artist_matches_track(track_artist: str, normalized_search: str, track_title: str = None) -> bool:
     """
-    Check if normalized search artist is present in track artist string.
+    Check if normalized search artist is present in track artist string or extracted from title.
     Handles 'Artist A feat. Artist B', 'Artist A & Artist C', etc.
     """
-    if not track_artist:
-        return False
-        
-    # Quick check using standard normalization (handles main artist)
-    if normalize_artist(track_artist) == normalized_search:
-        return True
-        
-    # Check parts: split by common separators
-    # Note: 'x' must be surrounded by spaces to avoid splitting inside words
-    parts = re.split(r'\s*(?:,|&|\+|\bx\b|\band\b|\bwith\b|feat\.?|ft\.?|featuring|prod\.?|produced\s+by|vs\.?)\s*', track_artist, flags=re.IGNORECASE)
-    
-    for part in parts:
-        if part and normalize_artist(part) == normalized_search:
+    # 1. Check artist field
+    if track_artist:
+        # Quick check using standard normalization
+        if normalize_artist(track_artist) == normalized_search:
             return True
             
+        # Check parts: split by common separators
+        parts = re.split(r'\s*(?:,|&|\+|\bx\b|\band\b|\bwith\b|feat\.?|ft\.?|featuring|prod\.?|produced\s+by|vs\.?)\s*', track_artist, flags=re.IGNORECASE)
+        
+        for part in parts:
+            if part and normalize_artist(part) == normalized_search:
+                return True
+
+    # 2. Check title field for featuring/prod/remix
+    if track_title:
+        extracted = extract_featured_artists(track_title)
+        for artist in extracted:
+            if normalize_artist(artist) == normalized_search:
+                return True
+                
     return False
 
 
@@ -404,7 +409,7 @@ async def get_artist(
         all_tracks_raw = tracks_result.unique().scalars().all()
         
         # Filter by normalized artist
-        matching_tracks = []
+        matching_tracks = [], track.title
         artist_names_seen = set()
         album_track_counts = {}
         
@@ -454,7 +459,7 @@ async def get_artist(
         album_track_counts = {}
         
         for track, lib_entry in all_tracks:
-            if artist_matches_track(track.artist, normalized_search):
+            if artist_matches_track(track.artist, normalized_search, track.title):
                 matching_tracks.append((track, lib_entry))
                 artist_names_seen.add(track.artist)
                 for at in track.album_tracks:
@@ -540,13 +545,13 @@ async def get_artist_track_ids(
     
     # Need to filter by normalized artist - fetch artists for filtering
     artist_result = await db.execute(
-        select(Track.id, Track.artist)
+        select(Track.id, Track.artist, Track.title)
         .where(Track.id.in_(all_ids))
     )
     
     matching_ids = [
         row[0] for row in artist_result.all()
-        if artist_matches_track(row[1], normalized_search)
+        if artist_matches_track(row[1], normalized_search, row[2])
     ]
     
     return {"ids": matching_ids, "total": len(matching_ids)}
