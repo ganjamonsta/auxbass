@@ -42,7 +42,7 @@ defineEmits(['dragstart', 'dragend', 'dragover', 'drop', 'remove'])
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: transparent;
+  background: var(--bg-highlight);
   border: none;
   color: var(--text-tertiary);
   cursor: pointer;
@@ -51,25 +51,7 @@ defineEmits(['dragstart', 'dragend', 'dragover', 'drop', 'remove'])
   justify-content: center;
   flex-shrink: 0;
   transition: all 0.2s;
-}
-
-/* On desktop, show on hover */
-@media (hover: hover) {
-  .remove-btn {
-    opacity: 0;
-  }
-  
-  :deep(.base-track-item:hover) .remove-btn { 
-    opacity: 1; 
-  }
-}
-
-/* On touch devices, always visible */
-@media (hover: none) {
-  .remove-btn {
-    opacity: 1;
-    background: var(--bg-highlight);
-  }
+  opacity: 1;
 }
 
 .remove-btn:hover { 
