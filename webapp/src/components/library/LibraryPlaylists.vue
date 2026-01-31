@@ -32,7 +32,7 @@
         @click="goToPlaylist(playlist)"
       >
         <div class="playlist-cover">
-          <div class="cover-grid" v-if="playlist.covers?.length">
+          <div class="cover-grid" :class="{ 'single-cover': playlist.covers?.length === 1 }" v-if="playlist.covers?.length">
             <img
               v-for="(cover, i) in playlist.covers.slice(0, 4)"
               :key="i"
@@ -292,6 +292,11 @@ onMounted(() => {
   grid-template-rows: 1fr 1fr;
   width: 100%;
   height: 100%;
+}
+
+.cover-grid.single-cover {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
 }
 
 .cover-grid img {

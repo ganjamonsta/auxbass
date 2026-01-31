@@ -3,7 +3,7 @@
     <!-- Playlist header -->
     <div class="playlist-header">
       <div class="playlist-cover">
-        <div class="cover-grid" v-if="coverImages.length">
+        <div class="cover-grid" :class="{ 'single-cover': coverImages.length === 1 }" v-if="coverImages.length">
           <img
             v-for="(cover, i) in coverImages"
             :key="i"
@@ -395,6 +395,11 @@ onMounted(loadPlaylist)
   grid-template-rows: 1fr 1fr;
   width: 100%;
   height: 100%;
+}
+
+.cover-grid.single-cover {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
 }
 
 .cover-grid img {

@@ -10,7 +10,7 @@ from shared.config import get_settings
 router = APIRouter(tags=["Images"])
 settings = get_settings()
 
-@router.get("/api/images/{file_id}")
+@router.get("/images/{file_id}")
 async def get_image(file_id: str):
     """Proxy image from Telegram"""
     # Create bot instance just to get file path

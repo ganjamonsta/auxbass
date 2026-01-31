@@ -187,7 +187,9 @@ async def handle_cover_upload(message: Message, state: FSMContext, bot: Bot):
             return
         
         # Generate cover URL through API proxy
-        cover_url = f"{settings.api_url}/api/images/{cover_file_id}"
+        # api_url may already contain /api, so use /images/ path only
+        base_url = settings.api_url.rstrip('/').removesuffix('/api')
+        cover_url = f"{base_url}/api/images/{cover_file_id}"
         
         # Update playlist in database
         async with get_session() as session:
