@@ -101,7 +101,7 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
             <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
           </svg>
-          Удалить плейлист
+          <span class="delete-text">Удалить плейлист</span>
         </button>
         <button 
           class="save-btn" 
@@ -358,6 +358,35 @@ const save = async () => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* Mobile fullscreen mode */
+@media (max-width: 480px) {
+  .modal-overlay {
+    padding: 0;
+  }
+  
+  .edit-playlist-modal {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    min-height: 100%;
+    border-radius: 0;
+  }
+}
+
+/* Small height screens - compact mode */
+@media (max-height: 600px) {
+  .modal-overlay {
+    padding: 0;
+  }
+  
+  .edit-playlist-modal {
+    height: 100%;
+    max-height: none;
+    min-height: 100%;
+    border-radius: 0;
+  }
 }
 
 @media (min-width: 600px) {
@@ -663,5 +692,93 @@ const save = async () => {
 
 @keyframes spin {
   to { transform: translateY(-50%) rotate(360deg); }
+}
+
+/* Mobile compact styles */
+@media (max-width: 480px) {
+  .edit-header {
+    padding: 12px 12px 10px;
+  }
+  
+  .edit-header h2 {
+    font-size: 16px;
+  }
+  
+  .edit-settings {
+    padding: 12px;
+    margin: 0 12px;
+    gap: 10px;
+  }
+  
+  .search-input-wrapper {
+    padding: 10px 12px;
+  }
+  
+  .search-input-wrapper input {
+    padding: 10px 36px;
+  }
+  
+  .search-icon {
+    left: 24px;
+  }
+  
+  .search-spinner {
+    right: 24px;
+  }
+  
+  .edit-content {
+    padding: 0 12px;
+  }
+  
+  .edit-footer {
+    padding: 12px;
+    gap: 8px;
+  }
+  
+  .delete-playlist-btn {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+  
+  .save-btn {
+    padding: 10px 18px;
+    font-size: 13px;
+  }
+}
+
+/* Very small screens (old phones) */
+@media (max-width: 360px) {
+  .edit-settings {
+    flex-wrap: wrap;
+    padding: 10px;
+    margin: 0 8px;
+  }
+  
+  .edit-name-input {
+    order: 2;
+    width: 100%;
+    flex: none;
+  }
+  
+  .edit-options {
+    order: 3;
+    margin-left: auto;
+  }
+  
+  .edit-header {
+    padding: 10px 8px;
+  }
+  
+  .edit-content {
+    padding: 0 8px;
+  }
+  
+  .edit-footer {
+    padding: 10px 8px;
+  }
+  
+  .delete-playlist-btn .delete-text {
+    display: none;
+  }
 }
 </style>
