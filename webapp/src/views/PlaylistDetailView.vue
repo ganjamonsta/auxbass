@@ -67,7 +67,7 @@
         :isLiked="track.is_liked"
         @click="playTrack(track, index)"
         @like="handleLikeTrack(track)"
-        @menu="openTrackMenu(track)"
+        @menu="(e) => openMenu('track', track, { context: 'playlist', playlistId: playlist.id }, e)"
         @download="handleDirectDownload(track)"
       />
     </div>
@@ -78,29 +78,6 @@
       <p>Плейлист пуст</p>
       <p class="hint">Нажмите «Добавить» чтобы добавить треки</p>
     </div>
-    
-    <!-- Track context menu -->
-    <TrackMenu
-      :show="showMenu"
-      :track="menuTrack"
-      :inPlaylist="true"
-      context="playlist"
-      @close="closeMenu"
-      @goToArtist="handleGoToArtist"
-      @goToAlbum="handleGoToAlbum"
-      @addToPlaylist="handleAddToPlaylist"
-      @download="handleDownloadTrack"
-      @removeFromPlaylist="handleRemoveFromPlaylist"
-    />
-    
-    <!-- Playlist picker modal -->
-    <PlaylistPicker
-      :show="showPlaylistPickerForMenu"
-      :track="menuTrack"
-      @close="showPlaylistPickerForMenu = false; closeMenu()"
-      @createNew="showPlaylistPickerForMenu = false; closeMenu()"
-      @added="handlePlaylistAdded"
-    />
 
     <!-- Edit modal -->
     <EditPlaylistModal
@@ -138,13 +115,15 @@ import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
 import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
+import { useContextMenu } from '@/composables/useContextMenu'
 import TrackItem from '@/components/TrackItem.vue'
-import TrackMenu from '@/components/TrackMenu.vue'
-import PlaylistPicker from '@/components/PlaylistPicker.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import EditPlaylistModal from '@/components/EditPlaylistModal.vue'
 import api, { playerApi } from '@/api/client'
 import { Music, Check, Plus, Globe } from 'lucide-vue-next'
+
+// Universal context menu
+const { openMenu } = useContextMenu()
 
 const route = useRoute()
 const router = useRouter()
@@ -158,9 +137,6 @@ const playlist = ref(null)
 const loading = ref(true)
 const showEditModal = ref(false)
 const showDeleteConfirm = ref(false)
-const showMenu = ref(false)
-const menuTrack = ref(null)
-const showPlaylistPickerForMenu = ref(false)
 const subscribing = ref(false)
 
 // Computed
@@ -208,54 +184,8 @@ const playTrack = (track, index) => {
   playerStore.playTrack(track, playlist.value.tracks, index)
 }
 
-// Track menu
-const openTrackMenu = (track) => {
-  menuTrack.value = track
-  showMenu.value = true
-}
-
-const closeMenu = () => {
-  showMenu.value = false
-  menuTrack.value = null
-}
-
 const handleLikeTrack = async (track) => {
   track.is_liked = await libraryStore.toggleLike(track.id)
-}
-
-const handleGoToArtist = () => {
-  closeMenu()
-  router.push(`/artist/${encodeURIComponent(menuTrack.value?.artist)}`)
-}
-
-const handleGoToAlbum = () => {
-  closeMenu()
-  const albumId = menuTrack.value?.album?.id || menuTrack.value?.album_id
-  if (albumId) router.push(`/album/${albumId}`)
-}
-
-const handleAddToPlaylist = () => {
-  showPlaylistPickerForMenu.value = true
-}
-
-const handlePlaylistAdded = (pl) => {
-  uiStore.toast.success('Добавлено', `Трек добавлен в плейлист "${pl.name}"`)
-}
-
-const handleDownloadTrack = async () => {
-  if (!menuTrack.value) return
-  try {
-    const response = await api.get(`/player/stream/${menuTrack.value.id}`, { responseType: 'blob' })
-    const url = window.URL.createObjectURL(response.data)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${menuTrack.value.artist} - ${menuTrack.value.title}.mp3`
-    a.click()
-    window.URL.revokeObjectURL(url)
-  } catch (error) {
-    console.error('Failed to download:', error)
-  }
-  closeMenu()
 }
 
 const handleDirectDownload = async (track) => {
@@ -266,23 +196,6 @@ const handleDirectDownload = async (track) => {
     const errorMsg = error.response?.data?.detail || 'Ошибка отправки'
     uiStore.toast.error('Не удалось отправить', errorMsg)
   }
-}
-
-const handleRemoveFromPlaylist = async () => {
-  if (!menuTrack.value) return
-  try {
-    await api.delete(`/playlists/${playlist.value.id}/tracks/${menuTrack.value.id}`)
-    playlist.value.tracks = playlist.value.tracks.filter(t => t.id !== menuTrack.value.id)
-    playlist.value.track_count--
-    // Update track_count in library store
-    const libraryPlaylist = libraryStore.playlists.find(p => p.id === playlist.value.id)
-    if (libraryPlaylist && libraryPlaylist.track_count > 0) {
-      libraryPlaylist.track_count--
-    }
-  } catch (error) {
-    console.error('Failed to remove track:', error)
-  }
-  closeMenu()
 }
 
 // Edit modal handlers

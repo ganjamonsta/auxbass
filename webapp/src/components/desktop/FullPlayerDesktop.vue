@@ -5,7 +5,7 @@
         
         <PlayerHeader 
           @close="$emit('close')" 
-          @openTrackMenu="openTrackMenu" 
+          @openTrackMenu="openTrackContextMenu" 
         />
 
         <!-- Main Content Grid -->
@@ -93,37 +93,6 @@
         <div class="glow-effect glow-1"></div>
         <div class="glow-effect glow-2"></div>
       </div>
-
-      <!-- Track context menu -->
-      <TrackMenu
-        :show="showTrackMenu"
-        :track="track"
-        :current-user-id="authStore.user?.id"
-        context="player"
-        @close="closeTrackMenu"
-        @goToArtist="handleGoToArtist"
-        @goToAlbum="handleGoToAlbum"
-        @addToPlaylist="handleAddToPlaylist"
-        @edit="handleEditTrack"
-        @download="handleDownloadTrack"
-        @delete="handleDeleteTrack"
-        @removeFromLibrary="handleRemoveFromLibrary"
-      />
-      
-      <!-- Edit track modal -->
-      <EditTrackModal
-        :show="showEditModal"
-        :track="editingTrack"
-        @close="closeEditModal"
-        @saved="handleTrackSaved"
-      />
-      
-      <!-- Playlist picker -->
-      <PlaylistPicker
-        :show="showPlaylistPicker"
-        :track="track"
-        @close="showPlaylistPicker = false"
-      />
     </div>
   </Transition>
 </template>
@@ -133,9 +102,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
-import TrackMenu from '@/components/TrackMenu.vue'
-import EditTrackModal from '@/components/EditTrackModal.vue'
-import PlaylistPicker from '@/components/PlaylistPicker.vue'
+import { useContextMenu } from '@/composables/useContextMenu'
 
 // New sub-components
 import PlayerHeader from './fullplayer/PlayerHeader.vue'
@@ -182,12 +149,7 @@ defineEmits([
 const router = useRouter()
 const playerStore = usePlayerStore()
 const authStore = useAuthStore()
-
-// State
-const showTrackMenu = ref(false)
-const showEditModal = ref(false)
-const showPlaylistPicker = ref(false)
-const editingTrack = ref(null)
+const { openMenu } = useContextMenu()
 
 // Computed
 const bufferedPercent = computed(() => {
@@ -203,68 +165,14 @@ const playModeText = computed(() => {
 })
 
 // Methods
-const openTrackMenu = () => {
-  showTrackMenu.value = true
-}
-
-const closeTrackMenu = () => {
-  showTrackMenu.value = false
-}
-
-const handleGoToArtist = () => {
-  closeTrackMenu()
-  if (props.track?.artist_id) {
-    router.push(`/artists/${props.track.artist_id}`)
-  }
-}
-
-const handleGoToAlbum = () => {
-  closeTrackMenu()
-  if (props.track?.album_id) {
-    router.push(`/albums/${props.track.album_id}`)
-  }
-}
-
-const handleAddToPlaylist = () => {
-  closeTrackMenu()
-  showPlaylistPicker.value = true
-}
-
-const handleEditTrack = () => {
-  editingTrack.value = { ...props.track }
-  showEditModal.value = true
-  closeTrackMenu()
-}
-
-const handleDownloadTrack = () => {
-  playerStore.downloadTrack(props.track)
-  closeTrackMenu()
+const openTrackContextMenu = () => {
+  openMenu('track', props.track, 'player')
 }
 
 const handleDownloadHD = () => {
   if (props.hdTrackInfo) {
     playerStore.downloadTrack(props.hdTrackInfo)
   }
-}
-
-const handleDeleteTrack = async () => {
-  closeTrackMenu()
-  // Confirmation handled by TrackMenu
-}
-
-const handleRemoveFromLibrary = async () => {
-  closeTrackMenu()
-  // Handled by TrackMenu
-}
-
-const closeEditModal = () => {
-  showEditModal.value = false
-  editingTrack.value = null
-}
-
-const handleTrackSaved = () => {
-  closeEditModal()
-  // Track will be updated via store
 }
 
 const handlePlayArtistTrack = (track) => {

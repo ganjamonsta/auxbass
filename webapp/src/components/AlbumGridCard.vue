@@ -1,5 +1,5 @@
 <template>
-  <div class="album-card" @click="$emit('click', album)">
+  <div class="album-card" @click="$emit('click', album)" @contextmenu.prevent="$emit('contextmenu', $event)">
     <div class="album-cover">
       <img v-if="album.cover_url" :src="album.cover_url" :alt="album.name" loading="lazy" />
       <div v-else class="cover-placeholder"><Disc3 :size="32" /></div>
@@ -34,7 +34,7 @@ defineProps({
   }
 })
 
-defineEmits(['click', 'play'])
+defineEmits(['click', 'play', 'contextmenu'])
 </script>
 
 <style scoped>

@@ -132,9 +132,25 @@ export function useContextMenu() {
       if (track?.id) {
         try {
           await playerApi.download(track.id)
+          uiStore.toast.success('Отправлено', 'Трек отправлен в Telegram')
         } catch (error) {
           console.error('Failed to download track:', error)
-          uiStore.toast.error('Ошибка', 'Не удалось скачать трек')
+          uiStore.toast.error('Ошибка', 'Не удалось отправить трек')
+        }
+      }
+      closeMenu()
+    },
+
+    downloadHD: async () => {
+      // HD version is available only for current playing track
+      const hdInfo = playerStore.hdTrackInfo
+      if (hdInfo?.id) {
+        try {
+          await playerApi.download(hdInfo.id)
+          uiStore.toast.success('HD отправлено', 'HD версия отправлена в Telegram')
+        } catch (error) {
+          console.error('Failed to download HD track:', error)
+          uiStore.toast.error('Ошибка', 'Не удалось отправить HD версию')
         }
       }
       closeMenu()

@@ -33,6 +33,7 @@
         :album="album"
         @click="$router.push(`/album/${album.id}`)"
         @play="playAlbum"
+        @contextmenu="(e) => openMenu('album', album, 'library', e)"
       />
     </div>
 
@@ -69,11 +70,15 @@
 import { watch } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { usePagination, useSort } from '@/composables'
+import { useContextMenu } from '@/composables/useContextMenu'
 import PaginationNav from '@/components/PaginationNav.vue'
 import SortChips from '@/components/SortChips.vue'
 import AlbumGridCard from '@/components/AlbumGridCard.vue'
 import api from '@/api/client'
 import { Disc3 } from 'lucide-vue-next'
+
+// Universal context menu
+const { openMenu } = useContextMenu()
 
 const props = defineProps({
   searchQuery: {

@@ -1,3 +1,12 @@
+<!--
+  @deprecated This component is deprecated. Use ContextMenu.vue with useContextMenu() composable instead.
+  This file is kept for legacy compatibility only.
+  
+  Migration: 
+    1. Import: import { useContextMenu } from '@/composables/useContextMenu'
+    2. Use: const { openMenu } = useContextMenu()
+    3. Call: openMenu('track', track, 'context', $event)
+-->
 <template>
   <Teleport to="body">
     <Transition name="fade">

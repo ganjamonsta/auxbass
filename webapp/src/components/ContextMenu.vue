@@ -70,7 +70,11 @@
                 </button>
                 <button class="menu-item" @click="exec('download')">
                   <Download :size="18" />
-                  <span>Скачать</span>
+                  <span>Скачать в Telegram</span>
+                </button>
+                <button v-if="hasHDVersion" class="menu-item" @click="exec('downloadHD')">
+                  <Disc3 :size="18" />
+                  <span>Скачать HD версию</span>
                 </button>
                 <div class="menu-divider" />
 
@@ -116,8 +120,8 @@
                   <span>Добавить в очередь</span>
                 </button>
 
-                <!-- Only for user playlists (not auto-albums) -->
-                <template v-if="!isAutoAlbum">
+                <!-- Only for user playlists that user owns (not auto-albums) -->
+                <template v-if="!isAutoAlbum && isPlaylistOwner">
                   <div class="menu-divider" />
                   <button class="menu-item" @click="exec('rename')">
                     <Pencil :size="18" />
@@ -226,6 +230,7 @@
 import { computed, watch, nextTick, ref, onMounted, onUnmounted } from 'vue'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useAuthStore } from '@/stores/auth'
+import { usePlayerStore } from '@/stores/player'
 import PlaylistPicker from '@/components/PlaylistPicker.vue'
 import EditTrackModal from '@/components/EditTrackModal.vue'
 import { 
@@ -244,13 +249,22 @@ const checkDesktop = () => {
   isDesktop.value = window.innerWidth >= 768 && !('ontouchstart' in window)
 }
 
+// Handle keyboard events
+const handleKeyDown = (e) => {
+  if (e.key === 'Escape') {
+    closeMenu()
+  }
+}
+
 onMounted(() => {
   checkDesktop()
   window.addEventListener('resize', checkDesktop)
+  window.addEventListener('keydown', handleKeyDown)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkDesktop)
+  window.removeEventListener('keydown', handleKeyDown)
 })
 
 const {
@@ -412,6 +426,22 @@ const playlistId = computed(() => {
 // Playlist-specific
 const isAutoAlbum = computed(() => {
   return menuData.value?.is_auto_album
+})
+
+const isPlaylistOwner = computed(() => {
+  const userId = authStore.user?.id
+  // Check if playlist has owner_id or user_id field
+  return menuData.value?.owner_id === userId || 
+         menuData.value?.user_id === userId ||
+         menuData.value?.is_owner === true
+})
+
+// Track HD version (only available in player context)
+const hasHDVersion = computed(() => {
+  if (menuContext.value !== 'player') return false
+  // Get from playerStore since HD info is only available for current track
+  const playerStore = usePlayerStore()
+  return !!playerStore.hdTrackInfo
 })
 
 // Album-specific

@@ -26,6 +26,7 @@
         :key="playlist.id"
         class="playlist-card"
         @click="goToPlaylist(playlist)"
+        @contextmenu.prevent="openMenu('playlist', playlist, 'library', $event)"
       >
         <div class="playlist-cover">
           <div class="cover-grid" :class="{ 'single-cover': playlist.covers?.length === 1 }" v-if="playlist.covers?.length">
@@ -87,8 +88,12 @@ import { ref, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { useAuthStore } from '@/stores/auth'
+import { useContextMenu } from '@/composables/useContextMenu'
 import api from '@/api/client'
 import { Plus, Heart, Music, FileText } from 'lucide-vue-next'
+
+// Universal context menu
+const { openMenu } = useContextMenu()
 
 const router = useRouter()
 const libraryStore = useLibraryStore()

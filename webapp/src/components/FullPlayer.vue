@@ -14,7 +14,7 @@
         </svg>
       </button>
       <span class="player-title">Сейчас играет</span>
-      <button class="menu-btn" @click="openTrackMenu" title="Меню трека">
+      <button class="menu-btn" @click="openTrackContextMenu" title="Меню трека">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
         </svg>
@@ -249,29 +249,6 @@
       </div>
     </Transition>
 
-    <!-- Track context menu -->
-    <TrackMenu
-      :show="showTrackMenu"
-      :track="track"
-      :current-user-id="authStore.user?.id"
-      context="player"
-      @close="closeTrackMenu"
-      @goToArtist="handleGoToArtist"
-      @goToAlbum="handleGoToAlbum"
-      @addToPlaylist="handleAddToPlaylist"
-      @edit="handleEditTrack"
-      @download="handleDownloadTrack"
-      @delete="handleDeleteTrack"
-      @removeFromLibrary="handleRemoveFromLibrary"
-    />
-    
-    <!-- Edit track modal -->
-    <EditTrackModal
-      :show="showEditModal"
-      :track="editingTrack"
-      @close="closeEditModal"
-      @saved="handleTrackSaved"
-    />
   </div>
 </template>
 
@@ -281,9 +258,7 @@ import { useRouter } from 'vue-router'
 import { getTrackCoverStyle, getTrackInitials } from '@/utils'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
-import { playerApi } from '@/api/client'
-import TrackMenu from '@/components/TrackMenu.vue'
-import EditTrackModal from '@/components/EditTrackModal.vue'
+import { useContextMenu } from '@/composables/useContextMenu'
 import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps({
@@ -363,83 +338,15 @@ const router = useRouter()
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
 const authStore = useAuthStore()
-
-// Track menu state
-const showTrackMenu = ref(false)
-
-const openTrackMenu = () => {
-  telegram?.HapticFeedback?.impactOccurred?.('light')
-  showTrackMenu.value = true
-}
-
-const closeTrackMenu = () => {
-  showTrackMenu.value = false
-}
-
-// Menu handlers
-const handleGoToArtist = (artist) => {
-  emit('close')
-  router.push(`/artist/${encodeURIComponent(artist)}`)
-}
-
-const handleGoToAlbum = (albumId) => {
-  if (albumId) {
-    emit('close')
-    router.push(`/album/${albumId}`)
-  }
-}
-
-const handleAddToPlaylist = (track) => {
-  // TODO: Show playlist picker
-  closeTrackMenu()
-}
-
-const handleEditTrack = (track) => {
-  closeTrackMenu()
-  editingTrack.value = track
-  showEditModal.value = true
-}
-
-// Edit modal state
-const showEditModal = ref(false)
-const editingTrack = ref(null)
-
-const closeEditModal = () => {
-  showEditModal.value = false
-  editingTrack.value = null
-}
-
-const handleTrackSaved = (updatedTrack) => {
-  // Update current track if it's the one being edited
-  if (props.track?.id === updatedTrack.id) {
-    // The parent component will receive updated track from library store
-    // We emit an event so App.vue can refresh if needed
-  }
-}
-
-const handleDownloadTrack = async (track) => {
-  try {
-    await playerApi.download(track.id)
-  } catch (error) {
-    console.error('Failed to download track:', error)
-  }
-  closeTrackMenu()
-}
-
-const handleDeleteTrack = async (track) => {
-  if (confirm('Удалить трек полностью?')) {
-    await libraryStore.deleteTrack(track.id)
-    playerStore.next()
-  }
-  closeTrackMenu()
-}
-
-const handleRemoveFromLibrary = async (track) => {
-  await libraryStore.removeFromLibrary(track.id)
-  closeTrackMenu()
-}
+const { openMenu } = useContextMenu()
 
 const telegram = inject('telegram')
+
+// Open track context menu (uses unified context menu)
+const openTrackContextMenu = () => {
+  telegram?.HapticFeedback?.impactOccurred?.('light')
+  openMenu('track', props.track, 'player')
+}
 
 // Swipe handling for cover
 const playerRef = ref(null)

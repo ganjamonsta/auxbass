@@ -68,31 +68,11 @@
           @click="playTrack(track, index)"
           @like="handleLikeTrack(track)"
           @addToLibrary="handleAddToLibrary(track)"
-          @menu="openTrackMenu(track)"
+          @menu="(e) => openMenu('track', track, 'artist', e)"
           @download="handleDirectDownload(track)"
         />
       </div>
     </section>
-    
-    <!-- Track context menu -->
-    <TrackMenu
-      :show="showMenu"
-      :track="menuTrack"
-      context="artist"
-      @close="closeMenu"
-      @goToAlbum="handleGoToAlbum"
-      @addToPlaylist="handleAddToPlaylist"
-      @download="handleDownloadTrack"
-    />
-    
-    <!-- Playlist picker modal -->
-    <PlaylistPicker
-      :show="showPlaylistPicker"
-      :track="menuTrack"
-      @close="showPlaylistPicker = false; closeMenu()"
-      @createNew="showPlaylistPicker = false; closeMenu()"
-      @added="handlePlaylistAdded"
-    />
   </div>
 
   <!-- Not in library - offer to view global -->
@@ -118,11 +98,13 @@ import { useRoute, useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
+import { useContextMenu } from '@/composables/useContextMenu'
 import TrackItem from '@/components/TrackItem.vue'
-import TrackMenu from '@/components/TrackMenu.vue'
-import PlaylistPicker from '@/components/PlaylistPicker.vue'
 import api, { playerApi } from '@/api/client'
 import { User, Disc3, Globe } from 'lucide-vue-next'
+
+// Universal context menu
+const { openMenu } = useContextMenu()
 
 const route = useRoute()
 const router = useRouter()
@@ -132,8 +114,6 @@ const uiStore = useUIStore()
 
 const artist = ref(null)
 const loading = ref(true)
-const showMenu = ref(false)
-const menuTrack = ref(null)
 const notInLibrary = ref(false)
 
 // Get scope from query param
@@ -191,17 +171,6 @@ const goToGlobal = () => {
   })
 }
 
-// Track menu handlers
-const openTrackMenu = (track) => {
-  menuTrack.value = track
-  showMenu.value = true
-}
-
-const closeMenu = () => {
-  showMenu.value = false
-  menuTrack.value = null
-}
-
 const handleLikeTrack = async (track) => {
   const newLikedState = await libraryStore.toggleLike(track.id)
   track.is_liked = newLikedState
@@ -212,39 +181,6 @@ const handleAddToLibrary = async (track) => {
   if (success) {
     track.in_library = true
   }
-}
-
-const handleGoToAlbum = () => {
-  closeMenu()
-  const albumId = menuTrack.value?.album?.id || menuTrack.value?.album_id
-  if (albumId) {
-    router.push(`/album/${albumId}`)
-  }
-}
-
-const handleAddToPlaylist = () => {
-  showPlaylistPicker.value = true
-}
-
-const showPlaylistPicker = ref(false)
-const handlePlaylistAdded = (playlist) => {
-  uiStore.toast.success('Добавлено', `Трек добавлен в плейлист "${playlist.name}"`)
-}
-
-const handleDownloadTrack = async () => {
-  if (!menuTrack.value) return
-  try {
-    const response = await api.get(`/player/stream/${menuTrack.value.id}`, { responseType: 'blob' })
-    const url = window.URL.createObjectURL(response.data)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${menuTrack.value.artist} - ${menuTrack.value.title}.mp3`
-    a.click()
-    window.URL.revokeObjectURL(url)
-  } catch (error) {
-    console.error('Failed to download:', error)
-  }
-  closeMenu()
 }
 
 // Handle direct download from TrackItem (for large/HD files)

@@ -30,6 +30,7 @@
         class="playlist-card"
         :class="{ 'subscribed-playlist': playlist.is_subscribed }"
         @click="goToPlaylist(playlist)"
+        @contextmenu.prevent="openMenu('playlist', playlist, 'library', $event)"
       >
         <div class="playlist-cover">
           <div class="cover-grid" :class="{ 'single-cover': playlist.covers?.length === 1 }" v-if="playlist.covers?.length">
@@ -97,8 +98,12 @@
 import { ref, onMounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
+import { useContextMenu } from '@/composables/useContextMenu'
 import api from '@/api/client'
 import { Heart, Plus, Music, Link, FileText } from 'lucide-vue-next'
+
+// Universal context menu
+const { openMenu } = useContextMenu()
 
 const props = defineProps({
   searchQuery: {

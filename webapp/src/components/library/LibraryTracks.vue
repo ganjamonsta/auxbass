@@ -41,7 +41,7 @@
           :isLiked="track.is_liked"
           @click="playTrack(track)"
           @like="handleLikeTrack(track)"
-          @menu="openTrackMenu(track)"
+          @menu="(e) => openMenu('track', track, 'library', e)"
           @download="handleDirectDownload(track)"
         />
         
@@ -69,7 +69,7 @@
             :inLibrary="track.in_library"
             @click="playFriendsTrack(track)"
             @like="handleLikeTrack(track)"
-            @menu="openTrackMenu(track)"
+            @menu="(e) => openMenu('track', track, 'library', e)"
             @download="handleDirectDownload(track)"
             @addToLibrary="handleAddToLibrary(track)"
           />
@@ -99,7 +99,7 @@
             :inLibrary="track.in_library"
             @click="playGlobalTrack(track)"
             @like="handleLikeTrack(track)"
-            @menu="openTrackMenu(track)"
+            @menu="(e) => openMenu('track', track, 'library', e)"
             @download="handleDirectDownload(track)"
             @addToLibrary="handleAddToLibrary(track)"
           />
@@ -121,40 +121,6 @@
         </div>
       </template>
     </div>
-    
-    <!-- Track context menu -->
-    <TrackMenu
-      :show="showMenu"
-      :track="menuTrack"
-      :current-user-id="authStore.user?.id"
-      context="library"
-      @close="closeMenu"
-      @goToArtist="handleGoToArtist"
-      @goToAlbum="handleGoToAlbum"
-      @addToPlaylist="handleAddToPlaylist"
-      @edit="handleEditTrack"
-      @download="handleDownloadTrack"
-      @delete="handleDeleteTrack"
-      @removeFromLibrary="handleRemoveFromLibrary"
-      @addToLibrary="handleAddToLibraryFromMenu"
-    />
-    
-    <!-- Playlist picker modal -->
-    <PlaylistPicker
-      :show="showPlaylistPicker"
-      :track="menuTrack"
-      @close="showPlaylistPicker = false; closeMenu()"
-      @createNew="showPlaylistPicker = false; closeMenu()"
-      @added="handlePlaylistAdded"
-    />
-    
-    <!-- Edit track modal -->
-    <EditTrackModal
-      :show="showEditModal"
-      :track="editingTrack"
-      @close="closeEditModal"
-      @saved="handleTrackSaved"
-    />
   </div>
 </template>
 
@@ -166,13 +132,14 @@ import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import { useSort } from '@/composables'
+import { useContextMenu } from '@/composables/useContextMenu'
 import TrackItem from '@/components/TrackItem.vue'
-import TrackMenu from '@/components/TrackMenu.vue'
-import EditTrackModal from '@/components/EditTrackModal.vue'
-import PlaylistPicker from '@/components/PlaylistPicker.vue'
 import SortChips from '@/components/SortChips.vue'
 import api, { playerApi, tracksApi, socialApi } from '@/api/client'
 import { Users, Music, Globe } from 'lucide-vue-next'
+
+// Universal context menu
+const { openMenu } = useContextMenu()
 
 const props = defineProps({
   searchQuery: {
@@ -209,10 +176,6 @@ const globalLoading = ref(false)
 // Friends search results
 const friendsTracks = ref([])
 const friendsLoading = ref(false)
-
-// Edit modal state
-const showEditModal = ref(false)
-const editingTrack = ref(null)
 
 const hasMore = computed(() => tracks.value.length < total.value)
 
@@ -425,69 +388,6 @@ const shuffleAll = async () => {
   await playerStore.playShuffleAll('library')
 }
 
-// Track menu state
-const menuTrack = ref(null)
-const showMenu = ref(false)
-
-const openTrackMenu = (track) => {
-  menuTrack.value = track
-  showMenu.value = true
-}
-
-const closeMenu = () => {
-  showMenu.value = false
-  menuTrack.value = null
-}
-
-const handleGoToArtist = (artist) => {
-  router.push(`/artist/${encodeURIComponent(artist)}`)
-}
-
-const handleGoToAlbum = (albumId) => {
-  if (albumId) {
-    router.push(`/album/${albumId}`)
-  }
-  closeMenu()
-}
-
-const handleAddToPlaylist = (track) => {
-  showPlaylistPicker.value = true
-}
-
-// Playlist picker state
-const showPlaylistPicker = ref(false)
-const handlePlaylistAdded = (playlist) => {
-  uiStore.toast.success('Добавлено', `Трек добавлен в плейлист "${playlist.name}"`)
-}
-
-const handleEditTrack = (track) => {
-  closeMenu()
-  editingTrack.value = track
-  showEditModal.value = true
-}
-
-const closeEditModal = () => {
-  showEditModal.value = false
-  editingTrack.value = null
-}
-
-const handleTrackSaved = (updatedTrack) => {
-  // Update track in local list
-  const index = tracks.value.findIndex(t => t.id === updatedTrack.id)
-  if (index !== -1) {
-    tracks.value[index] = { ...tracks.value[index], ...updatedTrack }
-  }
-  // Also update in player if currently playing
-  if (playerStore.currentTrack?.id === updatedTrack.id) {
-    playerStore.currentTrack = { ...playerStore.currentTrack, ...updatedTrack }
-  }
-}
-
-const handleDownloadTrack = async (track) => {
-  await handleDirectDownload(track)
-  closeMenu()
-}
-
 // Direct download from TrackItem button - sends file via Telegram bot
 const handleDirectDownload = async (track) => {
   try {
@@ -498,26 +398,6 @@ const handleDirectDownload = async (track) => {
     const errorMsg = error.response?.data?.detail || 'Ошибка отправки'
     uiStore.toast.error('Не удалось отправить', errorMsg)
   }
-}
-
-const handleDeleteTrack = async (track) => {
-  if (confirm('Удалить трек полностью?')) {
-    await libraryStore.deleteTrack(track.id)
-    tracks.value = tracks.value.filter(t => t.id !== track.id)
-  }
-  closeMenu()
-}
-
-const handleRemoveFromLibrary = async (track) => {
-  await libraryStore.removeFromLibrary(track.id)
-  tracks.value = tracks.value.filter(t => t.id !== track.id)
-  closeMenu()
-}
-
-// Handle add to library from context menu (for global tracks)
-const handleAddToLibraryFromMenu = async (track) => {
-  await handleAddToLibrary(track)
-  closeMenu()
 }
 
 onMounted(() => {

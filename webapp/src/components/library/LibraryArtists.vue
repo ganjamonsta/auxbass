@@ -20,6 +20,7 @@
         :key="artist.name"
         :artist="artist"
         @click="goToArtist"
+        @contextmenu="(e) => openMenu('artist', artist, 'library', e)"
       />
     </div>
 
@@ -44,10 +45,14 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSort } from '@/composables'
+import { useContextMenu } from '@/composables/useContextMenu'
 import SortChips from '@/components/SortChips.vue'
 import ArtistGridCard from '@/components/ArtistGridCard.vue'
 import api from '@/api/client'
 import { User } from 'lucide-vue-next'
+
+// Universal context menu
+const { openMenu } = useContextMenu()
 
 const props = defineProps({
   searchQuery: {

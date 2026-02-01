@@ -3,7 +3,7 @@
     class="track-item" 
     :class="{ playing: isPlaying, compact: compact, unavailable: track.is_unavailable }" 
     @click="handleClick"
-    @contextmenu.prevent="$emit('menu')"
+    @contextmenu.prevent="$emit('menu', $event)"
   >
     <!-- Track number (for album view) -->
     <span v-if="trackNumber" class="track-number">{{ trackNumber }}</span>
