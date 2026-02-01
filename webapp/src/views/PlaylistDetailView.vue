@@ -37,24 +37,24 @@
             <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
           </svg>
         </button>
+        <!-- Edit button for owner -->
         <button v-if="isOwner" class="action-btn edit-btn" @click="openEditModal">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
             <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
           </svg>
         </button>
+        <!-- Subscribe/Unsubscribe button for non-owner public playlists -->
+        <button 
+          v-else-if="playlist.is_public" 
+          class="action-btn subscribe-action-btn"
+          :class="{ subscribed: playlist.is_subscribed }"
+          @click="toggleSubscription"
+          :disabled="subscribing"
+        >
+          <Check v-if="playlist.is_subscribed" :size="18" />
+          <Plus v-else :size="18" />
+        </button>
       </div>
-      
-      <!-- Subscribe/Unsubscribe button for non-owner public playlists -->
-      <button 
-        v-if="!isOwner && playlist.is_public" 
-        class="subscribe-btn"
-        :class="{ subscribed: playlist.is_subscribed }"
-        @click="toggleSubscription"
-        :disabled="subscribing"
-      >
-        <span v-if="playlist.is_subscribed"><Check :size="16" /> В медиатеке</span>
-        <span v-else><Plus :size="16" /> Добавить</span>
-      </button>
     </div>
 
     <!-- Track list -->
@@ -427,8 +427,20 @@ watch(
   display: none;
 }
 
-/* Hide separator when edit button not shown (not owner) */
-.action-buttons:not(:has(.edit-btn)) .shuffle-btn::after {
+.action-btn.subscribe-action-btn::after {
+  display: none;
+}
+
+.action-btn.subscribe-action-btn.subscribed {
+  color: var(--accent);
+}
+
+.action-btn.subscribe-action-btn:disabled {
+  opacity: 0.5;
+}
+
+/* Hide separator when third button not shown */
+.action-buttons:not(:has(.edit-btn)):not(:has(.subscribe-action-btn)) .shuffle-btn::after {
   display: none;
 }
 
@@ -488,36 +500,4 @@ watch(
   margin-top: 4px;
 }
 
-.subscribe-btn {
-  padding: 12px 20px;
-  border-radius: 24px;
-  border: none;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  background: var(--bg-elevated);
-  color: var(--text-primary);
-  box-shadow: 
-    4px 4px 8px rgba(0, 0, 0, 0.2),
-    -2px -2px 6px rgba(255, 255, 255, 0.05);
-}
-
-.subscribe-btn:hover {
-  opacity: 0.9;
-}
-
-.subscribe-btn:active {
-  box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.subscribe-btn.subscribed {
-  background: var(--accent);
-  color: #000;
-}
-
-.subscribe-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
 </style>
