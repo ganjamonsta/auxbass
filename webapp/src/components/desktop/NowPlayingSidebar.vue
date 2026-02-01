@@ -34,6 +34,7 @@
         v-if="track?.artist" 
         class="info-link artist-link"
         @click="goToArtist"
+        @contextmenu.prevent="openMenu('artist', { name: track.artist }, 'sidebar', $event)"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
@@ -47,6 +48,7 @@
         v-if="track?.album?.id || track?.album_id" 
         class="info-link album-link"
         @click="goToAlbum"
+        @contextmenu.prevent="openMenu('album', { id: track.album?.id || track.album_id, name: track.album?.name || track.album_name, album_artist: track.artist }, 'sidebar', $event)"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"/>
@@ -159,6 +161,7 @@
           class="queue-item"
           :class="{ current: index === 0 }"
           @click="playFromQueueHandler(index)"
+          @contextmenu.prevent="openMenu('track', queueTrack, 'queue', $event)"
         >
           <div class="queue-item-number">
             <svg v-if="index === 0 && isPlaying" class="playing-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -212,6 +215,7 @@ import { computed, defineEmits } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
+import { useContextMenu } from '@/composables/useContextMenu'
 import { Play } from 'lucide-vue-next'
 
 const emit = defineEmits(['goToUser'])
@@ -219,6 +223,7 @@ const emit = defineEmits(['goToUser'])
 const router = useRouter()
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
+const { openMenu } = useContextMenu()
 
 // Computed from stores
 const track = computed(() => playerStore.currentTrack)

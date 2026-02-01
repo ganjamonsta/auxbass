@@ -47,6 +47,7 @@
             class="queue-track"
             :class="{ active: idx === 0 }"
             @click="$emit('playFromQueue', idx)"
+            @contextmenu.prevent="openMenu('track', t, 'queue', $event)"
           >
             <div class="queue-track-number">{{ idx + 1 }}</div>
             <div class="queue-track-cover" :style="getTrackCoverStyle(t)">
@@ -80,6 +81,7 @@
             :key="`h-${t.id}-${idx}`"
             class="queue-track history"
             @click="$emit('playFromHistory', idx)"
+            @contextmenu.prevent="openMenu('track', t, 'history', $event)"
           >
             <div class="queue-track-number">-{{ historyTracks.length - idx }}</div>
             <div class="queue-track-cover" :style="getTrackCoverStyle(t)">
@@ -105,6 +107,9 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { getTrackCoverStyle, getTrackInitials } from '@/utils'
+import { useContextMenu } from '@/composables/useContextMenu'
+
+const { openMenu } = useContextMenu()
 
 const props = defineProps({
   contextInfo: Object,
