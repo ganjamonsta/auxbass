@@ -139,6 +139,15 @@
       @addToLibrary="handleAddToLibraryFromMenu"
     />
     
+    <!-- Playlist picker modal -->
+    <PlaylistPicker
+      :show="showPlaylistPicker"
+      :track="menuTrack"
+      @close="showPlaylistPicker = false; closeMenu()"
+      @createNew="showPlaylistPicker = false; closeMenu()"
+      @added="handlePlaylistAdded"
+    />
+    
     <!-- Edit track modal -->
     <EditTrackModal
       :show="showEditModal"
@@ -160,6 +169,7 @@ import { useSort } from '@/composables'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackMenu from '@/components/TrackMenu.vue'
 import EditTrackModal from '@/components/EditTrackModal.vue'
+import PlaylistPicker from '@/components/PlaylistPicker.vue'
 import SortChips from '@/components/SortChips.vue'
 import api, { playerApi, tracksApi, socialApi } from '@/api/client'
 import { Users, Music, Globe } from 'lucide-vue-next'
@@ -441,7 +451,13 @@ const handleGoToAlbum = (albumId) => {
 }
 
 const handleAddToPlaylist = (track) => {
-  closeMenu()
+  showPlaylistPicker.value = true
+}
+
+// Playlist picker state
+const showPlaylistPicker = ref(false)
+const handlePlaylistAdded = (playlist) => {
+  uiStore.toast.success('Добавлено', `Трек добавлен в плейлист "${playlist.name}"`)
 }
 
 const handleEditTrack = (track) => {
