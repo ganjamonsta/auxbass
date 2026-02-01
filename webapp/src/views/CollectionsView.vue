@@ -24,7 +24,7 @@
     <!-- Albums Tab -->
     <div v-show="activeTab === 'albums'" class="tab-content">
       <!-- Scope switcher for albums -->
-      <div class="scope-tabs">
+      <div v-if="!authStore.hasChannel" class="scope-tabs">
         <button 
           class="scope-tab" 
           :class="{ active: albumScope === 'library' }"
@@ -445,6 +445,11 @@ onMounted(() => {
   if (!authStore.hasChannel && albumScope.value === 'library') {
     albumScope.value = 'global'
     localStorage.setItem(ALBUM_SCOPE_KEY, 'global')
+  }
+  
+  // If channel is present (Premium), force global scope as these sections are global-only for premium
+  if (authStore.hasChannel) {
+    albumScope.value = 'global' 
   }
   
   // Load initial tab data

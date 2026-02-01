@@ -1,7 +1,7 @@
 <template>
   <div class="artists-view">
     <!-- Scope tabs -->
-    <div class="scope-tabs">
+    <div v-if="!authStore.hasChannel" class="scope-tabs">
       <button 
         class="scope-tab" 
         :class="{ active: scope === 'library' }"
@@ -211,6 +211,11 @@ onMounted(() => {
   if (!authStore.hasChannel && scope.value === 'library') {
     scope.value = 'global'
     localStorage.setItem(SCOPE_KEY, 'global')
+  }
+  
+  // If channel is present (Premium), force global scope
+  if (authStore.hasChannel) {
+    scope.value = 'global'
   }
 
   loadArtists()
