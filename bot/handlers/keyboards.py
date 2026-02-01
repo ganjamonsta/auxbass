@@ -26,6 +26,33 @@ def get_webapp_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
+def get_help_menu_keyboard() -> InlineKeyboardMarkup:
+    """Create main help menu with section buttons"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📤 Добавление музыки", callback_data="help:upload")],
+        [InlineKeyboardButton(text="📁 Плейлисты", callback_data="help:playlists")],
+        [InlineKeyboardButton(text="💿 Альбомы и исполнители", callback_data="help:albums")],
+        [InlineKeyboardButton(text="☁️ Облачный бекап", callback_data="help:backup")],
+        [InlineKeyboardButton(text="🎧 Веб-плеер", callback_data="help:player")],
+        [InlineKeyboardButton(text="📱 Все команды", callback_data="help:commands")],
+        [InlineKeyboardButton(
+            text="🎵 Открыть плеер",
+            web_app=WebAppInfo(url=settings.webapp_url)
+        )]
+    ])
+
+
+def get_help_back_keyboard() -> InlineKeyboardMarkup:
+    """Create back button for help sections"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Назад к меню", callback_data="help:menu")],
+        [InlineKeyboardButton(
+            text="🎵 Открыть плеер",
+            web_app=WebAppInfo(url=settings.webapp_url)
+        )]
+    ])
+
+
 def get_track_keyboard(track_id: int, show_enrich: bool = False) -> InlineKeyboardMarkup:
     """
     Create keyboard for track message.

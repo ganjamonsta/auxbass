@@ -19,11 +19,173 @@ from shared.models import Track, Playlist, PlaylistTrack
 
 from bot.services import track_service, album_service, channel_service
 from bot.services.session import session_manager
-from bot.handlers.keyboards import get_webapp_keyboard
+from bot.handlers.keyboards import get_webapp_keyboard, get_help_menu_keyboard, get_help_back_keyboard
 
 
 router = Router()
 settings = get_settings()
+
+
+# ========== Help Section Callbacks ==========
+
+@router.callback_query(F.data == "help:menu")
+async def handle_help_menu(callback: CallbackQuery):
+    """Return to main help menu"""
+    await callback.message.edit_text(
+        "🎵 <b>TG Player — Центр помощи</b>\n\n"
+        "Добро пожаловать в твою персональную музыкальную библиотеку!\n\n"
+        "<b>🚀 Быстрый старт:</b>\n"
+        "Просто отправь аудиофайл — всё остальное бот сделает сам.\n\n"
+        "Выбери раздел, чтобы узнать больше:",
+        reply_markup=get_help_menu_keyboard()
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "help:upload")
+async def handle_help_upload(callback: CallbackQuery):
+    """Show help about uploading music"""
+    await callback.message.edit_text(
+        "📤 <b>Добавление музыки</b>\n\n"
+        "<b>Как добавить треки?</b>\n"
+        "Просто отправь аудиофайл боту — готово! "
+        "Поддерживаются MP3, FLAC, M4A, OGG и другие форматы.\n\n"
+        "<b>✨ Автоматическое обогащение</b>\n"
+        "Бот сам найдёт информацию о треке:\n"
+        "• Исполнитель, название, альбом\n"
+        "• Обложка альбома\n"
+        "• Год выпуска и жанр\n"
+        "• Номер трека в альбоме\n\n"
+        "<b>🔍 Источники данных</b>\n"
+        "Метаданные подтягиваются из Deezer и Last.fm "
+        "для максимальной точности.\n\n"
+        "<b>💾 Вечное хранение</b>\n"
+        "Вся музыка хранится прямо в Telegram — "
+        "твоя коллекция сохранится навсегда и доступна с любого устройства!",
+        reply_markup=get_help_back_keyboard()
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "help:playlists")
+async def handle_help_playlists(callback: CallbackQuery):
+    """Show help about playlists"""
+    await callback.message.edit_text(
+        "📁 <b>Плейлисты</b>\n\n"
+        "<b>Создание плейлиста:</b>\n"
+        "• /playlist — запустить создание\n"
+        '• /playlist "Название" — быстрое создание\n\n'
+        "<b>Добавление треков:</b>\n"
+        "После создания плейлиста просто пересылай "
+        "или отправляй аудиофайлы — они автоматически добавятся.\n\n"
+        "<b>Управление:</b>\n"
+        "• /playlists — список всех плейлистов\n"
+        "• Редактирование и удаление через веб-плеер\n\n"
+        "<b>✨ Умные функции:</b>\n"
+        "• Автоматическое определение дубликатов\n"
+        "• Генерация обложки плейлиста\n"
+        "• Воспроизведение прямо в Telegram",
+        reply_markup=get_help_back_keyboard()
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "help:albums")
+async def handle_help_albums(callback: CallbackQuery):
+    """Show help about albums and artists"""
+    await callback.message.edit_text(
+        "💿 <b>Альбомы и исполнители</b>\n\n"
+        "<b>Автоматическая организация</b>\n"
+        "Бот сам группирует треки по альбомам и исполнителям. "
+        "Просто добавляй музыку — структура создастся автоматически.\n\n"
+        "<b>🎨 Обложки альбомов</b>\n"
+        "Обложки загружаются автоматически из Deezer. "
+        "Твоя библиотека выглядит как настоящий музыкальный сервис!\n\n"
+        "<b>📊 Полная информация:</b>\n"
+        "• Год выпуска альбома\n"
+        "• Правильный порядок треков\n"
+        "• Группировка по исполнителям\n"
+        "• Жанры и теги\n\n"
+        "<b>🔍 Удобный поиск</b>\n"
+        "Ищи по исполнителю, альбому или названию трека в веб-плеере.",
+        reply_markup=get_help_back_keyboard()
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "help:backup")
+async def handle_help_backup(callback: CallbackQuery):
+    """Show help about cloud backup"""
+    await callback.message.edit_text(
+        "☁️ <b>Облачный бекап</b>\n\n"
+        "<b>Что это?</b>\n"
+        "Все треки автоматически дублируются в твой личный канал. "
+        "Это надёжный бекап прямо в Telegram!\n\n"
+        "<b>🔧 Настройка:</b>\n"
+        "1. Создай приватный канал\n"
+        "2. Добавь бота администратором\n"
+        "3. Команда /channel — привязать канал\n"
+        "4. /sync — синхронизировать библиотеку\n\n"
+        "<b>✨ Преимущества:</b>\n"
+        "• Автоматические хэштеги (#Исполнитель, #Альбом)\n"
+        "• Поиск прямо в Telegram\n"
+        "• Музыка доступна даже без бота\n"
+        "• Можно поделиться с друзьями\n\n"
+        "<b>💎 Вечное хранение</b>\n"
+        "Telegram не удаляет файлы — твоя музыка сохранится навсегда!",
+        reply_markup=get_help_back_keyboard()
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "help:player")
+async def handle_help_player(callback: CallbackQuery):
+    """Show help about web player"""
+    await callback.message.edit_text(
+        "🎧 <b>Веб-плеер</b>\n\n"
+        "<b>Полноценный музыкальный плеер:</b>\n"
+        "• Воспроизведение прямо в Telegram\n"
+        "• Работает в браузере на любом устройстве\n"
+        "• Красивый современный интерфейс\n\n"
+        "<b>🎛 Функции плеера:</b>\n"
+        "• Поиск по всей библиотеке\n"
+        "• Фильтрация по исполнителям и альбомам\n"
+        "• Очередь воспроизведения\n"
+        "• Shuffle и Repeat режимы\n"
+        "• Редактирование метаданных треков\n\n"
+        "<b>🌐 Доступ из браузера:</b>\n"
+        "Команда /login — получить код для входа с компьютера. "
+        "Слушай музыку на большом экране!\n\n"
+        "<b>📱 Mini App</b>\n"
+        "Нажми кнопку ниже, чтобы открыть плеер прямо в Telegram.",
+        reply_markup=get_help_back_keyboard()
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "help:commands")
+async def handle_help_commands(callback: CallbackQuery):
+    """Show all available commands"""
+    await callback.message.edit_text(
+        "📱 <b>Все команды</b>\n\n"
+        "<b>🎵 Основные:</b>\n"
+        "/start — Начать работу с ботом\n"
+        "/help — Центр помощи\n"
+        "/library — Открыть веб-плеер\n"
+        "/stats — Статистика библиотеки\n\n"
+        "<b>📁 Плейлисты:</b>\n"
+        "/playlist — Создать новый плейлист\n"
+        "/playlists — Мои плейлисты\n\n"
+        "<b>☁️ Бекап:</b>\n"
+        "/channel — Настроить канал\n"
+        "/sync — Синхронизировать с каналом\n\n"
+        "<b>🔐 Авторизация:</b>\n"
+        "/login — Код для входа в браузере\n\n"
+        "<b>💡 Подсказка:</b>\n"
+        "Большинство действий удобнее делать через веб-плеер!",
+        reply_markup=get_help_back_keyboard()
+    )
+    await callback.answer()
 
 
 # ========== Track Callbacks ==========

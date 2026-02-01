@@ -27,6 +27,7 @@ from bot.handlers.keyboards import (
     get_stats_keyboard,
     get_channel_setup_keyboard,
     get_cancel_keyboard,
+    get_help_menu_keyboard,
 )
 
 
@@ -82,33 +83,14 @@ async def cmd_start(message: Message):
 
 @router.message(Command("help"))
 async def cmd_help(message: Message):
-    """Handle /help command"""
+    """Handle /help command - show main help menu with sections"""
     await message.answer(
-        "🎵 <b>TG Player — Справка</b>\n\n"
-        "<b>Как добавить музыку?</b>\n"
-        "Просто отправь мне аудиофайл (MP3, FLAC, M4A и др.) — "
-        "я автоматически добавлю его в твою библиотеку.\n\n"
-        "<b>📱 Основные команды:</b>\n"
-        "/start — Начало работы\n"
-        "/help — Эта справка\n"
-        "/library — Открыть плеер\n"
-        "/stats — Статистика библиотеки\n\n"
-        "<b>🔐 Авторизация:</b>\n"
-        "/login — Код для входа в браузере\n\n"
-        "<b>📁 Плейлисты:</b>\n"
-        '/playlist — Создать плейлист\n'
-        '/playlist "Название" — Быстрое создание\n'
-        '/playlists — Мои плейлисты\n\n'
-        "<b>☁️ Резервное копирование:</b>\n"
-        "/channel — Настроить канал для бекапа\n"
-        "/sync — Синхронизировать библиотеку с каналом\n\n"
-        "<b>✨ Возможности:</b>\n"
-        "• Автообогащение метаданных (Deezer, Last.fm)\n"
-        "• Группировка по альбомам и исполнителям\n"
-        "• Редактирование информации о треках\n"
-        "• Бекап в личный Telegram канал\n"
-        "• Веб-плеер с поиском и фильтрами",
-        reply_markup=get_webapp_keyboard()
+        "🎵 <b>TG Player — Центр помощи</b>\n\n"
+        "Добро пожаловать в твою персональную музыкальную библиотеку!\n\n"
+        "<b>🚀 Быстрый старт:</b>\n"
+        "Просто отправь аудиофайл — всё остальное бот сделает сам.\n\n"
+        "Выбери раздел, чтобы узнать больше:",
+        reply_markup=get_help_menu_keyboard()
     )
 
 
