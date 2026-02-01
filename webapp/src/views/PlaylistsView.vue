@@ -32,16 +32,9 @@
           <span class="empty-icon"><FileText :size="48" /></span>
           <p>У вас пока нет плейлистов</p>
           <button class="create-first-btn" @click="handleCreatePlaylist">
-            Создать плейлист
-          </button>
-        </div>
-      </template>
-    </MediaGrid>
-
-    <!-- Create modal -->
-        Создать плейлист
-      </button>
-    </div>
+           Создать плейлист
+         </button>
+       </div>
 
     <!-- Loading -->
     <div v-if="loading" class="loading">
