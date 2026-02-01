@@ -1,9 +1,22 @@
 <template>
   <Teleport to="body">
     <Transition name="fade">
-      <div v-if="isOpen" class="menu-overlay" @click="closeMenu">
-        <Transition name="slide-up">
-          <div v-if="isOpen" class="menu-sheet" @click.stop>
+      <div 
+        v-if="isOpen" 
+        class="menu-overlay" 
+        :class="{ desktop: isDesktop }" 
+        @click="closeMenu"
+        @contextmenu.prevent="closeMenu"
+      >
+        <Transition :name="isDesktop ? 'scale' : 'slide-up'">
+          <div 
+            v-if="isOpen" 
+            ref="menuSheet"
+            class="menu-sheet" 
+            :class="{ desktop: isDesktop }"
+            :style="isDesktop && adjustedPosition.x ? { left: adjustedPosition.x + 'px', top: adjustedPosition.y + 'px' } : {}"
+            @click.stop
+          >
             <!-- Header -->
             <div class="menu-header">
               <div class="menu-cover" :style="coverStyle">
@@ -210,7 +223,7 @@
 </template>
 
 <script setup>
-import { computed, watch, nextTick, ref } from 'vue'
+import { computed, watch, nextTick, ref, onMounted, onUnmounted } from 'vue'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useAuthStore } from '@/stores/auth'
 import PlaylistPicker from '@/components/PlaylistPicker.vue'
@@ -222,12 +235,30 @@ import {
 
 const authStore = useAuthStore()
 const renameInput = ref(null)
+const menuSheet = ref(null)
+const isDesktop = ref(false)
+const adjustedPosition = ref({ x: 0, y: 0 })
+
+// Detect desktop
+const checkDesktop = () => {
+  isDesktop.value = window.innerWidth >= 768 && !('ontouchstart' in window)
+}
+
+onMounted(() => {
+  checkDesktop()
+  window.addEventListener('resize', checkDesktop)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkDesktop)
+})
 
 const {
   isOpen,
   menuType,
   menuData,
   menuContext,
+  menuPosition,
   closeMenu,
   executeAction,
   showPlaylistPicker,
@@ -254,6 +285,39 @@ watch(showRenameModal, (show) => {
 const exec = (action, extra = null) => {
   executeAction(action, extra)
 }
+
+// Calculate position for desktop mode (under cursor, within screen bounds)
+watch([isOpen, menuPosition], ([open, pos]) => {
+  if (open && isDesktop.value && pos.x > 0) {
+    nextTick(() => {
+      const menu = menuSheet.value
+      if (!menu) return
+      
+      const menuWidth = menu.offsetWidth || 280
+      const menuHeight = menu.offsetHeight || 400
+      const padding = 8
+      
+      let x = pos.x
+      let y = pos.y
+      
+      // Adjust if menu goes beyond right edge
+      if (x + menuWidth + padding > window.innerWidth) {
+        x = window.innerWidth - menuWidth - padding
+      }
+      
+      // Adjust if menu goes beyond bottom edge
+      if (y + menuHeight + padding > window.innerHeight) {
+        y = window.innerHeight - menuHeight - padding
+      }
+      
+      // Ensure minimum offset from edges
+      x = Math.max(padding, x)
+      y = Math.max(padding, y)
+      
+      adjustedPosition.value = { x, y }
+    })
+  }
+})
 
 // ═══════════════════════════════════════════════════════════
 // COMPUTED HELPERS
@@ -378,6 +442,12 @@ const getTracksWord = (count) => {
   justify-content: center;
 }
 
+/* Desktop overlay - transparent, just for catching clicks */
+.menu-overlay.desktop {
+  background: transparent;
+  backdrop-filter: none;
+}
+
 .menu-sheet {
   width: 100%;
   max-width: 400px;
@@ -387,6 +457,34 @@ const getTracksWord = (count) => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+/* Desktop menu - floating under cursor */
+.menu-sheet.desktop {
+  position: fixed;
+  width: 280px;
+  max-width: none;
+  max-height: 70vh;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.menu-sheet.desktop .menu-header {
+  padding: 12px;
+}
+
+.menu-sheet.desktop .menu-cover {
+  width: 40px;
+  height: 40px;
+}
+
+.menu-sheet.desktop .menu-item {
+  padding: 10px 14px;
+  font-size: 14px;
+}
+
+.menu-sheet.desktop .menu-close {
+  display: none;
 }
 
 .menu-header {
@@ -562,5 +660,18 @@ const getTracksWord = (count) => {
 .slide-up-enter-from,
 .slide-up-leave-to {
   transform: translateY(100%);
+}
+
+/* Desktop scale animation */
+.scale-enter-active,
+.scale-leave-active {
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease;
+  transform-origin: top left;
+}
+
+.scale-enter-from,
+.scale-leave-to {
+  transform: scale(0.9);
+  opacity: 0;
 }
 </style>

@@ -21,6 +21,7 @@ const isOpen = ref(false)
 const menuType = ref(null)        // 'track' | 'playlist' | 'album' | 'artist' | 'user'
 const menuData = ref(null)        // The actual item data
 const menuContext = ref(null)     // Additional context (e.g., 'player', 'sidebar', 'library')
+const menuPosition = ref({ x: 0, y: 0 })  // Mouse position for desktop context menu
 
 // Modal states
 const showPlaylistPicker = ref(false)
@@ -53,11 +54,19 @@ export function useContextMenu() {
    * @param {Object} data - The item data
    * @param {string} context - Optional context ('player', 'sidebar', 'library', etc.)
    */
-  const openMenu = (type, data, context = null) => {
+  const openMenu = (type, data, context = null, event = null) => {
     haptic('light')
     menuType.value = type
     menuData.value = data
     menuContext.value = context
+    
+    // Capture mouse position for desktop
+    if (event && event.clientX !== undefined) {
+      menuPosition.value = { x: event.clientX, y: event.clientY }
+    } else {
+      menuPosition.value = { x: 0, y: 0 }
+    }
+    
     isOpen.value = true
   }
 
@@ -537,6 +546,7 @@ export function useContextMenu() {
     menuType,
     menuData,
     menuContext,
+    menuPosition,
 
     // Menu control
     openMenu,

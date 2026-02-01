@@ -93,7 +93,7 @@
           class="nav-item playlist-item"
           :class="{ active: $route.params.id == album.id && $route.name === 'album-detail' }"
           @click="$router.push(`/album/${album.id}`)"
-          @contextmenu.prevent="openMenu('album', album, 'sidebar')"
+          @contextmenu.prevent="openMenu('album', album, 'sidebar', $event)"
         >
           <div class="playlist-cover album-cover" :style="getPlaylistCoverStyle(album)">
             <img v-if="album.cover_url" :src="album.cover_url" alt="" />
@@ -136,7 +136,7 @@
           class="nav-item playlist-item"
           :class="{ active: $route.params.id == playlist.id && $route.name === 'playlist-detail' }"
           @click="$router.push(`/playlist/${playlist.id}`)"
-          @contextmenu.prevent="openMenu('playlist', playlist, 'sidebar')"
+          @contextmenu.prevent="openMenu('playlist', playlist, 'sidebar', $event)"
         >
           <div class="playlist-cover" :style="getPlaylistCoverStyle(playlist)">
             <img v-if="playlist.cover_url" :src="playlist.cover_url" alt="" />

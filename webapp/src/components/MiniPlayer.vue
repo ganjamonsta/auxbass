@@ -1,5 +1,5 @@
 <template>
-  <div class="mini-player" @click="$emit('expand')" @contextmenu.prevent="openMenu('track', track, 'player')">
+  <div class="mini-player" @click="$emit('expand')" @contextmenu.prevent="openMenu('track', track, 'player', $event)">
     <!-- LCD Screen -->
     <div class="lcd-screen">
       <div class="lcd-row lcd-row-main">
