@@ -12,3 +12,8 @@ export { usePagination } from './usePagination'
 export { useSort, SORT_OPTIONS } from './useSort'
 export { useDragReorder } from './useDragReorder'
 export { useTrackSearch } from './useTrackSearch'
+export { useContextMenu } from './useContextMenu'
+
+// Legacy - can be removed after migration
+export { useTrackContextMenu } from './useTrackContextMenu'
+export { usePlaylistContextMenu } from './usePlaylistContextMenu'

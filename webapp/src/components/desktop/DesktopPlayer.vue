@@ -1,5 +1,5 @@
 <template>
-  <div class="desktop-player" :class="{ playing: isPlaying }" @contextmenu.prevent="openTrackMenu">
+  <div class="desktop-player" :class="{ playing: isPlaying }" @contextmenu.prevent="openMenu('track', track, 'player')">
     <!-- Left side - Volume knob -->
     <div class="player-left">
       <div 
@@ -111,59 +111,19 @@
         <VolumeX v-if="isMuted" :size="16" /><Volume2 v-else :size="16" />
       </button>
     </div>
-
-    <!-- Track context menu -->
-    <TrackMenu
-      :show="showTrackMenu"
-      :track="track"
-      :current-user-id="authStore.user?.id"
-      context="player"
-      @close="closeTrackMenu"
-      @goToArtist="handleGoToArtist"
-      @goToAlbum="handleGoToAlbum"
-      @addToPlaylist="handleAddToPlaylist"
-      @edit="handleEditTrack"
-      @download="handleDownloadTrack"
-      @delete="handleDeleteTrack"
-      @removeFromLibrary="handleRemoveFromLibrary"
-    />
-    
-    <!-- Edit track modal -->
-    <EditTrackModal
-      :show="showEditModal"
-      :track="editingTrack"
-      @close="closeEditModal"
-      @saved="handleTrackSaved"
-    />
-    
-    <!-- Playlist picker modal -->
-    <PlaylistPicker
-      :show="showPlaylistPicker"
-      :track="track"
-      @close="showPlaylistPicker = false"
-      @createNew="showPlaylistPicker = false"
-      @added="handlePlaylistAdded"
-    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
-import { useAuthStore } from '@/stores/auth'
-import { useUIStore } from '@/stores/ui'
-import { playerApi } from '@/api/client'
-import TrackMenu from '@/components/TrackMenu.vue'
-import EditTrackModal from '@/components/EditTrackModal.vue'
-import PlaylistPicker from '@/components/PlaylistPicker.vue'
+import { useContextMenu } from '@/composables/useContextMenu'
 import { Play, Square, Pause, Volume2, VolumeX, SkipBack, SkipForward } from 'lucide-vue-next'
 
-const router = useRouter()
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
-const authStore = useAuthStore()
+const { openMenu } = useContextMenu()
 
 const emit = defineEmits(['expand'])
 
@@ -331,85 +291,6 @@ const handleToggleLike = async () => {
   if (track.value?.id) {
     await libraryStore.toggleLike(track.value.id)
   }
-}
-
-// Track menu state
-const showTrackMenu = ref(false)
-
-const openTrackMenu = () => {
-  showTrackMenu.value = true
-}
-
-const closeTrackMenu = () => {
-  showTrackMenu.value = false
-}
-
-// Menu handlers
-const handleGoToArtist = (artist) => {
-  closeTrackMenu()
-  router.push(`/artist/${encodeURIComponent(artist)}`)
-}
-
-const handleGoToAlbum = (albumId) => {
-  if (albumId) {
-    closeTrackMenu()
-    router.push(`/album/${albumId}`)
-  }
-}
-
-const handleAddToPlaylist = (trackData) => {
-  closeTrackMenu()
-  showPlaylistPicker.value = true
-}
-
-// Playlist picker state
-const showPlaylistPicker = ref(false)
-const uiStore = useUIStore()
-
-const handlePlaylistAdded = (playlist) => {
-  showPlaylistPicker.value = false
-  uiStore.toast.success('Добавлено', `Трек добавлен в плейлист "${playlist.name}"`)
-}
-
-const handleEditTrack = (trackData) => {
-  closeTrackMenu()
-  editingTrack.value = trackData
-  showEditModal.value = true
-}
-
-// Edit modal state
-const showEditModal = ref(false)
-const editingTrack = ref(null)
-
-const closeEditModal = () => {
-  showEditModal.value = false
-  editingTrack.value = null
-}
-
-const handleTrackSaved = (updatedTrack) => {
-  // Update will be reflected through library store
-}
-
-const handleDownloadTrack = async (trackData) => {
-  try {
-    await playerApi.download(track.value.id)
-  } catch (error) {
-    console.error('Failed to download track:', error)
-  }
-  closeTrackMenu()
-}
-
-const handleDeleteTrack = async (trackData) => {
-  if (confirm('Удалить трек полностью?')) {
-    await libraryStore.deleteTrack(track.value.id)
-    playerStore.next()
-  }
-  closeTrackMenu()
-}
-
-const handleRemoveFromLibrary = async (trackData) => {
-  await libraryStore.removeFromLibrary(track.value.id)
-  closeTrackMenu()
 }
 
 onMounted(() => {

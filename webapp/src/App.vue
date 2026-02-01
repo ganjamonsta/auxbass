@@ -171,6 +171,9 @@
       <!-- Channel setup banner -->
       <ChannelBanner />
       
+      <!-- Global context menu (universal for all element types) -->
+      <ContextMenu />
+      
       <!-- Global toast notifications -->
       <ToastContainer />
     </template>
@@ -189,6 +192,7 @@ import MiniPlayer from '@/components/MiniPlayer.vue'
 import FullPlayer from '@/components/FullPlayer.vue'
 import ChannelBanner from '@/components/ChannelBanner.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
+import ContextMenu from '@/components/ContextMenu.vue'
 // Desktop components
 import Sidebar from '@/components/desktop/Sidebar.vue'
 import DesktopPlayer from '@/components/desktop/DesktopPlayer.vue'
