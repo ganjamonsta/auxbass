@@ -220,6 +220,16 @@ def get_cancel_keyboard(callback_data: str = "cancel") -> InlineKeyboardMarkup:
     ])
 
 
+def get_deduplication_keyboard() -> InlineKeyboardMarkup:
+    """Create keyboard for deduplication analysis"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🔍 Начать проверку", callback_data="dedup:start"),
+            InlineKeyboardButton(text="✗ Отменить", callback_data="cancel"),
+        ]
+    ])
+
+
 def get_deduplication_action_keyboard(tracks: List[Track], current_index: int, total_groups: int) -> InlineKeyboardMarkup:
     """
     Keyboard for duplicate resolution.
