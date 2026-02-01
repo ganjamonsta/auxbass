@@ -38,28 +38,18 @@
       />
     </div>
 
-    <!-- Artist grid -->
-    <div class="artist-grid" v-if="artists.length">
-      <ArtistGridCard
-        v-for="artist in artists"
-        :key="artist.name"
-        :artist="artist"
-        @click="goToArtist"
-        @contextmenu="(e) => openMenu('artist', artist, 'library', e)"
-      />
-    </div>
-
-    <!-- Empty state -->
-    <div v-else-if="!loading" class="empty-state">
-      <span class="empty-icon"><User :size="48" /></span>
-      <p v-if="searchQuery">Ничего не найдено</p>
-      <p v-else>Нет исполнителей</p>
-    </div>
-
-    <!-- Loading indicator -->
-    <div v-if="loading" class="loading">
-      <div class="spinner"></div>
-    </div>
+    <MediaGrid
+      type="artist"
+      :items="artists"
+      :loading="loading"
+      @click="goToArtist"
+      @contextmenu="handleContextMenu"
+    >
+      <template #empty>
+        <p v-if="searchQuery">Ничего не найдено</p>
+        <p v-else>Нет исполнителей</p>
+      </template>
+    </MediaGrid>
 
     <!-- Infinite scroll trigger -->
     <div ref="loadTrigger" class="load-trigger" v-show="hasMore && !loading"></div>
@@ -73,13 +63,17 @@ import { useAuthStore } from '@/stores/auth'
 import { useSort } from '@/composables'
 import { useContextMenu } from '@/composables/useContextMenu'
 import SortChips from '@/components/SortChips.vue'
-import ArtistGridCard from '@/components/ArtistGridCard.vue'
+import MediaGrid from '@/components/MediaGrid.vue'
 import SearchBar from '@/components/ui/SearchBar.vue'
 import { artistsApi } from '@/api/client'
 import { User } from 'lucide-vue-next'
 
 // Universal context menu
 const { openMenu } = useContextMenu()
+
+const handleContextMenu = ({ item, event }) => {
+  openMenu('artist', item, 'library', event)
+}
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -310,68 +304,6 @@ onUnmounted(() => {
   justify-content: space-between;
   margin-bottom: 20px;
   gap: 12px;
-}
-
-.artist-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
-@media (min-width: 400px) {
-  .artist-grid {
-    gap: 16px;
-  }
-}
-
-@media (min-width: 500px) {
-  .artist-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-@media (min-width: 700px) {
-  .artist-grid {
-    grid-template-columns: repeat(5, 1fr);
-    gap: 20px;
-  }
-}
-
-@media (min-width: 900px) {
-  .artist-grid {
-    grid-template-columns: repeat(6, 1fr);
-  }
-}
-
-.empty-state {
-  text-align: center;
-  padding: 48px 16px;
-  color: var(--text-secondary);
-}
-
-.empty-icon {
-  font-size: 48px;
-  display: block;
-  margin-bottom: 16px;
-}
-
-.loading {
-  display: flex;
-  justify-content: center;
-  padding: 24px;
-}
-
-.spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--bg-highlight);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 
 .load-trigger {

@@ -8,46 +8,37 @@
       </button>
     </div>
 
-    <!-- Liked tracks special card -->
-    <div class="special-playlists">
-      <div class="playlist-card liked-card" @click="goToLiked">
-        <div class="playlist-cover liked-cover">
-          <span class="liked-icon"><Heart :size="24" class="heart-icon" /></span>
-        </div>
-        <div class="playlist-name">Понравившиеся</div>
-        <div class="playlist-meta">{{ likedCount }} треков</div>
-      </div>
-    </div>
-
     <!-- Playlists grid -->
-    <div class="playlists-grid" v-if="playlists.length">
-      <div
-        v-for="playlist in playlists"
-        :key="playlist.id"
-        class="playlist-card"
-        @click="goToPlaylist(playlist)"
-        @contextmenu.prevent="openMenu('playlist', playlist, 'library', $event)"
-      >
-        <div class="playlist-cover">
-          <div class="cover-grid" :class="{ 'single-cover': playlist.covers?.length === 1 }" v-if="playlist.covers?.length">
-            <img
-              v-for="(cover, i) in playlist.covers.slice(0, 4)"
-              :key="i"
-              :src="cover"
-            />
+    <MediaGrid
+      type="playlist"
+      :items="playlists"
+      :loading="loading"
+      @click="goToPlaylist"
+      @contextmenu="handleContextMenu"
+    >
+      <template #prepend-grid>
+        <!-- Liked tracks special card -->
+        <div class="playlist-card liked-card" @click="goToLiked">
+          <div class="playlist-cover liked-cover">
+            <span class="liked-icon"><Heart :size="24" class="heart-icon" /></span>
           </div>
-          <div v-else class="cover-placeholder"><Music :size="24" /></div>
+          <div class="playlist-name">Понравившиеся</div>
+          <div class="playlist-meta">{{ likedCount }} треков</div>
         </div>
-        <div class="playlist-name">{{ playlist.name }}</div>
-        <div class="playlist-meta">{{ playlist.track_count }} треков</div>
-      </div>
-    </div>
+      </template>
 
-    <!-- Empty state -->
-    <div v-else-if="!loading" class="empty-state">
-      <span class="empty-icon"><FileText :size="48" /></span>
-      <p>У вас пока нет плейлистов</p>
-      <button class="create-first-btn" @click="handleCreatePlaylist">
+      <template #empty>
+         <div class="empty-state">
+          <span class="empty-icon"><FileText :size="48" /></span>
+          <p>У вас пока нет плейлистов</p>
+          <button class="create-first-btn" @click="handleCreatePlaylist">
+            Создать плейлист
+          </button>
+        </div>
+      </template>
+    </MediaGrid>
+
+    <!-- Create modal -->
         Создать плейлист
       </button>
     </div>
@@ -90,10 +81,15 @@ import { useLibraryStore } from '@/stores/library'
 import { useAuthStore } from '@/stores/auth'
 import { useContextMenu } from '@/composables/useContextMenu'
 import api from '@/api/client'
-import { Plus, Heart, Music, FileText } from 'lucide-vue-next'
+import { Plus, Heart, FileText } from 'lucide-vue-next'
+import MediaGrid from '@/components/MediaGrid.vue'
 
 // Universal context menu
 const { openMenu } = useContextMenu()
+
+const handleContextMenu = ({ item, event }) => {
+  openMenu('playlist', item, 'library', event)
+}
 
 const router = useRouter()
 const libraryStore = useLibraryStore()
@@ -234,37 +230,6 @@ const openModal = async () => {
   font-size: 40px;
 }
 
-.playlists-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
-@media (min-width: 400px) {
-  .playlists-grid {
-    gap: 16px;
-  }
-}
-
-@media (min-width: 500px) {
-  .playlists-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-@media (min-width: 700px) {
-  .playlists-grid {
-    grid-template-columns: repeat(5, 1fr);
-    gap: 20px;
-  }
-}
-
-@media (min-width: 900px) {
-  .playlists-grid {
-    grid-template-columns: repeat(6, 1fr);
-  }
-}
-
 .playlist-card {
   cursor: pointer;
 }
@@ -342,25 +307,6 @@ const openModal = async () => {
   padding: 12px 24px;
   font-weight: 600;
   cursor: pointer;
-}
-
-.loading {
-  display: flex;
-  justify-content: center;
-  padding: 48px;
-}
-
-.spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--bg-highlight);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 
 .modal-overlay {

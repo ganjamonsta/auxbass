@@ -60,31 +60,13 @@
         />
       </div>
 
-      <div class="albums-grid">
-        <div
-          v-for="album in albums"
-          :key="album.id"
-          class="album-card"
-          @click="goToAlbum(album)"
-        >
-          <div class="album-cover">
-            <img v-if="album.cover_url" :src="album.cover_url" :alt="album.name" />
-            <div v-else class="cover-placeholder"><Disc3 :size="24" /></div>
-            <button class="play-btn" @click.stop="playAlbum(album)"><Play :size="16" fill="currentColor" /></button>
-            <div v-if="album.total_tracks && album.track_count < album.total_tracks" class="progress-badge">
-              {{ album.track_count }}/{{ album.total_tracks }}
-            </div>
-          </div>
-          <div class="album-info">
-            <span class="album-name">{{ album.name }}</span>
-            <span class="album-artist">{{ album.artist }}</span>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="loadingAlbums" class="loading">
-        <div class="spinner"></div>
-      </div>
+      <MediaGrid
+        type="album"
+        :items="albums"
+        :loading="loadingAlbums"
+        @click="goToAlbum"
+        @play="playAlbum"
+      />
 
       <PaginationNav
         v-if="albumsTotalPages > 1 && !loadingAlbums"
@@ -118,54 +100,29 @@
         </button>
       </div>
 
-      <div class="playlists-grid" v-if="filteredPlaylists.length">
-        <div
-          v-for="playlist in filteredPlaylists"
-          :key="playlist.id"
-          class="playlist-card"
-          @click="$router.push(`/playlist/${playlist.id}`)"
-        >
-          <div class="playlist-cover">
-            <img v-if="playlist.cover_url" :src="playlist.cover_url" />
-            <div v-else class="cover-placeholder"><Music :size="24" /></div>
-            <div v-if="playlist.is_public" class="public-badge"><Globe :size="14" /></div>
-          </div>
-          <div class="playlist-name">{{ playlist.name }}</div>
-          <div class="playlist-meta">{{ playlist.track_count }} треков</div>
-        </div>
-      </div>
-
-
-      
-      <div v-else-if="!loadingPlaylists && playlistSearchQuery && filteredPlaylists.length === 0" class="empty-state">
-        <span class="empty-icon"><Search :size="48" /></span>
-        <p>Ничего не найдено</p>
-      </div>
-
-      <div v-if="loadingPlaylists" class="loading">
-        <div class="spinner"></div>
-      </div>
+      <MediaGrid
+        type="playlist"
+        :items="filteredPlaylists"
+        :loading="loadingPlaylists"
+        @click="(p) => $router.push(`/playlist/${p.id}`)"
+      >
+        <template #empty>
+           <div v-if="playlistSearchQuery" class="empty-results">
+            <span class="empty-icon"><Search :size="48" /></span>
+             <p>Ничего не найдено</p>
+           </div>
+           <p v-else>Нет плейлистов</p>
+        </template>
+      </MediaGrid>
 
       <!-- Public playlists section -->
-      <div v-if="filteredPublicPlaylists.length && !playlistSearchQuery" class="public-section">
-        <h3><Globe :size="18" /> Публичные плейлисты</h3>
-        <div class="playlists-grid">
-          <div
-            v-for="playlist in publicPlaylists"
-            :key="'public-' + playlist.id"
-            class="playlist-card"
-            @click="$router.push(`/playlist/${playlist.id}`)"
-          >
-            <div class="playlist-cover">
-              <img v-if="playlist.cover_url" :src="playlist.cover_url" />
-              <div v-else class="cover-placeholder"><Music :size="24" /></div>
-            </div>
-            <div class="playlist-name">{{ playlist.name }}</div>
-            <div class="playlist-meta">
-              {{ playlist.owner_name }} • {{ playlist.track_count }} треков
-            </div>
-          </div>
-        </div>
+      <div v-if="publicPlaylists.length && !playlistSearchQuery" class="public-section">
+        <MediaGrid
+          type="playlist"
+          title="Публичные плейлисты"
+          :items="publicPlaylists"
+          @click="(p) => $router.push(`/playlist/${p.id}`)"
+        />
       </div>
     </div>
 
@@ -210,6 +167,7 @@ import { useUIStore } from '@/stores/ui'
 import PaginationNav from '@/components/PaginationNav.vue'
 import SortChips from '@/components/SortChips.vue'
 import SearchBar from '@/components/ui/SearchBar.vue'
+import MediaGrid from '@/components/MediaGrid.vue'
 import api from '@/api/client'
 import { Disc3, Folder, Plus, Music, Globe, Search, Play } from 'lucide-vue-next'
 
@@ -633,225 +591,9 @@ onMounted(() => {
   max-width: fit-content;
 }
 
-/* Albums grid */
-.albums-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
-@media (min-width: 400px) {
-  .albums-grid {
-    gap: 16px;
-  }
-}
-
-@media (min-width: 500px) {
-  .albums-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-@media (min-width: 700px) {
-  .albums-grid {
-    grid-template-columns: repeat(5, 1fr);
-    gap: 20px;
-  }
-}
-
-@media (min-width: 900px) {
-  .albums-grid {
-    grid-template-columns: repeat(6, 1fr);
-  }
-}
-
-.album-card {
-  cursor: pointer;
-  transition: transform 0.2s;
-  min-width: 0;
-}
-
-.album-card:active {
-  transform: scale(0.98);
-}
-
-.album-cover {
-  position: relative;
-  aspect-ratio: 1;
-  width: 100%;
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--bg-elevated);
-  margin-bottom: 8px;
-}
-
-.album-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.cover-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  font-size: 40px;
-}
-
-.play-btn {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--accent);
-  border: none;
-  color: #000;
-  font-size: 14px;
-  cursor: pointer;
-  opacity: 0;
-  transform: translateY(8px);
-  transition: all 0.2s;
-}
-
-.album-card:hover .play-btn {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.progress-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: rgba(0, 0, 0, 0.7);
-  color: var(--accent);
-  font-size: 10px;
-  font-weight: 600;
-  padding: 3px 6px;
-  border-radius: 10px;
-}
-
-.album-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.album-name {
-  font-weight: 600;
-  color: var(--text-primary);
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.album-artist {
-  font-size: 11px;
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* Playlists */
 .special-playlists {
   margin-bottom: 20px;
-}
-
-.playlists-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
-@media (min-width: 400px) {
-  .playlists-grid {
-    gap: 16px;
-  }
-}
-
-@media (min-width: 500px) {
-  .playlists-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-@media (min-width: 700px) {
-  .playlists-grid {
-    grid-template-columns: repeat(5, 1fr);
-    gap: 20px;
-  }
-}
-
-@media (min-width: 900px) {
-  .playlists-grid {
-    grid-template-columns: repeat(6, 1fr);
-  }
-}
-
-.playlist-card {
-  cursor: pointer;
-  transition: transform 0.2s;
-}
-
-.playlist-card:active {
-  transform: scale(0.98);
-}
-
-.playlist-cover {
-  position: relative;
-  aspect-ratio: 1;
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--bg-elevated);
-  margin-bottom: 8px;
-}
-
-.playlist-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.liked-card .playlist-cover {
-  background: linear-gradient(135deg, #8b5cf6, #ec4899);
-}
-
-.liked-cover {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.liked-icon {
-  font-size: 40px;
-}
-
-.public-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  font-size: 16px;
-}
-
-.playlist-name {
-  font-weight: 600;
-  color: var(--text-primary);
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-bottom: 2px;
-}
-
-.playlist-meta {
-  font-size: 11px;
-  color: var(--text-secondary);
 }
 
 .public-section {
@@ -866,7 +608,7 @@ onMounted(() => {
 }
 
 /* Empty state */
-.empty-state {
+.empty-results {
   text-align: center;
   padding: 48px 24px;
   color: var(--text-secondary);
