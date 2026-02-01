@@ -132,7 +132,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
@@ -365,7 +365,18 @@ const toggleSubscription = async () => {
   }
 }
 
+// Load on mount
 onMounted(loadPlaylist)
+
+// Reload when route params change (for sidebar navigation)
+watch(
+  () => route.params.id,
+  (newId, oldId) => {
+    if (newId && newId !== oldId) {
+      loadPlaylist()
+    }
+  }
+)
 </script>
 
 <style scoped>

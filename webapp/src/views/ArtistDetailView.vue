@@ -279,6 +279,16 @@ onMounted(() => {
 watch(scope, () => {
   loadArtist()
 })
+
+// Reload when route params change (for sidebar navigation)
+watch(
+  () => route.params.name,
+  (newName, oldName) => {
+    if (newName && newName !== oldName) {
+      loadArtist()
+    }
+  }
+)
 </script>
 
 <style scoped>

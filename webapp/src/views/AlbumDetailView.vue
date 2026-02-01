@@ -178,7 +178,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
@@ -408,6 +408,16 @@ const formatYear = (date) => {
 onMounted(() => {
   loadAlbum()
 })
+
+// Reload when route params change (for sidebar navigation)
+watch(
+  () => route.params.id,
+  (newId, oldId) => {
+    if (newId && newId !== oldId) {
+      loadAlbum()
+    }
+  }
+)
 </script>
 
 <style scoped>
