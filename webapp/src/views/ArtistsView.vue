@@ -1,16 +1,16 @@
 <template>
   <div class="artists-view">
-    <!-- Scope tabs -->
-    <div v-if="!authStore.hasChannel" class="scope-tabs">
+    <!-- Scope switcher - unified neumorphic style -->
+    <div v-if="!authStore.hasChannel" class="neu-tab-bar scope-switcher">
       <button 
-        class="scope-tab" 
+        class="neu-tab" 
         :class="{ active: scope === 'library' }"
         @click="changeScope('library')"
       >
         Моя библиотека
       </button>
       <button 
-        class="scope-tab" 
+        class="neu-tab" 
         :class="{ active: scope === 'global' }"
         @click="changeScope('global')"
       >
@@ -46,8 +46,11 @@
       @contextmenu="handleContextMenu"
     >
       <template #empty>
-        <p v-if="searchQuery">Ничего не найдено</p>
-        <p v-else>Нет исполнителей</p>
+        <div class="empty-state">
+          <span class="empty-icon"><User :size="48" /></span>
+          <p v-if="searchQuery">Ничего не найдено</p>
+          <p v-else>Нет исполнителей</p>
+        </div>
       </template>
     </MediaGrid>
 
@@ -257,50 +260,13 @@ onUnmounted(() => {
   padding-bottom: 120px;
 }
 
-.scope-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
+/* Scope switcher uses neu-tab-bar from design-system */
+.scope-switcher {
   margin-bottom: 16px;
-  background: var(--c-bg-0);
-  border-radius: var(--r-md);
-  box-shadow:
-    inset 2px 2px 4px var(--sh-inset-dark),
-    inset -1px -1px 3px var(--sh-inset-light);
 }
 
-.scope-tab {
+.scope-switcher .neu-tab {
   flex: 1;
-  padding: 10px 14px;
-  background: transparent;
-  border: none;
-  border-radius: calc(var(--r-md) - 2px);
-  color: var(--c-text-2);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.scope-tab:hover {
-  color: var(--c-text-1);
-}
-
-.scope-tab.active {
-  background: var(--accent);
-  color: var(--accent-text, #000);
-  font-weight: 600;
-  box-shadow:
-    2px 2px 4px var(--sh-dark),
-    0 0 10px var(--accent-glow);
-}
-
-/* Search bar - neumorphic inset style */
-/* Removed old search-bar styles in favor of SearchBar component */
-
-.stats {
-  color: var(--text-secondary);
-  font-size: 14px;
 }
 
 .sort-options {
@@ -309,6 +275,27 @@ onUnmounted(() => {
   justify-content: space-between;
   margin-bottom: 20px;
   gap: 12px;
+}
+
+.stats {
+  color: var(--c-text-2);
+  font-size: 14px;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--c-text-2);
+}
+
+.empty-icon {
+  display: block;
+  margin-bottom: 16px;
+  color: var(--c-text-3);
 }
 
 .load-trigger {

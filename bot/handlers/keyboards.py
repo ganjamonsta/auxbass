@@ -195,11 +195,11 @@ def get_stats_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(
             text="🎵 Открыть плеер",
             web_app=WebAppInfo(url=settings.webapp_url)
-        )
+        )],
+        [
             InlineKeyboardButton(text="🔄 Обновить", callback_data="stats:refresh"),
             InlineKeyboardButton(text="🔍 Дубликаты", callback_data="stats:dedup"),
-        ] callback_data="stats:refresh"
-        )],
+        ]
     ])
 
 

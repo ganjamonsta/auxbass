@@ -3,16 +3,16 @@
     <!-- Section header with tab switcher -->
     <div class="section-header">
       <h1>Коллекции</h1>
-      <div class="tab-switcher">
+      <div class="neu-tab-bar tab-switcher">
         <button 
-          class="tab-btn" 
+          class="neu-tab" 
           :class="{ active: activeTab === 'albums' }"
           @click="setActiveTab('albums')"
         >
           <Disc3 :size="16" /> Альбомы
         </button>
         <button 
-          class="tab-btn" 
+          class="neu-tab" 
           :class="{ active: activeTab === 'playlists' }"
           @click="setActiveTab('playlists')"
         >
@@ -24,16 +24,16 @@
     <!-- Albums Tab -->
     <div v-show="activeTab === 'albums'" class="tab-content">
       <!-- Scope switcher for albums -->
-      <div v-if="!authStore.hasChannel" class="scope-tabs">
+      <div v-if="!authStore.hasChannel" class="neu-tab-bar scope-switcher">
         <button 
-          class="scope-tab" 
+          class="neu-tab" 
           :class="{ active: albumScope === 'library' }"
           @click="changeAlbumScope('library')"
         >
           Моя библиотека
         </button>
         <button 
-          class="scope-tab" 
+          class="neu-tab" 
           :class="{ active: albumScope === 'global' }"
           @click="changeAlbumScope('global')"
         >
@@ -479,19 +479,13 @@ onMounted(() => {
 .section-header h1 {
   font-size: 24px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   margin: 0;
 }
 
+/* Tab switcher uses neu-tab-bar from design-system */
 .tab-switcher {
   display: none;
-  gap: 4px;
-  background: var(--c-bg-0);
-  border-radius: var(--r-md);
-  padding: 4px;
-  box-shadow:
-    inset 2px 2px 4px var(--sh-inset-dark),
-    inset -1px -1px 3px var(--sh-inset-light);
 }
 
 /* Show tab-switcher only on desktop */
@@ -501,74 +495,14 @@ onMounted(() => {
   }
 }
 
-.tab-btn {
-  padding: 8px 14px;
-  background: transparent;
-  border: none;
-  border-radius: calc(var(--r-md) - 2px);
-  color: var(--c-text-2);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-}
-
-.tab-btn:hover {
-  color: var(--c-text-1);
-}
-
-.tab-btn.active {
-  background: var(--c-bg-2);
-  color: var(--c-text-1);
-  font-weight: 600;
-  box-shadow:
-    2px 2px 4px var(--sh-dark),
-    -1px -1px 2px var(--sh-light);
-}
-
-.scope-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
+/* Scope switcher uses neu-tab-bar from design-system */
+.scope-switcher {
   margin-bottom: 16px;
-  background: var(--c-bg-0);
-  border-radius: var(--r-md);
-  box-shadow:
-    inset 2px 2px 4px var(--sh-inset-dark),
-    inset -1px -1px 3px var(--sh-inset-light);
 }
 
-.scope-tab {
+.scope-switcher .neu-tab {
   flex: 1;
-  padding: 10px 14px;
-  background: transparent;
-  border: none;
-  border-radius: calc(var(--r-md) - 2px);
-  color: var(--c-text-2);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
 }
-
-.scope-tab:hover {
-  color: var(--c-text-1);
-}
-
-.scope-tab.active {
-  background: var(--accent);
-  color: var(--accent-text, #000);
-  font-weight: 600;
-  box-shadow:
-    2px 2px 4px var(--sh-dark),
-    0 0 10px var(--accent-glow);
-}
-
-/* Old search bar styles removed - using SearchBar component */
 
 .view-header {
   display: flex;
@@ -580,7 +514,7 @@ onMounted(() => {
 
 .count {
   font-size: 14px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
 }
 
 .create-btn {
@@ -608,7 +542,7 @@ onMounted(() => {
 .public-section h3 {
   font-size: 18px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   margin-bottom: 16px;
 }
 
@@ -616,7 +550,7 @@ onMounted(() => {
 .empty-results {
   text-align: center;
   padding: 48px 24px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
 }
 
 .empty-icon {
@@ -652,7 +586,7 @@ onMounted(() => {
 }
 
 .modal {
-  background: var(--bg-elevated);
+  background: var(--c-bg-2);
   border-radius: 16px;
   padding: 24px;
   width: 100%;
@@ -662,16 +596,16 @@ onMounted(() => {
 .modal h2 {
   margin: 0 0 20px;
   font-size: 20px;
-  color: var(--text-primary);
+  color: var(--c-text-1);
 }
 
 .modal input[type="text"] {
   width: 100%;
   padding: 14px 16px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
+  background: var(--c-bg-1);
+  border: 1px solid var(--c-bg-4);
   border-radius: 12px;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   font-size: 16px;
   margin-bottom: 16px;
 }
@@ -680,7 +614,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-size: 14px;
   margin-bottom: 12px;
   cursor: pointer;
@@ -692,7 +626,7 @@ onMounted(() => {
   -webkit-appearance: none;
   width: 44px;
   height: 24px;
-  background: var(--bg-highlight);
+  background: var(--c-bg-3);
   border-radius: 12px;
   position: relative;
   cursor: pointer;
@@ -721,7 +655,7 @@ onMounted(() => {
 
 .hint-text {
   font-size: 12px;
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   margin-bottom: 16px;
 }
 
@@ -740,8 +674,8 @@ onMounted(() => {
 }
 
 .cancel-btn {
-  background: var(--bg-highlight);
-  color: var(--text-primary);
+  background: var(--c-bg-3);
+  color: var(--c-text-1);
 }
 
 .confirm-btn {
@@ -764,8 +698,8 @@ onMounted(() => {
 .spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid var(--bg-highlight);
-  border-top-color: var(--accent);
+  border: 3px solid var(--c-bg-3);
+  border-top-color: var(--c-accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
