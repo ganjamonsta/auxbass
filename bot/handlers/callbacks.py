@@ -158,12 +158,14 @@ async def handle_help_player(callback: CallbackQuery):
         "• Очередь воспроизведения\n"
         "• Shuffle и Repeat режимы\n"
         "• Редактирование метаданных треков\n\n"
-        "<b>🌐 Доступ из браузера:</b>\n"
+        "<b>🌐 Сайт плеера:</b>\n"
+        "<a href=\"https://aux.ganjacraft.ru\">aux.ganjacraft.ru</a>\n\n"
+        "<b>🔑 Доступ из браузера:</b>\n"
         "Команда /login — получить код для входа с компьютера. "
         "Слушай музыку на большом экране!\n\n"
         "<b>📱 Mini App</b>\n"
         "Нажми кнопку ниже, чтобы открыть плеер прямо в Telegram.",
-        reply_markup=get_help_back_keyboard()
+        reply_markup=get_help_player_keyboard()
     )
     await callback.answer()
 
