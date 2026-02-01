@@ -53,6 +53,21 @@ def get_help_back_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
+def get_help_player_keyboard() -> InlineKeyboardMarkup:
+    """Create keyboard for web player help with site link"""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Назад к меню", callback_data="help:menu")],
+        [InlineKeyboardButton(
+            text="🎵 Открыть плеер",
+            web_app=WebAppInfo(url=settings.webapp_url)
+        )],
+        [InlineKeyboardButton(
+            text="🌐 Открыть сайт",
+            url="https://aux.ganjacraft.ru"
+        )]
+    ])
+
+
 def get_track_keyboard(track_id: int, show_enrich: bool = False) -> InlineKeyboardMarkup:
     """
     Create keyboard for track message.

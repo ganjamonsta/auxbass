@@ -19,7 +19,12 @@ from shared.models import Track, Playlist, PlaylistTrack
 
 from bot.services import track_service, album_service, channel_service
 from bot.services.session import session_manager
-from bot.handlers.keyboards import get_webapp_keyboard, get_help_menu_keyboard, get_help_back_keyboard
+from bot.handlers.keyboards import (
+    get_webapp_keyboard,
+    get_help_menu_keyboard,
+    get_help_back_keyboard,
+    get_help_player_keyboard,
+)
 
 
 router = Router()
@@ -179,11 +184,13 @@ async def handle_help_commands(callback: CallbackQuery):
         "<b>☁️ Бекап:</b>\n"
         "/channel — Настроить канал\n"
         "/sync — Синхронизировать с каналом\n\n"
-        "<b>🔐 Авторизация:</b>\n"
-        "/login — Код для входа в браузере\n\n"
+        "<a href=\"https://aux.ganjacraft.ru\">aux.ganjacraft.ru</a>\n\n"
+        "<b>🌐 Доступ из браузера:</b>\n"
+        "Команда /login — получить код для входа с компьютера. "
+        "Слушай музыку на большом экране!\n\n"
         "<b>💡 Подсказка:</b>\n"
         "Большинство действий удобнее делать через веб-плеер!",
-        reply_markup=get_help_back_keyboard()
+        reply_markup=get_help_player_keyboard()
     )
     await callback.answer()
 
