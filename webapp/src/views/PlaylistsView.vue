@@ -35,6 +35,8 @@
            Создать плейлист
          </button>
        </div>
+      </template>
+    </MediaGrid>
 
     <!-- Loading -->
     <div v-if="loading" class="loading">

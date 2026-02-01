@@ -212,7 +212,7 @@ onMounted(() => {
     scope.value = 'global'
     localStorage.setItem(SCOPE_KEY, 'global')
   }
-  
+
   loadArtists()
   
   observer = new IntersectionObserver(

@@ -11,6 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.config import get_settings
+from shared.models import Track
 
 settings = get_settings()
 
@@ -194,10 +195,10 @@ def get_stats_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(
             text="🎵 Открыть плеер",
             web_app=WebAppInfo(url=settings.webapp_url)
-        )],
-        [InlineKeyboardButton(
-            text="🔄 Обновить статистику",
-            callback_data="stats:refresh"
+        )
+            InlineKeyboardButton(text="🔄 Обновить", callback_data="stats:refresh"),
+            InlineKeyboardButton(text="🔍 Дубликаты", callback_data="stats:dedup"),
+        ] callback_data="stats:refresh"
         )],
     ])
 
@@ -217,3 +218,43 @@ def get_cancel_keyboard(callback_data: str = "cancel") -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✗ Отменить", callback_data=callback_data)]
     ])
+
+
+def get_deduplication_action_keyboard(tracks: List[Track], current_index: int, total_groups: int) -> InlineKeyboardMarkup:
+    """
+    Keyboard for duplicate resolution.
+    Allows playing specific tracks and selecting which ONE to keep.
+    """
+    buttons = []
+    
+    # Play buttons row (max 3 per row)
+    play_row = []
+    for idx, track in enumerate(tracks):
+        play_row.append(
+            InlineKeyboardButton(text=f"⏯ Слушать #{idx+1}", callback_data=f"dedup:play:{track.id}")
+        )
+        if len(play_row) == 2:
+            buttons.append(play_row)
+            play_row = []
+    if play_row:
+        buttons.append(play_row)
+    
+    # "Keep this" buttons
+    for idx, track in enumerate(tracks):
+         buttons.append([
+             InlineKeyboardButton(
+                 text=f"✅ Оставить #{idx+1} (удал. др.)", 
+                 callback_data=f"dedup:keep:{track.id}"
+             )
+         ])
+            
+    # Navigation
+    nav_buttons = []
+    nav_buttons.append(InlineKeyboardButton(text=f"➡ Пропустить ({current_index+1}/{total_groups})", callback_data="dedup:next"))
+    buttons.append(nav_buttons)
+    
+    # Cancel
+    buttons.append([InlineKeyboardButton(text="❌ Выход", callback_data="dedup:cancel")])
+    
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
