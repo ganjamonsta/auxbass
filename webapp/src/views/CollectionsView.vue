@@ -163,7 +163,7 @@
         
         <div class="playlists-manage-list">
           <div 
-            v-for="playlist in playlists" 
+            v-for="playlist in ownPlaylists" 
             :key="playlist.id"
             class="playlist-manage-item"
             @click="togglePlaylistStatus(playlist)"
@@ -327,6 +327,12 @@ const filteredPublicPlaylists = computed(() => {
 // Manage modal
 const showManageModal = ref(false)
 
+// Computed for own playlists only (for manage modal)
+const ownPlaylists = computed(() => {
+  // Filter only playlists owned by current user
+  return playlists.value.filter(p => p.is_owner === true)
+})
+
 const closeManageModal = () => {
   showManageModal.value = false
 }
@@ -334,7 +340,7 @@ const closeManageModal = () => {
 const togglePlaylistStatus = async (playlist) => {
   try {
     const newStatus = !playlist.is_public
-    await api.patch(`/playlists/${playlist.id}`, {
+    await api.put(`/playlists/${playlist.id}`, {
       is_public: newStatus
     })
     playlist.is_public = newStatus
