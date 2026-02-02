@@ -124,11 +124,12 @@ async def get_my_playlists(
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get user's playlists (owned and subscribed)"""
-    # Count owned playlists
+    """Get user's public playlists (owned and subscribed). Private playlists are excluded."""
+    # Count owned PUBLIC playlists only
     owned_count = await db.scalar(
         select(func.count(Playlist.id))
         .where(Playlist.owner_id == user.id)
+        .where(Playlist.is_public == True)
     ) or 0
     
     # Count subscribed playlists
@@ -141,19 +142,21 @@ async def get_my_playlists(
     
     total = owned_count + subscribed_count
     
-    # Get owned playlists
+    # Get owned PUBLIC playlists only
     offset = (page - 1) * per_page
     result = await db.execute(
-        select(Playlist)
+        select(Playlist, User)
+        .join(User, User.id == Playlist.owner_id)
         .where(Playlist.owner_id == user.id)
+        .where(Playlist.is_public == True)
         .order_by(Playlist.created_at.desc())
         .offset(offset)
         .limit(per_page)
     )
-    owned_playlists = result.scalars().all()
+    owned_rows = result.all()
     
     items = []
-    for playlist in owned_playlists:
+    for playlist, owner in owned_rows:
         track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
         items.append(PlaylistResponse(
             id=playlist.id,
@@ -164,6 +167,8 @@ async def get_my_playlists(
             cover_url=cover_url,
             covers=covers,
             is_public=playlist.is_public,
+            owner_id=owner.id,
+            owner_name=owner.display_name,
             is_owner=True,
             is_subscribed=False,
             created_at=playlist.created_at,
