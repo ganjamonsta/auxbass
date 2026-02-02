@@ -242,6 +242,8 @@ export function useContextMenu() {
         if (tracks?.length) {
           playerStore.playTrackList(tracks, 0)
           uiStore.toast.success('Воспроизведение', `Играет: ${playlist.name}`)
+        } else {
+          uiStore.toast.info('Пусто', 'В плейлисте нет треков')
         }
       } catch (error) {
         console.error('Failed to play playlist:', error)
@@ -326,11 +328,13 @@ export function useContextMenu() {
       if (!album?.id) return closeMenu()
       
       try {
-        const response = await albumsApi.getTracks(album.id)
-        const tracks = response?.tracks || response || []
+        const response = await albumsApi.getOne(album.id)
+        const tracks = response?.data?.tracks || []
         if (tracks.length) {
           playerStore.playTrackList(tracks, 0)
           uiStore.toast.success('Воспроизведение', `Играет: ${album.name}`)
+        } else {
+          uiStore.toast.info('Пусто', 'В альбоме нет треков')
         }
       } catch (error) {
         console.error('Failed to play album:', error)
@@ -343,13 +347,15 @@ export function useContextMenu() {
       if (!album?.id) return closeMenu()
       
       try {
-        const response = await albumsApi.getTracks(album.id)
-        const tracks = response?.tracks || response || []
+        const response = await albumsApi.getOne(album.id)
+        const tracks = response?.data?.tracks || []
         if (tracks.length) {
           const shuffled = [...tracks].sort(() => Math.random() - 0.5)
           playerStore.playTrackList(shuffled, 0)
           playerStore.setShuffle(true)
           uiStore.toast.success('Перемешивание', `Играет: ${album.name}`)
+        } else {
+          uiStore.toast.info('Пусто', 'В альбоме нет треков')
         }
       } catch (error) {
         console.error('Failed to shuffle album:', error)
@@ -362,11 +368,13 @@ export function useContextMenu() {
       if (!album?.id) return closeMenu()
       
       try {
-        const response = await albumsApi.getTracks(album.id)
-        const tracks = response?.tracks || response || []
+        const response = await albumsApi.getOne(album.id)
+        const tracks = response?.data?.tracks || []
         if (tracks.length) {
           tracks.forEach(track => playerStore.addToQueue(track))
           uiStore.toast.success('Добавлено', `${tracks.length} треков в очереди`)
+        } else {
+          uiStore.toast.info('Пусто', 'В альбоме нет треков')
         }
       } catch (error) {
         console.error('Failed to add album to queue:', error)
@@ -508,11 +516,11 @@ export function useContextMenu() {
     
     try {
       if (playlist.is_auto_album) {
-        const response = await albumsApi.getTracks(playlist.id)
-        return response?.tracks || response || []
+        const response = await albumsApi.getOne(playlist.id)
+        return response?.data?.tracks || []
       } else {
-        const response = await playlistsApi.getTracks(playlist.id)
-        return response?.tracks || response || []
+        const response = await playlistsApi.getOne(playlist.id)
+        return response?.data?.tracks || []
       }
     } catch (error) {
       console.error('Failed to load playlist tracks:', error)

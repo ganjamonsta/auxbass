@@ -130,7 +130,6 @@ export const playlistsApi = {
   getAll: () => api.get('/playlists'),
   getOne: (id) => api.get(`/playlists/${id}`),
   getIds: (id, params = {}) => api.get(`/playlists/${id}/ids`, { params }),
-  getTracks: (id, params = {}) => api.get(`/playlists/${id}/tracks`, { params }),
   create: (data) => api.post('/playlists', data),
   update: (id, data) => api.put(`/playlists/${id}`, data),
   delete: (id) => api.delete(`/playlists/${id}`),
@@ -152,7 +151,6 @@ export const albumsApi = {
   getGlobal: (params = {}) => api.get('/albums/global', { params }),
   getOne: (id) => api.get(`/albums/${id}`),
   getIds: (id, params = {}) => api.get(`/albums/${id}/ids`, { params }),
-  getTracks: (id, params = {}) => api.get(`/albums/${id}/tracks`, { params }),
 }
 
 // Player
