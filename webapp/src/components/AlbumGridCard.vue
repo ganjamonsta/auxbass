@@ -98,6 +98,13 @@ defineEmits(['click', 'play', 'contextmenu'])
   transform: translateY(0);
 }
 
+/* Hide play button on mobile devices */
+@media (max-width: 768px) {
+  .play-btn {
+    display: none;
+  }
+}
+
 .progress-badge {
   position: absolute;
   top: 8px;

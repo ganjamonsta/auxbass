@@ -603,6 +603,33 @@ onMounted(() => {
   line-height: 1.4;
 }
 
+/* Mobile adjustments - hide banner text on small screens */
+@media (max-width: 1023px) {
+  .info-banner-with-tabs {
+    gap: 12px;
+  }
+
+  .info-banner {
+    padding: 12px;
+    margin-bottom: 0;
+    flex: 0 0 auto;
+  }
+
+  .banner-text {
+    display: none;
+  }
+
+  .banner-icon {
+    width: 44px;
+    height: 44px;
+  }
+
+  .info-banner-with-tabs .collections-tabs {
+    display: flex;
+    flex: 1;
+  }
+}
+
 /* Scope switcher uses neu-tab-bar from design-system */
 .scope-switcher {
   margin-bottom: 16px;

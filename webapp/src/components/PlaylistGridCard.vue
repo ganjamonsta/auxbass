@@ -14,6 +14,9 @@
       </div>
       <div v-else class="cover-placeholder"><Music :size="24" /></div>
       
+      <!-- Play button -->
+      <button class="play-btn" @click.stop="$emit('play', playlist)"><Play :size="20" fill="currentColor" /></button>
+      
       <!-- Owner badge for created playlists -->
       <div v-if="playlist.is_owner" class="owner-badge creator-badge">
         <Crown :size="12" /> Ваш
@@ -38,7 +41,7 @@
 </template>
 
 <script setup>
-import { Music, Globe, Crown, UserPlus } from 'lucide-vue-next'
+import { Music, Globe, Crown, UserPlus, Play } from 'lucide-vue-next'
 
 defineProps({
   playlist: {
@@ -47,7 +50,7 @@ defineProps({
   }
 })
 
-defineEmits(['click', 'contextmenu'])
+defineEmits(['click', 'play', 'contextmenu'])
 </script>
 
 <style scoped>
@@ -147,5 +150,38 @@ defineEmits(['click', 'contextmenu'])
 .subscribed-badge {
   background: rgba(59, 130, 246, 0.9);
   color: #fff;
+}
+
+.play-btn {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  color: #000;
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.playlist-card:hover .play-btn {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Hide play button on mobile devices */
+@media (max-width: 768px) {
+  .play-btn {
+    display: none;
+  }
 }
 </style>
