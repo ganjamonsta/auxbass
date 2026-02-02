@@ -9,6 +9,14 @@ export const useUIStore = defineStore('ui', () => {
     collectionsTab.value = tab
   }
 
+  // Library tab state: 'tracks', 'albums', 'artists', or 'playlists'
+  const libraryTab = ref(localStorage.getItem('library_active_tab') || 'tracks')
+
+  const setLibraryTab = (tab) => {
+    libraryTab.value = tab
+    localStorage.setItem('library_active_tab', tab)
+  }
+
   // Toast notifications
   const toasts = ref([])
   let toastId = 0
@@ -57,6 +65,8 @@ export const useUIStore = defineStore('ui', () => {
   return {
     collectionsTab,
     setCollectionsTab,
+    libraryTab,
+    setLibraryTab,
     // Toast
     toasts,
     showToast,

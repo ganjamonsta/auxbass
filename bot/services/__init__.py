@@ -14,6 +14,7 @@ from .channels import (
     stop_channel_service,
 )
 from .albums import album_service, AlbumService
+from .deduplication import deduplication_service, DeduplicationService
 
 __all__ = [
     'metadata_service',
@@ -27,4 +28,6 @@ __all__ = [
     'stop_channel_service',
     'album_service',
     'AlbumService',
+    'deduplication_service',
+    'DeduplicationService',
 ]

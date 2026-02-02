@@ -1,5 +1,5 @@
 <template>
-  <div class="app spotify-theme" :class="appClasses">
+  <div class="app spotify-theme" :class="appClasses" :style="{ transform: `scale(${playerStore.uiScale})`, transformOrigin: 'top center', width: `${100 / playerStore.uiScale}%`, height: `${100 / playerStore.uiScale}%` }">
     <!-- Auth checking state -->
     <div v-if="authStore.loading && !authStore.initialized" class="auth-loading">
       <div class="auth-spinner"></div>
@@ -18,21 +18,36 @@
           :title="pageTitle"
           @goBack="goBack"
         >
+          <template v-if="route.name === 'library'" #toggle>
+            <div class="neu-tab-bar header-tabs">
+              <button 
+                v-for="tab in [{ id: 'tracks', label: 'Треки' }, { id: 'albums', label: 'Альбомы' }, { id: 'artists', label: 'Артисты' }, { id: 'playlists', label: 'Плейлисты' }]"
+                :key="tab.id"
+                class="neu-tab" 
+                :class="{ active: uiStore.libraryTab === tab.id }"
+                @click="uiStore.setLibraryTab(tab.id)"
+              >
+                <span class="neu-tab-content" :data-text="tab.label">{{ tab.label }}</span>
+              </button>
+            </div>
+          </template>
           <template v-if="route.name === 'collections'" #toggle>
-            <button 
-              class="toggle-btn" 
-              :class="{ active: uiStore.collectionsTab === 'albums' }"
-              @click="uiStore.setCollectionsTab('albums')"
-            >
-              💿 Альбомы
-            </button>
-            <button 
-              class="toggle-btn" 
-              :class="{ active: uiStore.collectionsTab === 'playlists' }"
-              @click="uiStore.setCollectionsTab('playlists')"
-            >
-              📁 Плейлисты
-            </button>
+            <div class="neu-tab-bar header-tabs">
+              <button 
+                class="neu-tab" 
+                :class="{ active: uiStore.collectionsTab === 'albums' }"
+                @click="uiStore.setCollectionsTab('albums')"
+              >
+                <span class="neu-tab-content" data-text="Альбомы">Альбомы</span>
+              </button>
+              <button 
+                class="neu-tab" 
+                :class="{ active: uiStore.collectionsTab === 'playlists' }"
+                @click="uiStore.setCollectionsTab('playlists')"
+              >
+                <span class="neu-tab-content" data-text="Плейлисты">Плейлисты</span>
+              </button>
+            </div>
           </template>
         </PageHeader>
 
@@ -240,13 +255,14 @@ const showHeader = computed(() => {
     const detailRoutes = ['album-detail', 'artist-detail', 'playlist-detail', 'liked', 'settings']
     return authStore.isAuthenticated && detailRoutes.includes(route.name)
   }
-  // On mobile, show header for all pages except login and library
-  const noHeaderRoutes = ['login', 'library']
+  // On mobile, show header for all pages except login
+  const noHeaderRoutes = ['login']
   return authStore.isAuthenticated && !noHeaderRoutes.includes(route.name)
 })
 
 const pageTitle = computed(() => {
   const titles = {
+    library: 'Библиотека',
     collections: 'Коллекции',
     albums: 'Альбомы',
     'album-detail': route.params?.name || 'Альбом',

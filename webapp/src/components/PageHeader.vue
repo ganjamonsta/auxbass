@@ -77,29 +77,15 @@ defineEmits(['goBack'])
 
 .header-toggle {
   display: flex;
-  gap: 4px;
-  background: var(--bg-secondary);
-  border-radius: 8px;
+}
+
+/* neu-tab styles for header are in design-system.css */
+.header-toggle :deep(.header-tabs) {
   padding: 3px;
 }
 
-.header-toggle :deep(.toggle-btn) {
-  padding: 6px 12px;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  color: var(--text-secondary);
+.header-toggle :deep(.neu-tab) {
+  padding: 6px 14px;
   font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.header-toggle :deep(.toggle-btn.active) {
-  background: var(--accent-color, #1db954);
-  color: var(--accent-text, #000);
 }
 </style>

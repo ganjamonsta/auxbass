@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from shared.matching import generate_hashtags, format_hashtags
 from shared.models import Track
 from bot.services.deduplication import deduplication_service
-from bot.handlers.keyboards import get_deduplication_keyboard, get_deduplication_action_keyboard
+from bot.handlers.keyboards import get_deduplication_action_keyboard
 
 router = Router()
 
@@ -177,11 +177,7 @@ async def handle_dedup_action(callback: CallbackQuery, state: FSMContext):
         
     elif action == "play":
         track_id = int(callback.data.split(":")[2])
-        # Need to send audio check
-        # For simplicity, we can try to get track info
-        from bot.services import track_service
-        # But we need to define how track_service imports are handled, likely circular if not careful.
-        # Use simple session here
+        # Send audio for preview
         from shared.database import get_session
         async with get_session() as session:
              track = await session.get(Track, track_id)

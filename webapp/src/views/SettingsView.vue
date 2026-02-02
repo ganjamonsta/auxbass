@@ -151,7 +151,28 @@
 
     <!-- Cache section -->
     <section class="section">
-      <h2>🎛️ Аудио (Enhancer)</h2>
+      <h2>� Интерфейс</h2>
+
+      <div class="setting-row slider-row">
+        <div class="setting-info">
+          <span class="setting-name">Масштаб интерфейса</span>
+          <span class="setting-value">{{ Math.round(playerStore.uiScale * 100) }}%</span>
+        </div>
+        <input 
+          type="range" 
+          min="0.7" 
+          max="1.3" 
+          step="0.05"
+          v-model.number="playerStore.uiScale"
+          class="range-slider"
+        />
+        <span class="setting-desc scale-desc">Измените размер интерфейса плеера для удобства использования</span>
+      </div>
+    </section>
+
+    <!-- Cache section -->
+    <section class="section">
+      <h2>�🎛️ Аудио (Enhancer)</h2>
 
       <div class="setting-row">
         <div class="setting-info">
@@ -770,5 +791,12 @@ h1 {
   color: var(--accent);
   font-weight: 500;
   font-size: 14px;
+}
+
+.scale-desc {
+  color: var(--text-tertiary);
+  font-size: 13px;
+  margin-top: 8px;
+  display: block;
 }
 </style>

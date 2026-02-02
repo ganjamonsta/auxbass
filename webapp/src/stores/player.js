@@ -59,6 +59,9 @@ export const usePlayerStore = defineStore('player', () => {
   const shuffle = ref(savedSettings.shuffle ?? false)
   const repeat = ref(savedSettings.repeat ?? 'none') // none, one, all
   
+  // UI Scale - zoom level for the player interface (0.8 to 1.5, default 1.0)
+  const uiScale = ref(savedSettings.uiScale ?? 1.0)
+  
   // Audio Enhancer State
   const enhancerEnabled = ref(savedSettings.enhancerEnabled ?? false)
   const bassGain = ref(savedSettings.bassGain ?? 0) // -10 to 10 dB
@@ -574,6 +577,11 @@ export const usePlayerStore = defineStore('player', () => {
   // Watchers for enhancer
   watch([enhancerEnabled, bassGain, trebleGain, autoGain], () => {
       updateEnhancerParams()
+      persistSettings()
+  })
+  
+  // Watcher for UI scale
+  watch(uiScale, () => {
       persistSettings()
   })
 
@@ -2118,6 +2126,7 @@ export const usePlayerStore = defineStore('player', () => {
       isMuted: isMuted.value,
       shuffle: shuffle.value,
       repeat: repeat.value,
+      uiScale: uiScale.value,
       enhancerEnabled: enhancerEnabled.value,
       bassGain: bassGain.value,
       trebleGain: trebleGain.value,
@@ -2384,6 +2393,9 @@ export const usePlayerStore = defineStore('player', () => {
     isMuted,
     shuffle,
     repeat,
+    
+    // UI Scale
+    uiScale,
     
     // Enhancer
     enhancerEnabled,

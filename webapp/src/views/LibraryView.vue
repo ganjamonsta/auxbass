@@ -50,6 +50,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useUIStore } from '@/stores/ui'
 import LibraryTracks from '@/components/library/LibraryTracks.vue'
 import LibraryAlbums from '@/components/library/LibraryAlbums.vue'
 import LibraryArtists from '@/components/library/LibraryArtists.vue'
@@ -58,6 +59,7 @@ import SearchBar from '@/components/ui/SearchBar.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const uiStore = useUIStore()
 
 const goToChannelSetup = () => {
   router.push('/settings#channel')
@@ -70,22 +72,15 @@ const tabs = [
   { id: 'playlists', label: 'Плейлисты', component: LibraryPlaylists, placeholder: 'Поиск плейлистов...' },
 ]
 
-// Tab State configuration
-const STORAGE_KEY = 'library_active_tab'
-const currentTabId = ref(localStorage.getItem(STORAGE_KEY) || 'tracks')
+// Use centralized tab state from uiStore
+const currentTabId = computed({
+  get: () => uiStore.libraryTab,
+  set: (val) => uiStore.setLibraryTab(val)
+})
 
 const currentTab = computed(() => tabs.find(t => t.id === currentTabId.value) || tabs[0])
 const currentTabComponent = computed(() => currentTab.value.component)
 const searchPlaceholder = computed(() => currentTab.value.placeholder)
-
-// Persist tab selection
-watch(currentTabId, (newVal) => {
-  localStorage.setItem(STORAGE_KEY, newVal)
-  // Clear search on tab switch maybe? 
-  // User might expect search to persist if relevant (e.g. searching "Linkin Park" works for all)
-  // But if I list tracks and switch to playlists, "Linkin Park" might verify emptiness. 
-  // I'll keep it.
-})
 
 // Search State
 const searchQuery = ref('')
@@ -120,6 +115,14 @@ const clearSearch = () => {
 /* Tabs Styles - use design system */
 .library-tabs {
   margin-bottom: 20px;
+  display: none; /* Hide on mobile, tabs are in PageHeader */
+}
+
+/* Show library-tabs only on desktop */
+@media (min-width: 1024px) {
+  .library-tabs {
+    display: flex;
+  }
 }
 
 /* Override base .neu-tab-bar for this specific use case */

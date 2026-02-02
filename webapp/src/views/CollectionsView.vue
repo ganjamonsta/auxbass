@@ -1,28 +1,5 @@
 <template>
   <div class="collections-view">
-    <!-- Section header with tab switcher -->
-    <div class="section-header">
-      <h1>Коллекции</h1>
-      <div class="neu-tab-bar tab-switcher">
-        <button 
-          class="neu-tab" 
-          :class="{ active: activeTab === 'albums' }"
-          @click="setActiveTab('albums')"
-        >
-          <Disc3 :size="16" />
-          <span class="neu-tab-content" data-text="Альбомы">Альбомы</span>
-        </button>
-        <button 
-          class="neu-tab" 
-          :class="{ active: activeTab === 'playlists' }"
-          @click="setActiveTab('playlists')"
-        >
-          <Folder :size="16" />
-          <span class="neu-tab-content" data-text="Плейлисты">Плейлисты</span>
-        </button>
-      </div>
-    </div>
-
     <!-- Albums Tab -->
     <div v-show="activeTab === 'albums'" class="tab-content">
       <!-- Scope switcher for albums -->
@@ -468,33 +445,6 @@ onMounted(() => {
 <style scoped>
 .collections-view {
   padding: 8px 16px 120px 16px;
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.section-header h1 {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--c-text-1);
-  margin: 0;
-}
-
-/* Tab switcher uses neu-tab-bar from design-system */
-.tab-switcher {
-  display: none;
-}
-
-/* Show tab-switcher only on desktop */
-@media (min-width: 1024px) {
-  .tab-switcher {
-    display: flex;
-  }
 }
 
 /* Scope switcher uses neu-tab-bar from design-system */
