@@ -272,7 +272,6 @@ const setupObserver = () => {
 watch(loadTriggerRef, (el) => {
   if (el) setupObserver()
 })
-}
 
 // Search global library for additional results
 const searchGlobal = async (query) => {
