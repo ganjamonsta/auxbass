@@ -622,11 +622,11 @@ onMounted(() => {
 
   .banner-title {
     font-size: 14px;
-    margin-bottom: 0;
+    margin-bottom: 2px;
   }
 
   .banner-description {
-    display: none;
+    font-size: 12px;
   }
 
   .banner-icon {
