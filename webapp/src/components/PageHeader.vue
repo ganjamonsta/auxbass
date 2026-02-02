@@ -95,8 +95,8 @@ defineEmits(['goBack'])
   white-space: nowrap;
 }
 
-/* Скрываем текст на узких экранах (до 380px) */
-@media (max-width: 380px) {
+/* Скрываем текст на мобильных устройствах, если слово не помещается */
+@media (max-width: 480px) {
   .page-title.with-icon .title-text {
     display: none;
   }
