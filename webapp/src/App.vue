@@ -202,6 +202,7 @@ import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
+import { useModals } from '@/composables/useModals'
 import PageHeader from '@/components/PageHeader.vue'
 import MiniPlayer from '@/components/MiniPlayer.vue'
 import FullPlayer from '@/components/FullPlayer.vue'
@@ -222,7 +223,7 @@ const libraryStore = useLibraryStore()
 const uiStore = useUIStore()
 const telegram = inject('telegram')
 
-const showFullPlayer = ref(false)
+const { showFullPlayer } = useModals(telegram)
 
 // Responsive detection
 const isDesktop = ref(window.innerWidth >= 1024)

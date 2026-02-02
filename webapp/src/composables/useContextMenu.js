@@ -14,6 +14,7 @@ import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
+import { useModals } from '@/composables/useModals'
 import { playerApi, playlistsApi, albumsApi, tracksApi } from '@/api/client'
 
 // Singleton state - shared across all components
@@ -38,6 +39,7 @@ export function useContextMenu() {
   const playerStore = usePlayerStore()
   const libraryStore = useLibraryStore()
   const uiStore = useUIStore()
+  const { closeFullPlayer } = useModals()
   const telegram = inject('telegram', null)
 
   // ═══════════════════════════════════════════════════════════
@@ -87,6 +89,7 @@ export function useContextMenu() {
   const trackActions = {
     goToArtist: (track) => {
       closeMenu()
+      closeFullPlayer() // Close full player if open
       if (track?.artist) {
         router.push(`/artist/${encodeURIComponent(track.artist)}`)
       }
@@ -94,6 +97,7 @@ export function useContextMenu() {
 
     goToAlbum: (track) => {
       closeMenu()
+      closeFullPlayer() // Close full player if open
       const albumId = track?.album_id || track?.album?.id
       if (albumId) {
         router.push(`/album/${albumId}`)

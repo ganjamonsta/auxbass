@@ -4,6 +4,9 @@
  */
 import { ref } from 'vue'
 
+// Singleton state for full player - shared across all components
+const showFullPlayer = ref(false)
+
 export function useModals(telegram = null) {
   // Track menu state
   const showTrackMenuModal = ref(false)
@@ -28,9 +31,6 @@ export function useModals(telegram = null) {
   // Create playlist dialog
   const showCreatePlaylist = ref(false)
   const newPlaylistName = ref('')
-
-  // Full player (mobile)
-  const showFullPlayer = ref(false)
 
   // Toast notification ref
   const toast = ref(null)
