@@ -1,5 +1,10 @@
 <template>
   <div class="settings-view">
+    <!-- Skeleton while loading -->
+    <SettingsSkeleton v-if="loading" />
+
+    <!-- Actual content -->
+    <template v-else>
     <h1>Настройки</h1>
 
     <!-- Channel section (Premium) -->
@@ -251,6 +256,7 @@
         Музыкальный плеер с хранением в Telegram
       </p>
     </section>
+    </template>
   </div>
 </template>
 
@@ -261,12 +267,14 @@ import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
 import api, { authApi } from '@/api/client'
 import { Megaphone, Check, Folder, Heart, ListMusic, Cloud, RefreshCw, Lock } from 'lucide-vue-next'
+import SettingsSkeleton from '@/components/SettingsSkeleton.vue'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const playerStore = usePlayerStore()
 
+const loading = ref(true)
 const stats = ref(null)
 const darkMode = ref(true)
 const botUsername = ref('tg_player_bot')  // Default, will be updated from config
@@ -374,10 +382,19 @@ watch(darkMode, (isDark) => {
   localStorage.setItem('theme', isDark ? 'dark' : 'light')
 })
 
-onMounted(() => {
-  loadStats()
-  loadBotConfig()
-  loadPrivacySettings()
+onMounted(async () => {
+  loading.value = true
+  
+  try {
+    // Load all data in parallel
+    await Promise.all([
+      loadStats(),
+      loadBotConfig(),
+      loadPrivacySettings()
+    ])
+  } finally {
+    loading.value = false
+  }
   
   // Load saved theme preference
   const savedTheme = localStorage.getItem('theme')

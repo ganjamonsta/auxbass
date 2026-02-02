@@ -2,6 +2,29 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { playerApi, tracksApi, playlistsApi, albumsApi } from '../api/client'
 
+// HD MIME types that cannot be streamed directly (lossless formats)
+const HD_MIME_TYPES = [
+  'audio/flac', 'audio/x-flac',           // FLAC
+  'audio/wav', 'audio/x-wav',             // WAV
+  'audio/aiff', 'audio/x-aiff',           // AIFF
+  'audio/x-m4a', 'audio/mp4',             // M4A (ALAC)
+  'audio/alac',                           // ALAC
+  'audio/x-alac'                          // ALAC variant
+]
+const MAX_STREAMABLE_SIZE = 20 * 1024 * 1024 // 20 MB
+
+// Check if track is HD format or too large for streaming
+const isTrackNotStreamable = (track) => {
+  if (!track) return false
+  // HD format check
+  if (track.mime_type && HD_MIME_TYPES.includes(track.mime_type.toLowerCase())) return true
+  // File size check
+  if (track.file_size && track.file_size > MAX_STREAMABLE_SIZE) return true
+  // Explicit flag
+  if (track.is_streamable === false) return true
+  return false
+}
+
 // Import storage and cache utilities
 import {
   loadSettings,
@@ -1284,6 +1307,66 @@ export const usePlayerStore = defineStore('player', () => {
     // If same track, just toggle
     if (currentTrack.value?.id === track.id) {
       toggle()
+      return
+    }
+    
+    // === HD/Large file check ===
+    // If track is HD format or too large, check if streamable version exists
+    if (isTrackNotStreamable(track)) {
+      console.log(`[Play] Track "${track.title}" is HD/large (mime: ${track.mime_type}, size: ${track.file_size})`)
+      
+      // Check if streamable version exists
+      if (track.streamable_id) {
+        // We have a streamable version - use it instead
+        console.log(`[Play] Using streamable version id=${track.streamable_id} for HD track`)
+        // Fetch the streamable track details and play it
+        try {
+          const response = await tracksApi.getById(track.streamable_id)
+          const streamableTrack = response.data
+          
+          // Keep reference to original HD track for UI
+          hdTrackInfo.value = {
+            id: track.id,
+            title: track.title,
+            isOriginalHd: true
+          }
+          
+          // Replace track in queue with streamable version (keeping visual info)
+          const mergedTrack = {
+            ...streamableTrack,
+            // Keep cover and visual info from original
+            cover_url: track.cover_url || streamableTrack.cover_url,
+            _originalHdId: track.id
+          }
+          
+          // Recursively play the streamable version
+          currentTrack.value = null // Reset to avoid toggle logic
+          await play(mergedTrack, null)
+          return
+        } catch (e) {
+          console.error('[Play] Failed to fetch streamable version:', e)
+          // Fall through to error handling below
+        }
+      }
+      
+      // No streamable version - cannot play, show error
+      const sizeMB = track.file_size ? (track.file_size / 1024 / 1024).toFixed(1) : '20+'
+      lastError.value = {
+        type: 'too_large',
+        track: track,
+        message: `Файл слишком большой для стриминга (${sizeMB} MB). Используйте кнопку скачивания.`
+      }
+      loading.value = false
+      currentTrack.value = null
+      
+      // Callback if set
+      if (onTrackUnavailableCallback) {
+        onTrackUnavailableCallback(track, lastError.value.message, true)
+      }
+      
+      // Auto-skip to next track
+      console.log('[Play] HD/Large file without streamable version - auto-skip in 1.5s')
+      setTimeout(() => next(), 1500)
       return
     }
     

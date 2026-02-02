@@ -170,6 +170,14 @@ const handleClick = () => {
     emit('menu')
     return
   }
+  
+  // HD/Large files without streamable version - trigger download instead
+  if (isNotStreamable.value && !props.track.streamable_id) {
+    console.log('[TrackItem] HD/Large file without streamable version, triggering download')
+    emit('download')
+    return
+  }
+  
   emit('click')
 }
 
@@ -177,10 +185,16 @@ const coverStyle = computed(() => getTrackCoverStyle(props.track))
 
 const coverInitials = computed(() => getTrackInitials(props.track))
 
-// HD MIME types that cannot be streamed
-const HD_MIME_TYPES = ['audio/flac', 'audio/x-flac', 'audio/wav', 'audio/x-wav', 'audio/aiff', 'audio/x-aiff']
+// HD MIME types that cannot be streamed directly (lossless formats)
+const HD_MIME_TYPES = [
+  'audio/flac', 'audio/x-flac',           // FLAC
+  'audio/wav', 'audio/x-wav',             // WAV
+  'audio/aiff', 'audio/x-aiff',           // AIFF
+  'audio/x-m4a', 'audio/mp4',             // M4A (ALAC)
+  'audio/alac', 'audio/x-alac'            // ALAC
+]
 
-// Check if track is HD format (FLAC, WAV, etc.)
+// Check if track is HD format (FLAC, WAV, M4A/ALAC, etc.)
 const isHdFormat = computed(() => {
   if (!props.track?.mime_type) return false
   return HD_MIME_TYPES.includes(props.track.mime_type.toLowerCase())
