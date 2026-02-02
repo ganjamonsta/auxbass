@@ -603,7 +603,7 @@ onMounted(() => {
   line-height: 1.4;
 }
 
-/* Mobile adjustments - hide banner text on small screens */
+/* Mobile adjustments - compact banner on small screens */
 @media (max-width: 1023px) {
   .info-banner-with-tabs {
     gap: 12px;
@@ -613,16 +613,25 @@ onMounted(() => {
     padding: 12px;
     margin-bottom: 0;
     width: 100%;
-    justify-content: center;
+    gap: 10px;
   }
 
   .banner-text {
+    flex: 1;
+  }
+
+  .banner-title {
+    font-size: 14px;
+    margin-bottom: 0;
+  }
+
+  .banner-description {
     display: none;
   }
 
   .banner-icon {
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
   }
 
   /* Tabs are in PageHeader on mobile, keep them hidden here */
