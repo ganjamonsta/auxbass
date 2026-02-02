@@ -139,6 +139,7 @@ def extract_featured_artists(title: str, main_artist: Optional[str] = None) -> L
         "Track feat. Artist1 & Artist2" -> ["Artist1", "Artist2"]
         "Song (Prod. Producer)" -> ["Producer"]
         "Battle vs. Other" -> ["Other"]
+        "Track (excision feat. black kray)" -> ["excision", "black kray"]
     
     Returns:
         List of additional artist names
@@ -161,7 +162,7 @@ def extract_featured_artists(title: str, main_artist: Optional[str] = None) -> L
             if artist and len(artist) > 1:
                 artists.append(artist)
     
-    # Pattern for feat.: "feat. Artist" or "ft. Artist"
+    # Pattern for feat.: "feat. Artist" or "ft. Artist" - outside parentheses
     feat_match = re.search(r'(?:feat\.?|ft\.?|featuring)\s+([^\(\)\[\]]+?)(?:\s*[\(\[]|$)', title, flags=re.IGNORECASE)
     if feat_match:
         feat_part = feat_match.group(1).strip()
@@ -171,6 +172,39 @@ def extract_featured_artists(title: str, main_artist: Optional[str] = None) -> L
             fa = fa.strip()
             if fa and len(fa) > 1:
                 artists.append(fa)
+    
+    # Pattern for feat. inside parentheses: "(Artist1 feat. Artist2)" or "(feat. Artist)"
+    # This handles mashups like "Track (excision feat. black kray)"
+    paren_feat_patterns = [
+        # "(Artist1 feat. Artist2)" - extract both parts
+        r'[\(\[]([^\)\]]+?)\s+(?:feat\.?|ft\.?|featuring)\s+([^\)\]]+)[\)\]]',
+        # "(feat. Artist)" - only extract featured artist
+        r'[\(\[](?:feat\.?|ft\.?|featuring)\s+([^\)\]]+)[\)\]]',
+    ]
+    for pattern in paren_feat_patterns:
+        matches = re.findall(pattern, title, flags=re.IGNORECASE)
+        for match in matches:
+            if isinstance(match, tuple):
+                # Pattern with two groups (Artist1 feat. Artist2)
+                for part in match:
+                    part = part.strip()
+                    if part and len(part) > 1:
+                        # Split by & , and
+                        sub_artists = re.split(r'\s*(?:&|,|\band\b)\s*', part)
+                        for sa in sub_artists:
+                            sa = sa.strip()
+                            if sa and len(sa) > 1:
+                                artists.append(sa)
+            else:
+                # Single group
+                part = match.strip()
+                if part and len(part) > 1:
+                    # Split by & , and
+                    sub_artists = re.split(r'\s*(?:&|,|\band\b)\s*', part)
+                    for sa in sub_artists:
+                        sa = sa.strip()
+                        if sa and len(sa) > 1:
+                            artists.append(sa)
     
     # Pattern for prod: "prod. Producer" or "(Prod. by Producer)"
     prod_patterns = [
