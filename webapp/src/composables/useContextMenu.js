@@ -267,7 +267,7 @@ export function useContextMenu() {
       try {
         const tracks = await loadPlaylistTracks(playlist)
         if (tracks?.length) {
-          playerStore.playTrackList(tracks, 0)
+          playerStore.play(tracks[0], tracks)
           uiStore.toast.success('Воспроизведение', `Играет: ${playlist.name}`)
         } else {
           uiStore.toast.info('Пусто', 'В плейлисте нет треков')
@@ -286,8 +286,7 @@ export function useContextMenu() {
         const tracks = await loadPlaylistTracks(playlist)
         if (tracks?.length) {
           const shuffled = [...tracks].sort(() => Math.random() - 0.5)
-          playerStore.playTrackList(shuffled, 0)
-          playerStore.setShuffle(true)
+          playerStore.play(shuffled[0], shuffled)
           uiStore.toast.success('Перемешивание', `Играет: ${playlist.name}`)
         }
       } catch (error) {
@@ -358,7 +357,7 @@ export function useContextMenu() {
         const response = await albumsApi.getOne(album.id)
         const tracks = response?.data?.tracks || []
         if (tracks.length) {
-          playerStore.playTrackList(tracks, 0)
+          playerStore.play(tracks[0], tracks)
           uiStore.toast.success('Воспроизведение', `Играет: ${album.name}`)
         } else {
           uiStore.toast.info('Пусто', 'В альбоме нет треков')
@@ -378,8 +377,7 @@ export function useContextMenu() {
         const tracks = response?.data?.tracks || []
         if (tracks.length) {
           const shuffled = [...tracks].sort(() => Math.random() - 0.5)
-          playerStore.playTrackList(shuffled, 0)
-          playerStore.setShuffle(true)
+          playerStore.play(shuffled[0], shuffled)
           uiStore.toast.success('Перемешивание', `Играет: ${album.name}`)
         } else {
           uiStore.toast.info('Пусто', 'В альбоме нет треков')
@@ -440,7 +438,7 @@ export function useContextMenu() {
         const response = await tracksApi.getArtistDetail(name)
         const tracks = response?.tracks || []
         if (tracks.length) {
-          playerStore.playTrackList(tracks, 0)
+          playerStore.play(tracks[0], tracks)
           uiStore.toast.success('Воспроизведение', `Играет: ${name}`)
         }
       } catch (error) {
@@ -459,8 +457,7 @@ export function useContextMenu() {
         const tracks = response?.tracks || []
         if (tracks.length) {
           const shuffled = [...tracks].sort(() => Math.random() - 0.5)
-          playerStore.playTrackList(shuffled, 0)
-          playerStore.setShuffle(true)
+          playerStore.play(shuffled[0], shuffled)
           uiStore.toast.success('Перемешивание', `Играет: ${name}`)
         }
       } catch (error) {
