@@ -67,7 +67,7 @@
         :isLiked="track.is_liked"
         @click="playTrack(track, index)"
         @like="handleLikeTrack(track)"
-        @menu="(e) => openMenu('track', track, { context: 'playlist', playlistId: playlist.id }, e)"
+        @menu="(e) => openMenu('track', track, `playlist:${playlist.id}`, e)"
         @download="handleDirectDownload(track)"
         @hdNotice="handleHdNotice"
       />
