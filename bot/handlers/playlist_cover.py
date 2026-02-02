@@ -4,19 +4,19 @@ TG Player Bot - Playlist Cover Handler
 Handles playlist cover uploads from the Mini App.
 Workflow:
 1. User clicks on playlist cover in webapp editor
-2. Webapp opens bot with deep link /start cover_<playlist_id>
-3. Bot asks user to send a photo
+2. Webapp calls API which sends message with ForceReply
+3. User replies to message with a photo
 4. Bot crops photo to square, uploads to user's channel for backup
 5. Cover URL (via API proxy) is saved to playlist
 """
 from typing import Optional
 from io import BytesIO
 import logging
+import re
 
 from aiogram import Router, F, Bot
 from aiogram.filters import CommandStart, CommandObject
 from aiogram.types import Message, CallbackQuery, BufferedInputFile, ContentType
-import json
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
@@ -38,6 +38,9 @@ logger = logging.getLogger(__name__)
 
 # Target size for cover images (square)
 COVER_SIZE = 500
+
+# Regex to parse cover data from reply_to_message
+COVER_DATA_PATTERN = re.compile(r'cover:(\d+):(-?\d+)')
 
 
 class PlaylistCoverStates(StatesGroup):
@@ -99,74 +102,6 @@ async def cmd_start_cover(message: Message, command: CommandObject, state: FSMCo
             f"📷 <b>Загрузка обложки для плейлиста</b>\n\n"
             f"🎵 <i>{playlist.name}</i>\n\n"
             "Отправьте изображение. Я автоматически обрежу его до квадрата по центру.",
-            parse_mode="HTML",
-            reply_markup=get_cancel_keyboard()
-        )
-
-
-@router.message(F.content_type == ContentType.WEB_APP_DATA)
-async def handle_webapp_cover_request(message: Message, state: FSMContext):
-    """
-    Handle cover upload request from Mini App via sendData.
-    This provides a seamless experience - user clicks cover in webapp,
-    webapp sends data and closes, bot immediately asks for photo.
-    """
-    try:
-        data = json.loads(message.web_app_data.data)
-    except (json.JSONDecodeError, AttributeError):
-        return  # Not our data, ignore
-    
-    # Check if this is a cover upload request
-    if data.get("action") != "upload_cover":
-        return  # Not a cover request
-    
-    playlist_id = data.get("playlist_id")
-    if not playlist_id:
-        await message.answer("❌ Неверные данные")
-        return
-    
-    user_id = message.from_user.id
-    
-    async with get_session() as session:
-        # Check playlist exists and user owns it
-        playlist = await session.get(Playlist, playlist_id)
-        if not playlist:
-            await message.answer("❌ Плейлист не найден")
-            return
-        
-        if playlist.owner_id != user_id:
-            await message.answer("❌ Вы не являетесь владельцем этого плейлиста")
-            return
-        
-        # Check if user has connected channel
-        channel = await session.scalar(
-            select(UserChannel).where(
-                UserChannel.user_id == user_id,
-                UserChannel.is_active == True
-            )
-        )
-        
-        if not channel:
-            await message.answer(
-                "🔒 <b>Подключите канал для загрузки обложек</b>\n\n"
-                "Обложки плейлистов хранятся в вашем Telegram-канале.\n\n"
-                "Используйте команду /channel для подключения.",
-                parse_mode="HTML"
-            )
-            return
-        
-        # Save state for cover upload
-        await state.set_state(PlaylistCoverStates.waiting_for_cover)
-        await state.update_data(
-            playlist_id=playlist_id,
-            playlist_name=playlist.name,
-            channel_id=channel.channel_id
-        )
-        
-        await message.answer(
-            f"📷 <b>Загрузка обложки для плейлиста</b>\n\n"
-            f"🎵 <i>{playlist.name}</i>\n\n"
-            "Отправьте фото прямо сейчас!",
             parse_mode="HTML",
             reply_markup=get_cancel_keyboard()
         )
@@ -320,7 +255,137 @@ async def handle_cover_invalid(message: Message, state: FSMContext):
 
 @router.callback_query(F.data == "cancel", PlaylistCoverStates.waiting_for_cover)
 async def cancel_cover_upload(callback: CallbackQuery, state: FSMContext):
-    """Cancel cover upload"""
+    """Cancel cover upload (FSM state)"""
     await state.clear()
     await callback.message.edit_text("❌ Загрузка обложки отменена")
     await callback.answer()
+
+
+@router.message(F.photo, F.reply_to_message)
+async def handle_photo_reply_for_cover(message: Message, state: FSMContext, bot: Bot):
+    """
+    Handle photo sent as reply to cover upload request.
+    Parses playlist_id and channel_id from replied message text.
+    No database storage needed!
+    """
+    # First check if FSM state is active (handled by handle_cover_upload)
+    current_state = await state.get_state()
+    if current_state == PlaylistCoverStates.waiting_for_cover:
+        return  # Will be handled by handle_cover_upload
+    
+    # Check if replied message contains cover data
+    reply_msg = message.reply_to_message
+    if not reply_msg or not reply_msg.text:
+        return  # Not a cover request reply
+    
+    # Parse cover data from message: cover:playlist_id:channel_id
+    match = COVER_DATA_PATTERN.search(reply_msg.text)
+    if not match:
+        return  # Not a cover request
+    
+    playlist_id = int(match.group(1))
+    channel_id = int(match.group(2))
+    
+    user_id = message.from_user.id
+    
+    # Get playlist info
+    async with get_session() as session:
+        playlist = await session.get(Playlist, playlist_id)
+        if not playlist:
+            await message.answer("❌ Плейлист не найден")
+            return
+        
+        if playlist.owner_id != user_id:
+            await message.answer("❌ Вы не являетесь владельцем этого плейлиста")
+            return
+        
+        playlist_name = playlist.name
+    
+    # Process the cover
+    status_msg = await message.answer("⏳ Обрабатываю изображение...")
+    
+    try:
+        photo = message.photo[-1]
+        file_info = await bot.get_file(photo.file_id)
+        downloaded_file = await bot.download_file(file_info.file_path)
+        
+        img = Image.open(downloaded_file)
+        
+        if img.mode in ('RGBA', 'P', 'LA'):
+            background = Image.new('RGB', img.size, (255, 255, 255))
+            if img.mode == 'P':
+                img = img.convert('RGBA')
+            background.paste(img, mask=img.split()[-1] if 'A' in img.mode else None)
+            img = background
+        elif img.mode != 'RGB':
+            img = img.convert('RGB')
+        
+        img = ImageOps.fit(
+            img, 
+            (COVER_SIZE, COVER_SIZE), 
+            method=Image.Resampling.LANCZOS, 
+            centering=(0.5, 0.5)
+        )
+        
+        output = BytesIO()
+        img.save(output, format="JPEG", quality=90)
+        output.seek(0)
+        
+        await status_msg.edit_text("⏳ Сохраняю в ваш канал...")
+        
+        try:
+            sent_msg = await bot.send_photo(
+                chat_id=channel_id,
+                photo=BufferedInputFile(output.read(), filename=f"cover_{playlist_id}.jpg"),
+                caption=f"🎵 Обложка плейлиста: <b>{playlist_name}</b>",
+                parse_mode="HTML"
+            )
+            cover_file_id = sent_msg.photo[-1].file_id
+            
+        except TelegramForbiddenError:
+            await status_msg.edit_text(
+                "❌ Бот был удалён из вашего канала.\n\n"
+                "Переподключите канал командой /channel"
+            )
+            return
+            
+        except TelegramBadRequest as e:
+            logger.error(f"Failed to upload cover to channel {channel_id}: {e}")
+            await status_msg.edit_text(
+                "❌ Не удалось загрузить обложку в канал.\n\n"
+                "Проверьте, что бот добавлен в канал как администратор."
+            )
+            return
+        
+        base_url = settings.api_url.rstrip('/').removesuffix('/api')
+        cover_url = f"{base_url}/api/images/{cover_file_id}"
+        
+        async with get_session() as session:
+            playlist = await session.get(Playlist, playlist_id)
+            if playlist:
+                playlist.cover_url = cover_url
+                await session.commit()
+                logger.info(f"Cover updated for playlist {playlist_id}: {cover_url}")
+        
+        await status_msg.delete()
+        
+        # Delete the request message to clean up
+        try:
+            await reply_msg.delete()
+        except Exception:
+            pass  # Ignore if can't delete
+        
+        output.seek(0)
+        await message.answer_photo(
+            BufferedInputFile(output.read(), filename="cover_preview.jpg"),
+            caption=(
+                f"✅ <b>Обложка обновлена!</b>\n\n"
+                f"🎵 Плейлист: <i>{playlist_name}</i>\n\n"
+                f"Обложка сохранена в ваш канал и будет отображаться в плеере."
+            ),
+            parse_mode="HTML"
+        )
+        
+    except Exception as e:
+        logger.exception(f"Error processing cover upload: {e}")
+        await status_msg.edit_text(f"❌ Ошибка при обработке: {str(e)}")

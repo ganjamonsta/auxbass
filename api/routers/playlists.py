@@ -17,7 +17,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.database import get_db
-from shared.models import Playlist, PlaylistTrack, Track, UserLibrary, AlbumTrack, User, PlaylistSubscription
+from shared.models import Playlist, PlaylistTrack, Track, UserLibrary, AlbumTrack, User, PlaylistSubscription, UserChannel
+from shared.config import get_settings
 
 from api.routers.auth import get_current_user, require_premium
 from api.routers.library import track_to_response
@@ -453,6 +454,69 @@ async def update_playlist(
         is_public=playlist.is_public,
         created_at=playlist.created_at,
     )
+
+
+@router.post("/{playlist_id}/request-cover")
+async def request_cover_upload(
+    playlist_id: int,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Request cover upload from webapp.
+    Sends message with ForceReply - user replies with photo.
+    No database storage needed - playlist_id and channel_id encoded in message.
+    """
+    import httpx
+    
+    settings = get_settings()
+    
+    # Verify playlist ownership
+    playlist = await db.get(Playlist, playlist_id)
+    if not playlist or playlist.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    
+    # Check user has connected channel
+    channel = await db.scalar(
+        select(UserChannel).where(
+            UserChannel.user_id == user.id,
+            UserChannel.is_active == True
+        )
+    )
+    
+    if not channel:
+        raise HTTPException(
+            status_code=400, 
+            detail="Подключите канал для загрузки обложек. Используйте /channel в боте."
+        )
+    
+    # Send message with ForceReply - encode data in hidden tag
+    # Format: <!-- cover:playlist_id:channel_id -->
+    bot_api_url = f"{settings.telegram_api_url}/bot{settings.bot_token}/sendMessage"
+    message_text = (
+        f"📷 <b>Загрузка обложки для плейлиста</b>\n\n"
+        f"🎵 <i>{playlist.name}</i>\n\n"
+        f"<b>Ответьте на это сообщение фотографией</b>\n"
+        f"<code>cover:{playlist_id}:{channel.channel_id}</code>"
+    )
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(bot_api_url, json={
+                "chat_id": user.id,
+                "text": message_text,
+                "parse_mode": "HTML",
+                "reply_markup": {
+                    "force_reply": True,
+                    "selective": True,
+                    "input_field_placeholder": "Отправьте фото..."
+                }
+            })
+            response.raise_for_status()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Не удалось отправить сообщение: {e}")
+    
+    return {"status": "pending", "message": "Ответьте на сообщение фото"}
 
 
 @router.delete("/{playlist_id}")

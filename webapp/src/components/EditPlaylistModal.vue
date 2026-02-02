@@ -141,20 +141,24 @@ const pendingCoverUpload = ref(false)
 // Current cover URL (local state for refresh)
 const currentCoverUrl = ref(null)
 
-const changeCover = () => {
+const changeCover = async () => {
     if (!props.playlist?.id) return
   
-    // Try seamless upload via sendData (closes Mini App, bot immediately asks for photo)
-    if (window.Telegram?.WebApp?.sendData) {
-        const data = JSON.stringify({
-            action: 'upload_cover',
-            playlist_id: props.playlist.id
-        })
-        // Close modal before sendData (sendData closes the webapp)
-        emit('close')
-        // sendData will close the webapp and send data to bot
-        window.Telegram.WebApp.sendData(data)
-        return
+    // Try seamless upload via API (sends message to user, they just send photo)
+    if (window.Telegram?.WebApp) {
+        try {
+            await api.post(`/playlists/${props.playlist.id}/request-cover`)
+            // Close modal - user will upload photo in bot chat
+            emit('close')
+            return
+        } catch (error) {
+            console.error('Failed to request cover upload:', error)
+            // Show error if API failed (e.g., no channel connected)
+            if (error.response?.data?.detail) {
+                alert(error.response.data.detail)
+                return
+            }
+        }
     }
     
     // Fallback: open deep link (requires user to send /start message)
