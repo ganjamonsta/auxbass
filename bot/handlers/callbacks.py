@@ -600,6 +600,7 @@ async def handle_playlist_finish(callback: CallbackQuery):
         playlist = Playlist(
             user_id=user_id,
             name=playlist_session.name,
+            is_public=True,  # Default to public
         )
         session.add(playlist)
         await session.flush()
