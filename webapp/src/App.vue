@@ -16,6 +16,7 @@
         <PageHeader 
           v-if="showHeader"
           :title="pageTitle"
+          :showBack="showBackButton"
           @goBack="goBack"
         >
           <template v-if="route.name === 'library'" #toggle>
@@ -259,6 +260,12 @@ const showHeader = computed(() => {
   // On mobile, show header for all pages except login
   const noHeaderRoutes = ['login']
   return authStore.isAuthenticated && !noHeaderRoutes.includes(route.name)
+})
+
+const showBackButton = computed(() => {
+  // Main navigation pages (bottom nav items) don't need back button
+  const mainRoutes = ['library', 'collections', 'artists', 'friends', 'settings']
+  return !mainRoutes.includes(route.name)
 })
 
 const pageTitle = computed(() => {
