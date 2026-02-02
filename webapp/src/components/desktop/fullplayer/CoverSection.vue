@@ -25,11 +25,6 @@
       <div class="corner-decoration bl"></div>
       <div class="corner-decoration br"></div>
     </div>
-    
-    <!-- Audio visualization bars -->
-    <div class="visualizer">
-      <div class="viz-bar" v-for="i in 32" :key="i" :style="getVisualizerStyle(i)"></div>
-    </div>
   </div>
 </template>
 
@@ -45,48 +40,6 @@ const props = defineProps({
 
 const coverStyle = computed(() => getTrackCoverStyle(props.track))
 const coverInitials = computed(() => getTrackInitials(props.track))
-
-// Visualizer logic
-const visualizerBars = ref(Array(32).fill(0))
-let visualizerInterval = null
-
-const getVisualizerStyle = (index) => {
-  const height = visualizerBars.value[index - 1] || 10
-  const delay = index * 0.02
-  return {
-    height: `${height}%`,
-    animationDelay: `${delay}s`
-  }
-}
-
-const animateVisualizer = () => {
-  if (props.isPlaying) {
-    visualizerBars.value = visualizerBars.value.map(() => {
-      return 10 + Math.random() * 90
-    })
-  } else {
-    visualizerBars.value = visualizerBars.value.map(v => {
-      return Math.max(10, v * 0.9)
-    })
-  }
-}
-
-onMounted(() => {
-  visualizerInterval = setInterval(animateVisualizer, 100)
-})
-
-onUnmounted(() => {
-  if (visualizerInterval) {
-    clearInterval(visualizerInterval)
-  }
-})
-
-watch(() => props.isPlaying, (playing) => {
-  if (!playing) {
-    // Gradually reduce visualizer bars when paused
-    visualizerBars.value = visualizerBars.value.map(v => Math.max(5, v * 0.8))
-  }
-})
 </script>
 
 <style scoped>
@@ -213,26 +166,6 @@ watch(() => props.isPlaying, (playing) => {
   letter-spacing: 2px;
   color: #db2220;
   font-family: 'Segoe UI', sans-serif;
-}
-
-/* Visualizer */
-.visualizer {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  height: 60px;
-  gap: 3px;
-  padding: 0 10px;
-  /* background and shadow removed */
-}
-
-.viz-bar {
-  flex: 1;
-  background: linear-gradient(to top, #db2220 0%, #e85c7c 100%);
-  min-height: 8px;
-  border-radius: 4px;
-  transition: height 0.1s ease;
-  box-shadow: 0 2px 6px rgba(232, 92, 124, 0.4);
 }
 
 .cover-scanlines, .corner-decoration {

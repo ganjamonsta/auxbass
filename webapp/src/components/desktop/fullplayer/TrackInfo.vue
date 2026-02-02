@@ -152,22 +152,30 @@ const formatTime = (seconds) => {
 
 .track-display {
   margin-bottom: 20px;
+  text-align: center;
+  width: 100%;
 }
 
 .track-title-main {
-  font-size: 32px;
+  font-size: 36px;
   font-weight: 700;
   color: #e8ecf1;
   margin: 0 0 10px 0;
-  line-height: 1.2;
+  line-height: 1.3;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.6);
+  width: 100%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .track-artist-main {
-  font-size: 20px;
+  font-size: 22px;
   color: #a0aec0;
   margin: 0;
   font-weight: 500;
+  width: 100%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .metadata-grid {

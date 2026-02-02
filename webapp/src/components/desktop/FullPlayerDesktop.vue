@@ -92,13 +92,18 @@
         <!-- Glow effects -->
         <div class="glow-effect glow-1"></div>
         <div class="glow-effect glow-2"></div>
+
+        <!-- Full-screen background visualizer -->
+        <div class="fullscreen-visualizer" :class="{ 'playing': isPlaying }">
+          <div class="viz-bar" v-for="i in 64" :key="i" :style="getVisualizerStyle(i)"></div>
+        </div>
       </div>
     </div>
   </Transition>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
@@ -162,6 +167,65 @@ const playModeText = computed(() => {
   if (props.repeat === 'one') return 'REPEAT 1'
   if (props.repeat === 'all') return 'REPEAT ALL'
   return 'NORMAL'
+})
+
+// Full-screen visualizer
+const visualizerBars = ref(Array(64).fill(0))
+const visualizerPeak = ref(0)
+let visualizerInterval = null
+
+const getVisualizerStyle = (index) => {
+  const height = visualizerBars.value[index - 1] || 5
+  const delay = index * 0.015
+  
+  // Dynamic color based on peak intensity
+  const intensity = visualizerPeak.value / 100
+  const hue = 350 + (intensity * 30) // Shift from red to pink/purple on peaks
+  const saturation = 70 + (intensity * 30)
+  
+  return {
+    height: `${height}%`,
+    animationDelay: `${delay}s`,
+    background: `linear-gradient(to top, hsl(${hue}, ${saturation}%, 50%), hsl(${hue}, ${saturation}%, 65%))`,
+    boxShadow: `0 0 ${4 + intensity * 8}px hsla(${hue}, ${saturation}%, 60%, ${0.3 + intensity * 0.4})`
+  }
+}
+
+const animateVisualizer = () => {
+  if (props.isPlaying) {
+    const newBars = visualizerBars.value.map((_, i) => {
+      // Create more dynamic waves across bars
+      const baseHeight = 15 + Math.random() * 85
+      const wave = Math.sin(Date.now() / 500 + i * 0.2) * 20
+      return Math.max(5, Math.min(100, baseHeight + wave))
+    })
+    visualizerBars.value = newBars
+    
+    // Calculate peak for color changes
+    const avgHeight = newBars.reduce((a, b) => a + b, 0) / newBars.length
+    visualizerPeak.value = avgHeight
+  } else {
+    visualizerBars.value = visualizerBars.value.map(v => {
+      return Math.max(5, v * 0.92)
+    })
+    visualizerPeak.value = visualizerPeak.value * 0.9
+  }
+}
+
+onMounted(() => {
+  visualizerInterval = setInterval(animateVisualizer, 80)
+})
+
+onUnmounted(() => {
+  if (visualizerInterval) {
+    clearInterval(visualizerInterval)
+  }
+})
+
+watch(() => props.isPlaying, (playing) => {
+  if (!playing) {
+    visualizerBars.value = visualizerBars.value.map(v => Math.max(5, v * 0.8))
+  }
 })
 
 // Methods
@@ -325,6 +389,36 @@ const handleAddToPlaylist = () => {
 .grid-background,
 .glow-effect {
   display: none;
+}
+
+/* Full-screen background visualizer */
+.fullscreen-visualizer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0;
+  padding: 0;
+  z-index: 1;
+  opacity: 0.12;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.fullscreen-visualizer.playing {
+  opacity: 0.18;
+}
+
+.fullscreen-visualizer .viz-bar {
+  flex: 1;
+  min-height: 4px;
+  border-radius: 0;
+  transition: height 0.08s ease, background 0.2s ease;
+  filter: blur(1px);
 }
 
 /* Responsive adjustments */
