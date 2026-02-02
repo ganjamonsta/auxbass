@@ -436,6 +436,7 @@ onUnmounted(() => {
 /* LCD Panel */
 .lcd-panel {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -444,6 +445,7 @@ onUnmounted(() => {
 
 .lcd-frame {
   flex: 1;
+  min-width: 0;
   background: #0a0a0a;
   border-radius: 4px;
   padding: 3px;
@@ -461,6 +463,7 @@ onUnmounted(() => {
   flex-direction: column;
   justify-content: space-between;
   cursor: pointer;
+  overflow: hidden;
 }
 
 .lcd-title-row {
@@ -469,12 +472,14 @@ onUnmounted(() => {
   justify-content: center;
   gap: 8px;
   flex: 1;
+  min-width: 0;
 }
 
 .lcd-progress-row {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .lcd-status {
