@@ -29,18 +29,22 @@
     <div class="track-info">
       <h2 class="track-title">{{ track?.title || 'Без названия' }}</h2>
       
-      <!-- Artist (clickable) -->
-      <button 
-        v-if="track?.artist" 
-        class="info-link artist-link"
-        @click="goToArtist"
-        @contextmenu.prevent="openMenu('artist', { name: track.artist }, 'sidebar', $event)"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <!-- Artists (clickable, split into separate links) -->
+      <div v-if="track?.artist" class="artists-container">
+        <svg class="artists-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
         </svg>
-        <span>{{ track.artist }}</span>
-      </button>
+        <span class="artists-links">
+          <template v-for="(artist, index) in parsedArtists" :key="artist">
+            <button 
+              class="artist-link-inline"
+              @click="goToArtistByName(artist)"
+              @contextmenu.prevent="openMenu('artist', { name: artist }, 'sidebar', $event)"
+            >{{ artist }}</button>
+            <span v-if="index < parsedArtists.length - 1" class="artist-separator">, </span>
+          </template>
+        </span>
+      </div>
       <span v-else class="info-text muted">Неизвестный исполнитель</span>
 
       <!-- Album (clickable) -->
@@ -216,6 +220,7 @@ import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useContextMenu } from '@/composables/useContextMenu'
+import { splitArtists } from '@/utils/formatters'
 import { Play } from 'lucide-vue-next'
 
 const emit = defineEmits(['goToUser'])
@@ -228,6 +233,12 @@ const { openMenu } = useContextMenu()
 // Computed from stores
 const track = computed(() => playerStore.currentTrack)
 const isPlaying = computed(() => playerStore.isPlaying)
+
+// Parse artists into separate names
+const parsedArtists = computed(() => {
+  if (!track.value?.artist) return []
+  return splitArtists(track.value.artist)
+})
 
 // Queue computed
 const queue = computed(() => playerStore.queue || [])
@@ -304,6 +315,13 @@ const formatPlayCount = (count) => {
 const goToArtist = () => {
   if (track.value?.artist) {
     router.push(`/artist/${encodeURIComponent(track.value.artist)}`)
+  }
+}
+
+// Navigate to specific artist by name
+const goToArtistByName = (artistName) => {
+  if (artistName) {
+    router.push(`/artist/${encodeURIComponent(artistName)}`)
   }
 }
 
@@ -503,6 +521,52 @@ const handleToggleLike = async () => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Artists Container - for split artists */
+.artists-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  margin: 4px 2px;
+}
+
+.artists-icon {
+  flex-shrink: 0;
+  opacity: 0.7;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.artists-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+
+.artist-link-inline {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s ease;
+}
+
+.artist-link-inline:hover {
+  color: #1DB954;
+  text-decoration: underline;
+}
+
+.artist-separator {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
 }
 
 /* Info Links */

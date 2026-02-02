@@ -106,3 +106,61 @@ export function truncateText(text, maxLength = 50) {
   if (!text || text.length <= maxLength) return text
   return text.substring(0, maxLength - 3) + '...'
 }
+
+/**
+ * Split artist string into individual artists
+ * Handles common separators: &, ,, +, x, and, with, feat., ft., featuring
+ * 
+ * Examples:
+ *   "Excision & Downlink" -> ["Excision", "Downlink"]
+ *   "Drake, Future" -> ["Drake", "Future"]
+ *   "Artist feat. Other" -> ["Artist", "Other"]
+ *   "A x B x C" -> ["A", "B", "C"]
+ * 
+ * @param {string} artistString - Artist string to split
+ * @returns {Array<string>} Array of individual artist names
+ */
+export function splitArtists(artistString) {
+  if (!artistString) return []
+  
+  // Normalize unicode characters
+  let str = artistString
+    .replace(/'/g, "'")
+    .replace(/"/g, '"')
+    .replace(/–/g, '-')
+    .replace(/—/g, '-')
+  
+  // Split by common separators (order matters - more specific first)
+  // Pattern: feat., ft., featuring, and, with, x, &, +, ,
+  const separatorPattern = /\s*(?:,\s*|\s+&\s+|\s+\+\s+|\s+x\s+|\s+and\s+|\s+with\s+|\s+feat\.?\s+|\s+ft\.?\s+|\s+featuring\s+)/gi
+  
+  const parts = str.split(separatorPattern)
+  
+  // Clean up each part
+  const artists = parts
+    .map(part => part.trim())
+    .filter(part => part.length > 0)
+  
+  // Remove duplicates while preserving order
+  const seen = new Set()
+  const unique = []
+  for (const artist of artists) {
+    const lower = artist.toLowerCase()
+    if (!seen.has(lower)) {
+      seen.add(lower)
+      unique.push(artist)
+    }
+  }
+  
+  return unique
+}
+
+/**
+ * Check if artist string contains multiple artists
+ * @param {string} artistString - Artist string to check
+ * @returns {boolean} True if contains multiple artists
+ */
+export function hasMultipleArtists(artistString) {
+  if (!artistString) return false
+  return splitArtists(artistString).length > 1
+}

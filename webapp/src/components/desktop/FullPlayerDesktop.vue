@@ -32,6 +32,7 @@
                 :hdTrackInfo="hdTrackInfo"
                 :isLiked="isLiked"
                 @goToAlbum="handleGoToAlbum"
+                @goToArtist="handleGoToArtist"
               />
 
               <PlayerControls 
@@ -246,6 +247,12 @@ const handlePlayArtistTrack = (track) => {
 const handleGoToAlbum = () => {
   if (!props.track?.album) return
   router.push(`/album/${props.track.album.id}`)
+}
+
+const handleGoToArtist = (artistName) => {
+  if (!artistName) return
+  router.push(`/artist/${encodeURIComponent(artistName)}`)
+  emit('close')
 }
 
 const handleAddToPlaylist = () => {

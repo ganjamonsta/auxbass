@@ -16,6 +16,7 @@ import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
 import { useModals } from '@/composables/useModals'
 import { playerApi, playlistsApi, albumsApi, tracksApi } from '@/api/client'
+import { splitArtists } from '@/utils/formatters'
 
 // Singleton state - shared across all components
 const isOpen = ref(false)
@@ -91,7 +92,19 @@ export function useContextMenu() {
       closeMenu()
       closeFullPlayer() // Close full player if open
       if (track?.artist) {
-        router.push(`/artist/${encodeURIComponent(track.artist)}`)
+        // For single artist, go directly
+        const artists = splitArtists(track.artist)
+        const artistName = artists.length > 0 ? artists[0] : track.artist
+        router.push(`/artist/${encodeURIComponent(artistName)}`)
+      }
+    },
+
+    // Go to specific artist by name (for multi-artist selection)
+    goToArtistByName: (track, artistName) => {
+      closeMenu()
+      closeFullPlayer()
+      if (artistName) {
+        router.push(`/artist/${encodeURIComponent(artistName)}`)
       }
     },
 

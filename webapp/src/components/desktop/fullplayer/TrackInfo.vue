@@ -26,7 +26,18 @@
     
     <div class="track-display">
       <h2 class="track-title-main">{{ track?.title || 'UNKNOWN TRACK' }}</h2>
-      <p class="track-artist-main">{{ track?.artist || 'UNKNOWN ARTIST' }}</p>
+      <p class="track-artist-main">
+        <template v-if="parsedArtists.length > 0">
+          <template v-for="(artist, index) in parsedArtists" :key="artist">
+            <span 
+              class="artist-link"
+              @click="$emit('goToArtist', artist)"
+            >{{ artist }}</span>
+            <span v-if="index < parsedArtists.length - 1" class="artist-sep">, </span>
+          </template>
+        </template>
+        <span v-else>UNKNOWN ARTIST</span>
+      </p>
     </div>
 
     <!-- Track metadata grid -->
@@ -48,13 +59,22 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
+import { splitArtists } from '@/utils/formatters'
+
 const props = defineProps({
   track: Object,
   hdTrackInfo: Object,
   isLiked: Boolean
 })
 
-defineEmits(['goToAlbum'])
+defineEmits(['goToAlbum', 'goToArtist'])
+
+// Parse artists into separate names
+const parsedArtists = computed(() => {
+  if (!props.track?.artist) return []
+  return splitArtists(props.track.artist)
+})
 
 const formatTime = (seconds) => {
   if (!seconds || isNaN(seconds)) return '0:00'
@@ -176,6 +196,20 @@ const formatTime = (seconds) => {
   width: 100%;
   word-wrap: break-word;
   overflow-wrap: break-word;
+}
+
+.track-artist-main .artist-link {
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.track-artist-main .artist-link:hover {
+  color: #1DB954;
+  text-decoration: underline;
+}
+
+.track-artist-main .artist-sep {
+  color: #6b7a8c;
 }
 
 .metadata-grid {

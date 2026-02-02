@@ -77,7 +77,18 @@
           </svg>
         </button>
       </div>
-      <p class="track-artist">{{ track?.artist || 'Неизвестный исполнитель' }}</p>
+      <p class="track-artist">
+        <template v-if="parsedArtists.length > 0">
+          <template v-for="(artist, index) in parsedArtists" :key="artist">
+            <span 
+              class="artist-link"
+              @click="goToArtist(artist)"
+            >{{ artist }}</span>
+            <span v-if="index < parsedArtists.length - 1" class="artist-sep">, </span>
+          </template>
+        </template>
+        <span v-else>Неизвестный исполнитель</span>
+      </p>
     </div>
 
     <!-- Progress bar -->
@@ -256,7 +267,7 @@
 <script setup>
 import { ref, computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
-import { getTrackCoverStyle, getTrackInitials } from '@/utils'
+import { getTrackCoverStyle, getTrackInitials, splitArtists } from '@/utils'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useContextMenu } from '@/composables/useContextMenu'
@@ -342,6 +353,20 @@ const authStore = useAuthStore()
 const { openMenu } = useContextMenu()
 
 const telegram = inject('telegram')
+
+// Parse artists into separate names
+const parsedArtists = computed(() => {
+  if (!props.track?.artist) return []
+  return splitArtists(props.track.artist)
+})
+
+// Navigate to artist page
+const goToArtist = (artistName) => {
+  if (artistName) {
+    router.push(`/artist/${encodeURIComponent(artistName)}`)
+    emit('close')
+  }
+}
 
 // Open track context menu (uses unified context menu)
 const openTrackContextMenu = () => {
@@ -799,6 +824,21 @@ const formatTime = (seconds) => {
 .track-artist {
   font-size: 15px;
   color: var(--xm-text-secondary);
+}
+
+.track-artist .artist-link {
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.track-artist .artist-link:hover {
+  color: #1DB954;
+  text-decoration: underline;
+}
+
+.track-artist .artist-sep {
+  color: var(--xm-text-secondary);
+  opacity: 0.6;
 }
 
 /* ─── Progress Bar ─── */

@@ -36,10 +36,33 @@
               <!-- ═══ TRACK MENU ═══ -->
               <template v-if="menuType === 'track'">
                 <!-- Navigation -->
-                <button v-if="hasArtist" class="menu-item" @click="exec('goToArtist')">
+                <!-- Single artist: direct navigation -->
+                <button v-if="hasArtist && parsedArtists.length === 1" class="menu-item" @click="exec('goToArtist')">
                   <User :size="18" />
                   <span>Перейти к артисту</span>
                 </button>
+                <!-- Multiple artists: expandable submenu -->
+                <template v-else-if="hasArtist && parsedArtists.length > 1">
+                  <button class="menu-item has-submenu" @click="showArtistSubmenu = !showArtistSubmenu">
+                    <User :size="18" />
+                    <span>Перейти к артисту</span>
+                    <ChevronDown v-if="showArtistSubmenu" :size="16" class="submenu-arrow" />
+                    <ChevronRight v-else :size="16" class="submenu-arrow" />
+                  </button>
+                  <Transition name="submenu">
+                    <div v-if="showArtistSubmenu" class="submenu">
+                      <button 
+                        v-for="artist in parsedArtists" 
+                        :key="artist"
+                        class="menu-item submenu-item"
+                        @click="goToSpecificArtist(artist)"
+                      >
+                        <User :size="16" />
+                        <span>{{ artist }}</span>
+                      </button>
+                    </div>
+                  </Transition>
+                </template>
                 <button v-if="hasAlbum" class="menu-item" @click="exec('goToAlbum')">
                   <Disc3 :size="18" />
                   <span>Перейти к альбому</span>
@@ -232,12 +255,16 @@ import { computed, watch, nextTick, ref, onMounted, onUnmounted } from 'vue'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
+import { splitArtists } from '@/utils/formatters'
 import PlaylistPicker from '@/components/PlaylistPicker.vue'
 import EditTrackModal from '@/components/EditTrackModal.vue'
 import { 
   X, User, Disc3, Play, ListMusic, Plus, Minus, Pencil, 
-  Download, Trash2, FolderOpen, Shuffle, Music, Mic2
+  Download, Trash2, FolderOpen, Shuffle, Music, Mic2, ChevronRight, ChevronDown
 } from 'lucide-vue-next'
+
+// State for artist submenu
+const showArtistSubmenu = ref(false)
 
 const authStore = useAuthStore()
 const renameInput = ref(null)
@@ -296,9 +323,21 @@ watch(showRenameModal, (show) => {
   }
 })
 
+// Reset submenu state when menu closes
+watch(isOpen, (open) => {
+  if (!open) {
+    showArtistSubmenu.value = false
+  }
+})
+
 // Execute action shorthand
 const exec = (action, extra = null) => {
   executeAction(action, extra)
+}
+
+// Go to specific artist (for multi-artist tracks)
+const goToSpecificArtist = (artistName) => {
+  executeAction('goToArtistByName', artistName)
 }
 
 // Calculate position for desktop mode (under cursor, within screen bounds)
@@ -393,6 +432,12 @@ const subtitle = computed(() => {
 // Track-specific
 const hasArtist = computed(() => {
   return menuData.value?.artist && menuData.value.artist !== 'Неизвестный исполнитель'
+})
+
+// Parse artists into array
+const parsedArtists = computed(() => {
+  if (!menuData.value?.artist) return []
+  return splitArtists(menuData.value.artist)
 })
 
 const hasAlbum = computed(() => {
@@ -625,6 +670,50 @@ const getTracksWord = (count) => {
   height: 1px;
   background: rgba(255, 255, 255, 0.1);
   margin: 8px 16px;
+}
+
+/* Submenu styles */
+.menu-item.has-submenu {
+  justify-content: flex-start;
+}
+
+.menu-item.has-submenu .submenu-arrow {
+  margin-left: auto;
+  opacity: 0.5;
+}
+
+.submenu {
+  background: rgba(0, 0, 0, 0.2);
+  border-left: 2px solid #1DB954;
+  margin-left: 16px;
+}
+
+.submenu-item {
+  padding-left: 24px !important;
+  font-size: 14px !important;
+}
+
+.submenu-item svg {
+  opacity: 0.7;
+}
+
+/* Submenu animation */
+.submenu-enter-active,
+.submenu-leave-active {
+  transition: all 0.2s ease;
+  overflow: hidden;
+}
+
+.submenu-enter-from,
+.submenu-leave-to {
+  opacity: 0;
+  max-height: 0;
+}
+
+.submenu-enter-to,
+.submenu-leave-from {
+  opacity: 1;
+  max-height: 200px;
 }
 
 /* Modal */
