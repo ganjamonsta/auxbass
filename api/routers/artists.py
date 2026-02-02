@@ -25,7 +25,7 @@ from shared.database import get_db
 from shared.models import (
     Track, Album, AlbumTrack, UserLibrary
 )
-from shared.matching import normalize_artist, extract_featured_artists
+from shared.matching import normalize_artist, extract_featured_artists, get_all_track_artists, extract_artists_from_filename
 
 from bot.services.enrichment.lastfm import lastfm_client
 from bot.services.metadata import metadata_service
@@ -44,10 +44,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Artists"])
 
 
-def artist_matches_track(track_artist: str, normalized_search: str, track_title: str = None) -> bool:
+def artist_matches_track(track_artist: str, normalized_search: str, track_title: str = None, track_file_name: str = None) -> bool:
     """
-    Check if normalized search artist is present in track artist string or extracted from title.
+    Check if normalized search artist is present in track artist string, title, or filename.
     Handles 'Artist A feat. Artist B', 'Artist A & Artist C', etc.
+    Also checks file_name for tracks without metadata.
     """
     # 1. Check artist field
     if track_artist:
@@ -65,6 +66,13 @@ def artist_matches_track(track_artist: str, normalized_search: str, track_title:
     # 2. Check title field for featuring/prod/remix
     if track_title:
         extracted = extract_featured_artists(track_title)
+        for artist in extracted:
+            if normalize_artist(artist) == normalized_search:
+                return True
+    
+    # 3. Check file_name for tracks without metadata (or as fallback)
+    if track_file_name:
+        extracted = extract_artists_from_filename(track_file_name)
         for artist in extracted:
             if normalize_artist(artist) == normalized_search:
                 return True
@@ -122,32 +130,36 @@ async def get_my_artists(
     Artists are grouped by normalized name (case-insensitive, first artist from collabs).
     Example: "BLADEE", "Bladee", "Bladee & Ecco2k" -> one "Bladee" artist
     
+    Also includes artists extracted from track titles and filenames for tracks without metadata.
+    
     Sort options:
     - name: alphabetically
     - track_count: by number of tracks
     - album_count: by number of albums  
     - latest_release: by latest album release date
     """
-    # Get all artist names from user's library
+    # Get all tracks from user's library (including those without artist metadata)
     query = (
-        select(Track.artist)
+        select(Track.artist, Track.title, Track.file_name)
         .join(UserLibrary, UserLibrary.track_id == Track.id)
         .where(UserLibrary.user_id == user.id)
-        .where(Track.artist.isnot(None))
-        .where(Track.artist != "")
     )
     
     result = await db.execute(query)
-    all_artists = [row[0] for row in result.all()]
+    all_tracks_data = result.all()
     
     # Group by normalized name
     # Key: normalized_name -> list of original names
     artist_groups: dict[str, list[str]] = defaultdict(list)
     
-    for artist in all_artists:
-        normalized = normalize_artist(artist)
-        if normalized:
-            artist_groups[normalized].append(artist)
+    for track_artist, track_title, track_file_name in all_tracks_data:
+        # Get all artists from this track (from artist, title, file_name)
+        all_artists = get_all_track_artists(track_artist, track_title, track_file_name)
+        
+        for artist in all_artists:
+            normalized = normalize_artist(artist)
+            if normalized:
+                artist_groups[normalized].append(artist)
     
     # Pre-fetch all albums for counting and getting release dates
     albums_result = await db.execute(
@@ -265,26 +277,29 @@ async def get_global_artists(
     Get artists from global public library.
     
     Shows all artists that have public tracks in the system.
+    Also includes artists extracted from track titles and filenames.
     """
-    # Get all artist names from public tracks
+    # Get all tracks from public library (including those without artist metadata)
     query = (
-        select(Track.artist)
+        select(Track.artist, Track.title, Track.file_name)
         .where(Track.is_public == True)
         .where(Track.is_unavailable == False)
-        .where(Track.artist.isnot(None))
-        .where(Track.artist != "")
     )
     
     result = await db.execute(query)
-    all_artists = [row[0] for row in result.all()]
+    all_tracks_data = result.all()
     
     # Group by normalized name
     artist_groups: dict[str, list[str]] = defaultdict(list)
     
-    for artist in all_artists:
-        normalized = normalize_artist(artist)
-        if normalized:
-            artist_groups[normalized].append(artist)
+    for track_artist, track_title, track_file_name in all_tracks_data:
+        # Get all artists from this track (from artist, title, file_name)
+        all_artists = get_all_track_artists(track_artist, track_title, track_file_name)
+        
+        for artist in all_artists:
+            normalized = normalize_artist(artist)
+            if normalized:
+                artist_groups[normalized].append(artist)
     
     # Pre-fetch all albums for counting and getting release dates
     albums_result = await db.execute(
@@ -390,6 +405,8 @@ async def get_artist(
     
     scope=library: only user's library tracks
     scope=global: all public tracks
+    
+    Also matches tracks where artist appears in title or filename.
     """
     # Ensure artist_name is URL-decoded
     artist_name = unquote(artist_name)
@@ -397,12 +414,11 @@ async def get_artist(
     
     # Build query based on scope
     if scope == "global":
-        # Global: get public tracks
+        # Global: get public tracks (including those without artist metadata)
         tracks_result = await db.execute(
             select(Track)
             .where(Track.is_public == True)
             .where(Track.is_unavailable == False)
-            .where(Track.artist.isnot(None))
             .options(
                 selectinload(Track.enrichment),
                 selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
@@ -411,15 +427,16 @@ async def get_artist(
         )
         all_tracks_raw = tracks_result.unique().scalars().all()
         
-        # Filter by normalized artist
+        # Filter by normalized artist (check artist, title, and file_name)
         matching_tracks = []
         artist_names_seen = set()
         album_track_counts = {}
         
         for track in all_tracks_raw:
-            if artist_matches_track(track.artist, normalized_search, track.title):
+            if artist_matches_track(track.artist, normalized_search, track.title, track.file_name):
                 matching_tracks.append(track)
-                artist_names_seen.add(track.artist)
+                if track.artist:
+                    artist_names_seen.add(track.artist)
                 for at in track.album_tracks:
                     album_track_counts[at.album_id] = album_track_counts.get(at.album_id, 0) + 1
         
@@ -442,12 +459,11 @@ async def get_artist(
             for track in matching_tracks
         ]
     else:
-        # Library: user's tracks only (original logic)
+        # Library: user's tracks only (including those without artist metadata)
         tracks_result = await db.execute(
             select(Track, UserLibrary)
             .join(UserLibrary, UserLibrary.track_id == Track.id)
             .where(UserLibrary.user_id == user.id)
-            .where(Track.artist.isnot(None))
             .options(
                 selectinload(Track.enrichment),
                 selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
@@ -456,15 +472,16 @@ async def get_artist(
         )
         all_tracks = tracks_result.unique().all()
         
-        # Filter by normalized artist
+        # Filter by normalized artist (check artist, title, and file_name)
         matching_tracks = []
         artist_names_seen = set()
         album_track_counts = {}
         
         for track, lib_entry in all_tracks:
-            if artist_matches_track(track.artist, normalized_search, track.title):
+            if artist_matches_track(track.artist, normalized_search, track.title, track.file_name):
                 matching_tracks.append((track, lib_entry))
-                artist_names_seen.add(track.artist)
+                if track.artist:
+                    artist_names_seen.add(track.artist)
                 for at in track.album_tracks:
                     album_track_counts[at.album_id] = album_track_counts.get(at.album_id, 0) + 1
         
@@ -475,7 +492,7 @@ async def get_artist(
         
         from api.routers.library import track_to_response
         all_tracks_response = [track_to_response(track, lib_entry) for track, lib_entry in matching_tracks]
-        artist_names_seen = set(t.artist for t, _ in matching_tracks)
+        artist_names_seen = set(t.artist for t, _ in matching_tracks if t.artist)
     
     # Determine the display name for this artist page
     # Priority: 

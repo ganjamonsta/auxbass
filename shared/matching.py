@@ -679,3 +679,103 @@ def generate_hashtags(
 def format_hashtags(tags: List[str]) -> str:
     """Format list of tags as hashtag string."""
     return ' '.join(f'#{tag}' for tag in tags)
+
+
+def extract_artists_from_filename(filename: str) -> List[str]:
+    """
+    Extract artist names from filename.
+    Common patterns:
+        "Artist - Title.mp3" -> ["Artist"]
+        "Artist - Title (feat. Other).mp3" -> ["Artist", "Other"]
+        "Title (Artist Remix).mp3" -> ["Artist"]
+        "ganjamonsta - Mashup (excision feat. black kray).mp3" -> ["excision", "black kray"]
+    
+    Returns:
+        List of extracted artist names
+    """
+    if not filename:
+        return []
+    
+    artists = []
+    
+    # Remove file extension
+    name = re.sub(r'\.(mp3|flac|wav|ogg|m4a|aac|opus)$', '', filename, flags=re.IGNORECASE)
+    
+    # Pattern 1: "Artist - Title" format
+    if ' - ' in name:
+        parts = name.split(' - ', 1)
+        artist_part = parts[0].strip()
+        title_part = parts[1].strip() if len(parts) > 1 else ''
+        
+        # Split artist part by common separators
+        artist_parts = re.split(r'\s*(?:,|&|\+|\bx\b|\band\b)\s*', artist_part, flags=re.IGNORECASE)
+        for ap in artist_parts:
+            ap = ap.strip()
+            if ap and len(ap) > 1:
+                artists.append(ap)
+        
+        # Also extract featured artists from title part
+        extracted = extract_featured_artists(title_part)
+        artists.extend(extracted)
+    else:
+        # No "Artist - Title" format, try to extract from parentheses
+        extracted = extract_featured_artists(name)
+        artists.extend(extracted)
+    
+    # Clean up: remove duplicates
+    unique = []
+    seen = set()
+    for a in artists:
+        a_lower = a.lower()
+        if a_lower not in seen:
+            seen.add(a_lower)
+            unique.append(a)
+    
+    return unique
+
+
+def get_all_track_artists(
+    artist: Optional[str] = None, 
+    title: Optional[str] = None, 
+    file_name: Optional[str] = None
+) -> List[str]:
+    """
+    Get all artists from a track by checking all available fields:
+    - artist field
+    - title field (featuring, remix, prod)
+    - file_name (Artist - Title pattern)
+    
+    Returns:
+        List of all unique artist names found in the track
+    """
+    artists = []
+    
+    # 1. From artist field
+    if artist:
+        # Split by common separators
+        parts = re.split(r'\s*(?:,|&|\+|\bx\b|\band\b|\bwith\b|feat\.?|ft\.?|featuring|vs\.?)\s*', artist, flags=re.IGNORECASE)
+        for part in parts:
+            part = part.strip()
+            if part and len(part) > 1:
+                artists.append(part)
+    
+    # 2. From title field
+    if title:
+        extracted = extract_featured_artists(title)
+        artists.extend(extracted)
+    
+    # 3. From file_name (for tracks without metadata)
+    if file_name and not artist:  # Only use filename if no artist metadata
+        extracted = extract_artists_from_filename(file_name)
+        artists.extend(extracted)
+    
+    # Clean up: remove duplicates
+    unique = []
+    seen = set()
+    for a in artists:
+        a_lower = a.lower()
+        if a_lower not in seen:
+            seen.add(a_lower)
+            unique.append(a)
+    
+    return unique
