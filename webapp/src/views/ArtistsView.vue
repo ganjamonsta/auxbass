@@ -76,7 +76,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { useVirtualScroll, useSort } from '@/composables'
+import { useVirtualScroll, useSort, useDebouncedSearch } from '@/composables'
 import { useContextMenu } from '@/composables/useContextMenu'
 import SortChips from '@/components/SortChips.vue'
 import MediaGrid from '@/components/MediaGrid.vue'
@@ -108,10 +108,10 @@ const {
   toggleOrder 
 } = useSort('artists-sort', 'artists', { sortBy: 'name', sortOrder: 'asc' })
 
-// Search state
-const searchQuery = ref('')
-const debouncedSearchQuery = ref('')
-let searchTimeout = null
+// Debounced search using composable
+const { query: searchQuery, debouncedQuery: debouncedSearchQuery, search: debouncedSearch, clear: clearSearch } = useDebouncedSearch({
+  onSearch: () => reset()
+})
 
 // Fetch function for virtual scroll
 const fetchArtists = async ({ offset, limit }) => {
@@ -163,17 +163,6 @@ const changeScope = (newScope) => {
   reset()
 }
 
-// Debounced search
-const debouncedSearch = () => {
-  if (searchTimeout) {
-    clearTimeout(searchTimeout)
-  }
-  searchTimeout = setTimeout(() => {
-    debouncedSearchQuery.value = searchQuery.value
-    reset()
-  }, 300)
-}
-
 // Sort change handlers
 const onNextSort = () => {
   nextSort()
@@ -198,8 +187,7 @@ const goToArtist = (artist) => {
 const handleResetState = (event) => {
   if (event.detail.route === '/artists') {
     // Сбрасываем поиск
-    searchQuery.value = ''
-    debouncedSearchQuery.value = ''
+    clearSearch()
     // Сбрасываем сортировку на дефолтную
     sortBy.value = 'name'
     sortOrder.value = 'asc'
@@ -229,9 +217,6 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  if (searchTimeout) {
-    clearTimeout(searchTimeout)
-  }
   window.removeEventListener('reset-view-state', handleResetState)
 })
 </script>
@@ -250,57 +235,7 @@ onUnmounted(() => {
   flex: 1;
 }
 
-.sort-options {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-  gap: 12px;
-}
-
-.stats {
-  color: var(--c-text-2);
-  font-size: 14px;
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px 24px;
-  text-align: center;
-  color: var(--c-text-2);
-}
-
-.empty-icon {
-  display: block;
-  margin-bottom: 16px;
-  color: var(--c-text-3);
-}
-
-.load-trigger {
-  height: 1px;
-}
-
-.loading-more {
-  display: flex;
-  justify-content: center;
-  padding: 16px;
-}
-
-.spinner {
-  width: 24px;
-  height: 24px;
-  border: 3px solid var(--bg-highlight, rgba(255,255,255,0.1));
-  border-top-color: var(--accent, #1DB954);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+/* sort-options, stats, empty-state, empty-icon, load-trigger, loading-more, spinner are in design-system.css */
 
 /* Grid skeleton layout */
 .media-grid.type-artist {

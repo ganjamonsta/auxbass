@@ -51,6 +51,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
+import { useDebouncedSearch } from '@/composables'
 import LibraryTracks from '@/components/library/LibraryTracks.vue'
 import LibraryAlbums from '@/components/library/LibraryAlbums.vue'
 import LibraryArtists from '@/components/library/LibraryArtists.vue'
@@ -82,22 +83,8 @@ const currentTab = computed(() => tabs.find(t => t.id === currentTabId.value) ||
 const currentTabComponent = computed(() => currentTab.value.component)
 const searchPlaceholder = computed(() => currentTab.value.placeholder)
 
-// Search State
-const searchQuery = ref('')
-const debouncedQuery = ref('')
-let searchTimeout = null
-
-const debouncedSearch = () => {
-  if (searchTimeout) clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => {
-    debouncedQuery.value = searchQuery.value
-  }, 300)
-}
-
-const clearSearch = () => {
-  searchQuery.value = ''
-  debouncedQuery.value = ''
-}
+// Debounced search using composable
+const { query: searchQuery, debouncedQuery, search: debouncedSearch, clear: clearSearch } = useDebouncedSearch()
 
 // Слушаем событие сброса состояния
 const handleResetState = (event) => {

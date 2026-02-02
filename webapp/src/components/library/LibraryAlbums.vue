@@ -192,41 +192,5 @@ const playAlbum = async (album) => {
   padding: 24px;
 }
 
-.spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--bg-highlight);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px 24px;
-  text-align: center;
-}
-
-.empty-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-  display: block;
-}
-
-.load-trigger {
-  height: 1px;
-}
-
-.loading-more {
-  display: flex;
-  justify-content: center;
-  padding: 24px;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+/* spinner, empty-state, empty-icon, load-trigger, loading-more are in design-system.css */
 </style>

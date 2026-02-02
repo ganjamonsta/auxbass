@@ -135,16 +135,19 @@ import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
-import { useSort } from '@/composables'
+import { useSort, useTrackActions } from '@/composables'
 import { useContextMenu } from '@/composables/useContextMenu'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackSkeleton from '@/components/TrackSkeleton.vue'
 import SortChips from '@/components/SortChips.vue'
-import api, { playerApi, tracksApi, socialApi } from '@/api/client'
+import api, { tracksApi, socialApi } from '@/api/client'
 import { Users, Music, Globe } from 'lucide-vue-next'
 
 // Universal context menu
 const { openMenu } = useContextMenu()
+
+// Track actions (download, HD notice)
+const { handleDirectDownload, handleHdNotice } = useTrackActions()
 
 const props = defineProps({
   searchQuery: {
@@ -406,24 +409,6 @@ const shuffleAll = async () => {
   await playerStore.playShuffleAll('library')
 }
 
-// Direct download from TrackItem button - sends file via Telegram bot
-const handleDirectDownload = async (track) => {
-  try {
-    await playerApi.download(track.id)
-    uiStore.toast.success('Трек отправлен', 'Проверьте сообщения в Telegram')
-  } catch (error) {
-    console.error('Failed to download track:', error)
-    const errorMsg = error.response?.data?.detail || 'Ошибка отправки'
-    uiStore.toast.error('Не удалось отправить', errorMsg)
-  }
-}
-
-// HD track notice - show that track is only available for download
-const handleHdNotice = (track) => {
-  const sizeMB = track.file_size ? (track.file_size / 1024 / 1024).toFixed(1) : '20+'
-  uiStore.toast.info('Только HD', `Этот трек (${sizeMB} MB) доступен только для скачивания. Используйте кнопку загрузки.`)
-}
-
 onMounted(() => {
   loadTracks()
 })
@@ -479,6 +464,7 @@ onUnmounted(() => {
   cursor: not-allowed;
 }
 
+/* Loading state - uses .spinner from design-system.css */
 .loading {
   display: flex;
   flex-direction: column;
@@ -488,98 +474,14 @@ onUnmounted(() => {
   color: var(--text-secondary);
 }
 
-.spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--bg-highlight);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin-bottom: 12px;
-}
+/* Empty state, section headers, spinner, loading-more are in design-system.css */
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.load-more {
-  display: flex;
-  justify-content: center;
-  padding: 16px;
-}
-
-.load-more button {
-  background: var(--accent);
-  color: #000;
-  border: none;
-  border-radius: 20px;
-  padding: 10px 24px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.load-more button:disabled {
-  opacity: 0.5;
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px 24px;
-  text-align: center;
-}
-
-.empty-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-}
-
-.empty-state h3 {
-  color: var(--text-primary);
-  margin-bottom: 8px;
-}
-
-.empty-state p {
-  color: var(--text-secondary);
-}
-
-/* Section headers for search results */
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 0 8px;
-  margin-top: 8px;
-}
-
-.section-header.global-section {
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
-}
-
+/* Section modifiers for search results */
+.section-header.global-section,
 .section-header.friends-section {
   margin-top: 24px;
   padding-top: 16px;
   border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
-}
-
-.section-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.section-count {
-  font-size: 12px;
-  color: var(--text-muted);
-  background: var(--bg-highlight);
-  padding: 2px 8px;
-  border-radius: 10px;
 }
 
 .global-loading {
@@ -592,20 +494,7 @@ onUnmounted(() => {
   font-size: 13px;
 }
 
-.spinner.small {
-  width: 16px;
-  height: 16px;
-  border-width: 2px;
-  margin-bottom: 0;
-}
-
 .load-trigger {
   height: 1px;
-}
-
-.loading-more {
-  display: flex;
-  justify-content: center;
-  padding: 24px;
 }
 </style>

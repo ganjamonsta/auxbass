@@ -189,32 +189,5 @@ const goToArtist = (artist) => {
   color: var(--text-secondary);
 }
 
-.empty-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-  display: block;
-}
-
-.load-trigger {
-  height: 1px;
-}
-
-.loading-more {
-  display: flex;
-  justify-content: center;
-  padding: 16px;
-}
-
-.spinner {
-  width: 24px;
-  height: 24px;
-  border: 3px solid var(--bg-highlight, rgba(255,255,255,0.1));
-  border-top-color: var(--accent, #1DB954);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+/* empty-icon, load-trigger, loading-more, spinner are in design-system.css */
 </style>

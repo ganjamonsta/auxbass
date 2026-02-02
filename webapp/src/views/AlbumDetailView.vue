@@ -182,8 +182,9 @@ import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
+import { useTrackActions, usePlaybackActions } from '@/composables'
 import TrackItem from '@/components/TrackItem.vue'
-import api, { playerApi } from '@/api/client'
+import api from '@/api/client'
 import { Disc3, Check, Music, X } from 'lucide-vue-next'
 import { splitArtists } from '@/utils/formatters'
 
@@ -195,6 +196,9 @@ const router = useRouter()
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
 const uiStore = useUIStore()
+
+// Unified track actions
+const { handleDirectDownload, handleHdNotice, handleLikeTrack, handleAddToLibrary } = useTrackActions()
 
 const album = ref(null)
 const loading = ref(true)
@@ -239,22 +243,8 @@ const loadAlbum = async () => {
   }
 }
 
-const playAll = () => {
-  if (playableTracks.value.length) {
-    playerStore.playTrack(playableTracks.value[0], playableTracks.value)
-  }
-}
-
-const shufflePlay = () => {
-  if (playableTracks.value.length) {
-    const shuffled = [...playableTracks.value].sort(() => Math.random() - 0.5)
-    playerStore.playTrack(shuffled[0], shuffled)
-  }
-}
-
-const playTrack = (track, index) => {
-  playerStore.playTrack(track, album.value.tracks, index)
-}
+// Unified playback actions
+const { playAll, shufflePlay, playTrack } = usePlaybackActions(playableTracks)
 
 const playTrackItem = (item) => {
   if (item.track) {
@@ -348,37 +338,8 @@ const goToArtistByName = (artistName) => {
   }
 }
 
-const handleLikeTrack = async (track) => {
-  const newLikedState = await libraryStore.toggleLike(track.id)
-  track.is_liked = newLikedState
-}
-
-const handleAddToLibrary = async (track) => {
-  const success = await libraryStore.addToLibrary(track.id)
-  if (success) {
-    track.in_library = true
-  }
-}
-
-// Direct download from TrackItem download button (for HD/large files)
-const handleDirectDownload = async (track) => {
-  if (!track) return
-  
-  try {
-    await playerApi.download(track.id)
-    uiStore.toast.success('Трек отправлен', 'Проверьте сообщения в Telegram')
-  } catch (error) {
-    console.error('Failed to download track:', error)
-    const errorMsg = error.response?.data?.detail || 'Ошибка отправки'
-    uiStore.toast.error('Не удалось отправить', errorMsg)
-  }
-}
-
-// HD track notice - show that track is only available for download
-const handleHdNotice = (track) => {
-  const sizeMB = track.file_size ? (track.file_size / 1024 / 1024).toFixed(1) : '20+'
-  uiStore.toast.info('Только HD', `Этот трек (${sizeMB} MB) доступен только для скачивания. Используйте кнопку загрузки.`)
-}
+// Track actions (handleLikeTrack, handleAddToLibrary, handleDirectDownload, handleHdNotice) 
+// are provided by useTrackActions composable above
 
 const formatDuration = (seconds) => {
   if (!seconds) return '--:--'
@@ -811,23 +772,10 @@ watch(
   cursor: pointer;
 }
 
-/* Loading */
+/* Loading - uses .spinner from design-system.css */
 .loading {
   display: flex;
   justify-content: center;
   padding: 48px;
-}
-
-.spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--bg-highlight);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 </style>

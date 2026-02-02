@@ -317,33 +317,10 @@ defineExpose({
 }
 
 .spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--bg-highlight, rgba(255,255,255,0.1));
-  border-top-color: var(--accent, #1DB954);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-.spinner.small {
-  width: 20px;
-  height: 20px;
-  border-width: 2px;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+/* spinner, spinner.small, load-trigger, loading-more are in design-system.css */
 
 .load-trigger {
-  height: 1px;
   width: 100%;
-}
-
-.loading-more {
-  display: flex;
-  justify-content: center;
-  padding: 16px;
 }
 
 .skeleton-spacer {

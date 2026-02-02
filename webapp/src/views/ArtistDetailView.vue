@@ -141,6 +141,7 @@ import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
 import { useVirtualScroll } from '@/composables'
 import { useContextMenu } from '@/composables/useContextMenu'
+import { useTrackActions, usePlaybackActions } from '@/composables'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackSkeleton from '@/components/TrackSkeleton.vue'
 import api, { playerApi } from '@/api/client'
@@ -154,6 +155,9 @@ const router = useRouter()
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
 const uiStore = useUIStore()
+
+// Unified track actions
+const { handleDirectDownload, handleHdNotice, handleLikeTrack, handleAddToLibrary } = useTrackActions()
 
 const artist = ref(null)
 const loading = ref(true)
@@ -213,22 +217,8 @@ const loadArtist = async () => {
   }
 }
 
-const playAll = () => {
-  if (tracks.value?.length) {
-    playerStore.playTrack(tracks.value[0], tracks.value)
-  }
-}
-
-const shufflePlay = () => {
-  if (tracks.value?.length) {
-    const shuffled = [...tracks.value].sort(() => Math.random() - 0.5)
-    playerStore.playTrack(shuffled[0], shuffled)
-  }
-}
-
-const playTrack = (track, index) => {
-  playerStore.playTrack(track, tracks.value, index)
-}
+// Unified playback actions
+const { playAll, shufflePlay, playTrack } = usePlaybackActions(tracks)
 
 const goToAlbum = (album) => {
   const query = isGlobal.value ? { scope: 'global' } : {}
@@ -243,35 +233,8 @@ const goToGlobal = () => {
   })
 }
 
-const handleLikeTrack = async (track) => {
-  const newLikedState = await libraryStore.toggleLike(track.id)
-  track.is_liked = newLikedState
-}
-
-const handleAddToLibrary = async (track) => {
-  const success = await libraryStore.addToLibrary(track.id)
-  if (success) {
-    track.in_library = true
-  }
-}
-
-// Handle direct download from TrackItem (for large/HD files)
-const handleDirectDownload = async (track) => {
-  try {
-    await playerApi.download(track.id)
-    uiStore.toast.success('Трек отправлен', 'Проверьте сообщения в Telegram')
-  } catch (error) {
-    console.error('Failed to download track:', error)
-    const errorMsg = error.response?.data?.detail || 'Ошибка отправки'
-    uiStore.toast.error('Не удалось отправить', errorMsg)
-  }
-}
-
-// HD track notice - show that track is only available for download
-const handleHdNotice = (track) => {
-  const sizeMB = track.file_size ? (track.file_size / 1024 / 1024).toFixed(1) : '20+'
-  uiStore.toast.info('Только HD', `Этот трек (${sizeMB} MB) доступен только для скачивания. Используйте кнопку загрузки.`)
-}
+// Track actions (handleLikeTrack, handleAddToLibrary, handleDirectDownload, handleHdNotice) 
+// are provided by useTrackActions composable above
 
 const formatDuration = (seconds) => {
   if (!seconds) return '--:--'
@@ -558,18 +521,7 @@ watch(
   padding: 48px;
 }
 
-.spinner {
-  width: 24px;
-  height: 24px;
-  border: 3px solid var(--bg-highlight, rgba(255,255,255,0.1));
-  border-top-color: var(--accent, #1DB954);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+/* spinner is in design-system.css */
 
 /* Page skeleton styles */
 .skeleton-image {

@@ -87,8 +87,9 @@ import { useLibraryStore } from '@/stores/library'
 import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
+import { useTrackActions, usePlaybackActions } from '@/composables'
 import TrackItem from '@/components/TrackItem.vue'
-import api, { playerApi } from '@/api/client'
+import api from '@/api/client'
 
 // Universal context menu
 const { openMenu } = useContextMenu()
@@ -98,6 +99,9 @@ const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
 const authStore = useAuthStore()
 const uiStore = useUIStore()
+
+// Unified track actions
+const { handleDirectDownload, handleHdNotice } = useTrackActions()
 
 const goToChannelSetup = () => {
   router.push('/settings#channel')
@@ -126,22 +130,8 @@ const loadLikedTracks = async () => {
   }
 }
 
-const playTrack = (track, index) => {
-  playerStore.playTrack(track, sortedTracks.value, index)
-}
-
-const playAll = () => {
-  if (sortedTracks.value.length > 0) {
-    playerStore.playTrack(sortedTracks.value[0], sortedTracks.value, 0)
-  }
-}
-
-const shufflePlay = () => {
-  if (sortedTracks.value.length > 0) {
-    const shuffled = [...sortedTracks.value].sort(() => Math.random() - 0.5)
-    playerStore.playTrack(shuffled[0], shuffled, 0)
-  }
-}
+// Unified playback actions
+const { playAll, shufflePlay, playTrack } = usePlaybackActions(sortedTracks)
 
 const unlikeTrack = async (track) => {
   try {
@@ -152,23 +142,7 @@ const unlikeTrack = async (track) => {
   }
 }
 
-// Handle direct download from TrackItem (for large/HD files)
-const handleDirectDownload = async (track) => {
-  try {
-    await playerApi.download(track.id)
-    uiStore.toast.success('Трек отправлен', 'Проверьте сообщения в Telegram')
-  } catch (error) {
-    console.error('Failed to download track:', error)
-    const errorMsg = error.response?.data?.detail || 'Ошибка отправки'
-    uiStore.toast.error('Не удалось отправить', errorMsg)
-  }
-}
-
-// HD track notice - show that track is only available for download
-const handleHdNotice = (track) => {
-  const sizeMB = track.file_size ? (track.file_size / 1024 / 1024).toFixed(1) : '20+'
-  uiStore.toast.info('Только HD', `Этот трек (${sizeMB} MB) доступен только для скачивания. Используйте кнопку загрузки.`)
-}
+// Track actions (handleDirectDownload, handleHdNotice) provided by useTrackActions above
 
 onMounted(() => {
   loadLikedTracks()

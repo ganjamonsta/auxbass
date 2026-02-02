@@ -126,22 +126,5 @@ const handleItemPlay = (item) => {
   padding: 40px;
 }
 
-.spinner {
-  width: 30px;
-  height: 30px;
-  border: 3px solid rgba(255, 255, 255, 0.1);
-  border-radius: 50%;
-  border-top-color: var(--accent);
-  animation: spin 1s ease-in-out infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.empty-state {
-  text-align: center;
-  padding: 40px;
-  color: var(--text-secondary);
-}
+/* spinner, empty-state are in design-system.css */
 </style>

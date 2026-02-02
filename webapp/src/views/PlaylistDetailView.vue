@@ -117,10 +117,11 @@ import { useAuthStore } from '@/stores/auth'
 import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
+import { useTrackActions, usePlaybackActions } from '@/composables'
 import TrackItem from '@/components/TrackItem.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import EditPlaylistModal from '@/components/EditPlaylistModal.vue'
-import api, { playerApi } from '@/api/client'
+import api from '@/api/client'
 import { Music, Check, Plus, Globe } from 'lucide-vue-next'
 
 // Universal context menu
@@ -133,12 +134,18 @@ const authStore = useAuthStore()
 const libraryStore = useLibraryStore()
 const uiStore = useUIStore()
 
+// Unified track actions
+const { handleDirectDownload, handleHdNotice, handleLikeTrack } = useTrackActions()
+
 // State
 const playlist = ref(null)
 const loading = ref(true)
 const showEditModal = ref(false)
 const showDeleteConfirm = ref(false)
 const subscribing = ref(false)
+
+// Unified playback actions
+const { playAll, shufflePlay, playTrack } = usePlaybackActions(() => playlist.value?.tracks)
 
 // Computed
 const isOwner = computed(() => {
@@ -167,43 +174,8 @@ const loadPlaylist = async () => {
   }
 }
 
-// Playback
-const playAll = () => {
-  if (playlist.value?.tracks?.length) {
-    playerStore.playTrack(playlist.value.tracks[0], playlist.value.tracks)
-  }
-}
-
-const shufflePlay = () => {
-  if (playlist.value?.tracks?.length) {
-    const shuffled = [...playlist.value.tracks].sort(() => Math.random() - 0.5)
-    playerStore.playTrack(shuffled[0], shuffled)
-  }
-}
-
-const playTrack = (track, index) => {
-  playerStore.playTrack(track, playlist.value.tracks, index)
-}
-
-const handleLikeTrack = async (track) => {
-  track.is_liked = await libraryStore.toggleLike(track.id)
-}
-
-const handleDirectDownload = async (track) => {
-  try {
-    await playerApi.download(track.id)
-    uiStore.toast.success('Трек отправлен', 'Проверьте сообщения в Telegram')
-  } catch (error) {
-    const errorMsg = error.response?.data?.detail || 'Ошибка отправки'
-    uiStore.toast.error('Не удалось отправить', errorMsg)
-  }
-}
-
-// HD track notice - show that track is only available for download
-const handleHdNotice = (track) => {
-  const sizeMB = track.file_size ? (track.file_size / 1024 / 1024).toFixed(1) : '20+'
-  uiStore.toast.info('Только HD', `Этот трек (${sizeMB} MB) доступен только для скачивания. Используйте кнопку загрузки.`)
-}
+// Playback and track actions (playAll, shufflePlay, playTrack, handleLikeTrack, handleDirectDownload, handleHdNotice)
+// are provided by composables above
 
 // Edit modal handlers
 const openEditModal = () => {

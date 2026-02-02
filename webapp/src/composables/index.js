@@ -16,6 +16,11 @@ export { useTrackSearch } from './useTrackSearch'
 export { useContextMenu } from './useContextMenu'
 export { useLayoutScroll } from './useLayoutScroll'
 
+// Unified action composables
+export { useTrackActions } from './useTrackActions'
+export { usePlaybackActions } from './usePlaybackActions'
+export { useDebouncedSearch } from './useDebouncedSearch'
+
 // Legacy - can be removed after migration
 export { useTrackContextMenu } from './useTrackContextMenu'
 export { usePlaylistContextMenu } from './usePlaylistContextMenu'

@@ -48,9 +48,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { usePlayerStore } from '@/stores/player'
-import { useVirtualScroll, useSort } from '@/composables'
+import { useVirtualScroll, useSort, useDebouncedSearch } from '@/composables'
 import { useContextMenu } from '@/composables/useContextMenu'
 import SortChips from '@/components/SortChips.vue'
 import MediaGrid from '@/components/MediaGrid.vue'
@@ -67,10 +67,10 @@ const handleContextMenu = ({ item, event }) => {
 
 const playerStore = usePlayerStore()
 
-// Search state
-const searchQuery = ref('')
-const debouncedSearchQuery = ref('')
-let searchTimeout = null
+// Debounced search using composable
+const { query: searchQuery, debouncedQuery: debouncedSearchQuery, search: debouncedSearch } = useDebouncedSearch({
+  onSearch: () => reset()
+})
 
 // Sort state (persisted to localStorage)
 const { 
@@ -111,15 +111,6 @@ const {
   limit: 30
 })
 
-// Debounced search
-const debouncedSearch = () => {
-  if (searchTimeout) clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => {
-    debouncedSearchQuery.value = searchQuery.value
-    reset()
-  }, 300)
-}
-
 // Sort handlers
 const onNextSort = () => {
   nextSort()
@@ -141,64 +132,13 @@ const playAlbum = async (album) => {
     console.error('Failed to load album:', error)
   }
 }
-
-onUnmounted(() => {
-  if (searchTimeout) clearTimeout(searchTimeout)
-})
 </script>
 <style scoped>
 .albums-view {
   padding: 16px;
 }
 
-.view-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 24px;
-}
-
-.header-left {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-}
-
-.view-header h1 {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.count {
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.load-trigger {
-  height: 1px;
-}
-
-.loading-more {
-  display: flex;
-  justify-content: center;
-  padding: 16px;
-}
-
-.spinner {
-  width: 24px;
-  height: 24px;
-  border: 3px solid var(--bg-highlight, rgba(255,255,255,0.1));
-  border-top-color: var(--accent, #1DB954);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+/* view-header, header-left, count, load-trigger, loading-more, spinner are in design-system.css */
 
 /* Grid skeleton layout */
 .media-grid.type-album {
