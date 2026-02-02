@@ -76,6 +76,8 @@
         @expand-player="showFullPlayer = true"
         @toggle-play="playerStore.togglePlay()"
         @next-track="playerStore.next()"
+        @toggle-shuffle="playerStore.toggleShuffle()"
+        @toggle-repeat="playerStore.toggleRepeat()"
       />
 
       <!-- Desktop: Now Playing Sidebar -->

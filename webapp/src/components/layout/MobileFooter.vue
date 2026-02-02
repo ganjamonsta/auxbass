@@ -12,6 +12,8 @@
         @expand="$emit('expand-player')"
         @toggle="$emit('toggle-play')"
         @next="$emit('next-track')"
+        @toggleShuffle="$emit('toggle-shuffle')"
+        @toggleRepeat="$emit('toggle-repeat')"
       />
     </div>
 

@@ -1,58 +1,77 @@
 <template>
   <div class="mini-player" @click="$emit('expand')" @contextmenu.prevent="openMenu('track', track, 'player', $event)">
-    <!-- LCD Screen -->
-    <div class="lcd-screen">
-      <div class="lcd-row lcd-row-main">
-        <div class="lcd-title-container">
-          <div class="lcd-title-track" :class="{ 'marquee': shouldMarquee }">
-            <span class="lcd-title">{{ displayText }}</span>
-            <span v-if="shouldMarquee" class="lcd-title lcd-title-clone">{{ displayText }}</span>
+    <!-- Compact 2-row layout -->
+    <div class="player-content">
+      <!-- Row 1: Title + Status Icons -->
+      <div class="player-row row-title">
+        <div class="title-container">
+          <div class="title-track" :class="{ 'marquee': shouldMarquee }">
+            <span class="title-text">{{ displayText }}</span>
+            <span v-if="shouldMarquee" class="title-text title-clone">{{ displayText }}</span>
           </div>
         </div>
-      </div>
-      <div class="lcd-row lcd-row-sub">
-        <span class="lcd-time">{{ formatTime(progress) }}/{{ formatTime(duration || track.duration) }}</span>
-        <div class="lcd-indicators">
-          <span v-if="playerStore.hdTrackInfo" class="lcd-indicator hd-indicator active" title="HD версия доступна для скачивания">HD</span>
-          <span class="lcd-indicator" :class="{ active: playerStore.shuffle }" title="Перемешивание">SHF</span>
-          <span class="lcd-indicator" :class="{ active: playerStore.repeatMode !== 'none' }" :title="repeatTitle">{{ repeatLabel }}</span>
+        <div class="status-icons">
+          <span v-if="playerStore.hdTrackInfo" class="status-icon hd-icon active" title="HD версия">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-8 12H9.5v-2h-2v2H6V9h1.5v2.5h2V9H11v6zm2-6h4c.55 0 1 .45 1 1v4c0 .55-.45 1-1 1h-4V9zm1.5 4.5h2v-3h-2v3z"/>
+            </svg>
+          </span>
+          <span v-else class="status-icon hd-icon" title="HD недоступен">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" opacity="0.3">
+              <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-8 12H9.5v-2h-2v2H6V9h1.5v2.5h2V9H11v6zm2-6h4c.55 0 1 .45 1 1v4c0 .55-.45 1-1 1h-4V9zm1.5 4.5h2v-3h-2v3z"/>
+            </svg>
+          </span>
+          <span 
+            class="status-icon shuffle-icon" 
+            :class="{ active: playerStore.shuffle }" 
+            title="Перемешивание"
+            @click.stop="$emit('toggleShuffle')"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
+            </svg>
+          </span>
+          <span 
+            class="status-icon repeat-icon" 
+            :class="{ active: playerStore.repeatMode !== 'none' }" 
+            :title="repeatTitle"
+            @click.stop="$emit('toggleRepeat')"
+          >
+            <svg v-if="playerStore.repeatMode === 'one'" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z"/>
+            </svg>
+            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
+            </svg>
+          </span>
         </div>
       </div>
-      <!-- LED Progress dots -->
-      <div class="lcd-progress">
-        <span class="lcd-status" style="margin-right: 6px; display: flex;">
-          <Play v-if="isPlaying" :size="10" fill="currentColor" />
-          <Pause v-else-if="isPaused" :size="10" fill="currentColor" />
-          <Square v-else :size="10" fill="currentColor" />
-        </span>
-        <span 
-          class="lcd-dot" 
-          v-for="i in 16" 
-          :key="i" 
-          :class="getDotClass(i)"
-        ></span>
+      
+      <!-- Row 2: Play/Pause + Progress + Time -->
+      <div class="player-row row-controls">
+        <button class="play-btn" @click.stop="$emit('toggle')">
+          <svg v-if="loading" class="spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+            <path d="M12 2a10 10 0 0 1 10 10"/>
+          </svg>
+          <svg v-else-if="isPlaying" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+          </svg>
+          <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+        </button>
+        
+        <div class="progress-dots">
+          <span 
+            class="dot" 
+            v-for="i in 24" 
+            :key="i" 
+            :class="getDotClass(i, 24)"
+          ></span>
+        </div>
+        
+        <span class="time-display">{{ formatTime(progress) }}/{{ formatTime(duration || track.duration) }}</span>
       </div>
-    </div>
-    
-    <!-- Nokia Style Controls -->
-    <div class="nokia-controls">
-      <button class="nokia-btn" @click.stop="$emit('toggle')">
-        <svg v-if="loading" class="spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-          <path d="M12 2a10 10 0 0 1 10 10"/>
-        </svg>
-        <svg v-else-if="isPlaying" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-          <rect x="6" y="4" width="4" height="16" rx="1"/>
-          <rect x="14" y="4" width="4" height="16" rx="1"/>
-        </svg>
-        <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M8 5v14l11-7z"/>
-        </svg>
-      </button>
-      <button class="nokia-btn" @click.stop="$emit('next')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M6 18l8.5-6L6 6v12zm8-12v12l8-6-8-6z"/>
-        </svg>
-      </button>
     </div>
   </div>
 </template>
@@ -62,7 +81,6 @@ import { computed } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { getDisplayTitle, getDisplayArtist } from '@/utils'
-import { Play, Square, Pause } from 'lucide-vue-next'
 
 const playerStore = usePlayerStore()
 const { openMenu } = useContextMenu()
@@ -94,7 +112,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['expand', 'toggle', 'next'])
+const emit = defineEmits(['expand', 'toggle', 'next', 'toggleShuffle', 'toggleRepeat'])
 
 const progressPercent = computed(() => {
   const dur = props.duration || props.track?.duration
@@ -108,10 +126,10 @@ const bufferedPercent = computed(() => {
   return (props.buffered / dur) * 100
 })
 
-// Get class for each LED dot
-const getDotClass = (index) => {
-  const dotPercent = (index / 16) * 100
-  const prevDotPercent = ((index - 1) / 16) * 100
+// Get class for each LED dot with configurable total
+const getDotClass = (index, total = 24) => {
+  const dotPercent = (index / total) * 100
+  const prevDotPercent = ((index - 1) / total) * 100
   
   // Active (played) - red
   if (dotPercent <= progressPercent.value) {
@@ -131,61 +149,14 @@ const getDotClass = (index) => {
   return ''
 }
 
-// Generate cover gradient
-const coverGradient = computed(() => {
-  const title = getDisplayTitle(props.track)
-  const artist = getDisplayArtist(props.track)
-  
-  const str = title + artist
-  let hash = 0
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  
-  const hue1 = Math.abs(hash % 360)
-  const hue2 = (hue1 + 40) % 360
-  
-  return `linear-gradient(135deg, hsl(${hue1}, 60%, 40%) 0%, hsl(${hue2}, 50%, 30%) 100%)`
-})
-
-const coverStyle = computed(() => {
-  if (props.track?.cover_url) return {}
-  return { background: coverGradient.value }
-})
-
-const coverInitials = computed(() => {
-  const title = getDisplayTitle(props.track)
-  const words = title.split(' ').filter(w => w.length > 0)
-  if (words.length >= 2) {
-    return (words[0][0] + words[1][0]).toUpperCase()
-  }
-  return title.substring(0, 2).toUpperCase()
-})
-
-const shouldMarqueeTitle = computed(() => {
-  return getDisplayTitle(props.track).length > 20
-})
-
 const displayText = computed(() => {
   const artist = getDisplayArtist(props.track)
   const title = getDisplayTitle(props.track)
   return `${artist} — ${title}`
 })
 
-const isPaused = computed(() => {
-  return !props.isPlaying && props.progress > 0
-})
-
 const shouldMarquee = computed(() => {
-  return displayText.value.length > 25
-})
-
-const repeatLabel = computed(() => {
-  switch (playerStore.repeatMode) {
-    case 'one': return 'RPT1'
-    case 'all': return 'RPTA'
-    default: return 'RPT0'
-  }
+  return displayText.value.length > 30
 })
 
 const repeatTitle = computed(() => {
@@ -206,17 +177,14 @@ const formatTime = (seconds) => {
 
 <style scoped>
 /* ═══════════════════════════════════════════════════════════
-   🎵 MINI PLAYER - Nokia XpressMusic Neumorphic Style
-   Inspired by Nokia 5700 with modern neumorphism
+   🎵 MINI PLAYER - Compact 2-Row Design
    ═══════════════════════════════════════════════════════════ */
 
 .mini-player {
-  /* Removed fixed positioning - now handled by parent MobileFooter */
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin: 8px 12px;
-  padding: 10px 12px;
+  margin: 6px 10px;
+  padding: 10px 14px;
   background: var(--xm-bg-elevated);
   border-radius: var(--neu-radius-lg);
   cursor: pointer;
@@ -235,219 +203,110 @@ const formatTime = (seconds) => {
     -2px -2px 4px var(--neu-shadow-light);
 }
 
-/* ─── LCD Screen - Nokia XpressMusic Style ─── */
-.lcd-screen {
+.player-content {
   flex: 1;
-  background: var(--lcd-bg);
-  border-radius: var(--neu-radius-md);
-  padding: 12px 14px 10px;
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  border: 1px solid #1a2a40;
-  box-shadow: 
-    inset 0 2px 8px rgba(0, 0, 0, 0.8),
-    0 1px 0 rgba(100, 150, 255, 0.1);
   min-width: 0;
-  position: relative;
-  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-/* Scanline effect for retro feel */
-.lcd-screen::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0, 0, 0, 0.03) 2px,
-    rgba(0, 0, 0, 0.03) 4px
-  );
-  pointer-events: none;
-}
-
-.lcd-row {
+/* ─── Row Layout ─── */
+.player-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-width: 0;
-  position: relative;
-  z-index: 1;
-}
-
-.lcd-row-main {
-  margin-bottom: 4px;
+  gap: 10px;
   min-width: 0;
 }
 
-.lcd-row-sub {
+/* ─── Row 1: Title + Icons ─── */
+.row-title {
   justify-content: space-between;
-  margin-bottom: 8px;
+}
+
+.title-container {
+  flex: 1;
   min-width: 0;
-  overflow: visible;
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, black 90%, transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, black 90%, transparent 100%);
 }
 
-.lcd-status {
-  color: var(--xm-accent);
-  font-size: 12px;
-  font-weight: bold;
-  text-shadow: 0 0 8px var(--xm-accent-glow);
-  flex-shrink: 0;
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-.lcd-indicators {
-  display: flex;
-  gap: 6px;
-  margin-left: auto;
-}
-
-.lcd-indicator {
-  font-size: 9px;
-  font-weight: 700;
-  font-family: 'Consolas', 'Monaco', monospace;
-  letter-spacing: 0.5px;
-  color: var(--lcd-dot-inactive);
-  transition: color 0.2s, text-shadow 0.2s;
-}
-
-.lcd-indicator.active {
-  color: var(--lcd-text);
-  text-shadow: 0 0 6px var(--lcd-text-glow);
-}
-
-/* HD indicator - special golden color to highlight quality */
-.lcd-indicator.hd-indicator.active {
-  color: #ffd700;
-  text-shadow: 0 0 8px rgba(255, 215, 0, 0.8);
-  animation: hd-pulse 2s ease-in-out infinite;
-}
-
-@keyframes hd-pulse {
-  0%, 100% { 
-    opacity: 1; 
-    text-shadow: 0 0 8px rgba(255, 215, 0, 0.8);
-  }
-  50% { 
-    opacity: 0.85; 
-    text-shadow: 0 0 12px rgba(255, 215, 0, 1);
-  }
-}
-
-@keyframes pulse-glow {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
-.lcd-title-container {
-  flex: 1 1 0;
-  min-width: 0;
-  overflow: visible;
-  position: relative;
-  /* Clip only horizontally, allow vertical for glow */
-  clip-path: inset(-10px 0 -10px 0);
-  mask-image: linear-gradient(90deg, black 85%, transparent 100%);
-  -webkit-mask-image: linear-gradient(90deg, black 85%, transparent 100%);
-}
-
-.lcd-title-track {
+.title-track {
   display: inline-flex;
   white-space: nowrap;
 }
 
-.lcd-title-track.marquee {
-  animation: marquee-scroll 10s linear infinite;
+.title-track.marquee {
+  animation: marquee-scroll 12s linear infinite;
 }
 
-.lcd-title {
-  color: var(--lcd-text);
-  font-size: 15px;
+.title-text {
+  color: var(--xm-text-primary);
+  font-size: 14px;
   font-weight: 600;
-  letter-spacing: 0.5px;
-  text-shadow: 0 0 10px var(--lcd-text-glow);
+  letter-spacing: 0.3px;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
-.lcd-title-clone {
-  margin-left: 80px;
+.title-clone {
+  margin-left: 60px;
 }
 
 @keyframes marquee-scroll {
-  0%, 5% {
-    transform: translateX(0);
-  }
-  95%, 100% {
-    transform: translateX(calc(-50% - 40px));
-  }
+  0%, 5% { transform: translateX(0); }
+  95%, 100% { transform: translateX(calc(-50% - 30px)); }
 }
 
-.lcd-time {
-  color: var(--lcd-text);
-  font-size: 12px;
-  font-weight: 600;
-  text-shadow: 0 0 6px var(--lcd-text-glow);
-  flex-shrink: 0;
-  letter-spacing: 1.5px;
-  font-variant-numeric: tabular-nums;
-}
-
-/* ─── LED Progress Dots ─── */
-.lcd-progress {
+/* ─── Status Icons ─── */
+.status-icons {
   display: flex;
   align-items: center;
-  gap: 3px;
-}
-
-.lcd-dot {
-  width: 100%;
-  height: 4px;
-  background: var(--lcd-dot-inactive);
-  border-radius: 2px;
-  flex: 1;
-  transition: background 0.15s ease, box-shadow 0.15s ease;
-}
-
-.lcd-dot.active {
-  background: var(--xm-accent);
-  box-shadow: 0 0 6px var(--xm-accent-glow);
-}
-
-.lcd-dot.buffered {
-  background: rgba(0, 188, 212, 0.35);
-  box-shadow: none;
-}
-
-.lcd-dot.next {
-  background: var(--xm-accent);
-  opacity: 0.5;
-  animation: dot-blink 0.6s ease-in-out infinite;
-}
-
-@keyframes dot-blink {
-  0%, 100% { 
-    opacity: 0.3;
-    box-shadow: none;
-  }
-  50% { 
-    opacity: 1;
-    box-shadow: 0 0 8px var(--xm-accent-glow);
-  }
-}
-
-/* ─── Nokia XpressMusic Style Rubber Buttons ─── */
-.nokia-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   flex-shrink: 0;
 }
 
-.nokia-btn {
-  width: 42px;
-  height: 30px;
-  border: none;
+.status-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
   border-radius: 6px;
+  color: var(--xm-text-muted);
+  opacity: 0.4;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.status-icon:active {
+  transform: scale(0.9);
+}
+
+.status-icon.active {
+  opacity: 1;
+  color: var(--xm-accent);
+}
+
+.status-icon.hd-icon.active {
+  color: #ffd700;
+}
+
+.status-icon.hd-icon {
+  cursor: default;
+}
+
+/* ─── Row 2: Controls ─── */
+.row-controls {
+  gap: 8px;
+}
+
+.play-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -455,51 +314,80 @@ const formatTime = (seconds) => {
   color: var(--xm-text-primary);
   flex-shrink: 0;
   transition: all 0.15s ease;
-  position: relative;
   
-  /* Nokia rubber button style */
+  /* Rubber button style */
   background: var(--rubber-bg);
   box-shadow: 
-    0 3px 6px rgba(0, 0, 0, 0.6),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+    0 3px 6px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
   border: 1px solid var(--rubber-border);
 }
 
-/* Rubber texture bumps */
-.nokia-btn::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 28px;
-  height: 16px;
-  background: 
-    radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%),
-    radial-gradient(circle at 50% 50%, rgba(255,255,255,0.1) 0%, transparent 50%),
-    radial-gradient(circle at 80% 50%, rgba(255,255,255,0.1) 0%, transparent 50%);
-  border-radius: 4px;
-  pointer-events: none;
-}
-
-.nokia-btn:active {
-  transform: scale(0.94) translateY(1px);
+.play-btn:active {
+  transform: scale(0.92) translateY(1px);
   background: var(--rubber-bg-pressed);
   box-shadow: 
-    0 1px 2px rgba(0, 0, 0, 0.5),
-    inset 0 2px 4px rgba(0, 0, 0, 0.4);
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    inset 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-.nokia-btn:active svg {
+.play-btn:active svg {
   color: var(--xm-accent);
   filter: drop-shadow(0 0 4px var(--xm-accent-glow));
 }
 
-.nokia-btn svg {
-  transition: color 0.15s ease, filter 0.15s ease;
+/* ─── Progress Dots ─── */
+.progress-dots {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
 }
 
+.dot {
+  flex: 1;
+  height: 4px;
+  min-width: 2px;
+  background: var(--lcd-dot-inactive, rgba(255, 255, 255, 0.15));
+  border-radius: 2px;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dot.active {
+  background: var(--xm-accent);
+  box-shadow: 0 0 4px var(--xm-accent-glow);
+}
+
+.dot.buffered {
+  background: rgba(0, 188, 212, 0.3);
+}
+
+.dot.next {
+  background: var(--xm-accent);
+  opacity: 0.5;
+  animation: dot-blink 0.6s ease-in-out infinite;
+}
+
+@keyframes dot-blink {
+  0%, 100% { opacity: 0.3; box-shadow: none; }
+  50% { opacity: 1; box-shadow: 0 0 6px var(--xm-accent-glow); }
+}
+
+/* ─── Time Display ─── */
+.time-display {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--xm-text-muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+  min-width: 70px;
+  text-align: right;
+}
+
+/* ─── Utilities ─── */
 .spin {
   animation: spin 1s linear infinite;
 }
