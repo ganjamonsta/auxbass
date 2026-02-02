@@ -195,9 +195,10 @@ const loadArtist = async () => {
   try {
     const name = decodeURIComponent(route.params.name)
     const params = { scope: scope.value }
-    const response = await api.get(`/artists/${encodeURIComponent(name)}`, { params })
+    // Use the lightweight /info endpoint (no tracks loaded here)
+    const response = await api.get(`/artists/${encodeURIComponent(name)}/info`, { params })
     artist.value = response.data
-    // Load tracks after artist info is fetched
+    // Load tracks separately via infinite scroll
     resetTracks()
   } catch (error) {
     // If artist not found in library, show option to view global

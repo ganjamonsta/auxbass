@@ -141,7 +141,9 @@ export const playlistsApi = {
 export const artistsApi = {
   getAll: (params = {}) => api.get('/artists', { params }),
   getGlobal: (params = {}) => api.get('/artists/global', { params }),
-  getOne: (artistName) => api.get(`/artists/${encodeURIComponent(artistName)}`),
+  getOne: (artistName, params = {}) => api.get(`/artists/${encodeURIComponent(artistName)}`, { params }),
+  getInfo: (artistName, params = {}) => api.get(`/artists/${encodeURIComponent(artistName)}/info`, { params }),
+  getTracks: (artistName, params = {}) => api.get(`/artists/${encodeURIComponent(artistName)}/tracks`, { params }),
   getImage: (artistName) => api.get(`/artists/${encodeURIComponent(artistName)}/image`),
 }
 

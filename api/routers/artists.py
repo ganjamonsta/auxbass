@@ -134,7 +134,7 @@ async def get_my_artists(
     Artists are grouped by normalized name (case-insensitive, first artist from collabs).
     Example: "BLADEE", "Bladee", "Bladee & Ecco2k" -> one "Bladee" artist
     
-    Also includes artists extracted from track titles and filenames for tracks without metadata.
+    Optimized: album data is loaded only when needed for sorting/display.
     
     Sort options:
     - name: alphabetically
@@ -142,7 +142,7 @@ async def get_my_artists(
     - album_count: by number of albums  
     - latest_release: by latest album release date
     """
-    # Get all tracks from user's library (including those without artist metadata)
+    # Get all tracks from user's library (lightweight query)
     query = (
         select(Track.artist, Track.title, Track.file_name)
         .join(UserLibrary, UserLibrary.track_id == Track.id)
@@ -153,11 +153,9 @@ async def get_my_artists(
     all_tracks_data = result.all()
     
     # Group by normalized name
-    # Key: normalized_name -> list of original names
     artist_groups: dict[str, list[str]] = defaultdict(list)
     
     for track_artist, track_title, track_file_name in all_tracks_data:
-        # Get all artists from this track (from artist, title, file_name)
         all_artists = get_all_track_artists(track_artist, track_title, track_file_name)
         
         for artist in all_artists:
@@ -165,49 +163,22 @@ async def get_my_artists(
             if normalized:
                 artist_groups[normalized].append(artist)
     
-    # Pre-fetch all albums for counting and getting release dates
-    albums_result = await db.execute(
-        select(Album)
-        .where(Album.artist.isnot(None))
-    )
-    all_albums = albums_result.scalars().all()
-    
-    # Build album lookup by normalized artist
-    # normalized_artist -> list of albums
-    albums_by_artist: dict[str, list] = defaultdict(list)
-    for album in all_albums:
-        norm = normalize_artist(album.artist)
-        if norm:
-            albums_by_artist[norm].append(album)
-    
-    # Build aggregated list with album info
+    # Build basic aggregated list
     aggregated = []
     for normalized, names in artist_groups.items():
         display_name = get_best_display_name(names)
         track_count = len(names)
         
-        # Get albums for this artist
-        artist_albums = albums_by_artist.get(normalized, [])
-        album_count = len(artist_albums)
-        
-        # Get latest release date
-        latest_release = None
-        for album in sorted(artist_albums, key=lambda a: a.release_date or "", reverse=True):
-            if album.release_date:
-                latest_release = album.release_date
-                break
-        
         aggregated.append({
             "normalized": normalized,
             "name": display_name,
             "track_count": track_count,
-            "album_count": album_count,
-            "latest_release_date": latest_release,
-            "all_names": names,  # For cover lookup
-            "albums": artist_albums,  # For cover lookup
+            "album_count": 0,  # Lazy loaded
+            "latest_release_date": None,  # Lazy loaded
+            "albums": [],  # Lazy loaded
         })
     
-    # Apply search filter
+    # Apply search filter early (before expensive album lookups)
     if search:
         search_lower = search.lower()
         aggregated = [
@@ -217,31 +188,72 @@ async def get_my_artists(
     
     total = len(aggregated)
     
-    # Sort
+    # Only load album data if we need it for sorting or display
+    needs_album_data = sort_by in ("album_count", "latest_release")
+    
+    if needs_album_data or True:  # Always need for covers, but optimize the query
+        # Get album counts and latest dates efficiently with a single query
+        # Only for artists we'll actually display (after pagination for simple sorts)
+        
+        # For album-based sorts, we need all artists' album data first
+        if sort_by in ("album_count", "latest_release"):
+            normalized_artists = [a["normalized"] for a in aggregated]
+        else:
+            # For name/track_count sorts, pre-sort and get only page artists
+            reverse = (sort_order == "desc")
+            if sort_by == "track_count":
+                aggregated.sort(key=lambda x: x["track_count"], reverse=reverse)
+            else:  # name
+                aggregated.sort(key=lambda x: x["name"].lower(), reverse=reverse)
+            
+            page_items_presort = aggregated[offset:offset + limit]
+            normalized_artists = [a["normalized"] for a in page_items_presort]
+        
+        # Load albums only for relevant artists
+        if normalized_artists:
+            albums_result = await db.execute(
+                select(Album)
+                .where(Album.artist.isnot(None))
+            )
+            all_albums = albums_result.scalars().all()
+            
+            # Build album lookup
+            albums_by_artist: dict[str, list] = defaultdict(list)
+            for album in all_albums:
+                norm = normalize_artist(album.artist)
+                if norm in normalized_artists or sort_by in ("album_count", "latest_release"):
+                    albums_by_artist[norm].append(album)
+            
+            # Update aggregated with album data
+            for item in aggregated:
+                artist_albums = albums_by_artist.get(item["normalized"], [])
+                item["album_count"] = len(artist_albums)
+                item["albums"] = artist_albums
+                
+                # Get latest release date
+                for album in sorted(artist_albums, key=lambda a: a.release_date or "", reverse=True):
+                    if album.release_date:
+                        item["latest_release_date"] = album.release_date
+                        break
+    
+    # Sort (if album-based sort, do it now after loading album data)
     reverse = (sort_order == "desc")
-    if sort_by == "track_count":
-        aggregated.sort(key=lambda x: x["track_count"], reverse=reverse)
-    elif sort_by == "album_count":
+    if sort_by == "album_count":
         aggregated.sort(key=lambda x: x["album_count"], reverse=reverse)
     elif sort_by == "latest_release":
-        # Sort by latest release date (nulls last)
-        aggregated.sort(
-            key=lambda x: x["latest_release_date"] or "",
-            reverse=reverse
-        )
+        aggregated.sort(key=lambda x: x["latest_release_date"] or "", reverse=reverse)
+    elif sort_by == "track_count":
+        aggregated.sort(key=lambda x: x["track_count"], reverse=reverse)
     else:  # name
         aggregated.sort(key=lambda x: x["name"].lower(), reverse=reverse)
     
-    # Paginate using offset/limit
+    # Paginate
     page_items = aggregated[offset:offset + limit]
-    
-    # Calculate page for response (for backwards compatibility)
     page = (offset // limit) + 1 if limit > 0 else 1
     
-    # Build response items with covers from pre-fetched albums
+    # Build response
     items = []
     for artist_data in page_items:
-        # Get cover from latest album (already sorted by release_date)
         cover_url = None
         for album in sorted(artist_data["albums"], key=lambda a: a.release_date or "", reverse=True):
             if album.cover_url:
@@ -253,7 +265,7 @@ async def get_my_artists(
             track_count=artist_data["track_count"],
             album_count=artist_data["album_count"],
             cover_url=cover_url,
-            image_url=cover_url,  # Frontend compatibility
+            image_url=cover_url,
             latest_release_date=artist_data["latest_release_date"],
         ))
     
@@ -397,28 +409,162 @@ async def get_global_artists(
     )
 
 
-@router.get("/{artist_name}", response_model=ArtistDetailResponse)
-async def get_artist(
+@router.get("/{artist_name}/info", response_model=ArtistInfoResponse)
+async def get_artist_info(
     artist_name: str,
     scope: str = Query("library", pattern="^(library|global)$"),
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Get artist details with tracks and albums.
+    Get artist info WITHOUT tracks (lightweight endpoint for initial page load).
     
-    scope=library: only user's library tracks
-    scope=global: all public tracks
+    Returns artist metadata, album list, and track count.
+    Use /artists/{artist_name}/tracks for paginated tracks.
     
-    Also matches tracks where artist appears in title or filename.
+    This is the optimized endpoint - use this instead of /{artist_name} for better performance.
     """
-    # Ensure artist_name is URL-decoded
     artist_name = unquote(artist_name)
     normalized_search = normalize_artist(artist_name)
     
-    # Build query based on scope
+    # Get track count and artist names efficiently (without loading full track data)
     if scope == "global":
-        # Global: get public tracks (including those without artist metadata)
+        # Count public tracks matching this artist
+        tracks_result = await db.execute(
+            select(Track.id, Track.artist, Track.title, Track.file_name)
+            .where(Track.is_public == True)
+            .where(Track.is_unavailable == False)
+        )
+        all_tracks_data = tracks_result.all()
+    else:
+        # Count user's library tracks matching this artist
+        tracks_result = await db.execute(
+            select(Track.id, Track.artist, Track.title, Track.file_name)
+            .join(UserLibrary, UserLibrary.track_id == Track.id)
+            .where(UserLibrary.user_id == user.id)
+        )
+        all_tracks_data = tracks_result.all()
+    
+    # Filter by artist (lightweight - only counting)
+    track_count = 0
+    artist_names_seen = set()
+    album_track_ids = set()
+    
+    for track_id, track_artist, track_title, track_file_name in all_tracks_data:
+        if artist_matches_track(track_artist, normalized_search, track_title, track_file_name):
+            track_count += 1
+            album_track_ids.add(track_id)
+            if track_artist:
+                artist_names_seen.add(track_artist)
+    
+    if track_count == 0:
+        detail = "Artist not found" if scope == "global" else "Artist not found in your library"
+        raise HTTPException(status_code=404, detail=detail)
+    
+    # Determine display name
+    actual_name = artist_name
+    for name in artist_names_seen:
+        if normalize_artist(name) == normalized_search:
+            actual_name = normalize_artist_display(name)
+            break
+    
+    # Get albums efficiently - only those with tracks in this scope
+    album_track_counts = {}
+    if album_track_ids:
+        album_tracks_result = await db.execute(
+            select(AlbumTrack.album_id, func.count(AlbumTrack.track_id))
+            .where(AlbumTrack.track_id.in_(album_track_ids))
+            .group_by(AlbumTrack.album_id)
+        )
+        album_track_counts = {row[0]: row[1] for row in album_tracks_result.all()}
+    
+    # Get albums for this artist
+    if album_track_counts:
+        albums_result = await db.execute(
+            select(Album)
+            .where(Album.id.in_(album_track_counts.keys()))
+            .order_by(Album.release_date.desc().nullslast())
+        )
+        albums = albums_result.scalars().all()
+    else:
+        # Fallback: get albums by artist name
+        albums_result = await db.execute(
+            select(Album)
+            .where(Album.artist.isnot(None))
+            .order_by(Album.release_date.desc().nullslast())
+        )
+        albums = [a for a in albums_result.scalars().all() 
+                  if artist_matches_track(a.artist, normalized_search)]
+    
+    # Get cover URL
+    cover_url = None
+    for album in albums:
+        if album.cover_url:
+            cover_url = album.cover_url
+            break
+    
+    # Get artist tags (async, non-blocking for initial load)
+    artist_tags = None
+    try:
+        if lastfm_client.is_configured:
+            artist_tags = await lastfm_client.get_artist_top_tags(actual_name)
+    except Exception as e:
+        logger.warning(f"Failed to get artist tags: {e}")
+    
+    from api.routers.albums import album_to_response
+    album_items = [album_to_response(album, track_count=album_track_counts.get(album.id, 0)) 
+                   for album in albums]
+    
+    return ArtistInfoResponse(
+        name=actual_name,
+        track_count=track_count,
+        album_count=len(albums),
+        cover_url=cover_url,
+        image_url=cover_url,
+        tags=artist_tags,
+        albums=album_items,
+    )
+
+
+@router.get("/{artist_name}", response_model=ArtistDetailResponse)
+async def get_artist(
+    artist_name: str,
+    scope: str = Query("library", pattern="^(library|global)$"),
+    include_tracks: bool = Query(False, description="Include all tracks (legacy mode, use /tracks endpoint instead)"),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get artist details.
+    
+    By default, returns artist info WITHOUT tracks for performance.
+    Use include_tracks=true for legacy behavior (all tracks in one response).
+    
+    RECOMMENDED: Use /{artist_name}/info + /{artist_name}/tracks for best performance.
+    
+    scope=library: only user's library tracks
+    scope=global: all public tracks
+    """
+    artist_name = unquote(artist_name)
+    normalized_search = normalize_artist(artist_name)
+    
+    # For performance: if not including tracks, use lightweight query
+    if not include_tracks:
+        # Get info without tracks
+        info = await get_artist_info(artist_name, scope, user, db)
+        return ArtistDetailResponse(
+            name=info.name,
+            track_count=info.track_count,
+            album_count=info.album_count,
+            cover_url=info.cover_url,
+            image_url=info.image_url,
+            tags=info.tags,
+            albums=info.albums,
+            tracks=[],  # Empty - use /tracks endpoint for paginated loading
+        )
+    
+    # Legacy mode: include all tracks (not recommended for large libraries)
+    if scope == "global":
         tracks_result = await db.execute(
             select(Track)
             .where(Track.is_public == True)
@@ -431,7 +577,6 @@ async def get_artist(
         )
         all_tracks_raw = tracks_result.unique().scalars().all()
         
-        # Filter by normalized artist (check artist, title, and file_name)
         matching_tracks = []
         artist_names_seen = set()
         album_track_counts = {}
@@ -449,21 +594,18 @@ async def get_artist(
         if track_count == 0:
             raise HTTPException(status_code=404, detail="Artist not found")
         
-        # Get user's library to mark which tracks are in library
         user_lib_result = await db.execute(
             select(UserLibrary.track_id)
             .where(UserLibrary.user_id == user.id)
         )
         user_library_ids = set(row[0] for row in user_lib_result.all())
         
-        # Build track responses with in_library flag
         from api.routers.library import track_to_response_global
         all_tracks_response = [
             track_to_response_global(track, in_library=track.id in user_library_ids)
             for track in matching_tracks
         ]
     else:
-        # Library: user's tracks only (including those without artist metadata)
         tracks_result = await db.execute(
             select(Track, UserLibrary)
             .join(UserLibrary, UserLibrary.track_id == Track.id)
@@ -476,7 +618,6 @@ async def get_artist(
         )
         all_tracks = tracks_result.unique().all()
         
-        # Filter by normalized artist (check artist, title, and file_name)
         matching_tracks = []
         artist_names_seen = set()
         album_track_counts = {}
@@ -498,21 +639,12 @@ async def get_artist(
         all_tracks_response = [track_to_response(track, lib_entry) for track, lib_entry in matching_tracks]
         artist_names_seen = set(t.artist for t, _ in matching_tracks if t.artist)
     
-    # Determine the display name for this artist page
-    # Priority: 
-    # 1. If searched name exactly matches a track's artist field (normalized), use that artist field value
-    # 2. Otherwise, use the searched name (this handles featured/remix artists from title)
-    actual_name = artist_name  # Default to what user searched/clicked
-    
-    # Check if any track has this as main artist (not just featured)
+    actual_name = artist_name
     for name in artist_names_seen:
         if normalize_artist(name) == normalized_search:
-            # Found exact match in artist field - use normalized display version
-            # This extracts first artist with proper casing (e.g., "Excision, Skism" -> "Excision")
             actual_name = normalize_artist_display(name)
             break
     
-    # Get albums by this artist (normalized)
     albums_result = await db.execute(
         select(Album)
         .where(Album.artist.isnot(None))
@@ -521,20 +653,17 @@ async def get_artist(
     all_albums = albums_result.scalars().all()
     all_artist_albums = [a for a in all_albums if artist_matches_track(a.artist, normalized_search)]
     
-    # For library scope, only show albums that have tracks in user's library
     if scope == "library":
         albums = [a for a in all_artist_albums if album_track_counts.get(a.id, 0) > 0]
     else:
         albums = all_artist_albums
     
-    # Get cover URL from albums
     cover_url = None
     for album in albums:
         if album.cover_url:
             cover_url = album.cover_url
             break
     
-    # Get artist tags from Last.fm
     artist_tags = None
     try:
         if lastfm_client.is_configured:
@@ -542,7 +671,6 @@ async def get_artist(
     except Exception as e:
         logger.warning(f"Failed to get artist tags: {e}")
     
-    # Albums as response
     from api.routers.albums import album_to_response
     album_items = [album_to_response(album, track_count=album_track_counts.get(album.id, 0)) for album in albums]
     
@@ -570,78 +698,102 @@ async def get_artist_tracks(
     """
     Get paginated tracks for an artist.
     
-    This endpoint is more efficient than /{artist_name} for artists with many tracks,
-    as it only returns a page of tracks at a time.
+    Optimized two-phase approach:
+    1. First, get matching track IDs (lightweight)
+    2. Then, load full track data only for the requested page
+    
+    This is much more efficient than loading all tracks then paginating.
     """
-    # Ensure artist_name is URL-decoded
     artist_name = unquote(artist_name)
     normalized_search = normalize_artist(artist_name)
     
-    # Build query based on scope
+    # Phase 1: Get all matching track IDs (lightweight query - no joins)
     if scope == "global":
-        # Global: get public tracks
-        tracks_result = await db.execute(
-            select(Track)
+        ids_result = await db.execute(
+            select(Track.id, Track.artist, Track.title, Track.file_name, Track.created_at)
             .where(Track.is_public == True)
             .where(Track.is_unavailable == False)
+            .order_by(Track.created_at.desc())
+        )
+        all_ids_data = ids_result.all()
+        
+        # Filter by artist (in Python - but only lightweight data)
+        matching_ids = [
+            row[0] for row in all_ids_data
+            if artist_matches_track(row[1], normalized_search, row[2], row[3])
+        ]
+    else:
+        ids_result = await db.execute(
+            select(Track.id, Track.artist, Track.title, Track.file_name, UserLibrary.play_count)
+            .join(UserLibrary, UserLibrary.track_id == Track.id)
+            .where(UserLibrary.user_id == user.id)
+            .order_by(UserLibrary.play_count.desc(), Track.title.asc())
+        )
+        all_ids_data = ids_result.all()
+        
+        matching_ids = [
+            row[0] for row in all_ids_data
+            if artist_matches_track(row[1], normalized_search, row[2], row[3])
+        ]
+    
+    total = len(matching_ids)
+    
+    # Phase 2: Load full data only for the requested page
+    page_ids = matching_ids[offset:offset + limit]
+    
+    if not page_ids:
+        return ArtistTracksResponse(
+            items=[],
+            total=total,
+            offset=offset,
+            limit=limit,
+        )
+    
+    # Load full track data for the page
+    if scope == "global":
+        tracks_result = await db.execute(
+            select(Track)
+            .where(Track.id.in_(page_ids))
             .options(
                 selectinload(Track.enrichment),
                 selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
             )
-            .order_by(Track.created_at.desc())
         )
-        all_tracks_raw = tracks_result.unique().scalars().all()
+        tracks_map = {t.id: t for t in tracks_result.unique().scalars().all()}
         
-        # Filter by normalized artist
-        matching_tracks = [
-            track for track in all_tracks_raw
-            if artist_matches_track(track.artist, normalized_search, track.title, track.file_name)
-        ]
-        
-        total = len(matching_tracks)
-        
-        # Get user's library to mark which tracks are in library
+        # Get user's library status for these tracks
         user_lib_result = await db.execute(
             select(UserLibrary.track_id)
             .where(UserLibrary.user_id == user.id)
+            .where(UserLibrary.track_id.in_(page_ids))
         )
         user_library_ids = set(row[0] for row in user_lib_result.all())
         
-        # Paginate
-        paginated = matching_tracks[offset:offset + limit]
-        
         from api.routers.library import track_to_response_global
+        # Preserve order from matching_ids
         tracks_response = [
-            track_to_response_global(track, in_library=track.id in user_library_ids)
-            for track in paginated
+            track_to_response_global(tracks_map[tid], in_library=tid in user_library_ids)
+            for tid in page_ids if tid in tracks_map
         ]
     else:
-        # Library: user's tracks only
         tracks_result = await db.execute(
             select(Track, UserLibrary)
             .join(UserLibrary, UserLibrary.track_id == Track.id)
+            .where(Track.id.in_(page_ids))
             .where(UserLibrary.user_id == user.id)
             .options(
                 selectinload(Track.enrichment),
                 selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
             )
-            .order_by(UserLibrary.play_count.desc(), Track.title.asc())
         )
-        all_tracks = tracks_result.unique().all()
-        
-        # Filter by normalized artist
-        matching_tracks = [
-            (track, lib_entry) for track, lib_entry in all_tracks
-            if artist_matches_track(track.artist, normalized_search, track.title, track.file_name)
-        ]
-        
-        total = len(matching_tracks)
-        
-        # Paginate
-        paginated = matching_tracks[offset:offset + limit]
+        tracks_map = {t.id: (t, lib) for t, lib in tracks_result.unique().all()}
         
         from api.routers.library import track_to_response
-        tracks_response = [track_to_response(track, lib_entry) for track, lib_entry in paginated]
+        # Preserve order from matching_ids
+        tracks_response = [
+            track_to_response(tracks_map[tid][0], tracks_map[tid][1])
+            for tid in page_ids if tid in tracks_map
+        ]
     
     return ArtistTracksResponse(
         items=tracks_response,
