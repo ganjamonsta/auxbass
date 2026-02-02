@@ -308,11 +308,45 @@ export function getDisplayTitle(track) {
 }
 
 /**
+ * Extract artist from filename pattern "Artist - Title.ext"
+ * @param {string} fileName - Filename
+ * @returns {string|null} Extracted artist or null
+ */
+function extractArtistFromFilename(fileName) {
+  if (!fileName) return null
+  
+  // Remove extension
+  const name = fileName.replace(/\.(mp3|flac|wav|ogg|m4a|aac|opus)$/i, '')
+  
+  // Check for "Artist - Title" pattern
+  if (name.includes(' - ')) {
+    const parts = name.split(' - ')
+    const artist = parts[0].trim()
+    if (artist && artist.length > 1) {
+      return artist
+    }
+  }
+  
+  return null
+}
+
+/**
  * Get display artist for a track (for MediaSession, notifications, etc.)
+ * Falls back to extracting artist from filename if no metadata
  * @param {Object} track - Track object with artist property
  * @returns {string} Display artist
  */
 export function getDisplayArtist(track) {
   if (!track) return ''
-  return track.artist || 'Unknown Artist'
+  
+  // 1. Use artist metadata if available
+  if (track.artist) return track.artist
+  
+  // 2. Try to extract from filename (for tracks without metadata)
+  if (track.file_name) {
+    const extracted = extractArtistFromFilename(track.file_name)
+    if (extracted) return extracted
+  }
+  
+  return 'Unknown Artist'
 }
