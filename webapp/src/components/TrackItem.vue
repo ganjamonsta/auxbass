@@ -504,10 +504,25 @@ const albumName = computed(() => {
   transition: all 0.2s ease;
   flex-shrink: 0;
   border-radius: var(--neu-radius-full);
+  box-shadow: 
+    2px 2px 4px var(--neu-shadow-dark),
+    -1px -1px 2px var(--neu-shadow-light),
+    0 0 8px var(--accent-glow, rgba(29, 185, 84, 0.3));
 }
 
 .track-add-library:hover {
-  transform: scale(1.1);
+  transform: scale(1.05);
+  box-shadow: 
+    3px 3px 6px var(--neu-shadow-dark),
+    -2px -2px 4px var(--neu-shadow-light),
+    0 0 12px var(--accent-glow, rgba(29, 185, 84, 0.5));
+}
+
+.track-add-library:active {
+  transform: scale(0.95);
+  box-shadow: 
+    inset 1px 1px 2px rgba(0, 0, 0, 0.2),
+    0 0 8px var(--accent-glow, rgba(29, 185, 84, 0.4));
 }
 
 .in-library-badge {
