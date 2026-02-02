@@ -196,7 +196,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
+import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
@@ -350,8 +350,8 @@ const applyUIScale = () => {
 }
 
 // Watch for scale changes
-const stopWatchingScale = playerStore.$watch(
-  (state) => state.uiScale,
+watch(
+  () => playerStore.uiScale,
   () => applyUIScale(),
   { immediate: true }
 )
@@ -400,7 +400,6 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('resize', updateDesktopState)
   window.removeEventListener('auth:logout', handleAuthLogout)
-  stopWatchingScale()
   // Reset zoom on unmount
   document.body.style.zoom = '1'
 })
