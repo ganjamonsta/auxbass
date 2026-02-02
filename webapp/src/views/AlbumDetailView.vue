@@ -8,7 +8,23 @@
       </div>
       <div class="album-info">
         <h1>{{ album.name }}</h1>
-        <p class="artist" @click="goToArtist">{{ album.artist }}</p>
+        <!-- Artists (clickable, split into separate links) -->
+        <div v-if="parsedAlbumArtists.length > 0" class="artists-container">
+          <svg class="artists-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+          </svg>
+          <span class="artists-links">
+            <template v-for="(artist, index) in parsedAlbumArtists" :key="artist">
+              <button 
+                class="artist-link-inline"
+                @click="goToArtistByName(artist)"
+                @contextmenu.prevent="openMenu('artist', { name: artist }, 'album-header', $event)"
+              >{{ artist }}</button>
+              <span v-if="index < parsedAlbumArtists.length - 1" class="artist-separator">, </span>
+            </template>
+          </span>
+        </div>
+        <p v-else class="artist" @click="goToArtist">{{ album.artist }}</p>
         <p class="meta">
           <span v-if="album.release_date">{{ formatYear(album.release_date) }} • </span>
           <span v-if="album.total_tracks">
@@ -169,6 +185,7 @@ import { useContextMenu } from '@/composables/useContextMenu'
 import TrackItem from '@/components/TrackItem.vue'
 import api, { playerApi } from '@/api/client'
 import { Disc3, Check, Music, X } from 'lucide-vue-next'
+import { splitArtists } from '@/utils/formatters'
 
 // Universal context menu
 const { openMenu } = useContextMenu()
@@ -185,6 +202,12 @@ const loading = ref(true)
 // Scope from query
 const scope = computed(() => route.query.scope || 'library')
 const isGlobal = computed(() => scope.value === 'global')
+
+// Parse album artists into separate names
+const parsedAlbumArtists = computed(() => {
+  if (!album.value?.artist) return []
+  return splitArtists(album.value.artist)
+})
 
 // Missing track modal state
 const showMissingModal = ref(false)
@@ -317,6 +340,14 @@ const goToArtist = () => {
   router.push({ path: `/artist/${encodeURIComponent(album.value.artist)}`, query })
 }
 
+// Navigate to specific artist by name
+const goToArtistByName = (artistName) => {
+  if (artistName) {
+    const query = isGlobal.value ? { scope: 'global' } : {}
+    router.push({ path: `/artist/${encodeURIComponent(artistName)}`, query })
+  }
+}
+
 const handleLikeTrack = async (track) => {
   const newLikedState = await libraryStore.toggleLike(track.id)
   track.is_liked = newLikedState
@@ -433,6 +464,46 @@ watch(
 
 .artist:hover {
   text-decoration: underline;
+}
+
+/* Artists Container - for split artists */
+.artists-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 4px 0;
+}
+
+.artists-icon {
+  flex-shrink: 0;
+  opacity: 0.7;
+  color: var(--text-secondary);
+}
+
+.artists-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0;
+}
+
+.artist-link-inline {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: inherit;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s ease;
+}
+
+.artist-link-inline:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.artist-separator {
+  color: var(--text-tertiary);
 }
 
 .meta {
