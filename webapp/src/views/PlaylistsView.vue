@@ -8,10 +8,16 @@
       </button>
     </div>
 
+    <!-- Search -->
+    <SearchBar
+      v-model="searchQuery"
+      placeholder="Поиск плейлистов..."
+    />
+
     <!-- Playlists grid -->
     <MediaGrid
       type="playlist"
-      :items="playlists"
+      :items="filteredPlaylists"
       :loading="loading"
       @click="goToPlaylist"
       @contextmenu="handleContextMenu"
@@ -70,7 +76,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { useAuthStore } from '@/stores/auth'
@@ -78,6 +84,7 @@ import { useContextMenu } from '@/composables/useContextMenu'
 import api from '@/api/client'
 import { Plus, Heart, FileText } from 'lucide-vue-next'
 import MediaGrid from '@/components/MediaGrid.vue'
+import SearchBar from '@/components/ui/SearchBar.vue'
 
 // Universal context menu
 const { openMenu } = useContextMenu()
@@ -96,6 +103,20 @@ const showCreateModal = ref(false)
 const newPlaylistName = ref('')
 const nameInput = ref(null)
 const likedCount = ref(0)
+
+// Search state
+const searchQuery = ref('')
+
+// Filtered playlists
+const filteredPlaylists = computed(() => {
+  if (!searchQuery.value) {
+    return playlists.value
+  }
+  const query = searchQuery.value.toLowerCase()
+  return playlists.value.filter(p => 
+    p.name.toLowerCase().includes(query)
+  )
+})
 
 // Handle create playlist - check for channel
 const handleCreatePlaylist = () => {

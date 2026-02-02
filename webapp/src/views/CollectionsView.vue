@@ -20,6 +20,19 @@
         </button>
       </div>
 
+      <!-- Info banner -->
+      <div class="info-banner">
+        <div class="banner-icon">
+          <Disc3 :size="20" />
+        </div>
+        <div class="banner-text">
+          <div class="banner-title">{{ albumScope === 'global' ? 'Общая коллекция альбомов' : 'Альбомы в вашей библиотеке' }}</div>
+          <div class="banner-description">
+            {{ albumScope === 'global' ? 'Все альбомы, доступные в системе' : 'Альбомы из вашего канала' }}
+          </div>
+        </div>
+      </div>
+
       <!-- Search -->
       <SearchBar
         v-model="albumSearchQuery"
@@ -66,6 +79,19 @@
 
     <!-- Playlists Tab -->
     <div v-show="activeTab === 'playlists'" class="tab-content">
+      <!-- Info banner -->
+      <div class="info-banner">
+        <div class="banner-icon">
+          <Folder :size="20" />
+        </div>
+        <div class="banner-text">
+          <div class="banner-title">Ваши плейлисты</div>
+          <div class="banner-description">
+            Создавайте и делитесь публичными плейлистами
+          </div>
+        </div>
+      </div>
+
       <!-- Search for playlists -->
       <SearchBar
         v-model="playlistSearchQuery"
@@ -445,6 +471,47 @@ onMounted(() => {
 <style scoped>
 .collections-view {
   padding: 8px 16px 180px 16px;
+}
+
+/* Info banner */
+.info-banner {
+  display: flex;
+  align-items: start;
+  gap: 12px;
+  padding: 16px;
+  background: var(--c-bg-2);
+  border-radius: 12px;
+  margin-bottom: 16px;
+  border: 1px solid var(--c-bg-3);
+}
+
+.banner-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: #000;
+  border-radius: 10px;
+}
+
+.banner-text {
+  flex: 1;
+}
+
+.banner-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-text-1);
+  margin-bottom: 4px;
+}
+
+.banner-description {
+  font-size: 13px;
+  color: var(--c-text-2);
+  line-height: 1.4;
 }
 
 /* Scope switcher uses neu-tab-bar from design-system */

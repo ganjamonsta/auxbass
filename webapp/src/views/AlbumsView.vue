@@ -1,5 +1,12 @@
 <template>
   <div class="albums-view">
+    <!-- Search -->
+    <SearchBar
+      v-model="searchQuery"
+      placeholder="Поиск альбомов..."
+      @input="debouncedSearch"
+    />
+
     <div class="view-header">
       <div class="header-left">
         <h1>Альбомы</h1>
@@ -55,13 +62,14 @@
 </template>
 
 <script setup>
-import { watch } from 'vue'
+import { ref, watch } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { usePagination, useSort } from '@/composables'
 import { useContextMenu } from '@/composables/useContextMenu'
 import PaginationNav from '@/components/PaginationNav.vue'
 import SortChips from '@/components/SortChips.vue'
 import MediaGrid from '@/components/MediaGrid.vue'
+import SearchBar from '@/components/ui/SearchBar.vue'
 import api from '@/api/client'
 
 // Universal context menu
@@ -72,6 +80,19 @@ const handleContextMenu = ({ item, event }) => {
 }
 
 const playerStore = usePlayerStore()
+
+// Search state
+const searchQuery = ref('')
+const debouncedSearchQuery = ref('')
+let searchTimeout = null
+
+const debouncedSearch = () => {
+  if (searchTimeout) clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    debouncedSearchQuery.value = searchQuery.value
+    goToFirst()
+  }, 300)
+}
 
 // Sort state (persisted to localStorage)
 const { 
@@ -116,7 +137,8 @@ const {
         offset, 
         limit,
         sort_by: sortBy.value,
-        sort_order: sortOrder.value
+        sort_order: sortOrder.value,
+        search: debouncedSearchQuery.value || undefined
       }
     })
     return response.data
@@ -125,8 +147,8 @@ const {
   mode: 'windowed'  // Memory optimized - only current page in memory
 })
 
-// Watch sort changes to refresh data
-watch([sortBy, sortOrder], () => {
+// Watch sort and search changes to refresh data
+watch([sortBy, sortOrder, debouncedSearchQuery], () => {
   refresh()
 })
 
