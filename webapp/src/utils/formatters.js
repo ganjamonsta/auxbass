@@ -191,9 +191,16 @@ export function extractFeaturedArtists(title) {
   for (const pattern of remixPatterns) {
     let match
     while ((match = pattern.exec(title)) !== null) {
-      const artist = match[1].trim()
-      if (artist && artist.length > 1) {
-        artists.push(artist)
+      const remixArtist = match[1].trim()
+      if (remixArtist && remixArtist.length > 1) {
+        // Split by common separators (& , x and) to handle "Seven Lions & Dimibo Remix"
+        const remixArtists = remixArtist.split(/\s*(?:&|,|\band\b|\bx\b)\s*/i)
+        for (const ra of remixArtists) {
+          const cleaned = ra.trim()
+          if (cleaned && cleaned.length > 1) {
+            artists.push(cleaned)
+          }
+        }
       }
     }
   }
@@ -202,8 +209,8 @@ export function extractFeaturedArtists(title) {
   const featMatch = title.match(/(?:feat\.?|ft\.?|featuring)\s+([^\(\)\[\]]+?)(?:\s*[\(\[]|$)/i)
   if (featMatch) {
     const featPart = featMatch[1].trim()
-    // Split by & , and
-    const featArtists = featPart.split(/\s*(?:&|,|\band\b)\s*/i)
+    // Split by common separators (& , x and) to handle multiple featured artists
+    const featArtists = featPart.split(/\s*(?:&|,|\band\b|\bx\b)\s*/i)
     for (const fa of featArtists) {
       const cleaned = fa.trim()
       if (cleaned && cleaned.length > 1) {
@@ -220,9 +227,16 @@ export function extractFeaturedArtists(title) {
   for (const pattern of prodPatterns) {
     let match
     while ((match = pattern.exec(title)) !== null) {
-      const artist = match[1].trim()
-      if (artist && artist.length > 1) {
-        artists.push(artist)
+      const prodPart = match[1].trim()
+      if (prodPart && prodPart.length > 1) {
+        // Split by common separators (& , x and) to handle multiple producers
+        const prodArtists = prodPart.split(/\s*(?:&|,|\band\b|\bx\b)\s*/i)
+        for (const pa of prodArtists) {
+          const cleaned = pa.trim()
+          if (cleaned && cleaned.length > 1) {
+            artists.push(cleaned)
+          }
+        }
       }
     }
   }
@@ -230,9 +244,16 @@ export function extractFeaturedArtists(title) {
   // Pattern for vs: "vs. Artist" or "vs Artist"
   const vsMatch = title.match(/\bvs\.?\s+([^\(\)\[\]]+?)(?:\s*[\(\[]|$)/i)
   if (vsMatch) {
-    const artist = vsMatch[1].trim()
-    if (artist && artist.length > 1) {
-      artists.push(artist)
+    const vsPart = vsMatch[1].trim()
+    if (vsPart && vsPart.length > 1) {
+      // Split by common separators (& , x and) to handle multiple artists
+      const vsArtists = vsPart.split(/\s*(?:&|,|\band\b|\bx\b)\s*/i)
+      for (const va of vsArtists) {
+        const cleaned = va.trim()
+        if (cleaned && cleaned.length > 1) {
+          artists.push(cleaned)
+        }
+      }
     }
   }
   
