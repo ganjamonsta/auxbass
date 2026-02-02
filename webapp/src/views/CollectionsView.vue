@@ -72,29 +72,28 @@
         />
       </div>
 
-      <MediaGrid
-        type="album"
-        :items="albums"
-        :loading="loadingAlbums"
-        @click="goToAlbum"
-        @play="playAlbum"
-      />
+      <!-- Loading state with skeletons -->
+      <div v-if="loadingAlbums && !albums.length" class="media-grid type-album">
+        <GridSkeleton v-for="i in 12" :key="i" type="album" />
+      </div>
 
-      <PaginationNav
-        v-if="albumsTotalPages > 1 && !loadingAlbums"
-        :currentPage="albumsPage"
-        :totalPages="albumsTotalPages"
-        :pageInfo="albumsPageInfo"
-        :isFirstPage="albumsPage === 1"
-        :isLastPage="albumsPage >= albumsTotalPages"
-        :loading="loadingAlbums"
-        position="bottom"
-        @goToPage="goToAlbumsPage"
-        @goToFirst="() => goToAlbumsPage(1)"
-        @goToLast="() => goToAlbumsPage(albumsTotalPages)"
-        @prevPage="() => goToAlbumsPage(albumsPage - 1)"
-        @nextPage="() => goToAlbumsPage(albumsPage + 1)"
-      />
+      <template v-else>
+        <MediaGrid
+          type="album"
+          :items="albums"
+          :loading="false"
+          @click="goToAlbum"
+          @play="playAlbum"
+        />
+
+        <!-- Infinite scroll trigger -->
+        <div ref="albumsLoadTrigger" class="load-trigger" v-show="hasMoreAlbums && !loadingAlbums"></div>
+
+        <!-- Loading more indicator -->
+        <div v-if="loadingMoreAlbums" class="loading-more">
+          <div class="spinner"></div>
+        </div>
+      </template>
     </div>
 
     <!-- Playlists Tab -->
@@ -208,10 +207,10 @@ import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
-import PaginationNav from '@/components/PaginationNav.vue'
 import SortChips from '@/components/SortChips.vue'
 import SearchBar from '@/components/ui/SearchBar.vue'
 import MediaGrid from '@/components/MediaGrid.vue'
+import GridSkeleton from '@/components/GridSkeleton.vue'
 import api from '@/api/client'
 import { Disc3, Folder, Plus, Music, Globe, Search, Play } from 'lucide-vue-next'
 
@@ -240,8 +239,7 @@ const changeAlbumScope = (newScope) => {
   }
   albumScope.value = newScope
   localStorage.setItem(ALBUM_SCOPE_KEY, newScope)
-  albumsPage.value = 1
-  loadAlbums()
+  resetAlbums()
 }
 
 // Sort options for albums
@@ -254,11 +252,14 @@ const ALBUM_SORT_OPTIONS = [
 // Albums state
 const albums = ref([])
 const albumsTotal = ref(0)
-const albumsPage = ref(1)
-const albumsTotalPages = ref(1)
-const loadingAlbums = ref(false)
+const albumsOffset = ref(0)
+const loadingAlbums = ref(true)
+const loadingMoreAlbums = ref(false)
+const hasMoreAlbums = ref(true)
 const albumSortBy = ref('release_date')
 const albumSortOrder = ref('desc')
+const albumsLoadTrigger = ref(null)
+let albumsObserver = null
 
 // Album search state
 const albumSearchQuery = ref('')
@@ -270,25 +271,13 @@ const debouncedAlbumSearch = () => {
     clearTimeout(albumSearchTimeout)
   }
   albumSearchTimeout = setTimeout(() => {
-    albumsPage.value = 1
-    loadAlbums()
+    resetAlbums()
   }, 300)
 }
 const albumSortOption = computed(() => {
   return ALBUM_SORT_OPTIONS.find(opt => opt.value === albumSortBy.value) || ALBUM_SORT_OPTIONS[0]
 })
 const ALBUMS_PER_PAGE = 30
-
-// Computed page info for pagination
-const albumsPageInfo = computed(() => {
-  const itemsFrom = (albumsPage.value - 1) * ALBUMS_PER_PAGE + 1
-  const itemsTo = Math.min(albumsPage.value * ALBUMS_PER_PAGE, albumsTotal.value)
-  return {
-    itemsFrom,
-    itemsTo,
-    itemsTotal: albumsTotal.value
-  }
-})
 
 // Playlists state
 const playlists = ref([])
@@ -371,12 +360,17 @@ const togglePlaylistStatus = async (playlist) => {
 }
 
 // Albums functions
-const loadAlbums = async () => {
-  loadingAlbums.value = true
+const loadAlbums = async (append = false) => {
+  if (!append) {
+    loadingAlbums.value = true
+  } else {
+    loadingMoreAlbums.value = true
+  }
+  
   try {
     const endpoint = albumScope.value === 'global' ? '/albums/global' : '/albums'
     const params = {
-      offset: (albumsPage.value - 1) * ALBUMS_PER_PAGE,
+      offset: albumsOffset.value,
       limit: ALBUMS_PER_PAGE,
       sort_by: albumSortBy.value,
       sort_order: albumSortOrder.value,
@@ -388,18 +382,57 @@ const loadAlbums = async () => {
     }
     
     const response = await api.get(endpoint, { params })
-    albums.value = response.data.items || []
+    const newItems = response.data.items || []
+    
+    if (append) {
+      albums.value = [...albums.value, ...newItems]
+    } else {
+      albums.value = newItems
+    }
+    
     albumsTotal.value = response.data.total || 0
-    albumsTotalPages.value = Math.ceil(albumsTotal.value / ALBUMS_PER_PAGE)
+    hasMoreAlbums.value = albums.value.length < albumsTotal.value
   } finally {
     loadingAlbums.value = false
+    loadingMoreAlbums.value = false
   }
 }
 
-const goToAlbumsPage = (page) => {
-  albumsPage.value = page
+const loadMoreAlbums = async () => {
+  if (loadingMoreAlbums.value || loadingAlbums.value || !hasMoreAlbums.value) return
+  albumsOffset.value = albums.value.length
+  await loadAlbums(true)
+}
+
+const resetAlbums = () => {
+  albums.value = []
+  albumsOffset.value = 0
+  hasMoreAlbums.value = true
   loadAlbums()
 }
+
+// Setup IntersectionObserver for albums
+const setupAlbumsObserver = () => {
+  if (albumsObserver) albumsObserver.disconnect()
+  
+  albumsObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting && hasMoreAlbums.value && !loadingAlbums.value && !loadingMoreAlbums.value) {
+        loadMoreAlbums()
+      }
+    },
+    { rootMargin: '200px' }
+  )
+  
+  if (albumsLoadTrigger.value) {
+    albumsObserver.observe(albumsLoadTrigger.value)
+  }
+}
+
+// Watch loadTrigger to setup observer
+watch(albumsLoadTrigger, (el) => {
+  if (el) setupAlbumsObserver()
+})
 
 const goToAlbum = (album) => {
   const query = albumScope.value === 'global' ? { scope: 'global' } : {}
@@ -413,14 +446,12 @@ const onNextAlbumSort = () => {
   const idx = ALBUM_SORT_OPTIONS.findIndex(opt => opt.value === albumSortBy.value)
   const nextIdx = (idx + 1) % ALBUM_SORT_OPTIONS.length
   albumSortBy.value = ALBUM_SORT_OPTIONS[nextIdx].value
-  albumsPage.value = 1
-  loadAlbums()
+  resetAlbums()
 }
 
 const onToggleAlbumOrder = () => {
   albumSortOrder.value = albumSortOrder.value === 'asc' ? 'desc' : 'asc'
-  albumsPage.value = 1
-  loadAlbums()
+  resetAlbums()
 }
 
 const playAlbum = async (album) => {
@@ -530,32 +561,31 @@ onMounted(() => {
   }
   
   // Слушаем событие сброса состояния
-  const handleResetState = (event) => {
-    if (event.detail.route === '/collections') {
-      // Сбрасываем состояние до базового
-      if (activeTab.value === 'albums') {
-        // Сброс поиска
-        albumSearchQuery.value = ''
-        // Сброс сортировки
-        albumSortBy.value = 'release_date'
-        albumSortOrder.value = 'desc'
-        // Переход на первую страницу
-        if (albumsPage.value !== 1) {
-          albumsPage.value = 1
-          loadAlbums()
-        }
-      } else if (activeTab.value === 'playlists') {
-        // Сброс поиска плейлистов
-        playlistSearchQuery.value = ''
-      }
+  window.addEventListener('reset-view-state', handleResetState)
+})
+
+// Handle reset state event
+const handleResetState = (event) => {
+  if (event.detail.route === '/collections') {
+    // Сбрасываем состояние до базового
+    if (activeTab.value === 'albums') {
+      // Сброс поиска
+      albumSearchQuery.value = ''
+      // Сброс сортировки
+      albumSortBy.value = 'release_date'
+      albumSortOrder.value = 'desc'
+      // Сброс и перезагрузка
+      resetAlbums()
+    } else if (activeTab.value === 'playlists') {
+      // Сброс поиска плейлистов
+      playlistSearchQuery.value = ''
     }
   }
-  
-  window.addEventListener('reset-view-state', handleResetState)
-  
-  onUnmounted(() => {
-    window.removeEventListener('reset-view-state', handleResetState)
-  })
+}
+
+onUnmounted(() => {
+  window.removeEventListener('reset-view-state', handleResetState)
+  if (albumsObserver) albumsObserver.disconnect()
 })
 </script>
 
@@ -973,5 +1003,15 @@ onMounted(() => {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+.load-trigger {
+  height: 1px;
+}
+
+.loading-more {
+  display: flex;
+  justify-content: center;
+  padding: 24px;
 }
 </style>

@@ -13,67 +13,50 @@
       />
     </div>
 
-    <!-- Top pagination (shows when not on first page) -->
-    <PaginationNav
-      v-if="!isFirstPage"
-      :currentPage="currentPage"
-      :totalPages="totalPages"
-      :pageInfo="pageInfo"
-      :isFirstPage="isFirstPage"
-      :isLastPage="isLastPage"
-      :loading="loading"
-      position="top"
-      @goToFirst="goToFirst"
-    />
-
-    <div class="albums-grid">
-      <AlbumGridCard
-        v-for="album in albums"
-        :key="album.id"
-        :album="album"
-        @click="$router.push(`/album/${album.id}`)"
-        @play="playAlbum"
-        @contextmenu="(e) => openMenu('album', album, 'library', e)"
-      />
+    <!-- Loading state with skeletons -->
+    <div v-if="loading && !initialized" class="albums-grid">
+      <GridSkeleton v-for="i in 12" :key="i" type="album" />
     </div>
 
-    <div v-if="loading" class="loading">
-      <div class="spinner"></div>
-    </div>
-    
-    <div v-if="!loading && !albums.length" class="empty-state">
-      <span class="empty-icon"><Disc3 :size="48" /></span>
-      <h3 v-if="searchQuery">Ничего не найдено</h3>
-      <p v-else>В библиотеке нет альбомов</p>
-    </div>
+    <!-- Albums grid -->
+    <template v-else>
+      <div class="albums-grid" v-if="albums.length">
+        <AlbumGridCard
+          v-for="album in albums"
+          :key="album.id"
+          :album="album"
+          @click="$router.push(`/album/${album.id}`)"
+          @play="playAlbum"
+          @contextmenu="(e) => openMenu('album', album, 'library', e)"
+        />
+      </div>
 
-    <!-- Bottom pagination -->
-    <PaginationNav
-      v-if="totalPages > 1 && !loading"
-      :currentPage="currentPage"
-      :totalPages="totalPages"
-      :pageInfo="pageInfo"
-      :isFirstPage="isFirstPage"
-      :isLastPage="isLastPage"
-      :loading="loading"
-      position="bottom"
-      @goToPage="goToPage"
-      @goToFirst="goToFirst"
-      @goToLast="goToLast"
-      @prevPage="prevPage"
-      @nextPage="nextPage"
-    />
+      <!-- Empty state -->
+      <div v-else-if="!loading" class="empty-state">
+        <span class="empty-icon"><Disc3 :size="48" /></span>
+        <h3 v-if="searchQuery">Ничего не найдено</h3>
+        <p v-else>В библиотеке нет альбомов</p>
+      </div>
+
+      <!-- Infinite scroll trigger -->
+      <div ref="loadTriggerRef" class="load-trigger" v-show="hasMore && !loading"></div>
+
+      <!-- Loading more indicator -->
+      <div v-if="loadingMore" class="loading-more">
+        <div class="spinner"></div>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup>
 import { watch } from 'vue'
 import { usePlayerStore } from '@/stores/player'
-import { usePagination, useSort } from '@/composables'
+import { useVirtualScroll, useSort } from '@/composables'
 import { useContextMenu } from '@/composables/useContextMenu'
-import PaginationNav from '@/components/PaginationNav.vue'
 import SortChips from '@/components/SortChips.vue'
 import AlbumGridCard from '@/components/AlbumGridCard.vue'
+import GridSkeleton from '@/components/GridSkeleton.vue'
 import api from '@/api/client'
 import { Disc3 } from 'lucide-vue-next'
 
@@ -101,31 +84,26 @@ const {
 // Sort handlers
 const onNextSort = () => {
   nextSort()
-  goToFirst()
+  reset()
 }
 
 const onToggleOrder = () => {
   toggleOrder()
-  goToFirst()
+  reset()
 }
 
-// Pagination with unified composable
+// Infinite scroll with unified composable
 const { 
   items: albums, 
   total, 
   loading,
-  currentPage,
-  totalPages,
-  isFirstPage,
-  isLastPage,
-  pageInfo,
-  goToPage,
-  goToFirst,
-  goToLast,
-  prevPage,
-  nextPage,
+  loadingMore,
+  hasMore,
+  initialized,
+  loadTriggerRef,
+  reset,
   refresh
-} = usePagination({
+} = useVirtualScroll({
   fetchFn: async ({ offset, limit }) => {
     const params = { 
       offset, 
@@ -139,18 +117,12 @@ const {
     const response = await api.get('/albums', { params })
     return response.data
   },
-  limit: 30,
-  mode: 'windowed'
+  limit: 30
 })
 
 // Watch search query to reload
 watch(() => props.searchQuery, () => {
-  goToFirst()
-})
-
-// Watch sort changes to refresh data
-watch([sortBy, sortOrder], () => {
-  refresh()
+  reset()
 })
 
 const playAlbum = async (album) => {
@@ -242,6 +214,16 @@ const playAlbum = async (album) => {
   font-size: 48px;
   margin-bottom: 16px;
   display: block;
+}
+
+.load-trigger {
+  height: 1px;
+}
+
+.loading-more {
+  display: flex;
+  justify-content: center;
+  padding: 24px;
 }
 
 @keyframes spin {

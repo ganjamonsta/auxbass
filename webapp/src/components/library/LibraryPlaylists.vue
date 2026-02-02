@@ -11,8 +11,19 @@
       </button>
     </div>
 
+    <!-- Loading state with skeletons -->
+    <div v-if="loading" class="playlists-grid">
+      <!-- Liked card skeleton -->
+      <div class="playlist-card liked-card skeleton-liked">
+        <div class="playlist-cover liked-cover"></div>
+        <div class="skeleton-text"></div>
+        <div class="skeleton-meta"></div>
+      </div>
+      <GridSkeleton v-for="i in 8" :key="i" type="playlist" />
+    </div>
+
     <!-- Playlists grid -->
-    <div class="playlists-grid" v-if="playlists.length">
+    <div class="playlists-grid" v-else-if="playlists.length">
         <!-- Liked tracks special card - maybe redundant if we have quick access above, but consistent with PlaylistsView -->
         <!-- Actually I moved liked card to `actions-header` or keep it in grid? -->
         <!-- PlaylistsView has it as a special card. Let's keep consistency. -->
@@ -63,10 +74,7 @@
       </template>
     </div>
 
-    <!-- Loading -->
-    <div v-if="loading" class="loading">
-      <div class="spinner"></div>
-    </div>
+
 
     <!-- Create modal -->
     <div v-if="showCreateModal" class="modal-overlay" @click.self="closeModal">
@@ -101,6 +109,7 @@ import { useLibraryStore } from '@/stores/library'
 import { useContextMenu } from '@/composables/useContextMenu'
 import api from '@/api/client'
 import { Heart, Plus, Music, Link, FileText } from 'lucide-vue-next'
+import GridSkeleton from '@/components/GridSkeleton.vue'
 
 // Universal context menu
 const { openMenu } = useContextMenu()
@@ -116,7 +125,7 @@ const router = useRouter()
 const libraryStore = useLibraryStore()
 
 const playlists = ref([])
-const loading = ref(false)
+const loading = ref(true)
 const showCreateModal = ref(false)
 const newPlaylistName = ref('')
 const nameInput = ref(null)
@@ -452,5 +461,33 @@ onMounted(() => {
   justify-content: center;
   padding: 48px 24px;
   text-align: center;
+}
+
+/* Skeleton styles */
+.skeleton-liked .playlist-cover {
+  background: var(--bg-tertiary);
+}
+
+.skeleton-text {
+  height: 14px;
+  width: 80%;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  margin-top: 8px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-meta {
+  height: 12px;
+  width: 50%;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  margin-top: 6px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
 }
 </style>

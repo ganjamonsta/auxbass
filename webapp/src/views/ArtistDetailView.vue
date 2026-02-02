@@ -1,5 +1,31 @@
 <template>
-  <div class="artist-detail-view" v-if="artist">
+  <!-- Loading skeleton for entire page -->
+  <div class="artist-detail-view" v-if="loading && !artist">
+    <!-- Artist header skeleton -->
+    <div class="artist-header">
+      <div class="artist-image skeleton-image"></div>
+      <div class="artist-info">
+        <div class="skeleton-title"></div>
+        <div class="skeleton-meta"></div>
+      </div>
+    </div>
+
+    <!-- Actions skeleton -->
+    <div class="artist-actions">
+      <div class="skeleton-buttons"></div>
+    </div>
+
+    <!-- Tracks section skeleton -->
+    <section class="section">
+      <div class="skeleton-section-title"></div>
+      <div class="track-list">
+        <TrackSkeleton v-for="i in 8" :key="i" />
+      </div>
+    </section>
+  </div>
+
+  <!-- Actual content -->
+  <div class="artist-detail-view" v-else-if="artist">
     <!-- Artist header -->
     <div class="artist-header">
       <div class="artist-image">
@@ -104,10 +130,6 @@
         <Globe :size="16" /> Посмотреть всю музыку артиста
       </button>
     </div>
-  </div>
-
-  <div v-else-if="loading" class="loading">
-    <div class="spinner"></div>
   </div>
 </template>
 
@@ -544,12 +566,59 @@ watch(
   animation: spin 0.8s linear infinite;
 }
 
-.loading .spinner {
-  width: 32px;
-  height: 32px;
-}
-
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* Page skeleton styles */
+.skeleton-image {
+  background: var(--xm-bg-surface, #222);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-title {
+  height: 28px;
+  width: 180px;
+  background: var(--xm-bg-surface, #222);
+  border-radius: 4px;
+  margin-bottom: 8px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-meta {
+  height: 16px;
+  width: 140px;
+  background: var(--xm-bg-surface, #222);
+  border-radius: 4px;
+  animation: pulse 1.5s ease-in-out infinite;
+  animation-delay: 0.1s;
+}
+
+.skeleton-buttons {
+  width: 100px;
+  height: 48px;
+  background: var(--xm-bg-surface, #222);
+  border-radius: 24px;
+  animation: pulse 1.5s ease-in-out infinite;
+  animation-delay: 0.2s;
+}
+
+.skeleton-section-title {
+  height: 20px;
+  width: 100px;
+  background: var(--xm-bg-surface, #222);
+  border-radius: 4px;
+  margin-bottom: 16px;
+  animation: pulse 1.5s ease-in-out infinite;
+  animation-delay: 0.3s;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
 }
 </style>

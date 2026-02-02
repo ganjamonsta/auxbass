@@ -18,10 +18,10 @@
 
     <!-- Track list -->
     <div class="track-list" ref="trackListRef">
-      <div v-if="loading && !tracks.length" class="loading">
-        <div class="spinner"></div>
-        <span>Загрузка...</span>
-      </div>
+      <!-- Loading state with skeletons -->
+      <template v-if="loading && !tracks.length">
+        <TrackSkeleton v-for="i in 12" :key="i" />
+      </template>
       
       <template v-else>
         <!-- Section: My Library results -->
@@ -46,10 +46,11 @@
           @hdNotice="handleHdNotice"
         />
         
-        <div v-if="hasMore && !searchQuery" class="load-more">
-          <button @click="loadMore" :disabled="loading">
-            {{ loading ? 'Загрузка...' : 'Загрузить ещё' }}
-          </button>
+        <div v-if="hasMore && !searchQuery" class="load-trigger" ref="loadTriggerRef"></div>
+        
+        <!-- Loading more indicator -->
+        <div v-if="loadingMore && !searchQuery" class="loading-more">
+          <div class="spinner small"></div>
         </div>
         
         <!-- Section: Friends' Libraries results (only when searching) -->
@@ -128,7 +129,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
@@ -137,6 +138,7 @@ import { useUIStore } from '@/stores/ui'
 import { useSort } from '@/composables'
 import { useContextMenu } from '@/composables/useContextMenu'
 import TrackItem from '@/components/TrackItem.vue'
+import TrackSkeleton from '@/components/TrackSkeleton.vue'
 import SortChips from '@/components/SortChips.vue'
 import api, { playerApi, tracksApi, socialApi } from '@/api/client'
 import { Users, Music, Globe } from 'lucide-vue-next'
@@ -166,11 +168,14 @@ const {
   toggleOrder 
 } = useSort('library-sort', 'library', { sortBy: 'added_at', sortOrder: 'desc' })
 
-const loading = ref(false)
+const loading = ref(true)
+const loadingMore = ref(false)
 const tracks = ref([])
 const page = ref(1)
 const total = ref(0)
 const perPage = 50
+const loadTriggerRef = ref(null)
+let observer = null
 
 // Global search results
 const globalTracks = ref([])
@@ -234,28 +239,39 @@ const loadTracks = async () => {
     total.value = libraryStore.total
   } finally {
     loading.value = false
+    loadingMore.value = false
   }
 }
 
 const loadMore = async () => {
+  if (loadingMore.value || loading.value || !hasMore.value) return
+  loadingMore.value = true
   page.value++
-  // Here is the issue: if loadTracks replaces `tracks.value`, then we lose previous items.
-  // I will check if I should append.
-  // Given user wants "Auto loading" (infinite scroll), likely we want to append.
-  // But I am just refactoring now.
-  // If I change it to `if (page.value > 1) tracks.value.push(...)` that might be safer.
-  // BUT I'll stick to 1:1 copy for now to minimize bugs, assuming the `libraryStore` handles it?
-  // Let's check `libraryStore.tracks` behavior if I can.
-  // Actually, I'll just check if the user asked for infinite scroll previously and if it was implemented in `ArtistsView` but not `LibraryView` yet?
-  // The summary says "Pagination seems inappropriate... need auto-loading".
-  // `ArtistsView` uses `IntersectionObserver`.
-  // `LibraryView` uses "Load More" button.
-  // User asked "unify these sortings" and "use window...".
-  // I should probably also implement infinite scroll here since I am touching it?
-  // User said "buttons at the top... showing here list... expanded view".
-  // I'll stick to "Load More" button to keep this step focused on architecture, unless requested otherwise.
-  
   await loadTracks()
+}
+
+// Setup IntersectionObserver for infinite scroll
+const setupObserver = () => {
+  if (observer) observer.disconnect()
+  
+  observer = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting && hasMore.value && !loading.value && !loadingMore.value) {
+        loadMore()
+      }
+    },
+    { rootMargin: '200px' }
+  )
+  
+  if (loadTriggerRef.value) {
+    observer.observe(loadTriggerRef.value)
+  }
+}
+
+// Watch loadTriggerRef to setup observer when element appears
+watch(loadTriggerRef, (el) => {
+  if (el) setupObserver()
+})
 }
 
 // Search global library for additional results
@@ -411,6 +427,10 @@ const handleHdNotice = (track) => {
 
 onMounted(() => {
   loadTracks()
+})
+
+onUnmounted(() => {
+  if (observer) observer.disconnect()
 })
 </script>
 
@@ -578,5 +598,15 @@ onMounted(() => {
   height: 16px;
   border-width: 2px;
   margin-bottom: 0;
+}
+
+.load-trigger {
+  height: 1px;
+}
+
+.loading-more {
+  display: flex;
+  justify-content: center;
+  padding: 24px;
 }
 </style>

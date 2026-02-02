@@ -14,11 +14,23 @@
       placeholder="Поиск плейлистов..."
     />
 
+    <!-- Loading state with skeletons -->
+    <div v-if="loading" class="media-grid type-playlist">
+      <!-- Liked card skeleton -->
+      <div class="playlist-card liked-card skeleton-liked">
+        <div class="playlist-cover liked-cover"></div>
+        <div class="skeleton-text"></div>
+        <div class="skeleton-meta"></div>
+      </div>
+      <GridSkeleton v-for="i in 8" :key="i" type="playlist" />
+    </div>
+
     <!-- Playlists grid -->
     <MediaGrid
+      v-else
       type="playlist"
       :items="filteredPlaylists"
-      :loading="loading"
+      :loading="false"
       @click="goToPlaylist"
       @contextmenu="handleContextMenu"
     >
@@ -43,11 +55,6 @@
        </div>
       </template>
     </MediaGrid>
-
-    <!-- Loading -->
-    <div v-if="loading" class="loading">
-      <div class="spinner"></div>
-    </div>
 
     <!-- Create modal -->
     <div v-if="showCreateModal" class="modal-overlay" @click.self="closeModal">
@@ -84,6 +91,7 @@ import { useContextMenu } from '@/composables/useContextMenu'
 import api from '@/api/client'
 import { Plus, Heart, FileText } from 'lucide-vue-next'
 import MediaGrid from '@/components/MediaGrid.vue'
+import GridSkeleton from '@/components/GridSkeleton.vue'
 import SearchBar from '@/components/ui/SearchBar.vue'
 
 // Universal context menu
@@ -98,7 +106,7 @@ const libraryStore = useLibraryStore()
 const authStore = useAuthStore()
 
 const playlists = ref([])
-const loading = ref(false)
+const loading = ref(true)
 const showCreateModal = ref(false)
 const newPlaylistName = ref('')
 const nameInput = ref(null)
@@ -403,5 +411,33 @@ const openModal = async () => {
 .confirm-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Skeleton styles */
+.skeleton-liked .playlist-cover {
+  background: var(--bg-tertiary);
+}
+
+.skeleton-text {
+  height: 14px;
+  width: 80%;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  margin-top: 8px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-meta {
+  height: 12px;
+  width: 50%;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  margin-top: 6px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
 }
 </style>
