@@ -128,10 +128,7 @@ const handleNavClick = (path) => {
 
 <style scoped>
 .mobile-footer {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  flex-shrink: 0;
   z-index: var(--z-overlay, 100);
   background: var(--bg-secondary);
   border-top: 1px solid var(--border);

@@ -442,8 +442,11 @@ html, body {
 .app {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
+  overflow: hidden;
 }
 
 /* Desktop Layout - CSS Grid */
@@ -512,13 +515,12 @@ html, body {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  /* Mobile: add padding for fixed footer */
-  padding-bottom: var(--nav-height, 60px);
+  min-height: 0;
 }
 
-/* When player is showing, add extra space for it */
+/* Mobile: no extra padding needed since footer is in flex layout */
 .app.has-player .main-content {
-  padding-bottom: calc(var(--nav-height, 60px) + var(--player-height, 64px));
+  /* No extra padding needed */
 }
 
 /* Desktop: no extra padding needed, grid handles it */
