@@ -31,6 +31,24 @@ from ..albums import album_service
 logger = logging.getLogger(__name__)
 
 
+def sanitize_artist(artist: Optional[str]) -> Optional[str]:
+    """Sanitize artist name to prevent URL routing issues.
+    
+    Removes forward slashes that would break REST API paths like /api/artists/{name}
+    """
+    if not artist:
+        return artist
+    
+    # Replace forward slashes with space/comma/and depending on context
+    # "Ecco2k/Bladee" -> "Ecco2k & Bladee"
+    artist = artist.replace('/', ' & ')
+    
+    # Clean up multiple spaces
+    artist = ' '.join(artist.split())
+    
+    return artist.strip()
+
+
 @dataclass
 class SaveTrackResult:
     """Result of saving a track"""
@@ -145,11 +163,14 @@ class TrackService:
                     session.add(user)
                     await session.flush()
                 
+                # Sanitize artist name to prevent URL issues
+                sanitized_artist = sanitize_artist(artist)
+                
                 track = Track(
                     file_id=file_id,
                     file_unique_id=file_unique_id,
                     title=title,
-                    artist=artist,
+                    artist=sanitized_artist,
                     duration=duration,
                     file_size=file_size,
                     mime_type=mime_type,
@@ -324,9 +345,11 @@ class TrackService:
                 track.title = title
                 changed = True
             
-            if artist and artist != track.artist:
-                track.artist = artist
-                changed = True
+            if artist:
+                sanitized_artist = sanitize_artist(artist)
+                if sanitized_artist != track.artist:
+                    track.artist = sanitized_artist
+                    changed = True
             
             if changed:
                 track.updated_at = datetime.utcnow()
