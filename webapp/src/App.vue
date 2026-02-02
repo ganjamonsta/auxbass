@@ -1,5 +1,5 @@
 <template>
-  <div class="app spotify-theme" :class="appClasses" :style="{ zoom: playerStore.uiScale }">
+  <div class="app spotify-theme" :class="appClasses">
     <!-- Auth checking state -->
     <div v-if="authStore.loading && !authStore.initialized" class="auth-loading">
       <div class="auth-spinner"></div>
@@ -344,8 +344,23 @@ const handleAuthLogout = () => {
   window.location.href = '/login'
 }
 
+// Apply UI scale to body
+const applyUIScale = () => {
+  document.body.style.zoom = playerStore.uiScale
+}
+
+// Watch for scale changes
+const stopWatchingScale = playerStore.$watch(
+  (state) => state.uiScale,
+  () => applyUIScale(),
+  { immediate: true }
+)
+
 // Initialize auth on mount
 onMounted(async () => {
+  // Apply initial scale
+  applyUIScale()
+  
   // Initialize Telegram WebApp
   if (telegram) {
     telegram.ready()
@@ -385,6 +400,9 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('resize', updateDesktopState)
   window.removeEventListener('auth:logout', handleAuthLogout)
+  stopWatchingScale()
+  // Reset zoom on unmount
+  document.body.style.zoom = '1'
 })
 </script>
 
