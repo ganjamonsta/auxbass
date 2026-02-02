@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Header, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 import aiohttp
 import asyncio
 
@@ -120,7 +121,10 @@ def validate_stream_token(token: str) -> Optional[tuple[int, int, str]]:
 async def find_streamable_alternative(track: Track, db: AsyncSession) -> Optional[Track]:
     """
     Find a streamable (MP3) alternative for an HD track.
-    Matches by normalized title and artist.
+    Matches by normalized title and artist, with additional validation:
+    - Duration difference < 5 seconds
+    - File size smaller than original (MP3 should be smaller than HD)
+    - Deezer track ID match (if available)
     """
     if not track.title:
         return None
@@ -128,6 +132,11 @@ async def find_streamable_alternative(track: Track, db: AsyncSession) -> Optiona
     # Normalize for matching
     norm_title = normalize_title(track.title).lower()
     norm_artist = normalize_artist(track.artist or "").lower() if track.artist else None
+    
+    # Get HD track enrichment data for Deezer ID matching
+    hd_deezer_id = None
+    if track.enrichment:
+        hd_deezer_id = track.enrichment.deezer_track_id
     
     # Find MP3 tracks with similar title/artist
     # Using func.lower() for case-insensitive search in DB
@@ -142,12 +151,16 @@ async def find_streamable_alternative(track: Track, db: AsyncSession) -> Optiona
                 Track.mime_type == None,  # Legacy tracks without mime_type are usually MP3
             )
         )
+        .options(selectinload(Track.enrichment))  # Load enrichment for deezer_id check
     )
     
     result = await db.execute(query)
     candidates = result.scalars().all()
     
-    # Find best match
+    # Find best match with scoring
+    best_match = None
+    best_score = 0
+    
     for candidate in candidates:
         if not candidate.title:
             continue
@@ -164,8 +177,48 @@ async def find_streamable_alternative(track: Track, db: AsyncSession) -> Optiona
             if norm_artist != cand_norm_artist:
                 continue
         
-        # Found a match - prefer smaller file (more likely to stream well)
-        return candidate
+        # Calculate match score
+        score = 0
+        
+        # Check Deezer ID match (highest priority)
+        if hd_deezer_id and candidate.enrichment:
+            if candidate.enrichment.deezer_track_id == hd_deezer_id:
+                score += 100  # Perfect match via Deezer
+        
+        # Check duration similarity (±5 seconds)
+        if track.duration and candidate.duration:
+            duration_diff = abs(track.duration - candidate.duration)
+            if duration_diff <= 5:
+                score += 50  # Good duration match
+            elif duration_diff <= 10:
+                score += 20  # Acceptable duration match
+            else:
+                continue  # Duration too different, skip
+        
+        # Check file size (MP3 should be smaller than HD)
+        if track.file_size and candidate.file_size:
+            if candidate.file_size < track.file_size:
+                # MP3 is smaller than HD - good sign
+                size_ratio = track.file_size / candidate.file_size
+                if 2 <= size_ratio <= 10:  # Typical HD/MP3 ratio
+                    score += 30
+                elif size_ratio > 1.5:  # At least somewhat smaller
+                    score += 10
+        
+        # Prefer smaller files (better for streaming)
+        if candidate.file_size:
+            file_size_mb = candidate.file_size / (1024 * 1024)
+            if file_size_mb < 10:
+                score += 5
+        
+        # Update best match
+        if score > best_score:
+            best_score = score
+            best_match = candidate
+    
+    # Require minimum score to avoid false matches
+    if best_match and best_score >= 20:  # At least title+artist match + some validation
+        return best_match
     
     return None
 
@@ -174,6 +227,10 @@ async def find_hd_alternative(track: Track, db: AsyncSession) -> Optional[Track]
     """
     Find an HD (FLAC/WAV) alternative for an MP3 track.
     Useful to show user that HD version is available.
+    Matches by normalized title and artist, with additional validation:
+    - Duration difference < 5 seconds
+    - File size larger than original (HD should be larger than MP3)
+    - Deezer track ID match (if available)
     """
     if not track.title:
         return None
@@ -182,6 +239,11 @@ async def find_hd_alternative(track: Track, db: AsyncSession) -> Optional[Track]
     norm_title = normalize_title(track.title).lower()
     norm_artist = normalize_artist(track.artist or "").lower() if track.artist else None
     
+    # Get MP3 track enrichment data for Deezer ID matching
+    mp3_deezer_id = None
+    if track.enrichment:
+        mp3_deezer_id = track.enrichment.deezer_track_id
+    
     # Find HD tracks with similar title/artist
     hd_mime_list = list(HD_MIME_TYPES)
     query = (
@@ -189,12 +251,16 @@ async def find_hd_alternative(track: Track, db: AsyncSession) -> Optional[Track]
         .where(Track.id != track.id)
         .where(Track.is_unavailable == False)
         .where(Track.mime_type.in_(hd_mime_list))
+        .options(selectinload(Track.enrichment))  # Load enrichment for deezer_id check
     )
     
     result = await db.execute(query)
     candidates = result.scalars().all()
     
-    # Find best match
+    # Find best match with scoring
+    best_match = None
+    best_score = 0
+    
     for candidate in candidates:
         if not candidate.title:
             continue
@@ -211,7 +277,42 @@ async def find_hd_alternative(track: Track, db: AsyncSession) -> Optional[Track]
             if norm_artist != cand_norm_artist:
                 continue
         
-        return candidate
+        # Calculate match score
+        score = 0
+        
+        # Check Deezer ID match (highest priority)
+        if mp3_deezer_id and candidate.enrichment:
+            if candidate.enrichment.deezer_track_id == mp3_deezer_id:
+                score += 100  # Perfect match via Deezer
+        
+        # Check duration similarity (±5 seconds)
+        if track.duration and candidate.duration:
+            duration_diff = abs(track.duration - candidate.duration)
+            if duration_diff <= 5:
+                score += 50  # Good duration match
+            elif duration_diff <= 10:
+                score += 20  # Acceptable duration match
+            else:
+                continue  # Duration too different, skip
+        
+        # Check file size (HD should be larger than MP3)
+        if track.file_size and candidate.file_size:
+            if candidate.file_size > track.file_size:
+                # HD is larger than MP3 - good sign
+                size_ratio = candidate.file_size / track.file_size
+                if 2 <= size_ratio <= 10:  # Typical HD/MP3 ratio
+                    score += 30
+                elif size_ratio > 1.5:  # At least somewhat larger
+                    score += 10
+        
+        # Update best match
+        if score > best_score:
+            best_score = score
+            best_match = candidate
+    
+    # Require minimum score to avoid false matches
+    if best_match and best_score >= 20:  # At least title+artist match + some validation
+        return best_match
     
     return None
 
@@ -425,9 +526,11 @@ async def get_stream_url(
     - Any public track (from global library)
     - Their own private tracks
     """
-    # Get track (any track, we'll check permissions)
+    # Get track (any track, we'll check permissions) - load enrichment for better matching
     original_track = await db.scalar(
-        select(Track).where(Track.id == track_id)
+        select(Track)
+        .where(Track.id == track_id)
+        .options(selectinload(Track.enrichment))
     )
     
     if not original_track:
@@ -455,7 +558,11 @@ async def get_stream_url(
         
         if mp3_alt:
             # Found MP3 alternative - use it for streaming, save HD info
-            logger.info(f"[Stream Request] Found MP3 alternative: track {mp3_alt.id} for HD/large track {track_id}")
+            mp3_size_mb = (mp3_alt.file_size or 0) / (1024 * 1024)
+            logger.info(
+                f"[Stream Request] ✅ Auto-substitution: HD track {track_id} ({file_size_mb:.1f}MB, {original_track.mime_type}) "
+                f"-> MP3 track {mp3_alt.id} ({mp3_size_mb:.1f}MB)"
+            )
             track = mp3_alt
             hd_track_info = {
                 "id": original_track.id,
@@ -463,7 +570,7 @@ async def get_stream_url(
             }
         else:
             # No MP3 alternative - can't stream
-            logger.warning(f"[Stream Request] Track {track_id} ({reason}) has no MP3 alternative")
+            logger.warning(f"[Stream Request] ❌ Track {track_id} ({reason}) has no MP3 alternative")
             if is_track_hd:
                 raise HTTPException(
                     status_code=503,

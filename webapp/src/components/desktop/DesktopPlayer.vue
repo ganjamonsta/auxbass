@@ -459,7 +459,6 @@ onUnmounted(() => {
 
 .lcd-text-container {
   flex: 1;
-  max-width: 500px;
   overflow: hidden;
   mask-image: linear-gradient(90deg, transparent, black 3%, black 97%, transparent);
 }

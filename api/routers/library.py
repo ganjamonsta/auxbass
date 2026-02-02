@@ -114,6 +114,17 @@ def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None)
         liked_at = library_entry.liked_at
         play_count = library_entry.play_count or 0
     
+    # Check if track is streamable
+    track_is_streamable = is_streamable(track.mime_type)
+    
+    # Initialize IDs for alternative versions
+    streamable_id = None  # MP3 version if this is HD
+    hd_id = None  # HD version if this is MP3
+    
+    # Note: Alternative version lookup happens on-demand during playback
+    # Here we just set flags and return original track info
+    # The API will auto-substitute during /stream/{track_id} request
+    
     return TrackResponse(
         id=track.id,
         telegram_file_id=track.file_id,
@@ -124,7 +135,9 @@ def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None)
         mime_type=track.mime_type,
         library_source=source,
         enrichment_status=track.enrichment_status.value if track.enrichment_status else None,
-        is_streamable=is_streamable(track.mime_type),
+        is_streamable=track_is_streamable,
+        streamable_id=streamable_id,  # Will be resolved on-demand
+        hd_id=hd_id,  # Will be resolved on-demand
         album=album_info,
         album_name=album_info["name"] if album_info else None,
         cover_url=enrichment.cover_url if enrichment else None,
@@ -158,6 +171,9 @@ def track_to_response_global(track: Track, in_library: bool = False) -> TrackRes
                 "cover_url": album.cover_url,
             }
     
+    # Check if track is streamable
+    track_is_streamable = is_streamable(track.mime_type)
+    
     return TrackResponse(
         id=track.id,
         telegram_file_id=track.file_id,
@@ -168,7 +184,9 @@ def track_to_response_global(track: Track, in_library: bool = False) -> TrackRes
         mime_type=track.mime_type,
         library_source="global",
         enrichment_status=track.enrichment_status.value if track.enrichment_status else None,
-        is_streamable=is_streamable(track.mime_type),
+        is_streamable=track_is_streamable,
+        streamable_id=None,  # Will be resolved on-demand
+        hd_id=None,  # Will be resolved on-demand
         album=album_info,
         album_name=album_info["name"] if album_info else None,
         cover_url=enrichment.cover_url if enrichment else None,

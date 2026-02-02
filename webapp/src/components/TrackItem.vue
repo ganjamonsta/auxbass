@@ -54,12 +54,18 @@
     
     <!-- Large file or HD: show size + download button instead of duration -->
     <template v-if="isLargeFile && !track.is_unavailable">
-      <span v-if="isHdFormat" class="hd-badge-mini" title="Высокое качество (FLAC/WAV)">HD</span>
+      <span 
+        v-if="isHdFormat" 
+        class="hd-badge-mini" 
+        :title="track.streamable_id ? 'Высокое качество (FLAC/WAV) - будет воспроизведена MP3 версия' : 'Высокое качество (FLAC/WAV) - только скачивание'"
+      >
+        HD
+      </span>
       <span class="track-filesize">{{ fileSizeMB }} MB</span>
       <button 
         class="track-download" 
         @click.stop="$emit('download')"
-        title="Скачать файл"
+        title="Скачать HD версию"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
           <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
