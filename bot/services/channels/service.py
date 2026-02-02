@@ -604,6 +604,8 @@ class ChannelService:
         Update channel messages for tracks that were synced before enrichment completed.
         Finds messages where track now has enrichment data but message has incomplete hashtags.
         
+        OPTIMIZED: Pre-calculates expected hashtags and only processes messages that need updates.
+        
         Args:
             user_id: Specific user to update, or None for all users
             bot: Bot instance
@@ -617,7 +619,7 @@ class ChannelService:
             logger.error("No bot instance available for updating messages")
             return {"checked": 0, "updated": 0, "failed": 0}
         
-        stats = {"checked": 0, "updated": 0, "failed": 0}
+        stats = {"checked": 0, "updated": 0, "failed": 0, "skipped": 0}
         
         async with get_session() as session:
             # Build query for ALL channel messages for this user
@@ -647,20 +649,12 @@ class ChannelService:
             total = len(messages)
             logger.info(f"Checking {total} channel messages for incomplete hashtags")
             
-            last_progress_update = 0
-            for i, msg in enumerate(messages):
-                stats["checked"] += 1
-                
-                # Update progress every 5 messages or every 2 seconds worth of work
-                if progress_callback and (i - last_progress_update >= 5 or i == 0):
-                    try:
-                        await progress_callback(i, total, stats["updated"])
-                        last_progress_update = i
-                    except:
-                        pass
-                
+            # OPTIMIZATION: Pre-calculate all expected hashtags in memory first
+            # This is much faster than doing it during iteration with API calls
+            messages_to_update = []
+            
+            for msg in messages:
                 track = msg.track
-                channel = msg.channel
                 enrichment = track.enrichment
                 
                 # Parse current hashtags
@@ -681,6 +675,7 @@ class ChannelService:
                 
                 # Check if update needed (compare sets to ignore order)
                 if set(current_hashtags) == set(expected_hashtags):
+                    stats["skipped"] += 1
                     continue  # Already up to date
                 
                 # Build new caption
@@ -698,6 +693,45 @@ class ChannelService:
                 
                 caption = "\n".join(caption_parts)
                 
+                messages_to_update.append({
+                    "msg": msg,
+                    "channel": msg.channel,
+                    "caption": caption,
+                    "expected_hashtags": expected_hashtags,
+                })
+            
+            stats["checked"] = total
+            update_total = len(messages_to_update)
+            logger.info(f"Found {update_total} messages that need hashtag updates (skipped {stats['skipped']} up-to-date)")
+            
+            # If nothing to update, return early
+            if update_total == 0:
+                if progress_callback:
+                    try:
+                        await progress_callback(total, total, 0)
+                    except:
+                        pass
+                return stats
+            
+            # OPTIMIZATION: Progress update every 50 messages or 10% of total, whichever is smaller
+            progress_step = min(50, max(1, update_total // 10))
+            last_progress_update = 0
+            batch_count = 0
+            
+            for i, item in enumerate(messages_to_update):
+                msg = item["msg"]
+                channel = item["channel"]
+                caption = item["caption"]
+                expected_hashtags = item["expected_hashtags"]
+                
+                # Update progress less frequently to reduce Telegram API overhead
+                if progress_callback and (i - last_progress_update >= progress_step or i == 0):
+                    try:
+                        await progress_callback(stats["skipped"] + i, total, stats["updated"])
+                        last_progress_update = i
+                    except:
+                        pass
+                
                 try:
                     await use_bot.edit_message_caption(
                         chat_id=channel.channel_id,
@@ -709,13 +743,17 @@ class ChannelService:
                     msg.hashtags = json.dumps(expected_hashtags)
                     msg.updated_at = datetime.utcnow()
                     stats["updated"] += 1
+                    batch_count += 1
                     
-                    # Rate limiting
-                    await asyncio.sleep(0.5)
+                    # OPTIMIZATION: Minimal rate limiting - Telegram allows ~30 edits/sec for own channels
+                    # Only add delay every 20 messages to stay well under limits
+                    if batch_count >= 20:
+                        await asyncio.sleep(0.5)
+                        batch_count = 0
                     
                 except TelegramBadRequest as e:
                     if "message is not modified" in str(e):
-                        pass  # Same content
+                        pass  # Same content - no delay needed
                     elif "message to edit not found" in str(e).lower():
                         # Message was deleted, remove record
                         await session.delete(msg)
@@ -725,9 +763,11 @@ class ChannelService:
                 except TelegramForbiddenError:
                     channel.is_active = False
                     stats["failed"] += 1
+                    break  # No point continuing if we lost access
                 except TelegramRetryAfter as e:
                     logger.warning(f"Rate limited, waiting {e.retry_after}s")
                     await asyncio.sleep(e.retry_after + 1)
+                    batch_count = 0  # Reset batch counter
                     # Don't count as failed, will be caught next time
             
             # Final progress update

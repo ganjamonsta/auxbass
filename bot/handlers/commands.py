@@ -305,19 +305,21 @@ async def cmd_sync(message: Message):
             f"📢 {stats['channel_title']}\n"
             f"🎵 В канале: <b>{stats['already_synced']}</b> треков\n"
             f"📚 В библиотеке: <b>{stats['total_tracks']}</b> треков\n\n"
-            f"🔍 Проверяю хештеги... 0/{stats['already_synced']}"
+            f"🔍 Проверяю хештеги..."
         )
         
         # Progress callback for hashtag updates
         async def hashtag_progress(current, total, updated):
             try:
+                progress_text = f"🔍 Обновляю хештеги... {updated}"
+                if current < total:
+                    progress_text += f" (проверено {current}/{total})"
                 await status_msg.edit_text(
                     f"✅ <b>Все треки уже синхронизированы!</b>\n\n"
                     f"📢 {stats['channel_title']}\n"
                     f"🎵 В канале: <b>{stats['already_synced']}</b> треков\n"
                     f"📚 В библиотеке: <b>{stats['total_tracks']}</b> треков\n\n"
-                    f"🔍 Проверяю хештеги... {current}/{total}\n"
-                    f"✏️ Обновлено: {updated}"
+                    f"{progress_text}"
                 )
             except:
                 pass
@@ -409,18 +411,20 @@ async def cmd_sync(message: Message):
         f"✅ <b>Треки отправлены!</b>\n\n"
         f"📤 Добавлено в канал: <b>{synced_count}</b>\n"
         f"⏭️ Уже было в канале: <b>{skipped_count}</b>\n\n"
-        f"🔍 Обновляю хештеги..."
+        f"🔍 Проверяю хештеги..."
     )
     
     # Progress callback for hashtag updates after sync
     async def hashtag_progress_after_sync(current, total, updated):
         try:
+            progress_text = f"🔍 Обновляю хештеги... {updated}"
+            if current < total:
+                progress_text += f" (проверено {current}/{total})"
             await status_msg.edit_text(
                 f"✅ <b>Треки отправлены!</b>\n\n"
                 f"📤 Добавлено в канал: <b>{synced_count}</b>\n"
                 f"⏭️ Уже было в канале: <b>{skipped_count}</b>\n\n"
-                f"🔍 Обновляю хештеги... {current}/{total}\n"
-                f"✏️ Обновлено: {updated}"
+                f"{progress_text}"
             )
         except:
             pass

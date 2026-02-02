@@ -377,6 +377,10 @@ async def handle_channel_settings(callback: CallbackQuery):
                 callback_data="channel:sync"
             )],
             [InlineKeyboardButton(
+                text="🔍 Найти дубликаты",
+                callback_data="channel:duplicates"
+            )],
+            [InlineKeyboardButton(
                 text="❌ Отключить канал",
                 callback_data="channel:disconnect_confirm"
             )],
@@ -543,6 +547,14 @@ async def handle_channel_sync_cancel(callback: CallbackQuery):
     user_id = callback.from_user.id
     channel_service.request_cancel_sync(user_id)
     await callback.answer("⛔ Прерывание синхронизации...", show_alert=True)
+
+
+@router.callback_query(F.data == "channel:duplicates")
+async def handle_channel_duplicates(callback: CallbackQuery, state: FSMContext):
+    """Start deduplication from channel settings"""
+    from bot.handlers.deduplication import start_dedup_flow
+    await callback.answer()
+    await start_dedup_flow(callback, state, callback.from_user.id)
 
 
 @router.callback_query(F.data == "channel:disconnect_confirm")
