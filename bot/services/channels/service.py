@@ -440,6 +440,7 @@ class ChannelService:
                         title=track.title,
                         album=enrichment.album_name if enrichment else None,
                         genre=enrichment.genre if enrichment else None,
+                        extra_tags=enrichment.tags if enrichment else None,
                     )
                 
                 # Build caption (use display_title for tracks without metadata)
@@ -553,6 +554,7 @@ class ChannelService:
                     title=track.title,
                     album=track.enrichment.album_name if track.enrichment else None,
                     genre=track.enrichment.genre if track.enrichment else None,
+                    extra_tags=track.enrichment.tags if track.enrichment else None,
                 )
                 
                 # Build new caption
@@ -671,6 +673,7 @@ class ChannelService:
                     title=track.title,
                     album=enrichment.album_name if enrichment else None,
                     genre=enrichment.genre if enrichment else None,
+                    extra_tags=enrichment.tags if enrichment else None,
                 )
                 
                 # Check if update needed (compare sets to ignore order)
@@ -901,6 +904,7 @@ class ChannelService:
                                 title=track.title,
                                 album=enrichment.album_name if enrichment else None,
                                 genre=enrichment.genre if enrichment else None,
+                                extra_tags=enrichment.tags if enrichment else None,
                             )
                         
                         # Build caption

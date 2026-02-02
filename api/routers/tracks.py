@@ -405,6 +405,56 @@ async def get_genres(
     ]
 
 
+# ============== Tags (Last.fm) ==============
+
+@router.get("/tags")
+async def get_tags(
+    scope: str = Query("library", pattern="^(library|global)$"),
+    limit: int = Query(50, ge=1, le=200),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get unique tags from tracks with counts.
+    
+    Tags are more detailed than genres (e.g., 'cloud rap', 'witch house', 'drain gang')
+    and come from Last.fm user-generated data.
+    """
+    from collections import Counter
+    
+    # Get tracks with tags
+    if scope == "library":
+        query = (
+            select(TrackEnrichment.tags)
+            .join(Track, Track.id == TrackEnrichment.track_id)
+            .join(UserLibrary, UserLibrary.track_id == Track.id)
+            .where(UserLibrary.user_id == user.id)
+            .where(TrackEnrichment.tags.isnot(None))
+        )
+    else:
+        query = (
+            select(TrackEnrichment.tags)
+            .join(Track, Track.id == TrackEnrichment.track_id)
+            .where(Track.is_public == True)
+            .where(TrackEnrichment.tags.isnot(None))
+        )
+    
+    result = await db.execute(query)
+    
+    # Count tags across all tracks
+    tag_counter = Counter()
+    for (tags_list,) in result.all():
+        if tags_list:
+            for tag in tags_list:
+                tag_counter[tag] += 1
+    
+    # Return sorted by count
+    return [
+        {"name": tag, "track_count": count}
+        for tag, count in tag_counter.most_common(limit)
+    ]
+
+
 # ============== Play History ==============
 
 @router.get("/history")

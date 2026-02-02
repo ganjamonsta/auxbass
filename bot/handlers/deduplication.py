@@ -112,6 +112,7 @@ async def show_duplicate_group(message_obj, state: FSMContext, offset: int, conf
             title=track.title,
             album=enrichment.album_name if enrichment else None,
             genre=enrichment.genre if enrichment else None,
+            extra_tags=enrichment.tags if enrichment else None,
         )
         tag_str = format_hashtags(hashtags[:5]) # Show first 5 keys
         if len(hashtags) > 5:

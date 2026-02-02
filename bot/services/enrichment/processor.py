@@ -4,8 +4,8 @@ TG Player - Enrichment Processor
 Orchestrates metadata enrichment from multiple sources.
 """
 import logging
-from typing import Optional, Dict, Any
-from dataclasses import dataclass
+from typing import Optional, Dict, Any, List
+from dataclasses import dataclass, field
 
 from .deezer import deezer_client
 from .lastfm import lastfm_client
@@ -23,7 +23,8 @@ class EnrichmentResult:
     
     # Enriched metadata
     album_name: Optional[str] = None
-    genre: Optional[str] = None
+    genre: Optional[str] = None  # Deezer genre (broad category)
+    tags: List[str] = field(default_factory=list)  # Last.fm tags (detailed)
     cover_url: Optional[str] = None
     release_date: Optional[str] = None
     track_number: Optional[int] = None
@@ -85,6 +86,9 @@ class EnrichmentProcessor:
                 
                 if lastfm_data.get("genre"):
                     result.genre = lastfm_data["genre"]
+                
+                if lastfm_data.get("tags"):
+                    result.tags = lastfm_data["tags"]
                 
                 if lastfm_data.get("lastfm_url"):
                     result.lastfm_url = lastfm_data["lastfm_url"]
@@ -201,11 +205,15 @@ class EnrichmentProcessor:
         title: str,
         artist: str,
     ) -> Optional[Dict[str, Any]]:
-        """Get enrichment data from Last.fm"""
+        """Get enrichment data from Last.fm including combined tags"""
         try:
             track_info = await lastfm_client.get_track_info(title, artist)
             
             if not track_info:
+                # Even without track info, try to get tags
+                tags = await lastfm_client.get_combined_tags(title, artist)
+                if tags:
+                    return {"tags": tags}
                 return None
             
             result = {
@@ -216,18 +224,20 @@ class EnrichmentProcessor:
             if track_info.get("album"):
                 result["album"] = track_info["album"]
             
-            # Genre from tags
-            tags = track_info.get("tags", [])
+            # Get combined tags (track + artist)
+            tags = await lastfm_client.get_combined_tags(title, artist)
             if tags:
-                # Find first tag that maps to a known genre
+                result["tags"] = tags
+                
+                # Also set genre from first tag that maps to a known genre
                 for tag in tags:
                     tag_lower = tag.lower()
                     if tag_lower in GENRE_MAPPINGS:
                         result["genre"] = GENRE_MAPPINGS[tag_lower]
                         break
                 
-                # If no mapping found, use first tag
-                if "genre" not in result and tags:
+                # If no mapping found, use first tag as genre fallback
+                if "genre" not in result:
                     result["genre"] = tags[0]
             
             return result

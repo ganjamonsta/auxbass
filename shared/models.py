@@ -15,7 +15,7 @@ from enum import Enum
 from sqlalchemy import (
     BigInteger, Integer, String, Text, Boolean, 
     DateTime, ForeignKey, UniqueConstraint, Index,
-    Enum as SQLEnum, String as SQLString
+    Enum as SQLEnum, String as SQLString, JSON
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -242,8 +242,13 @@ class Track(Base):
     
     @property
     def genre(self) -> Optional[str]:
-        """Get genre from enrichment"""
+        """Get genre from enrichment (Deezer - broad category)"""
         return self.enrichment.genre if self.enrichment else None
+    
+    @property
+    def tags(self) -> Optional[List[str]]:
+        """Get tags from enrichment (Last.fm - detailed)"""
+        return self.enrichment.tags if self.enrichment else None
     
     @property
     def release_date(self) -> Optional[str]:
@@ -273,7 +278,8 @@ class TrackEnrichment(Base):
     
     # Enriched metadata
     album_name: Mapped[Optional[str]] = mapped_column(String(255))
-    genre: Mapped[Optional[str]] = mapped_column(String(100))
+    genre: Mapped[Optional[str]] = mapped_column(String(100))  # Deezer genre (broad category)
+    tags: Mapped[Optional[List[str]]] = mapped_column(JSON)  # Last.fm tags (detailed, up to 5)
     cover_url: Mapped[Optional[str]] = mapped_column(String(500))
     release_date: Mapped[Optional[str]] = mapped_column(String(20))  # YYYY-MM-DD
     track_number: Mapped[Optional[int]] = mapped_column(Integer)

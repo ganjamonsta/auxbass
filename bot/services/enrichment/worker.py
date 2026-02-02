@@ -147,6 +147,8 @@ class EnrichmentWorker:
                         enrichment.album_name = result.album_name
                     if result.genre:
                         enrichment.genre = result.genre
+                    if result.tags:
+                        enrichment.tags = result.tags
                     if result.cover_url:
                         enrichment.cover_url = result.cover_url
                     if result.release_date:
