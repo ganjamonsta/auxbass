@@ -454,11 +454,12 @@ html, body {
 .app.desktop-layout {
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: 1fr auto;
   grid-template-areas:
     "sidebar main"
     "player player";
-  height: 100vh;
+  min-height: 100vh;
+  max-height: 100vh;
   overflow: hidden;
 }
 
