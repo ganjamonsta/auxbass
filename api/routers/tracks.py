@@ -29,12 +29,12 @@ from bot.services.channels import get_channel_service
 
 from api.routers.auth import get_current_user, require_premium, get_optional_user
 from api.routers.library import track_to_response, track_to_response_global
-from api.schemas_v2.tracks import (
+from api.schemas.tracks import (
     TrackResponse,
     TracksListResponse,
     TrackUpdate,
 )
-from api.schemas_v2.common import TelegramUser
+from api.schemas.common import TelegramUser
 
 
 logger = logging.getLogger(__name__)

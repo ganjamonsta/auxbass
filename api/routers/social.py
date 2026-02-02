@@ -29,8 +29,8 @@ from api.routers.auth import get_current_user, require_premium
 
 logger = logging.getLogger(__name__)
 from api.routers.library import track_to_response
-from api.schemas_v2.common import TelegramUser, PaginatedResponse
-from api.schemas_v2.tracks import TrackResponse
+from api.schemas.common import TelegramUser, PaginatedResponse
+from api.schemas.tracks import TrackResponse
 
 
 router = APIRouter(prefix="/social", tags=["Social"])

@@ -1,19 +1,13 @@
 """
-Tests for API schemas
+Tests for API schemas (v2)
 """
 import pytest
 from datetime import datetime
 from pydantic import ValidationError
 
-from api.schemas import (
-    TelegramUser,
-    TrackBase,
-    TrackUpdate,
-    TrackResponse,
-    PlaylistBase,
-    PlaylistCreate,
-    StreamUrlResponse,
-)
+from api.schemas.common import TelegramUser
+from api.schemas.tracks import TrackResponse, TrackUpdate
+from api.schemas.player import StreamUrlResponse
 
 
 class TestTelegramUser:
@@ -43,52 +37,22 @@ class TestTelegramUser:
 class TestTrackSchemas:
     """Tests for Track-related schemas"""
     
-    def test_track_base(self):
-        track = TrackBase(
-            title="Song",
-            artist="Artist",
-            album="Album"
-        )
-        assert track.title == "Song"
-        assert track.genre is None
-    
     def test_track_update_partial(self):
         update = TrackUpdate(title="New Title")
         assert update.title == "New Title"
         assert update.artist is None
-        assert update.is_public is None
     
     def test_track_response(self):
         response = TrackResponse(
             id=1,
-            file_id="abc123",
+            telegram_file_id="abc123",
             title="Test",
             artist="Artist",
-            created_at=datetime.now()
+            added_at=datetime.now()
         )
         assert response.id == 1
         assert response.is_liked == False
         assert response.play_count == 0
-
-
-class TestPlaylistSchemas:
-    """Tests for Playlist-related schemas"""
-    
-    def test_playlist_base(self):
-        playlist = PlaylistBase(name="My Playlist")
-        assert playlist.name == "My Playlist"
-        assert playlist.description is None
-    
-    def test_playlist_create(self):
-        playlist = PlaylistCreate(
-            name="New Playlist",
-            description="Test description"
-        )
-        assert playlist.name == "New Playlist"
-    
-    def test_playlist_name_required(self):
-        with pytest.raises(ValidationError):
-            PlaylistBase(description="No name")
 
 
 class TestStreamUrlResponse:

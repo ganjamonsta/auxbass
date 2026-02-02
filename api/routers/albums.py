@@ -23,13 +23,13 @@ from shared.models import (
 from shared.matching import normalize_artist, normalize_title, fuzzy_match_title
 
 from api.routers.auth import get_current_user
-from api.schemas_v2.albums import (
+from api.schemas.albums import (
     AlbumResponse,
     AlbumDetailResponse,
     AlbumsListResponse,
     AlbumTracklistItem,
 )
-from api.schemas_v2.common import TelegramUser
+from api.schemas.common import TelegramUser
 
 
 router = APIRouter(tags=["Albums"])

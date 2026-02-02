@@ -31,14 +31,14 @@ from bot.services.enrichment.lastfm import lastfm_client
 from bot.services.metadata import metadata_service
 
 from api.routers.auth import get_current_user
-from api.schemas_v2.artists import (
+from api.schemas.artists import (
     ArtistResponse,
     ArtistDetailResponse,
     ArtistInfoResponse,
     ArtistTracksResponse,
     ArtistsListResponse,
 )
-from api.schemas_v2.common import TelegramUser
+from api.schemas.common import TelegramUser
 
 
 logger = logging.getLogger(__name__)

@@ -1,71 +1,36 @@
 """
-Centralized Pydantic schemas for the API.
-Organized by domain for easy imports.
+TG Player API v2 - Schemas Module
 """
-
-from .auth import (
-    TelegramUser,
-    AuthResult,
-    CodeRequest,
-    CodeVerify,
-    CodeGenerated,
-)
-
-from .tracks import (
-    TrackBase,
-    TrackUpdate,
-    TrackResponse,
-    TracksListResponse,
-    UploaderInfo,
-    ForwardSourceInfo,
-    UserStatsResponse,
-    ArtistAlbumInfo,
-    ArtistDetailResponse,
-)
-
-from .playlists import (
-    PlaylistBase,
-    PlaylistCreate,
-    PlaylistUpdate,
-    PlaylistResponse,
-    PlaylistWithTracksResponse,
-    AddTrackRequest,
-    AlbumCandidateResponse,
-    AssembleAlbumsResponse,
-)
-
-from .player import (
-    StreamUrlResponse,
-    DownloadPlaylistRequest,
-)
+from .common import TelegramUser, PaginatedResponse, StatusResponse
+from .tracks import TrackResponse, TracksListResponse, TrackUpdate, TrackCreate
+from .albums import AlbumResponse, AlbumsListResponse, AlbumDetailResponse
+from .artists import ArtistResponse, ArtistsListResponse, ArtistDetailResponse, ArtistInfoResponse, ArtistTracksResponse
+from .library import LibraryStatsResponse
 
 __all__ = [
-    # Auth
+    # Common
     "TelegramUser",
-    "AuthResult",
-    "CodeRequest",
-    "CodeVerify",
-    "CodeGenerated",
+    "PaginatedResponse",
+    "StatusResponse",
+    
     # Tracks
-    "TrackBase",
-    "TrackUpdate",
     "TrackResponse",
     "TracksListResponse",
-    "UploaderInfo",
-    "ForwardSourceInfo",
-    "UserStatsResponse",
-    "ArtistAlbumInfo",
+    "TrackUpdate",
+    "TrackCreate",
+    
+    # Albums
+    "AlbumResponse",
+    "AlbumsListResponse", 
+    "AlbumDetailResponse",
+    
+    # Artists
+    "ArtistResponse",
+    "ArtistsListResponse",
     "ArtistDetailResponse",
-    # Playlists
-    "PlaylistBase",
-    "PlaylistCreate",
-    "PlaylistUpdate",
-    "PlaylistResponse",
-    "PlaylistWithTracksResponse",
-    "AddTrackRequest",
-    "AlbumCandidateResponse",
-    "AssembleAlbumsResponse",
-    # Player
-    "StreamUrlResponse",
-    "DownloadPlaylistRequest",
+    "ArtistInfoResponse",
+    "ArtistTracksResponse",
+    
+    # Library
+    "LibraryStatsResponse",
 ]

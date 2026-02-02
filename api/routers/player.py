@@ -29,8 +29,8 @@ from shared.matching import normalize_title, normalize_artist
 
 from .auth import get_current_user
 from .library import is_streamable, is_hd_format, STREAMABLE_MIME_TYPES, HD_MIME_TYPES
-from api.schemas_v2.player import StreamUrlResponse, DownloadPlaylistRequest
-from api.schemas_v2.common import TelegramUser
+from api.schemas.player import StreamUrlResponse, DownloadPlaylistRequest
+from api.schemas.common import TelegramUser
 
 
 logger = logging.getLogger("uvicorn.error")

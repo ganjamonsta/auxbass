@@ -24,15 +24,15 @@ from shared.models import (
 from shared.matching import normalize_artist, normalize_title
 
 from api.routers.auth import get_current_user, require_premium
-from api.schemas_v2.tracks import (
+from api.schemas.tracks import (
     TrackResponse,
     TracksListResponse,
     TrackUpdate,
 )
-from api.schemas_v2.library import (
+from api.schemas.library import (
     LibraryStatsResponse,
 )
-from api.schemas_v2.common import TelegramUser
+from api.schemas.common import TelegramUser
 
 
 router = APIRouter(tags=["Library"])
