@@ -29,8 +29,10 @@ const menuPosition = ref({ x: 0, y: 0 })  // Mouse position for desktop context 
 const showPlaylistPicker = ref(false)
 const showEditModal = ref(false)
 const showRenameModal = ref(false)
+const showCreatePlaylist = ref(false)
 const editingItem = ref(null)
 const renameValue = ref('')
+const newPlaylistName = ref('')
 
 /**
  * Universal Context Menu composable
@@ -500,6 +502,38 @@ export function useContextMenu() {
     uiStore.toast.success('Добавлено', `Трек добавлен в "${playlist.name}"`)
   }
 
+  const openCreatePlaylist = () => {
+    showPlaylistPicker.value = false
+    newPlaylistName.value = ''
+    showCreatePlaylist.value = true
+  }
+
+  const closeCreatePlaylist = () => {
+    showCreatePlaylist.value = false
+    newPlaylistName.value = ''
+  }
+
+  const confirmCreatePlaylist = async () => {
+    const name = newPlaylistName.value.trim()
+    if (!name) return
+    
+    try {
+      const playlist = await libraryStore.createPlaylist(name)
+      if (playlist && editingItem.value?.id) {
+        // Add the track to the newly created playlist
+        await libraryStore.addTrackToPlaylist(playlist.id, editingItem.value.id)
+        uiStore.toast.success('Создано', `Плейлист "${name}" создан и трек добавлен`)
+      } else if (playlist) {
+        uiStore.toast.success('Создано', `Плейлист "${name}" создан`)
+      }
+      closeCreatePlaylist()
+      editingItem.value = null
+    } catch (error) {
+      console.error('Failed to create playlist:', error)
+      uiStore.toast.error('Ошибка', 'Не удалось создать плейлист')
+    }
+  }
+
   const closeEditModal = () => {
     showEditModal.value = false
     editingItem.value = null
@@ -615,12 +649,17 @@ export function useContextMenu() {
     showPlaylistPicker,
     showEditModal,
     showRenameModal,
+    showCreatePlaylist,
     editingItem,
     renameValue,
+    newPlaylistName,
 
     // Modal handlers
     closePlaylistPicker,
     onPlaylistAdded,
+    openCreatePlaylist,
+    closeCreatePlaylist,
+    confirmCreatePlaylist,
     closeEditModal,
     onTrackSaved,
     closeRenameModal,

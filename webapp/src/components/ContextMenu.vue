@@ -214,7 +214,7 @@
     :show="showPlaylistPicker"
     :track="editingItem"
     @close="closePlaylistPicker"
-    @createNew="closePlaylistPicker"
+    @createNew="openCreatePlaylist"
     @added="onPlaylistAdded"
   />
 
@@ -225,6 +225,29 @@
     @close="closeEditModal"
     @saved="onTrackSaved"
   />
+
+  <!-- Create Playlist Modal -->
+  <Teleport to="body">
+    <Transition name="fade">
+      <div v-if="showCreatePlaylist" class="modal-overlay" @click="closeCreatePlaylist">
+        <div class="modal-content" @click.stop>
+          <h3>Создать плейлист</h3>
+          <input 
+            v-model="newPlaylistName" 
+            type="text" 
+            class="modal-input"
+            placeholder="Название плейлиста"
+            @keyup.enter="confirmCreatePlaylist"
+            ref="createPlaylistInput"
+          />
+          <div class="modal-actions">
+            <button class="modal-btn cancel" @click="closeCreatePlaylist">Отмена</button>
+            <button class="modal-btn confirm" @click="confirmCreatePlaylist">Создать</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 
   <!-- Rename Playlist Modal -->
   <Teleport to="body">
@@ -306,20 +329,34 @@ const {
   showPlaylistPicker,
   showEditModal,
   showRenameModal,
+  showCreatePlaylist,
   editingItem,
   renameValue,
+  newPlaylistName,
   closePlaylistPicker,
   onPlaylistAdded,
+  openCreatePlaylist,
+  closeCreatePlaylist,
+  confirmCreatePlaylist,
   closeEditModal,
   onTrackSaved,
   closeRenameModal,
   confirmRename,
 } = useContextMenu()
 
+const createPlaylistInput = ref(null)
+
 // Auto-focus rename input
 watch(showRenameModal, (show) => {
   if (show) {
     nextTick(() => renameInput.value?.focus())
+  }
+})
+
+// Auto-focus create playlist input
+watch(showCreatePlaylist, (show) => {
+  if (show) {
+    nextTick(() => createPlaylistInput.value?.focus())
   }
 })
 

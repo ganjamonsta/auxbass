@@ -348,11 +348,8 @@ export const useLibraryStore = defineStore('library', () => {
   const addTrackToPlaylist = async (playlistId, trackId) => {
     try {
       await playlistsApi.addTrack(playlistId, trackId)
-      // Update track_count in local state
-      const playlist = playlists.value.find(p => p.id === playlistId)
-      if (playlist) {
-        playlist.track_count = (playlist.track_count || 0) + 1
-      }
+      // Refetch playlists to get updated covers and track counts
+      await fetchPlaylists()
       return true
     } catch (error) {
       console.error('Failed to add track to playlist:', error)
@@ -364,11 +361,8 @@ export const useLibraryStore = defineStore('library', () => {
   const removeTrackFromPlaylist = async (playlistId, trackId) => {
     try {
       await playlistsApi.removeTrack(playlistId, trackId)
-      // Update track_count in local state
-      const playlist = playlists.value.find(p => p.id === playlistId)
-      if (playlist && playlist.track_count > 0) {
-        playlist.track_count--
-      }
+      // Refetch playlists to get updated covers and track counts
+      await fetchPlaylists()
       return true
     } catch (error) {
       console.error('Failed to remove track from playlist:', error)
