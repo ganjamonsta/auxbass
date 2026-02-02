@@ -25,7 +25,7 @@ from shared.database import get_db
 from shared.models import (
     Track, Album, AlbumTrack, UserLibrary
 )
-from shared.matching import normalize_artist, extract_featured_artists, get_all_track_artists, extract_artists_from_filename
+from shared.matching import normalize_artist, normalize_artist_display, extract_featured_artists, get_all_track_artists, extract_artists_from_filename
 
 from bot.services.enrichment.lastfm import lastfm_client
 from bot.services.metadata import metadata_service
@@ -84,6 +84,7 @@ def get_best_display_name(artist_names: list[str]) -> str:
     """
     Choose the best display name from a list of artist name variations.
     Prefers: Title case, no collaborations, shorter names.
+    Returns only the first artist (no collaborators).
     """
     if not artist_names:
         return ""
@@ -111,7 +112,8 @@ def get_best_display_name(artist_names: list[str]) -> str:
             best = name
             best_priority = priority
     
-    return best
+    # Always return only the first artist (strip collaborations)
+    return normalize_artist_display(best)
 
 
 @router.get("", response_model=ArtistsListResponse)
@@ -503,8 +505,9 @@ async def get_artist(
     # Check if any track has this as main artist (not just featured)
     for name in artist_names_seen:
         if normalize_artist(name) == normalized_search:
-            # Found exact match in artist field - use this (better casing)
-            actual_name = name
+            # Found exact match in artist field - use normalized display version
+            # This extracts first artist with proper casing (e.g., "Excision, Skism" -> "Excision")
+            actual_name = normalize_artist_display(name)
             break
     
     # Get albums by this artist (normalized)
