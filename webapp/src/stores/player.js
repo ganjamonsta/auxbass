@@ -1317,14 +1317,16 @@ export const usePlayerStore = defineStore('player', () => {
     
     // === HD/Large file check ===
     // If track is HD format or too large, check if streamable version exists
+    // NOTE: Even if streamable_id is not set, the API /stream/{track_id} has
+    // find_streamable_alternative() that can auto-substitute HD -> MP3
+    // So we should try API first before giving up
     if (isTrackNotStreamable(track)) {
       console.log(`[Play] Track "${track.title}" is HD/large (mime: ${track.mime_type}, size: ${track.file_size})`)
       
-      // Check if streamable version exists
+      // Check if we have a pre-resolved streamable version (optimization)
       if (track.streamable_id) {
         // We have a streamable version - use it instead
-        console.log(`[Play] Using streamable version id=${track.streamable_id} for HD track`)
-        // Fetch the streamable track details and play it
+        console.log(`[Play] Using pre-resolved streamable version id=${track.streamable_id} for HD track`)
         try {
           const response = await tracksApi.getById(track.streamable_id)
           const streamableTrack = response.data
@@ -1349,30 +1351,16 @@ export const usePlayerStore = defineStore('player', () => {
           await play(mergedTrack, null)
           return
         } catch (e) {
-          console.error('[Play] Failed to fetch streamable version:', e)
-          // Fall through to error handling below
+          console.error('[Play] Failed to fetch pre-resolved streamable version:', e)
+          // Fall through - will try API which can find alternative
         }
       }
       
-      // No streamable version - cannot play, show error
-      const sizeMB = track.file_size ? (track.file_size / 1024 / 1024).toFixed(1) : '20+'
-      lastError.value = {
-        type: 'too_large',
-        track: track,
-        message: `Файл слишком большой для стриминга (${sizeMB} MB). Используйте кнопку скачивания.`
-      }
-      loading.value = false
-      currentTrack.value = null
-      
-      // Callback if set
-      if (onTrackUnavailableCallback) {
-        onTrackUnavailableCallback(track, lastError.value.message, true)
-      }
-      
-      // Auto-skip to next track
-      console.log('[Play] HD/Large file without streamable version - auto-skip in 1.5s')
-      setTimeout(() => next(), 1500)
-      return
+      // No pre-resolved streamable_id - but API can still find alternative!
+      // Don't block here, let the normal flow continue and try API /stream/{track_id}
+      // The API has find_streamable_alternative() that searches for MP3 versions
+      console.log(`[Play] No pre-resolved streamable_id, will try API auto-substitution for HD track`)
+      // Continue with normal playback flow - API will handle HD->MP3 substitution
     }
     
     // Reset preload trigger flag for new track

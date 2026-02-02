@@ -171,12 +171,10 @@ const handleClick = () => {
     return
   }
   
-  // HD/Large files without streamable version - show notice, don't auto-download
-  if (isNotStreamable.value && !props.track.streamable_id) {
-    console.log('[TrackItem] HD/Large file without streamable version, showing notice')
-    emit('hdNotice', props.track)
-    return
-  }
+  // HD/Large files - let the player try to find MP3 alternative via API
+  // The API /stream/{track_id} has find_streamable_alternative() that can auto-substitute
+  // Only block if explicitly marked as not streamable AND no streamable_id set AND API already tried
+  // For now, always emit click and let player handle HD tracks via API
   
   emit('click')
 }
