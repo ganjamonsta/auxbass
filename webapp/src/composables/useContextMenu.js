@@ -91,10 +91,10 @@ export function useContextMenu() {
     goToArtist: (track) => {
       closeMenu()
       closeFullPlayer() // Close full player if open
-      if (track?.artist) {
-        // For single artist, go directly (use first from combined list)
-        const artists = getAllTrackArtists(track.artist, track.title)
-        const artistName = artists.length > 0 ? artists[0] : track.artist
+      // Get all artists including from filename for tracks without metadata
+      const artists = getAllTrackArtists(track?.artist, track?.title, track?.file_name)
+      if (artists.length > 0) {
+        const artistName = artists[0]
         router.push(`/artist/${encodeURIComponent(artistName)}`)
       }
     },

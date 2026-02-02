@@ -267,7 +267,7 @@
 <script setup>
 import { ref, computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
-import { getTrackCoverStyle, getTrackInitials, splitArtists, getDisplayTitle, getDisplayArtist } from '@/utils'
+import { getTrackCoverStyle, getTrackInitials, splitArtists, getDisplayTitle, getDisplayArtist, getAllTrackArtists } from '@/utils'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useContextMenu } from '@/composables/useContextMenu'
@@ -354,10 +354,11 @@ const { openMenu } = useContextMenu()
 
 const telegram = inject('telegram')
 
-// Parse artists into separate names
+// Parse artists into separate names (from artist + title + file_name)
 const parsedArtists = computed(() => {
-  if (!props.track?.artist) return []
-  return splitArtists(props.track.artist)
+  const t = props.track
+  if (!t) return []
+  return getAllTrackArtists(t.artist, t.title, t.file_name)
 })
 
 // Navigate to artist page

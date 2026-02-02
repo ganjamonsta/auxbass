@@ -205,7 +205,7 @@ export function extractFeaturedArtists(title) {
     }
   }
   
-  // Pattern for feat.: "feat. Artist" or "ft. Artist"
+  // Pattern for feat.: "feat. Artist" or "ft. Artist" - outside parentheses
   const featMatch = title.match(/(?:feat\.?|ft\.?|featuring)\s+([^\(\)\[\]]+?)(?:\s*[\(\[]|$)/i)
   if (featMatch) {
     const featPart = featMatch[1].trim()
@@ -215,6 +215,36 @@ export function extractFeaturedArtists(title) {
       const cleaned = fa.trim()
       if (cleaned && cleaned.length > 1) {
         artists.push(cleaned)
+      }
+    }
+  }
+  
+  // Pattern for feat. inside parentheses: "(Artist1 feat. Artist2)" or "(feat. Artist)"
+  // This handles mashups like "Track (excision feat. black kray)"
+  const parenFeatPatterns = [
+    // "(Artist1 feat. Artist2)" - extract both parts
+    /[\(\[]([^\)\]]+?)\s+(?:feat\.?|ft\.?|featuring)\s+([^\)\]]+)[\)\]]/gi,
+    // "(feat. Artist)" - only extract featured artist
+    /[\(\[](?:feat\.?|ft\.?|featuring)\s+([^\)\]]+)[\)\]]/gi,
+  ]
+  for (const pattern of parenFeatPatterns) {
+    let match
+    while ((match = pattern.exec(title)) !== null) {
+      // Handle both capture groups if present
+      for (let i = 1; i < match.length; i++) {
+        if (match[i]) {
+          const part = match[i].trim()
+          if (part && part.length > 1) {
+            // Split by common separators
+            const subArtists = part.split(/\s*(?:&|,|\band\b|\bx\b)\s*/i)
+            for (const sa of subArtists) {
+              const cleaned = sa.trim()
+              if (cleaned && cleaned.length > 1) {
+                artists.push(cleaned)
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -272,25 +302,89 @@ export function extractFeaturedArtists(title) {
 }
 
 /**
- * Get all artists from track (from artist field + extracted from title)
+ * Get all artists from track (from artist field + extracted from title + extracted from filename)
  * 
  * @param {string} artistString - Artist field value
  * @param {string} title - Track title (optional)
+ * @param {string} fileName - File name (optional, used for tracks without metadata)
  * @returns {Array<string>} Array of all unique artist names
  */
-export function getAllTrackArtists(artistString, title = null) {
+export function getAllTrackArtists(artistString, title = null, fileName = null) {
   const fromArtist = splitArtists(artistString)
   const fromTitle = title ? extractFeaturedArtists(title) : []
+  
+  // For tracks without artist metadata, extract from filename
+  let fromFileName = []
+  if (!artistString && fileName) {
+    fromFileName = extractAllArtistsFromFilename(fileName)
+  }
   
   // Combine and deduplicate
   const seen = new Set()
   const unique = []
   
-  for (const artist of [...fromArtist, ...fromTitle]) {
+  for (const artist of [...fromArtist, ...fromTitle, ...fromFileName]) {
     const lower = artist.toLowerCase()
     if (!seen.has(lower)) {
       seen.add(lower)
       unique.push(artist)
+    }
+  }
+  
+  return unique
+}
+
+/**
+ * Extract all artists from filename (main artist + featured artists)
+ * Patterns:
+ *   "Artist - Title.mp3" -> ["Artist"]
+ *   "Artist - Title (feat. Other).mp3" -> ["Artist", "Other"]
+ *   "ganjamonsta - Track (excision feat. black kray).mp3" -> ["ganjamonsta", "excision", "black kray"]
+ * @param {string} fileName - Filename
+ * @returns {Array<string>} Array of extracted artist names
+ */
+function extractAllArtistsFromFilename(fileName) {
+  if (!fileName) return []
+  
+  const artists = []
+  
+  // Remove extension
+  const name = fileName.replace(/\.(mp3|flac|wav|ogg|m4a|aac|opus)$/i, '')
+  
+  // Check for "Artist - Title" pattern
+  if (name.includes(' - ')) {
+    const parts = name.split(' - ', 2)
+    const artistPart = parts[0].trim()
+    const titlePart = parts[1] || ''
+    
+    // Split main artist by common separators
+    if (artistPart && artistPart.length > 1) {
+      const mainArtists = artistPart.split(/\s*(?:,|&|\+|\band\b|\bx\b)\s*/i)
+      for (const ma of mainArtists) {
+        const cleaned = ma.trim()
+        if (cleaned && cleaned.length > 1) {
+          artists.push(cleaned)
+        }
+      }
+    }
+    
+    // Extract featured artists from title part
+    const fromTitle = extractFeaturedArtists(titlePart)
+    artists.push(...fromTitle)
+  } else {
+    // No "Artist - Title" format, try to extract from the name itself
+    const fromName = extractFeaturedArtists(name)
+    artists.push(...fromName)
+  }
+  
+  // Deduplicate
+  const seen = new Set()
+  const unique = []
+  for (const a of artists) {
+    const lower = a.toLowerCase()
+    if (!seen.has(lower)) {
+      seen.add(lower)
+      unique.push(a)
     }
   }
   

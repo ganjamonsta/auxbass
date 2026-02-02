@@ -105,7 +105,7 @@
 import { inject, computed } from 'vue'
 import { usePlayerStore } from '../stores/player'
 import { useAuthStore } from '../stores/auth'
-import { getDisplayTitle, getDisplayArtist } from '@/utils'
+import { getDisplayTitle, getDisplayArtist, getAllTrackArtists } from '@/utils'
 import { Music, User, Disc3, Play, ListMusic, Plus, Minus, Pencil, Download, Trash2 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -128,7 +128,16 @@ const telegram = inject('telegram')
 
 // Computed properties for navigation availability
 const hasArtist = computed(() => {
-  return props.track?.artist && props.track.artist !== 'Неизвестный исполнитель'
+  const track = props.track
+  if (!track) return false
+  // Check if we have artist metadata
+  if (track.artist && track.artist !== 'Неизвестный исполнитель') return true
+  // For tracks without metadata, check if we can extract from filename
+  if (!track.artist && track.file_name) {
+    const extracted = getAllTrackArtists(null, track.title, track.file_name)
+    return extracted.length > 0
+  }
+  return false
 })
 
 const hasAlbum = computed(() => {
@@ -203,7 +212,10 @@ const haptic = (type = 'light') => {
 
 const handleGoToArtist = () => {
   haptic('light')
-  emit('goToArtist', props.track?.artist)
+  // Get all artists including from filename for tracks without metadata
+  const artists = getAllTrackArtists(props.track?.artist, props.track?.title, props.track?.file_name)
+  const artistName = artists.length > 0 ? artists[0] : props.track?.artist
+  emit('goToArtist', artistName)
   emit('close')
 }
 

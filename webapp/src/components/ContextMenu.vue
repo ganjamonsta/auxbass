@@ -431,14 +431,23 @@ const subtitle = computed(() => {
 
 // Track-specific
 const hasArtist = computed(() => {
-  return menuData.value?.artist && menuData.value.artist !== 'Неизвестный исполнитель'
+  const data = menuData.value
+  if (!data) return false
+  // Check if we have artist metadata OR can extract from filename
+  if (data.artist && data.artist !== 'Неизвестный исполнитель') return true
+  // For tracks without metadata, check if we can extract from filename
+  if (!data.artist && data.file_name) {
+    const extracted = getAllTrackArtists(null, data.title, data.file_name)
+    return extracted.length > 0
+  }
+  return false
 })
 
-// Parse artists into array (from artist field + extracted from title)
+// Parse artists into array (from artist field + extracted from title + filename)
 const parsedArtists = computed(() => {
   const data = menuData.value
-  if (!data?.artist) return []
-  return getAllTrackArtists(data.artist, data.title)
+  if (!data) return []
+  return getAllTrackArtists(data.artist, data.title, data.file_name)
 })
 
 const hasAlbum = computed(() => {

@@ -134,7 +134,7 @@ const getDotClass = (index) => {
 // Generate cover gradient
 const coverGradient = computed(() => {
   const title = getDisplayTitle(props.track)
-  const artist = props.track?.artist || ''
+  const artist = getDisplayArtist(props.track)
   
   const str = title + artist
   let hash = 0

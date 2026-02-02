@@ -30,7 +30,7 @@
       <h2 class="track-title">{{ getDisplayTitle(track) }}</h2>
       
       <!-- Artists (clickable, split into separate links) -->
-      <div v-if="track?.artist" class="artists-container">
+      <div v-if="parsedArtists.length > 0" class="artists-container">
         <svg class="artists-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
         </svg>
@@ -220,7 +220,7 @@ import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useContextMenu } from '@/composables/useContextMenu'
-import { splitArtists, getDisplayTitle, getDisplayArtist } from '@/utils/formatters'
+import { splitArtists, getDisplayTitle, getDisplayArtist, getAllTrackArtists } from '@/utils/formatters'
 import { Play } from 'lucide-vue-next'
 
 const emit = defineEmits(['goToUser'])
@@ -234,10 +234,11 @@ const { openMenu } = useContextMenu()
 const track = computed(() => playerStore.currentTrack)
 const isPlaying = computed(() => playerStore.isPlaying)
 
-// Parse artists into separate names
+// Parse artists into separate names (from artist + title + file_name)
 const parsedArtists = computed(() => {
-  if (!track.value?.artist) return []
-  return splitArtists(track.value.artist)
+  const t = track.value
+  if (!t) return []
+  return getAllTrackArtists(t.artist, t.title, t.file_name)
 })
 
 // Queue computed
