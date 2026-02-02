@@ -275,3 +275,23 @@ export function getAllTrackArtists(artistString, title = null) {
   
   return unique
 }
+
+/**
+ * Get display title for a track (for MediaSession, notifications, etc.)
+ * @param {Object} track - Track object with title property
+ * @returns {string} Display title
+ */
+export function getDisplayTitle(track) {
+  if (!track) return ''
+  return track.title || track.name || 'Unknown Title'
+}
+
+/**
+ * Get display artist for a track (for MediaSession, notifications, etc.)
+ * @param {Object} track - Track object with artist property
+ * @returns {string} Display artist
+ */
+export function getDisplayArtist(track) {
+  if (!track) return ''
+  return track.artist || 'Unknown Artist'
+}
