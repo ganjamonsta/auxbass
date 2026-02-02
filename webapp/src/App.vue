@@ -1,5 +1,5 @@
 <template>
-  <div class="app spotify-theme" :class="appClasses" :style="{ transform: `scale(${playerStore.uiScale})`, transformOrigin: 'top center', width: `${100 / playerStore.uiScale}%`, height: `${100 / playerStore.uiScale}%` }">
+  <div class="app spotify-theme" :class="appClasses" :style="{ zoom: playerStore.uiScale }">
     <!-- Auth checking state -->
     <div v-if="authStore.loading && !authStore.initialized" class="auth-loading">
       <div class="auth-spinner"></div>

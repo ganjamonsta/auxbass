@@ -395,7 +395,7 @@ onMounted(() => {
 <style scoped>
 .settings-view {
   padding: 16px;
-  padding-bottom: 120px;
+  padding-bottom: 180px;
 }
 
 h1 {

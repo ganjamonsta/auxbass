@@ -169,7 +169,7 @@ const openModal = async () => {
 <style scoped>
 .playlists-view {
   padding: 16px;
-  padding-bottom: 120px;
+  padding-bottom: 180px;
 }
 
 .header {

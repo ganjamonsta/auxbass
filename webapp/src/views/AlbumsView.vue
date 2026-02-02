@@ -144,7 +144,7 @@ const playAlbum = async (album) => {
 <style scoped>
 .albums-view {
   padding: 16px;
-  padding-bottom: 120px;
+  padding-bottom: 180px;
 }
 
 .view-header {

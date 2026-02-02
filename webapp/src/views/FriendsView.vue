@@ -552,7 +552,7 @@ onMounted(() => {
 <style scoped>
 .friends-view {
   padding: 16px;
-  padding-bottom: 120px;
+  padding-bottom: 180px;
 }
 
 .tabs-header {

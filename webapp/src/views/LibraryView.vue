@@ -104,7 +104,7 @@ const clearSearch = () => {
 <style scoped>
 .library-view {
   padding: 16px;
-  padding-bottom: 120px; /* Space for player */
+  padding-bottom: 180px; /* Space for player */
   min-height: 100vh;
 }
 

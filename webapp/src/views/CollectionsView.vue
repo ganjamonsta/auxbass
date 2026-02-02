@@ -444,7 +444,7 @@ onMounted(() => {
 
 <style scoped>
 .collections-view {
-  padding: 8px 16px 120px 16px;
+  padding: 8px 16px 180px 16px;
 }
 
 /* Scope switcher uses neu-tab-bar from design-system */
