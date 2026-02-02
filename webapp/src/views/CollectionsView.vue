@@ -20,21 +20,22 @@
         </button>
       </div>
 
-      <!-- Info banner -->
-      <div class="info-banner">
-        <div class="banner-icon">
-          <Disc3 :size="20" />
-        </div>
-        <div class="banner-text">
-          <div class="banner-title">{{ albumScope === 'global' ? 'Общая коллекция альбомов' : 'Альбомы в вашей библиотеке' }}</div>
-          <div class="banner-description">
-            {{ albumScope === 'global' ? 'Все альбомы, доступные в системе' : 'Альбомы из вашего канала' }}
+      <!-- Info banner + Tabs combined -->
+      <div class="info-banner-with-tabs">
+        <div class="info-banner">
+          <div class="banner-icon">
+            <Disc3 :size="20" />
+          </div>
+          <div class="banner-text">
+            <div class="banner-title">{{ albumScope === 'global' ? 'Общая коллекция альбомов' : 'Альбомы в вашей библиотеке' }}</div>
+            <div class="banner-description">
+              {{ albumScope === 'global' ? 'Все альбомы, доступные в системе' : 'Альбомы из вашего канала' }}
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Type Switcher (Tabs) - Neumorphic style - Desktop Only -->
-      <div class="neu-tab-bar collections-tabs">
+        <!-- Type Switcher (Tabs) - Neumorphic style - Desktop Only -->
+        <div class="neu-tab-bar collections-tabs">
         <button 
           class="neu-tab"
           :class="{ active: activeTab === 'albums' }"
@@ -49,6 +50,7 @@
         >
           <span class="neu-tab-content" data-text="Плейлисты">Плейлисты</span>
         </button>
+      </div>
       </div>
 
       <!-- Search -->
@@ -97,18 +99,20 @@
 
     <!-- Playlists Tab -->
     <div v-show="activeTab === 'playlists'" class="tab-content">
-      <!-- Info banner -->
-      <div class="info-banner">
-        <div class="banner-icon">
-          <Folder :size="20" />
+      <!-- Info banner + Tabs combined -->
+      <div class="info-banner-with-tabs">
+        <div class="info-banner">
+          <div class="banner-icon">
+            <Folder :size="20" />
+          </div>
+          <div class="banner-text">
+            <div class="banner-title">Общие плейлисты</div>
+            <div class="banner-description">Все плейлисты, доступные в системе</div>
+          </div>
         </div>
-        <div class="banner-text">
-          <div class="banner-title">Общие плейлисты</div>
-        </div>
-      </div>
 
-      <!-- Type Switcher (Tabs) - Neumorphic style - Desktop Only -->
-      <div class="neu-tab-bar collections-tabs">
+        <!-- Type Switcher (Tabs) - Neumorphic style - Desktop Only -->
+        <div class="neu-tab-bar collections-tabs">
         <button 
           class="neu-tab"
           :class="{ active: activeTab === 'albums' }"
@@ -123,6 +127,7 @@
         >
           <span class="neu-tab-content" data-text="Плейлисты">Плейлисты</span>
         </button>
+      </div>
       </div>
 
       <!-- Search for playlists -->
@@ -540,6 +545,21 @@ onMounted(() => {
 /* Override base .neu-tab-bar for this specific use case */
 .collections-tabs.neu-tab-bar {
   padding: 4px;
+}
+
+/* Info banner with tabs container */
+.info-banner-with-tabs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 16px;
+}
+
+/* Adjust collections-tabs when inside info-banner-with-tabs */
+.info-banner-with-tabs .collections-tabs {
+  margin-bottom: 0;
+  flex-shrink: 0;
 }
 
 /* Info banner */
