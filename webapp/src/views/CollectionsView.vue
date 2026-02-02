@@ -1,5 +1,23 @@
 <template>
   <div class="collections-view">
+    <!-- Type Switcher (Tabs) - Neumorphic style - Desktop Only -->
+    <div class="neu-tab-bar collections-tabs">
+      <button 
+        class="neu-tab"
+        :class="{ active: activeTab === 'albums' }"
+        @click="setActiveTab('albums')"
+      >
+        <span class="neu-tab-content" data-text="Альбомы">Альбомы</span>
+      </button>
+      <button 
+        class="neu-tab"
+        :class="{ active: activeTab === 'playlists' }"
+        @click="setActiveTab('playlists')"
+      >
+        <span class="neu-tab-content" data-text="Плейлисты">Плейлисты</span>
+      </button>
+    </div>
+
     <!-- Albums Tab -->
     <div v-show="activeTab === 'albums'" class="tab-content">
       <!-- Scope switcher for albums -->
@@ -471,6 +489,24 @@ onMounted(() => {
 <style scoped>
 .collections-view {
   padding: 8px 16px 180px 16px;
+}
+
+/* Tabs Styles - use design system */
+.collections-tabs {
+  margin-bottom: 20px;
+  display: none; /* Hide on mobile, tabs are in PageHeader */
+}
+
+/* Show collections-tabs only on desktop */
+@media (min-width: 1024px) {
+  .collections-tabs {
+    display: flex;
+  }
+}
+
+/* Override base .neu-tab-bar for this specific use case */
+.collections-tabs.neu-tab-bar {
+  padding: 4px;
 }
 
 /* Info banner */
