@@ -317,7 +317,14 @@ const filteredPlaylists = computed(() => {
 const filteredPublicPlaylists = computed(() => {
   // Combine own public playlists and public playlists from others
   const ownPublic = playlists.value.filter(p => p.is_public)
-  const allPublic = [...ownPublic, ...publicPlaylists.value]
+  
+  // Create a Set of own playlist IDs for efficient lookup
+  const ownPlaylistIds = new Set(playlists.value.map(p => p.id))
+  
+  // Filter out any playlists that are already in user's playlists to avoid duplicates
+  const othersPublic = publicPlaylists.value.filter(p => !ownPlaylistIds.has(p.id))
+  
+  const allPublic = [...ownPublic, ...othersPublic]
   
   if (!playlistSearchQuery.value) {
     return allPublic
