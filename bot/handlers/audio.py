@@ -18,7 +18,14 @@ from shared.models import User, Track, LibrarySource, ForwardSourceType, UserCha
 from shared.utils import format_duration
 
 from bot.services import track_service, channel_service
-from bot.services.deduplication import deduplication_service, get_approx_bitrate
+from bot.services.deduplication import (
+    deduplication_service, 
+    get_approx_bitrate, 
+    get_approx_bitrate_raw,
+    is_hd_quality_raw,
+    is_hd_version,
+    UploadQualityDecision,
+)
 from bot.services.session import session_manager
 from bot.handlers.keyboards import (
     get_track_keyboard,
@@ -158,11 +165,42 @@ async def handle_audio(message: Message):
     )
     
     if potential_duplicates and not playlist_session:
-        # Found potential duplicates - ask user to compare
-        display_title = title or (file_name.rsplit('.', 1)[0] if file_name else "Без названия")
+        # Check quality: if uploading HD and library has only regular - auto save
+        upload_is_hd = is_hd_quality_raw(duration, file_size, audio.mime_type)
+        upload_bitrate = get_approx_bitrate_raw(duration, file_size)
         
-        # Format duplicate info
-        dup_list = []
+        # Check if all duplicates are lower quality
+        all_duplicates_lower_quality = False
+        if upload_is_hd:
+            # HD upload - check if all existing are regular quality
+            all_duplicates_lower_quality = all(not is_hd_version(dup) for dup in potential_duplicates)
+        elif upload_bitrate:
+            # Regular upload - check if we're uploading significantly better quality
+            all_duplicates_lower_quality = all(
+                (br := get_approx_bitrate(dup)) is not None and upload_bitrate > br * 1.4
+                for dup in potential_duplicates
+            )
+        
+        if all_duplicates_lower_quality:
+            # Uploading better quality version - save without asking
+            pass  # Continue to normal save flow below
+        else:
+            # Same or lower quality - ask user
+            display_title = title or (file_name.rsplit('.', 1)[0] if file_name else "Без названия")
+            
+            # Show what we're uploading
+            upload_meta = []
+            if duration:
+                m, s = divmod(duration, 60)
+                upload_meta.append(f"{m}:{s:02d}")
+            if file_size:
+                upload_meta.append(f"{file_size / (1024*1024):.1f}MB")
+            if upload_bitrate:
+                upload_meta.append(f"~{int(upload_bitrate)}kbps")
+            upload_meta_str = " • ".join(upload_meta) if upload_meta else ""
+            
+            # Format duplicate info
+            dup_list = []
         for idx, dup in enumerate(potential_duplicates[:3]):
             dup_meta = []
             if dup.duration:
@@ -180,31 +218,32 @@ async def handle_audio(message: Message):
                 f"   └ {meta_str}"
             )
         
-        dup_text = "\n".join(dup_list)
-        
-        # Store pending upload data in session
-        session_manager.set_pending_upload(user_id, {
-            "file_id": audio.file_id,
-            "file_unique_id": audio.file_unique_id,
-            "title": title,
-            "artist": artist,
-            "duration": duration,
-            "file_size": file_size,
-            "file_name": file_name,
-            "library_source": library_source.value if library_source else None,
-            "forward_info": forward_info,
-        })
-        
-        await message.reply(
-            f"⚠️ <b>Возможный дубликат!</b>\n\n"
-            f"🎵 Вы загружаете: <b>{display_title}</b>\n"
-            f"👤 {artist or 'Неизвестный исполнитель'}\n\n"
-            f"📚 Похожие треки в библиотеке:\n{dup_text}\n\n"
-            f"<i>Можете прослушать и сравнить перед сохранением</i>",
-            reply_markup=get_upload_duplicate_keyboard(audio.file_unique_id, potential_duplicates),
-            parse_mode="HTML"
-        )
-        return
+            dup_text = "\n".join(dup_list)
+            
+            # Store pending upload data in session
+            session_manager.set_pending_upload(user_id, {
+                "file_id": audio.file_id,
+                "file_unique_id": audio.file_unique_id,
+                "title": title,
+                "artist": artist,
+                "duration": duration,
+                "file_size": file_size,
+                "file_name": file_name,
+                "library_source": library_source.value if library_source else None,
+                "forward_info": forward_info,
+            })
+            
+            await message.reply(
+                f"⚠️ <b>Возможный дубликат!</b>\n\n"
+                f"🎵 Вы загружаете: <b>{display_title}</b>\n"
+                f"   └ {upload_meta_str}\n"
+                f"👤 {artist or 'Неизвестный исполнитель'}\n\n"
+                f"📚 Похожие треки в библиотеке:\n{dup_text}\n\n"
+                f"<i>Можете прослушать и сравнить перед сохранением</i>",
+                reply_markup=get_upload_duplicate_keyboard(audio.file_unique_id, potential_duplicates),
+                parse_mode="HTML"
+            )
+            return
     
     # Save track using service
     result = await track_service.save_track(

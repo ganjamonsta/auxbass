@@ -19,6 +19,13 @@ from shared.matching import normalize_unicode, generate_hashtags
 
 logger = logging.getLogger(__name__)
 
+
+class UploadQualityDecision:
+    """Result of comparing upload quality vs existing duplicates"""
+    SAVE_AUTO = "save_auto"  # HD upgrade - save without asking
+    ASK_USER = "ask_user"    # Same quality or downgrade - ask user
+    NO_DUPLICATES = "no_duplicates"  # No duplicates found
+
 # Threshold for quality difference detection
 # If bitrate differs by more than this ratio, tracks are considered different quality versions
 QUALITY_DIFF_THRESHOLD = 0.4  # 40% difference = different quality (e.g. MP3 128 vs FLAC)
@@ -34,6 +41,37 @@ def get_approx_bitrate(track: Track) -> Optional[float]:
     # file_size in bytes, duration in seconds
     # bitrate = (file_size * 8) / duration / 1000 = kbps
     return (track.file_size * 8) / track.duration / 1000
+
+
+def get_approx_bitrate_raw(duration: Optional[int], file_size: Optional[int]) -> Optional[float]:
+    """
+    Calculate approximate bitrate in kbps from raw values.
+    Returns None if duration or file_size is not available.
+    """
+    if not duration or not file_size or duration == 0:
+        return None
+    return (file_size * 8) / duration / 1000
+
+
+def is_hd_quality_raw(duration: Optional[int], file_size: Optional[int], mime_type: Optional[str] = None) -> bool:
+    """
+    Check if track is likely an HD/lossless version from raw values.
+    HD versions typically have:
+    - Higher bitrate (> 500 kbps suggests lossless)
+    - FLAC, WAV, ALAC mime types
+    """
+    # Check mime type for lossless formats
+    lossless_types = {'audio/flac', 'audio/x-flac', 'audio/wav', 'audio/x-wav', 
+                      'audio/alac', 'audio/x-alac', 'audio/aiff', 'audio/x-aiff'}
+    if mime_type and mime_type.lower() in lossless_types:
+        return True
+    
+    # Check by bitrate (> 500 kbps is likely lossless or high quality)
+    bitrate = get_approx_bitrate_raw(duration, file_size)
+    if bitrate and bitrate > 500:
+        return True
+    
+    return False
 
 
 def is_hd_version(track: Track) -> bool:
