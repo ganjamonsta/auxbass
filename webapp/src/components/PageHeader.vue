@@ -5,7 +5,12 @@
         <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
       </svg>
     </button>
-    <h1 class="page-title">{{ title }}</h1>
+    <h1 class="page-title" :class="{ 'with-icon': $slots.icon }">
+      <span v-if="$slots.icon" class="title-icon">
+        <slot name="icon"></slot>
+      </span>
+      <span class="title-text">{{ title }}</span>
+    </h1>
     <div v-if="$slots.toggle" class="header-toggle">
       <slot name="toggle"></slot>
     </div>
@@ -68,6 +73,33 @@ defineEmits(['goBack'])
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-title.with-icon {
+  min-width: 0;
+}
+
+.title-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  color: var(--text-primary);
+}
+
+.title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Скрываем текст на узких экранах (до 380px) */
+@media (max-width: 380px) {
+  .page-title.with-icon .title-text {
+    display: none;
+  }
 }
 
 .header-actions {

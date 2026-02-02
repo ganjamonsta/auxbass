@@ -19,6 +19,9 @@
           :showBack="showBackButton"
           @goBack="goBack"
         >
+          <template v-if="route.name === 'library'" #icon>
+            <component :is="libraryIcon" :size="20" />
+          </template>
           <template v-if="route.name === 'library'" #toggle>
             <div class="neu-tab-bar header-tabs">
               <button 
@@ -191,6 +194,7 @@ import ChannelBanner from '@/components/ChannelBanner.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
 import ContextMenu from '@/components/ContextMenu.vue'
 import { MobileFooter } from '@/components/layout'
+import { Music, Disc3, User, Folder } from 'lucide-vue-next'
 // Desktop components
 import Sidebar from '@/components/desktop/Sidebar.vue'
 import DesktopPlayer from '@/components/desktop/DesktopPlayer.vue'
@@ -249,8 +253,18 @@ const showBackButton = computed(() => {
 })
 
 const pageTitle = computed(() => {
+  // Для главной страницы библиотеки показываем название текущего раздела
+  if (route.name === 'library') {
+    const libraryTitles = {
+      tracks: 'Треки',
+      albums: 'Альбомы',
+      artists: 'Артисты',
+      playlists: 'Плейлисты'
+    }
+    return libraryTitles[uiStore.libraryTab] || 'Библиотека'
+  }
+  
   const titles = {
-    library: 'Библиотека',
     collections: 'Коллекции',
     albums: 'Альбомы',
     'album-detail': route.params?.name || 'Альбом',
@@ -262,6 +276,16 @@ const pageTitle = computed(() => {
     settings: 'Настройки',
   }
   return titles[route.name] || ''
+})
+
+const libraryIcon = computed(() => {
+  const icons = {
+    tracks: Music,
+    albums: Disc3,
+    artists: User,
+    playlists: Folder
+  }
+  return icons[uiStore.libraryTab] || Music
 })
 
 // Queue computeds for desktop player
