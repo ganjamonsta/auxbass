@@ -454,12 +454,12 @@ html, body {
 .app.desktop-layout {
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: minmax(0, 1fr) auto;
   grid-template-areas:
     "sidebar main"
     "player player";
   height: 100vh;
-  max-height: 100vh;
+  overflow: hidden;
 }
 
 .app.desktop-layout.has-now-playing {
@@ -486,15 +486,14 @@ html, body {
 .app.desktop-layout :deep(.now-playing-sidebar) {
   grid-area: nowplaying;
   height: 100%;
+  overflow: hidden;
 }
 
 .app.desktop-layout :deep(.desktop-player) {
   grid-area: player;
   width: 100%;
-  min-height: var(--desktop-player-height);
   flex-shrink: 0;
-  position: sticky;
-  bottom: 0;
+  position: relative;
   z-index: 200;
 }
 

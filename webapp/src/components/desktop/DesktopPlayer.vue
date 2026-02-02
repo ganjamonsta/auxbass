@@ -308,8 +308,7 @@ onUnmounted(() => {
 
 <style scoped>
 .desktop-player {
-  min-height: 100px;
-  height: 100px;
+  height: var(--desktop-player-height);
   background: linear-gradient(180deg, #1a1a1a 0%, #0d0d0d 50%, #1a1a1a 100%);
   border-top: 1px solid #333;
   display: flex;
@@ -321,7 +320,6 @@ onUnmounted(() => {
     0 -4px 20px rgba(0, 0, 0, 0.5);
   position: relative;
   overflow: visible;
-  contain: layout style;
 }
 
 .desktop-player::before {
