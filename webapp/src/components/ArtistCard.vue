@@ -41,6 +41,7 @@
           :key="album.id"
           class="album-card"
           @click="$emit('openAlbum', album)"
+          @contextmenu.prevent="$emit('albumContextmenu', { album, event: $event })"
         >
           <div class="album-cover">
             <img v-if="album.cover_url" :src="album.cover_url" alt="" />
@@ -115,7 +116,7 @@ const props = defineProps({
   isPlaying: Boolean
 })
 
-const emit = defineEmits(['play', 'menu', 'like', 'openAlbum', 'openPlaylist', 'playAll'])
+const emit = defineEmits(['play', 'menu', 'like', 'openAlbum', 'openPlaylist', 'playAll', 'albumContextmenu'])
 
 const initials = computed(() => {
   const name = props.artist.name || '?'

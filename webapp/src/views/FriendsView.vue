@@ -298,6 +298,7 @@
               :key="album.id"
               class="album-item"
               @click="$router.push(`/album/${album.id}`); closeProfile()"
+              @contextmenu.prevent="handleAlbumContextMenu(album, $event)"
             >
               <img v-if="album.cover_url" :src="album.cover_url" />
               <div v-else class="album-placeholder"><Disc3 :size="24" /></div>
@@ -317,6 +318,7 @@ import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
+import { useContextMenu } from '@/composables/useContextMenu'
 import api from '@/api/client'
 import SearchBar from '@/components/ui/SearchBar.vue'
 import { Users, User, Search, Check, X, Music, Folder, Disc3, Lightbulb } from 'lucide-vue-next'
@@ -325,6 +327,13 @@ const router = useRouter()
 const route = useRoute()
 const playerStore = usePlayerStore()
 const authStore = useAuthStore()
+
+// Context menu
+const { openMenu } = useContextMenu()
+
+const handleAlbumContextMenu = (album, event) => {
+  openMenu('album', album, 'friend', event)
+}
 
 // Navigate to channel setup
 const goToChannelSetup = () => {

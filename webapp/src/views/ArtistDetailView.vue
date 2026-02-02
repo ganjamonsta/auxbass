@@ -39,6 +39,7 @@
           :key="album.id"
           class="album-card"
           @click="goToAlbum(album)"
+          @contextmenu.prevent="openMenu('album', album, 'artist', $event)"
         >
           <div class="album-cover">
             <img v-if="album.cover_url" :src="album.cover_url" :alt="album.name" />
