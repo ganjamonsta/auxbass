@@ -612,7 +612,8 @@ onMounted(() => {
   .info-banner {
     padding: 12px;
     margin-bottom: 0;
-    flex: 0 0 auto;
+    width: 100%;
+    justify-content: center;
   }
 
   .banner-text {
@@ -620,8 +621,8 @@ onMounted(() => {
   }
 
   .banner-icon {
-    width: 44px;
-    height: 44px;
+    width: 48px;
+    height: 48px;
   }
 
   /* Tabs are in PageHeader on mobile, keep them hidden here */
