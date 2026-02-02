@@ -38,35 +38,49 @@
       />
     </div>
 
-    <MediaGrid
-      type="artist"
-      :items="artists"
-      :loading="loading"
-      @click="goToArtist"
-      @contextmenu="handleContextMenu"
-    >
-      <template #empty>
-        <div class="empty-state">
-          <span class="empty-icon"><User :size="48" /></span>
-          <p v-if="searchQuery">Ничего не найдено</p>
-          <p v-else>Нет исполнителей</p>
-        </div>
-      </template>
-    </MediaGrid>
+    <!-- Loading state with skeletons -->
+    <div v-if="loading && !initialized" class="media-grid type-artist">
+      <GridSkeleton v-for="i in 12" :key="i" type="artist" />
+    </div>
 
-    <!-- Infinite scroll trigger -->
-    <div ref="loadTrigger" class="load-trigger" v-show="hasMore && !loading"></div>
+    <!-- Artist grid with infinite scroll -->
+    <template v-else>
+      <MediaGrid
+        type="artist"
+        :items="artists"
+        :loading="false"
+        @click="goToArtist"
+        @contextmenu="handleContextMenu"
+      >
+        <template #empty>
+          <div class="empty-state">
+            <span class="empty-icon"><User :size="48" /></span>
+            <p v-if="searchQuery">Ничего не найдено</p>
+            <p v-else>Нет исполнителей</p>
+          </div>
+        </template>
+      </MediaGrid>
+
+      <!-- Infinite scroll trigger -->
+      <div ref="loadTriggerRef" class="load-trigger" v-show="hasMore && !loading"></div>
+      
+      <!-- Loading more indicator -->
+      <div v-if="loadingMore" class="loading-more">
+        <div class="spinner"></div>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { useSort } from '@/composables'
+import { useVirtualScroll, useSort } from '@/composables'
 import { useContextMenu } from '@/composables/useContextMenu'
 import SortChips from '@/components/SortChips.vue'
 import MediaGrid from '@/components/MediaGrid.vue'
+import GridSkeleton from '@/components/GridSkeleton.vue'
 import SearchBar from '@/components/ui/SearchBar.vue'
 import { artistsApi } from '@/api/client'
 import { User } from 'lucide-vue-next'
@@ -85,6 +99,59 @@ const authStore = useAuthStore()
 const SCOPE_KEY = 'artists-scope'
 const scope = ref(localStorage.getItem(SCOPE_KEY) || 'library')
 
+// Sort state (persisted to localStorage)
+const { 
+  sortBy, 
+  sortOrder, 
+  currentOption, 
+  nextSort, 
+  toggleOrder 
+} = useSort('artists-sort', 'artists', { sortBy: 'name', sortOrder: 'asc' })
+
+// Search state
+const searchQuery = ref('')
+const debouncedSearchQuery = ref('')
+let searchTimeout = null
+
+// Fetch function for virtual scroll
+const fetchArtists = async ({ offset, limit }) => {
+  const params = {
+    offset,
+    limit,
+    sort_by: sortBy.value,
+    sort_order: sortOrder.value
+  }
+  
+  if (debouncedSearchQuery.value) {
+    params.search = debouncedSearchQuery.value
+  }
+  
+  // Use global or library endpoint based on scope
+  const response = scope.value === 'global' 
+    ? await artistsApi.getGlobal(params)
+    : await artistsApi.getAll(params)
+  
+  return response.data
+}
+
+// Virtual scroll composable
+const {
+  items: artists,
+  total,
+  loading,
+  loadingMore,
+  hasMore,
+  initialized,
+  loadTriggerRef,
+  reset,
+  refresh
+} = useVirtualScroll({
+  fetchFn: fetchArtists,
+  limit: 30,
+  immediate: false // We'll load after scope is set
+})
+
+// Change scope handler
 const changeScope = (newScope) => {
   // If trying to access library without channel, show prompt
   if (newScope === 'library' && !authStore.hasChannel) {
@@ -96,94 +163,13 @@ const changeScope = (newScope) => {
   reset()
 }
 
-// Sort state (persisted to localStorage)
-const { 
-  sortBy, 
-  sortOrder, 
-  currentOption, 
-  nextSort, 
-  toggleOrder 
-} = useSort('artists-sort', 'artists', { sortBy: 'name', sortOrder: 'asc' })
-
-// Data state
-const artists = ref([])
-const total = ref(0)
-const loading = ref(false)
-const offset = ref(0)
-const limit = 30
-
-// Search state
-const searchQuery = ref('')
-let searchTimeout = null
-
-// Infinite scroll
-const loadTrigger = ref(null)
-let observer = null
-
-const hasMore = ref(true)
-
-// Load artists
-const loadArtists = async (append = false) => {
-  if (loading.value) return
-  
-  loading.value = true
-  
-  try {
-    const params = {
-      offset: append ? offset.value : 0,
-      limit: limit,
-      sort_by: sortBy.value,
-      sort_order: sortOrder.value
-    }
-    
-    if (searchQuery.value) {
-      params.search = searchQuery.value
-    }
-    
-    // Use global or library endpoint based on scope
-    const response = scope.value === 'global' 
-      ? await artistsApi.getGlobal(params)
-      : await artistsApi.getAll(params)
-    const data = response.data
-    
-    if (append) {
-      artists.value.push(...data.items)
-    } else {
-      artists.value = data.items
-      offset.value = 0
-    }
-    
-    total.value = data.total
-    offset.value += data.items.length
-    hasMore.value = artists.value.length < total.value
-    
-  } catch (error) {
-    console.error('Failed to load artists:', error)
-  } finally {
-    loading.value = false
-  }
-}
-
-// Load more (for infinite scroll)
-const loadMore = () => {
-  if (hasMore.value && !loading.value) {
-    loadArtists(true)
-  }
-}
-
-// Reset and reload
-const reset = () => {
-  offset.value = 0
-  hasMore.value = true
-  loadArtists(false)
-}
-
 // Debounced search
 const debouncedSearch = () => {
   if (searchTimeout) {
     clearTimeout(searchTimeout)
   }
   searchTimeout = setTimeout(() => {
+    debouncedSearchQuery.value = searchQuery.value
     reset()
   }, 300)
 }
@@ -208,7 +194,21 @@ const goToArtist = (artist) => {
   })
 }
 
-// Setup infinite scroll with IntersectionObserver
+// Обработчик сброса состояния
+const handleResetState = (event) => {
+  if (event.detail.route === '/artists') {
+    // Сбрасываем поиск
+    searchQuery.value = ''
+    debouncedSearchQuery.value = ''
+    // Сбрасываем сортировку на дефолтную
+    sortBy.value = 'name'
+    sortOrder.value = 'asc'
+    // Перезагружаем список
+    reset()
+  }
+}
+
+// Initial load
 onMounted(() => {
   // If no channel and scope is library, switch to global
   if (!authStore.hasChannel && scope.value === 'library') {
@@ -221,54 +221,19 @@ onMounted(() => {
     scope.value = 'global'
   }
 
-  loadArtists()
-  
-  observer = new IntersectionObserver(
-    (entries) => {
-      if (entries[0].isIntersecting) {
-        loadMore()
-      }
-    },
-    { rootMargin: '200px' }
-  )
-  
-  if (loadTrigger.value) {
-    observer.observe(loadTrigger.value)
-  }
+  // Initial load
+  reset()
   
   // Слушаем событие сброса состояния
   window.addEventListener('reset-view-state', handleResetState)
 })
 
-// Watch for trigger element changes
-watch(loadTrigger, (el) => {
-  if (el && observer) {
-    observer.observe(el)
-  }
-})
-
 onUnmounted(() => {
-  if (observer) {
-    observer.disconnect()
-  }
   if (searchTimeout) {
     clearTimeout(searchTimeout)
   }
   window.removeEventListener('reset-view-state', handleResetState)
 })
-
-// Обработчик сброса состояния
-const handleResetState = (event) => {
-  if (event.detail.route === '/artists') {
-    // Сбрасываем поиск
-    searchQuery.value = ''
-    // Сбрасываем сортировку на дефолтную
-    sortBy.value = 'name'
-    sortOrder.value = 'asc'
-    // Перезагружаем список
-    reset()
-  }
-}
 </script>
 
 <style scoped>
@@ -316,5 +281,38 @@ const handleResetState = (event) => {
 
 .load-trigger {
   height: 1px;
+}
+
+.loading-more {
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--bg-highlight, rgba(255,255,255,0.1));
+  border-top-color: var(--accent, #1DB954);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Grid skeleton layout */
+.media-grid.type-artist {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 24px;
+}
+
+@media (max-width: 768px) {
+  .media-grid.type-artist {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 16px;
+  }
 }
 </style>

@@ -13,41 +13,49 @@
       />
     </div>
 
+    <!-- Loading state with skeletons -->
+    <div v-if="loading && !initialized" class="artist-grid">
+      <GridSkeleton v-for="i in 12" :key="i" type="artist" />
+    </div>
+
     <!-- Artist grid -->
-    <div class="artist-grid" v-if="artists.length">
-      <ArtistGridCard
-        v-for="artist in artists"
-        :key="artist.name"
-        :artist="artist"
-        @click="goToArtist"
-        @contextmenu="(e) => openMenu('artist', artist, 'library', e)"
-      />
-    </div>
+    <template v-else>
+      <div class="artist-grid" v-if="artists.length">
+        <ArtistGridCard
+          v-for="artist in artists"
+          :key="artist.name"
+          :artist="artist"
+          @click="goToArtist"
+          @contextmenu="(e) => openMenu('artist', artist, 'library', e)"
+        />
+      </div>
 
-    <!-- Empty state -->
-    <div v-else-if="!loading" class="empty-state">
-      <span class="empty-icon"><User :size="48" /></span>
-      <p v-if="searchQuery">Ничего не найдено</p>
-      <p v-else>Нет исполнителей</p>
-    </div>
+      <!-- Empty state -->
+      <div v-else-if="!loading" class="empty-state">
+        <span class="empty-icon"><User :size="48" /></span>
+        <p v-if="searchQuery">Ничего не найдено</p>
+        <p v-else>Нет исполнителей</p>
+      </div>
 
-    <!-- Loading indicator -->
-    <div v-if="loading" class="loading">
-      <div class="spinner"></div>
-    </div>
+      <!-- Infinite scroll trigger -->
+      <div ref="loadTriggerRef" class="load-trigger" v-show="hasMore && !loading"></div>
 
-    <!-- Infinite scroll trigger -->
-    <div ref="loadTrigger" class="load-trigger" v-show="hasMore && !loading"></div>
+      <!-- Loading more indicator -->
+      <div v-if="loadingMore" class="loading-more">
+        <div class="spinner"></div>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { useSort } from '@/composables'
+import { useVirtualScroll, useSort } from '@/composables'
 import { useContextMenu } from '@/composables/useContextMenu'
 import SortChips from '@/components/SortChips.vue'
 import ArtistGridCard from '@/components/ArtistGridCard.vue'
+import GridSkeleton from '@/components/GridSkeleton.vue'
 import api from '@/api/client'
 import { User } from 'lucide-vue-next'
 
@@ -72,71 +80,37 @@ const {
   toggleOrder 
 } = useSort('library-artists-sort', 'artists', { sortBy: 'name', sortOrder: 'asc' })
 
-// Data state
-const artists = ref([])
-const total = ref(0)
-const loading = ref(false)
-const offset = ref(0)
-const limit = 30
-
-// Infinite scroll
-const loadTrigger = ref(null)
-let observer = null
-
-const hasMore = ref(true)
-
-// Load artists
-const loadArtists = async (append = false) => {
-  if (loading.value) return
-  
-  loading.value = true
-  
-  try {
-    const params = new URLSearchParams({
-      offset: append ? offset.value.toString() : '0',
-      limit: limit.toString(),
-      sort_by: sortBy.value,
-      sort_order: sortOrder.value
-    })
-    
-    if (props.searchQuery) {
-      params.set('search', props.searchQuery)
-    }
-    
-    const response = await api.get(`/artists?${params}`)
-    const data = response.data
-    
-    if (append) {
-      artists.value.push(...data.items)
-    } else {
-      artists.value = data.items
-      offset.value = 0
-    }
-    
-    total.value = data.total
-    offset.value += data.items.length
-    hasMore.value = artists.value.length < total.value
-    
-  } catch (error) {
-    console.error('Failed to load artists:', error)
-  } finally {
-    loading.value = false
+// Fetch function for virtual scroll
+const fetchArtists = async ({ offset, limit }) => {
+  const params = {
+    offset,
+    limit,
+    sort_by: sortBy.value,
+    sort_order: sortOrder.value
   }
-}
-
-// Load more (for infinite scroll)
-const loadMore = () => {
-  if (hasMore.value && !loading.value) {
-    loadArtists(true)
+  
+  if (props.searchQuery) {
+    params.search = props.searchQuery
   }
+  
+  const response = await api.get('/artists', { params })
+  return response.data
 }
 
-// Reset and reload
-const reset = () => {
-  offset.value = 0
-  hasMore.value = true
-  loadArtists(false)
-}
+// Virtual scroll composable
+const {
+  items: artists,
+  total,
+  loading,
+  loadingMore,
+  hasMore,
+  initialized,
+  loadTriggerRef,
+  reset
+} = useVirtualScroll({
+  fetchFn: fetchArtists,
+  limit: 30
+})
 
 // Watchers
 watch(() => props.searchQuery, () => {
@@ -158,37 +132,6 @@ const onToggleOrder = () => {
 const goToArtist = (artist) => {
   router.push(`/artist/${encodeURIComponent(artist.name)}`)
 }
-
-// Setup infinite scroll with IntersectionObserver
-onMounted(() => {
-  loadArtists()
-  
-  observer = new IntersectionObserver(
-    (entries) => {
-      if (entries[0].isIntersecting) {
-        loadMore()
-      }
-    },
-    { rootMargin: '200px' }
-  )
-  
-  if (loadTrigger.value) {
-    observer.observe(loadTrigger.value)
-  }
-})
-
-// Watch for trigger element changes
-watch(loadTrigger, (el) => {
-  if (el && observer) {
-    observer.observe(el)
-  }
-})
-
-onUnmounted(() => {
-  if (observer) {
-    observer.disconnect()
-  }
-})
 </script>
 
 <style scoped>
@@ -252,26 +195,26 @@ onUnmounted(() => {
   display: block;
 }
 
-.loading {
+.load-trigger {
+  height: 1px;
+}
+
+.loading-more {
   display: flex;
   justify-content: center;
-  padding: 24px;
+  padding: 16px;
 }
 
 .spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--bg-highlight);
-  border-top-color: var(--accent);
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--bg-highlight, rgba(255,255,255,0.1));
+  border-top-color: var(--accent, #1DB954);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
   to { transform: rotate(360deg); }
-}
-
-.load-trigger {
-  height: 1px;
 }
 </style>

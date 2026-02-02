@@ -16,7 +16,7 @@
 
     <!-- Actions -->
     <div class="artist-actions">
-      <div class="action-buttons" v-if="artist.tracks?.length">
+      <div class="action-buttons" v-if="artist.track_count > 0">
         <button class="action-btn play-btn" @click="playAll">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
             <path d="M8 5v14l11-7z"/>
@@ -53,27 +53,44 @@
       </div>
     </section>
 
-    <!-- Tracks section -->
+    <!-- Tracks section with pagination -->
     <section class="section">
       <h2>Все треки</h2>
-      <div class="track-list">
-        <TrackItem
-          v-for="(track, index) in artist.tracks"
-          :key="track.id"
-          :track="track"
-          :isPlaying="playerStore.currentTrack?.id === track.id"
-          :isLiked="track.is_liked"
-          :showAlbum="true"
-          :showAddToLibrary="isGlobal"
-          :inLibrary="track.in_library"
-          @click="playTrack(track, index)"
-          @like="handleLikeTrack(track)"
-          @addToLibrary="handleAddToLibrary(track)"
-          @menu="(e) => openMenu('track', track, 'artist', e)"
-          @download="handleDirectDownload(track)"
-          @hdNotice="handleHdNotice"
-        />
+      
+      <!-- Loading state with skeletons -->
+      <div v-if="tracksLoading && !tracksInitialized" class="track-list">
+        <TrackSkeleton v-for="i in 10" :key="i" />
       </div>
+      
+      <!-- Track list with infinite scroll -->
+      <template v-else>
+        <div class="track-list">
+          <TrackItem
+            v-for="(track, index) in tracks"
+            :key="track.id"
+            :track="track"
+            :isPlaying="playerStore.currentTrack?.id === track.id"
+            :isLiked="track.is_liked"
+            :showAlbum="true"
+            :showAddToLibrary="isGlobal"
+            :inLibrary="track.in_library"
+            @click="playTrack(track, index)"
+            @like="handleLikeTrack(track)"
+            @addToLibrary="handleAddToLibrary(track)"
+            @menu="(e) => openMenu('track', track, 'artist', e)"
+            @download="handleDirectDownload(track)"
+            @hdNotice="handleHdNotice"
+          />
+        </div>
+        
+        <!-- Infinite scroll trigger -->
+        <div ref="loadTriggerRef" class="load-trigger" v-show="hasMoreTracks && !tracksLoadingMore"></div>
+        
+        <!-- Loading more indicator -->
+        <div v-if="tracksLoadingMore" class="loading-more">
+          <div class="spinner"></div>
+        </div>
+      </template>
     </section>
   </div>
 
@@ -95,13 +112,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
+import { useVirtualScroll } from '@/composables'
 import { useContextMenu } from '@/composables/useContextMenu'
 import TrackItem from '@/components/TrackItem.vue'
+import TrackSkeleton from '@/components/TrackSkeleton.vue'
 import api, { playerApi } from '@/api/client'
 import { User, Disc3, Globe } from 'lucide-vue-next'
 
@@ -122,6 +141,32 @@ const notInLibrary = ref(false)
 const scope = computed(() => route.query.scope || 'library')
 const isGlobal = computed(() => scope.value === 'global')
 
+// Tracks pagination with virtual scroll
+const artistName = computed(() => route.params.name ? decodeURIComponent(route.params.name) : null)
+
+const fetchArtistTracks = async ({ offset, limit }) => {
+  if (!artistName.value) return { items: [], total: 0 }
+  
+  const response = await api.get(`/artists/${encodeURIComponent(artistName.value)}/tracks`, {
+    params: { offset, limit, scope: scope.value }
+  })
+  return response.data
+}
+
+const {
+  items: tracks,
+  loading: tracksLoading,
+  loadingMore: tracksLoadingMore,
+  hasMore: hasMoreTracks,
+  initialized: tracksInitialized,
+  loadTriggerRef,
+  reset: resetTracks
+} = useVirtualScroll({
+  fetchFn: fetchArtistTracks,
+  limit: 30,
+  immediate: false // Load after artist info is fetched
+})
+
 const loadArtist = async () => {
   loading.value = true
   notInLibrary.value = false
@@ -130,6 +175,8 @@ const loadArtist = async () => {
     const params = { scope: scope.value }
     const response = await api.get(`/artists/${encodeURIComponent(name)}`, { params })
     artist.value = response.data
+    // Load tracks after artist info is fetched
+    resetTracks()
   } catch (error) {
     // If artist not found in library, show option to view global
     if (error.response?.status === 404 && !isGlobal.value) {
@@ -144,20 +191,20 @@ const loadArtist = async () => {
 }
 
 const playAll = () => {
-  if (artist.value?.tracks?.length) {
-    playerStore.playTrack(artist.value.tracks[0], artist.value.tracks)
+  if (tracks.value?.length) {
+    playerStore.playTrack(tracks.value[0], tracks.value)
   }
 }
 
 const shufflePlay = () => {
-  if (artist.value?.tracks?.length) {
-    const shuffled = [...artist.value.tracks].sort(() => Math.random() - 0.5)
+  if (tracks.value?.length) {
+    const shuffled = [...tracks.value].sort(() => Math.random() - 0.5)
     playerStore.playTrack(shuffled[0], shuffled)
   }
 }
 
 const playTrack = (track, index) => {
-  playerStore.playTrack(track, artist.value.tracks, index)
+  playerStore.playTrack(track, tracks.value, index)
 }
 
 const goToAlbum = (album) => {
@@ -472,6 +519,16 @@ watch(
   gap: 2px;
 }
 
+.load-trigger {
+  height: 1px;
+}
+
+.loading-more {
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+}
+
 .loading {
   display: flex;
   justify-content: center;
@@ -479,12 +536,17 @@ watch(
 }
 
 .spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--bg-highlight);
-  border-top-color: var(--accent);
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--bg-highlight, rgba(255,255,255,0.1));
+  border-top-color: var(--accent, #1DB954);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+}
+
+.loading .spinner {
+  width: 32px;
+  height: 32px;
 }
 
 @keyframes spin {

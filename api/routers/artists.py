@@ -34,6 +34,8 @@ from api.routers.auth import get_current_user
 from api.schemas_v2.artists import (
     ArtistResponse,
     ArtistDetailResponse,
+    ArtistInfoResponse,
+    ArtistTracksResponse,
     ArtistsListResponse,
 )
 from api.schemas_v2.common import TelegramUser
@@ -553,6 +555,99 @@ async def get_artist(
         tags=artist_tags,
         albums=album_items,
         tracks=all_tracks_response,
+    )
+
+
+@router.get("/{artist_name}/tracks", response_model=ArtistTracksResponse)
+async def get_artist_tracks(
+    artist_name: str,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(30, ge=1, le=100),
+    scope: str = Query("library", pattern="^(library|global)$"),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get paginated tracks for an artist.
+    
+    This endpoint is more efficient than /{artist_name} for artists with many tracks,
+    as it only returns a page of tracks at a time.
+    """
+    # Ensure artist_name is URL-decoded
+    artist_name = unquote(artist_name)
+    normalized_search = normalize_artist(artist_name)
+    
+    # Build query based on scope
+    if scope == "global":
+        # Global: get public tracks
+        tracks_result = await db.execute(
+            select(Track)
+            .where(Track.is_public == True)
+            .where(Track.is_unavailable == False)
+            .options(
+                selectinload(Track.enrichment),
+                selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
+            )
+            .order_by(Track.created_at.desc())
+        )
+        all_tracks_raw = tracks_result.unique().scalars().all()
+        
+        # Filter by normalized artist
+        matching_tracks = [
+            track for track in all_tracks_raw
+            if artist_matches_track(track.artist, normalized_search, track.title, track.file_name)
+        ]
+        
+        total = len(matching_tracks)
+        
+        # Get user's library to mark which tracks are in library
+        user_lib_result = await db.execute(
+            select(UserLibrary.track_id)
+            .where(UserLibrary.user_id == user.id)
+        )
+        user_library_ids = set(row[0] for row in user_lib_result.all())
+        
+        # Paginate
+        paginated = matching_tracks[offset:offset + limit]
+        
+        from api.routers.library import track_to_response_global
+        tracks_response = [
+            track_to_response_global(track, in_library=track.id in user_library_ids)
+            for track in paginated
+        ]
+    else:
+        # Library: user's tracks only
+        tracks_result = await db.execute(
+            select(Track, UserLibrary)
+            .join(UserLibrary, UserLibrary.track_id == Track.id)
+            .where(UserLibrary.user_id == user.id)
+            .options(
+                selectinload(Track.enrichment),
+                selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
+            )
+            .order_by(UserLibrary.play_count.desc(), Track.title.asc())
+        )
+        all_tracks = tracks_result.unique().all()
+        
+        # Filter by normalized artist
+        matching_tracks = [
+            (track, lib_entry) for track, lib_entry in all_tracks
+            if artist_matches_track(track.artist, normalized_search, track.title, track.file_name)
+        ]
+        
+        total = len(matching_tracks)
+        
+        # Paginate
+        paginated = matching_tracks[offset:offset + limit]
+        
+        from api.routers.library import track_to_response
+        tracks_response = [track_to_response(track, lib_entry) for track, lib_entry in paginated]
+    
+    return ArtistTracksResponse(
+        items=tracks_response,
+        total=total,
+        offset=offset,
+        limit=limit,
     )
 
 

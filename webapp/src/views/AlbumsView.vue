@@ -20,55 +20,41 @@
       />
     </div>
 
-    <!-- Top pagination (shows when not on first page) -->
-    <PaginationNav
-      v-if="!isFirstPage"
-      :currentPage="currentPage"
-      :totalPages="totalPages"
-      :pageInfo="pageInfo"
-      :isFirstPage="isFirstPage"
-      :isLastPage="isLastPage"
-      :loading="loading"
-      position="top"
-      @goToFirst="goToFirst"
-    />
+    <!-- Loading state with skeletons -->
+    <div v-if="loading && !initialized" class="media-grid type-album">
+      <GridSkeleton v-for="i in 12" :key="i" type="album" />
+    </div>
 
-    <MediaGrid
-      type="album"
-      :items="albums"
-      :loading="loading"
-      @click="(album) => $router.push(`/album/${album.id}`)"
-      @play="playAlbum"
-      @contextmenu="handleContextMenu"
-    />
+    <!-- Album grid with infinite scroll -->
+    <template v-else>
+      <MediaGrid
+        type="album"
+        :items="albums"
+        :loading="false"
+        @click="(album) => $router.push(`/album/${album.id}`)"
+        @play="playAlbum"
+        @contextmenu="handleContextMenu"
+      />
 
-    <!-- Bottom pagination -->
-    <PaginationNav
-      v-if="totalPages > 1 && !loading"
-      :currentPage="currentPage"
-      :totalPages="totalPages"
-      :pageInfo="pageInfo"
-      :isFirstPage="isFirstPage"
-      :isLastPage="isLastPage"
-      :loading="loading"
-      position="bottom"
-      @goToPage="goToPage"
-      @goToFirst="goToFirst"
-      @goToLast="goToLast"
-      @prevPage="prevPage"
-      @nextPage="nextPage"
-    />
+      <!-- Infinite scroll trigger -->
+      <div ref="loadTriggerRef" class="load-trigger" v-show="hasMore && !loading"></div>
+      
+      <!-- Loading more indicator -->
+      <div v-if="loadingMore" class="loading-more">
+        <div class="spinner"></div>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { usePlayerStore } from '@/stores/player'
-import { usePagination, useSort } from '@/composables'
+import { useVirtualScroll, useSort } from '@/composables'
 import { useContextMenu } from '@/composables/useContextMenu'
-import PaginationNav from '@/components/PaginationNav.vue'
 import SortChips from '@/components/SortChips.vue'
 import MediaGrid from '@/components/MediaGrid.vue'
+import GridSkeleton from '@/components/GridSkeleton.vue'
 import SearchBar from '@/components/ui/SearchBar.vue'
 import api from '@/api/client'
 
@@ -86,14 +72,6 @@ const searchQuery = ref('')
 const debouncedSearchQuery = ref('')
 let searchTimeout = null
 
-const debouncedSearch = () => {
-  if (searchTimeout) clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => {
-    debouncedSearchQuery.value = searchQuery.value
-    goToFirst()
-  }, 300)
-}
-
 // Sort state (persisted to localStorage)
 const { 
   sortBy, 
@@ -103,54 +81,55 @@ const {
   toggleOrder 
 } = useSort('albums-sort', 'albums', { sortBy: 'release_date', sortOrder: 'desc' })
 
+// Fetch function for virtual scroll
+const fetchAlbums = async ({ offset, limit }) => {
+  const response = await api.get('/albums', {
+    params: { 
+      offset, 
+      limit,
+      sort_by: sortBy.value,
+      sort_order: sortOrder.value,
+      search: debouncedSearchQuery.value || undefined
+    }
+  })
+  return response.data
+}
+
+// Virtual scroll composable
+const {
+  items: albums,
+  total,
+  loading,
+  loadingMore,
+  hasMore,
+  initialized,
+  loadTriggerRef,
+  reset,
+  refresh
+} = useVirtualScroll({
+  fetchFn: fetchAlbums,
+  limit: 30
+})
+
+// Debounced search
+const debouncedSearch = () => {
+  if (searchTimeout) clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    debouncedSearchQuery.value = searchQuery.value
+    reset()
+  }, 300)
+}
+
 // Sort handlers
 const onNextSort = () => {
   nextSort()
-  goToFirst()
+  reset()
 }
 
 const onToggleOrder = () => {
   toggleOrder()
-  goToFirst()
+  reset()
 }
-
-// Pagination with unified composable (windowed mode for memory optimization)
-const { 
-  items: albums, 
-  total, 
-  loading,
-  currentPage,
-  totalPages,
-  isFirstPage,
-  isLastPage,
-  pageInfo,
-  goToPage,
-  goToFirst,
-  goToLast,
-  prevPage,
-  nextPage,
-  refresh
-} = usePagination({
-  fetchFn: async ({ offset, limit }) => {
-    const response = await api.get('/albums', {
-      params: { 
-        offset, 
-        limit,
-        sort_by: sortBy.value,
-        sort_order: sortOrder.value,
-        search: debouncedSearchQuery.value || undefined
-      }
-    })
-    return response.data
-  },
-  limit: 30,
-  mode: 'windowed'  // Memory optimized - only current page in memory
-})
-
-// Watch sort and search changes to refresh data
-watch([sortBy, sortOrder, debouncedSearchQuery], () => {
-  refresh()
-})
 
 const playAlbum = async (album) => {
   try {
@@ -162,6 +141,10 @@ const playAlbum = async (album) => {
     console.error('Failed to load album:', error)
   }
 }
+
+onUnmounted(() => {
+  if (searchTimeout) clearTimeout(searchTimeout)
+})
 </script>
 <style scoped>
 .albums-view {
@@ -192,5 +175,42 @@ const playAlbum = async (album) => {
 .count {
   font-size: 14px;
   color: var(--text-secondary);
+}
+
+.load-trigger {
+  height: 1px;
+}
+
+.loading-more {
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--bg-highlight, rgba(255,255,255,0.1));
+  border-top-color: var(--accent, #1DB954);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Grid skeleton layout */
+.media-grid.type-album {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 24px;
+}
+
+@media (max-width: 768px) {
+  .media-grid.type-album {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 16px;
+  }
 }
 </style>

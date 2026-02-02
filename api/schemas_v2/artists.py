@@ -25,8 +25,24 @@ class ArtistsListResponse(PaginatedResponse):
     items: List[ArtistResponse]
 
 
+class ArtistInfoResponse(BaseModel):
+    """Artist info without tracks (lightweight)"""
+    name: str
+    track_count: int
+    album_count: int
+    cover_url: Optional[str] = None
+    image_url: Optional[str] = None  # Alias for cover_url (frontend compat)
+    tags: Optional[List[str]] = None  # Last.fm tags for artist
+    albums: List[AlbumResponse] = []
+
+
+class ArtistTracksResponse(PaginatedResponse):
+    """Paginated tracks for an artist"""
+    items: List[TrackResponse]
+
+
 class ArtistDetailResponse(BaseModel):
-    """Artist with albums and all tracks"""
+    """Artist with albums and all tracks (legacy - for backwards compat)"""
     name: str
     track_count: int
     album_count: int
