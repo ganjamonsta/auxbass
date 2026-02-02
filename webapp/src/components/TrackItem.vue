@@ -44,9 +44,9 @@
     </div>
     
     <div class="track-info">
-      <div class="track-title">{{ track.title || 'Без названия' }}</div>
+      <div class="track-title">{{ getDisplayTitle(track) }}</div>
       <div class="track-meta">
-        <span v-if="!hideArtist" class="track-artist">{{ track.artist || 'Неизвестный' }}</span>
+        <span v-if="!hideArtist" class="track-artist">{{ getDisplayArtist(track) }}</span>
         <span v-if="showAlbum && albumName" class="track-album">{{ albumName }}</span>
         <span v-else-if="track.play_count && !hideArtist" class="play-count">• {{ track.play_count }} прослушиваний</span>
       </div>
@@ -116,7 +116,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { formatDuration, getTrackCoverStyle, getTrackInitials } from '@/utils'
+import { formatDuration, getTrackCoverStyle, getTrackInitials, getDisplayTitle, getDisplayArtist } from '@/utils'
 import { X, Check } from 'lucide-vue-next'
 
 const props = defineProps({

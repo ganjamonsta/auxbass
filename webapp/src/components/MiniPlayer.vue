@@ -61,6 +61,7 @@
 import { computed } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { useContextMenu } from '@/composables/useContextMenu'
+import { getDisplayTitle, getDisplayArtist } from '@/utils'
 import { Play, Square, Pause } from 'lucide-vue-next'
 
 const playerStore = usePlayerStore()
@@ -132,7 +133,7 @@ const getDotClass = (index) => {
 
 // Generate cover gradient
 const coverGradient = computed(() => {
-  const title = props.track?.title || 'Music'
+  const title = getDisplayTitle(props.track)
   const artist = props.track?.artist || ''
   
   const str = title + artist
@@ -153,7 +154,7 @@ const coverStyle = computed(() => {
 })
 
 const coverInitials = computed(() => {
-  const title = props.track?.title || 'M'
+  const title = getDisplayTitle(props.track)
   const words = title.split(' ').filter(w => w.length > 0)
   if (words.length >= 2) {
     return (words[0][0] + words[1][0]).toUpperCase()
@@ -162,12 +163,12 @@ const coverInitials = computed(() => {
 })
 
 const shouldMarqueeTitle = computed(() => {
-  return (props.track?.title?.length || 0) > 20
+  return getDisplayTitle(props.track).length > 20
 })
 
 const displayText = computed(() => {
-  const artist = props.track?.artist || '---'
-  const title = props.track?.title || 'NO TRACK'
+  const artist = getDisplayArtist(props.track)
+  const title = getDisplayTitle(props.track)
   return `${artist} — ${title}`
 })
 

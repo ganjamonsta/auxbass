@@ -17,8 +17,8 @@
             <div class="menu-header">
               <div class="menu-cover"><Music :size="20" /></div>
               <div class="menu-info">
-                <div class="menu-title">{{ track?.title || 'Без названия' }}</div>
-                <div class="menu-artist">{{ track?.artist || 'Неизвестный исполнитель' }}</div>
+                <div class="menu-title">{{ getDisplayTitle(track) }}</div>
+                <div class="menu-artist">{{ getDisplayArtist(track) }}</div>
               </div>
               <button class="menu-close" @click="$emit('close')">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -105,6 +105,7 @@
 import { inject, computed } from 'vue'
 import { usePlayerStore } from '../stores/player'
 import { useAuthStore } from '../stores/auth'
+import { getDisplayTitle, getDisplayArtist } from '@/utils'
 import { Music, User, Disc3, Play, ListMusic, Plus, Minus, Pencil, Download, Trash2 } from 'lucide-vue-next'
 
 const props = defineProps({

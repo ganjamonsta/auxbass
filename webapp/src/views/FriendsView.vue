@@ -267,8 +267,8 @@
                 <span v-else><Music :size="20" /></span>
               </div>
               <div class="track-info">
-                <div class="track-title">{{ track.title || 'Без названия' }}</div>
-                <div class="track-artist">{{ track.artist || 'Неизвестен' }}</div>
+                <div class="track-title">{{ getDisplayTitle(track) }}</div>
+                <div class="track-artist">{{ getDisplayArtist(track) }}</div>
               </div>
             </div>
             <p v-if="userTracks.length === 0" class="empty-hint">Нет треков</p>
@@ -319,6 +319,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
 import { useContextMenu } from '@/composables/useContextMenu'
+import { getDisplayTitle, getDisplayArtist } from '@/utils'
 import api from '@/api/client'
 import SearchBar from '@/components/ui/SearchBar.vue'
 import { Users, User, Search, Check, X, Music, Folder, Disc3, Lightbulb } from 'lucide-vue-next'

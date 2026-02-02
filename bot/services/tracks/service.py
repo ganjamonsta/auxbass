@@ -97,11 +97,12 @@ class TrackService:
         user_id: int,
         file_id: str,
         file_unique_id: str,
-        title: str,
+        title: Optional[str] = None,
         artist: Optional[str] = None,
         duration: Optional[int] = None,
         file_size: Optional[int] = None,
         mime_type: Optional[str] = None,
+        file_name: Optional[str] = None,
         library_source: LibrarySource = LibrarySource.UPLOADED,
         forward_source_type: Optional[ForwardSourceType] = None,
         forward_source_id: Optional[int] = None,
@@ -119,11 +120,12 @@ class TrackService:
             user_id: Telegram user ID
             file_id: Telegram file ID
             file_unique_id: Unique file identifier
-            title: Track title
+            title: Track title (from ID3 tags)
             artist: Artist name
             duration: Duration in seconds
             file_size: File size in bytes
             mime_type: MIME type
+            file_name: Original filename from Telegram
             library_source: How track was added
             forward_source_*: Forwarding source info
             enrich: Whether to schedule enrichment
@@ -174,6 +176,7 @@ class TrackService:
                     duration=duration,
                     file_size=file_size,
                     mime_type=mime_type,
+                    file_name=file_name,
                     uploader_id=user_id,
                     forward_source_type=forward_source_type,
                     forward_source_id=forward_source_id,

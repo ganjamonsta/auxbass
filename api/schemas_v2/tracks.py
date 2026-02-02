@@ -21,6 +21,7 @@ class TrackResponse(BaseModel):
     telegram_file_id: str
     title: Optional[str] = None
     artist: Optional[str] = None
+    file_name: Optional[str] = None  # Original filename for fallback display
     duration: Optional[int] = None
     file_size: Optional[int] = None
     mime_type: Optional[str] = None  # audio/mpeg, audio/flac, etc.

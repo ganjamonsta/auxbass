@@ -48,6 +48,9 @@ import {
   recyclePreloadAudio,
 } from './playerCache'
 
+// Import display helpers for track title/artist
+import { getDisplayTitle, getDisplayArtist } from '../utils/formatters'
+
 // Load saved settings
 const savedSettings = loadSettings()
 const savedState = loadPlayerState()
@@ -255,8 +258,8 @@ export const usePlayerStore = defineStore('player', () => {
     ] : []
     
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: track.title || 'Без названия',
-      artist: track.artist || 'Неизвестный исполнитель',
+      title: getDisplayTitle(track),
+      artist: getDisplayArtist(track),
       album: track.album || '',
       artwork
     })

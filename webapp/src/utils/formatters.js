@@ -164,3 +164,151 @@ export function hasMultipleArtists(artistString) {
   if (!artistString) return false
   return splitArtists(artistString).length > 1
 }
+
+/**
+ * Extract featured/remix/prod artists from track title
+ * 
+ * Examples:
+ *   "Sleepless (Loadstar Remix)" -> ["Loadstar"]
+ *   "Track feat. Artist1 & Artist2" -> ["Artist1", "Artist2"]
+ *   "Song (Prod. Producer)" -> ["Producer"]
+ *   "Battle vs. Other" -> ["Other"]
+ * 
+ * @param {string} title - Track title
+ * @returns {Array<string>} Array of extracted artist names
+ */
+export function extractFeaturedArtists(title) {
+  if (!title) return []
+  
+  const artists = []
+  
+  // Pattern for remix: "(Artist Remix)" or "(Artist's Remix)" or "[Artist Remix]"
+  const remixPatterns = [
+    /[\(\[]([^\)\]]+?)(?:'s)?\s+(?:Remix|Rmx|Mix|Edit|Bootleg|Rework|Flip|VIP)[\)\]]/gi,
+    /\(Remix\s+by\s+([^\)]+)\)/gi,
+    /\[Remix\s+by\s+([^\]]+)\]/gi,
+  ]
+  for (const pattern of remixPatterns) {
+    let match
+    while ((match = pattern.exec(title)) !== null) {
+      const artist = match[1].trim()
+      if (artist && artist.length > 1) {
+        artists.push(artist)
+      }
+    }
+  }
+  
+  // Pattern for feat.: "feat. Artist" or "ft. Artist"
+  const featMatch = title.match(/(?:feat\.?|ft\.?|featuring)\s+([^\(\)\[\]]+?)(?:\s*[\(\[]|$)/i)
+  if (featMatch) {
+    const featPart = featMatch[1].trim()
+    // Split by & , and
+    const featArtists = featPart.split(/\s*(?:&|,|\band\b)\s*/i)
+    for (const fa of featArtists) {
+      const cleaned = fa.trim()
+      if (cleaned && cleaned.length > 1) {
+        artists.push(cleaned)
+      }
+    }
+  }
+  
+  // Pattern for prod: "prod. Producer" or "(Prod. by Producer)"
+  const prodPatterns = [
+    /(?:prod\.?|produced\s+by)\s+([^\(\)\[\]]+?)(?:\s*[\(\[]|$)/gi,
+    /[\(\[](?:prod\.?|produced\s+by)\s+([^\)\]]+)[\)\]]/gi,
+  ]
+  for (const pattern of prodPatterns) {
+    let match
+    while ((match = pattern.exec(title)) !== null) {
+      const artist = match[1].trim()
+      if (artist && artist.length > 1) {
+        artists.push(artist)
+      }
+    }
+  }
+  
+  // Pattern for vs: "vs. Artist" or "vs Artist"
+  const vsMatch = title.match(/\bvs\.?\s+([^\(\)\[\]]+?)(?:\s*[\(\[]|$)/i)
+  if (vsMatch) {
+    const artist = vsMatch[1].trim()
+    if (artist && artist.length > 1) {
+      artists.push(artist)
+    }
+  }
+  
+  // Remove duplicates
+  const seen = new Set()
+  const unique = []
+  for (const a of artists) {
+    const lower = a.toLowerCase()
+    if (!seen.has(lower)) {
+      seen.add(lower)
+      unique.push(a)
+    }
+  }
+  
+  return unique
+}
+
+/**
+ * Get all artists from track (from artist field + extracted from title)
+ * 
+ * @param {string} artistString - Artist field value
+ * @param {string} title - Track title (optional)
+ * @returns {Array<string>} Array of all unique artist names
+ */
+export function getAllTrackArtists(artistString, title = null) {
+  const fromArtist = splitArtists(artistString)
+  const fromTitle = title ? extractFeaturedArtists(title) : []
+  
+  // Combine and deduplicate
+  const seen = new Set()
+  const unique = []
+  
+  for (const artist of [...fromArtist, ...fromTitle]) {
+    const lower = artist.toLowerCase()
+    if (!seen.has(lower)) {
+      seen.add(lower)
+      unique.push(artist)
+    }
+  }
+  
+  return unique
+}
+
+/**
+ * Get display title for a track
+ * Falls back to filename (without extension) when title is missing or placeholder
+ * 
+ * @param {Object} track - Track object with title and file_name properties
+ * @returns {string} Display title
+ */
+export function getDisplayTitle(track) {
+  if (!track) return 'Без названия'
+  
+  // Use title if it's not a placeholder
+  if (track.title && track.title !== 'Без названия') {
+    return track.title
+  }
+  
+  // Fallback to filename without extension
+  if (track.file_name) {
+    const lastDot = track.file_name.lastIndexOf('.')
+    const name = lastDot > 0 ? track.file_name.substring(0, lastDot) : track.file_name
+    if (name.trim()) {
+      return name.trim()
+    }
+  }
+  
+  return 'Без названия'
+}
+
+/**
+ * Get display artist for a track
+ * @param {Object} track - Track object with artist property
+ * @returns {string} Display artist
+ */
+export function getDisplayArtist(track) {
+  if (!track) return 'Неизвестный исполнитель'
+  return track.artist || 'Неизвестный исполнитель'
+}

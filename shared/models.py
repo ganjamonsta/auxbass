@@ -138,6 +138,7 @@ class Track(Base):
     file_unique_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     file_size: Mapped[Optional[int]] = mapped_column(Integer)
     mime_type: Mapped[Optional[str]] = mapped_column(String(50))
+    file_name: Mapped[Optional[str]] = mapped_column(String(255))  # Original filename from Telegram
     
     # Basic metadata (from ID3 tags or user input)
     title: Mapped[Optional[str]] = mapped_column(String(255))
@@ -197,6 +198,37 @@ class Track(Base):
     
     # ===== Properties from enrichment =====
     # These provide access to enrichment data directly from Track
+    
+    @property
+    def display_title(self) -> str:
+        """Get best available title for display.
+        
+        Priority:
+        1. ID3 title tag (if not placeholder)
+        2. Filename without extension
+        3. Fallback to 'Без названия'
+        """
+        # Use title if it's not a placeholder
+        if self.title and self.title != "Без названия":
+            return self.title
+        
+        # Use filename without extension
+        if self.file_name:
+            import os
+            name = os.path.splitext(self.file_name)[0]
+            # Clean up common patterns
+            name = name.strip()
+            if name:
+                return name
+        
+        return "Без названия"
+    
+    @property
+    def has_metadata(self) -> bool:
+        """Check if track has real metadata (not placeholders)."""
+        has_title = bool(self.title and self.title != "Без названия")
+        has_artist = bool(self.artist)
+        return has_title or has_artist
     
     @property
     def album(self) -> Optional[str]:

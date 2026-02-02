@@ -121,10 +121,11 @@ async def handle_audio(message: Message):
             return
     
     # Extract metadata
-    title = audio.title or "Без названия"
+    title = audio.title
     artist = audio.performer
     duration = audio.duration
     file_size = audio.file_size
+    file_name = audio.file_name  # Original filename for fallback display
     
     # Extract forward info
     forward_info = extract_forward_info(message)
@@ -155,6 +156,7 @@ async def handle_audio(message: Message):
         artist=artist,
         duration=duration,
         file_size=file_size,
+        file_name=file_name,
         library_source=library_source,
         forward_source_type=forward_info["source_type"],
         forward_source_id=forward_info["source_id"],
@@ -180,6 +182,17 @@ async def handle_audio(message: Message):
     # Build response
     duration_str = format_duration(duration) if duration else ""
     size_mb = (file_size or 0) / (1024 * 1024)
+    
+    # Get display title - prefer title, fallback to filename
+    def get_display_title():
+        if title:
+            return title
+        if file_name:
+            import os
+            return os.path.splitext(file_name)[0].strip() or "Без названия"
+        return "Без названия"
+    
+    display_title = get_display_title()
     
     # Source info
     source_note = ""
@@ -207,7 +220,7 @@ async def handle_audio(message: Message):
         if playlist_session:
             await message.reply(
                 f"⚠️ Трек уже в твоей библиотеке!\n\n"
-                f"🎵 <b>{title}</b>\n"
+                f"🎵 <b>{display_title}</b>\n"
                 f"👤 {artist or 'Неизвестный исполнитель'}\n\n"
                 f"Добавить в плейлист «{playlist_session.name}»?",
                 reply_markup=get_duplicate_keyboard(track_id)
@@ -215,7 +228,7 @@ async def handle_audio(message: Message):
         else:
             await message.reply(
                 "⚠️ Этот трек уже есть в твоей библиотеке!\n\n"
-                f"🎵 <b>{title}</b>\n"
+                f"🎵 <b>{display_title}</b>\n"
                 f"👤 {artist or 'Неизвестный исполнитель'}",
                 reply_markup=get_track_keyboard(track_id)
             )
@@ -226,7 +239,7 @@ async def handle_audio(message: Message):
         playlist_session.add_track(track_id)
         await message.reply(
             f"✅ Трек добавлен в плейлист «{playlist_session.name}»!\n\n"
-            f"🎵 <b>{title}</b>\n"
+            f"🎵 <b>{display_title}</b>\n"
             f"👤 {artist or 'Неизвестный исполнитель'}\n"
             f"⏱ {duration_str}{source_note}\n\n"
             f"📊 Всего в плейлисте: <b>{playlist_session.track_count}</b> треков",
@@ -235,7 +248,7 @@ async def handle_audio(message: Message):
     else:
         await message.reply(
             f"✅ <b>Трек добавлен в библиотеку!</b>\n\n"
-            f"🎵 <b>{title}</b>\n"
+            f"🎵 <b>{display_title}</b>\n"
             f"👤 {artist or 'Неизвестный исполнитель'}\n"
             f"⏱ {duration_str} • {size_mb:.1f} MB{source_note}{channel_note}\n\n"
             f"🔄 <i>Метаданные загружаются...</i>",

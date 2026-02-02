@@ -128,8 +128,9 @@ def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None)
     return TrackResponse(
         id=track.id,
         telegram_file_id=track.file_id,
-        title=track.title if track.title else f"Track {track.id}",  # Fallback for old/bad data
+        title=track.title,
         artist=track.artist,
+        file_name=track.file_name,  # Original filename for fallback display
         duration=track.duration,
         file_size=track.file_size,
         mime_type=track.mime_type,
@@ -177,8 +178,9 @@ def track_to_response_global(track: Track, in_library: bool = False) -> TrackRes
     return TrackResponse(
         id=track.id,
         telegram_file_id=track.file_id,
-        title=track.title if track.title else f"Track {track.id}",
+        title=track.title,
         artist=track.artist,
+        file_name=track.file_name,  # Original filename for fallback display
         duration=track.duration,
         file_size=track.file_size,
         mime_type=track.mime_type,

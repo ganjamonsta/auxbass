@@ -3,6 +3,8 @@
  * Common style generation functions
  */
 
+import { getDisplayTitle } from './formatters'
+
 /**
  * Generate gradient style for artist avatar based on name
  * @param {string} name - Artist name
@@ -101,7 +103,8 @@ export function getGenreStyle(genre) {
 export function getTrackCoverStyle(track) {
   if (track.cover_url) return {}
   
-  const str = (track.title || '') + (track.artist || '')
+  const title = getDisplayTitle(track)
+  const str = title + (track.artist || '')
   let hash = 0
   for (let i = 0; i < str.length; i++) {
     hash = str.charCodeAt(i) + ((hash << 5) - hash)
@@ -120,7 +123,7 @@ export function getTrackCoverStyle(track) {
  * @returns {string} 1-2 character initials
  */
 export function getTrackInitials(track) {
-  const title = track.title || 'M'
+  const title = getDisplayTitle(track)
   const words = title.split(' ').filter(w => w.length > 0)
   if (words.length >= 2) {
     return (words[0][0] + words[1][0]).toUpperCase()

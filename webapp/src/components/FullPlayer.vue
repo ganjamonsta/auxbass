@@ -58,7 +58,7 @@
     <!-- Track info -->
     <div class="player-info">
       <div class="track-info-row">
-        <h2 class="track-title">{{ track?.title || 'Без названия' }}</h2>
+        <h2 class="track-title">{{ getDisplayTitle(track) }}</h2>
         <!-- HD indicator badge -->
         <span v-if="playerStore.hdTrackInfo" class="hd-badge" title="HD версия доступна для скачивания">
           HD
@@ -87,7 +87,7 @@
             <span v-if="index < parsedArtists.length - 1" class="artist-sep">, </span>
           </template>
         </template>
-        <span v-else>Неизвестный исполнитель</span>
+        <span v-else>{{ getDisplayArtist(track) }}</span>
       </p>
     </div>
 
@@ -238,8 +238,8 @@
             </div>
             <span class="queue-num">{{ idx + 1 }}</span>
             <div class="queue-info">
-              <span class="queue-title">{{ t.title || 'Без названия' }}</span>
-              <span class="queue-artist">{{ t.artist || 'Неизвестный' }}</span>
+              <span class="queue-title">{{ getDisplayTitle(t) }}</span>
+              <span class="queue-artist">{{ getDisplayArtist(t) }}</span>
             </div>
             <div class="delete-indicator">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -267,7 +267,7 @@
 <script setup>
 import { ref, computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
-import { getTrackCoverStyle, getTrackInitials, splitArtists } from '@/utils'
+import { getTrackCoverStyle, getTrackInitials, splitArtists, getDisplayTitle, getDisplayArtist } from '@/utils'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useContextMenu } from '@/composables/useContextMenu'

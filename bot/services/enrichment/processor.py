@@ -65,6 +65,10 @@ class EnrichmentProcessor:
         if not title:
             return EnrichmentResult(success=False, confidence=0)
         
+        # Skip placeholder titles - no point searching for "Без названия"
+        if title == "Без названия" or title.lower() in ["untitled", "unknown", "без названия"]:
+            return EnrichmentResult(success=False, confidence=0)
+        
         result = EnrichmentResult(success=False, confidence=0, source="none")
         
         # 1. Try Last.fm first (richer database, priority source)

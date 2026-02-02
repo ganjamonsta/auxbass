@@ -205,6 +205,9 @@ class AlbumService:
         Automatically assign track to album based on enrichment data.
         Also loads full album tracklist from Deezer if available.
         
+        Skips tracks without real metadata (placeholder titles) to avoid
+        creating fake "unknown" albums.
+        
         Returns:
             Album ID if assigned, None otherwise
         """
@@ -222,6 +225,12 @@ class AlbumService:
             
             enrichment = track.enrichment
             if not enrichment.album_name:
+                return None
+            
+            # Skip tracks without real metadata - they shouldn't be in albums
+            # This prevents "Без названия" tracks from being assigned to albums
+            if not track.has_metadata:
+                logger.debug(f"Skipping album assignment for track {track_id} - no real metadata")
                 return None
             
             # Load full tracklist - Last.fm first (richer database), Deezer fallback

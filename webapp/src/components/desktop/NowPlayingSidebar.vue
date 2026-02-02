@@ -27,7 +27,7 @@
 
     <!-- Track Info -->
     <div class="track-info">
-      <h2 class="track-title">{{ track?.title || 'Без названия' }}</h2>
+      <h2 class="track-title">{{ getDisplayTitle(track) }}</h2>
       
       <!-- Artists (clickable, split into separate links) -->
       <div v-if="track?.artist" class="artists-container">
@@ -195,8 +195,8 @@
             <span v-else class="queue-cover-placeholder">♪</span>
           </div>
           <div class="queue-item-info">
-            <div class="queue-item-title">{{ queueTrack.title || 'Без названия' }}</div>
-            <div class="queue-item-artist">{{ queueTrack.artist || 'Неизвестный' }}</div>
+            <div class="queue-item-title">{{ getDisplayTitle(queueTrack) }}</div>
+            <div class="queue-item-artist">{{ getDisplayArtist(queueTrack) }}</div>
           </div>
           <button 
             v-if="index > 0"
@@ -220,7 +220,7 @@ import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useContextMenu } from '@/composables/useContextMenu'
-import { splitArtists } from '@/utils/formatters'
+import { splitArtists, getDisplayTitle, getDisplayArtist } from '@/utils/formatters'
 import { Play } from 'lucide-vue-next'
 
 const emit = defineEmits(['goToUser'])
@@ -260,7 +260,7 @@ const isLiked = computed(() => {
 // Cover style
 const coverStyle = computed(() => {
   if (track.value?.cover_url) return {}
-  const str = track.value?.title || 'Music'
+  const str = getDisplayTitle(track.value)
   let hash = 0
   for (let i = 0; i < str.length; i++) {
     hash = str.charCodeAt(i) + ((hash << 5) - hash)
@@ -272,7 +272,7 @@ const coverStyle = computed(() => {
 })
 
 const coverInitials = computed(() => {
-  const title = track.value?.title || 'M'
+  const title = getDisplayTitle(track.value)
   return title.substring(0, 2).toUpperCase()
 })
 
