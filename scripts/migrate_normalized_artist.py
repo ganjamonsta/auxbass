@@ -16,7 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy import select, update, text
-from shared.database import async_session_maker, engine
+from shared.database import async_session, engine
 from shared.models import Track
 from shared.matching import normalize_artist
 
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 async def migrate():
     """Populate normalized_artist for all tracks."""
     
-    async with async_session_maker() as db:
+    async with async_session() as db:
         # First, add the column if it doesn't exist
         # SQLite doesn't support IF NOT EXISTS for ALTER TABLE, so we catch the error
         try:
