@@ -453,7 +453,7 @@ html, body {
 .app.desktop-layout {
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
-  grid-template-rows: 1fr var(--desktop-player-height);
+  grid-template-rows: 1fr auto;
   grid-template-areas:
     "sidebar main"
     "player player";
@@ -479,6 +479,7 @@ html, body {
   flex-direction: column;
   overflow: hidden;
   height: 100%;
+  min-height: 0;
 }
 
 .app.desktop-layout :deep(.now-playing-sidebar) {
@@ -491,6 +492,7 @@ html, body {
   width: 100%;
   height: var(--desktop-player-height);
   overflow: visible;
+  flex-shrink: 0;
 }
 
 /* Mobile layout wrapper */
