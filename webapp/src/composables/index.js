@@ -13,6 +13,7 @@ export { useSort, SORT_OPTIONS } from './useSort'
 export { useDragReorder } from './useDragReorder'
 export { useTrackSearch } from './useTrackSearch'
 export { useContextMenu } from './useContextMenu'
+export { useLayoutScroll } from './useLayoutScroll'
 
 // Legacy - can be removed after migration
 export { useTrackContextMenu } from './useTrackContextMenu'
