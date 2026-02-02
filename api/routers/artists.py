@@ -409,7 +409,7 @@ async def get_artist(
         all_tracks_raw = tracks_result.unique().scalars().all()
         
         # Filter by normalized artist
-        matching_tracks = [], track.title
+        matching_tracks = []
         artist_names_seen = set()
         album_track_counts = {}
         

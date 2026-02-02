@@ -178,6 +178,15 @@ const handleDownloadHD = () => {
 const handlePlayArtistTrack = (track) => {
   playerStore.playTrack(track, { type: 'artist', artist: props.track.artist })
 }
+
+const handleGoToAlbum = () => {
+  if (!props.track?.album) return
+  router.push(`/album/${props.track.album.id}`)
+}
+
+const handleAddToPlaylist = () => {
+  openMenu('track', props.track, 'player')
+}
 </script>
 
 <style scoped>
