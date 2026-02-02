@@ -127,23 +127,6 @@ const clearSearch = () => {
   padding: 4px;
 }
 
-.neu-tab-content {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.neu-tab-content::after {
-  content: attr(data-text);
-  height: 0;
-  visibility: hidden;
-  overflow: hidden;
-  user-select: none;
-  pointer-events: none;
-  font-weight: 600;
-}
-
 /* No channel prompt */
 .no-channel-prompt {
   display: flex;

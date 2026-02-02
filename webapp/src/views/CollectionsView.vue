@@ -9,14 +9,16 @@
           :class="{ active: activeTab === 'albums' }"
           @click="setActiveTab('albums')"
         >
-          <Disc3 :size="16" /> Альбомы
+          <Disc3 :size="16" />
+          <span class="neu-tab-content" data-text="Альбомы">Альбомы</span>
         </button>
         <button 
           class="neu-tab" 
           :class="{ active: activeTab === 'playlists' }"
           @click="setActiveTab('playlists')"
         >
-          <Folder :size="16" /> Плейлисты
+          <Folder :size="16" />
+          <span class="neu-tab-content" data-text="Плейлисты">Плейлисты</span>
         </button>
       </div>
     </div>
@@ -30,14 +32,14 @@
           :class="{ active: albumScope === 'library' }"
           @click="changeAlbumScope('library')"
         >
-          Моя библиотека
+          <span class="neu-tab-content" data-text="Моя библиотека">Моя библиотека</span>
         </button>
         <button 
           class="neu-tab" 
           :class="{ active: albumScope === 'global' }"
           @click="changeAlbumScope('global')"
         >
-          Общая
+          <span class="neu-tab-content" data-text="Общая">Общая</span>
         </button>
       </div>
 

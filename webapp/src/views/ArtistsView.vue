@@ -7,14 +7,14 @@
         :class="{ active: scope === 'library' }"
         @click="changeScope('library')"
       >
-        Моя библиотека
+        <span class="neu-tab-content" data-text="Моя библиотека">Моя библиотека</span>
       </button>
       <button 
         class="neu-tab" 
         :class="{ active: scope === 'global' }"
         @click="changeScope('global')"
       >
-        Общая
+        <span class="neu-tab-content" data-text="Общая">Общая</span>
       </button>
     </div>
 
