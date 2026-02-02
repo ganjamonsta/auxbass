@@ -1,23 +1,5 @@
 <template>
   <div class="collections-view">
-    <!-- Type Switcher (Tabs) - Neumorphic style - Desktop Only -->
-    <div class="neu-tab-bar collections-tabs">
-      <button 
-        class="neu-tab"
-        :class="{ active: activeTab === 'albums' }"
-        @click="setActiveTab('albums')"
-      >
-        <span class="neu-tab-content" data-text="Альбомы">Альбомы</span>
-      </button>
-      <button 
-        class="neu-tab"
-        :class="{ active: activeTab === 'playlists' }"
-        @click="setActiveTab('playlists')"
-      >
-        <span class="neu-tab-content" data-text="Плейлисты">Плейлисты</span>
-      </button>
-    </div>
-
     <!-- Albums Tab -->
     <div v-show="activeTab === 'albums'" class="tab-content">
       <!-- Scope switcher for albums -->
@@ -49,6 +31,24 @@
             {{ albumScope === 'global' ? 'Все альбомы, доступные в системе' : 'Альбомы из вашего канала' }}
           </div>
         </div>
+      </div>
+
+      <!-- Type Switcher (Tabs) - Neumorphic style - Desktop Only -->
+      <div class="neu-tab-bar collections-tabs">
+        <button 
+          class="neu-tab"
+          :class="{ active: activeTab === 'albums' }"
+          @click="setActiveTab('albums')"
+        >
+          <span class="neu-tab-content" data-text="Альбомы">Альбомы</span>
+        </button>
+        <button 
+          class="neu-tab"
+          :class="{ active: activeTab === 'playlists' }"
+          @click="setActiveTab('playlists')"
+        >
+          <span class="neu-tab-content" data-text="Плейлисты">Плейлисты</span>
+        </button>
       </div>
 
       <!-- Search -->
@@ -103,11 +103,26 @@
           <Folder :size="20" />
         </div>
         <div class="banner-text">
-          <div class="banner-title">Ваши плейлисты</div>
-          <div class="banner-description">
-            Создавайте и делитесь публичными плейлистами
-          </div>
+          <div class="banner-title">Общие плейлисты</div>
         </div>
+      </div>
+
+      <!-- Type Switcher (Tabs) - Neumorphic style - Desktop Only -->
+      <div class="neu-tab-bar collections-tabs">
+        <button 
+          class="neu-tab"
+          :class="{ active: activeTab === 'albums' }"
+          @click="setActiveTab('albums')"
+        >
+          <span class="neu-tab-content" data-text="Альбомы">Альбомы</span>
+        </button>
+        <button 
+          class="neu-tab"
+          :class="{ active: activeTab === 'playlists' }"
+          @click="setActiveTab('playlists')"
+        >
+          <span class="neu-tab-content" data-text="Плейлисты">Плейлисты</span>
+        </button>
       </div>
 
       <!-- Search for playlists -->
@@ -117,63 +132,64 @@
       />
 
       <div class="view-header">
-        <span class="count">{{ filteredPlaylists.length }} плейлистов</span>
-        <button class="create-btn" @click="handleCreatePlaylist">
-          <Plus :size="16" /> Создать
+        <span class="count">{{ filteredPublicPlaylists.length }} плейлистов</span>
+        <button class="create-btn" @click="showManageModal = true">
+          <Plus :size="16" /> Добавить
         </button>
       </div>
 
       <MediaGrid
         type="playlist"
-        :items="filteredPlaylists"
+        :items="filteredPublicPlaylists"
         :loading="loadingPlaylists"
         @click="(p) => $router.push(`/playlist/${p.id}`)"
+        @play="shufflePlaylist"
       >
         <template #empty>
            <div v-if="playlistSearchQuery" class="empty-results">
             <span class="empty-icon"><Search :size="48" /></span>
              <p>Ничего не найдено</p>
            </div>
-           <p v-else>Нет плейлистов</p>
+           <p v-else>Нет публичных плейлистов</p>
         </template>
       </MediaGrid>
-
-      <!-- Public playlists section -->
-      <div v-if="publicPlaylists.length && !playlistSearchQuery" class="public-section">
-        <MediaGrid
-          type="playlist"
-          title="Публичные плейлисты"
-          :items="publicPlaylists"
-          @click="(p) => $router.push(`/playlist/${p.id}`)"
-        />
-      </div>
     </div>
 
-    <!-- Create playlist modal -->
-    <div v-if="showCreateModal" class="modal-overlay" @click.self="closeModal">
-      <div class="modal">
-        <h2>Новый плейлист</h2>
-        <input
-          v-model="newPlaylistName"
-          type="text"
-          placeholder="Название плейлиста"
-          ref="nameInput"
-          @keyup.enter="createPlaylist"
-        />
-        <label class="checkbox-label">
-          <input type="checkbox" v-model="newPlaylistPublic" />
-          <span>Публичный плейлист</span>
-        </label>
-        <p class="hint-text">Публичные плейлисты видны в разделе «Коллекции»</p>
-        <div class="modal-actions">
-          <button class="cancel-btn" @click="closeModal">Отмена</button>
-          <button 
-            class="confirm-btn" 
-            @click="createPlaylist"
-            :disabled="!newPlaylistName.trim()"
+    <!-- Manage playlists modal -->
+    <div v-if="showManageModal" class="modal-overlay" @click.self="closeManageModal">
+      <div class="modal manage-modal">
+        <h2>Добавить в коллекции</h2>
+        <p class="hint-text">Выберите плейлисты для отображения в общей коллекции</p>
+        
+        <div class="playlists-manage-list">
+          <div 
+            v-for="playlist in playlists" 
+            :key="playlist.id"
+            class="playlist-manage-item"
+            @click="togglePlaylistStatus(playlist)"
           >
-            Создать
-          </button>
+            <div class="playlist-manage-info">
+              <div class="playlist-manage-cover">
+                <img v-if="playlist.cover_url" :src="playlist.cover_url" />
+                <div v-else class="playlist-manage-placeholder"><Music :size="20" /></div>
+              </div>
+              <div class="playlist-manage-text">
+                <div class="playlist-manage-name">{{ playlist.name }}</div>
+                <div class="playlist-manage-count">{{ playlist.track_count }} треков</div>
+              </div>
+            </div>
+            <label class="checkbox-label compact">
+              <input 
+                type="checkbox" 
+                :checked="playlist.is_public"
+                @click.stop="togglePlaylistStatus(playlist)"
+              />
+            </label>
+          </div>
+        </div>
+        
+        <div class="modal-actions">
+          <button class="cancel-btn" @click="closeManageModal">Закрыть</button>
         </div>
       </div>
     </div>
@@ -292,31 +308,48 @@ const filteredPlaylists = computed(() => {
   )
 })
 
-// Filtered public playlists computed
+// Filtered public playlists computed - combine own public + others public
 const filteredPublicPlaylists = computed(() => {
+  // Combine own public playlists and public playlists from others
+  const ownPublic = playlists.value.filter(p => p.is_public)
+  const allPublic = [...ownPublic, ...publicPlaylists.value]
+  
   if (!playlistSearchQuery.value) {
-    return publicPlaylists.value
+    return allPublic
   }
   const query = playlistSearchQuery.value.toLowerCase()
-  return publicPlaylists.value.filter(p => 
+  return allPublic.filter(p => 
     p.name.toLowerCase().includes(query) ||
     (p.owner_name && p.owner_name.toLowerCase().includes(query))
   )
 })
 
-// Create modal
-const showCreateModal = ref(false)
-const newPlaylistName = ref('')
-const newPlaylistPublic = ref(false)
-const nameInput = ref(null)
+// Manage modal
+const showManageModal = ref(false)
 
-// Handle create playlist - check for channel
-const handleCreatePlaylist = () => {
-  if (!authStore.hasChannel) {
-    authStore.promptChannelSetup()
-    return
+const closeManageModal = () => {
+  showManageModal.value = false
+}
+
+const togglePlaylistStatus = async (playlist) => {
+  try {
+    const newStatus = !playlist.is_public
+    await api.patch(`/playlists/${playlist.id}`, {
+      is_public: newStatus
+    })
+    playlist.is_public = newStatus
+    
+    // Update in library store
+    const libraryPlaylist = libraryStore.playlists.find(p => p.id === playlist.id)
+    if (libraryPlaylist) {
+      libraryPlaylist.is_public = newStatus
+    }
+    
+    uiStore.toast.success('Сохранено', `Плейлист ${newStatus ? 'добавлен в коллекции' : 'удален из коллекций'}`)
+  } catch (error) {
+    console.error('Failed to toggle playlist status:', error)
+    uiStore.toast.error('Ошибка', 'Не удалось обновить статус')
   }
-  showCreateModal.value = true
 }
 
 // Albums functions
@@ -430,25 +463,19 @@ const loadLikedCount = async () => {
   }
 }
 
-const closeModal = () => {
-  showCreateModal.value = false
-  newPlaylistName.value = ''
-  newPlaylistPublic.value = false
-}
-
-const createPlaylist = async () => {
-  if (!newPlaylistName.value.trim()) return
-  
+const shufflePlaylist = async (playlist) => {
   try {
-    const response = await api.post('/playlists', {
-      name: newPlaylistName.value.trim(),
-      is_public: newPlaylistPublic.value
-    })
-    playlists.value.unshift(response.data)
-    closeModal()
-    router.push(`/playlist/${response.data.id}`)
+    const response = await api.get(`/playlists/${playlist.id}`)
+    const playlistData = response.data
+    const tracks = playlistData.tracks || []
+    
+    if (tracks.length) {
+      // Shuffle tracks array
+      const shuffled = [...tracks].sort(() => Math.random() - 0.5)
+      playerStore.playTrack(shuffled[0], shuffled)
+    }
   } catch (error) {
-    console.error('Failed to create playlist:', error)
+    console.error('Failed to shuffle playlist:', error)
   }
 }
 
@@ -649,9 +676,91 @@ onMounted(() => {
 }
 
 .modal h2 {
-  margin: 0 0 20px;
+  margin: 0 0 12px;
   font-size: 20px;
   color: var(--c-text-1);
+}
+
+/* Manage modal */
+.manage-modal {
+  max-width: 480px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.playlists-manage-list {
+  flex: 1;
+  overflow-y: auto;
+  margin: 16px 0;
+  max-height: 50vh;
+}
+
+.playlist-manage-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: var(--c-bg-3);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.playlist-manage-item:hover {
+  background: var(--c-bg-4);
+}
+
+.playlist-manage-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.playlist-manage-cover {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--c-bg-1);
+  flex-shrink: 0;
+}
+
+.playlist-manage-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.playlist-manage-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-text-3);
+}
+
+.playlist-manage-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.playlist-manage-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playlist-manage-count {
+  font-size: 13px;
+  color: var(--c-text-3);
+  margin-top: 2px;
 }
 
 .modal input[type="text"] {
@@ -706,6 +815,11 @@ onMounted(() => {
 
 .checkbox-label input[type="checkbox"]:checked::before {
   transform: translateX(20px);
+}
+
+.checkbox-label.compact {
+  margin-bottom: 0;
+  gap: 0;
 }
 
 .hint-text {
