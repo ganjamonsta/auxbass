@@ -206,10 +206,14 @@ def extract_featured_artists(title: str, main_artist: Optional[str] = None) -> L
                         if sa and len(sa) > 1:
                             artists.append(sa)
     
-    # Pattern for prod: "prod. Producer" or "(Prod. by Producer)"
+    # Pattern for prod: "prod. Producer" or "(Prod. by Producer)" or "Prod.Producer" (no space)
     prod_patterns = [
+        # With space: "prod. Producer" or "produced by Producer"
         r'(?:prod\.?|produced\s+by)\s+([^\(\)\[\]]+?)(?:\s*[\(\[]|$)',
+        # Inside parentheses: "(Prod. by Producer)" or "(prod Producer)"
         r'[\(\[](?:prod\.?|produced\s+by)\s+([^\)\]]+)[\)\]]',
+        # Without space after dot: "Prod.Producer" - common in user-tagged files
+        r'\bprod\.([A-Za-zА-Яа-яЁё][A-Za-zА-Яа-яЁё0-9_\s&]+?)(?:\s*[\(\[\|]|$)',
     ]
     for pattern in prod_patterns:
         matches = re.findall(pattern, title, flags=re.IGNORECASE)
