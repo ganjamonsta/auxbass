@@ -185,25 +185,12 @@ const showGoToAlbum = computed(() => {
   return hasAlbum.value && props.context !== 'album'
 })
 
-// Get album button text - show album artist if different from track artist
+// Get album button text - show album name
 const albumButtonText = computed(() => {
-  const album = props.track?.album
-  const albumArtist = album?.artist
-  const trackArtist = props.track?.artist
+  const albumName = props.track?.album?.name || props.track?.album_name
   
-  // If album artist differs from track artist (e.g. remix on compilation album)
-  // Show the album artist to avoid confusion
-  if (albumArtist && trackArtist) {
-    // Normalize for comparison (case-insensitive, trim)
-    const normalizedAlbumArtist = albumArtist.toLowerCase().trim()
-    const normalizedTrackArtist = trackArtist.toLowerCase().trim()
-    
-    // Check if they're different (allow for partial match like "Bladee" != "Sewerslvt")
-    if (normalizedAlbumArtist !== normalizedTrackArtist && 
-        !normalizedTrackArtist.includes(normalizedAlbumArtist) &&
-        !normalizedAlbumArtist.includes(normalizedTrackArtist)) {
-      return `Перейти к альбому (${albumArtist})`
-    }
+  if (albumName) {
+    return `Перейти к альбому (${albumName})`
   }
   
   return 'Перейти к альбому'

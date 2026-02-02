@@ -446,25 +446,13 @@ const hasAlbum = computed(() => {
   return data?.album_id || data?.album?.id || data?.album_name
 })
 
-// Get album button text - show album artist if different from track artist
+// Get album button text - show album name
 const albumButtonText = computed(() => {
   const data = menuData.value
-  const albumArtist = data?.album?.artist
-  const trackArtist = data?.artist
+  const albumName = data?.album?.name || data?.album_name
   
-  // If album artist differs from track artist (e.g. remix on compilation album)
-  // Show the album artist to avoid confusion
-  if (albumArtist && trackArtist) {
-    // Normalize for comparison (case-insensitive, trim)
-    const normalizedAlbumArtist = albumArtist.toLowerCase().trim()
-    const normalizedTrackArtist = trackArtist.toLowerCase().trim()
-    
-    // Check if they're different (allow for partial match)
-    if (normalizedAlbumArtist !== normalizedTrackArtist && 
-        !normalizedTrackArtist.includes(normalizedAlbumArtist) &&
-        !normalizedAlbumArtist.includes(normalizedTrackArtist)) {
-      return `Перейти к альбому (${albumArtist})`
-    }
+  if (albumName) {
+    return `Перейти к альбому (${albumName})`
   }
   
   return 'Перейти к альбому'
