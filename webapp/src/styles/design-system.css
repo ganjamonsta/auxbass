@@ -941,12 +941,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px;
-  background: var(--c-bg-0);
-  border-radius: var(--r-lg);
-  box-shadow:
-    inset 3px 3px 6px var(--sh-inset-dark),
-    inset -2px -2px 4px var(--sh-inset-light);
+  padding: 0;
+  background: transparent;
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -956,7 +952,7 @@
   display: none;
 }
 
-/* Individual tab button - raised pill style */
+/* Individual tab button - flat style */
 .neu-tab {
   display: flex;
   align-items: center;
@@ -964,7 +960,7 @@
   gap: 6px;
   min-width: max-content;
   padding: 10px 18px;
-  background: var(--c-bg-2);
+  background: transparent;
   border: none;
   border-radius: var(--r-md);
   color: var(--c-text-2);
@@ -975,9 +971,6 @@
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   transition: all 0.15s ease;
-  box-shadow:
-    3px 3px 6px var(--sh-dark),
-    -2px -2px 4px var(--sh-light);
 }
 
 /* Icon support */
@@ -1009,26 +1002,16 @@
 
 .neu-tab:active {
   transform: scale(0.97);
-  box-shadow:
-    inset 2px 2px 4px var(--sh-inset-dark),
-    inset -1px -1px 2px var(--sh-inset-light);
 }
 
 .neu-tab.active {
   background: var(--accent, var(--c-accent));
   color: var(--accent-text, var(--c-accent-text, #000));
   font-weight: 600;
-  box-shadow:
-    3px 3px 6px var(--sh-dark),
-    -2px -2px 4px var(--sh-light),
-    0 0 12px var(--accent-glow, var(--c-accent-glow));
 }
 
 .neu-tab.active:active {
   transform: scale(0.97);
-  box-shadow:
-    inset 2px 2px 4px rgba(0, 0, 0, 0.3),
-    0 0 8px var(--accent-glow, var(--c-accent-glow));
 }
 
 /* Simple pill tabs (without inset container) */
