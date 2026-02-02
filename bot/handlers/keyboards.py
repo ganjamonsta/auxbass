@@ -262,6 +262,43 @@ def get_cancel_keyboard(callback_data: str = "cancel") -> InlineKeyboardMarkup:
     ])
 
 
+def get_upload_duplicate_keyboard(new_file_unique_id: str, existing_tracks: List[Track]) -> InlineKeyboardMarkup:
+    """
+    Keyboard for handling potential duplicates during upload.
+    Allows user to compare tracks, save anyway, or cancel upload.
+    
+    Args:
+        new_file_unique_id: The file_unique_id of the incoming track
+        existing_tracks: List of potentially duplicate tracks already in library
+    """
+    buttons = []
+    
+    # Show compare/listen buttons for each potential duplicate
+    for idx, track in enumerate(existing_tracks[:3]):  # Max 3 duplicates shown
+        buttons.append([
+            InlineKeyboardButton(
+                text=f"▶️ Слушать #{idx+1}: {(track.title or 'Без названия')[:20]}",
+                callback_data=f"upload_dup:listen:{track.id}"
+            ),
+        ])
+    
+    # Action buttons
+    buttons.append([
+        InlineKeyboardButton(
+            text="✅ Всё равно сохранить",
+            callback_data=f"upload_dup:save:{new_file_unique_id}"
+        ),
+    ])
+    buttons.append([
+        InlineKeyboardButton(
+            text="❌ Отменить загрузку",
+            callback_data="upload_dup:cancel"
+        ),
+    ])
+    
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
 def get_deduplication_action_keyboard(tracks: List[Track], current_index: int, total_groups: int, confirm_delete_id: Optional[int] = None) -> InlineKeyboardMarkup:
     """
     Keyboard for duplicate resolution.

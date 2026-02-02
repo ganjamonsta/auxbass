@@ -149,6 +149,21 @@ def extract_featured_artists(title: str, main_artist: Optional[str] = None) -> L
     
     artists = []
     
+    # Words that look like artist names before "Mix/Remix" but are actually version descriptors
+    # "Original Mix" = standard/original version (common in electronic music)
+    # "Radio Mix/Edit" = shortened radio version
+    # "Extended Mix" = longer club version
+    # "Club Mix" = club-oriented version
+    # "Dub Mix" = dub version (not artist "Dub")
+    # "Instrumental Mix" = version without vocals
+    # "Vocal Mix" = version with vocals
+    # "Acoustic Mix" = acoustic version
+    NON_ARTIST_MIX_PREFIXES = {
+        'original', 'radio', 'extended', 'club', 'dub', 'instrumental', 
+        'vocal', 'acoustic', 'main', 'album', 'single', 'short', 'long',
+        'clean', 'dirty', 'explicit', 'censored', 'uncensored'
+    }
+    
     # Pattern for remix: "(Artist Remix)" or "(Artist's Remix)" or "[Artist Remix]"
     remix_patterns = [
         r'[\(\[]([^\)\]]+?)(?:\'s)?\s+(?:Remix|Rmx|Mix|Edit|Bootleg|Rework|Flip|VIP)[\)\]]',
@@ -159,7 +174,8 @@ def extract_featured_artists(title: str, main_artist: Optional[str] = None) -> L
         matches = re.findall(pattern, title, flags=re.IGNORECASE)
         for match in matches:
             artist = match.strip()
-            if artist and len(artist) > 1:
+            # Skip version descriptors that aren't artist names
+            if artist and len(artist) > 1 and artist.lower() not in NON_ARTIST_MIX_PREFIXES:
                 artists.append(artist)
     
     # Pattern for feat.: "feat. Artist" or "ft. Artist" - outside parentheses

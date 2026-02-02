@@ -274,4 +274,65 @@ class DeduplicationService:
             await session.commit()
             return True
 
+    async def find_potential_duplicates(
+        self,
+        user_id: int,
+        artist: Optional[str],
+        title: Optional[str],
+        file_unique_id: str,
+        limit: int = 5
+    ) -> List[Track]:
+        """
+        Find tracks that might be duplicates of an incoming upload.
+        Uses fuzzy matching on artist/title.
+        Excludes the exact same file (by file_unique_id).
+        
+        Returns list of potential duplicate tracks from user's library.
+        """
+        if not artist and not title:
+            return []
+        
+        norm_artist = normalize_unicode(artist or "").lower().strip()
+        norm_title = normalize_unicode(title or "").lower().strip()
+        
+        if not norm_artist and not norm_title:
+            return []
+        
+        async with get_session() as session:
+            # Fetch all user's tracks
+            result = await session.execute(
+                select(Track)
+                .join(UserLibrary)
+                .where(UserLibrary.user_id == user_id)
+                .where(Track.file_unique_id != file_unique_id)  # Exclude exact same file
+                .options(selectinload(Track.enrichment))
+            )
+            tracks = result.scalars().all()
+            
+            # Find matches by normalized artist+title
+            matches = []
+            for track in tracks:
+                track_artist = normalize_unicode(track.artist or "").lower().strip()
+                track_title = normalize_unicode(track.title or "").lower().strip()
+                
+                # Check for exact or near match
+                if norm_artist and norm_title:
+                    # Both must match
+                    if track_artist == norm_artist and track_title == norm_title:
+                        matches.append((track, 1.0))  # Exact match
+                    elif track_artist and track_title:
+                        # Fuzzy check: artist matches AND title contains or matches
+                        artist_match = track_artist == norm_artist or norm_artist in track_artist or track_artist in norm_artist
+                        title_match = track_title == norm_title or norm_title in track_title or track_title in norm_title
+                        if artist_match and title_match:
+                            matches.append((track, 0.8))
+                elif norm_title and track_title == norm_title:
+                    # Only title available and matches
+                    matches.append((track, 0.7))
+            
+            # Sort by match score and return top matches
+            matches.sort(key=lambda x: x[1], reverse=True)
+            return [m[0] for m in matches[:limit]]
+
+
 deduplication_service = DeduplicationService()

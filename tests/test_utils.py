@@ -6,12 +6,13 @@ from shared.utils import (
     sanitize_input,
     normalize_artist,
     normalize_title,
-    clean_search_string,
-    fuzzy_match_strings,
-    artist_matches,
+    clean_for_search,
+    fuzzy_match_artist,
+    artists_match,
     format_duration,
     split_artists,
 )
+from shared.matching import extract_featured_artists
 
 
 class TestSanitizeInput:
@@ -111,33 +112,94 @@ class TestSplitArtists:
         assert len(result) == 3
 
 
-class TestFuzzyMatchStrings:
-    """Tests for fuzzy_match_strings function"""
+class TestFuzzyMatch:
+    """Tests for fuzzy_match_artist function"""
     
     def test_exact_match(self):
-        assert fuzzy_match_strings("test", "test") == True
+        assert fuzzy_match_artist("test", "test") >= 0.9
     
     def test_case_insensitive(self):
-        assert fuzzy_match_strings("Test", "TEST") == True
+        assert fuzzy_match_artist("Test", "TEST") >= 0.9
     
-    def test_partial_match(self):
-        assert fuzzy_match_strings("test", "testing") == True
+    def test_similar_match(self):
+        assert fuzzy_match_artist("test", "testing") >= 0.5
     
     def test_no_match(self):
-        assert fuzzy_match_strings("abc", "xyz") == False
+        assert fuzzy_match_artist("abc", "xyz") < 0.5
 
 
-class TestArtistMatches:
-    """Tests for artist_matches function"""
+class TestArtistsMatch:
+    """Tests for artists_match function"""
     
     def test_exact_match(self):
-        assert artist_matches("Artist", "Artist") == True
+        assert artists_match("Artist", "Artist") == True
     
     def test_case_insensitive(self):
-        assert artist_matches("artist", "ARTIST") == True
+        assert artists_match("artist", "ARTIST") == True
     
     def test_with_feat(self):
-        assert artist_matches("Artist feat. Other", "Artist") == True
+        assert artists_match("Artist feat. Other", "Artist") == True
     
     def test_no_match(self):
-        assert artist_matches("Artist1", "Artist2") == False
+        assert artists_match("Artist1", "Artist2") == False
+
+
+class TestExtractFeaturedArtists:
+    """Tests for extract_featured_artists function"""
+    
+    def test_remix_artist(self):
+        """Should extract remix artist name"""
+        result = extract_featured_artists("Track (Space Laces Remix)")
+        assert result == ["Space Laces"]
+    
+    def test_original_mix_not_artist(self):
+        """Original Mix should NOT create an artist named 'Original'"""
+        result = extract_featured_artists("Track (Original Mix)")
+        assert result == []
+        assert "Original" not in result
+    
+    def test_radio_edit_not_artist(self):
+        """Radio Edit should NOT create an artist named 'Radio'"""
+        result = extract_featured_artists("Track (Radio Edit)")
+        assert result == []
+    
+    def test_extended_mix_not_artist(self):
+        """Extended Mix should NOT create an artist named 'Extended'"""
+        result = extract_featured_artists("Track (Extended Mix)")
+        assert result == []
+    
+    def test_club_mix_not_artist(self):
+        """Club Mix should NOT create an artist named 'Club'"""
+        result = extract_featured_artists("Track (Club Mix)")
+        assert result == []
+    
+    def test_dub_mix_not_artist(self):
+        """Dub Mix should NOT create an artist named 'Dub'"""
+        result = extract_featured_artists("Track (Dub Mix)")
+        assert result == []
+    
+    def test_instrumental_mix_not_artist(self):
+        """Instrumental Mix should NOT create an artist named 'Instrumental'"""
+        result = extract_featured_artists("Track (Instrumental Mix)")
+        assert result == []
+    
+    def test_feat_artist(self):
+        """Should extract featured artist"""
+        result = extract_featured_artists("Track feat. Artist1")
+        assert "Artist1" in result
+    
+    def test_feat_multiple_artists(self):
+        """Should extract multiple featured artists"""
+        result = extract_featured_artists("Track feat. Artist1 & Artist2")
+        assert "Artist1" in result
+        assert "Artist2" in result
+    
+    def test_prod_artist(self):
+        """Should extract producer"""
+        result = extract_featured_artists("Track (Prod. Producer)")
+        assert "Producer" in result
+    
+    def test_vs_artist(self):
+        """Should extract vs artist"""
+        result = extract_featured_artists("Track vs. Other")
+        assert "Other" in result

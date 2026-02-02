@@ -5,7 +5,7 @@ Handles audio file uploads and forwards.
 Uses new modular service architecture.
 """
 from aiogram import Router, F
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 from typing import Optional
 
 import sys
@@ -18,11 +18,13 @@ from shared.models import User, Track, LibrarySource, ForwardSourceType, UserCha
 from shared.utils import format_duration
 
 from bot.services import track_service, channel_service
+from bot.services.deduplication import deduplication_service, get_approx_bitrate
 from bot.services.session import session_manager
 from bot.handlers.keyboards import (
     get_track_keyboard,
     get_playlist_mode_keyboard,
     get_duplicate_keyboard,
+    get_upload_duplicate_keyboard,
 )
 
 
@@ -147,6 +149,63 @@ async def handle_audio(message: Message):
             session.add(db_user)
             await session.flush()
     
+    # Check for potential duplicates BEFORE saving (by artist/title, not file_unique_id)
+    potential_duplicates = await deduplication_service.find_potential_duplicates(
+        user_id=user_id,
+        artist=artist,
+        title=title,
+        file_unique_id=audio.file_unique_id,
+    )
+    
+    if potential_duplicates and not playlist_session:
+        # Found potential duplicates - ask user to compare
+        display_title = title or (file_name.rsplit('.', 1)[0] if file_name else "Без названия")
+        
+        # Format duplicate info
+        dup_list = []
+        for idx, dup in enumerate(potential_duplicates[:3]):
+            dup_meta = []
+            if dup.duration:
+                m, s = divmod(dup.duration, 60)
+                dup_meta.append(f"{m}:{s:02d}")
+            if dup.file_size:
+                dup_meta.append(f"{dup.file_size / (1024*1024):.1f}MB")
+            bitrate = get_approx_bitrate(dup)
+            if bitrate:
+                dup_meta.append(f"~{int(bitrate)}kbps")
+            
+            meta_str = " • ".join(dup_meta) if dup_meta else ""
+            dup_list.append(
+                f"<b>#{idx+1}</b>: {dup.artist or 'Неизвестный'} - {dup.title or 'Без названия'}\n"
+                f"   └ {meta_str}"
+            )
+        
+        dup_text = "\n".join(dup_list)
+        
+        # Store pending upload data in session
+        session_manager.set_pending_upload(user_id, {
+            "file_id": audio.file_id,
+            "file_unique_id": audio.file_unique_id,
+            "title": title,
+            "artist": artist,
+            "duration": duration,
+            "file_size": file_size,
+            "file_name": file_name,
+            "library_source": library_source.value if library_source else None,
+            "forward_info": forward_info,
+        })
+        
+        await message.reply(
+            f"⚠️ <b>Возможный дубликат!</b>\n\n"
+            f"🎵 Вы загружаете: <b>{display_title}</b>\n"
+            f"👤 {artist or 'Неизвестный исполнитель'}\n\n"
+            f"📚 Похожие треки в библиотеке:\n{dup_text}\n\n"
+            f"<i>Можете прослушать и сравнить перед сохранением</i>",
+            reply_markup=get_upload_duplicate_keyboard(audio.file_unique_id, potential_duplicates),
+            parse_mode="HTML"
+        )
+        return
+    
     # Save track using service
     result = await track_service.save_track(
         user_id=user_id,
@@ -254,6 +313,90 @@ async def handle_audio(message: Message):
             f"🔄 <i>Метаданные загружаются...</i>",
             reply_markup=get_track_keyboard(track_id)
         )
+
+
+# ========== Upload Duplicate Callbacks ==========
+
+@router.callback_query(F.data.startswith("upload_dup:"))
+async def handle_upload_dup_callback(callback: CallbackQuery):
+    """Handle upload duplicate confirmation callbacks"""
+    user_id = callback.from_user.id
+    action = callback.data.split(":")[1]
+    
+    if action == "listen":
+        # Listen to existing track for comparison
+        track_id = int(callback.data.split(":")[2])
+        async with get_session() as session:
+            track = await session.get(Track, track_id)
+            if track:
+                await callback.message.reply_audio(
+                    track.file_id,
+                    caption=f"🎧 Существующий трек:\n{track.artist or 'Неизвестный'} - {track.title or 'Без названия'}"
+                )
+        await callback.answer()
+    
+    elif action == "save":
+        # User confirmed - save the track anyway
+        pending = session_manager.get_pending_upload(user_id)
+        if not pending:
+            await callback.answer("Загрузка устарела, отправьте трек ещё раз", show_alert=True)
+            return
+        
+        # Parse library source back from string
+        lib_source = LibrarySource.UPLOADED
+        if pending.get("library_source"):
+            try:
+                lib_source = LibrarySource(pending["library_source"])
+            except ValueError:
+                pass
+        
+        forward_info = pending.get("forward_info", {})
+        
+        # Save the track
+        result = await track_service.save_track(
+            user_id=user_id,
+            file_id=pending["file_id"],
+            file_unique_id=pending["file_unique_id"],
+            title=pending.get("title"),
+            artist=pending.get("artist"),
+            duration=pending.get("duration"),
+            file_size=pending.get("file_size"),
+            file_name=pending.get("file_name"),
+            library_source=lib_source,
+            forward_source_type=forward_info.get("source_type"),
+            forward_source_id=forward_info.get("source_id"),
+            forward_source_name=forward_info.get("source_name"),
+            enrich=True,
+        )
+        
+        session_manager.clear_pending_upload(user_id)
+        
+        # Queue for channel backup
+        try:
+            await channel_service.forward_track_to_channel(
+                user_id=user_id,
+                track_id=result.track_id,
+                bot=callback.bot,
+            )
+        except Exception:
+            pass
+        
+        display_title = pending.get("title") or "Без названия"
+        
+        await callback.message.edit_text(
+            f"✅ <b>Трек сохранён!</b>\n\n"
+            f"🎵 <b>{display_title}</b>\n"
+            f"👤 {pending.get('artist') or 'Неизвестный исполнитель'}\n\n"
+            f"🔄 <i>Метаданные загружаются...</i>",
+            reply_markup=get_track_keyboard(result.track_id)
+        )
+        await callback.answer("Трек сохранён!")
+    
+    elif action == "cancel":
+        # User cancelled upload
+        session_manager.clear_pending_upload(user_id)
+        await callback.message.edit_text("❌ Загрузка отменена.")
+        await callback.answer()
 
 
 @router.message(F.voice)

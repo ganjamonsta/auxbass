@@ -36,6 +36,7 @@ class SessionManager:
     def __init__(self):
         self._playlist_sessions: Dict[int, PlaylistSession] = {}
         self._pending_duplicates: Dict[int, dict] = {}  # user_id -> {track_info, playlist_session}
+        self._pending_uploads: Dict[int, dict] = {}  # user_id -> pending upload data awaiting confirmation
     
     # Playlist sessions
     def start_playlist_session(self, user_id: int, name: str) -> PlaylistSession:
@@ -72,6 +73,19 @@ class SessionManager:
     def clear_pending_duplicate(self, user_id: int):
         """Clear pending duplicate"""
         self._pending_duplicates.pop(user_id, None)
+    
+    # Pending upload confirmations (for deduplication on upload)
+    def set_pending_upload(self, user_id: int, upload_data: dict):
+        """Store pending upload awaiting duplicate confirmation"""
+        self._pending_uploads[user_id] = upload_data
+    
+    def get_pending_upload(self, user_id: int) -> Optional[dict]:
+        """Get pending upload data"""
+        return self._pending_uploads.get(user_id)
+    
+    def clear_pending_upload(self, user_id: int):
+        """Clear pending upload"""
+        self._pending_uploads.pop(user_id, None)
     
     # Cleanup
     def cleanup_expired(self):
