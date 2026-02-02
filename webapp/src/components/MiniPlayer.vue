@@ -210,19 +210,15 @@ const formatTime = (seconds) => {
    ═══════════════════════════════════════════════════════════ */
 
 .mini-player {
-  position: fixed;
-  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom));
-  left: 0;
-  right: 0;
+  /* Removed fixed positioning - now handled by parent MobileFooter */
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 0 12px;
+  margin: 8px 12px;
   padding: 10px 12px;
   background: var(--xm-bg-elevated);
   border-radius: var(--neu-radius-lg);
   cursor: pointer;
-  z-index: 99; /* Below nav (100), above content */
   overflow: visible;
   box-shadow: 
     6px 6px 12px var(--neu-shadow-dark),

@@ -19,23 +19,6 @@
         <span>Главная</span>
       </router-link>
 
-      <router-link to="/collections" class="nav-item" :class="{ active: isActive('/collections') }">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
-        </svg>
-        <span>Коллекции</span>
-      </router-link>
-    </nav>
-
-    <!-- Divider -->
-    <div class="sidebar-divider"></div>
-
-    <!-- Library Section -->
-    <div class="sidebar-section">
-      <div class="section-header">
-        <span>Моя музыка</span>
-      </div>
-
       <router-link to="/liked" class="nav-item" :class="{ active: isActive('/liked') }">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
@@ -43,86 +26,9 @@
         <span>Любимое</span>
         <span v-if="likedCount" class="nav-count">{{ formatCount(likedCount) }}</span>
       </router-link>
+    </nav>
 
-      <router-link to="/artists" class="nav-item" :class="{ active: isActive('/artists') }">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-        </svg>
-        <span>Артисты</span>
-        <span v-if="artistCount" class="nav-count">{{ formatCount(artistCount) }}</span>
-      </router-link>
-
-      <router-link to="/albums" class="nav-item" :class="{ active: isActive('/albums') }">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"/>
-        </svg>
-        <span>Альбомы</span>
-        <span v-if="albums.length" class="nav-count">{{ albums.length }}</span>
-      </router-link>
-
-      <router-link to="/playlists" class="nav-item" :class="{ active: isActive('/playlists') }">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
-        </svg>
-        <span>Плейлисты</span>
-        <span v-if="userPlaylists.length" class="nav-count">{{ userPlaylists.length }}</span>
-      </router-link>
-
-      <router-link to="/friends" class="nav-item" :class="{ active: isActive('/friends') }">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
-        </svg>
-        <span>Кенты</span>
-      </router-link>
-    </div>
-
-    <!-- Divider -->
-    <div class="sidebar-divider"></div>
-
-    <!-- Albums List (collapsed) -->
-    <div v-if="displayedAlbums.length > 0" class="sidebar-section albums-section">
-      <div class="section-header clickable" @click="$router.push('/albums')">
-        <span>Альбомы</span>
-        <span class="section-count">{{ albums.length }}</span>
-      </div>
-
-      <div class="playlists-list">
-        <div 
-          v-for="album in displayedAlbums" 
-          :key="album.id"
-          class="nav-item playlist-item"
-          :class="{ active: $route.params.id == album.id && $route.name === 'album-detail' }"
-          @click="$router.push(`/album/${album.id}`)"
-          @contextmenu.prevent="openMenu('album', album, 'sidebar', $event)"
-        >
-          <div class="playlist-cover album-cover" :style="getPlaylistCoverStyle(album)">
-            <img v-if="album.cover_url" :src="album.cover_url" alt="" />
-            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"/>
-            </svg>
-          </div>
-          <div class="playlist-info">
-            <span class="playlist-name">{{ album.name }}</span>
-            <span v-if="album.album_artist" class="playlist-artist">{{ album.album_artist }}</span>
-          </div>
-          <span class="nav-count">{{ album.track_count }}</span>
-        </div>
-        
-        <!-- Show more link -->
-        <div 
-          v-if="hasMoreAlbums"
-          class="nav-item show-more-btn"
-          @click="$router.push('/albums')"
-        >
-          <span class="show-more-text">Показать все {{ albums.length }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Divider -->
-    <div v-if="displayedAlbums.length > 0 && displayedPlaylists.length > 0" class="sidebar-divider"></div>
-
-    <!-- Playlists List -->
+    <!-- Playlists Section -->
     <div v-if="displayedPlaylists.length > 0" class="sidebar-section playlists-section">
       <div class="section-header clickable" @click="$router.push('/playlists')">
         <span>Плейлисты</span>
@@ -159,6 +65,45 @@
           <span class="show-more-text">Показать все {{ userPlaylists.length }}</span>
         </div>
       </div>
+    </div>
+
+    <!-- Friends Section -->
+    <div class="sidebar-section">
+      <router-link to="/friends" class="nav-item" :class="{ active: isActive('/friends') }">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+        </svg>
+        <span>Кенты</span>
+      </router-link>
+    </div>
+
+    <!-- Divider -->
+    <div class="sidebar-divider"></div>
+
+    <!-- Library Section -->
+    <div class="sidebar-section">
+      <router-link to="/collections" class="nav-item" :class="{ active: isActive('/collections') }">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+        </svg>
+        <span>Коллекции</span>
+      </router-link>
+
+      <router-link to="/artists" class="nav-item" :class="{ active: isActive('/artists') }">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+        </svg>
+        <span>Артисты</span>
+        <span v-if="artistCount" class="nav-count">{{ formatCount(artistCount) }}</span>
+      </router-link>
+
+      <router-link to="/albums" class="nav-item" :class="{ active: isActive('/albums') }">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"/>
+        </svg>
+        <span>Альбомы</span>
+        <span v-if="albums.length" class="nav-count">{{ albums.length }}</span>
+      </router-link>
     </div>
 
     <!-- User Section (bottom) -->
@@ -199,7 +144,6 @@ const authStore = useAuthStore()
 const { openMenu } = useContextMenu()
 
 // Stats
-const trackCount = computed(() => libraryStore.total || 0)
 const likedCount = computed(() => libraryStore.likedTracks?.length || 0)
 const artistCount = computed(() => libraryStore.artists?.length || 0)
 
@@ -208,14 +152,6 @@ const playlists = computed(() => libraryStore.playlists || [])
 
 const albums = computed(() => {
   return playlists.value.filter(p => p.is_auto_album && p.track_count > 0)
-})
-
-const displayedAlbums = computed(() => {
-  return albums.value.slice(0, 5)
-})
-
-const hasMoreAlbums = computed(() => {
-  return albums.value.length > 5
 })
 
 const userPlaylists = computed(() => {

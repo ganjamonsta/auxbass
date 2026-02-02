@@ -61,44 +61,22 @@
           </router-view>
         </main>
 
-        <!-- Bottom navigation (mobile only) -->
-        <nav v-if="showNav && !isDesktop" class="bottom-nav">
-          <button @click="handleNavClick('/')" class="nav-item" :class="{ active: isRoute('/') }">
-            <span class="nav-icon">🎵</span>
-            <span class="nav-label">Библиотека</span>
-          </button>
-          <button @click="handleNavClick('/collections')" class="nav-item" :class="{ active: isRoute('/collections') || isRoute('/albums') || isRoute('/playlists') }">
-            <span class="nav-icon">💿</span>
-            <span class="nav-label">Коллекции</span>
-          </button>
-          <button @click="handleNavClick('/artists')" class="nav-item" :class="{ active: isRoute('/artists') }">
-            <span class="nav-icon">🎤</span>
-            <span class="nav-label">Артисты</span>
-          </button>
-          <button @click="handleNavClick('/friends')" class="nav-item" :class="{ active: isRoute('/friends') }">
-            <span class="nav-icon">👥</span>
-            <span class="nav-label">Кенты</span>
-          </button>
-          <button @click="handleNavClick('/settings')" class="nav-item" :class="{ active: isRoute('/settings') }">
-            <span class="nav-icon">⚙️</span>
-            <span class="nav-label">Настройки</span>
-          </button>
-        </nav>
-
-        <!-- Mini player (mobile only) -->
-        <MiniPlayer 
-          v-if="playerStore.currentTrack && showNav && !isDesktop" 
-          :track="playerStore.currentTrack"
-          :is-playing="playerStore.isPlaying"
-          :loading="playerStore.loading"
-          :progress="playerStore.progress"
-          :duration="playerStore.duration"
-          :buffered="playerStore.buffered"
-          @expand="showFullPlayer = true"
-          @toggle="playerStore.togglePlay()"
-          @next="playerStore.next()"
-        />
       </div>
+
+      <!-- Mobile Footer (Player + Navigation) -->
+      <MobileFooter
+        v-if="showNav && !isDesktop"
+        :showPlayer="!!playerStore.currentTrack"
+        :currentTrack="playerStore.currentTrack"
+        :isPlaying="playerStore.isPlaying"
+        :loading="playerStore.loading"
+        :progress="playerStore.progress"
+        :duration="playerStore.duration"
+        :buffered="playerStore.buffered"
+        @expand-player="showFullPlayer = true"
+        @toggle-play="playerStore.togglePlay()"
+        @next-track="playerStore.next()"
+      />
 
       <!-- Desktop: Now Playing Sidebar -->
       <NowPlayingSidebar 
@@ -210,6 +188,7 @@ import FullPlayer from '@/components/FullPlayer.vue'
 import ChannelBanner from '@/components/ChannelBanner.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
 import ContextMenu from '@/components/ContextMenu.vue'
+import { MobileFooter } from '@/components/layout'
 // Desktop components
 import Sidebar from '@/components/desktop/Sidebar.vue'
 import DesktopPlayer from '@/components/desktop/DesktopPlayer.vue'
@@ -312,31 +291,6 @@ const historyTracks = computed(() => {
     return playerStore.queue.slice(0, playerStore.queueIndex).reverse()
   }
 })
-
-const isRoute = (path) => {
-  if (path === '/') return route.path === '/'
-  return route.path.startsWith(path)
-}
-
-const handleNavClick = (path) => {
-  // Если уже на этой странице
-  if (isRoute(path)) {
-    // Проверяем, находимся ли мы наверху страницы
-    const scrollTop = window.scrollY || document.documentElement.scrollTop
-    
-    if (scrollTop > 100) {
-      // Если не наверху - прокручиваем наверх
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    } else {
-      // Если уже наверху - сбрасываем состояние страницы
-      // Используем event bus для общения с компонентами
-      window.dispatchEvent(new CustomEvent('reset-view-state', { detail: { route: path } }))
-    }
-  } else {
-    // Если на другой странице - просто переходим
-    router.push(path)
-  }
-}
 
 const goBack = () => {
   if (window.history.length > 1) {
@@ -542,10 +496,13 @@ html, body {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  /* Mobile: add padding for fixed footer */
+  padding-bottom: var(--nav-height, 60px);
 }
 
+/* When player is showing, add extra space for it */
 .app.has-player .main-content {
-  padding-bottom: calc(var(--nav-height) + var(--player-height));
+  padding-bottom: calc(var(--nav-height, 60px) + var(--player-height, 64px));
 }
 
 /* Desktop: no extra padding needed, grid handles it */
@@ -575,50 +532,6 @@ html, body {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
-}
-
-/* Bottom Navigation (mobile) */
-.bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: var(--nav-height);
-  background: var(--bg-secondary);
-  border-top: 1px solid var(--border);
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  z-index: 100;
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-.nav-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  text-decoration: none;
-  color: var(--text-tertiary);
-  font-size: 10px;
-  padding: 8px 12px;
-  transition: color 0.2s;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.nav-item.active {
-  color: var(--text-primary);
-}
-
-.nav-icon {
-  font-size: 22px;
-}
-
-.nav-label {
-  font-weight: 500;
 }
 
 /* Desktop adjustments */

@@ -171,7 +171,6 @@ onMounted(() => {
 <style scoped>
 .liked-tracks-view {
   padding: 16px;
-  padding-bottom: 180px;
 }
 
 .liked-header {

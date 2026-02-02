@@ -410,7 +410,6 @@ const handleResetState = (event) => {
 <style scoped>
 .settings-view {
   padding: 16px;
-  padding-bottom: 180px;
 }
 
 h1 {

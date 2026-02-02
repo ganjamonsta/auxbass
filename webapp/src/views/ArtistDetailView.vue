@@ -230,7 +230,6 @@ watch(
 <style scoped>
 .artist-detail-view {
   padding: 16px;
-  padding-bottom: 180px;
 }
 
 .not-in-library {

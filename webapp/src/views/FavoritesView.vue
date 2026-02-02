@@ -101,7 +101,6 @@ onMounted(() => {
 <style scoped>
 .favorites-view {
   padding: 24px;
-  padding-bottom: 180px;
 }
 
 .view-header {

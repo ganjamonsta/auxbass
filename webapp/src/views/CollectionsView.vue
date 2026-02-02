@@ -561,7 +561,7 @@ onMounted(() => {
 
 <style scoped>
 .collections-view {
-  padding: 8px 16px 180px 16px;
+  padding: 8px 16px 16px 16px;
 }
 
 /* Tabs Styles - use design system */

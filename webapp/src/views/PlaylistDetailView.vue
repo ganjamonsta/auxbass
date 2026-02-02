@@ -295,7 +295,6 @@ watch(
 <style scoped>
 .playlist-detail-view {
   padding: 16px;
-  padding-bottom: 180px;
 }
 
 .playlist-header {

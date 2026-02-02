@@ -572,7 +572,6 @@ const handleResetState = (event) => {
 <style scoped>
 .friends-view {
   padding: 16px;
-  padding-bottom: 180px;
 }
 
 .tabs-header {

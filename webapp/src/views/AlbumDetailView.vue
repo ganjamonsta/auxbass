@@ -371,7 +371,6 @@ watch(
 <style scoped>
 .album-detail-view {
   padding: 16px;
-  padding-bottom: 180px;
 }
 
 .album-header {

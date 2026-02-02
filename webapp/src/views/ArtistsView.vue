@@ -274,7 +274,6 @@ const handleResetState = (event) => {
 <style scoped>
 .artists-view {
   padding: 16px;
-  padding-bottom: 180px;
 }
 
 /* Scope switcher uses neu-tab-bar from design-system */

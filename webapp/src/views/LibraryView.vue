@@ -122,8 +122,7 @@ onUnmounted(() => {
 <style scoped>
 .library-view {
   padding: 16px;
-  padding-bottom: 180px; /* Space for player */
-  min-height: 100vh;
+  /* No padding-bottom needed - handled by App.vue layout */
 }
 
 .search-section {
