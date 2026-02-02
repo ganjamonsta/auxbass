@@ -872,12 +872,34 @@ async def get_batch_stream_urls(
     tracks = {t.id: t for t in result.scalars().all()}
     
     # Pre-fetch all file paths in parallel (key optimization!)
+    # Also try to refresh stale file_ids from channel messages
     async def get_file_path_for_track(track):
         try:
-            return await get_telegram_file_path(track.file_id)
+            file_path = await get_telegram_file_path(track.file_id)
+            if file_path:
+                return file_path, None  # (file_path, new_file_id)
+            
+            # File path is None - try to refresh file_id from channel
+            file_size_mb = (track.file_size or 0) / (1024 * 1024)
+            if file_size_mb > 20:
+                # File too large for Bot API
+                logger.debug(f"[Batch] Track {track.id} too large ({file_size_mb:.1f}MB)")
+                return None, None
+            
+            logger.info(f"[Batch] Track {track.id} file_id stale, attempting refresh from channel...")
+            new_file_id = await refresh_file_id_from_channel(track.id, db)
+            
+            if new_file_id:
+                # Try again with new file_id
+                file_path = await get_telegram_file_path(new_file_id)
+                if file_path:
+                    logger.info(f"[Batch] Track {track.id} file_id refreshed successfully!")
+                    return file_path, new_file_id
+            
+            return None, None
         except Exception as e:
             logger.debug(f"Failed to get file path for track {track.id}: {e}")
-            return None
+            return None, None
     
     # Fetch all file paths concurrently
     file_path_tasks = []
@@ -888,8 +910,43 @@ async def get_batch_stream_urls(
             file_path_tasks.append(get_file_path_for_track(track))
             track_order.append(track_id)
     
-    file_paths = await asyncio.gather(*file_path_tasks, return_exceptions=True)
-    file_path_map = dict(zip(track_order, file_paths))
+    results = await asyncio.gather(*file_path_tasks, return_exceptions=True)
+    file_path_map = {}
+    
+    # Process results and update tracks with new file_ids
+    tracks_to_update = []
+    tracks_to_mark_unavailable = []
+    
+    for track_id, result in zip(track_order, results):
+        track = tracks.get(track_id)
+        if isinstance(result, Exception) or result is None:
+            file_path_map[track_id] = None
+            continue
+        
+        file_path, new_file_id = result
+        file_path_map[track_id] = file_path
+        
+        if new_file_id and track:
+            # Update track with new file_id
+            track.file_id = new_file_id
+            track.is_unavailable = False
+            tracks_to_update.append(track_id)
+        elif not file_path and track and not track.is_unavailable:
+            # Mark as unavailable
+            track.is_unavailable = True
+            tracks_to_mark_unavailable.append(track_id)
+    
+    # Commit updates in bulk
+    if tracks_to_update or tracks_to_mark_unavailable:
+        try:
+            await db.commit()
+            if tracks_to_update:
+                logger.info(f"[Batch] Refreshed file_ids for tracks: {tracks_to_update}")
+            if tracks_to_mark_unavailable:
+                logger.warning(f"[Batch] Marked tracks as unavailable: {tracks_to_mark_unavailable}")
+        except Exception as e:
+            logger.error(f"[Batch] Failed to update tracks: {e}")
+            await db.rollback()
     
     urls = []
     expires_at = int(time.time()) + STREAM_TOKEN_TTL
@@ -906,10 +963,18 @@ async def get_batch_stream_urls(
         
         file_path = file_path_map.get(track_id)
         if isinstance(file_path, Exception) or not file_path:
+            # Check if file is too large
+            file_size_mb = (track.file_size or 0) / (1024 * 1024)
+            if file_size_mb > 20:
+                error_msg = f"File too large ({file_size_mb:.1f}MB)"
+            elif track.is_unavailable:
+                error_msg = "Track unavailable - re-upload required"
+            else:
+                error_msg = "Could not get file path"
             urls.append({
                 "track_id": track_id,
                 "url": None,
-                "error": "Could not get file path"
+                "error": error_msg
             })
             continue
         

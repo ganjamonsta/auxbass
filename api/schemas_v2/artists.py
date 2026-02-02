@@ -16,6 +16,7 @@ class ArtistResponse(BaseModel):
     album_count: int = 0
     cover_url: Optional[str] = None
     image_url: Optional[str] = None  # Alias for cover_url (frontend compat)
+    tags: Optional[List[str]] = None  # Last.fm tags for artist
     latest_release_date: Optional[str] = None  # For sorting by date
 
 
@@ -31,5 +32,6 @@ class ArtistDetailResponse(BaseModel):
     album_count: int
     cover_url: Optional[str] = None
     image_url: Optional[str] = None  # Alias for cover_url (frontend compat)
+    tags: Optional[List[str]] = None  # Last.fm tags for artist
     albums: List[AlbumResponse] = []
     tracks: List[TrackResponse] = []  # All tracks by this artist

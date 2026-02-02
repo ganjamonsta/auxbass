@@ -50,6 +50,7 @@ class PlaylistResponse(BaseModel):
     total_duration: int = 0
     cover_url: Optional[str] = None
     covers: List[str] = []  # Array of cover URLs for collage display
+    tags: Optional[List[str]] = None  # Tags aggregated from playlist tracks
     is_public: bool = False
     owner_id: Optional[int] = None
     owner_name: Optional[str] = None
@@ -367,6 +368,27 @@ async def get_playlist(
         )
         is_subscribed = subscription is not None
     
+    # Collect tags from playlist tracks (aggregate unique tags)
+    playlist_tags = None
+    try:
+        seen_tags = set()
+        collected_tags = []
+        for track, _ in rows:
+            if track.enrichment and track.enrichment.tags:
+                for tag in track.enrichment.tags:
+                    tag_lower = tag.lower()
+                    if tag_lower not in seen_tags:
+                        seen_tags.add(tag_lower)
+                        collected_tags.append(tag)
+                        if len(collected_tags) >= 5:
+                            break
+            if len(collected_tags) >= 5:
+                break
+        if collected_tags:
+            playlist_tags = collected_tags
+    except Exception:
+        playlist_tags = None
+    
     return PlaylistDetailResponse(
         id=playlist.id,
         name=playlist.name,
@@ -375,6 +397,7 @@ async def get_playlist(
         total_duration=total_duration,
         cover_url=cover_url,
         covers=covers,
+        tags=playlist_tags,
         is_public=playlist.is_public,
         owner_id=owner.id,
         owner_name=owner.display_name,

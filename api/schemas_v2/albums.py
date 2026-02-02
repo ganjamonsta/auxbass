@@ -34,6 +34,7 @@ class AlbumResponse(BaseModel):
     total_tracks: Optional[int] = None  # Total tracks in album (from Deezer)
     deezer_album_id: Optional[int] = None
     has_full_tracklist: bool = False  # Whether we have full tracklist data
+    tags: Optional[List[str]] = None  # Tags from track enrichments or Last.fm
 
     class Config:
         from_attributes = True

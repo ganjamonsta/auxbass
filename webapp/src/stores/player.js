@@ -1032,6 +1032,8 @@ export const usePlayerStore = defineStore('player', () => {
         for (const item of urlData) {
           if (item.url && !item.error && item.url.startsWith('/api/player/audio/')) {
             setCachedUrl(item.track_id, item.url, item.expires_at)
+          } else if (item.error) {
+            console.warn(`[Preload Lazy] Track ${item.track_id} unavailable: ${item.error}`)
           }
         }
         
@@ -2407,16 +2409,65 @@ export const usePlayerStore = defineStore('player', () => {
 
   // Play next (insert track after current)
   const playNext = (track) => {
+    // Handle Lazy Shuffle mode - insert track ID into lazyShuffleIds
+    if (isLazyShuffleMode()) {
+      const trackId = track.id
+      // Remove if already in lazyShuffleIds
+      const existingIdx = lazyShuffleIds.value.indexOf(trackId)
+      if (existingIdx !== -1) {
+        lazyShuffleIds.value.splice(existingIdx, 1)
+        if (existingIdx <= lazyShuffleIndex.value) {
+          lazyShuffleIndex.value--
+        }
+      }
+      // Insert right after current position
+      lazyShuffleIds.value.splice(lazyShuffleIndex.value + 1, 0, trackId)
+      console.log(`[PlayNext] Lazy shuffle: inserted track ${trackId} at position ${lazyShuffleIndex.value + 1}`)
+      persistState()
+      return
+    }
+    
     const insertIndex = queueIndex.value + 1
     // Remove if already in queue
     const existingIndex = queue.value.findIndex(t => t.id === track.id)
     if (existingIndex !== -1) {
+      // If in shuffle mode, also remove from shuffleOrder
+      if (shuffle.value && shuffleOrder.value.length > 0) {
+        const shufflePos = shuffleOrder.value.indexOf(existingIndex)
+        if (shufflePos !== -1) {
+          shuffleOrder.value.splice(shufflePos, 1)
+          // Adjust shuffleIndex if needed
+          if (shufflePos <= shuffleIndex.value) {
+            shuffleIndex.value--
+          }
+        }
+        // Adjust indices in shuffleOrder for the removed element
+        shuffleOrder.value = shuffleOrder.value.map(idx => 
+          idx > existingIndex ? idx - 1 : idx
+        )
+      }
+      
       queue.value.splice(existingIndex, 1)
       if (existingIndex < queueIndex.value) {
         queueIndex.value--
       }
     }
+    
+    // Insert track into queue
     queue.value.splice(insertIndex, 0, track)
+    
+    // If in shuffle mode, update shuffleOrder to play this track next
+    if (shuffle.value && shuffleOrder.value.length > 0) {
+      // Adjust all indices >= insertIndex (they shifted by 1)
+      shuffleOrder.value = shuffleOrder.value.map(idx => 
+        idx >= insertIndex ? idx + 1 : idx
+      )
+      // Insert the new track's index right after current position in shuffle order
+      // This ensures the "play next" track actually plays next, even in shuffle mode
+      shuffleOrder.value.splice(shuffleIndex.value + 1, 0, insertIndex)
+      console.log(`[PlayNext] Inserted track at shuffleOrder position ${shuffleIndex.value + 1}`)
+    }
+    
     persistState() // Save queue change
   }
 

@@ -38,7 +38,7 @@ router = APIRouter(tags=["Albums"])
 MIN_USER_TRACKS_FOR_ALBUM = 2
 
 
-def album_to_response(album: Album, track_count: Optional[int] = None) -> AlbumResponse:
+def album_to_response(album: Album, track_count: Optional[int] = None, tags: Optional[List[str]] = None) -> AlbumResponse:
     """Convert Album model to response"""
     # Get actual track count if not provided
     actual_count = track_count if track_count is not None else len(album.tracks) if album.tracks else 0
@@ -53,6 +53,7 @@ def album_to_response(album: Album, track_count: Optional[int] = None) -> AlbumR
         total_tracks=album.total_tracks,
         deezer_album_id=album.deezer_album_id,
         has_full_tracklist=bool(album.full_tracklist),
+        tags=tags,
     )
 
 
@@ -428,6 +429,29 @@ async def get_album(
             except (json.JSONDecodeError, Exception):
                 full_tracklist = None
     
+    # Collect tags from album tracks (aggregate unique tags from enriched tracks)
+    album_tags = None
+    try:
+        seen_tags = set()
+        collected_tags = []
+        # Get from all album tracks
+        for track, at in (all_album_rows if scope == "library" else rows):
+            enrichment = track.__dict__.get('enrichment')
+            if enrichment and enrichment.tags:
+                for tag in enrichment.tags:
+                    tag_lower = tag.lower()
+                    if tag_lower not in seen_tags:
+                        seen_tags.add(tag_lower)
+                        collected_tags.append(tag)
+                        if len(collected_tags) >= 5:
+                            break
+            if len(collected_tags) >= 5:
+                break
+        if collected_tags:
+            album_tags = collected_tags
+    except Exception:
+        album_tags = None
+    
     return AlbumDetailResponse(
         id=album.id,
         name=album.name,
@@ -438,6 +462,7 @@ async def get_album(
         total_tracks=album.total_tracks,
         deezer_album_id=album.deezer_album_id,
         has_full_tracklist=bool(album.full_tracklist),
+        tags=album_tags,
         tracks=tracks,
         full_tracklist=full_tracklist,
     )

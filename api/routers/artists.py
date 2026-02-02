@@ -532,6 +532,14 @@ async def get_artist(
             cover_url = album.cover_url
             break
     
+    # Get artist tags from Last.fm
+    artist_tags = None
+    try:
+        if lastfm_client.is_configured:
+            artist_tags = await lastfm_client.get_artist_top_tags(actual_name)
+    except Exception as e:
+        logger.warning(f"Failed to get artist tags: {e}")
+    
     # Albums as response
     from api.routers.albums import album_to_response
     album_items = [album_to_response(album, track_count=album_track_counts.get(album.id, 0)) for album in albums]
@@ -542,6 +550,7 @@ async def get_artist(
         album_count=len(albums),
         cover_url=cover_url,
         image_url=cover_url,
+        tags=artist_tags,
         albums=album_items,
         tracks=all_tracks_response,
     )

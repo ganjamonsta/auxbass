@@ -39,6 +39,7 @@ class TrackResponse(BaseModel):
     album_name: Optional[str] = None  # Convenience field for backward compatibility
     cover_url: Optional[str] = None
     genre: Optional[str] = None
+    tags: Optional[List[str]] = None  # Last.fm tags (detailed genres/styles)
     release_date: Optional[str] = None  # YYYY-MM-DD string
     
     # User library state
