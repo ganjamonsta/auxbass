@@ -48,6 +48,12 @@ After: ~50ms per artist page load (constant time regardless of library size)
 ## Deployment Steps
 
 1. Deploy new code
-2. Run SQL migration: `psql -f database/migrations/003_add_normalized_artist.sql`
-3. Run data migration: `python scripts/migrate_normalized_artist.py`
-4. Restart API service
+2. Run data migration (handles column creation and data population):
+   ```bash
+   cd /opt/tg_player
+   source venv/bin/activate
+   python scripts/migrate_normalized_artist.py
+   ```
+3. Restart API service
+
+The migration script is idempotent and safe to run multiple times.

@@ -28,7 +28,8 @@ async def migrate():
     """Populate normalized_artist for all tracks."""
     
     async with async_session_maker() as db:
-        # First, add the column if it doesn't exist (for SQLite compatibility)
+        # First, add the column if it doesn't exist
+        # SQLite doesn't support IF NOT EXISTS for ALTER TABLE, so we catch the error
         try:
             await db.execute(text(
                 "ALTER TABLE tracks ADD COLUMN normalized_artist VARCHAR(255)"
@@ -36,16 +37,26 @@ async def migrate():
             await db.commit()
             logger.info("Added normalized_artist column")
         except Exception as e:
-            if "duplicate column" in str(e).lower() or "already exists" in str(e).lower():
+            # SQLite returns "duplicate column name" error
+            error_msg = str(e).lower()
+            if "duplicate" in error_msg or "already exists" in error_msg:
                 logger.info("Column normalized_artist already exists")
+                await db.rollback()
             else:
                 logger.warning(f"Column may already exist: {e}")
+                await db.rollback()
         
-        # Get all tracks
-        result = await db.execute(select(Track.id, Track.artist))
+        # Get all tracks that need updating (where normalized_artist is NULL)
+        result = await db.execute(
+            select(Track.id, Track.artist).where(Track.normalized_artist.is_(None))
+        )
         tracks = result.all()
         
         logger.info(f"Found {len(tracks)} tracks to process")
+        
+        if not tracks:
+            logger.info("All tracks already have normalized_artist set")
+            return
         
         # Update in batches
         batch_size = 500
@@ -69,7 +80,7 @@ async def migrate():
         
         logger.info(f"Migration complete! Updated {updated} tracks with normalized_artist")
         
-        # Create index if not exists (PostgreSQL)
+        # Create index if not exists (works in SQLite)
         try:
             await db.execute(text(
                 "CREATE INDEX IF NOT EXISTS idx_tracks_normalized_artist ON tracks(normalized_artist)"
