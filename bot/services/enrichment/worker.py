@@ -95,10 +95,11 @@ class EnrichmentWorker:
             True if there was work to do
         """
         async with get_session() as session:
-            # Get pending tracks
+            # Get pending tracks - prioritize newest tracks (higher id = newer)
             result = await session.execute(
                 select(Track)
                 .where(Track.enrichment_status == EnrichmentStatus.PENDING)
+                .order_by(Track.id.desc())
                 .limit(batch_size)
             )
             tracks = list(result.scalars().all())
