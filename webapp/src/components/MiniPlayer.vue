@@ -47,20 +47,8 @@
         </div>
       </div>
       
-      <!-- Row 2: Play/Pause + Progress Dots + Time -->
+      <!-- Row 2: Progress Dots + Time + Controls -->
       <div class="lcd-row row-controls">
-        <button class="lcd-play-btn" @click.stop="$emit('toggle')">
-          <svg v-if="loading" class="spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-            <path d="M12 2a10 10 0 0 1 10 10"/>
-          </svg>
-          <svg v-else-if="isPlaying" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-          </svg>
-          <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M8 5v14l11-7z"/>
-          </svg>
-        </button>
-        
         <div class="lcd-progress">
           <span 
             class="lcd-dot" 
@@ -71,6 +59,25 @@
         </div>
         
         <span class="lcd-time">{{ formatTime(progress) }}/{{ formatTime(duration || track.duration) }}</span>
+        
+        <div class="lcd-buttons">
+          <button class="lcd-btn" @click.stop="$emit('toggle')" title="Воспроизведение">
+            <svg v-if="loading" class="spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+              <path d="M12 2a10 10 0 0 1 10 10"/>
+            </svg>
+            <svg v-else-if="isPlaying" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+            </svg>
+            <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+          </button>
+          <button class="lcd-btn" @click.stop="$emit('next')" title="Следующий трек">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -334,37 +341,49 @@ const formatTime = (seconds) => {
   gap: 8px;
 }
 
-.lcd-play-btn {
-  width: 28px;
-  height: 28px;
-  border: none;
+/* ─── LCD Buttons Group (Play + Next) ─── */
+.lcd-buttons {
+  display: flex;
+  flex-shrink: 0;
   border-radius: 6px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.4);
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.lcd-btn {
+  width: 32px;
+  height: 26px;
+  border: none;
+  background: transparent;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--lcd-text);
-  flex-shrink: 0;
   transition: all 0.15s ease;
-  
-  /* Rubber button style inside LCD */
-  background: rgba(0, 0, 0, 0.4);
-  box-shadow: 
-    0 2px 4px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  position: relative;
 }
 
-.lcd-play-btn:active {
-  transform: scale(0.92) translateY(1px);
-  background: rgba(0, 0, 0, 0.6);
-  box-shadow: 
-    0 1px 2px rgba(0, 0, 0, 0.4),
-    inset 0 2px 4px rgba(0, 0, 0, 0.3);
+/* Divider between buttons */
+.lcd-btn:first-child::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.1);
 }
 
-.lcd-play-btn:active svg {
+.lcd-btn:active {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.lcd-btn:active svg {
   color: var(--xm-accent);
   filter: drop-shadow(0 0 4px var(--xm-accent-glow));
 }
