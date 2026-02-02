@@ -490,9 +490,11 @@ html, body {
 .app.desktop-layout :deep(.desktop-player) {
   grid-area: player;
   width: 100%;
-  height: var(--desktop-player-height);
-  overflow: visible;
+  min-height: var(--desktop-player-height);
   flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 200;
 }
 
 /* Mobile layout wrapper */
