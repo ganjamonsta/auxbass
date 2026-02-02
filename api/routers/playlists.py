@@ -32,7 +32,7 @@ router = APIRouter(tags=["Playlists"])
 class PlaylistCreate(BaseModel):
     name: str
     description: Optional[str] = None
-    is_public: bool = False
+    is_public: bool = True  # Default to public
 
 
 class PlaylistUpdate(BaseModel):
@@ -208,6 +208,59 @@ async def get_my_playlists(
                 is_subscribed=True,
                 created_at=playlist.created_at,
             ))
+    
+    return PlaylistsListResponse(
+        items=items,
+        total=total,
+        page=page,
+        per_page=per_page,
+    )
+
+
+@router.get("/manage/all", response_model=PlaylistsListResponse)
+async def get_all_my_playlists(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=100),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get ALL user's playlists including private ones (for management/settings)"""
+    # Count all owned playlists
+    total = await db.scalar(
+        select(func.count(Playlist.id))
+        .where(Playlist.owner_id == user.id)
+    ) or 0
+    
+    # Get all playlists
+    offset = (page - 1) * per_page
+    result = await db.execute(
+        select(Playlist, User)
+        .join(User, User.id == Playlist.owner_id)
+        .where(Playlist.owner_id == user.id)
+        .order_by(Playlist.created_at.desc())
+        .offset(offset)
+        .limit(per_page)
+    )
+    rows = result.all()
+    
+    items = []
+    for playlist, owner in rows:
+        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
+        items.append(PlaylistResponse(
+            id=playlist.id,
+            name=playlist.name,
+            description=playlist.description,
+            track_count=track_count,
+            total_duration=total_duration,
+            cover_url=cover_url,
+            covers=covers,
+            is_public=playlist.is_public,
+            owner_id=owner.id,
+            owner_name=owner.display_name,
+            is_owner=True,
+            is_subscribed=False,
+            created_at=playlist.created_at,
+        ))
     
     return PlaylistsListResponse(
         items=items,

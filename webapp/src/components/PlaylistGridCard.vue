@@ -14,9 +14,14 @@
       </div>
       <div v-else class="cover-placeholder"><Music :size="24" /></div>
       
-      <!-- Owner badge for subscribed playlists -->
-      <div v-if="!playlist.is_owner && playlist.owner_username" class="owner-badge">
-        <User :size="12" /> {{ playlist.owner_username }}
+      <!-- Owner badge for created playlists -->
+      <div v-if="playlist.is_owner" class="owner-badge creator-badge">
+        <Crown :size="12" /> Ваш
+      </div>
+      
+      <!-- Subscribed badge for added playlists -->
+      <div v-else-if="playlist.is_subscribed" class="owner-badge subscribed-badge">
+        <UserPlus :size="12" /> {{ playlist.owner_name || 'Добавлен' }}
       </div>
     </div>
     
@@ -24,7 +29,7 @@
       <div class="playlist-name">{{ playlist.name }}</div>
       <div class="playlist-meta">
         {{ playlist.track_count }} треков
-        <span v-if="playlist.is_public && playlist.is_owner" class="public-badge">
+        <span v-if="playlist.is_public" class="public-badge">
           <Globe :size="12" />
         </span>
       </div>
@@ -33,7 +38,7 @@
 </template>
 
 <script setup>
-import { Music, Globe, User } from 'lucide-vue-next'
+import { Music, Globe, Crown, UserPlus } from 'lucide-vue-next'
 
 defineProps({
   playlist: {
@@ -122,13 +127,23 @@ defineEmits(['click', 'contextmenu'])
   position: absolute;
   bottom: 0px;
   right: 0px;
-  background: rgba(0,0,0,0.7);
+  background: rgba(0,0,0,0.75);
   color: white;
   font-size: 10px;
-  padding: 2px 6px;
+  font-weight: 600;
+  padding: 3px 8px;
   border-top-left-radius: 6px;
   display: flex;
   align-items: center;
   gap: 3px;
+  backdrop-filter: blur(4px);
 }
-</style>
+
+.creator-badge {
+  background: rgba(255, 215, 0, 0.9);
+  color: #000;
+}
+
+.subscribed-badge {
+  background: rgba(59, 130, 246, 0.9);
+  color: #fff;

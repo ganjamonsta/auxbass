@@ -164,7 +164,8 @@ const createPlaylist = async () => {
   
   try {
     const response = await api.post('/playlists', {
-      name: newPlaylistName.value.trim()
+      name: newPlaylistName.value.trim(),
+      is_public: true  // Create as public by default
     })
     playlists.value.unshift(response.data)
     closeModal()
