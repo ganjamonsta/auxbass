@@ -1,76 +1,76 @@
 <template>
   <div class="mini-player" @click="$emit('expand')" @contextmenu.prevent="openMenu('track', track, 'player', $event)">
-    <!-- Compact 2-row layout -->
-    <div class="player-content">
+    <!-- LCD Screen -->
+    <div class="lcd-screen">
       <!-- Row 1: Title + Status Icons -->
-      <div class="player-row row-title">
-        <div class="title-container">
-          <div class="title-track" :class="{ 'marquee': shouldMarquee }">
-            <span class="title-text">{{ displayText }}</span>
-            <span v-if="shouldMarquee" class="title-text title-clone">{{ displayText }}</span>
+      <div class="lcd-row row-title">
+        <div class="lcd-title-container">
+          <div class="lcd-title-track" :class="{ 'marquee': shouldMarquee }">
+            <span class="lcd-title">{{ displayText }}</span>
+            <span v-if="shouldMarquee" class="lcd-title lcd-title-clone">{{ displayText }}</span>
           </div>
         </div>
-        <div class="status-icons">
-          <span v-if="playerStore.hdTrackInfo" class="status-icon hd-icon active" title="HD версия">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <div class="lcd-indicators">
+          <span v-if="playerStore.hdTrackInfo" class="lcd-indicator hd-indicator active" title="HD версия">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
               <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-8 12H9.5v-2h-2v2H6V9h1.5v2.5h2V9H11v6zm2-6h4c.55 0 1 .45 1 1v4c0 .55-.45 1-1 1h-4V9zm1.5 4.5h2v-3h-2v3z"/>
             </svg>
           </span>
-          <span v-else class="status-icon hd-icon" title="HD недоступен">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" opacity="0.3">
+          <span v-else class="lcd-indicator hd-indicator" title="HD недоступен">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
               <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-8 12H9.5v-2h-2v2H6V9h1.5v2.5h2V9H11v6zm2-6h4c.55 0 1 .45 1 1v4c0 .55-.45 1-1 1h-4V9zm1.5 4.5h2v-3h-2v3z"/>
             </svg>
           </span>
           <span 
-            class="status-icon shuffle-icon" 
+            class="lcd-indicator shuffle-indicator" 
             :class="{ active: playerStore.shuffle }" 
             title="Перемешивание"
             @click.stop="$emit('toggleShuffle')"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
               <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
             </svg>
           </span>
           <span 
-            class="status-icon repeat-icon" 
+            class="lcd-indicator repeat-indicator" 
             :class="{ active: playerStore.repeatMode !== 'none' }" 
             :title="repeatTitle"
             @click.stop="$emit('toggleRepeat')"
           >
-            <svg v-if="playerStore.repeatMode === 'one'" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <svg v-if="playerStore.repeatMode === 'one'" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
               <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z"/>
             </svg>
-            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
               <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
             </svg>
           </span>
         </div>
       </div>
       
-      <!-- Row 2: Play/Pause + Progress + Time -->
-      <div class="player-row row-controls">
-        <button class="play-btn" @click.stop="$emit('toggle')">
-          <svg v-if="loading" class="spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+      <!-- Row 2: Play/Pause + Progress Dots + Time -->
+      <div class="lcd-row row-controls">
+        <button class="lcd-play-btn" @click.stop="$emit('toggle')">
+          <svg v-if="loading" class="spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
             <path d="M12 2a10 10 0 0 1 10 10"/>
           </svg>
-          <svg v-else-if="isPlaying" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <svg v-else-if="isPlaying" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
             <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
           </svg>
-          <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
             <path d="M8 5v14l11-7z"/>
           </svg>
         </button>
         
-        <div class="progress-dots">
+        <div class="lcd-progress">
           <span 
-            class="dot" 
-            v-for="i in 24" 
+            class="lcd-dot" 
+            v-for="i in 20" 
             :key="i" 
-            :class="getDotClass(i, 24)"
+            :class="getDotClass(i, 20)"
           ></span>
         </div>
         
-        <span class="time-display">{{ formatTime(progress) }}/{{ formatTime(duration || track.duration) }}</span>
+        <span class="lcd-time">{{ formatTime(progress) }}/{{ formatTime(duration || track.duration) }}</span>
       </div>
     </div>
   </div>
@@ -177,14 +177,14 @@ const formatTime = (seconds) => {
 
 <style scoped>
 /* ═══════════════════════════════════════════════════════════
-   🎵 MINI PLAYER - Compact 2-Row Design
+   🎵 MINI PLAYER - Nokia XpressMusic LCD Style (Compact 2-Row)
    ═══════════════════════════════════════════════════════════ */
 
 .mini-player {
   display: flex;
   align-items: center;
   margin: 6px 10px;
-  padding: 10px 14px;
+  padding: 6px;
   background: var(--xm-bg-elevated);
   border-radius: var(--neu-radius-lg);
   cursor: pointer;
@@ -203,28 +203,57 @@ const formatTime = (seconds) => {
     -2px -2px 4px var(--neu-shadow-light);
 }
 
-.player-content {
+/* ─── LCD Screen - Nokia XpressMusic Style ─── */
+.lcd-screen {
   flex: 1;
+  background: var(--lcd-bg);
+  border-radius: var(--neu-radius-md);
+  padding: 10px 12px;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  border: 1px solid #1a2a40;
+  box-shadow: 
+    inset 0 2px 8px rgba(0, 0, 0, 0.8),
+    0 1px 0 rgba(100, 150, 255, 0.1);
   min-width: 0;
+  position: relative;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-/* ─── Row Layout ─── */
-.player-row {
+/* Scanline effect for retro feel */
+.lcd-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ─── LCD Rows ─── */
+.lcd-row {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
+  position: relative;
+  z-index: 1;
 }
 
-/* ─── Row 1: Title + Icons ─── */
+/* ─── Row 1: Title + Indicators ─── */
 .row-title {
   justify-content: space-between;
 }
 
-.title-container {
+.lcd-title-container {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -232,25 +261,26 @@ const formatTime = (seconds) => {
   -webkit-mask-image: linear-gradient(90deg, black 90%, transparent 100%);
 }
 
-.title-track {
+.lcd-title-track {
   display: inline-flex;
   white-space: nowrap;
 }
 
-.title-track.marquee {
+.lcd-title-track.marquee {
   animation: marquee-scroll 12s linear infinite;
 }
 
-.title-text {
-  color: var(--xm-text-primary);
+.lcd-title {
+  color: var(--lcd-text);
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.3px;
+  text-shadow: 0 0 8px var(--lcd-text-glow);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
-.title-clone {
+.lcd-title-clone {
   margin-left: 60px;
 }
 
@@ -259,42 +289,44 @@ const formatTime = (seconds) => {
   95%, 100% { transform: translateX(calc(-50% - 30px)); }
 }
 
-/* ─── Status Icons ─── */
-.status-icons {
+/* ─── LCD Indicators (Icons) ─── */
+.lcd-indicators {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   flex-shrink: 0;
 }
 
-.status-icon {
+.lcd-indicator {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  color: var(--xm-text-muted);
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  color: var(--lcd-dot-inactive);
   opacity: 0.4;
   transition: all 0.2s ease;
   cursor: pointer;
 }
 
-.status-icon:active {
+.lcd-indicator:active {
   transform: scale(0.9);
 }
 
-.status-icon.active {
+.lcd-indicator.active {
   opacity: 1;
-  color: var(--xm-accent);
+  color: var(--lcd-text);
+  text-shadow: 0 0 6px var(--lcd-text-glow);
 }
 
-.status-icon.hd-icon.active {
-  color: #ffd700;
-}
-
-.status-icon.hd-icon {
+.lcd-indicator.hd-indicator {
   cursor: default;
+}
+
+.lcd-indicator.hd-indicator.active {
+  color: #ffd700;
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.8);
 }
 
 /* ─── Row 2: Controls ─── */
@@ -302,43 +334,43 @@ const formatTime = (seconds) => {
   gap: 8px;
 }
 
-.play-btn {
-  width: 32px;
-  height: 32px;
+.lcd-play-btn {
+  width: 28px;
+  height: 28px;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--xm-text-primary);
+  color: var(--lcd-text);
   flex-shrink: 0;
   transition: all 0.15s ease;
   
-  /* Rubber button style */
-  background: var(--rubber-bg);
+  /* Rubber button style inside LCD */
+  background: rgba(0, 0, 0, 0.4);
   box-shadow: 
-    0 3px 6px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 2px 4px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
     inset 0 -1px 0 rgba(0, 0, 0, 0.2);
-  border: 1px solid var(--rubber-border);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.play-btn:active {
+.lcd-play-btn:active {
   transform: scale(0.92) translateY(1px);
-  background: var(--rubber-bg-pressed);
+  background: rgba(0, 0, 0, 0.6);
   box-shadow: 
     0 1px 2px rgba(0, 0, 0, 0.4),
     inset 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-.play-btn:active svg {
+.lcd-play-btn:active svg {
   color: var(--xm-accent);
   filter: drop-shadow(0 0 4px var(--xm-accent-glow));
 }
 
-/* ─── Progress Dots ─── */
-.progress-dots {
+/* ─── LED Progress Dots ─── */
+.lcd-progress {
   flex: 1;
   display: flex;
   align-items: center;
@@ -346,25 +378,25 @@ const formatTime = (seconds) => {
   min-width: 0;
 }
 
-.dot {
+.lcd-dot {
   flex: 1;
   height: 4px;
   min-width: 2px;
-  background: var(--lcd-dot-inactive, rgba(255, 255, 255, 0.15));
+  background: var(--lcd-dot-inactive);
   border-radius: 2px;
   transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 
-.dot.active {
+.lcd-dot.active {
   background: var(--xm-accent);
   box-shadow: 0 0 4px var(--xm-accent-glow);
 }
 
-.dot.buffered {
+.lcd-dot.buffered {
   background: rgba(0, 188, 212, 0.3);
 }
 
-.dot.next {
+.lcd-dot.next {
   background: var(--xm-accent);
   opacity: 0.5;
   animation: dot-blink 0.6s ease-in-out infinite;
@@ -376,14 +408,15 @@ const formatTime = (seconds) => {
 }
 
 /* ─── Time Display ─── */
-.time-display {
+.lcd-time {
   font-size: 11px;
   font-weight: 600;
-  color: var(--xm-text-muted);
+  color: var(--lcd-text);
+  text-shadow: 0 0 6px var(--lcd-text-glow);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.5px;
   flex-shrink: 0;
-  min-width: 70px;
+  min-width: 65px;
   text-align: right;
 }
 
