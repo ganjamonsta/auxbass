@@ -431,8 +431,9 @@ watch(
   display: none;
 }
 
-.action-btn.subscribe-action-btn.subscribed {
-  color: var(--accent);
+/* Ensure Lucide icons inherit color */
+.action-btn.subscribe-action-btn svg {
+  color: inherit;
 }
 
 .action-btn.subscribe-action-btn:disabled {
