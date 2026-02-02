@@ -162,7 +162,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['click', 'menu', 'like', 'addToLibrary', 'download'])
+const emit = defineEmits(['click', 'menu', 'like', 'addToLibrary', 'download', 'hdNotice'])
 
 const handleClick = () => {
   if (props.track.is_unavailable) {
@@ -171,10 +171,10 @@ const handleClick = () => {
     return
   }
   
-  // HD/Large files without streamable version - trigger download instead
+  // HD/Large files without streamable version - show notice, don't auto-download
   if (isNotStreamable.value && !props.track.streamable_id) {
-    console.log('[TrackItem] HD/Large file without streamable version, triggering download')
-    emit('download')
+    console.log('[TrackItem] HD/Large file without streamable version, showing notice')
+    emit('hdNotice', props.track)
     return
   }
   

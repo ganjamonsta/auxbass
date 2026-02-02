@@ -160,6 +160,20 @@ export function useContextMenu() {
       closeMenu()
     },
 
+    // Download the track itself as HD (for HD tracks in context menu)
+    downloadTrackHD: async (track) => {
+      if (track?.id) {
+        try {
+          await playerApi.download(track.id)
+          uiStore.toast.success('HD отправлено', 'HD файл отправлен в Telegram')
+        } catch (error) {
+          console.error('Failed to download HD track:', error)
+          uiStore.toast.error('Ошибка', 'Не удалось отправить HD файл')
+        }
+      }
+      closeMenu()
+    },
+
     delete: async (track) => {
       if (!track?.id) return closeMenu()
       
@@ -284,6 +298,16 @@ export function useContextMenu() {
         uiStore.toast.error('Ошибка', 'Не удалось добавить в очередь')
       }
       closeMenu()
+    },
+
+    edit: (playlist) => {
+      if (playlist?.is_auto_album) return closeMenu()
+      
+      closeMenu()
+      if (!playlist?.id) return
+      
+      // Navigate to playlist page with edit query param
+      router.push({ path: `/playlist/${playlist.id}`, query: { edit: 'true' } })
     },
 
     rename: (playlist) => {

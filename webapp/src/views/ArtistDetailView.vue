@@ -71,6 +71,7 @@
           @addToLibrary="handleAddToLibrary(track)"
           @menu="(e) => openMenu('track', track, 'artist', e)"
           @download="handleDirectDownload(track)"
+          @hdNotice="handleHdNotice"
         />
       </div>
     </section>
@@ -194,6 +195,12 @@ const handleDirectDownload = async (track) => {
     const errorMsg = error.response?.data?.detail || 'Ошибка отправки'
     uiStore.toast.error('Не удалось отправить', errorMsg)
   }
+}
+
+// HD track notice - show that track is only available for download
+const handleHdNotice = (track) => {
+  const sizeMB = track.file_size ? (track.file_size / 1024 / 1024).toFixed(1) : '20+'
+  uiStore.toast.info('Только HD', `Этот трек (${sizeMB} MB) доступен только для скачивания. Используйте кнопку загрузки.`)
 }
 
 const formatDuration = (seconds) => {

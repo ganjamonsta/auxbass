@@ -44,14 +44,9 @@
 
               <div v-if="!isAlbum" class="menu-divider"></div>
 
-              <button v-if="!isAlbum" class="menu-item" @click="handleRename">
+              <button v-if="!isAlbum" class="menu-item" @click="handleEdit">
                 <span class="menu-icon"><Pencil :size="18" /></span>
-                <span>Переименовать</span>
-              </button>
-
-              <button v-if="!isAlbum" class="menu-item danger" @click="handleDelete">
-                <span class="menu-icon"><Trash2 :size="18" /></span>
-                <span>Удалить плейлист</span>
+                <span>Редактировать</span>
               </button>
             </div>
           </div>
@@ -64,14 +59,14 @@
 <script setup>
 import { inject, computed } from 'vue'
 import { usePlayerStore } from '../stores/player'
-import { FolderOpen, Play, Shuffle, ListMusic, Pencil, Trash2, Music, Disc3 } from 'lucide-vue-next'
+import { FolderOpen, Play, Shuffle, ListMusic, Pencil, Music, Disc3 } from 'lucide-vue-next'
 
 const props = defineProps({
   show: Boolean,
   playlist: Object
 })
 
-const emit = defineEmits(['close', 'open', 'playAll', 'shuffle', 'addToQueue', 'rename', 'delete'])
+const emit = defineEmits(['close', 'open', 'playAll', 'shuffle', 'addToQueue', 'edit'])
 
 const player = usePlayerStore()
 const telegram = inject('telegram')
@@ -146,15 +141,9 @@ const handleAddToQueue = () => {
   emit('close')
 }
 
-const handleRename = () => {
+const handleEdit = () => {
   haptic('light')
-  emit('rename', props.playlist)
-  emit('close')
-}
-
-const handleDelete = () => {
-  haptic('warning')
-  emit('delete', props.playlist)
+  emit('edit', props.playlist)
   emit('close')
 }
 </script>

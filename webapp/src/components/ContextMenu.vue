@@ -76,6 +76,10 @@
                   <Disc3 :size="18" />
                   <span>Скачать HD версию</span>
                 </button>
+                <button v-if="isTrackHD" class="menu-item" @click="exec('downloadTrackHD')">
+                  <Download :size="18" />
+                  <span>Скачать HD файл</span>
+                </button>
                 <div class="menu-divider" />
 
                 <!-- Remove from playlist (in playlist context) -->
@@ -123,13 +127,9 @@
                 <!-- Only for user playlists that user owns (not auto-albums) -->
                 <template v-if="!isAutoAlbum && isPlaylistOwner">
                   <div class="menu-divider" />
-                  <button class="menu-item" @click="exec('rename')">
+                  <button class="menu-item" @click="exec('edit')">
                     <Pencil :size="18" />
-                    <span>Переименовать</span>
-                  </button>
-                  <button class="menu-item danger" @click="exec('delete')">
-                    <Trash2 :size="18" />
-                    <span>Удалить плейлист</span>
+                    <span>Редактировать</span>
                   </button>
                 </template>
               </template>
@@ -442,6 +442,28 @@ const hasHDVersion = computed(() => {
   // Get from playerStore since HD info is only available for current track
   const playerStore = usePlayerStore()
   return !!playerStore.hdTrackInfo
+})
+
+// HD MIME types for track detection
+const HD_MIME_TYPES = [
+  'audio/flac', 'audio/x-flac',
+  'audio/wav', 'audio/x-wav',
+  'audio/aiff', 'audio/x-aiff',
+  'audio/x-m4a', 'audio/mp4',
+  'audio/alac', 'audio/x-alac'
+]
+const MAX_STREAMABLE_SIZE = 20 * 1024 * 1024
+
+// Check if current track is HD/large file (show download HD option)
+const isTrackHD = computed(() => {
+  if (menuType.value !== 'track') return false
+  const track = menuData.value
+  if (!track) return false
+  // HD format check
+  if (track.mime_type && HD_MIME_TYPES.includes(track.mime_type.toLowerCase())) return true
+  // Large file check
+  if (track.file_size && track.file_size > MAX_STREAMABLE_SIZE) return true
+  return false
 })
 
 // Album-specific
