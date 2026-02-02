@@ -11,7 +11,7 @@
         <div class="cover-art" :style="coverStyle">
           <img 
             v-if="track?.cover_url" 
-            :src="track.cover_url" 
+            :src="getCoverUrl(track.cover_url, CoverSize.XL)" 
             alt="Cover" 
             class="cover-image"
           />
@@ -188,7 +188,7 @@
           <div class="queue-item-cover">
             <img 
               v-if="queueTrack.cover_url" 
-              :src="queueTrack.cover_url" 
+              :src="getCoverUrl(queueTrack.cover_url, CoverSize.SMALL)" 
               alt=""
               class="queue-cover-image"
             />
@@ -220,7 +220,7 @@ import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useContextMenu } from '@/composables/useContextMenu'
-import { splitArtists, getDisplayTitle, getDisplayArtist, getAllTrackArtists } from '@/utils/formatters'
+import { splitArtists, getDisplayTitle, getDisplayArtist, getAllTrackArtists, getCoverUrl, CoverSize } from '@/utils/formatters'
 import { Play } from 'lucide-vue-next'
 
 const emit = defineEmits(['goToUser'])

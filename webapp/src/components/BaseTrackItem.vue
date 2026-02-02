@@ -26,7 +26,7 @@
     <!-- Cover with play button -->
     <div class="cover-wrapper" @click.stop="togglePlay">
       <div class="cover">
-        <img v-if="track.cover_url" :src="track.cover_url" />
+        <img v-if="track.cover_url" :src="getCoverUrl(track.cover_url, CoverSize.SMALL)" />
         <Music v-else :size="20" />
       </div>
       <div class="play-overlay" :class="{ 'is-playing': isCurrentTrack && playerStore.isPlaying }">
@@ -69,6 +69,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { usePlayerStore } from '@/stores/player'
+import { getCoverUrl, CoverSize } from '@/utils'
 import { Music } from 'lucide-vue-next'
 
 const props = defineProps({

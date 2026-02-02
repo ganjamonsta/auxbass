@@ -123,6 +123,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import EditPlaylistModal from '@/components/EditPlaylistModal.vue'
 import api from '@/api/client'
 import { Music, Check, Plus, Globe } from 'lucide-vue-next'
+import { getCoverUrl, CoverSize } from '@/utils'
 
 // Universal context menu
 const { openMenu } = useContextMenu()
@@ -156,11 +157,11 @@ const isOwner = computed(() => {
 const coverImages = computed(() => {
   // If playlist has its own cover, use it (single image in array for consistent template)
   if (playlist.value?.cover_url) {
-    return [playlist.value.cover_url]
+    return [getCoverUrl(playlist.value.cover_url, CoverSize.LARGE)]
   }
-  // Fallback to track covers for collage
+  // Fallback to track covers for collage (use small size for grid)
   if (!playlist.value?.tracks) return []
-  return playlist.value.tracks.filter(t => t.cover_url).slice(0, 4).map(t => t.cover_url)
+  return playlist.value.tracks.filter(t => t.cover_url).slice(0, 4).map(t => getCoverUrl(t.cover_url, CoverSize.SMALL))
 })
 
 // Data loading

@@ -2,11 +2,11 @@
   <div class="playlist-card" @click="$emit('click')">
     <div class="playlist-cover" :class="coverClass">
       <!-- Single cover image (albums or custom cover) -->
-      <img v-if="playlist.cover_url" :src="playlist.cover_url" alt="" class="cover-image" />
+      <img v-if="playlist.cover_url" :src="getCoverUrl(playlist.cover_url, CoverSize.MEDIUM)" alt="" class="cover-image" />
       
       <!-- Collage from track covers -->
       <div v-else-if="collageCovers.length > 0" class="cover-collage" :class="'collage-' + collageCovers.length">
-        <img v-for="(cover, i) in collageCovers" :key="i" :src="cover" alt="" class="collage-img" />
+        <img v-for="(cover, i) in collageCovers" :key="i" :src="getCoverUrl(cover, CoverSize.SMALL)" alt="" class="collage-img" />
       </div>
       
       <!-- Fallback icon -->
@@ -26,6 +26,7 @@
 <script setup>
 import { computed } from 'vue'
 import { Bot, Megaphone, User, Folder, Disc3 } from 'lucide-vue-next'
+import { getCoverUrl, CoverSize } from '@/utils'
 
 const props = defineProps({
   playlist: {

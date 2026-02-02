@@ -12,7 +12,7 @@
     <div v-if="!hideCover" class="track-cover" :style="coverStyle">
       <img 
         v-if="track.cover_url && !track.is_unavailable" 
-        :src="track.cover_url" 
+        :src="getCoverUrl(track.cover_url, CoverSize.SMALL)" 
         alt=""
         class="cover-image"
         loading="lazy"
@@ -116,7 +116,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { formatDuration, getTrackCoverStyle, getTrackInitials, getDisplayTitle, getDisplayArtist } from '@/utils'
+import { formatDuration, getTrackCoverStyle, getTrackInitials, getDisplayTitle, getDisplayArtist, getCoverUrl, CoverSize } from '@/utils'
 import { X, Check } from 'lucide-vue-next'
 
 const props = defineProps({

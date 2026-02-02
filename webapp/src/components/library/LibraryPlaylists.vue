@@ -48,7 +48,7 @@
             <img
               v-for="(cover, i) in playlist.covers.slice(0, 4)"
               :key="i"
-              :src="cover"
+              :src="getCoverUrl(cover, CoverSize.SMALL)"
             />
           </div>
           <div v-else class="cover-placeholder"><Music :size="24" /></div>
@@ -107,6 +107,7 @@ import { ref, onMounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { useContextMenu } from '@/composables/useContextMenu'
+import { getCoverUrl, CoverSize } from '@/utils'
 import api from '@/api/client'
 import { Heart, Plus, Music, Link, FileText } from 'lucide-vue-next'
 import GridSkeleton from '@/components/GridSkeleton.vue'

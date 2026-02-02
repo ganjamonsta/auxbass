@@ -5,7 +5,7 @@
       <div class="artist-avatar" :style="avatarStyle">
         <img 
           v-if="artist.image_url" 
-          :src="artist.image_url" 
+          :src="getCoverUrl(artist.image_url, CoverSize.LARGE)" 
           alt=""
           @error="$event.target.style.display = 'none'"
         />
@@ -44,7 +44,7 @@
           @contextmenu.prevent="$emit('albumContextmenu', { album, event: $event })"
         >
           <div class="album-cover">
-            <img v-if="album.cover_url" :src="album.cover_url" alt="" />
+            <img v-if="album.cover_url" :src="getCoverUrl(album.cover_url, CoverSize.SMALL)" alt="" />
             <svg v-else width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"/>
             </svg>
@@ -71,7 +71,7 @@
           @click="$emit('openPlaylist', playlist)"
         >
           <div class="playlist-cover">
-            <img v-if="playlist.cover_url" :src="playlist.cover_url" alt="" />
+            <img v-if="playlist.cover_url" :src="getCoverUrl(playlist.cover_url, CoverSize.SMALL)" alt="" />
             <svg v-else width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
               <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
             </svg>
@@ -105,7 +105,7 @@
 <script setup>
 import { computed } from 'vue'
 import TrackItem from './TrackItem.vue'
-import { formatPlayCount } from '@/utils'
+import { formatPlayCount, getCoverUrl, CoverSize } from '@/utils'
 
 const props = defineProps({
   artist: {

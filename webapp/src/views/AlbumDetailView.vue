@@ -3,7 +3,7 @@
     <!-- Album header -->
     <div class="album-header">
       <div class="album-cover">
-        <img v-if="album.cover_url" :src="album.cover_url" :alt="album.name" />
+        <img v-if="album.cover_url" :src="getCoverUrl(album.cover_url, CoverSize.LARGE)" :alt="album.name" />
         <div v-else class="cover-placeholder"><Disc3 :size="32" /></div>
       </div>
       <div class="album-info">
@@ -186,7 +186,7 @@ import { useTrackActions, usePlaybackActions } from '@/composables'
 import TrackItem from '@/components/TrackItem.vue'
 import api from '@/api/client'
 import { Disc3, Check, Music, X } from 'lucide-vue-next'
-import { splitArtists } from '@/utils/formatters'
+import { splitArtists, getCoverUrl, CoverSize } from '@/utils/formatters'
 
 // Universal context menu
 const { openMenu } = useContextMenu()

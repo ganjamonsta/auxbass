@@ -29,7 +29,7 @@
     <!-- Artist header -->
     <div class="artist-header">
       <div class="artist-image">
-        <img v-if="artist.image_url" :src="artist.image_url" :alt="artist.name" />
+        <img v-if="artist.image_url" :src="getCoverUrl(artist.image_url, CoverSize.LARGE)" :alt="artist.name" />
         <div v-else class="image-placeholder"><User :size="48" /></div>
       </div>
       <div class="artist-info">
@@ -68,7 +68,7 @@
           @contextmenu.prevent="openMenu('album', album, 'artist', $event)"
         >
           <div class="album-cover">
-            <img v-if="album.cover_url" :src="album.cover_url" :alt="album.name" />
+            <img v-if="album.cover_url" :src="getCoverUrl(album.cover_url, CoverSize.MEDIUM)" :alt="album.name" />
             <div v-else class="cover-placeholder"><Disc3 :size="24" /></div>
           </div>
           <div class="album-name">{{ album.name }}</div>
@@ -146,6 +146,7 @@ import TrackItem from '@/components/TrackItem.vue'
 import TrackSkeleton from '@/components/TrackSkeleton.vue'
 import api, { playerApi } from '@/api/client'
 import { User, Disc3, Globe } from 'lucide-vue-next'
+import { getCoverUrl, CoverSize } from '@/utils'
 
 // Universal context menu
 const { openMenu } = useContextMenu()

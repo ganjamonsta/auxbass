@@ -51,7 +51,7 @@
           >
             <div class="queue-track-number">{{ idx + 1 }}</div>
             <div class="queue-track-cover" :style="getTrackCoverStyle(t)">
-              <img v-if="t.cover_url" :src="t.cover_url" alt="" />
+              <img v-if="t.cover_url" :src="getCoverUrl(t.cover_url, CoverSize.SMALL)" alt="" />
               <span v-else>{{ getTrackInitials(t) }}</span>
             </div>
             <div class="queue-track-info">
@@ -85,7 +85,7 @@
           >
             <div class="queue-track-number">-{{ historyTracks.length - idx }}</div>
             <div class="queue-track-cover" :style="getTrackCoverStyle(t)">
-              <img v-if="t.cover_url" :src="t.cover_url" alt="" />
+              <img v-if="t.cover_url" :src="getCoverUrl(t.cover_url, CoverSize.SMALL)" alt="" />
               <span v-else>{{ getTrackInitials(t) }}</span>
             </div>
             <div class="queue-track-info">
@@ -106,7 +106,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { getTrackCoverStyle, getTrackInitials } from '@/utils'
+import { getTrackCoverStyle, getTrackInitials, getCoverUrl, CoverSize } from '@/utils'
 import { useContextMenu } from '@/composables/useContextMenu'
 
 const { openMenu } = useContextMenu()

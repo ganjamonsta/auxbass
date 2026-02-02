@@ -1,7 +1,7 @@
 <template>
   <div class="album-card" @click="$emit('click', album)" @contextmenu.prevent="$emit('contextmenu', $event)">
     <div class="album-cover">
-      <img v-if="album.cover_url" :src="album.cover_url" :alt="album.name" loading="lazy" />
+      <img v-if="album.cover_url" :src="getCoverUrl(album.cover_url, CoverSize.MEDIUM)" :alt="album.name" loading="lazy" />
       <div v-else class="cover-placeholder"><Disc3 :size="32" /></div>
       <button class="play-btn" @click.stop="$emit('play', album)"><Play :size="20" fill="currentColor" /></button>
       <!-- Progress indicator if we have total_tracks -->
@@ -26,6 +26,7 @@
 
 <script setup>
 import { Disc3, Play } from 'lucide-vue-next'
+import { getCoverUrl, CoverSize } from '@/utils'
 
 defineProps({
   album: {

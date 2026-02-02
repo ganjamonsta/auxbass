@@ -31,7 +31,7 @@
     >
       <div class="cover-image" :style="coverStyle">
         <span v-if="!track?.cover_url" class="cover-text">{{ coverInitials }}</span>
-        <img v-else :src="track.cover_url" alt="Cover" class="cover-img" />
+        <img v-else :src="getCoverUrl(track.cover_url, CoverSize.XL)" alt="Cover" class="cover-img" />
       </div>
 
       <!-- Loading Overlay -->
@@ -267,7 +267,7 @@
 <script setup>
 import { ref, computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
-import { getTrackCoverStyle, getTrackInitials, splitArtists, getDisplayTitle, getDisplayArtist, getAllTrackArtists } from '@/utils'
+import { getTrackCoverStyle, getTrackInitials, splitArtists, getDisplayTitle, getDisplayArtist, getAllTrackArtists, getCoverUrl, CoverSize } from '@/utils'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useContextMenu } from '@/composables/useContextMenu'

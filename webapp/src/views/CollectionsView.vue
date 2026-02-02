@@ -174,7 +174,7 @@
           >
             <div class="playlist-manage-info">
               <div class="playlist-manage-cover">
-                <img v-if="playlist.cover_url" :src="playlist.cover_url" />
+                <img v-if="playlist.cover_url" :src="getCoverUrl(playlist.cover_url, CoverSize.SMALL)" />
                 <div v-else class="playlist-manage-placeholder"><Music :size="20" /></div>
               </div>
               <div class="playlist-manage-text">
@@ -213,6 +213,7 @@ import MediaGrid from '@/components/MediaGrid.vue'
 import GridSkeleton from '@/components/GridSkeleton.vue'
 import api from '@/api/client'
 import { Disc3, Folder, Plus, Music, Globe, Search, Play } from 'lucide-vue-next'
+import { getCoverUrl, CoverSize } from '@/utils'
 
 const router = useRouter()
 const playerStore = usePlayerStore()

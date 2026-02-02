@@ -1,7 +1,7 @@
 <template>
   <div class="artist-card" @click="$emit('click', artist)" @contextmenu.prevent="$emit('contextmenu', $event)">
     <div class="artist-image">
-      <img v-if="artist.image_url" :src="artist.image_url" :alt="artist.name" loading="lazy" />
+      <img v-if="artist.image_url" :src="getCoverUrl(artist.image_url, CoverSize.MEDIUM)" :alt="artist.name" loading="lazy" />
       <div v-else class="image-placeholder"><User :size="32" /></div>
     </div>
     <div class="artist-name">{{ artist.name }}</div>
@@ -13,6 +13,7 @@
 
 <script setup>
 import { User } from 'lucide-vue-next'
+import { getCoverUrl, CoverSize } from '@/utils'
 
 defineProps({
   artist: {

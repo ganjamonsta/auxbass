@@ -9,7 +9,7 @@
         <img
           v-for="(cover, i) in playlist.covers.slice(0, 4)"
           :key="i"
-          :src="cover"
+          :src="getCoverUrl(cover, CoverSize.SMALL)"
         />
       </div>
       <div v-else class="cover-placeholder"><Music :size="24" /></div>
@@ -42,6 +42,7 @@
 
 <script setup>
 import { Music, Globe, Crown, UserPlus, Play } from 'lucide-vue-next'
+import { getCoverUrl, CoverSize } from '@/utils'
 
 defineProps({
   playlist: {

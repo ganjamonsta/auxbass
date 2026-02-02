@@ -81,7 +81,7 @@
     <div class="player-right">
       <div class="cover-display" @click="$emit('expand')">
         <div class="cover-art" :style="coverStyle">
-          <img v-if="track?.cover_url" :src="track.cover_url" alt="" />
+          <img v-if="track?.cover_url" :src="getCoverUrl(track.cover_url, CoverSize.LARGE)" alt="" />
           <span v-else class="cover-text">{{ coverInitials }}</span>
         </div>
         <div class="vinyl-disc" :class="{ spinning: isPlaying }">
@@ -119,6 +119,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useContextMenu } from '@/composables/useContextMenu'
+import { getCoverUrl, CoverSize } from '@/utils'
 import { Play, Square, Pause, Volume2, VolumeX, SkipBack, SkipForward } from 'lucide-vue-next'
 
 const playerStore = usePlayerStore()

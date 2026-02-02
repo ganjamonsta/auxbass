@@ -263,7 +263,7 @@
               @click="playTrack(track)"
             >
               <div class="track-cover">
-                <img v-if="track.cover_url" :src="track.cover_url" />
+                <img v-if="track.cover_url" :src="getCoverUrl(track.cover_url, CoverSize.SMALL)" />
                 <span v-else><Music :size="20" /></span>
               </div>
               <div class="track-info">
@@ -300,7 +300,7 @@
               @click="$router.push(`/album/${album.id}`); closeProfile()"
               @contextmenu.prevent="handleAlbumContextMenu(album, $event)"
             >
-              <img v-if="album.cover_url" :src="album.cover_url" />
+              <img v-if="album.cover_url" :src="getCoverUrl(album.cover_url, CoverSize.SMALL)" />
               <div v-else class="album-placeholder"><Disc3 :size="24" /></div>
               <div class="album-name">{{ album.name }}</div>
             </div>
@@ -319,7 +319,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
 import { useContextMenu } from '@/composables/useContextMenu'
-import { getDisplayTitle, getDisplayArtist } from '@/utils'
+import { getDisplayTitle, getDisplayArtist, getCoverUrl, CoverSize } from '@/utils'
 import api from '@/api/client'
 import SearchBar from '@/components/ui/SearchBar.vue'
 import { Users, User, Search, Check, X, Music, Folder, Disc3, Lightbulb } from 'lucide-vue-next'

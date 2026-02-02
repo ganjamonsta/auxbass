@@ -444,3 +444,75 @@ export function getDisplayArtist(track) {
   
   return 'Unknown Artist'
 }
+
+/**
+ * Cover image size presets for different use cases.
+ * Deezer provides: 56x56 (small), 120x120, 250x250 (medium), 500x500 (big), 1000x1000 (xl)
+ */
+export const CoverSize = {
+  SMALL: 'small',     // 56x56 - for tiny thumbnails, lists with many items
+  MEDIUM: 'medium',   // 250x250 - for track lists, playlist grids
+  LARGE: 'large',     // 500x500 - for album/playlist detail headers
+  XL: 'xl'            // 1000x1000 - for full player, high-res displays
+}
+
+/**
+ * Get optimized cover URL for the specified size.
+ * Converts Deezer cover URLs to appropriate resolution.
+ * 
+ * Deezer URL format: https://e-cdns-images.dzcdn.net/images/cover/{hash}/{size}x{size}-000000-80-0-0.jpg
+ * 
+ * @param {string|null} url - Original cover URL
+ * @param {string} size - Desired size from CoverSize enum
+ * @returns {string|null} Optimized cover URL or original if not a Deezer URL
+ */
+export function getCoverUrl(url, size = CoverSize.MEDIUM) {
+  if (!url) return null
+  
+  // Map size presets to Deezer dimensions
+  const sizeMap = {
+    [CoverSize.SMALL]: '120x120',   // Using 120 instead of 56 for better quality on retina
+    [CoverSize.MEDIUM]: '250x250',
+    [CoverSize.LARGE]: '500x500',
+    [CoverSize.XL]: '1000x1000'
+  }
+  
+  const targetSize = sizeMap[size] || sizeMap[CoverSize.MEDIUM]
+  
+  // Check if this is a Deezer cover URL
+  if (url.includes('dzcdn.net/images/cover/')) {
+    // Replace any size pattern (e.g., 1000x1000, 500x500, etc.) with target size
+    return url.replace(/\/\d+x\d+(-|$)/, `/${targetSize}$1`)
+  }
+  
+  // For non-Deezer URLs (Last.fm, etc.), return as-is
+  // In future, could add support for Last.fm size suffixes
+  return url
+}
+
+/**
+ * Get srcset for responsive cover images.
+ * Provides 1x, 2x variants for different device pixel ratios.
+ * 
+ * @param {string|null} url - Original cover URL
+ * @param {string} baseSize - Base size from CoverSize enum
+ * @returns {string|null} srcset string or null
+ */
+export function getCoverSrcSet(url, baseSize = CoverSize.MEDIUM) {
+  if (!url || !url.includes('dzcdn.net/images/cover/')) return null
+  
+  // Define srcset pairs: [size for 1x, size for 2x]
+  const srcsetMap = {
+    [CoverSize.SMALL]: ['120x120', '250x250'],
+    [CoverSize.MEDIUM]: ['250x250', '500x500'],
+    [CoverSize.LARGE]: ['500x500', '1000x1000'],
+    [CoverSize.XL]: ['1000x1000', '1000x1000']  // XL is max
+  }
+  
+  const [size1x, size2x] = srcsetMap[baseSize] || srcsetMap[CoverSize.MEDIUM]
+  
+  const url1x = url.replace(/\/\d+x\d+(-|$)/, `/${size1x}$1`)
+  const url2x = url.replace(/\/\d+x\d+(-|$)/, `/${size2x}$1`)
+  
+  return `${url1x} 1x, ${url2x} 2x`
+}

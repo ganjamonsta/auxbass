@@ -3,7 +3,7 @@
     <div class="cover-frame">
       <div class="cover-scanlines"></div>
       <div class="cover-wrapper" :style="coverStyle">
-        <img v-if="track?.cover_url" :src="track.cover_url" alt="Cover" class="cover-image" />
+        <img v-if="track?.cover_url" :src="getCoverUrl(track.cover_url, CoverSize.XL)" alt="Cover" class="cover-image" />
         <div v-else class="cover-placeholder">
           <span class="cover-initials">{{ coverInitials }}</span>
         </div>
@@ -30,7 +30,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { getTrackCoverStyle, getTrackInitials } from '@/utils'
+import { getTrackCoverStyle, getTrackInitials, getCoverUrl, CoverSize } from '@/utils'
 
 const props = defineProps({
   track: Object,
