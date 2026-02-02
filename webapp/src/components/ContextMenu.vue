@@ -255,7 +255,7 @@ import { computed, watch, nextTick, ref, onMounted, onUnmounted } from 'vue'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
-import { getAllTrackArtists, getDisplayTitle, getDisplayArtist } from '@/utils/formatters'
+import { getAllTrackArtists } from '@/utils/formatters'
 import PlaylistPicker from '@/components/PlaylistPicker.vue'
 import EditTrackModal from '@/components/EditTrackModal.vue'
 import { 
@@ -408,7 +408,7 @@ const title = computed(() => {
   if (!data) return ''
   
   switch (menuType.value) {
-    case 'track': return getDisplayTitle(data)
+    case 'track': return data.title || 'Без названия'
     case 'playlist': return data.name || 'Плейлист'
     case 'album': return data.name || data.album_name || 'Альбом'
     case 'artist': return typeof data === 'string' ? data : data.name || 'Артист'
@@ -421,7 +421,7 @@ const subtitle = computed(() => {
   if (!data) return ''
   
   switch (menuType.value) {
-    case 'track': return getDisplayArtist(data)
+    case 'track': return data.artist || 'Неизвестный исполнитель'
     case 'playlist': return `${data.track_count || 0} ${getTracksWord(data.track_count || 0)}`
     case 'album': return data.album_artist || data.artist || ''
     case 'artist': return `${data.track_count || ''} ${data.track_count ? getTracksWord(data.track_count) : ''}`

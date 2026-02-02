@@ -11,6 +11,7 @@ import re
 from pathlib import Path
 from typing import Optional, List
 from collections import defaultdict
+from urllib.parse import unquote
 
 # Add parent directory to path for shared/bot imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -390,6 +391,8 @@ async def get_artist(
     scope=library: only user's library tracks
     scope=global: all public tracks
     """
+    # Ensure artist_name is URL-decoded
+    artist_name = unquote(artist_name)
     normalized_search = normalize_artist(artist_name)
     
     # Build query based on scope
@@ -414,7 +417,7 @@ async def get_artist(
         album_track_counts = {}
         
         for track in all_tracks_raw:
-            if artist_matches_track(track.artist, normalized_search):
+            if artist_matches_track(track.artist, normalized_search, track.title):
                 matching_tracks.append(track)
                 artist_names_seen.add(track.artist)
                 for at in track.album_tracks:
@@ -474,8 +477,18 @@ async def get_artist(
         all_tracks_response = [track_to_response(track, lib_entry) for track, lib_entry in matching_tracks]
         artist_names_seen = set(t.artist for t, _ in matching_tracks)
     
-    # Get best display name
-    actual_name = get_best_display_name(list(artist_names_seen)) or artist_name
+    # Determine the display name for this artist page
+    # Priority: 
+    # 1. If searched name exactly matches a track's artist field (normalized), use that artist field value
+    # 2. Otherwise, use the searched name (this handles featured/remix artists from title)
+    actual_name = artist_name  # Default to what user searched/clicked
+    
+    # Check if any track has this as main artist (not just featured)
+    for name in artist_names_seen:
+        if normalize_artist(name) == normalized_search:
+            # Found exact match in artist field - use this (better casing)
+            actual_name = name
+            break
     
     # Get albums by this artist (normalized)
     albums_result = await db.execute(
