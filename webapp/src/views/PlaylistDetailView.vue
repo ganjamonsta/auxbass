@@ -286,15 +286,7 @@ const toggleSubscription = async () => {
 }
 
 // Load on mount
-onMounted(async () => {
-  await loadPlaylist()
-  // Check if edit mode requested via query param
-  if (route.query.edit === 'true' && isOwner.value) {
-    showEditModal.value = true
-    // Clear query param to avoid reopening on refresh
-    router.replace({ path: route.path, query: {} })
-  }
-})
+onMounted(loadPlaylist)
 
 // Reload when route params change (for sidebar navigation)
 watch(
@@ -302,17 +294,6 @@ watch(
   (newId, oldId) => {
     if (newId && newId !== oldId) {
       loadPlaylist()
-    }
-  }
-)
-
-// Handle edit query param when navigating to same playlist
-watch(
-  () => route.query.edit,
-  (editParam) => {
-    if (editParam === 'true' && isOwner.value && playlist.value) {
-      showEditModal.value = true
-      router.replace({ path: route.path, query: {} })
     }
   }
 )

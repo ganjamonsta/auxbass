@@ -72,13 +72,10 @@
                   <Download :size="18" />
                   <span>Скачать в Telegram</span>
                 </button>
+                <!-- HD version available for current playing track (streamable version playing, HD original exists) -->
                 <button v-if="hasHDVersion" class="menu-item" @click="exec('downloadHD')">
                   <Disc3 :size="18" />
                   <span>Скачать HD версию</span>
-                </button>
-                <button v-if="isTrackHD" class="menu-item" @click="exec('downloadTrackHD')">
-                  <Download :size="18" />
-                  <span>Скачать HD файл</span>
                 </button>
                 <div class="menu-divider" />
 
@@ -127,9 +124,13 @@
                 <!-- Only for user playlists that user owns (not auto-albums) -->
                 <template v-if="!isAutoAlbum && isPlaylistOwner">
                   <div class="menu-divider" />
-                  <button class="menu-item" @click="exec('edit')">
+                  <button class="menu-item" @click="exec('rename')">
                     <Pencil :size="18" />
-                    <span>Редактировать</span>
+                    <span>Переименовать</span>
+                  </button>
+                  <button class="menu-item danger" @click="exec('delete')">
+                    <Trash2 :size="18" />
+                    <span>Удалить плейлист</span>
                   </button>
                 </template>
               </template>

@@ -300,16 +300,6 @@ export function useContextMenu() {
       closeMenu()
     },
 
-    edit: (playlist) => {
-      if (playlist?.is_auto_album) return closeMenu()
-      
-      closeMenu()
-      if (!playlist?.id) return
-      
-      // Navigate to playlist page with edit query param
-      router.push({ path: `/playlist/${playlist.id}`, query: { edit: 'true' } })
-    },
-
     rename: (playlist) => {
       if (playlist?.is_auto_album) return closeMenu()
       
