@@ -202,7 +202,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
@@ -528,6 +528,34 @@ onMounted(() => {
     loadPublicPlaylists()
     loadLikedCount()
   }
+  
+  // Слушаем событие сброса состояния
+  const handleResetState = (event) => {
+    if (event.detail.route === '/collections') {
+      // Сбрасываем состояние до базового
+      if (activeTab.value === 'albums') {
+        // Сброс поиска
+        albumSearchQuery.value = ''
+        // Сброс сортировки
+        albumSortBy.value = 'release_date'
+        albumSortOrder.value = 'desc'
+        // Переход на первую страницу
+        if (albumsPage.value !== 1) {
+          albumsPage.value = 1
+          loadAlbums()
+        }
+      } else if (activeTab.value === 'playlists') {
+        // Сброс поиска плейлистов
+        playlistSearchQuery.value = ''
+      }
+    }
+  }
+  
+  window.addEventListener('reset-view-state', handleResetState)
+  
+  onUnmounted(() => {
+    window.removeEventListener('reset-view-state', handleResetState)
+  })
 })
 </script>
 

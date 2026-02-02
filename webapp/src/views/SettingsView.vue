@@ -255,7 +255,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
@@ -389,7 +389,22 @@ onMounted(() => {
       document.getElementById('channel')?.scrollIntoView({ behavior: 'smooth' })
     }, 100)
   }
+  
+  // Слушаем событие сброса состояния
+  window.addEventListener('reset-view-state', handleResetState)
 })
+
+onUnmounted(() => {
+  window.removeEventListener('reset-view-state', handleResetState)
+})
+
+// Обработчик сброса состояния
+const handleResetState = (event) => {
+  if (event.detail.route === '/settings') {
+    // Прокручиваем наверх
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
 </script>
 
 <style scoped>

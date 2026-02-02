@@ -235,6 +235,9 @@ onMounted(() => {
   if (loadTrigger.value) {
     observer.observe(loadTrigger.value)
   }
+  
+  // Слушаем событие сброса состояния
+  window.addEventListener('reset-view-state', handleResetState)
 })
 
 // Watch for trigger element changes
@@ -251,7 +254,21 @@ onUnmounted(() => {
   if (searchTimeout) {
     clearTimeout(searchTimeout)
   }
+  window.removeEventListener('reset-view-state', handleResetState)
 })
+
+// Обработчик сброса состояния
+const handleResetState = (event) => {
+  if (event.detail.route === '/artists') {
+    // Сбрасываем поиск
+    searchQuery.value = ''
+    // Сбрасываем сортировку на дефолтную
+    sortBy.value = 'name'
+    sortOrder.value = 'asc'
+    // Перезагружаем список
+    reset()
+  }
+}
 </script>
 
 <style scoped>

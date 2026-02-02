@@ -47,7 +47,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
@@ -98,6 +98,24 @@ const clearSearch = () => {
   searchQuery.value = ''
   debouncedQuery.value = ''
 }
+
+// Слушаем событие сброса состояния
+const handleResetState = (event) => {
+  if (event.detail.route === '/') {
+    // Сбрасываем поиск
+    clearSearch()
+    // Сбрасываем на первую вкладку (Треки)
+    currentTabId.value = 'tracks'
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('reset-view-state', handleResetState)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('reset-view-state', handleResetState)
+})
 
 </script>
 

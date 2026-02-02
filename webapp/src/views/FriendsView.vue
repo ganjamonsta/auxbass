@@ -313,7 +313,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, computed } from 'vue'
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
@@ -546,7 +546,27 @@ onMounted(() => {
     // Clear the query param
     router.replace({ name: 'friends' })
   }
+  
+  // Слушаем событие сброса состояния
+  window.addEventListener('reset-view-state', handleResetState)
 })
+
+onUnmounted(() => {
+  window.removeEventListener('reset-view-state', handleResetState)
+})
+
+// Обработчик сброса состояния
+const handleResetState = (event) => {
+  if (event.detail.route === '/friends') {
+    // Сбрасываем на вкладку "Подписки"
+    activeTab.value = 'following'
+    // Сбрасываем поиск
+    searchQuery.value = ''
+    searchResults.value = []
+    // Перезагружаем данные
+    loadFollowing()
+  }
+}
 </script>
 
 <style scoped>

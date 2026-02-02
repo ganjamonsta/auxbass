@@ -63,26 +63,26 @@
 
         <!-- Bottom navigation (mobile only) -->
         <nav v-if="showNav && !isDesktop" class="bottom-nav">
-          <router-link to="/" class="nav-item" :class="{ active: isRoute('/') }">
+          <button @click="handleNavClick('/')" class="nav-item" :class="{ active: isRoute('/') }">
             <span class="nav-icon">🎵</span>
             <span class="nav-label">Библиотека</span>
-          </router-link>
-          <router-link to="/collections" class="nav-item" :class="{ active: isRoute('/collections') || isRoute('/albums') || isRoute('/playlists') }">
+          </button>
+          <button @click="handleNavClick('/collections')" class="nav-item" :class="{ active: isRoute('/collections') || isRoute('/albums') || isRoute('/playlists') }">
             <span class="nav-icon">💿</span>
             <span class="nav-label">Коллекции</span>
-          </router-link>
-          <router-link to="/artists" class="nav-item" :class="{ active: isRoute('/artists') }">
+          </button>
+          <button @click="handleNavClick('/artists')" class="nav-item" :class="{ active: isRoute('/artists') }">
             <span class="nav-icon">🎤</span>
             <span class="nav-label">Артисты</span>
-          </router-link>
-          <router-link to="/friends" class="nav-item" :class="{ active: isRoute('/friends') }">
+          </button>
+          <button @click="handleNavClick('/friends')" class="nav-item" :class="{ active: isRoute('/friends') }">
             <span class="nav-icon">👥</span>
             <span class="nav-label">Кенты</span>
-          </router-link>
-          <router-link to="/settings" class="nav-item" :class="{ active: isRoute('/settings') }">
+          </button>
+          <button @click="handleNavClick('/settings')" class="nav-item" :class="{ active: isRoute('/settings') }">
             <span class="nav-icon">⚙️</span>
             <span class="nav-label">Настройки</span>
-          </router-link>
+          </button>
         </nav>
 
         <!-- Mini player (mobile only) -->
@@ -316,6 +316,26 @@ const historyTracks = computed(() => {
 const isRoute = (path) => {
   if (path === '/') return route.path === '/'
   return route.path.startsWith(path)
+}
+
+const handleNavClick = (path) => {
+  // Если уже на этой странице
+  if (isRoute(path)) {
+    // Проверяем, находимся ли мы наверху страницы
+    const scrollTop = window.scrollY || document.documentElement.scrollTop
+    
+    if (scrollTop > 100) {
+      // Если не наверху - прокручиваем наверх
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } else {
+      // Если уже наверху - сбрасываем состояние страницы
+      // Используем event bus для общения с компонентами
+      window.dispatchEvent(new CustomEvent('reset-view-state', { detail: { route: path } }))
+    }
+  } else {
+    // Если на другой странице - просто переходим
+    router.push(path)
+  }
 }
 
 const goBack = () => {
@@ -583,6 +603,10 @@ html, body {
   font-size: 10px;
   padding: 8px 12px;
   transition: color 0.2s;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 .nav-item.active {
