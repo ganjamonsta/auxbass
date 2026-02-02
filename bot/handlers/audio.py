@@ -377,9 +377,28 @@ async def handle_upload_dup_callback(callback: CallbackQuery):
     elif action == "save":
         # User confirmed - save the track anyway
         pending = session_manager.get_pending_upload(user_id)
+        
+        # If pending data expired, try to recover from original message
         if not pending:
-            await callback.answer("Загрузка устарела, отправьте трек ещё раз", show_alert=True)
-            return
+            # Get original audio message (reply_to_message of bot's duplicate warning)
+            original_message = callback.message.reply_to_message
+            if original_message and original_message.audio:
+                audio = original_message.audio
+                # Reconstruct pending data from original message
+                pending = {
+                    "file_id": audio.file_id,
+                    "file_unique_id": audio.file_unique_id,
+                    "title": audio.title,
+                    "artist": audio.performer,
+                    "duration": audio.duration,
+                    "file_size": audio.file_size,
+                    "file_name": audio.file_name,
+                    "library_source": get_library_source(original_message).value,
+                    "forward_info": extract_forward_info(original_message),
+                }
+            else:
+                await callback.answer("Загрузка устарела, отправьте трек ещё раз", show_alert=True)
+                return
         
         # Parse library source back from string
         lib_source = LibrarySource.UPLOADED
