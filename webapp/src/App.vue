@@ -459,8 +459,10 @@ html, body {
     "sidebar main"
     "player player";
   min-height: 100vh;
+  height: 100vh;
   max-height: 100vh;
   overflow: hidden;
+  position: relative;
 }
 
 .app.desktop-layout.has-now-playing {
@@ -494,7 +496,10 @@ html, body {
   grid-area: player;
   width: 100%;
   flex-shrink: 0;
-  position: relative;
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
   z-index: 200;
 }
 
