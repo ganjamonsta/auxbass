@@ -24,7 +24,7 @@
         <div class="lcd-screen" @click="handleLcdClick">
           <!-- Title row -->
           <div class="lcd-title-row">
-            <div class="lcd-text-container">
+            <div class="lcd-text-container" ref="textContainer">
               <div class="lcd-text" :class="{ scrolling: shouldScroll }">
                 <span class="segment-text">{{ displayText }}</span>
                 <span v-if="shouldScroll" class="segment-text clone">{{ displayText }}</span>
@@ -115,7 +115,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useContextMenu } from '@/composables/useContextMenu'
@@ -197,7 +197,21 @@ const displayText = computed(() => {
   return `${artist} - ${title}`.toUpperCase()
 })
 
-const shouldScroll = computed(() => displayText.value.length > 30)
+const textContainer = ref(null)
+const shouldScroll = ref(false)
+
+// Check if text needs scrolling
+const checkTextOverflow = () => {
+  if (!textContainer.value) return
+  const container = textContainer.value
+  const textElement = container.querySelector('.segment-text')
+  if (!textElement) return
+  
+  // Compare text width with container width
+  const textWidth = textElement.scrollWidth
+  const containerWidth = container.clientWidth
+  shouldScroll.value = textWidth > containerWidth
+}
 
 // Progress
 const progressPercent = computed(() => {
@@ -293,12 +307,25 @@ const handleToggleLike = async () => {
   }
 }
 
+// Watch for track changes and check text overflow
+watch([track, displayText], () => {
+  nextTick(() => {
+    checkTextOverflow()
+  })
+})
+
 onMounted(() => {
   eqInterval = setInterval(animateEq, 100)
+  nextTick(() => {
+    checkTextOverflow()
+  })
+  // Also check on window resize
+  window.addEventListener('resize', checkTextOverflow)
 })
 
 onUnmounted(() => {
   clearInterval(eqInterval)
+  window.removeEventListener('resize', checkTextOverflow)
   document.removeEventListener('mousemove', onVolumeMove)
   document.removeEventListener('mouseup', stopVolumeAdjust)
   document.removeEventListener('mousemove', onSeekMove)
@@ -489,6 +516,9 @@ onUnmounted(() => {
     0 0 10px rgba(77, 195, 255, 0.6),
     0 0 20px rgba(0, 188, 212, 0.4);
   letter-spacing: 1px;
+}
+
+.lcd-text.scrolling .segment-text {
   padding-right: 50px;
 }
 
