@@ -263,9 +263,8 @@ const showHeader = computed(() => {
 })
 
 const showBackButton = computed(() => {
-  // Main navigation pages (bottom nav items) don't need back button
-  const mainRoutes = ['library', 'collections', 'artists', 'friends', 'settings']
-  return !mainRoutes.includes(route.name)
+  // Only the main library page (home) doesn't need back button
+  return route.name !== 'library'
 })
 
 const pageTitle = computed(() => {
