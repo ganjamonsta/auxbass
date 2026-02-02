@@ -3,6 +3,8 @@ TG Player Bot - Deduplication Handlers
 
 Handlers for analyzing and resolving duplicates.
 """
+from typing import Optional
+
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, Message
 from aiogram.filters import Command
