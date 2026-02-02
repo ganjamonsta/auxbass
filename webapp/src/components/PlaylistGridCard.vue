@@ -147,3 +147,5 @@ defineEmits(['click', 'contextmenu'])
 .subscribed-badge {
   background: rgba(59, 130, 246, 0.9);
   color: #fff;
+}
+</style>
