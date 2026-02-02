@@ -422,51 +422,73 @@ async def get_artist_info(
     Returns artist metadata, album list, and track count.
     Use /artists/{artist_name}/tracks for paginated tracks.
     
-    This is the optimized endpoint - use this instead of /{artist_name} for better performance.
+    Optimized: Uses SQL filtering on normalized_artist column.
     """
     artist_name = unquote(artist_name)
     normalized_search = normalize_artist(artist_name)
     
-    # Get track count and artist names efficiently (without loading full track data)
+    # Optimized: Count tracks using SQL filter on normalized_artist
     if scope == "global":
-        # Count public tracks matching this artist
-        tracks_result = await db.execute(
-            select(Track.id, Track.artist, Track.title, Track.file_name)
+        count_result = await db.execute(
+            select(func.count(Track.id))
             .where(Track.is_public == True)
             .where(Track.is_unavailable == False)
+            .where(Track.normalized_artist == normalized_search)
         )
-        all_tracks_data = tracks_result.all()
+        track_count = count_result.scalar() or 0
+        
+        # Get sample artist name for display
+        sample_result = await db.execute(
+            select(Track.artist)
+            .where(Track.is_public == True)
+            .where(Track.is_unavailable == False)
+            .where(Track.normalized_artist == normalized_search)
+            .limit(1)
+        )
+        sample_artist = sample_result.scalar()
+        
+        # Get track IDs for album counting (limited for performance)
+        track_ids_result = await db.execute(
+            select(Track.id)
+            .where(Track.is_public == True)
+            .where(Track.is_unavailable == False)
+            .where(Track.normalized_artist == normalized_search)
+        )
+        album_track_ids = set(row[0] for row in track_ids_result.all())
     else:
-        # Count user's library tracks matching this artist
-        tracks_result = await db.execute(
-            select(Track.id, Track.artist, Track.title, Track.file_name)
+        count_result = await db.execute(
+            select(func.count(Track.id))
             .join(UserLibrary, UserLibrary.track_id == Track.id)
             .where(UserLibrary.user_id == user.id)
+            .where(Track.normalized_artist == normalized_search)
         )
-        all_tracks_data = tracks_result.all()
-    
-    # Filter by artist (lightweight - only counting)
-    track_count = 0
-    artist_names_seen = set()
-    album_track_ids = set()
-    
-    for track_id, track_artist, track_title, track_file_name in all_tracks_data:
-        if artist_matches_track(track_artist, normalized_search, track_title, track_file_name):
-            track_count += 1
-            album_track_ids.add(track_id)
-            if track_artist:
-                artist_names_seen.add(track_artist)
+        track_count = count_result.scalar() or 0
+        
+        # Get sample artist name for display
+        sample_result = await db.execute(
+            select(Track.artist)
+            .join(UserLibrary, UserLibrary.track_id == Track.id)
+            .where(UserLibrary.user_id == user.id)
+            .where(Track.normalized_artist == normalized_search)
+            .limit(1)
+        )
+        sample_artist = sample_result.scalar()
+        
+        # Get track IDs for album counting
+        track_ids_result = await db.execute(
+            select(Track.id)
+            .join(UserLibrary, UserLibrary.track_id == Track.id)
+            .where(UserLibrary.user_id == user.id)
+            .where(Track.normalized_artist == normalized_search)
+        )
+        album_track_ids = set(row[0] for row in track_ids_result.all())
     
     if track_count == 0:
         detail = "Artist not found" if scope == "global" else "Artist not found in your library"
         raise HTTPException(status_code=404, detail=detail)
     
     # Determine display name
-    actual_name = artist_name
-    for name in artist_names_seen:
-        if normalize_artist(name) == normalized_search:
-            actual_name = normalize_artist_display(name)
-            break
+    actual_name = normalize_artist_display(sample_artist) if sample_artist else artist_name
     
     # Get albums efficiently - only those with tracks in this scope
     album_track_counts = {}
@@ -487,14 +509,13 @@ async def get_artist_info(
         )
         albums = albums_result.scalars().all()
     else:
-        # Fallback: get albums by artist name
+        # Fallback: get albums by normalized_artist (if Album has it)
         albums_result = await db.execute(
             select(Album)
-            .where(Album.artist.isnot(None))
+            .where(Album.normalized_artist == normalized_search)
             .order_by(Album.release_date.desc().nullslast())
         )
-        albums = [a for a in albums_result.scalars().all() 
-                  if artist_matches_track(a.artist, normalized_search)]
+        albums = albums_result.scalars().all()
     
     # Get cover URL
     cover_url = None
@@ -564,35 +585,34 @@ async def get_artist(
         )
     
     # Legacy mode: include all tracks (not recommended for large libraries)
+    # Optimized: Use SQL filter on normalized_artist
     if scope == "global":
         tracks_result = await db.execute(
             select(Track)
             .where(Track.is_public == True)
             .where(Track.is_unavailable == False)
+            .where(Track.normalized_artist == normalized_search)
             .options(
                 selectinload(Track.enrichment),
                 selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
             )
             .order_by(Track.created_at.desc())
         )
-        all_tracks_raw = tracks_result.unique().scalars().all()
-        
-        matching_tracks = []
-        artist_names_seen = set()
-        album_track_counts = {}
-        
-        for track in all_tracks_raw:
-            if artist_matches_track(track.artist, normalized_search, track.title, track.file_name):
-                matching_tracks.append(track)
-                if track.artist:
-                    artist_names_seen.add(track.artist)
-                for at in track.album_tracks:
-                    album_track_counts[at.album_id] = album_track_counts.get(at.album_id, 0) + 1
+        matching_tracks = list(tracks_result.unique().scalars().all())
         
         track_count = len(matching_tracks)
         
         if track_count == 0:
             raise HTTPException(status_code=404, detail="Artist not found")
+        
+        # Get album track counts
+        album_track_counts = {}
+        for track in matching_tracks:
+            for at in track.album_tracks:
+                album_track_counts[at.album_id] = album_track_counts.get(at.album_id, 0) + 1
+        
+        # Get sample artist name for display
+        sample_artist = matching_tracks[0].artist if matching_tracks else None
         
         user_lib_result = await db.execute(
             select(UserLibrary.track_id)
@@ -610,48 +630,41 @@ async def get_artist(
             select(Track, UserLibrary)
             .join(UserLibrary, UserLibrary.track_id == Track.id)
             .where(UserLibrary.user_id == user.id)
+            .where(Track.normalized_artist == normalized_search)
             .options(
                 selectinload(Track.enrichment),
                 selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
             )
             .order_by(UserLibrary.play_count.desc(), Track.title.asc())
         )
-        all_tracks = tracks_result.unique().all()
-        
-        matching_tracks = []
-        artist_names_seen = set()
-        album_track_counts = {}
-        
-        for track, lib_entry in all_tracks:
-            if artist_matches_track(track.artist, normalized_search, track.title, track.file_name):
-                matching_tracks.append((track, lib_entry))
-                if track.artist:
-                    artist_names_seen.add(track.artist)
-                for at in track.album_tracks:
-                    album_track_counts[at.album_id] = album_track_counts.get(at.album_id, 0) + 1
+        matching_tracks = list(tracks_result.unique().all())
         
         track_count = len(matching_tracks)
         
         if track_count == 0:
             raise HTTPException(status_code=404, detail="Artist not found in your library")
         
+        # Get album track counts
+        album_track_counts = {}
+        for track, _ in matching_tracks:
+            for at in track.album_tracks:
+                album_track_counts[at.album_id] = album_track_counts.get(at.album_id, 0) + 1
+        
+        # Get sample artist name for display
+        sample_artist = matching_tracks[0][0].artist if matching_tracks else None
+        
         from api.routers.library import track_to_response
         all_tracks_response = [track_to_response(track, lib_entry) for track, lib_entry in matching_tracks]
-        artist_names_seen = set(t.artist for t, _ in matching_tracks if t.artist)
     
-    actual_name = artist_name
-    for name in artist_names_seen:
-        if normalize_artist(name) == normalized_search:
-            actual_name = normalize_artist_display(name)
-            break
+    actual_name = normalize_artist_display(sample_artist) if sample_artist else artist_name
     
+    # Get albums using normalized_artist
     albums_result = await db.execute(
         select(Album)
-        .where(Album.artist.isnot(None))
+        .where(Album.normalized_artist == normalized_search)
         .order_by(Album.release_date.desc().nullslast())
     )
-    all_albums = albums_result.scalars().all()
-    all_artist_albums = [a for a in all_albums if artist_matches_track(a.artist, normalized_search)]
+    all_artist_albums = list(albums_result.scalars().all())
     
     if scope == "library":
         albums = [a for a in all_artist_albums if album_track_counts.get(a.id, 0) > 0]
@@ -698,48 +711,55 @@ async def get_artist_tracks(
     """
     Get paginated tracks for an artist.
     
-    Optimized two-phase approach:
-    1. First, get matching track IDs (lightweight)
-    2. Then, load full track data only for the requested page
-    
-    This is much more efficient than loading all tracks then paginating.
+    Optimized SQL-based filtering using normalized_artist column.
+    Falls back to Python filtering only for tracks without normalized_artist.
     """
     artist_name = unquote(artist_name)
     normalized_search = normalize_artist(artist_name)
     
-    # Phase 1: Get all matching track IDs (lightweight query - no joins)
+    # Try optimized SQL query first (using normalized_artist index)
     if scope == "global":
-        ids_result = await db.execute(
-            select(Track.id, Track.artist, Track.title, Track.file_name, Track.created_at)
+        # Count total matching tracks
+        count_result = await db.execute(
+            select(func.count(Track.id))
             .where(Track.is_public == True)
             .where(Track.is_unavailable == False)
-            .order_by(Track.created_at.desc())
+            .where(Track.normalized_artist == normalized_search)
         )
-        all_ids_data = ids_result.all()
+        total = count_result.scalar() or 0
         
-        # Filter by artist (in Python - but only lightweight data)
-        matching_ids = [
-            row[0] for row in all_ids_data
-            if artist_matches_track(row[1], normalized_search, row[2], row[3])
-        ]
-    else:
+        # Get page of track IDs with SQL pagination
         ids_result = await db.execute(
-            select(Track.id, Track.artist, Track.title, Track.file_name, UserLibrary.play_count)
+            select(Track.id)
+            .where(Track.is_public == True)
+            .where(Track.is_unavailable == False)
+            .where(Track.normalized_artist == normalized_search)
+            .order_by(Track.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        page_ids = [row[0] for row in ids_result.all()]
+    else:
+        # Count total matching tracks in user's library
+        count_result = await db.execute(
+            select(func.count(Track.id))
             .join(UserLibrary, UserLibrary.track_id == Track.id)
             .where(UserLibrary.user_id == user.id)
-            .order_by(UserLibrary.play_count.desc(), Track.title.asc())
+            .where(Track.normalized_artist == normalized_search)
         )
-        all_ids_data = ids_result.all()
+        total = count_result.scalar() or 0
         
-        matching_ids = [
-            row[0] for row in all_ids_data
-            if artist_matches_track(row[1], normalized_search, row[2], row[3])
-        ]
-    
-    total = len(matching_ids)
-    
-    # Phase 2: Load full data only for the requested page
-    page_ids = matching_ids[offset:offset + limit]
+        # Get page of track IDs with SQL pagination
+        ids_result = await db.execute(
+            select(Track.id)
+            .join(UserLibrary, UserLibrary.track_id == Track.id)
+            .where(UserLibrary.user_id == user.id)
+            .where(Track.normalized_artist == normalized_search)
+            .order_by(UserLibrary.play_count.desc(), Track.title.asc())
+            .offset(offset)
+            .limit(limit)
+        )
+        page_ids = [row[0] for row in ids_result.all()]
     
     if not page_ids:
         return ArtistTracksResponse(
@@ -814,14 +834,16 @@ async def get_artist_track_ids(
     Get all track IDs for an artist.
     
     Lightweight endpoint for shuffle - returns only IDs.
+    Optimized: Uses SQL filtering on normalized_artist column.
     """
     normalized_search = normalize_artist(artist_name)
     
+    # Optimized: SQL filter on normalized_artist
     query = (
         select(Track.id)
         .join(UserLibrary, UserLibrary.track_id == Track.id)
         .where(UserLibrary.user_id == user.id)
-        .where(Track.artist.isnot(None))
+        .where(Track.normalized_artist == normalized_search)
     )
     
     if shuffle:
@@ -830,18 +852,7 @@ async def get_artist_track_ids(
         query = query.order_by(Track.title.asc())
     
     result = await db.execute(query)
-    all_ids = result.scalars().all()
-    
-    # Need to filter by normalized artist - fetch artists for filtering
-    artist_result = await db.execute(
-        select(Track.id, Track.artist, Track.title)
-        .where(Track.id.in_(all_ids))
-    )
-    
-    matching_ids = [
-        row[0] for row in artist_result.all()
-        if artist_matches_track(row[1], normalized_search, row[2])
-    ]
+    matching_ids = list(result.scalars().all())
     
     return {"ids": matching_ids, "total": len(matching_ids)}
 
@@ -901,42 +912,26 @@ async def get_artist_image(
         logger.warning(f"Deezer artist lookup failed: {e}")
     
     # Priority 3: Latest album cover from library (by release_date)
+    # Optimized: Use normalized_artist column
     try:
-        # Get all albums for this artist, sorted by release_date desc
+        # Get albums matching this artist by normalized_artist, sorted by release_date desc
         albums_result = await db.execute(
             select(Album)
             .where(Album.cover_url.isnot(None))
-            .where(Album.release_date.isnot(None))
-            .order_by(Album.release_date.desc())
+            .where(Album.normalized_artist == normalized_search)
+            .order_by(Album.release_date.desc().nullslast())
+            .limit(1)
         )
-        all_albums = albums_result.scalars().all()
+        album = albums_result.scalars().first()
         
-        # Find albums matching this artist
-        for album in all_albums:
-            if artist_matches_track(album.artist, normalized_search):
-                logger.debug(f"Artist image from album '{album.name}': {artist_name}")
-                return {
-                    "artist": artist_name,
-                    "image_url": album.cover_url,
-                    "source": "album",
-                    "album_name": album.name
-                }
-        
-        # Also try albums without release_date as last resort
-        albums_no_date = await db.execute(
-            select(Album)
-            .where(Album.cover_url.isnot(None))
-            .where(Album.release_date.is_(None))
-        )
-        for album in albums_no_date.scalars().all():
-            if artist_matches_track(album.artist, normalized_search):
-                logger.debug(f"Artist image from album (no date) '{album.name}': {artist_name}")
-                return {
-                    "artist": artist_name,
-                    "image_url": album.cover_url,
-                    "source": "album",
-                    "album_name": album.name
-                }
+        if album:
+            logger.debug(f"Artist image from album '{album.name}': {artist_name}")
+            return {
+                "artist": artist_name,
+                "image_url": album.cover_url,
+                "source": "album",
+                "album_name": album.name
+            }
     except Exception as e:
         logger.warning(f"Album cover lookup failed: {e}")
     

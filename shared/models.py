@@ -143,6 +143,7 @@ class Track(Base):
     # Basic metadata (from ID3 tags or user input)
     title: Mapped[Optional[str]] = mapped_column(String(255))
     artist: Mapped[Optional[str]] = mapped_column(String(255))
+    normalized_artist: Mapped[Optional[str]] = mapped_column(String(255))  # For fast SQL filtering
     duration: Mapped[Optional[int]] = mapped_column(Integer)  # seconds
     
     # Who uploaded this track
@@ -257,6 +258,7 @@ class Track(Base):
     
     __table_args__ = (
         Index("idx_tracks_artist", "artist"),
+        Index("idx_tracks_normalized_artist", "normalized_artist"),
         Index("idx_tracks_title", "title"),
         Index("idx_tracks_uploader", "uploader_id"),
         Index("idx_tracks_public", "is_public"),

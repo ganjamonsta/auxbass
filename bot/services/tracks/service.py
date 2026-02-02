@@ -173,6 +173,7 @@ class TrackService:
                     file_unique_id=file_unique_id,
                     title=title,
                     artist=sanitized_artist,
+                    normalized_artist=normalize_artist(sanitized_artist) if sanitized_artist else None,
                     duration=duration,
                     file_size=file_size,
                     mime_type=mime_type,
