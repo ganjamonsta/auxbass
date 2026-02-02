@@ -431,9 +431,9 @@ class ChannelService:
                 return False
             
             try:
-                # Generate hashtags
+                # Generate hashtags (only for tracks with real metadata)
                 hashtags = []
-                if channel.include_hashtags:
+                if channel.include_hashtags and track.has_metadata:
                     enrichment = track.enrichment
                     hashtags = generate_hashtags(
                         artist=track.artist,
@@ -442,14 +442,19 @@ class ChannelService:
                         genre=enrichment.genre if enrichment else None,
                     )
                 
-                # Build caption
+                # Build caption (use display_title for tracks without metadata)
                 caption_parts = []
-                if track.title:
-                    caption_parts.append(f"🎵 {track.title}")
-                if track.artist:
-                    caption_parts.append(f"👤 {track.artist}")
-                if track.enrichment and track.enrichment.album_name:
-                    caption_parts.append(f"💿 {track.enrichment.album_name}")
+                if track.has_metadata:
+                    # Track has real metadata - show title/artist/album
+                    if track.title:
+                        caption_parts.append(f"🎵 {track.title}")
+                    if track.artist:
+                        caption_parts.append(f"👤 {track.artist}")
+                    if track.enrichment and track.enrichment.album_name:
+                        caption_parts.append(f"💿 {track.enrichment.album_name}")
+                else:
+                    # No metadata - use filename as title
+                    caption_parts.append(f"🎵 {track.display_title}")
                 
                 if hashtags:
                     caption_parts.append("")

@@ -19,11 +19,111 @@ from shared.matching import normalize_unicode, generate_hashtags
 
 logger = logging.getLogger(__name__)
 
+# Threshold for quality difference detection
+# If bitrate differs by more than this ratio, tracks are considered different quality versions
+QUALITY_DIFF_THRESHOLD = 0.4  # 40% difference = different quality (e.g. MP3 128 vs FLAC)
+
+
+def get_approx_bitrate(track: Track) -> Optional[float]:
+    """
+    Calculate approximate bitrate in kbps.
+    Returns None if duration or file_size is not available.
+    """
+    if not track.duration or not track.file_size or track.duration == 0:
+        return None
+    # file_size in bytes, duration in seconds
+    # bitrate = (file_size * 8) / duration / 1000 = kbps
+    return (track.file_size * 8) / track.duration / 1000
+
+
+def is_hd_version(track: Track) -> bool:
+    """
+    Check if track is likely an HD/lossless version.
+    HD versions typically have:
+    - Higher bitrate (> 500 kbps suggests lossless)
+    - FLAC, WAV, ALAC mime types
+    """
+    # Check mime type for lossless formats
+    lossless_types = {'audio/flac', 'audio/x-flac', 'audio/wav', 'audio/x-wav', 
+                      'audio/alac', 'audio/x-alac', 'audio/aiff', 'audio/x-aiff'}
+    if track.mime_type and track.mime_type.lower() in lossless_types:
+        return True
+    
+    # Check by bitrate (> 500 kbps is likely lossless or high quality)
+    bitrate = get_approx_bitrate(track)
+    if bitrate and bitrate > 500:
+        return True
+    
+    return False
+
+
+def are_same_quality_version(track1: Track, track2: Track) -> bool:
+    """
+    Check if two tracks are the same quality version.
+    Returns True if they should be considered duplicates,
+    False if one is HD version of the other.
+    """
+    bitrate1 = get_approx_bitrate(track1)
+    bitrate2 = get_approx_bitrate(track2)
+    
+    # If we can't calculate bitrate for both, fallback to file size comparison
+    if bitrate1 is None or bitrate2 is None:
+        # Compare file sizes if available
+        if track1.file_size and track2.file_size:
+            size_ratio = max(track1.file_size, track2.file_size) / min(track1.file_size, track2.file_size)
+            # If one file is 2x+ larger, they are different quality
+            if size_ratio > 2.0:
+                return False
+        return True
+    
+    # Compare bitrates
+    if bitrate1 == 0 or bitrate2 == 0:
+        return True
+        
+    ratio = max(bitrate1, bitrate2) / min(bitrate1, bitrate2)
+    # If bitrate differs by more than threshold, different quality
+    if ratio > (1 + QUALITY_DIFF_THRESHOLD):
+        return False
+    
+    return True
+
+
+def split_by_quality(tracks: List[Track]) -> List[List[Track]]:
+    """
+    Split a group of potential duplicates into subgroups by quality.
+    Each subgroup contains tracks of similar quality.
+    
+    Returns list of subgroups, where each subgroup has 2+ tracks (actual duplicates).
+    """
+    if len(tracks) <= 1:
+        return []
+    
+    # Group by quality using union-find like approach
+    quality_groups: List[List[Track]] = []
+    
+    for track in tracks:
+        placed = False
+        for group in quality_groups:
+            # Check if track matches quality of first track in group
+            if are_same_quality_version(track, group[0]):
+                group.append(track)
+                placed = True
+                break
+        
+        if not placed:
+            quality_groups.append([track])
+    
+    # Return only groups with 2+ tracks (actual duplicates)
+    return [g for g in quality_groups if len(g) > 1]
+
 class DeduplicationService:
     
     async def get_duplicate_stats(self, user_id: int) -> dict:
         """
         Analyze library and return statistics about duplicates.
+        
+        Note: Tracks with significantly different quality (HD vs regular) 
+        are NOT considered duplicates - they are different versions.
         """
         async with get_session() as session:
             # 1. Total tracks in user library
@@ -55,8 +155,24 @@ class DeduplicationService:
                     key = f"{artist}|{title}"
                     content_groups[key].append(track)
             
-            # Filter groups with > 1 track
-            duplicate_groups = {k: v for k, v in content_groups.items() if len(v) > 1}
+            # Filter groups with > 1 track by same artist|title
+            raw_duplicate_groups = {k: v for k, v in content_groups.items() if len(v) > 1}
+            
+            # Now split each group by quality to exclude HD versions from duplicates
+            # HD version of a track should NOT be considered a duplicate
+            duplicate_groups = {}
+            for key, group_tracks in raw_duplicate_groups.items():
+                quality_subgroups = split_by_quality(group_tracks)
+                
+                # Each quality subgroup is a set of actual duplicates
+                for idx, subgroup in enumerate(quality_subgroups):
+                    # Create unique key for each quality subgroup
+                    if idx == 0:
+                        subgroup_key = key
+                    else:
+                        subgroup_key = f"{key}|quality_{idx}"
+                    duplicate_groups[subgroup_key] = subgroup
+            
             potential_duplicates_count = sum(len(v) for v in duplicate_groups.values())
             groups_count = len(duplicate_groups)
             
@@ -125,6 +241,36 @@ class DeduplicationService:
                      if track and track.uploader_id == user_id:
                          await session.delete(track)
 
+            await session.commit()
+            return True
+
+    async def delete_single_track(self, track_id: int, user_id: int) -> bool:
+        """
+        Delete a single track from user's library.
+        If track has no other users, delete the Track entity as well.
+        """
+        async with get_session() as session:
+            # Remove from UserLibrary
+            stmt = select(UserLibrary).where(
+                UserLibrary.user_id == user_id,
+                UserLibrary.track_id == track_id
+            )
+            entry = (await session.execute(stmt)).scalar_one_or_none()
+            
+            if entry:
+                await session.delete(entry)
+            
+            # Check if anyone else has this track
+            other_usage = await session.scalar(
+                select(func.count(UserLibrary.id)).where(UserLibrary.track_id == track_id)
+            )
+            
+            if other_usage == 0:
+                # No one else has this track, delete the Track entity
+                track = await session.get(Track, track_id)
+                if track and track.uploader_id == user_id:
+                    await session.delete(track)
+            
             await session.commit()
             return True
 

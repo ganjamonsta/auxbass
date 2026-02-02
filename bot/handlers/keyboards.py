@@ -262,41 +262,41 @@ def get_cancel_keyboard(callback_data: str = "cancel") -> InlineKeyboardMarkup:
     ])
 
 
-def get_deduplication_action_keyboard(tracks: List[Track], current_index: int, total_groups: int) -> InlineKeyboardMarkup:
+def get_deduplication_action_keyboard(tracks: List[Track], current_index: int, total_groups: int, confirm_delete_id: Optional[int] = None) -> InlineKeyboardMarkup:
     """
     Keyboard for duplicate resolution.
-    Allows playing specific tracks and selecting which ONE to keep.
+    Allows playing specific tracks and deleting individual duplicates.
+    User can delete tracks one by one or skip to keep all.
+    
+    Args:
+        tracks: List of duplicate tracks
+        current_index: Current group index
+        total_groups: Total number of duplicate groups
+        confirm_delete_id: If set, show confirmation for this track ID
     """
     buttons = []
     
-    # Play buttons row (max 3 per row)
-    play_row = []
+    # Each track gets its own row with Play and Delete buttons
     for idx, track in enumerate(tracks):
-        play_row.append(
-            InlineKeyboardButton(text=f"⏯ Слушать #{idx+1}", callback_data=f"dedup:play:{track.id}")
-        )
-        if len(play_row) == 2:
-            buttons.append(play_row)
-            play_row = []
-    if play_row:
-        buttons.append(play_row)
-    
-    # "Keep this" buttons
-    for idx, track in enumerate(tracks):
-         buttons.append([
-             InlineKeyboardButton(
-                 text=f"✅ Оставить #{idx+1} (удал. др.)", 
-                 callback_data=f"dedup:keep:{track.id}"
-             )
-         ])
+        if confirm_delete_id == track.id:
+            # Show confirmation buttons for this track
+            buttons.append([
+                InlineKeyboardButton(text=f"✅ Да, удалить #{idx+1}", callback_data=f"dedup:confirm_delete:{track.id}"),
+                InlineKeyboardButton(text="❌ Отмена", callback_data="dedup:cancel_delete"),
+            ])
+        else:
+            # Normal row: Play + Delete
+            buttons.append([
+                InlineKeyboardButton(text=f"▶️ #{idx+1}", callback_data=f"dedup:play:{track.id}"),
+                InlineKeyboardButton(text=f"🗑 Удалить #{idx+1}", callback_data=f"dedup:delete:{track.id}"),
+            ])
             
-    # Navigation
-    nav_buttons = []
-    nav_buttons.append(InlineKeyboardButton(text=f"➡ Пропустить ({current_index+1}/{total_groups})", callback_data="dedup:next"))
-    buttons.append(nav_buttons)
-    
-    # Cancel
-    buttons.append([InlineKeyboardButton(text="❌ Выход", callback_data="dedup:cancel")])
+    # Navigation and actions - all on one row
+    buttons.append([
+        InlineKeyboardButton(text="➡️ Далее", callback_data="dedup:next"),
+        InlineKeyboardButton(text=f"📊 {current_index+1}/{total_groups}", callback_data="dedup:noop"),
+        InlineKeyboardButton(text="❌ Выход", callback_data="dedup:cancel"),
+    ])
     
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 

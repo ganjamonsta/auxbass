@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.matching import generate_hashtags, format_hashtags
 from shared.models import Track
-from bot.services.deduplication import deduplication_service
+from bot.services.deduplication import deduplication_service, get_approx_bitrate, is_hd_version
 from bot.handlers.keyboards import get_deduplication_action_keyboard
 
 router = Router()
@@ -66,7 +66,7 @@ async def start_dedup_flow(event_obj, state: FSMContext, user_id: int):
     await show_duplicate_group(event_obj if isinstance(event_obj, Message) else event_obj.message, state, 0)
 
 
-async def show_duplicate_group(message_obj, state: FSMContext, offset: int):
+async def show_duplicate_group(message_obj, state: FSMContext, offset: int, confirm_delete_id: Optional[int] = None):
     """Show specific duplicate group"""
     user_id = message_obj.from_user.id
     
@@ -97,6 +97,11 @@ async def show_duplicate_group(message_obj, state: FSMContext, offset: int):
             mb = track.file_size / (1024 * 1024)
             meta_parts.append(f"{mb:.1f} MB")
         
+        # Add quality info (bitrate)
+        bitrate = get_approx_bitrate(track)
+        if bitrate:
+            meta_parts.append(f"~{int(bitrate)} kbps")
+        
         # Hashtags preview
         hashtags = []
         enrichment = track.enrichment
@@ -118,7 +123,7 @@ async def show_duplicate_group(message_obj, state: FSMContext, offset: int):
         )
 
     # Use answer or edit_text depending on context
-    keyboard = get_deduplication_action_keyboard(tracks, offset, total)
+    keyboard = get_deduplication_action_keyboard(tracks, offset, total, confirm_delete_id)
     
     if isinstance(message_obj, CallbackQuery):
         await message_obj.message.edit_text(text, reply_markup=keyboard)
@@ -133,46 +138,35 @@ async def handle_dedup_action(callback: CallbackQuery, state: FSMContext):
     offset = data.get("current_offset", 0)
     
     if action == "next":
+        # Skip this group (keep all tracks)
         await state.update_data(current_offset=offset + 1)
         await show_duplicate_group(callback, state, offset + 1)
+    
+    elif action == "noop":
+        # Do nothing (info button clicked)
+        await callback.answer()
         
-    elif action == "keep":
-        # dedup:keep:TRACK_ID
-        keep_id = int(callback.data.split(":")[2])
+    elif action == "delete":
+        # dedup:delete:TRACK_ID - show confirmation
+        delete_id = int(callback.data.split(":")[2])
+        await callback.answer("⚠️ Подтвердите удаление")
+        # Re-render with confirmation buttons
+        await show_duplicate_group(callback, state, offset, confirm_delete_id=delete_id)
         
-        # Get current group again to find all IDs
-        group_data = await deduplication_service.get_next_duplicate_group(callback.from_user.id, offset)
-        if group_data:
-            _, tracks = group_data
-            all_ids = [t.id for t in tracks]
-            delete_ids = [tid for tid in all_ids if tid != keep_id]
-            
-            if delete_ids:
-                await deduplication_service.resolve_duplicates(keep_id, delete_ids, callback.from_user.id)
-                await callback.answer(f"🗑 Удалено {len(delete_ids)} дубликатов")
-            else:
-                await callback.answer("🤔 Нечего удалять")
-                
-        # Move to next
-        # IMPORTANT: Since we modified the library, the offset mechanism might shift if we rely on dynamic querying.
-        # But our service implementation currently re-fetches everything for 'get_duplicate_stats' (which 'get_next_duplicate_group' calls).
-        # So if we remove a group, the list of groups shrinks.
-        # If we are at index 0 and remove it, the next group becomes index 0.
-        # So we should probably keep offset same?
-        # WAIT: 'get_duplicate_stats' fetches fresh data. If we delete group at offset X, the group at offset X+1 shifts to X.
-        # So we should NOT increment offset if we resolved the current group.
-        # If we skipped ("next"), we increment.
+    elif action == "cancel_delete":
+        # Cancel deletion confirmation
+        await callback.answer("❌ Отменено")
+        await show_duplicate_group(callback, state, offset)
         
-        # Let's just create a better state tracking or stick to simple offset logic.
-        # If I resolved, I basically consumed the group at keys[offset].
-        # So next call to `get_next_duplicate_group(..., offset)` will duplicate the logic?
-        # If dynamic:
-        #  Group 1 (Deleted)
-        #  Group 2 -> New Group 1
-        # So accessing offset 0 gives new group. 
-        # Accessing offset 1 skips "Group 2".
+    elif action == "confirm_delete":
+        # dedup:confirm_delete:TRACK_ID - actually delete
+        delete_id = int(callback.data.split(":")[2])
         
-        # Optimization: When resolving, don't change offset.
+        # Delete this specific track
+        await deduplication_service.delete_single_track(delete_id, callback.from_user.id)
+        await callback.answer("🗑 Трек удалён")
+        
+        # Check if group still has duplicates after deletion
         await show_duplicate_group(callback, state, offset)
         
     elif action == "play":
