@@ -98,6 +98,7 @@ def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None)
             album_info = {
                 "id": album.id,
                 "name": album.name,
+                "artist": album.artist,  # Album artist (may differ from track artist for remixes)
                 "cover_url": album.cover_url,
             }
     
@@ -169,6 +170,7 @@ def track_to_response_global(track: Track, in_library: bool = False) -> TrackRes
             album_info = {
                 "id": album.id,
                 "name": album.name,
+                "artist": album.artist,  # Album artist (may differ from track artist for remixes)
                 "cover_url": album.cover_url,
             }
     

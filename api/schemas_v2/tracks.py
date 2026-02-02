@@ -12,6 +12,7 @@ class AlbumInfo(BaseModel):
     """Compact album info for track response"""
     id: int
     name: str
+    artist: Optional[str] = None  # Album artist (may differ from track artist for remixes/compilations)
     cover_url: Optional[str] = None
 
 

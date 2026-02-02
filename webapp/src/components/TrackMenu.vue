@@ -37,7 +37,7 @@
 
               <button v-if="showGoToAlbum" class="menu-item" @click="handleGoToAlbum">
                 <span class="menu-icon"><Disc3 :size="18" /></span>
-                <span>Перейти к альбому</span>
+                <span>{{ albumButtonText }}</span>
               </button>
 
               <div v-if="showGoToArtist || showGoToAlbum" class="menu-divider"></div>
@@ -183,6 +183,30 @@ const showGoToArtist = computed(() => {
 // Show navigation to album (hide if already on album page)
 const showGoToAlbum = computed(() => {
   return hasAlbum.value && props.context !== 'album'
+})
+
+// Get album button text - show album artist if different from track artist
+const albumButtonText = computed(() => {
+  const album = props.track?.album
+  const albumArtist = album?.artist
+  const trackArtist = props.track?.artist
+  
+  // If album artist differs from track artist (e.g. remix on compilation album)
+  // Show the album artist to avoid confusion
+  if (albumArtist && trackArtist) {
+    // Normalize for comparison (case-insensitive, trim)
+    const normalizedAlbumArtist = albumArtist.toLowerCase().trim()
+    const normalizedTrackArtist = trackArtist.toLowerCase().trim()
+    
+    // Check if they're different (allow for partial match like "Bladee" != "Sewerslvt")
+    if (normalizedAlbumArtist !== normalizedTrackArtist && 
+        !normalizedTrackArtist.includes(normalizedAlbumArtist) &&
+        !normalizedAlbumArtist.includes(normalizedTrackArtist)) {
+      return `Перейти к альбому (${albumArtist})`
+    }
+  }
+  
+  return 'Перейти к альбому'
 })
 
 // Haptic feedback helper

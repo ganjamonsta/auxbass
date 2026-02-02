@@ -65,7 +65,7 @@
                 </template>
                 <button v-if="hasAlbum" class="menu-item" @click="exec('goToAlbum')">
                   <Disc3 :size="18" />
-                  <span>Перейти к альбому</span>
+                  <span>{{ albumButtonText }}</span>
                 </button>
                 <div v-if="hasArtist || hasAlbum" class="menu-divider" />
 
@@ -444,6 +444,30 @@ const parsedArtists = computed(() => {
 const hasAlbum = computed(() => {
   const data = menuData.value
   return data?.album_id || data?.album?.id || data?.album_name
+})
+
+// Get album button text - show album artist if different from track artist
+const albumButtonText = computed(() => {
+  const data = menuData.value
+  const albumArtist = data?.album?.artist
+  const trackArtist = data?.artist
+  
+  // If album artist differs from track artist (e.g. remix on compilation album)
+  // Show the album artist to avoid confusion
+  if (albumArtist && trackArtist) {
+    // Normalize for comparison (case-insensitive, trim)
+    const normalizedAlbumArtist = albumArtist.toLowerCase().trim()
+    const normalizedTrackArtist = trackArtist.toLowerCase().trim()
+    
+    // Check if they're different (allow for partial match)
+    if (normalizedAlbumArtist !== normalizedTrackArtist && 
+        !normalizedTrackArtist.includes(normalizedAlbumArtist) &&
+        !normalizedAlbumArtist.includes(normalizedTrackArtist)) {
+      return `Перейти к альбому (${albumArtist})`
+    }
+  }
+  
+  return 'Перейти к альбому'
 })
 
 const isTrackOwner = computed(() => {
