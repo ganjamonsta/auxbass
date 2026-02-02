@@ -26,7 +26,7 @@
         :class="{ active: isActiveRoute(item.path, item.matchPaths) }"
         @click="handleNavClick(item.path)"
       >
-        <span class="nav-icon">{{ item.icon }}</span>
+        <component :is="item.icon" class="nav-icon" :size="22" :stroke-width="2" />
         <span class="nav-label">{{ item.label }}</span>
       </button>
     </nav>
@@ -37,6 +37,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MiniPlayer from '@/components/MiniPlayer.vue'
+import { ListMusic, Disc3, Users, Music2, Settings } from 'lucide-vue-next'
 
 const props = defineProps({
   // Player props
@@ -76,11 +77,11 @@ const props = defineProps({
   navItems: {
     type: Array,
     default: () => [
-      { path: '/', icon: '🎵', label: 'Библиотека', matchPaths: ['/'] },
-      { path: '/collections', icon: '💿', label: 'Коллекции', matchPaths: ['/collections', '/albums', '/playlists'] },
-      { path: '/artists', icon: '🎤', label: 'Артисты', matchPaths: ['/artists'] },
-      { path: '/friends', icon: '👥', label: 'Кенты', matchPaths: ['/friends'] },
-      { path: '/settings', icon: '⚙️', label: 'Настройки', matchPaths: ['/settings'] },
+      { path: '/', icon: ListMusic, label: 'Библиотека', matchPaths: ['/'] },
+      { path: '/collections', icon: Disc3, label: 'Коллекции', matchPaths: ['/collections', '/albums', '/playlists'] },
+      { path: '/artists', icon: Music2, label: 'Артисты', matchPaths: ['/artists'] },
+      { path: '/friends', icon: Users, label: 'Кенты', matchPaths: ['/friends'] },
+      { path: '/settings', icon: Settings, label: 'Настройки', matchPaths: ['/settings'] },
     ]
   }
 })
@@ -133,55 +134,81 @@ const handleNavClick = (path) => {
   flex-shrink: 0;
   z-index: var(--z-overlay, 100);
   background: var(--bg-secondary);
-  border-top: 1px solid var(--border);
+  border-top: 2px solid var(--border);
   padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
 }
 
 /* Player section */
 .footer-player {
-  border-bottom: 1px solid var(--border);
+  background: var(--bg-primary);
+  padding: 8px 0;
 }
 
 /* Navigation */
 .footer-nav {
-  height: var(--nav-height, 60px);
+  height: 72px;
   display: flex;
   justify-content: space-around;
   align-items: center;
+  padding: 8px 0;
+  background: var(--bg-secondary);
 }
 
 .nav-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  gap: 6px;
   text-decoration: none;
   color: var(--text-tertiary);
-  font-size: 10px;
-  padding: 8px 12px;
-  transition: color 0.2s;
+  font-size: 11px;
+  padding: 10px 12px;
+  transition: all 0.2s ease;
   background: none;
   border: none;
   cursor: pointer;
   font-family: inherit;
   -webkit-tap-highlight-color: transparent;
+  border-radius: 12px;
+  position: relative;
+  min-width: 64px;
 }
 
 .nav-item.active {
-  color: var(--text-primary);
+  color: var(--accent);
+}
+
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32px;
+  height: 3px;
+  background: var(--accent);
+  border-radius: 0 0 3px 3px;
 }
 
 .nav-item:active {
+  transform: scale(0.95);
   opacity: 0.7;
 }
 
 .nav-icon {
-  font-size: 22px;
-  line-height: 1;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.nav-item.active .nav-icon {
+  transform: translateY(-2px);
 }
 
 .nav-label {
   font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
 /* Desktop: hide mobile footer */
