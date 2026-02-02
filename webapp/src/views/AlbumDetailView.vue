@@ -49,6 +49,7 @@
             'not-in-library': item.track && !item.in_library
           }"
           @click="handleTracklistItemClick(item)"
+          @contextmenu.prevent="item.track && openMenu('track', item.track, 'album', $event)"
         >
           <span class="track-number">{{ item.track_number }}</span>
           
