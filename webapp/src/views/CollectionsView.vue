@@ -624,9 +624,9 @@ onMounted(() => {
     height: 44px;
   }
 
+  /* Tabs are in PageHeader on mobile, keep them hidden here */
   .info-banner-with-tabs .collections-tabs {
-    display: flex;
-    flex: 1;
+    display: none;
   }
 }
 
