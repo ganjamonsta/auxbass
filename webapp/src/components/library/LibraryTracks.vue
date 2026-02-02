@@ -432,6 +432,18 @@ onMounted(() => {
   font-size: 13px;
   cursor: pointer;
   white-space: nowrap;
+  box-shadow:
+    3px 3px 6px var(--sh-dark),
+    -2px -2px 4px var(--sh-light),
+    0 0 10px var(--accent-glow, var(--c-accent-glow));
+  transition: all 0.15s ease;
+}
+
+.shuffle-all-btn:active {
+  transform: scale(0.97);
+  box-shadow:
+    inset 2px 2px 4px rgba(0, 0, 0, 0.3),
+    0 0 8px var(--accent-glow, var(--c-accent-glow));
 }
 
 .shuffle-all-btn:disabled {

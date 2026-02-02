@@ -952,7 +952,7 @@
   display: none;
 }
 
-/* Individual tab button - flat style */
+/* Individual tab button - neumorphic style */
 .neu-tab {
   display: flex;
   align-items: center;
@@ -960,9 +960,9 @@
   gap: 6px;
   min-width: max-content;
   padding: 10px 18px;
-  background: transparent;
+  background: var(--c-bg-2);
   border: none;
-  border-radius: var(--r-md);
+  border-radius: var(--r-full);
   color: var(--c-text-2);
   font-size: 14px;
   font-weight: 500;
@@ -971,6 +971,9 @@
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   transition: all 0.15s ease;
+  box-shadow:
+    3px 3px 6px var(--sh-dark),
+    -2px -2px 4px var(--sh-light);
 }
 
 /* Icon support */
@@ -1002,12 +1005,19 @@
 
 .neu-tab:active {
   transform: scale(0.97);
+  box-shadow:
+    inset 2px 2px 4px var(--sh-inset-dark),
+    inset -1px -1px 2px var(--sh-inset-light);
 }
 
 .neu-tab.active {
   background: var(--accent, var(--c-accent));
   color: var(--accent-text, var(--c-accent-text, #000));
   font-weight: 600;
+  box-shadow:
+    3px 3px 6px var(--sh-dark),
+    -2px -2px 4px var(--sh-light),
+    0 0 10px var(--accent-glow, var(--c-accent-glow));
 }
 
 .neu-tab.active:active {
