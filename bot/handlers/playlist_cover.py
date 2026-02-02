@@ -15,7 +15,8 @@ import logging
 
 from aiogram import Router, F, Bot
 from aiogram.filters import CommandStart, CommandObject
-from aiogram.types import Message, CallbackQuery, BufferedInputFile
+from aiogram.types import Message, CallbackQuery, BufferedInputFile, ContentType
+import json
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
@@ -98,6 +99,74 @@ async def cmd_start_cover(message: Message, command: CommandObject, state: FSMCo
             f"📷 <b>Загрузка обложки для плейлиста</b>\n\n"
             f"🎵 <i>{playlist.name}</i>\n\n"
             "Отправьте изображение. Я автоматически обрежу его до квадрата по центру.",
+            parse_mode="HTML",
+            reply_markup=get_cancel_keyboard()
+        )
+
+
+@router.message(F.content_type == ContentType.WEB_APP_DATA)
+async def handle_webapp_cover_request(message: Message, state: FSMContext):
+    """
+    Handle cover upload request from Mini App via sendData.
+    This provides a seamless experience - user clicks cover in webapp,
+    webapp sends data and closes, bot immediately asks for photo.
+    """
+    try:
+        data = json.loads(message.web_app_data.data)
+    except (json.JSONDecodeError, AttributeError):
+        return  # Not our data, ignore
+    
+    # Check if this is a cover upload request
+    if data.get("action") != "upload_cover":
+        return  # Not a cover request
+    
+    playlist_id = data.get("playlist_id")
+    if not playlist_id:
+        await message.answer("❌ Неверные данные")
+        return
+    
+    user_id = message.from_user.id
+    
+    async with get_session() as session:
+        # Check playlist exists and user owns it
+        playlist = await session.get(Playlist, playlist_id)
+        if not playlist:
+            await message.answer("❌ Плейлист не найден")
+            return
+        
+        if playlist.owner_id != user_id:
+            await message.answer("❌ Вы не являетесь владельцем этого плейлиста")
+            return
+        
+        # Check if user has connected channel
+        channel = await session.scalar(
+            select(UserChannel).where(
+                UserChannel.user_id == user_id,
+                UserChannel.is_active == True
+            )
+        )
+        
+        if not channel:
+            await message.answer(
+                "🔒 <b>Подключите канал для загрузки обложек</b>\n\n"
+                "Обложки плейлистов хранятся в вашем Telegram-канале.\n\n"
+                "Используйте команду /channel для подключения.",
+                parse_mode="HTML"
+            )
+            return
+        
+        # Save state for cover upload
+        await state.set_state(PlaylistCoverStates.waiting_for_cover)
+        await state.update_data(
+            playlist_id=playlist_id,
+            playlist_name=playlist.name,
+            channel_id=channel.channel_id
+        )
+        
+        await message.answer(
+            f"📷 <b>Загрузка обложки для плейлиста</b>\n\n"
+            f"🎵 <i>{playlist.name}</i>\n\n"
+            "Отправьте фото прямо сейчас!",
             parse_mode="HTML",
             reply_markup=get_cancel_keyboard()
         )

@@ -144,6 +144,20 @@ const currentCoverUrl = ref(null)
 const changeCover = () => {
     if (!props.playlist?.id) return
   
+    // Try seamless upload via sendData (closes Mini App, bot immediately asks for photo)
+    if (window.Telegram?.WebApp?.sendData) {
+        const data = JSON.stringify({
+            action: 'upload_cover',
+            playlist_id: props.playlist.id
+        })
+        // Close modal before sendData (sendData closes the webapp)
+        emit('close')
+        // sendData will close the webapp and send data to bot
+        window.Telegram.WebApp.sendData(data)
+        return
+    }
+    
+    // Fallback: open deep link (requires user to send /start message)
     const botUsername = authStore.appName
     const url = `https://t.me/${botUsername}?start=cover_${props.playlist.id}`
   
