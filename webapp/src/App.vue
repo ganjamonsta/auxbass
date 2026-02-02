@@ -372,8 +372,24 @@ onMounted(async () => {
     if (isLargeFile) {
       const sizeMB = track.file_size ? (track.file_size / 1024 / 1024).toFixed(1) : '20+'
       console.warn(`[Player] Track too large for streaming: ${sizeMB} MB`)
+      uiStore.toast.warning(
+        'Большой файл',
+        `Трек (${sizeMB} MB) слишком большой для стриминга. Используйте кнопку скачивания.`
+      )
     } else {
       console.warn('[Player] Track unavailable:', message)
+      // Check if it's HD format error
+      if (message && (message.includes('HD') || message.includes('FLAC') || message.includes('WAV') || message.includes('высокого качества'))) {
+        uiStore.toast.warning(
+          'Только HD',
+          'Этот трек доступен только в HD качестве. Используйте кнопку скачивания.'
+        )
+      } else {
+        uiStore.toast.error(
+          'Трек недоступен',
+          message || 'Не удалось воспроизвести трек'
+        )
+      }
     }
   })
 })

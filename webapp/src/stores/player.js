@@ -1528,17 +1528,31 @@ export const usePlayerStore = defineStore('player', () => {
       
       // Check if file is unavailable (503 error)
       if (statusCode === 503) {
+        // Detect if it's a large file (>20MB)
         const isLargeFile = errorDetail.includes('слишком большой') || errorDetail.includes('too large') ||
                            (track.file_size && track.file_size > 20 * 1024 * 1024)
         
+        // Detect if it's HD format (FLAC, WAV, etc.) - separate from large file
+        const isHdFormat = errorDetail.includes('высокого качества') || errorDetail.includes('HD') ||
+                          errorDetail.includes('FLAC') || errorDetail.includes('WAV') ||
+                          errorDetail.includes('недоступен для стриминга')
+        
+        // Determine error type
+        let errorType = 'unavailable'
+        if (isLargeFile) {
+          errorType = 'too_large'
+        } else if (isHdFormat) {
+          errorType = 'hd_only'
+        }
+        
         lastError.value = {
-          type: isLargeFile ? 'too_large' : 'unavailable',
+          type: errorType,
           track: track,
           message: errorDetail
         }
         
-        // Only mark as unavailable if file is truly gone (not just too large)
-        if (!isLargeFile) {
+        // Only mark as unavailable if file is truly gone (not just too large or HD)
+        if (!isLargeFile && !isHdFormat) {
           try {
             await tracksApi.markUnavailable(track.id)
             track.is_unavailable = true
@@ -1547,9 +1561,9 @@ export const usePlayerStore = defineStore('player', () => {
           }
         }
         
-        // Call callback if set
+        // Call callback if set - pass both flags
         if (onTrackUnavailableCallback) {
-          onTrackUnavailableCallback(track, errorDetail, isLargeFile)
+          onTrackUnavailableCallback(track, errorDetail, isLargeFile || isHdFormat)
         }
         
         // Auto-skip to next track

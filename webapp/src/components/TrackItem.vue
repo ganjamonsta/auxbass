@@ -173,8 +173,8 @@ const handleClick = () => {
   
   // HD/Large files - let the player try to find MP3 alternative via API
   // The API /stream/{track_id} has find_streamable_alternative() that can auto-substitute
-  // Only block if explicitly marked as not streamable AND no streamable_id set AND API already tried
-  // For now, always emit click and let player handle HD tracks via API
+  // If API finds no alternative, it will return 503 and App.vue callback will show notification
+  // Note: streamable_id is NOT pre-populated by API, so we can't check it here
   
   emit('click')
 }
