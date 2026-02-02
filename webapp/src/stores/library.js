@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { tracksApi, playlistsApi, playerApi } from '../api/client'
+import apiCache from '../utils/apiCache'
 
 export const useLibraryStore = defineStore('library', () => {
   // State - My Library
@@ -766,5 +767,9 @@ export const useLibraryStore = defineStore('library', () => {
     addToLibrary,
     removeFromLibrary,
     isInLibrary,
+    
+    // Cache management
+    clearApiCache: () => apiCache.clear(),
+    invalidateCachePattern: (pattern) => apiCache.invalidatePattern(pattern),
   }
 })

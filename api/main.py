@@ -81,6 +81,55 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+class CacheControlMiddleware(BaseHTTPMiddleware):
+    """Add cache-control headers to GET requests for cacheable resources"""
+    
+    # Cache durations for different endpoints (in seconds)
+    CACHE_RULES = {
+        r'/api/tracks/liked': 60,              # 1 minute - liked tracks change frequently
+        r'/api/tracks/global/stats': 120,      # 2 minutes - statistics
+        r'/api/library/stats': 120,            # 2 minutes - statistics  
+        r'/api/tracks/genres': 1800,           # 30 minutes - genres
+        r'/api/tracks/artists': 1800,          # 30 minutes - artists list
+        r'/api/artists/.+/info': 900,          # 15 minutes - artist details
+        r'/api/artists/.+/tracks': 900,        # 15 minutes - artist tracks
+        r'/api/artists/global': 600,           # 10 minutes - global artists
+        r'/api/artists': 600,                  # 10 minutes - artists
+        r'/api/albums/global': 600,            # 10 minutes - global albums
+        r'/api/albums': 600,                   # 10 minutes - albums
+        r'/api/playlists': 300,                # 5 minutes - playlists
+        r'/api/tracks': 180,                   # 3 minutes - tracks
+    }
+    
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        
+        # Only add cache headers to successful GET requests
+        if request.method == "GET" and response.status_code == 200:
+            path = request.url.path
+            
+            # Skip cache headers for streaming and images
+            if "/api/player/audio/" in path or "/api/images/" in path:
+                return response
+            
+            # Find matching cache rule
+            max_age = None
+            for pattern, duration in self.CACHE_RULES.items():
+                if re.match(pattern, path):
+                    max_age = duration
+                    break
+            
+            if max_age:
+                # Add cache-control header
+                # - private: only client can cache (not CDN/proxy)
+                # - max-age: how long to cache
+                # - must-revalidate: check with server when stale
+                response.headers["Cache-Control"] = f"private, max-age={max_age}, must-revalidate"
+                response.headers["X-Cache-TTL"] = str(max_age)
+        
+        return response
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
@@ -117,6 +166,9 @@ app = FastAPI(
 
 # Rate limiting
 app.add_middleware(RateLimitMiddleware, requests_per_minute=600)
+
+# Cache control
+app.add_middleware(CacheControlMiddleware)
 
 # CORS
 app.add_middleware(
