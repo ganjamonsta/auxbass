@@ -1676,6 +1676,10 @@ export const usePlayerStore = defineStore('player', () => {
       queue.value = [firstTrack]
       queueIndex.value = 0
       
+      // Force play by clearing currentTrack to prevent toggle behavior
+      // This ensures that shuffle always starts a new random track
+      currentTrack.value = null
+      
       await play(firstTrack)
       
     } catch (error) {
