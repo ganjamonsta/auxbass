@@ -3,16 +3,17 @@
  * 
  * Provides common playback action handlers for detail views:
  * - playAll - play all tracks from the beginning
- * - shufflePlay - shuffle and play all tracks
+ * - shufflePlay - shuffle and play all tracks (loaded only - for small lists)
+ * - shufflePlayFull - shuffle with lazy loading via API (for large collections)
  * 
  * Works with any reactive tracks source (ref, computed, or getter function)
  * 
  * Usage:
- *   const { playAll, shufflePlay } = usePlaybackActions(() => playlist.value.tracks)
+ *   const { playAll, shufflePlay, shufflePlayFull } = usePlaybackActions(() => playlist.value.tracks)
  *   <button @click="playAll">Play</button>
- *   <button @click="shufflePlay">Shuffle</button>
+ *   <button @click="shufflePlayFull('playlist', playlistId)">Shuffle</button>
  */
-import { unref } from 'vue'
+import { ref, unref } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 
 /**
@@ -21,6 +22,9 @@ import { usePlayerStore } from '@/stores/player'
  */
 export function usePlaybackActions(tracksSource) {
   const playerStore = usePlayerStore()
+  
+  // Loading state for shuffle operations
+  const isShuffling = ref(false)
 
   /**
    * Get tracks array from source (handles ref, computed, and functions)
@@ -44,13 +48,37 @@ export function usePlaybackActions(tracksSource) {
   }
 
   /**
-   * Shuffle tracks and start playing
+   * Shuffle currently loaded tracks and start playing
+   * Use for small lists that are fully loaded (e.g., liked tracks)
+   * For large collections, use shufflePlayFull instead
    */
   const shufflePlay = () => {
     const tracks = getTracks()
     if (tracks.length > 0) {
       const shuffled = [...tracks].sort(() => Math.random() - 0.5)
       playerStore.playTrack(shuffled[0], shuffled, 0)
+    }
+  }
+
+  /**
+   * Shuffle play with full lazy loading support
+   * Fetches all track IDs from server and plays with lazy loading
+   * Use for large collections (playlists, albums, artists, library)
+   * 
+   * @param {'library'|'playlist'|'album'|'artist'} context - Type of collection
+   * @param {number|string|null} contextId - ID for playlist/album, name for artist, null for library
+   * @returns {Promise<void>}
+   */
+  const shufflePlayFull = async (context, contextId = null) => {
+    if (isShuffling.value) return
+    
+    isShuffling.value = true
+    try {
+      await playerStore.playShuffleAll(context, contextId)
+    } catch (error) {
+      console.error(`[ShufflePlayFull] Failed to shuffle ${context}:`, error)
+    } finally {
+      isShuffling.value = false
     }
   }
 
@@ -76,6 +104,8 @@ export function usePlaybackActions(tracksSource) {
   return {
     playAll,
     shufflePlay,
+    shufflePlayFull,
+    isShuffling,
     playTrack,
     hasTracks,
     getTracks,

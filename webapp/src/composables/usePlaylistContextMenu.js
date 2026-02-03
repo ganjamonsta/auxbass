@@ -93,14 +93,8 @@ export function usePlaylistContextMenu(options = {}) {
     if (!p?.id) return
     
     try {
-      const tracks = await loadPlaylistTracks(p)
-      if (tracks?.length) {
-        // Перемешать и запустить
-        const shuffled = [...tracks].sort(() => Math.random() - 0.5)
-        playerStore.playTrackList(shuffled, 0)
-        playerStore.setShuffle(true)
-        uiStore.toast.success('Перемешивание', `Играет: ${p.name}`)
-      }
+      await playerStore.playShuffleAll('playlist', p.id)
+      uiStore.toast.success('Перемешивание', `Играет: ${p.name}`)
     } catch (error) {
       console.error('Failed to shuffle playlist:', error)
       uiStore.toast.error('Ошибка', 'Не удалось воспроизвести плейлист')

@@ -513,17 +513,10 @@ const loadLikedCount = async () => {
   }
 }
 
+// Shuffle playlist using lazy loading - delegates to playerStore.playShuffleAll
 const shufflePlaylist = async (playlist) => {
   try {
-    const response = await api.get(`/playlists/${playlist.id}`)
-    const playlistData = response.data
-    const tracks = playlistData.tracks || []
-    
-    if (tracks.length) {
-      // Shuffle tracks array
-      const shuffled = [...tracks].sort(() => Math.random() - 0.5)
-      playerStore.playTrack(shuffled[0], shuffled)
-    }
+    await playerStore.playShuffleAll('playlist', playlist.id)
   } catch (error) {
     console.error('Failed to shuffle playlist:', error)
   }

@@ -32,7 +32,7 @@
             <path d="M8 5v14l11-7z"/>
           </svg>
         </button>
-        <button class="action-btn shuffle-btn" @click="shufflePlay" :disabled="!playlist.tracks?.length">
+        <button class="action-btn shuffle-btn" @click="shufflePlay" :disabled="!playlist.tracks?.length || isShuffling">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
             <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
           </svg>
@@ -145,8 +145,15 @@ const showEditModal = ref(false)
 const showDeleteConfirm = ref(false)
 const subscribing = ref(false)
 
-// Unified playback actions
-const { playAll, shufflePlay, playTrack } = usePlaybackActions(() => playlist.value?.tracks)
+// Unified playback actions - use shufflePlayFull for lazy loading all playlist tracks
+const { playAll, shufflePlayFull, isShuffling, playTrack } = usePlaybackActions(() => playlist.value?.tracks)
+
+// Shuffle play handler using lazy loading
+const shufflePlay = () => {
+  if (playlist.value?.id) {
+    shufflePlayFull('playlist', playlist.value.id)
+  }
+}
 
 // Computed
 const isOwner = computed(() => {

@@ -116,7 +116,7 @@ const props = defineProps({
   isPlaying: Boolean
 })
 
-const emit = defineEmits(['play', 'menu', 'like', 'openAlbum', 'openPlaylist', 'playAll', 'albumContextmenu'])
+const emit = defineEmits(['play', 'menu', 'like', 'openAlbum', 'openPlaylist', 'playAll', 'shuffleAll', 'albumContextmenu'])
 
 const initials = computed(() => {
   const name = props.artist.name || '?'
@@ -172,11 +172,9 @@ const playAll = () => {
   }
 }
 
+// Emit shuffleAll event - parent should call playerStore.playShuffleAll('artist', artistName)
 const shufflePlay = () => {
-  if (props.artist.tracks?.length) {
-    const shuffled = [...props.artist.tracks].sort(() => Math.random() - 0.5)
-    emit('play', shuffled[0], shuffled)
-  }
+  emit('shuffleAll', props.artist.name)
 }
 </script>
 

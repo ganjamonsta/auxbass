@@ -285,12 +285,8 @@ export function useContextMenu() {
       if (!playlist?.id) return closeMenu()
       
       try {
-        const tracks = await loadPlaylistTracks(playlist)
-        if (tracks?.length) {
-          const shuffled = [...tracks].sort(() => Math.random() - 0.5)
-          playerStore.play(shuffled[0], shuffled)
-          uiStore.toast.success('Перемешивание', `Играет: ${playlist.name}`)
-        }
+        await playerStore.playShuffleAll('playlist', playlist.id)
+        uiStore.toast.success('Перемешивание', `Играет: ${playlist.name}`)
       } catch (error) {
         console.error('Failed to shuffle playlist:', error)
         uiStore.toast.error('Ошибка', 'Не удалось воспроизвести')
@@ -375,15 +371,8 @@ export function useContextMenu() {
       if (!album?.id) return closeMenu()
       
       try {
-        const response = await albumsApi.getOne(album.id)
-        const tracks = response?.data?.tracks || []
-        if (tracks.length) {
-          const shuffled = [...tracks].sort(() => Math.random() - 0.5)
-          playerStore.play(shuffled[0], shuffled)
-          uiStore.toast.success('Перемешивание', `Играет: ${album.name}`)
-        } else {
-          uiStore.toast.info('Пусто', 'В альбоме нет треков')
-        }
+        await playerStore.playShuffleAll('album', album.id)
+        uiStore.toast.success('Перемешивание', `Играет: ${album.name}`)
       } catch (error) {
         console.error('Failed to shuffle album:', error)
         uiStore.toast.error('Ошибка', 'Не удалось воспроизвести альбом')
@@ -455,13 +444,8 @@ export function useContextMenu() {
       if (!name) return closeMenu()
       
       try {
-        const response = await tracksApi.getArtistDetail(name)
-        const tracks = response?.tracks || []
-        if (tracks.length) {
-          const shuffled = [...tracks].sort(() => Math.random() - 0.5)
-          playerStore.play(shuffled[0], shuffled)
-          uiStore.toast.success('Перемешивание', `Играет: ${name}`)
-        }
+        await playerStore.playShuffleAll('artist', null, name)
+        uiStore.toast.success('Перемешивание', `Играет: ${name}`)
       } catch (error) {
         console.error('Failed to shuffle artist:', error)
         uiStore.toast.error('Ошибка', 'Не удалось воспроизвести')
