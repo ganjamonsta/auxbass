@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS tracks (
 -- Плейлисты
 CREATE TABLE IF NOT EXISTS playlists (
     id SERIAL PRIMARY KEY,
-    user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+    owner_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     description TEXT,
     cover_file_id VARCHAR(255),
@@ -99,14 +99,14 @@ CREATE TABLE IF NOT EXISTS playlist_subscriptions (
 );
 
 -- Индексы для быстрого поиска
-CREATE INDEX IF NOT EXISTS idx_tracks_user_id ON tracks(user_id);
+CREATE INDEX IF NOT EXISTS idx_tracks_uploader_id ON tracks(uploader_id);
 CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist);
 CREATE INDEX IF NOT EXISTS idx_tracks_title ON tracks(title);
 CREATE INDEX IF NOT EXISTS idx_tracks_genre ON tracks(genre);
 CREATE INDEX IF NOT EXISTS idx_tracks_deezer_album_id ON tracks(deezer_album_id);
 CREATE INDEX IF NOT EXISTS idx_tracks_forward_from_id ON tracks(forward_from_id) WHERE forward_from_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_playlists_user_id ON playlists(user_id);
-CREATE INDEX IF NOT EXISTS idx_playlists_auto_source ON playlists(user_id, is_auto_source, source_id) WHERE is_auto_source = TRUE;
+CREATE INDEX IF NOT EXISTS idx_playlists_owner_id ON playlists(owner_id);
+CREATE INDEX IF NOT EXISTS idx_playlists_auto_source ON playlists(owner_id, is_auto_source, source_id) WHERE is_auto_source = TRUE;
 CREATE INDEX IF NOT EXISTS idx_playlist_tracks_playlist_id ON playlist_tracks(playlist_id);
 CREATE INDEX IF NOT EXISTS idx_playlist_subscription_user ON playlist_subscriptions(user_id);
 CREATE INDEX IF NOT EXISTS idx_playlist_subscription_playlist ON playlist_subscriptions(playlist_id);
