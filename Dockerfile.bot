@@ -11,4 +11,4 @@ COPY shared/ ./shared/
 COPY bot/ ./bot/
 
 # Run bot
-CMD ["python", "bot/main.py"]
+CMD ["python", "-m", "bot.main"]
