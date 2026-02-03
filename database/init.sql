@@ -7,6 +7,9 @@ CREATE TABLE IF NOT EXISTS users (
     first_name VARCHAR(255),
     last_name VARCHAR(255),
     is_premium BOOLEAN DEFAULT FALSE,
+    hide_from_search BOOLEAN DEFAULT FALSE,
+    hide_profile BOOLEAN DEFAULT FALSE,
+    notify_subscription BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -14,13 +17,14 @@ CREATE TABLE IF NOT EXISTS users (
 -- Треки
 CREATE TABLE IF NOT EXISTS tracks (
     id SERIAL PRIMARY KEY,
-    user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+    uploader_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
     file_id VARCHAR(255) NOT NULL,
     file_unique_id VARCHAR(255) NOT NULL,
     
     -- Метаданные
     title VARCHAR(255),
     artist VARCHAR(255),
+    normalized_artist VARCHAR(255),
     album VARCHAR(255),
     genre VARCHAR(100),
     duration INTEGER,
@@ -28,22 +32,29 @@ CREATE TABLE IF NOT EXISTS tracks (
     deezer_album_id INTEGER,
     enrichment_status VARCHAR(20) DEFAULT 'pending',
     
-    -- Forward source info (от кого переслано сообщение)
-    forward_from_id BIGINT,
-    forward_from_username VARCHAR(255),
-    forward_from_name VARCHAR(255),
-    forward_from_type VARCHAR(20),  -- user, bot, channel, supergroup, hidden
+    -- Forward source info
+    forward_source_id BIGINT,
+    forward_source_username VARCHAR(255),
+    forward_source_name VARCHAR(255),
+    forward_source_type VARCHAR(20),
     
     -- Telegram данные
     file_size INTEGER,
     mime_type VARCHAR(50),
+    file_name VARCHAR(255),
+    
+    -- Visibility & Stats
+    is_public BOOLEAN DEFAULT TRUE,
+    is_unavailable BOOLEAN DEFAULT FALSE,
+    play_count INTEGER DEFAULT 0,
+    last_played_at TIMESTAMP,
     
     -- Timestamps
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW(),
     
     -- Уникальность: один файл на пользователя
-    UNIQUE(user_id, file_unique_id)
+    UNIQUE(uploader_id, file_unique_id)
 );
 
 -- Плейлисты
