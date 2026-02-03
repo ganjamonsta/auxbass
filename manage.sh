@@ -6,7 +6,7 @@
 #
 #  Использование:
 #    ./manage.sh                    # Интерактивное меню
-#    ./manage.sh <command> [args]   # CLI режим
+#    ./manage.sh <команда> [args]   # CLI режим
 #
 #  Примеры:
 #    ./manage.sh status             # Статус всех сервисов
@@ -19,7 +19,7 @@
 set -e
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  CONFIGURATION
+#  КОНФИГУРАЦИЯ
 # ═══════════════════════════════════════════════════════════════════════════════
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -56,7 +56,7 @@ ICON_BOT="🤖"
 ICON_WEB="🌐"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  HELPER FUNCTIONS
+#  ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 # ═══════════════════════════════════════════════════════════════════════════════
 
 print_header() {
@@ -71,7 +71,7 @@ print_header() {
     echo "║   ${WHITE}   ██║   ╚██████╔╝    ██║     ███████╗██║  ██║   ██║   ███████╗██║  ██║${CYAN}   ║"
     echo "║   ${WHITE}   ╚═╝    ╚═════╝     ╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝${CYAN}   ║"
     echo "║                                                                               ║"
-    echo "║                         ${WHITE}${BOLD}Server Manager v2.0${NC}${CYAN}                                 ║"
+    echo "║                         ${WHITE}${BOLD}Менеджер сервера v2.0${NC}${CYAN}                              ║"
     echo "║                                                                               ║"
     echo "╚═══════════════════════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
@@ -79,7 +79,7 @@ print_header() {
 
 print_mini_header() {
     echo -e "\n${CYAN}═══════════════════════════════════════════════════════════════${NC}"
-    echo -e "${CYAN}  ${WHITE}${BOLD}TG Player Manager${NC}"
+    echo -e "${CYAN}  ${WHITE}${BOLD}TG Player Менеджер${NC}"
     echo -e "${CYAN}═══════════════════════════════════════════════════════════════${NC}\n"
 }
 
@@ -91,17 +91,17 @@ log_step() { echo -e "${PURPLE}→${NC} $1"; }
 
 # Получить текущую git ветку
 get_branch() {
-    git branch --show-current 2>/dev/null || echo "unknown"
+    git branch --show-current 2>/dev/null || echo "неизвестно"
 }
 
 # Получить короткий hash коммита
 get_commit() {
-    git rev-parse --short HEAD 2>/dev/null || echo "unknown"
+    git rev-parse --short HEAD 2>/dev/null || echo "неизвестно"
 }
 
 # Получить время последнего коммита
 get_commit_time() {
-    git log -1 --format="%cr" 2>/dev/null || echo "unknown"
+    git log -1 --format="%cr" 2>/dev/null || echo "неизвестно"
 }
 
 # Проверить наличие несохраненных изменений
@@ -135,21 +135,21 @@ container_status() {
     case "$status" in
         running)
             if [ "$health" = "healthy" ]; then
-                echo -e "${GREEN}● running (healthy)${NC}"
+                echo -e "${GREEN}● работает (healthy)${NC}"
             elif [ "$health" = "unhealthy" ]; then
-                echo -e "${RED}● running (unhealthy)${NC}"
+                echo -e "${RED}● работает (unhealthy)${NC}"
             else
-                echo -e "${GREEN}● running${NC}"
+                echo -e "${GREEN}● работает${NC}"
             fi
             ;;
         exited)
-            echo -e "${RED}○ stopped${NC}"
+            echo -e "${RED}○ остановлен${NC}"
             ;;
         restarting)
-            echo -e "${YELLOW}◐ restarting${NC}"
+            echo -e "${YELLOW}◐ перезапуск${NC}"
             ;;
         *)
-            echo -e "${DIM}○ not created${NC}"
+            echo -e "${DIM}○ не создан${NC}"
             ;;
     esac
 }
@@ -168,44 +168,44 @@ get_running_env() {
     fi
     
     if $prod_running && $dev_running; then
-        echo "both"
+        echo "оба"
     elif $prod_running; then
         echo "prod"
     elif $dev_running; then
         echo "dev"
     else
-        echo "none"
+        echo "нет"
     fi
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  STATUS FUNCTIONS
+#  ФУНКЦИИ СТАТУСА
 # ═══════════════════════════════════════════════════════════════════════════════
 
 show_status() {
     print_mini_header
     
-    # Git info
-    echo -e "${BOLD}${ICON_GIT} Git Status${NC}"
-    echo -e "  Branch:  ${CYAN}$(get_branch)${NC}"
-    echo -e "  Commit:  ${DIM}$(get_commit)${NC} ($(get_commit_time))"
+    # Git инфо
+    echo -e "${BOLD}${ICON_GIT} Git Статус${NC}"
+    echo -e "  Ветка:   ${CYAN}$(get_branch)${NC}"
+    echo -e "  Коммит:  ${DIM}$(get_commit)${NC} ($(get_commit_time))"
     
     if has_changes; then
-        echo -e "  Changes: ${YELLOW}uncommitted changes${NC}"
+        echo -e "  Изменения: ${YELLOW}есть несохранённые${NC}"
     else
-        echo -e "  Changes: ${GREEN}clean${NC}"
+        echo -e "  Изменения: ${GREEN}чисто${NC}"
     fi
     
     if has_updates 2>/dev/null; then
-        echo -e "  Remote:  ${YELLOW}updates available${NC}"
+        echo -e "  Remote:  ${YELLOW}есть обновления${NC}"
     else
-        echo -e "  Remote:  ${GREEN}up to date${NC}"
+        echo -e "  Remote:  ${GREEN}актуально${NC}"
     fi
     
     echo ""
     
-    # Docker status
-    echo -e "${BOLD}${ICON_DOCKER} Docker Services${NC}"
+    # Docker статус
+    echo -e "${BOLD}${ICON_DOCKER} Docker Сервисы${NC}"
     
     local running_env=$(get_running_env)
     
@@ -222,9 +222,9 @@ show_status() {
     
     echo ""
     
-    # Resource usage
-    echo -e "${BOLD}📊 Resource Usage${NC}"
-    docker stats --no-stream --format "  {{.Name}}: CPU {{.CPUPerc}}, Mem {{.MemUsage}}" 2>/dev/null | head -5 || echo "  No containers running"
+    # Ресурсы
+    echo -e "${BOLD}📊 Использование ресурсов${NC}"
+    docker stats --no-stream --format "  {{.Name}}: CPU {{.CPUPerc}}, Память {{.MemUsage}}" 2>/dev/null | head -5 || echo "  Нет запущенных контейнеров"
     
     echo ""
 }
@@ -233,69 +233,69 @@ show_quick_status() {
     local running=$(get_running_env)
     local branch=$(get_branch)
     
-    echo -e "${CYAN}TG Player${NC} | Branch: ${CYAN}$branch${NC} | Running: ${GREEN}$running${NC}"
+    echo -e "${CYAN}TG Player${NC} | Ветка: ${CYAN}$branch${NC} | Запущено: ${GREEN}$running${NC}"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  ENVIRONMENT MANAGEMENT
+#  УПРАВЛЕНИЕ ОКРУЖЕНИЯМИ
 # ═══════════════════════════════════════════════════════════════════════════════
 
 start_prod() {
-    log_step "Starting production environment..."
+    log_step "Запуск production окружения..."
     
-    # Check .env
+    # Проверка .env
     if [ ! -f ".env" ]; then
-        log_error ".env file not found! Copy from .env.example"
+        log_error "Файл .env не найден! Скопируй из .env.example"
         return 1
     fi
     
     docker compose -f "$PROD_COMPOSE" up -d --build
     
     echo ""
-    log_ok "Production started!"
+    log_ok "Production запущен!"
     echo ""
     echo -e "  ${ICON_API} API:    ${CYAN}http://localhost:${API_PORT:-8000}${NC}"
     echo -e "  ${ICON_WEB} WebApp: ${CYAN}http://localhost:${WEBAPP_PORT:-5173}${NC}"
 }
 
 stop_prod() {
-    log_step "Stopping production environment..."
+    log_step "Остановка production окружения..."
     docker compose -f "$PROD_COMPOSE" down
-    log_ok "Production stopped"
+    log_ok "Production остановлен"
 }
 
 restart_prod() {
-    log_step "Restarting production environment..."
+    log_step "Перезапуск production окружения..."
     docker compose -f "$PROD_COMPOSE" restart
-    log_ok "Production restarted"
+    log_ok "Production перезапущен"
 }
 
 start_dev() {
-    log_step "Starting development environment (PostgreSQL only)..."
+    log_step "Запуск development окружения (только PostgreSQL)..."
     docker compose -f "$DEV_COMPOSE" up -d
     
     echo ""
-    log_ok "Development database started!"
+    log_ok "База данных для разработки запущена!"
     echo ""
     echo -e "  ${ICON_DB} PostgreSQL: ${CYAN}localhost:5432${NC}"
     echo ""
-    echo -e "  Run locally:"
+    echo -e "  Запусти локально:"
     echo -e "    ${DIM}python -m uvicorn api.main:app --reload --port 8000${NC}"
     echo -e "    ${DIM}python bot/main.py${NC}"
     echo -e "    ${DIM}cd webapp && npm run dev${NC}"
 }
 
 stop_dev() {
-    log_step "Stopping development environment..."
+    log_step "Остановка development окружения..."
     docker compose -f "$DEV_COMPOSE" down
-    log_ok "Development stopped"
+    log_ok "Development остановлен"
 }
 
 stop_all() {
-    log_step "Stopping all environments..."
+    log_step "Остановка всех окружений..."
     docker compose -f "$PROD_COMPOSE" down 2>/dev/null || true
     docker compose -f "$DEV_COMPOSE" down 2>/dev/null || true
-    log_ok "All environments stopped"
+    log_ok "Все окружения остановлены"
 }
 
 switch_env() {
@@ -303,22 +303,22 @@ switch_env() {
     local current=$(get_running_env)
     
     if [ "$current" = "$target" ]; then
-        log_info "Already running $target"
+        log_info "Уже запущено $target"
         return 0
     fi
     
-    log_step "Switching to $target environment..."
+    log_step "Переключение на $target окружение..."
     
-    # Stop current
+    # Остановить текущее
     if [ "$current" = "prod" ]; then
         stop_prod
     elif [ "$current" = "dev" ]; then
         stop_dev
-    elif [ "$current" = "both" ]; then
+    elif [ "$current" = "оба" ]; then
         stop_all
     fi
     
-    # Start target
+    # Запустить целевое
     if [ "$target" = "prod" ]; then
         start_prod
     elif [ "$target" = "dev" ]; then
@@ -327,66 +327,66 @@ switch_env() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  UPDATE & BUILD
+#  ОБНОВЛЕНИЕ И СБОРКА
 # ═══════════════════════════════════════════════════════════════════════════════
 
 update() {
-    log_step "Updating TG Player..."
+    log_step "Обновление TG Player..."
     echo ""
     
-    # Check for uncommitted changes
+    # Проверка несохранённых изменений
     if has_changes; then
-        log_warn "You have uncommitted changes!"
+        log_warn "Есть несохранённые изменения!"
         echo ""
         git status --short
         echo ""
-        read -p "Stash changes and continue? [y/N] " -n 1 -r
+        read -p "Сохранить в stash и продолжить? [y/N] " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             git stash
-            log_ok "Changes stashed"
+            log_ok "Изменения сохранены в stash"
         else
-            log_error "Update cancelled"
+            log_error "Обновление отменено"
             return 1
         fi
     fi
     
-    # Pull updates
-    log_step "Pulling latest changes..."
+    # Получить обновления
+    log_step "Получение последних изменений..."
     git pull
     
-    # Check if prod is running
+    # Проверить запущен ли prod
     local running=$(get_running_env)
     
-    if [ "$running" = "prod" ] || [ "$running" = "both" ]; then
-        log_step "Rebuilding and restarting production..."
+    if [ "$running" = "prod" ] || [ "$running" = "оба" ]; then
+        log_step "Пересборка и перезапуск production..."
         docker compose -f "$PROD_COMPOSE" up -d --build
-        log_ok "Production updated and restarted"
+        log_ok "Production обновлён и перезапущен"
     else
-        log_info "Production not running, skipping restart"
-        log_info "Run './manage.sh prod start' to start"
+        log_info "Production не запущен, пропускаем перезапуск"
+        log_info "Запусти: './manage.sh prod start'"
     fi
     
     echo ""
-    log_ok "Update complete!"
+    log_ok "Обновление завершено!"
 }
 
 rebuild() {
     local service=$1
     
     if [ -z "$service" ]; then
-        log_step "Rebuilding all images (no cache)..."
+        log_step "Пересборка всех образов (без кэша)..."
         docker compose -f "$PROD_COMPOSE" build --no-cache
     else
-        log_step "Rebuilding $service..."
+        log_step "Пересборка $service..."
         docker compose -f "$PROD_COMPOSE" build --no-cache "$service"
     fi
     
-    log_ok "Rebuild complete"
+    log_ok "Пересборка завершена"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  LOGS
+#  ЛОГИ
 # ═══════════════════════════════════════════════════════════════════════════════
 
 show_logs() {
@@ -409,24 +409,24 @@ show_logs() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  GIT OPERATIONS
+#  GIT ОПЕРАЦИИ
 # ═══════════════════════════════════════════════════════════════════════════════
 
 git_status() {
-    echo -e "${BOLD}${ICON_GIT} Git Status${NC}"
+    echo -e "${BOLD}${ICON_GIT} Git Статус${NC}"
     echo ""
     git status
 }
 
 git_log() {
     local count=${1:-10}
-    echo -e "${BOLD}${ICON_GIT} Recent Commits${NC}"
+    echo -e "${BOLD}${ICON_GIT} Последние коммиты${NC}"
     echo ""
     git log --oneline --graph --decorate -n "$count"
 }
 
 git_branches() {
-    echo -e "${BOLD}${ICON_GIT} Branches${NC}"
+    echo -e "${BOLD}${ICON_GIT} Ветки${NC}"
     echo ""
     git branch -a --color
 }
@@ -435,13 +435,13 @@ git_checkout() {
     local branch=$1
     
     if [ -z "$branch" ]; then
-        log_error "Branch name required"
+        log_error "Нужно указать имя ветки"
         return 1
     fi
     
     if has_changes; then
-        log_warn "You have uncommitted changes!"
-        read -p "Stash and switch? [y/N] " -n 1 -r
+        log_warn "Есть несохранённые изменения!"
+        read -p "Сохранить в stash и переключиться? [y/N] " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             git stash
@@ -450,16 +450,16 @@ git_checkout() {
         fi
     fi
     
-    log_step "Switching to branch: $branch"
+    log_step "Переключение на ветку: $branch"
     git checkout "$branch"
     
-    # Ask about restart
+    # Спросить о перезапуске
     local running=$(get_running_env)
-    if [ "$running" != "none" ]; then
-        read -p "Rebuild and restart running services? [Y/n] " -n 1 -r
+    if [ "$running" != "нет" ]; then
+        read -p "Пересобрать и перезапустить сервисы? [Y/n] " -n 1 -r
         echo
         if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-            if [ "$running" = "prod" ] || [ "$running" = "both" ]; then
+            if [ "$running" = "prod" ] || [ "$running" = "оба" ]; then
                 docker compose -f "$PROD_COMPOSE" up -d --build
             fi
         fi
@@ -471,7 +471,7 @@ git_diff() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  DATABASE OPERATIONS
+#  ОПЕРАЦИИ С БАЗОЙ ДАННЫХ
 # ═══════════════════════════════════════════════════════════════════════════════
 
 db_shell() {
@@ -484,7 +484,7 @@ db_shell() {
         container="tg_player_db"
     fi
     
-    log_step "Connecting to PostgreSQL ($env)..."
+    log_step "Подключение к PostgreSQL ($env)..."
     docker exec -it "$container" psql -U postgres -d tg_player
 }
 
@@ -501,9 +501,9 @@ db_backup() {
         filename="prod_$filename"
     fi
     
-    log_step "Creating backup: $filename"
+    log_step "Создание бэкапа: $filename"
     docker exec "$container" pg_dump -U postgres tg_player > "$filename"
-    log_ok "Backup saved: $filename"
+    log_ok "Бэкап сохранён: $filename"
 }
 
 db_restore() {
@@ -512,12 +512,12 @@ db_restore() {
     local container=""
     
     if [ -z "$filename" ]; then
-        log_error "Backup file required"
+        log_error "Нужно указать файл бэкапа"
         return 1
     fi
     
     if [ ! -f "$filename" ]; then
-        log_error "File not found: $filename"
+        log_error "Файл не найден: $filename"
         return 1
     fi
     
@@ -527,20 +527,20 @@ db_restore() {
         container="tg_player_db"
     fi
     
-    log_warn "This will OVERWRITE the $env database!"
-    read -p "Continue? [y/N] " -n 1 -r
+    log_warn "Это ПЕРЕЗАПИШЕТ базу данных $env!"
+    read -p "Продолжить? [y/N] " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         return 1
     fi
     
-    log_step "Restoring from: $filename"
+    log_step "Восстановление из: $filename"
     cat "$filename" | docker exec -i "$container" psql -U postgres tg_player
-    log_ok "Database restored"
+    log_ok "База данных восстановлена"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  INTERACTIVE MENU
+#  ИНТЕРАКТИВНОЕ МЕНЮ
 # ═══════════════════════════════════════════════════════════════════════════════
 
 show_menu() {
@@ -549,49 +549,49 @@ show_menu() {
     local running=$(get_running_env)
     local branch=$(get_branch)
     
-    echo -e "  ${DIM}Branch: ${NC}${CYAN}$branch${NC}  ${DIM}|  Running: ${NC}${GREEN}$running${NC}"
+    echo -e "  ${DIM}Ветка: ${NC}${CYAN}$branch${NC}  ${DIM}|  Запущено: ${NC}${GREEN}$running${NC}"
     echo ""
-    echo -e "  ${BOLD}Environment${NC}"
-    echo -e "    ${CYAN}1${NC}) Start Production    ${CYAN}2${NC}) Stop Production"
-    echo -e "    ${CYAN}3${NC}) Start Development   ${CYAN}4${NC}) Stop Development"
-    echo -e "    ${CYAN}5${NC}) Restart Production  ${CYAN}6${NC}) Stop All"
+    echo -e "  ${BOLD}Окружение${NC}"
+    echo -e "    ${CYAN}1${NC}) Запустить Production    ${CYAN}2${NC}) Остановить Production"
+    echo -e "    ${CYAN}3${NC}) Запустить Development   ${CYAN}4${NC}) Остановить Development"
+    echo -e "    ${CYAN}5${NC}) Перезапустить Prod      ${CYAN}6${NC}) Остановить всё"
     echo ""
-    echo -e "  ${BOLD}Operations${NC}"
-    echo -e "    ${CYAN}u${NC}) Update (git pull + rebuild)"
-    echo -e "    ${CYAN}r${NC}) Rebuild images"
-    echo -e "    ${CYAN}s${NC}) Full status"
-    echo -e "    ${CYAN}l${NC}) View logs"
+    echo -e "  ${BOLD}Операции${NC}"
+    echo -e "    ${CYAN}u${NC}) Обновить (git pull + пересборка)"
+    echo -e "    ${CYAN}r${NC}) Пересобрать образы"
+    echo -e "    ${CYAN}s${NC}) Полный статус"
+    echo -e "    ${CYAN}l${NC}) Просмотр логов"
     echo ""
     echo -e "  ${BOLD}Git${NC}"
-    echo -e "    ${CYAN}g${NC}) Git status"
-    echo -e "    ${CYAN}b${NC}) List branches"
-    echo -e "    ${CYAN}c${NC}) Checkout branch"
-    echo -e "    ${CYAN}h${NC}) Commit history"
+    echo -e "    ${CYAN}g${NC}) Git статус"
+    echo -e "    ${CYAN}b${NC}) Список веток"
+    echo -e "    ${CYAN}c${NC}) Переключить ветку"
+    echo -e "    ${CYAN}h${NC}) История коммитов"
     echo ""
-    echo -e "  ${BOLD}Database${NC}"
-    echo -e "    ${CYAN}d${NC}) Database shell"
-    echo -e "    ${CYAN}B${NC}) Backup database"
-    echo -e "    ${CYAN}R${NC}) Restore database"
+    echo -e "  ${BOLD}База данных${NC}"
+    echo -e "    ${CYAN}d${NC}) Консоль БД"
+    echo -e "    ${CYAN}B${NC}) Бэкап базы"
+    echo -e "    ${CYAN}R${NC}) Восстановить базу"
     echo ""
-    echo -e "    ${CYAN}q${NC}) Quit"
+    echo -e "    ${CYAN}q${NC}) Выход"
     echo ""
 }
 
 logs_submenu() {
     echo ""
-    echo -e "  ${BOLD}Select service:${NC}"
-    echo -e "    ${CYAN}1${NC}) All services"
+    echo -e "  ${BOLD}Выбери сервис:${NC}"
+    echo -e "    ${CYAN}1${NC}) Все сервисы"
     echo -e "    ${CYAN}2${NC}) API"
-    echo -e "    ${CYAN}3${NC}) Bot"
+    echo -e "    ${CYAN}3${NC}) Бот"
     echo -e "    ${CYAN}4${NC}) WebApp"
     echo -e "    ${CYAN}5${NC}) PostgreSQL"
-    echo -e "    ${CYAN}0${NC}) Back"
+    echo -e "    ${CYAN}0${NC}) Назад"
     echo ""
-    read -p "  Choose: " choice
+    read -p "  Выбор: " choice
     
     local env=$(get_running_env)
-    [ "$env" = "none" ] && env="prod"
-    [ "$env" = "both" ] && env="prod"
+    [ "$env" = "нет" ] && env="prod"
+    [ "$env" = "оба" ] && env="prod"
     
     case $choice in
         1) show_logs "$env" "" ;;
@@ -605,8 +605,8 @@ logs_submenu() {
 
 db_submenu() {
     local env=$(get_running_env)
-    [ "$env" = "none" ] && { log_error "No database running"; return; }
-    [ "$env" = "both" ] && env="prod"
+    [ "$env" = "нет" ] && { log_error "База данных не запущена"; return; }
+    [ "$env" = "оба" ] && env="prod"
     
     db_shell "$env"
 }
@@ -614,7 +614,7 @@ db_submenu() {
 interactive_menu() {
     while true; do
         show_menu
-        read -p "  Choose: " choice
+        read -p "  Выбор: " choice
         
         case $choice in
             1) start_prod ;;
@@ -625,36 +625,36 @@ interactive_menu() {
             6) stop_all ;;
             u) update ;;
             r) rebuild ;;
-            s) show_status; read -p "Press Enter to continue..." ;;
+            s) show_status; read -p "Нажми Enter для продолжения..." ;;
             l) logs_submenu ;;
-            g) git_status; read -p "Press Enter to continue..." ;;
-            b) git_branches; read -p "Press Enter to continue..." ;;
+            g) git_status; read -p "Нажми Enter для продолжения..." ;;
+            b) git_branches; read -p "Нажми Enter для продолжения..." ;;
             c) 
-                read -p "  Branch name: " branch
+                read -p "  Имя ветки: " branch
                 git_checkout "$branch"
                 ;;
-            h) git_log; read -p "Press Enter to continue..." ;;
+            h) git_log; read -p "Нажми Enter для продолжения..." ;;
             d) db_submenu ;;
             B) 
                 local env=$(get_running_env)
-                [ "$env" = "both" ] && env="prod"
+                [ "$env" = "оба" ] && env="prod"
                 db_backup "$env"
-                read -p "Press Enter to continue..."
+                read -p "Нажми Enter для продолжения..."
                 ;;
             R)
-                read -p "  Backup file: " file
+                read -p "  Файл бэкапа: " file
                 local env=$(get_running_env)
-                [ "$env" = "both" ] && env="prod"
+                [ "$env" = "оба" ] && env="prod"
                 db_restore "$env" "$file"
-                read -p "Press Enter to continue..."
+                read -p "Нажми Enter для продолжения..."
                 ;;
             q|Q) 
                 echo ""
-                log_info "Goodbye!"
+                log_info "Пока!"
                 exit 0
                 ;;
             *)
-                log_error "Invalid option"
+                log_error "Неверный выбор"
                 sleep 1
                 ;;
         esac
@@ -662,50 +662,50 @@ interactive_menu() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  CLI COMMANDS
+#  CLI КОМАНДЫ
 # ═══════════════════════════════════════════════════════════════════════════════
 
 show_help() {
-    echo -e "${BOLD}TG Player Manager${NC} - Server management tool"
+    echo -e "${BOLD}TG Player Менеджер${NC} - Управление сервером"
     echo ""
-    echo -e "${BOLD}Usage:${NC}"
-    echo "  ./manage.sh                     Interactive menu"
-    echo "  ./manage.sh <command> [args]    Run command directly"
+    echo -e "${BOLD}Использование:${NC}"
+    echo "  ./manage.sh                     Интерактивное меню"
+    echo "  ./manage.sh <команда> [аргументы]    Выполнить команду"
     echo ""
-    echo -e "${BOLD}Environment Commands:${NC}"
-    echo "  prod start              Start production environment"
-    echo "  prod stop               Stop production"
-    echo "  prod restart            Restart production"
-    echo "  prod logs [service]     View production logs"
+    echo -e "${BOLD}Команды окружения:${NC}"
+    echo "  prod start              Запустить production"
+    echo "  prod stop               Остановить production"
+    echo "  prod restart            Перезапустить production"
+    echo "  prod logs [сервис]      Логи production"
     echo ""
-    echo "  dev start               Start development (DB only)"
-    echo "  dev stop                Stop development"
-    echo "  dev logs                View development logs"
+    echo "  dev start               Запустить development (только БД)"
+    echo "  dev stop                Остановить development"
+    echo "  dev logs                Логи development"
     echo ""
-    echo "  switch <prod|dev>       Switch environment"
-    echo "  stop                    Stop all environments"
+    echo "  switch <prod|dev>       Переключить окружение"
+    echo "  stop                    Остановить всё"
     echo ""
-    echo -e "${BOLD}Update Commands:${NC}"
-    echo "  update                  Pull changes and rebuild"
-    echo "  rebuild [service]       Rebuild images (no cache)"
+    echo -e "${BOLD}Команды обновления:${NC}"
+    echo "  update                  Получить изменения и пересобрать"
+    echo "  rebuild [сервис]        Пересобрать образы (без кэша)"
     echo ""
-    echo -e "${BOLD}Status Commands:${NC}"
-    echo "  status                  Full status"
-    echo "  quick                   Quick status line"
+    echo -e "${BOLD}Команды статуса:${NC}"
+    echo "  status                  Полный статус"
+    echo "  quick                   Краткий статус"
     echo ""
-    echo -e "${BOLD}Git Commands:${NC}"
-    echo "  git status              Git status"
-    echo "  git log [n]             Show last n commits"
-    echo "  git branches            List branches"
-    echo "  git checkout <branch>   Switch branch"
-    echo "  git diff                Show changes"
+    echo -e "${BOLD}Git команды:${NC}"
+    echo "  git status              Git статус"
+    echo "  git log [n]             Последние n коммитов"
+    echo "  git branches            Список веток"
+    echo "  git checkout <ветка>    Переключить ветку"
+    echo "  git diff                Показать изменения"
     echo ""
-    echo -e "${BOLD}Database Commands:${NC}"
-    echo "  db shell [prod|dev]     Open psql shell"
-    echo "  db backup [prod|dev]    Create backup"
-    echo "  db restore <file>       Restore from backup"
+    echo -e "${BOLD}Команды БД:${NC}"
+    echo "  db shell [prod|dev]     Открыть psql консоль"
+    echo "  db backup [prod|dev]    Создать бэкап"
+    echo "  db restore <файл>       Восстановить из бэкапа"
     echo ""
-    echo -e "${BOLD}Examples:${NC}"
+    echo -e "${BOLD}Примеры:${NC}"
     echo "  ./manage.sh prod start"
     echo "  ./manage.sh prod logs api"
     echo "  ./manage.sh update"
@@ -714,29 +714,29 @@ show_help() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  MAIN
+#  ГЛАВНАЯ ФУНКЦИЯ
 # ═══════════════════════════════════════════════════════════════════════════════
 
 main() {
-    # Check docker
+    # Проверка docker
     check_docker || exit 1
     
-    # No arguments - interactive mode
+    # Без аргументов - интерактивный режим
     if [ $# -eq 0 ]; then
         interactive_menu
         exit 0
     fi
     
-    # Parse CLI commands
+    # Разбор CLI команд
     case "$1" in
-        # Environment
+        # Окружение
         prod)
             case "$2" in
                 start) start_prod ;;
                 stop) stop_prod ;;
                 restart) restart_prod ;;
                 logs) show_logs "prod" "$3" ;;
-                *) log_error "Unknown prod command: $2"; show_help ;;
+                *) log_error "Неизвестная команда prod: $2"; show_help ;;
             esac
             ;;
         dev)
@@ -744,7 +744,7 @@ main() {
                 start) start_dev ;;
                 stop) stop_dev ;;
                 logs) show_logs "dev" "$3" ;;
-                *) log_error "Unknown dev command: $2"; show_help ;;
+                *) log_error "Неизвестная команда dev: $2"; show_help ;;
             esac
             ;;
         switch)
@@ -754,7 +754,7 @@ main() {
             stop_all
             ;;
             
-        # Update
+        # Обновление
         update)
             update
             ;;
@@ -762,7 +762,7 @@ main() {
             rebuild "$2"
             ;;
             
-        # Status
+        # Статус
         status)
             show_status
             ;;
@@ -778,27 +778,27 @@ main() {
                 branches) git_branches ;;
                 checkout) git_checkout "$3" ;;
                 diff) git_diff ;;
-                *) log_error "Unknown git command: $2" ;;
+                *) log_error "Неизвестная git команда: $2" ;;
             esac
             ;;
             
-        # Database
+        # База данных
         db)
             case "$2" in
                 shell) db_shell "${3:-prod}" ;;
                 backup) db_backup "${3:-prod}" ;;
                 restore) db_restore "${3:-prod}" "$4" ;;
-                *) log_error "Unknown db command: $2" ;;
+                *) log_error "Неизвестная db команда: $2" ;;
             esac
             ;;
             
-        # Help
+        # Помощь
         help|--help|-h)
             show_help
             ;;
             
         *)
-            log_error "Unknown command: $1"
+            log_error "Неизвестная команда: $1"
             echo ""
             show_help
             exit 1
