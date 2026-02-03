@@ -577,14 +577,29 @@ migrate_sqlite_data() {
         return 1
     fi
     
-    # Запускаем Python скрипт миграции
-    if [ -f "scripts/migrate_sqlite_to_postgres.py" ]; then
-        python3 scripts/migrate_sqlite_to_postgres.py --sqlite tg_player.db --docker
-        return $?
-    else
-        log_error "Скрипт миграции не найден: scripts/migrate_sqlite_to_postgres.py"
+    # Проверяем что API контейнер работает (там есть все зависимости)
+    if ! docker ps --format '{{.Names}}' | grep -q "tg_player_api"; then
+        log_error "API контейнер не запущен. Запустите: docker compose -f docker-compose.prod.yml up -d"
         return 1
     fi
+    
+    # Копируем SQLite базу и скрипт в контейнер API
+    log_step "Копирование файлов в контейнер..."
+    docker cp tg_player.db tg_player_api:/tmp/tg_player.db
+    docker cp scripts/migrate_sqlite_to_postgres.py tg_player_api:/tmp/migrate_sqlite_to_postgres.py
+    
+    # Запускаем миграцию внутри контейнера (там есть sqlalchemy и asyncpg)
+    log_step "Запуск миграции внутри контейнера..."
+    docker exec tg_player_api python /tmp/migrate_sqlite_to_postgres.py \
+        --sqlite /tmp/tg_player.db \
+        --postgres "postgresql+asyncpg://postgres:postgres@postgres:5432/tg_player"
+    
+    local result=$?
+    
+    # Очистка
+    docker exec tg_player_api rm -f /tmp/tg_player.db /tmp/migrate_sqlite_to_postgres.py 2>/dev/null
+    
+    return $result
 }
 
 # Полная миграция с systemd на Docker
