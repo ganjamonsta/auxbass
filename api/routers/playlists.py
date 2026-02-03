@@ -419,10 +419,15 @@ async def get_playlist_track_ids(
     Get all track IDs for a playlist.
     
     Lightweight endpoint for shuffle - returns only IDs.
+    Allows access to public playlists even if user is not the owner.
     """
     playlist = await db.get(Playlist, playlist_id)
     
-    if not playlist or playlist.owner_id != user.id:
+    if not playlist:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    
+    # Allow access if owner or if playlist is public
+    if playlist.owner_id != user.id and not playlist.is_public:
         raise HTTPException(status_code=404, detail="Playlist not found")
     
     query = (
