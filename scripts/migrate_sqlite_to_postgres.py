@@ -115,14 +115,15 @@ async def migrate_data(sqlite_path: str, postgres_url: str, dry_run: bool = Fals
                         stats[table] = 0
                         continue
                     
-                    # Получаем колонки PostgreSQL таблицы
+                    # Получаем информацию о типах колонок PostgreSQL
                     pg_cols_result = await postgres_conn.execute(
                         text(f"""
-                            SELECT column_name FROM information_schema.columns 
+                            SELECT column_name, data_type FROM information_schema.columns 
                             WHERE table_name = '{table}' AND table_schema = 'public'
                         """)
                     )
-                    pg_columns = {row[0] for row in pg_cols_result.fetchall()}
+                    pg_columns_info = {row[0]: row[1] for row in pg_cols_result.fetchall()}
+                    pg_columns = set(pg_columns_info.keys())
                     
                     # Используем только общие колонки
                     common_columns = [c for c in columns if c in pg_columns]
@@ -149,8 +150,36 @@ async def migrate_data(sqlite_path: str, postgres_url: str, dry_run: bool = Fals
                     
                     for row in rows:
                         row_dict = dict(zip(columns, row))
-                        # Берём только общие колонки
-                        filtered_dict = {k: v for k, v in row_dict.items() if k in common_columns}
+                        # Берём только общие колонки и конвертируем типы
+                        filtered_dict = {}
+                        for k, v in row_dict.items():
+                            if k not in common_columns:
+                                continue
+                            
+                            # Конвертация типов SQLite -> PostgreSQL
+                            pg_type = pg_columns_info.get(k, '')
+                            
+                            # Boolean: SQLite хранит как 0/1
+                            if pg_type == 'boolean' and isinstance(v, int):
+                                v = bool(v)
+                            
+                            # Datetime: SQLite хранит как строку
+                            if pg_type in ('timestamp without time zone', 'timestamp with time zone'):
+                                if isinstance(v, str) and v:
+                                    try:
+                                        v = datetime.fromisoformat(v)
+                                    except:
+                                        pass
+                            
+                            # Date: SQLite хранит как строку
+                            if pg_type == 'date':
+                                if isinstance(v, str) and v:
+                                    try:
+                                        v = datetime.fromisoformat(v).date()
+                                    except:
+                                        pass
+                            
+                            filtered_dict[k] = v
                         
                         cols = ', '.join(filtered_dict.keys())
                         placeholders = ', '.join(f':{k}' for k in filtered_dict.keys())
