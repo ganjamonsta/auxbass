@@ -2,11 +2,17 @@
   <div class="library-tracks">
     <!-- Sort options -->
     <div class="sort-options">
-      <button class="shuffle-all-btn" @click="shuffleAll" :disabled="!total">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
-        </svg>
-        <span>Перемешать ({{ total }})</span>
+      <button class="shuffle-all-btn" @click="shuffleAll" :disabled="!total || shuffling">
+        <template v-if="shuffling">
+          <div class="spinner small"></div>
+          <span>Загрузка...</span>
+        </template>
+        <template v-else>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
+          </svg>
+          <span>Перемешать ({{ total }})</span>
+        </template>
       </button>
       <SortChips
         :currentOption="currentOption"
@@ -173,6 +179,7 @@ const {
 
 const loading = ref(true)
 const loadingMore = ref(false)
+const shuffling = ref(false)
 const tracks = ref([])
 const page = ref(1)
 const total = ref(0)
@@ -406,7 +413,13 @@ const handleAddToLibrary = async (track) => {
 
 // Shuffle all library tracks using lazy loading
 const shuffleAll = async () => {
-  await playerStore.playShuffleAll('library')
+  if (shuffling.value) return
+  shuffling.value = true
+  try {
+    await playerStore.playShuffleAll('library')
+  } finally {
+    shuffling.value = false
+  }
 }
 
 onMounted(() => {

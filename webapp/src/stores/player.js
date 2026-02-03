@@ -1609,9 +1609,19 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
+  // Flag to prevent multiple simultaneous shuffle requests
+  let shuffleInProgress = false
+
   // Play with shuffle from all tracks in context (library, artist, album, playlist)
   // This fetches all track IDs with shuffle order and plays lazily
   const playShuffleAll = async (context, contextId = null, contextName = null) => {
+    // Prevent multiple simultaneous shuffle requests
+    if (shuffleInProgress) {
+      console.log('[Lazy Shuffle] Already in progress, ignoring request')
+      return
+    }
+    
+    shuffleInProgress = true
     loading.value = true
     console.log(`[Lazy Shuffle] Starting shuffle for ${context}`, contextId || contextName || '')
     
@@ -1643,6 +1653,7 @@ export const usePlayerStore = defineStore('player', () => {
       if (!ids || ids.length === 0) {
         console.warn('[Lazy Shuffle] No tracks found')
         loading.value = false
+        shuffleInProgress = false
         return
       }
       
@@ -1669,6 +1680,7 @@ export const usePlayerStore = defineStore('player', () => {
         console.error('[Lazy Shuffle] Failed to load first track')
         clearLazyShuffle()
         loading.value = false
+        shuffleInProgress = false
         return
       }
       
@@ -1687,10 +1699,14 @@ export const usePlayerStore = defineStore('player', () => {
       
       await play(firstTrack)
       
+      // Mark shuffle as complete after playback starts
+      shuffleInProgress = false
+      
     } catch (error) {
       console.error('[Lazy Shuffle] Failed to start shuffle:', error)
       clearLazyShuffle()
       loading.value = false
+      shuffleInProgress = false
     }
   }
 
