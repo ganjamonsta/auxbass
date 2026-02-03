@@ -707,11 +707,18 @@ export const usePlayerStore = defineStore('player', () => {
       updatePositionState()
     })
     
-    audio.value.addEventListener('ended', () => {
+    audio.value.addEventListener('ended', (e) => {
+      // Ignore ended events from obsolete (swapped out) audio elements
+      if (e.target?._obsolete) {
+        console.log('[Audio Ended] Ignoring ended event from obsolete audio element')
+        return
+      }
       handleEnded()
     })
     
     audio.value.addEventListener('play', () => {
+      // Clear obsolete flag on successful play (audio is active now)
+      if (audio.value) audio.value._obsolete = false
       isPlaying.value = true
       isSkipping = false  // Reset skip flag on successful playback
       consecutiveSkipCount = 0  // Reset skip counter on successful play
@@ -900,11 +907,18 @@ export const usePlayerStore = defineStore('player', () => {
       updatePositionState()
     })
     
-    audio.value.addEventListener('ended', () => {
+    audio.value.addEventListener('ended', (e) => {
+      // Ignore ended events from obsolete (swapped out) audio elements
+      if (e.target?._obsolete) {
+        console.log('[Audio Ended] Ignoring ended event from obsolete audio element')
+        return
+      }
       handleEnded()
     })
     
     audio.value.addEventListener('play', () => {
+      // Clear obsolete flag on successful play (audio is active now)
+      if (audio.value) audio.value._obsolete = false
       isPlaying.value = true
       isSkipping = false  // Reset skip flag on successful playback
       consecutiveSkipCount = 0  // Reset consecutive skip counter
@@ -1689,11 +1703,15 @@ export const usePlayerStore = defineStore('player', () => {
       queueIndex.value = 0
       
       // === Force fresh playback ===
-      // Stop current audio to prevent toggle behavior
+      // Stop current audio and mark as obsolete to prevent toggle behavior
+      // and ignore any stale 'ended' events from the cleared source
       if (audio.value) {
+        audio.value._obsolete = true  // Mark to ignore events
         audio.value.pause()
         audio.value.src = ''
       }
+      // Reset duration to prevent false 'ended' events
+      duration.value = 0
       // Clear current track to force new playback
       currentTrack.value = null
       
@@ -1902,6 +1920,7 @@ export const usePlayerStore = defineStore('player', () => {
         console.log(`[Next] Using preloaded Audio element, readyState: ${preloadedAudio.readyState}, networkState: ${preloadedAudio.networkState}`)
       
         if (audio.value) {
+          audio.value._obsolete = true  // Mark old audio to ignore its events
           audio.value.pause()
           audio.value.src = ''
         }
@@ -2123,6 +2142,23 @@ export const usePlayerStore = defineStore('player', () => {
     const track = currentTrack.value
     const playedDuration = audio.value?.currentTime || 0
     const totalDuration = duration.value || 0
+    
+    // === GUARD: Ignore false 'ended' events ===
+    // This can happen when:
+    // 1. audio.src is set to '' during track change
+    // 2. Stream is interrupted before any data is loaded
+    // 3. Browser fires ended on empty/invalid source
+    if (!track || totalDuration === 0 || !audio.value?.src) {
+      console.log(`[Track Ended] Ignoring false 'ended' event (no track, zero duration, or no src)`)
+      return
+    }
+    
+    // === GUARD: Ignore if ended fires too early (less than 1 second played) ===
+    // This catches race conditions during shuffle start / track switching
+    if (playedDuration < 1 && totalDuration > 5) {
+      console.warn(`[Track Ended] Ignoring premature 'ended' event: played=${playedDuration.toFixed(3)}s, duration=${totalDuration.toFixed(2)}s`)
+      return
+    }
     
     // Detect suspicious early endings (less than 5 seconds or less than 10% of track)
     const isSuspiciousEnd = playedDuration < 5 || (totalDuration > 0 && playedDuration < totalDuration * 0.1)
@@ -2531,6 +2567,7 @@ export const usePlayerStore = defineStore('player', () => {
   // Stop
   const stop = () => {
     if (audio.value) {
+      audio.value._obsolete = true  // Mark to ignore any pending events
       audio.value.pause()
       audio.value.src = ''
     }
