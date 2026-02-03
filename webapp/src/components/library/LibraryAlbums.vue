@@ -41,9 +41,13 @@
       <!-- Infinite scroll trigger -->
       <div ref="loadTriggerRef" class="load-trigger" v-show="hasMore && !loading"></div>
 
-      <!-- Loading more indicator -->
-      <div v-if="loadingMore" class="loading-more">
-        <div class="spinner"></div>
+      <!-- Loading more with skeletons -->
+      <div v-if="loadingMore" class="albums-grid loading-more-grid">
+        <GridSkeleton 
+          v-for="i in loadingSkeletonCount" 
+          :key="'skeleton-more-' + i" 
+          type="album" 
+        />
       </div>
     </template>
   </div>
@@ -101,6 +105,7 @@ const {
   hasMore,
   initialized,
   loadTriggerRef,
+  loadingSkeletonCount,
   reset,
   refresh
 } = useVirtualScroll({
@@ -117,7 +122,8 @@ const {
     const response = await api.get('/albums', { params })
     return response.data
   },
-  limit: 30
+  limit: 30,
+  skeletonCount: 6
 })
 
 // Watch search query to reload

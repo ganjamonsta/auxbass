@@ -19,6 +19,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
  * @param {number} [options.bufferSize=2] - Number of pages to keep in buffer (for virtualize mode)
  * @param {string} [options.rootMargin='200px'] - IntersectionObserver margin for triggering loads
  * @param {Ref<HTMLElement>} [options.scrollContainer=null] - Custom scroll container ref
+ * @param {number} [options.skeletonCount=6] - Number of skeleton placeholders to show when loading more
  * 
  * @example
  * const { 
@@ -37,7 +38,9 @@ export function useVirtualScroll(options) {
     virtualize = false,
     bufferSize = 2,
     rootMargin = '200px',
-    scrollContainer = null
+    scrollContainer = null,
+    // New option: number of skeleton placeholders to show when loading more
+    skeletonCount = 6
   } = options
 
   // State
@@ -86,6 +89,14 @@ export function useVirtualScroll(options) {
   const bottomSkeletonCount = computed(() => {
     if (!virtualize) return 0
     return Math.max(0, total.value - visibleEndIndex.value)
+  })
+
+  // Skeleton count to show when loading more items (for infinite scroll)
+  const loadingSkeletonCount = computed(() => {
+    if (!loadingMore.value) return 0
+    // Show skeletons equal to remaining items or skeletonCount, whichever is smaller
+    const remaining = total.value - items.value.length
+    return Math.min(Math.max(remaining, 0), skeletonCount)
   })
 
   /**
@@ -269,6 +280,9 @@ export function useVirtualScroll(options) {
     // Skeleton counts for virtual scrolling
     topSkeletonCount,
     bottomSkeletonCount,
+    
+    // Skeleton count for loading more (infinite scroll)
+    loadingSkeletonCount,
     
     // Refs for DOM elements
     loadTriggerRef,

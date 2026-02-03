@@ -73,7 +73,7 @@
       </div>
 
       <!-- Loading state with skeletons -->
-      <div v-if="loadingAlbums && !albums.length" class="media-grid type-album">
+      <div v-if="loadingAlbums && !albumsInitialized" class="media-grid type-album">
         <GridSkeleton v-for="i in 12" :key="i" type="album" />
       </div>
 
@@ -89,9 +89,13 @@
         <!-- Infinite scroll trigger -->
         <div ref="albumsLoadTrigger" class="load-trigger" v-show="hasMoreAlbums && !loadingAlbums"></div>
 
-        <!-- Loading more indicator -->
-        <div v-if="loadingMoreAlbums" class="loading-more">
-          <div class="spinner"></div>
+        <!-- Loading more with skeletons -->
+        <div v-if="loadingMoreAlbums" class="media-grid type-album loading-more-grid">
+          <GridSkeleton 
+            v-for="i in albumsLoadingSkeletonCount" 
+            :key="'skeleton-more-' + i" 
+            type="album" 
+          />
         </div>
       </template>
     </div>
@@ -207,6 +211,7 @@ import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
+import { useVirtualScroll } from '@/composables'
 import SortChips from '@/components/SortChips.vue'
 import SearchBar from '@/components/ui/SearchBar.vue'
 import MediaGrid from '@/components/MediaGrid.vue'
@@ -250,17 +255,9 @@ const ALBUM_SORT_OPTIONS = [
   { value: 'track_count', label: 'Треки', icon: 'Music' }
 ]
 
-// Albums state
-const albums = ref([])
-const albumsTotal = ref(0)
-const albumsOffset = ref(0)
-const loadingAlbums = ref(true)
-const loadingMoreAlbums = ref(false)
-const hasMoreAlbums = ref(true)
+// Albums sort state
 const albumSortBy = ref('release_date')
 const albumSortOrder = ref('desc')
-const albumsLoadTrigger = ref(null)
-let albumsObserver = null
 
 // Album search state
 const albumSearchQuery = ref('')
@@ -275,10 +272,49 @@ const debouncedAlbumSearch = () => {
     resetAlbums()
   }, 300)
 }
+
 const albumSortOption = computed(() => {
   return ALBUM_SORT_OPTIONS.find(opt => opt.value === albumSortBy.value) || ALBUM_SORT_OPTIONS[0]
 })
+
 const ALBUMS_PER_PAGE = 30
+
+// Fetch function for albums virtual scroll
+const fetchAlbumsData = async ({ offset, limit }) => {
+  const endpoint = albumScope.value === 'global' ? '/albums/global' : '/albums'
+  const params = {
+    offset,
+    limit,
+    sort_by: albumSortBy.value,
+    sort_order: albumSortOrder.value,
+    min_tracks: albumScope.value === 'global' ? 1 : 2
+  }
+  
+  if (albumSearchQuery.value) {
+    params.search = albumSearchQuery.value
+  }
+  
+  const response = await api.get(endpoint, { params })
+  return response.data
+}
+
+// Albums infinite scroll with unified composable
+const {
+  items: albums,
+  total: albumsTotal,
+  loading: loadingAlbums,
+  loadingMore: loadingMoreAlbums,
+  hasMore: hasMoreAlbums,
+  initialized: albumsInitialized,
+  loadTriggerRef: albumsLoadTrigger,
+  loadingSkeletonCount: albumsLoadingSkeletonCount,
+  reset: resetAlbums
+} = useVirtualScroll({
+  fetchFn: fetchAlbumsData,
+  limit: ALBUMS_PER_PAGE,
+  immediate: false, // Will load in onMounted based on activeTab
+  skeletonCount: 6
+})
 
 // Playlists state
 const playlists = ref([])
@@ -359,81 +395,6 @@ const togglePlaylistStatus = async (playlist) => {
     uiStore.toast.error('Ошибка', 'Не удалось обновить статус')
   }
 }
-
-// Albums functions
-const loadAlbums = async (append = false) => {
-  if (!append) {
-    loadingAlbums.value = true
-  } else {
-    loadingMoreAlbums.value = true
-  }
-  
-  try {
-    const endpoint = albumScope.value === 'global' ? '/albums/global' : '/albums'
-    const params = {
-      offset: albumsOffset.value,
-      limit: ALBUMS_PER_PAGE,
-      sort_by: albumSortBy.value,
-      sort_order: albumSortOrder.value,
-      min_tracks: albumScope.value === 'global' ? 1 : 2
-    }
-    
-    if (albumSearchQuery.value) {
-      params.search = albumSearchQuery.value
-    }
-    
-    const response = await api.get(endpoint, { params })
-    const newItems = response.data.items || []
-    
-    if (append) {
-      albums.value = [...albums.value, ...newItems]
-    } else {
-      albums.value = newItems
-    }
-    
-    albumsTotal.value = response.data.total || 0
-    hasMoreAlbums.value = albums.value.length < albumsTotal.value
-  } finally {
-    loadingAlbums.value = false
-    loadingMoreAlbums.value = false
-  }
-}
-
-const loadMoreAlbums = async () => {
-  if (loadingMoreAlbums.value || loadingAlbums.value || !hasMoreAlbums.value) return
-  albumsOffset.value = albums.value.length
-  await loadAlbums(true)
-}
-
-const resetAlbums = () => {
-  albums.value = []
-  albumsOffset.value = 0
-  hasMoreAlbums.value = true
-  loadAlbums()
-}
-
-// Setup IntersectionObserver for albums
-const setupAlbumsObserver = () => {
-  if (albumsObserver) albumsObserver.disconnect()
-  
-  albumsObserver = new IntersectionObserver(
-    (entries) => {
-      if (entries[0].isIntersecting && hasMoreAlbums.value && !loadingAlbums.value && !loadingMoreAlbums.value) {
-        loadMoreAlbums()
-      }
-    },
-    { rootMargin: '200px' }
-  )
-  
-  if (albumsLoadTrigger.value) {
-    albumsObserver.observe(albumsLoadTrigger.value)
-  }
-}
-
-// Watch loadTrigger to setup observer
-watch(albumsLoadTrigger, (el) => {
-  if (el) setupAlbumsObserver()
-})
 
 const goToAlbum = (album) => {
   const query = albumScope.value === 'global' ? { scope: 'global' } : {}
@@ -525,7 +486,7 @@ const shufflePlaylist = async (playlist) => {
 // Load data on tab change
 watch(activeTab, (tab) => {
   if (tab === 'albums' && albums.value.length === 0) {
-    loadAlbums()
+    resetAlbums()
   } else if (tab === 'playlists' && playlists.value.length === 0) {
     loadPlaylists()
     loadPublicPlaylists()
@@ -547,7 +508,7 @@ onMounted(() => {
   
   // Load initial tab data
   if (activeTab.value === 'albums') {
-    loadAlbums()
+    resetAlbums()
   } else {
     loadPlaylists()
     loadPublicPlaylists()
@@ -579,7 +540,6 @@ const handleResetState = (event) => {
 
 onUnmounted(() => {
   window.removeEventListener('reset-view-state', handleResetState)
-  if (albumsObserver) albumsObserver.disconnect()
 })
 </script>
 
@@ -986,26 +946,9 @@ onUnmounted(() => {
   padding: 24px;
 }
 
-.spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--c-bg-3);
-  border-top-color: var(--c-accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
+/* spinner, load-trigger, loading-more are in design-system.css */
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.load-trigger {
-  height: 1px;
-}
-
-.loading-more {
-  display: flex;
-  justify-content: center;
-  padding: 24px;
+.loading-more-grid {
+  margin-top: 16px;
 }
 </style>

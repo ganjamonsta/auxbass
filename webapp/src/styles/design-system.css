@@ -1251,6 +1251,15 @@
   font-size: 14px;
 }
 
+/* Skeleton grid for loading more items */
+.loading-more-grid {
+  margin-top: 16px;
+}
+
+.loading-more-tracks {
+  margin-top: 8px;
+}
+
 .load-trigger {
   height: 1px;
 }

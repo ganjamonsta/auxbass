@@ -507,7 +507,5 @@ onUnmounted(() => {
   font-size: 13px;
 }
 
-.load-trigger {
-  height: 1px;
-}
+/* load-trigger is in design-system.css */
 </style>

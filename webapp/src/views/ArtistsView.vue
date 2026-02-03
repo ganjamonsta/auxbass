@@ -64,9 +64,13 @@
       <!-- Infinite scroll trigger -->
       <div ref="loadTriggerRef" class="load-trigger" v-show="hasMore && !loading"></div>
       
-      <!-- Loading more indicator -->
-      <div v-if="loadingMore" class="loading-more">
-        <div class="spinner"></div>
+      <!-- Loading more with skeletons -->
+      <div v-if="loadingMore" class="media-grid type-artist loading-more-grid">
+        <GridSkeleton 
+          v-for="i in loadingSkeletonCount" 
+          :key="'skeleton-more-' + i" 
+          type="artist" 
+        />
       </div>
     </template>
   </div>
@@ -143,12 +147,14 @@ const {
   hasMore,
   initialized,
   loadTriggerRef,
+  loadingSkeletonCount,
   reset,
   refresh
 } = useVirtualScroll({
   fetchFn: fetchArtists,
   limit: 30,
-  immediate: false // We'll load after scope is set
+  immediate: false, // We'll load after scope is set
+  skeletonCount: 6
 })
 
 // Change scope handler

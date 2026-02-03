@@ -112,9 +112,12 @@
         <!-- Infinite scroll trigger -->
         <div ref="loadTriggerRef" class="load-trigger" v-show="hasMoreTracks && !tracksLoadingMore"></div>
         
-        <!-- Loading more indicator -->
-        <div v-if="tracksLoadingMore" class="loading-more">
-          <div class="spinner"></div>
+        <!-- Loading more with skeletons -->
+        <div v-if="tracksLoadingMore" class="track-list loading-more-tracks">
+          <TrackSkeleton 
+            v-for="i in tracksLoadingSkeletonCount" 
+            :key="'skeleton-more-' + i" 
+          />
         </div>
       </template>
     </section>
@@ -187,11 +190,13 @@ const {
   hasMore: hasMoreTracks,
   initialized: tracksInitialized,
   loadTriggerRef,
+  loadingSkeletonCount: tracksLoadingSkeletonCount,
   reset: resetTracks
 } = useVirtualScroll({
   fetchFn: fetchArtistTracks,
   limit: 30,
-  immediate: false // Load after artist info is fetched
+  immediate: false, // Load after artist info is fetched
+  skeletonCount: 8
 })
 
 const loadArtist = async () => {
@@ -513,14 +518,10 @@ watch(
   gap: 2px;
 }
 
-.load-trigger {
-  height: 1px;
-}
+/* load-trigger, loading-more are in design-system.css */
 
-.loading-more {
-  display: flex;
-  justify-content: center;
-  padding: 16px;
+.loading-more-tracks {
+  margin-top: 8px;
 }
 
 .loading {
