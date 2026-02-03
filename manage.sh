@@ -471,6 +471,189 @@ git_diff() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  МИГРАЦИЯ С SYSTEMD
+# ═══════════════════════════════════════════════════════════════════════════════
+
+SYSTEMD_SERVICES="tg-player-api tg-player-bot tg-player-webapp"
+
+# Проверить статус systemd сервисов
+check_systemd() {
+    echo -e "${BOLD}🔧 Статус systemd сервисов${NC}"
+    echo ""
+    
+    for service in $SYSTEMD_SERVICES; do
+        local status=$(systemctl is-active "$service" 2>/dev/null || echo "не найден")
+        local enabled=$(systemctl is-enabled "$service" 2>/dev/null || echo "—")
+        
+        case "$status" in
+            active)
+                echo -e "  ${GREEN}●${NC} $service: ${GREEN}работает${NC} (автозапуск: $enabled)"
+                ;;
+            inactive)
+                echo -e "  ${RED}○${NC} $service: ${DIM}остановлен${NC} (автозапуск: $enabled)"
+                ;;
+            *)
+                echo -e "  ${DIM}○${NC} $service: ${DIM}$status${NC}"
+                ;;
+        esac
+    done
+    echo ""
+}
+
+# Остановить и отключить systemd сервисы
+stop_systemd() {
+    log_step "Остановка systemd сервисов..."
+    
+    for service in $SYSTEMD_SERVICES; do
+        if systemctl is-active "$service" &>/dev/null; then
+            sudo systemctl stop "$service"
+            log_ok "Остановлен: $service"
+        fi
+    done
+}
+
+disable_systemd() {
+    log_step "Отключение автозапуска systemd сервисов..."
+    
+    for service in $SYSTEMD_SERVICES; do
+        if systemctl is-enabled "$service" &>/dev/null; then
+            sudo systemctl disable "$service"
+            log_ok "Отключён: $service"
+        fi
+    done
+}
+
+# Бэкап базы из systemd PostgreSQL (на хосте)
+backup_host_db() {
+    local filename="migration_backup_$(date +%Y%m%d_%H%M%S).sql"
+    
+    log_step "Создание бэкапа базы данных хоста..."
+    
+    if command -v pg_dump &>/dev/null; then
+        sudo -u postgres pg_dump tg_player > "$filename"
+        log_ok "Бэкап сохранён: $filename"
+        echo "$filename"
+    else
+        log_error "pg_dump не найден. Установи PostgreSQL client или сделай бэкап вручную"
+        return 1
+    fi
+}
+
+# Полная миграция с systemd на Docker
+migrate_to_docker() {
+    print_mini_header
+    echo -e "${BOLD}${ICON_ROCKET} Миграция с systemd на Docker${NC}"
+    echo ""
+    
+    # Показать текущий статус
+    check_systemd
+    
+    echo -e "${YELLOW}Это выполнит:${NC}"
+    echo "  1. Создаст бэкап базы данных"
+    echo "  2. Остановит systemd сервисы (api, bot, webapp)"
+    echo "  3. Отключит их автозапуск"
+    echo "  4. Запустит Docker контейнеры"
+    echo "  5. Восстановит базу в Docker PostgreSQL"
+    echo ""
+    
+    read -p "Продолжить миграцию? [y/N] " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        log_info "Миграция отменена"
+        return 0
+    fi
+    
+    echo ""
+    
+    # Шаг 1: Бэкап
+    log_step "Шаг 1/5: Бэкап базы данных..."
+    local backup_file=$(backup_host_db)
+    if [ $? -ne 0 ]; then
+        log_error "Не удалось создать бэкап. Миграция прервана."
+        return 1
+    fi
+    
+    # Шаг 2: Остановка systemd
+    echo ""
+    log_step "Шаг 2/5: Остановка systemd сервисов..."
+    stop_systemd
+    
+    # Шаг 3: Отключение автозапуска
+    echo ""
+    log_step "Шаг 3/5: Отключение автозапуска..."
+    disable_systemd
+    
+    # Шаг 4: Запуск Docker
+    echo ""
+    log_step "Шаг 4/5: Запуск Docker контейнеров..."
+    
+    if [ ! -f ".env" ]; then
+        log_warn "Файл .env не найден, копирую из .env.example"
+        cp .env.example .env
+        log_warn "Отредактируй .env и запусти миграцию заново!"
+        return 1
+    fi
+    
+    docker compose -f "$PROD_COMPOSE" up -d --build
+    
+    # Подождать пока PostgreSQL поднимется
+    log_step "Ожидание запуска PostgreSQL..."
+    sleep 10
+    
+    # Шаг 5: Восстановление базы
+    echo ""
+    log_step "Шаг 5/5: Восстановление базы данных..."
+    
+    if [ -f "$backup_file" ]; then
+        cat "$backup_file" | docker exec -i tg_player_db psql -U postgres -d tg_player
+        log_ok "База данных восстановлена"
+    else
+        log_warn "Файл бэкапа не найден, пропускаю восстановление"
+    fi
+    
+    echo ""
+    echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}"
+    log_ok "Миграция завершена!"
+    echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo "  Бэкап сохранён: $backup_file"
+    echo ""
+    echo "  Проверь статус: ./manage.sh status"
+    echo "  Логи:           ./manage.sh prod logs"
+    echo ""
+    echo -e "  ${DIM}Старые systemd сервисы отключены, но файлы остались в /etc/systemd/system/${NC}"
+    echo -e "  ${DIM}Удалить их можно командой: sudo rm /etc/systemd/system/tg-player-*.service${NC}"
+}
+
+# Откат на systemd (если что-то пошло не так)
+rollback_to_systemd() {
+    print_mini_header
+    echo -e "${BOLD}⏪ Откат на systemd${NC}"
+    echo ""
+    
+    log_warn "Это остановит Docker и вернёт systemd сервисы"
+    read -p "Продолжить? [y/N] " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        return 0
+    fi
+    
+    # Остановить Docker
+    log_step "Остановка Docker контейнеров..."
+    docker compose -f "$PROD_COMPOSE" down
+    
+    # Включить и запустить systemd
+    log_step "Включение systemd сервисов..."
+    for service in $SYSTEMD_SERVICES; do
+        sudo systemctl enable "$service" 2>/dev/null || true
+        sudo systemctl start "$service" 2>/dev/null || true
+    done
+    
+    log_ok "Откат завершён"
+    check_systemd
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  ОПЕРАЦИИ С БАЗОЙ ДАННЫХ
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -573,6 +756,11 @@ show_menu() {
     echo -e "    ${CYAN}B${NC}) Бэкап базы"
     echo -e "    ${CYAN}R${NC}) Восстановить базу"
     echo ""
+    echo -e "  ${BOLD}Миграция${NC}"
+    echo -e "    ${CYAN}m${NC}) Мигрировать с systemd на Docker"
+    echo -e "    ${CYAN}M${NC}) Откат на systemd"
+    echo -e "    ${CYAN}S${NC}) Статус systemd сервисов"
+    echo ""
     echo -e "    ${CYAN}q${NC}) Выход"
     echo ""
 }
@@ -648,6 +836,9 @@ interactive_menu() {
                 db_restore "$env" "$file"
                 read -p "Нажми Enter для продолжения..."
                 ;;
+            m) migrate_to_docker; read -p "Нажми Enter для продолжения..." ;;
+            M) rollback_to_systemd; read -p "Нажми Enter для продолжения..." ;;
+            S) check_systemd; read -p "Нажми Enter для продолжения..." ;;
             q|Q) 
                 echo ""
                 log_info "Пока!"
@@ -704,6 +895,13 @@ show_help() {
     echo "  db shell [prod|dev]     Открыть psql консоль"
     echo "  db backup [prod|dev]    Создать бэкап"
     echo "  db restore <файл>       Восстановить из бэкапа"
+    echo ""
+    echo -e "${BOLD}Миграция:${NC}"
+    echo "  migrate                 Мигрировать с systemd на Docker"
+    echo "  rollback                Откатиться на systemd"
+    echo "  systemd status          Статус systemd сервисов"
+    echo "  systemd stop            Остановить systemd сервисы"
+    echo "  systemd disable         Отключить автозапуск systemd"
     echo ""
     echo -e "${BOLD}Примеры:${NC}"
     echo "  ./manage.sh prod start"
@@ -789,6 +987,22 @@ main() {
                 backup) db_backup "${3:-prod}" ;;
                 restore) db_restore "${3:-prod}" "$4" ;;
                 *) log_error "Неизвестная db команда: $2" ;;
+            esac
+            ;;
+        
+        # Миграция с systemd
+        migrate)
+            migrate_to_docker
+            ;;
+        rollback)
+            rollback_to_systemd
+            ;;
+        systemd)
+            case "$2" in
+                status) check_systemd ;;
+                stop) stop_systemd ;;
+                disable) disable_systemd ;;
+                *) log_error "Неизвестная systemd команда: $2"; echo "Доступно: status, stop, disable" ;;
             esac
             ;;
             
