@@ -523,18 +523,66 @@ disable_systemd() {
     done
 }
 
-# Бэкап базы из systemd PostgreSQL (на хосте)
+# Бэкап базы из systemd (PostgreSQL или SQLite)
 backup_host_db() {
     local filename="migration_backup_$(date +%Y%m%d_%H%M%S).sql"
     
     log_step "Создание бэкапа базы данных хоста..."
     
+    # Определяем тип базы данных из .env
+    local db_url=""
+    if [ -f ".env" ]; then
+        db_url=$(grep "^DATABASE_URL=" .env | cut -d'=' -f2-)
+    fi
+    
+    # Проверяем SQLite
+    if [[ "$db_url" == *"sqlite"* ]] || [ -f "tg_player.db" ]; then
+        log_info "Обнаружена SQLite база данных"
+        
+        if [ -f "tg_player.db" ]; then
+            local sqlite_backup="migration_backup_$(date +%Y%m%d_%H%M%S).db"
+            cp tg_player.db "$sqlite_backup"
+            log_ok "SQLite бэкап сохранён: $sqlite_backup"
+            echo "$sqlite_backup"
+            return 0
+        else
+            log_error "SQLite файл tg_player.db не найден"
+            return 1
+        fi
+    fi
+    
+    # PostgreSQL на хосте
     if command -v pg_dump &>/dev/null; then
         sudo -u postgres pg_dump tg_player > "$filename"
-        log_ok "Бэкап сохранён: $filename"
+        log_ok "PostgreSQL бэкап сохранён: $filename"
         echo "$filename"
     else
         log_error "pg_dump не найден. Установи PostgreSQL client или сделай бэкап вручную"
+        return 1
+    fi
+}
+
+# Миграция данных из SQLite в Docker PostgreSQL
+migrate_sqlite_data() {
+    log_step "Миграция данных из SQLite в PostgreSQL..."
+    
+    if [ ! -f "tg_player.db" ]; then
+        log_error "SQLite файл tg_player.db не найден"
+        return 1
+    fi
+    
+    # Проверяем что PostgreSQL контейнер работает
+    if ! docker exec tg_player_db pg_isready -U postgres &>/dev/null; then
+        log_error "PostgreSQL контейнер не готов. Запустите: docker compose -f docker-compose.prod.yml up -d"
+        return 1
+    fi
+    
+    # Запускаем Python скрипт миграции
+    if [ -f "scripts/migrate_sqlite_to_postgres.py" ]; then
+        python3 scripts/migrate_sqlite_to_postgres.py --sqlite tg_player.db --docker
+        return $?
+    else
+        log_error "Скрипт миграции не найден: scripts/migrate_sqlite_to_postgres.py"
         return 1
     fi
 }
@@ -605,10 +653,23 @@ migrate_to_docker() {
     log_step "Шаг 5/5: Восстановление базы данных..."
     
     if [ -f "$backup_file" ]; then
-        cat "$backup_file" | docker exec -i tg_player_db psql -U postgres -d tg_player
+        # Проверяем тип бэкапа (SQLite .db или PostgreSQL .sql)
+        if [[ "$backup_file" == *.db ]]; then
+            log_info "Обнаружен SQLite бэкап, запускаю миграцию данных..."
+            migrate_sqlite_data
+        else
+            # PostgreSQL SQL дамп
+            cat "$backup_file" | docker exec -i tg_player_db psql -U postgres -d tg_player
+        fi
         log_ok "База данных восстановлена"
     else
         log_warn "Файл бэкапа не найден, пропускаю восстановление"
+        
+        # Проверяем есть ли SQLite база для миграции
+        if [ -f "tg_player.db" ]; then
+            log_info "Найден файл tg_player.db, запускаю миграцию..."
+            migrate_sqlite_data
+        fi
     fi
     
     echo ""
@@ -895,9 +956,11 @@ show_help() {
     echo "  db shell [prod|dev]     Открыть psql консоль"
     echo "  db backup [prod|dev]    Создать бэкап"
     echo "  db restore <файл>       Восстановить из бэкапа"
+    echo "  db migrate-sqlite       Мигрировать данные из SQLite в Docker PostgreSQL"
     echo ""
     echo -e "${BOLD}Миграция:${NC}"
     echo "  migrate                 Мигрировать с systemd на Docker"
+    echo "  migrate-data            Только миграция данных SQLite → PostgreSQL"
     echo "  rollback                Откатиться на systemd"
     echo "  systemd status          Статус systemd сервисов"
     echo "  systemd stop            Остановить systemd сервисы"
@@ -986,13 +1049,18 @@ main() {
                 shell) db_shell "${3:-prod}" ;;
                 backup) db_backup "${3:-prod}" ;;
                 restore) db_restore "${3:-prod}" "$4" ;;
-                *) log_error "Неизвестная db команда: $2" ;;
+                migrate-sqlite) migrate_sqlite_data ;;
+                *) log_error "Неизвестная db команда: $2"; echo "Доступно: shell, backup, restore, migrate-sqlite" ;;
             esac
             ;;
         
         # Миграция с systemd
         migrate)
             migrate_to_docker
+            ;;
+        migrate-data)
+            # Только миграция данных из SQLite (без остановки systemd)
+            migrate_sqlite_data
             ;;
         rollback)
             rollback_to_systemd
