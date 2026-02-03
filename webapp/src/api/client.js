@@ -138,8 +138,11 @@ export const tracksApi = {
   // My library (cached)
   getAll: cacheable((params = {}) => api.get('/tracks', { params })),
   // Bypass cache when sort_by is 'random' to get fresh shuffled order each time
+  // Add timestamp to ensure truly random results on every call
   getAllIds: (params = {}) => api.get('/tracks/ids', { 
-    params, 
+    params: params.sort_by === 'random' 
+      ? { ...params, _t: Date.now() }  // Add timestamp to bypass any caching
+      : params, 
     bypassCache: params.sort_by === 'random' 
   }),
   getOne: cacheable((id) => api.get(`/tracks/${id}`)),
@@ -149,8 +152,11 @@ export const tracksApi = {
   getArtistImage: cacheable((artistName) => api.get(`/tracks/artist-image/${encodeURIComponent(artistName)}`)),
   getArtistDetail: cacheable((artistName, scope = 'library') => api.get(`/tracks/artist/${encodeURIComponent(artistName)}`, { params: { scope } })),
   // Bypass cache when sort_by is 'random' to get fresh shuffled order each time
+  // Add timestamp to ensure truly random results on every call
   getArtistIds: (artistName, params = {}) => api.get(`/tracks/artist/${encodeURIComponent(artistName)}/ids`, { 
-    params, 
+    params: params.sort_by === 'random' 
+      ? { ...params, _t: Date.now() }  // Add timestamp to bypass any caching
+      : params, 
     bypassCache: params.sort_by === 'random' 
   }),
   getGenres: cacheable((scope = 'library') => api.get('/tracks/genres', { params: { scope } })),
@@ -181,8 +187,11 @@ export const playlistsApi = {
   getAll: cacheable(() => api.get('/playlists')),
   getOne: cacheable((id) => api.get(`/playlists/${id}`)),
   // Bypass cache when shuffle is requested to get fresh random order
+  // Add timestamp to ensure truly random results on every call
   getIds: (id, params = {}) => api.get(`/playlists/${id}/ids`, { 
-    params, 
+    params: params.shuffle 
+      ? { ...params, _t: Date.now() }  // Add timestamp to bypass any caching
+      : params, 
     bypassCache: params.shuffle === true 
   }),
   create: nonCacheable((data) => api.post('/playlists', data), 'playlist'),
@@ -208,8 +217,11 @@ export const albumsApi = {
   getGlobal: cacheable((params = {}) => api.get('/albums/global', { params })),
   getOne: cacheable((id) => api.get(`/albums/${id}`)),
   // Bypass cache when shuffle is requested to get fresh random order
+  // Add timestamp to ensure truly random results on every call
   getIds: (id, params = {}) => api.get(`/albums/${id}/ids`, { 
-    params, 
+    params: params.shuffle 
+      ? { ...params, _t: Date.now() }  // Add timestamp to bypass any caching
+      : params, 
     bypassCache: params.shuffle === true 
   }),
 }
