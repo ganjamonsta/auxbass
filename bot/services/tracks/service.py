@@ -142,12 +142,19 @@ class TrackService:
             
             is_new = False
             
+            mime_type_normalized = mime_type.lower() if mime_type else None
+
             if existing_track:
                 track = existing_track
                 # Update file_id if needed (can change when user re-sends file)
                 if track.file_id != file_id:
                     track.file_id = file_id
                     logger.info(f"Updated file_id for track {track.id}: {title} - {artist}")
+
+                # Backfill mime_type if we now know it
+                if mime_type_normalized and track.mime_type != mime_type_normalized:
+                    track.mime_type = mime_type_normalized
+                    logger.info(f"Updated mime_type for track {track.id} to {mime_type_normalized}")
                 
                 # Clear is_unavailable flag if it was set
                 # This "resurrects" tracks that became unavailable due to stale file_id
@@ -176,7 +183,7 @@ class TrackService:
                     normalized_artist=normalize_artist(sanitized_artist) if sanitized_artist else None,
                     duration=duration,
                     file_size=file_size,
-                    mime_type=mime_type,
+                    mime_type=mime_type_normalized,
                     file_name=file_name,
                     uploader_id=user_id,
                     forward_source_type=forward_source_type,
