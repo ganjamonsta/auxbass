@@ -2,7 +2,7 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 #  TG Player Manager v2.0
 # ═══════════════════════════════════════════════════════════════════════════════
-#  Универсальный менеджер для управления dev и prod окружениями
+#  Менеджер для управления production окружением
 #
 #  Использование:
 #    ./manage.sh                    # Интерактивное меню
@@ -10,10 +10,9 @@
 #
 #  Примеры:
 #    ./manage.sh status             # Статус всех сервисов
-#    ./manage.sh prod start         # Запустить prod
-#    ./manage.sh dev logs api       # Логи API в dev
+#    ./manage.sh start              # Запустить production
+#    ./manage.sh logs api           # Логи API
 #    ./manage.sh update             # Обновить код и пересобрать
-#    ./manage.sh switch dev         # Переключиться на dev
 # ═══════════════════════════════════════════════════════════════════════════════
 
 set -e
@@ -27,7 +26,6 @@ cd "$SCRIPT_DIR"
 
 # Файлы конфигурации
 PROD_COMPOSE="docker-compose.prod.yml"
-DEV_COMPOSE="docker-compose.dev.yml"
 STATE_FILE=".manager_state"
 
 # Цвета
@@ -154,25 +152,10 @@ container_status() {
     esac
 }
 
-# Проверить какое окружение запущено
+# Проверить запущено ли prod окружение
 get_running_env() {
-    local prod_running=false
-    local dev_running=false
-    
     if docker compose -f "$PROD_COMPOSE" ps -q 2>/dev/null | grep -q .; then
-        prod_running=true
-    fi
-    
-    if docker compose -f "$DEV_COMPOSE" ps -q 2>/dev/null | grep -q .; then
-        dev_running=true
-    fi
-    
-    if $prod_running && $dev_running; then
-        echo "оба"
-    elif $prod_running; then
         echo "prod"
-    elif $dev_running; then
-        echo "dev"
     else
         echo "нет"
     fi
@@ -215,10 +198,6 @@ show_status() {
     echo -e "    ${ICON_API} api        $(container_status tg_player_api)"
     echo -e "    ${ICON_BOT} bot        $(container_status tg_player_bot)"
     echo -e "    ${ICON_WEB} webapp     $(container_status tg_player_webapp)"
-    
-    echo ""
-    echo -e "  ${BOLD}Development:${NC}"
-    echo -e "    ${ICON_DB}  postgres   $(container_status tg_player_db_dev)"
     
     echo ""
     
@@ -270,60 +249,27 @@ restart_prod() {
     log_ok "Production перезапущен"
 }
 
-start_dev() {
-    log_step "Запуск development окружения (только PostgreSQL)..."
-    docker compose -f "$DEV_COMPOSE" up -d
-    
-    echo ""
-    log_ok "База данных для разработки запущена!"
-    echo ""
-    echo -e "  ${ICON_DB} PostgreSQL: ${CYAN}localhost:5432${NC}"
-    echo ""
-    echo -e "  Запусти локально:"
-    echo -e "    ${DIM}python -m uvicorn api.main:app --reload --port 8000${NC}"
-    echo -e "    ${DIM}python bot/main.py${NC}"
-    echo -e "    ${DIM}cd webapp && npm run dev${NC}"
-}
-
-stop_dev() {
-    log_step "Остановка development окружения..."
-    docker compose -f "$DEV_COMPOSE" down
-    log_ok "Development остановлен"
-}
-
 stop_all() {
-    log_step "Остановка всех окружений..."
+    log_step "Остановка production окружения..."
     docker compose -f "$PROD_COMPOSE" down 2>/dev/null || true
-    docker compose -f "$DEV_COMPOSE" down 2>/dev/null || true
-    log_ok "Все окружения остановлены"
+    log_ok "Production остановлен"
 }
 
 switch_env() {
     local target=$1
     local current=$(get_running_env)
     
-    if [ "$current" = "$target" ]; then
-        log_info "Уже запущено $target"
+    if [ "$target" != "prod" ]; then
+        log_error "Доступно только prod окружение"
+        return 1
+    fi
+    
+    if [ "$current" = "prod" ]; then
+        log_info "Production уже запущен"
         return 0
     fi
     
-    log_step "Переключение на $target окружение..."
-    
-    # Остановить текущее
-    if [ "$current" = "prod" ]; then
-        stop_prod
-    elif [ "$current" = "dev" ]; then
-        stop_dev
-    elif [ "$current" = "оба" ]; then
-        stop_all
-    fi
-    
-    # Запустить целевое
-    if [ "$target" = "prod" ]; then
-        start_prod
-    elif [ "$target" = "dev" ]; then
-        start_dev
-    fi
+    start_prod
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -390,21 +336,13 @@ rebuild() {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 show_logs() {
-    local env=$1
-    local service=$2
-    local lines=${3:-100}
-    
-    local compose_file=""
-    if [ "$env" = "prod" ]; then
-        compose_file="$PROD_COMPOSE"
-    else
-        compose_file="$DEV_COMPOSE"
-    fi
+    local service=$1
+    local lines=${2:-100}
     
     if [ -z "$service" ]; then
-        docker compose -f "$compose_file" logs -f --tail="$lines"
+        docker compose -f "$PROD_COMPOSE" logs -f --tail="$lines"
     else
-        docker compose -f "$compose_file" logs -f --tail="$lines" "$service"
+        docker compose -f "$PROD_COMPOSE" logs -f --tail="$lines" "$service"
     fi
 }
 
@@ -734,41 +672,20 @@ rollback_to_systemd() {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 db_shell() {
-    local env=$1
-    local container=""
-    
-    if [ "$env" = "dev" ]; then
-        container="tg_player_db_dev"
-    else
-        container="tg_player_db"
-    fi
-    
-    log_step "Подключение к PostgreSQL ($env)..."
-    docker exec -it "$container" psql -U postgres -d tg_player
+    log_step "Подключение к PostgreSQL..."
+    docker exec -it tg_player_db psql -U postgres -d tg_player
 }
 
 db_backup() {
-    local env=$1
-    local container=""
     local filename="backup_$(date +%Y%m%d_%H%M%S).sql"
     
-    if [ "$env" = "dev" ]; then
-        container="tg_player_db_dev"
-        filename="dev_$filename"
-    else
-        container="tg_player_db"
-        filename="prod_$filename"
-    fi
-    
     log_step "Создание бэкапа: $filename"
-    docker exec "$container" pg_dump -U postgres tg_player > "$filename"
+    docker exec tg_player_db pg_dump -U postgres tg_player > "$filename"
     log_ok "Бэкап сохранён: $filename"
 }
 
 db_restore() {
-    local env=$1
-    local filename=$2
-    local container=""
+    local filename=$1
     
     if [ -z "$filename" ]; then
         log_error "Нужно указать файл бэкапа"
@@ -780,13 +697,7 @@ db_restore() {
         return 1
     fi
     
-    if [ "$env" = "dev" ]; then
-        container="tg_player_db_dev"
-    else
-        container="tg_player_db"
-    fi
-    
-    log_warn "Это ПЕРЕЗАПИШЕТ базу данных $env!"
+    log_warn "Это ПЕРЕЗАПИШЕТ базу данных!"
     read -p "Продолжить? [y/N] " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -794,7 +705,7 @@ db_restore() {
     fi
     
     log_step "Восстановление из: $filename"
-    cat "$filename" | docker exec -i "$container" psql -U postgres tg_player
+    cat "$filename" | docker exec -i tg_player_db psql -U postgres tg_player
     log_ok "База данных восстановлена"
 }
 
@@ -812,8 +723,7 @@ show_menu() {
     echo ""
     echo -e "  ${BOLD}Окружение${NC}"
     echo -e "    ${CYAN}1${NC}) Запустить Production    ${CYAN}2${NC}) Остановить Production"
-    echo -e "    ${CYAN}3${NC}) Запустить Development   ${CYAN}4${NC}) Остановить Development"
-    echo -e "    ${CYAN}5${NC}) Перезапустить Prod      ${CYAN}6${NC}) Остановить всё"
+    echo -e "    ${CYAN}3${NC}) Перезапустить Prod"
     echo ""
     echo -e "  ${BOLD}Операции${NC}"
     echo -e "    ${CYAN}u${NC}) Обновить (git pull + пересборка)"
@@ -853,26 +763,21 @@ logs_submenu() {
     echo ""
     read -p "  Выбор: " choice
     
-    local env=$(get_running_env)
-    [ "$env" = "нет" ] && env="prod"
-    [ "$env" = "оба" ] && env="prod"
-    
     case $choice in
-        1) show_logs "$env" "" ;;
-        2) show_logs "$env" "api" ;;
-        3) show_logs "$env" "bot" ;;
-        4) show_logs "$env" "webapp" ;;
-        5) show_logs "$env" "postgres" ;;
+        1) show_logs "" ;;
+        2) show_logs "api" ;;
+        3) show_logs "bot" ;;
+        4) show_logs "webapp" ;;
+        5) show_logs "postgres" ;;
         0) return ;;
     esac
 }
 
 db_submenu() {
-    local env=$(get_running_env)
-    [ "$env" = "нет" ] && { log_error "База данных не запущена"; return; }
-    [ "$env" = "оба" ] && env="prod"
+    local running=$(get_running_env)
+    [ "$running" = "нет" ] && { log_error "База данных не запущена"; return; }
     
-    db_shell "$env"
+    db_shell "prod"
 }
 
 interactive_menu() {
@@ -883,10 +788,7 @@ interactive_menu() {
         case $choice in
             1) start_prod ;;
             2) stop_prod ;;
-            3) start_dev ;;
-            4) stop_dev ;;
-            5) restart_prod ;;
-            6) stop_all ;;
+            3) restart_prod ;;
             u) update ;;
             r) rebuild ;;
             s) show_status; read -p "Нажми Enter для продолжения..." ;;
@@ -900,16 +802,12 @@ interactive_menu() {
             h) git_log; read -p "Нажми Enter для продолжения..." ;;
             d) db_submenu ;;
             B) 
-                local env=$(get_running_env)
-                [ "$env" = "оба" ] && env="prod"
-                db_backup "$env"
+                db_backup "prod"
                 read -p "Нажми Enter для продолжения..."
                 ;;
             R)
                 read -p "  Файл бэкапа: " file
-                local env=$(get_running_env)
-                [ "$env" = "оба" ] && env="prod"
-                db_restore "$env" "$file"
+                db_restore "prod" "$file"
                 read -p "Нажми Enter для продолжения..."
                 ;;
             m) migrate_to_docker; read -p "Нажми Enter для продолжения..." ;;
@@ -940,17 +838,10 @@ show_help() {
     echo "  ./manage.sh <команда> [аргументы]    Выполнить команду"
     echo ""
     echo -e "${BOLD}Команды окружения:${NC}"
-    echo "  prod start              Запустить production"
-    echo "  prod stop               Остановить production"
-    echo "  prod restart            Перезапустить production"
-    echo "  prod logs [сервис]      Логи production"
-    echo ""
-    echo "  dev start               Запустить development (только БД)"
-    echo "  dev stop                Остановить development"
-    echo "  dev logs                Логи development"
-    echo ""
-    echo "  switch <prod|dev>       Переключить окружение"
-    echo "  stop                    Остановить всё"
+    echo "  start                   Запустить production"
+    echo "  stop                    Остановить production"
+    echo "  restart                 Перезапустить production"
+    echo "  logs [сервис]           Логи production"
     echo ""
     echo -e "${BOLD}Команды обновления:${NC}"
     echo "  update                  Получить изменения и пересобрать"
@@ -968,8 +859,8 @@ show_help() {
     echo "  git diff                Показать изменения"
     echo ""
     echo -e "${BOLD}Команды БД:${NC}"
-    echo "  db shell [prod|dev]     Открыть psql консоль"
-    echo "  db backup [prod|dev]    Создать бэкап"
+    echo "  db shell                Открыть psql консоль"
+    echo "  db backup               Создать бэкап"
     echo "  db restore <файл>       Восстановить из бэкапа"
     echo "  db migrate-sqlite       Мигрировать данные из SQLite в Docker PostgreSQL"
     echo ""
@@ -982,11 +873,11 @@ show_help() {
     echo "  systemd disable         Отключить автозапуск systemd"
     echo ""
     echo -e "${BOLD}Примеры:${NC}"
-    echo "  ./manage.sh prod start"
-    echo "  ./manage.sh prod logs api"
+    echo "  ./manage.sh start"
+    echo "  ./manage.sh logs api"
     echo "  ./manage.sh update"
     echo "  ./manage.sh git checkout develop"
-    echo "  ./manage.sh db backup prod"
+    echo "  ./manage.sh db backup"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1006,28 +897,27 @@ main() {
     # Разбор CLI команд
     case "$1" in
         # Окружение
+        start)
+            start_prod
+            ;;
+        stop)
+            stop_prod
+            ;;
+        restart)
+            restart_prod
+            ;;
+        logs)
+            show_logs "$2"
+            ;;
+        # Обратная совместимость с prod командами
         prod)
             case "$2" in
                 start) start_prod ;;
                 stop) stop_prod ;;
                 restart) restart_prod ;;
-                logs) show_logs "prod" "$3" ;;
-                *) log_error "Неизвестная команда prod: $2"; show_help ;;
+                logs) show_logs "$3" ;;
+                *) log_error "Неизвестная команда: $2"; show_help ;;
             esac
-            ;;
-        dev)
-            case "$2" in
-                start) start_dev ;;
-                stop) stop_dev ;;
-                logs) show_logs "dev" "$3" ;;
-                *) log_error "Неизвестная команда dev: $2"; show_help ;;
-            esac
-            ;;
-        switch)
-            switch_env "$2"
-            ;;
-        stop)
-            stop_all
             ;;
             
         # Обновление
@@ -1061,9 +951,9 @@ main() {
         # База данных
         db)
             case "$2" in
-                shell) db_shell "${3:-prod}" ;;
-                backup) db_backup "${3:-prod}" ;;
-                restore) db_restore "${3:-prod}" "$4" ;;
+                shell) db_shell ;;
+                backup) db_backup ;;
+                restore) db_restore "$3" ;;
                 migrate-sqlite) migrate_sqlite_data ;;
                 *) log_error "Неизвестная db команда: $2"; echo "Доступно: shell, backup, restore, migrate-sqlite" ;;
             esac
