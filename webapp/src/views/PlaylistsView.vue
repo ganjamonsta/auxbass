@@ -106,13 +106,12 @@ const router = useRouter()
 const libraryStore = useLibraryStore()
 const authStore = useAuthStore()
 
-// Use store for playlists
-const playlists = computed(() => libraryStore.playlists)
-const loading = ref(false) // libraryStore.loading? maybe better to track locally for this view or use store's
+const playlists = ref([])
+const loading = ref(true)
 const showCreateModal = ref(false)
 const newPlaylistName = ref('')
 const nameInput = ref(null)
-const likedCount = computed(() => libraryStore.likedTracks?.length || 0)
+const likedCount = ref(0)
 
 // Search state
 const searchQuery = ref('')
@@ -140,14 +139,8 @@ const handleCreatePlaylist = () => {
 const loadPlaylists = async () => {
   loading.value = true
   try {
-    // Force refresh? Or just fetch if empty?
-    // Since this is a main view, we might want to ensure we have data.
-    if (playlists.value.length === 0) {
-      await libraryStore.fetchPlaylists()
-    } else {
-        // Maybe background refresh?
-        libraryStore.fetchPlaylists()
-    }
+    const response = await api.get('/playlists')
+    playlists.value = response.data.items || response.data
   } finally {
     loading.value = false
   }
@@ -155,9 +148,8 @@ const loadPlaylists = async () => {
 
 const loadLikedCount = async () => {
   try {
-    if (!libraryStore.likedTracks.length) {
-        await libraryStore.fetchLikedTracks()
-    }
+    await libraryStore.fetchLikedTracks()
+    likedCount.value = libraryStore.likedTracks?.length || 0
   } catch (e) {
     console.error('Failed to load liked count:', e)
   }
@@ -180,11 +172,13 @@ const createPlaylist = async () => {
   if (!newPlaylistName.value.trim()) return
   
   try {
-    const newPlaylist = await libraryStore.createPlaylist(newPlaylistName.value.trim())
-    if (newPlaylist) {
-        closeModal()
-        router.push(`/playlist/${newPlaylist.id}`)
-    }
+    const response = await api.post('/playlists', {
+      name: newPlaylistName.value.trim(),
+      is_public: true  // Create as public by default
+    })
+    playlists.value.unshift(response.data)
+    closeModal()
+    router.push(`/playlist/${response.data.id}`)
   } catch (error) {
     console.error('Failed to create playlist:', error)
   }

@@ -183,30 +183,6 @@ export const useLibraryStore = defineStore('library', () => {
   const fetchPlaylist = async (id) => {
     try {
       const response = await playlistsApi.getOne(id)
-      
-      // Update playlist in global list if it exists to keep sidebar in sync
-      if (response.data) {
-        const existingIndex = playlists.value.findIndex(p => p.id === parseInt(id))
-        
-        if (existingIndex !== -1) {
-          // Create a list-optimized version (without tracks array if generic list doesn't use it)
-          // But preserving everything else
-          const updatedPlaylist = { ...playlists.value[existingIndex], ...response.data }
-          
-          // Remove tracks from the list item to avoid memory bloat if the list is huge,
-          // though usually it's fine. The playlist list items usually don't have 'tracks'.
-          if (updatedPlaylist.tracks) {
-            delete updatedPlaylist.tracks
-          }
-          
-          playlists.value[existingIndex] = updatedPlaylist
-        } else {
-          // If we visited a playlist that isn't in our loaded list (e.g. paginated out or first load)
-          // We could add it, but that might mess up pagination orders.
-          // For now, only update if exists.
-        }
-      }
-
       return response.data
     } catch (error) {
       console.error('Failed to fetch playlist:', error)
