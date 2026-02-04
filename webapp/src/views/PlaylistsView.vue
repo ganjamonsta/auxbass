@@ -84,7 +84,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onActivated, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { useAuthStore } from '@/stores/auth'
@@ -187,6 +187,11 @@ const createPlaylist = async () => {
 onMounted(() => {
   loadPlaylists()
   loadLikedCount()
+})
+
+// Reload playlists when returning to this view (keep-alive)
+onActivated(() => {
+  loadPlaylists()
 })
 
 // Focus input when modal opens

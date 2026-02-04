@@ -207,11 +207,13 @@ const handlePlaylistRefresh = (updatedPlaylist) => {
   // Update cover and other fields from refresh
   if (updatedPlaylist.cover_url) {
     playlist.value.cover_url = updatedPlaylist.cover_url
+    playlist.value.covers = updatedPlaylist.covers || [updatedPlaylist.cover_url]
   }
-  // Update in library store
+  // Update in library store (both cover_url and covers array)
   const libraryPlaylist = libraryStore.playlists.find(p => p.id === playlist.value.id)
   if (libraryPlaylist && updatedPlaylist.cover_url) {
     libraryPlaylist.cover_url = updatedPlaylist.cover_url
+    libraryPlaylist.covers = updatedPlaylist.covers || [updatedPlaylist.cover_url]
   }
 }
 
