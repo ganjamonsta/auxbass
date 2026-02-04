@@ -1053,8 +1053,8 @@ async def remove_from_library(
 
 @router.get("")
 async def get_all_tracks(
-    page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
     search: Optional[str] = None,
     sort_by: str = Query("added_at", pattern="^(added_at|title|artist|duration)$"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
@@ -1110,9 +1110,8 @@ async def get_all_tracks(
     else:
         query = query.order_by(asc(order_col))
     
-    # Pagination
-    offset = (page - 1) * per_page
-    query = query.offset(offset).limit(per_page)
+    # Pagination with offset/limit
+    query = query.offset(offset).limit(limit)
     
     result = await db.execute(query)
     rows = result.unique().all()
@@ -1120,6 +1119,6 @@ async def get_all_tracks(
     return TracksListResponse(
         items=[track_to_response(track, lib) for track, lib in rows],
         total=total,
-        page=page,
-        per_page=per_page,
+        offset=offset,
+        limit=limit,
     )
