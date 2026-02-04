@@ -249,29 +249,6 @@ restart_prod() {
     log_ok "Production перезапущен"
 }
 
-stop_all() {
-    log_step "Остановка production окружения..."
-    docker compose -f "$PROD_COMPOSE" down 2>/dev/null || true
-    log_ok "Production остановлен"
-}
-
-switch_env() {
-    local target=$1
-    local current=$(get_running_env)
-    
-    if [ "$target" != "prod" ]; then
-        log_error "Доступно только prod окружение"
-        return 1
-    fi
-    
-    if [ "$current" = "prod" ]; then
-        log_info "Production уже запущен"
-        return 0
-    fi
-    
-    start_prod
-}
-
 # ═══════════════════════════════════════════════════════════════════════════════
 #  ОБНОВЛЕНИЕ И СБОРКА
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -304,13 +281,13 @@ update() {
     # Проверить запущен ли prod
     local running=$(get_running_env)
     
-    if [ "$running" = "prod" ] || [ "$running" = "оба" ]; then
+    if [ "$running" = "prod" ]; then
         log_step "Пересборка и перезапуск production..."
         docker compose -f "$PROD_COMPOSE" up -d --build
         log_ok "Production обновлён и перезапущен"
     else
         log_info "Production не запущен, пропускаем перезапуск"
-        log_info "Запусти: './manage.sh prod start'"
+        log_info "Запусти: './manage.sh start'"
     fi
     
     echo ""
@@ -397,274 +374,13 @@ git_checkout() {
         read -p "Пересобрать и перезапустить сервисы? [Y/n] " -n 1 -r
         echo
         if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-            if [ "$running" = "prod" ] || [ "$running" = "оба" ]; then
-                docker compose -f "$PROD_COMPOSE" up -d --build
-            fi
+            docker compose -f "$PROD_COMPOSE" up -d --build
         fi
     fi
 }
 
 git_diff() {
     git diff --color
-}
-
-# ═══════════════════════════════════════════════════════════════════════════════
-#  МИГРАЦИЯ С SYSTEMD
-# ═══════════════════════════════════════════════════════════════════════════════
-
-SYSTEMD_SERVICES="tg-player-api tg-player-bot tg-player-webapp"
-
-# Проверить статус systemd сервисов
-check_systemd() {
-    echo -e "${BOLD}🔧 Статус systemd сервисов${NC}"
-    echo ""
-    
-    for service in $SYSTEMD_SERVICES; do
-        local status=$(systemctl is-active "$service" 2>/dev/null || echo "не найден")
-        local enabled=$(systemctl is-enabled "$service" 2>/dev/null || echo "—")
-        
-        case "$status" in
-            active)
-                echo -e "  ${GREEN}●${NC} $service: ${GREEN}работает${NC} (автозапуск: $enabled)"
-                ;;
-            inactive)
-                echo -e "  ${RED}○${NC} $service: ${DIM}остановлен${NC} (автозапуск: $enabled)"
-                ;;
-            *)
-                echo -e "  ${DIM}○${NC} $service: ${DIM}$status${NC}"
-                ;;
-        esac
-    done
-    echo ""
-}
-
-# Остановить и отключить systemd сервисы
-stop_systemd() {
-    log_step "Остановка systemd сервисов..."
-    
-    for service in $SYSTEMD_SERVICES; do
-        if systemctl is-active "$service" &>/dev/null; then
-            sudo systemctl stop "$service"
-            log_ok "Остановлен: $service"
-        fi
-    done
-}
-
-disable_systemd() {
-    log_step "Отключение автозапуска systemd сервисов..."
-    
-    for service in $SYSTEMD_SERVICES; do
-        if systemctl is-enabled "$service" &>/dev/null; then
-            sudo systemctl disable "$service"
-            log_ok "Отключён: $service"
-        fi
-    done
-}
-
-# Бэкап базы из systemd (PostgreSQL или SQLite)
-backup_host_db() {
-    local filename="migration_backup_$(date +%Y%m%d_%H%M%S).sql"
-    
-    log_step "Создание бэкапа базы данных хоста..."
-    
-    # Определяем тип базы данных из .env
-    local db_url=""
-    if [ -f ".env" ]; then
-        db_url=$(grep "^DATABASE_URL=" .env | cut -d'=' -f2-)
-    fi
-    
-    # Проверяем SQLite
-    if [[ "$db_url" == *"sqlite"* ]] || [ -f "tg_player.db" ]; then
-        log_info "Обнаружена SQLite база данных"
-        
-        if [ -f "tg_player.db" ]; then
-            local sqlite_backup="migration_backup_$(date +%Y%m%d_%H%M%S).db"
-            cp tg_player.db "$sqlite_backup"
-            log_ok "SQLite бэкап сохранён: $sqlite_backup"
-            echo "$sqlite_backup"
-            return 0
-        else
-            log_error "SQLite файл tg_player.db не найден"
-            return 1
-        fi
-    fi
-    
-    # PostgreSQL на хосте
-    if command -v pg_dump &>/dev/null; then
-        sudo -u postgres pg_dump tg_player > "$filename"
-        log_ok "PostgreSQL бэкап сохранён: $filename"
-        echo "$filename"
-    else
-        log_error "pg_dump не найден. Установи PostgreSQL client или сделай бэкап вручную"
-        return 1
-    fi
-}
-
-# Миграция данных из SQLite в Docker PostgreSQL
-migrate_sqlite_data() {
-    log_step "Миграция данных из SQLite в PostgreSQL..."
-    
-    if [ ! -f "tg_player.db" ]; then
-        log_error "SQLite файл tg_player.db не найден"
-        return 1
-    fi
-    
-    # Проверяем что PostgreSQL контейнер работает
-    if ! docker exec tg_player_db pg_isready -U postgres &>/dev/null; then
-        log_error "PostgreSQL контейнер не готов. Запустите: docker compose -f docker-compose.prod.yml up -d"
-        return 1
-    fi
-    
-    # Проверяем что API контейнер работает (там есть все зависимости)
-    if ! docker ps --format '{{.Names}}' | grep -q "tg_player_api"; then
-        log_error "API контейнер не запущен. Запустите: docker compose -f docker-compose.prod.yml up -d"
-        return 1
-    fi
-    
-    # Копируем SQLite базу и скрипт в контейнер API
-    log_step "Копирование файлов в контейнер..."
-    docker cp tg_player.db tg_player_api:/tmp/tg_player.db
-    docker cp scripts/migrate_sqlite_to_postgres.py tg_player_api:/tmp/migrate_sqlite_to_postgres.py
-    
-    # Запускаем миграцию внутри контейнера (там есть sqlalchemy и asyncpg)
-    log_step "Запуск миграции внутри контейнера..."
-    docker exec tg_player_api python /tmp/migrate_sqlite_to_postgres.py \
-        --sqlite /tmp/tg_player.db \
-        --postgres "postgresql+asyncpg://postgres:postgres@postgres:5432/tg_player"
-    
-    local result=$?
-    
-    # Очистка
-    docker exec tg_player_api rm -f /tmp/tg_player.db /tmp/migrate_sqlite_to_postgres.py 2>/dev/null
-    
-    return $result
-}
-
-# Полная миграция с systemd на Docker
-migrate_to_docker() {
-    print_mini_header
-    echo -e "${BOLD}${ICON_ROCKET} Миграция с systemd на Docker${NC}"
-    echo ""
-    
-    # Показать текущий статус
-    check_systemd
-    
-    echo -e "${YELLOW}Это выполнит:${NC}"
-    echo "  1. Создаст бэкап базы данных"
-    echo "  2. Остановит systemd сервисы (api, bot, webapp)"
-    echo "  3. Отключит их автозапуск"
-    echo "  4. Запустит Docker контейнеры"
-    echo "  5. Восстановит базу в Docker PostgreSQL"
-    echo ""
-    
-    read -p "Продолжить миграцию? [y/N] " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        log_info "Миграция отменена"
-        return 0
-    fi
-    
-    echo ""
-    
-    # Шаг 1: Бэкап
-    log_step "Шаг 1/5: Бэкап базы данных..."
-    local backup_file=$(backup_host_db)
-    if [ $? -ne 0 ]; then
-        log_error "Не удалось создать бэкап. Миграция прервана."
-        return 1
-    fi
-    
-    # Шаг 2: Остановка systemd
-    echo ""
-    log_step "Шаг 2/5: Остановка systemd сервисов..."
-    stop_systemd
-    
-    # Шаг 3: Отключение автозапуска
-    echo ""
-    log_step "Шаг 3/5: Отключение автозапуска..."
-    disable_systemd
-    
-    # Шаг 4: Запуск Docker
-    echo ""
-    log_step "Шаг 4/5: Запуск Docker контейнеров..."
-    
-    if [ ! -f ".env" ]; then
-        log_warn "Файл .env не найден, копирую из .env.example"
-        cp .env.example .env
-        log_warn "Отредактируй .env и запусти миграцию заново!"
-        return 1
-    fi
-    
-    docker compose -f "$PROD_COMPOSE" up -d --build
-    
-    # Подождать пока PostgreSQL поднимется
-    log_step "Ожидание запуска PostgreSQL..."
-    sleep 10
-    
-    # Шаг 5: Восстановление базы
-    echo ""
-    log_step "Шаг 5/5: Восстановление базы данных..."
-    
-    if [ -f "$backup_file" ]; then
-        # Проверяем тип бэкапа (SQLite .db или PostgreSQL .sql)
-        if [[ "$backup_file" == *.db ]]; then
-            log_info "Обнаружен SQLite бэкап, запускаю миграцию данных..."
-            migrate_sqlite_data
-        else
-            # PostgreSQL SQL дамп
-            cat "$backup_file" | docker exec -i tg_player_db psql -U postgres -d tg_player
-        fi
-        log_ok "База данных восстановлена"
-    else
-        log_warn "Файл бэкапа не найден, пропускаю восстановление"
-        
-        # Проверяем есть ли SQLite база для миграции
-        if [ -f "tg_player.db" ]; then
-            log_info "Найден файл tg_player.db, запускаю миграцию..."
-            migrate_sqlite_data
-        fi
-    fi
-    
-    echo ""
-    echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}"
-    log_ok "Миграция завершена!"
-    echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}"
-    echo ""
-    echo "  Бэкап сохранён: $backup_file"
-    echo ""
-    echo "  Проверь статус: ./manage.sh status"
-    echo "  Логи:           ./manage.sh prod logs"
-    echo ""
-    echo -e "  ${DIM}Старые systemd сервисы отключены, но файлы остались в /etc/systemd/system/${NC}"
-    echo -e "  ${DIM}Удалить их можно командой: sudo rm /etc/systemd/system/tg-player-*.service${NC}"
-}
-
-# Откат на systemd (если что-то пошло не так)
-rollback_to_systemd() {
-    print_mini_header
-    echo -e "${BOLD}⏪ Откат на systemd${NC}"
-    echo ""
-    
-    log_warn "Это остановит Docker и вернёт systemd сервисы"
-    read -p "Продолжить? [y/N] " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        return 0
-    fi
-    
-    # Остановить Docker
-    log_step "Остановка Docker контейнеров..."
-    docker compose -f "$PROD_COMPOSE" down
-    
-    # Включить и запустить systemd
-    log_step "Включение systemd сервисов..."
-    for service in $SYSTEMD_SERVICES; do
-        sudo systemctl enable "$service" 2>/dev/null || true
-        sudo systemctl start "$service" 2>/dev/null || true
-    done
-    
-    log_ok "Откат завершён"
-    check_systemd
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -742,11 +458,6 @@ show_menu() {
     echo -e "    ${CYAN}B${NC}) Бэкап базы"
     echo -e "    ${CYAN}R${NC}) Восстановить базу"
     echo ""
-    echo -e "  ${BOLD}Миграция${NC}"
-    echo -e "    ${CYAN}m${NC}) Мигрировать с systemd на Docker"
-    echo -e "    ${CYAN}M${NC}) Откат на systemd"
-    echo -e "    ${CYAN}S${NC}) Статус systemd сервисов"
-    echo ""
     echo -e "    ${CYAN}q${NC}) Выход"
     echo ""
 }
@@ -769,7 +480,8 @@ logs_submenu() {
         3) show_logs "bot" ;;
         4) show_logs "webapp" ;;
         5) show_logs "postgres" ;;
-        0) return ;;
+        0|"") return ;;
+        *) log_error "Неверный выбор"; sleep 1 ;;
     esac
 }
 
@@ -777,7 +489,7 @@ db_submenu() {
     local running=$(get_running_env)
     [ "$running" = "нет" ] && { log_error "База данных не запущена"; return; }
     
-    db_shell "prod"
+    db_shell
 }
 
 interactive_menu() {
@@ -802,17 +514,14 @@ interactive_menu() {
             h) git_log; read -p "Нажми Enter для продолжения..." ;;
             d) db_submenu ;;
             B) 
-                db_backup "prod"
+                db_backup
                 read -p "Нажми Enter для продолжения..."
                 ;;
             R)
                 read -p "  Файл бэкапа: " file
-                db_restore "prod" "$file"
+                db_restore "$file"
                 read -p "Нажми Enter для продолжения..."
                 ;;
-            m) migrate_to_docker; read -p "Нажми Enter для продолжения..." ;;
-            M) rollback_to_systemd; read -p "Нажми Enter для продолжения..." ;;
-            S) check_systemd; read -p "Нажми Enter для продолжения..." ;;
             q|Q) 
                 echo ""
                 log_info "Пока!"
@@ -862,15 +571,6 @@ show_help() {
     echo "  db shell                Открыть psql консоль"
     echo "  db backup               Создать бэкап"
     echo "  db restore <файл>       Восстановить из бэкапа"
-    echo "  db migrate-sqlite       Мигрировать данные из SQLite в Docker PostgreSQL"
-    echo ""
-    echo -e "${BOLD}Миграция:${NC}"
-    echo "  migrate                 Мигрировать с systemd на Docker"
-    echo "  migrate-data            Только миграция данных SQLite → PostgreSQL"
-    echo "  rollback                Откатиться на systemd"
-    echo "  systemd status          Статус systemd сервисов"
-    echo "  systemd stop            Остановить systemd сервисы"
-    echo "  systemd disable         Отключить автозапуск systemd"
     echo ""
     echo -e "${BOLD}Примеры:${NC}"
     echo "  ./manage.sh start"
@@ -954,28 +654,7 @@ main() {
                 shell) db_shell ;;
                 backup) db_backup ;;
                 restore) db_restore "$3" ;;
-                migrate-sqlite) migrate_sqlite_data ;;
-                *) log_error "Неизвестная db команда: $2"; echo "Доступно: shell, backup, restore, migrate-sqlite" ;;
-            esac
-            ;;
-        
-        # Миграция с systemd
-        migrate)
-            migrate_to_docker
-            ;;
-        migrate-data)
-            # Только миграция данных из SQLite (без остановки systemd)
-            migrate_sqlite_data
-            ;;
-        rollback)
-            rollback_to_systemd
-            ;;
-        systemd)
-            case "$2" in
-                status) check_systemd ;;
-                stop) stop_systemd ;;
-                disable) disable_systemd ;;
-                *) log_error "Неизвестная systemd команда: $2"; echo "Доступно: status, stop, disable" ;;
+                *) log_error "Неизвестная db команда: $2"; echo "Доступно: shell, backup, restore" ;;
             esac
             ;;
             
