@@ -87,7 +87,7 @@
       </div>
       
       <!-- Virtual track list with Spotify-style skeleton loading -->
-      <div class="virtual-tracks-container" :style="virtualContainerStyle">
+      <div class="virtual-tracks-container">
         <VirtualTrackList
           ref="virtualTrackListRef"
           :fetchFn="fetchArtistTracks"
@@ -163,12 +163,6 @@ const isGlobal = computed(() => scope.value === 'global')
 
 // Tracks pagination with virtual scroll
 const artistName = computed(() => route.params.name ? decodeURIComponent(route.params.name) : null)
-
-// Calculate container height for virtual list (viewport - header)
-const virtualContainerStyle = computed(() => ({
-  height: 'calc(100vh - 400px)',
-  minHeight: '300px'
-}))
 
 const fetchArtistTracks = async ({ offset, limit }) => {
   if (!artistName.value) return { items: [], total: 0 }

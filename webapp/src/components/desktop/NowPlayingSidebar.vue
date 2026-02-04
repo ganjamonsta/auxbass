@@ -715,10 +715,11 @@ const handleToggleLike = async () => {
 
 /* Queue Section */
 .queue-section {
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  max-height: 350px; /* ~5-6 треков */
   overflow: hidden;
 }
 
@@ -727,6 +728,7 @@ const handleToggleLike = async () => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
+  flex-shrink: 0;
 }
 
 .queue-count {

@@ -149,6 +149,7 @@ const loadingMore = ref(false)
 const initialized = ref(false)
 const total = ref(0)
 const scrollTop = ref(0)
+const containerOffset = ref(Infinity) // Start with Infinity so relativeScroll = 0 until calculated
 const viewportHeight = ref(800)
 const loadedPages = ref(new Set())
 const pendingFetches = ref(new Set())
@@ -163,15 +164,18 @@ const totalHeight = computed(() => {
   return total.value * rowHeight.value - props.gap
 })
 
-// Calculate visible range based on scroll position
+// Calculate visible range based on scroll position relative to container
 const startIndex = computed(() => {
-  const start = Math.floor(scrollTop.value / rowHeight.value) - props.overscan
+  // scrollTop is relative to scroll container, need to subtract container offset
+  const relativeScroll = Math.max(0, scrollTop.value - containerOffset.value)
+  const start = Math.floor(relativeScroll / rowHeight.value) - props.overscan
   return Math.max(0, start)
 })
 
 const endIndex = computed(() => {
+  const relativeScroll = Math.max(0, scrollTop.value - containerOffset.value)
   const visibleCount = Math.ceil(viewportHeight.value / rowHeight.value)
-  const end = Math.floor(scrollTop.value / rowHeight.value) + visibleCount + props.overscan
+  const end = Math.floor(relativeScroll / rowHeight.value) + visibleCount + props.overscan
   return Math.min(total.value, end)
 })
 
@@ -263,12 +267,33 @@ const loadVisiblePages = async () => {
 let scrollContainer = null
 let ticking = false
 
+const updateContainerOffset = () => {
+  if (containerRef.value && scrollContainer) {
+    if (scrollContainer === window) {
+      const rect = containerRef.value.getBoundingClientRect()
+      containerOffset.value = rect.top + window.scrollY
+    } else {
+      // Get offset relative to scroll container
+      const containerRect = containerRef.value.getBoundingClientRect()
+      const scrollRect = scrollContainer.getBoundingClientRect()
+      containerOffset.value = containerRect.top - scrollRect.top + scrollContainer.scrollTop
+    }
+  }
+}
+
 const handleScroll = () => {
   if (!ticking) {
     requestAnimationFrame(() => {
       if (scrollContainer) {
-        scrollTop.value = scrollContainer.scrollTop
-        viewportHeight.value = scrollContainer.clientHeight
+        if (scrollContainer === window) {
+          scrollTop.value = window.scrollY
+          viewportHeight.value = window.innerHeight
+        } else {
+          scrollTop.value = scrollContainer.scrollTop
+          viewportHeight.value = scrollContainer.clientHeight
+        }
+        // Update container offset on each scroll for dynamic layouts
+        updateContainerOffset()
         loadVisiblePages()
       }
       ticking = false
@@ -296,7 +321,10 @@ const load = async () => {
   try {
     await fetchPage(0)
     initialized.value = true
-    nextTick(() => loadVisiblePages())
+    nextTick(() => {
+      updateContainerOffset()
+      loadVisiblePages()
+    })
   } finally {
     loading.value = false
   }
@@ -359,10 +387,19 @@ onMounted(() => {
   if (scrollContainer === window) {
     window.addEventListener('scroll', handleScroll, { passive: true })
     viewportHeight.value = window.innerHeight
+    scrollTop.value = window.scrollY
   } else {
     scrollContainer.addEventListener('scroll', handleScroll, { passive: true })
     viewportHeight.value = scrollContainer.clientHeight
+    scrollTop.value = scrollContainer.scrollTop
   }
+  
+  // Calculate initial container offset after next tick (when layout is ready)
+  nextTick(() => {
+    updateContainerOffset()
+    // Trigger initial visible pages load after offset is calculated
+    loadVisiblePages()
+  })
   
   load()
 })
