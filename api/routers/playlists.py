@@ -166,7 +166,7 @@ async def get_my_playlists(
     
     items = []
     for playlist, owner in owned_rows:
-        track_count, total_duration, cover_url, _, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
+        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
         items.append(PlaylistResponse(
             id=playlist.id,
             name=playlist.name,
@@ -201,7 +201,7 @@ async def get_my_playlists(
         subscribed_rows = result.all()
         
         for playlist, owner, subscription in subscribed_rows:
-            track_count, total_duration, cover_url, _, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
+            track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
             items.append(PlaylistResponse(
                 id=playlist.id,
                 name=playlist.name,
@@ -717,7 +717,7 @@ async def get_public_playlists(
     
     items = []
     for playlist, owner in rows:
-        track_count, total_duration, cover_url, _, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
+        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
         
         # Check if current user is subscribed or is owner
         is_owner = playlist.owner_id == user.id
@@ -795,7 +795,7 @@ async def get_user_public_playlists(
     
     items = []
     for playlist in playlists:
-        track_count, total_duration, cover_url, _, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
+        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
         # Check if current user is subscribed
         is_subscribed = False
         if not is_own:
