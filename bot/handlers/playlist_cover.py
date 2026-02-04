@@ -200,7 +200,7 @@ async def handle_cover_upload(message: Message, state: FSMContext, bot: Bot):
             playlist = await session.get(Playlist, playlist_id)
             if playlist:
                 playlist.cover_url = cover_url
-                await session.commit()
+                # Note: get_session() auto-commits on successful exit
                 logger.info(f"Cover updated for playlist {playlist_id}: {cover_url}")
         
         # Send success message with preview
@@ -365,7 +365,7 @@ async def handle_photo_reply_for_cover(message: Message, state: FSMContext, bot:
             playlist = await session.get(Playlist, playlist_id)
             if playlist:
                 playlist.cover_url = cover_url
-                await session.commit()
+                # Note: get_session() auto-commits on successful exit
                 logger.info(f"Cover updated for playlist {playlist_id}: {cover_url}")
         
         await status_msg.delete()

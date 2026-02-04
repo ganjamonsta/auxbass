@@ -212,10 +212,13 @@ const startCoverPolling = () => {
         
         try {
             const response = await api.get(`/playlists/${props.playlist.id}`)
+            const newCoverUrl = response.data?.cover_url
+            console.log(`[Cover Poll #${attempts}] initial: ${initialCoverUrl}, new: ${newCoverUrl}`)
             // Check if cover changed from initial value
-            if (response.data?.cover_url && response.data.cover_url !== initialCoverUrl) {
+            if (newCoverUrl && newCoverUrl !== initialCoverUrl) {
+                console.log('[Cover Poll] Cover changed! Updating...')
                 // Add cache-busting to force browser to load new image
-                currentCoverUrl.value = getCacheBustedUrl(response.data.cover_url)
+                currentCoverUrl.value = getCacheBustedUrl(newCoverUrl)
                 emit('refresh', response.data)
                 stopCoverPolling()
                 // Show success feedback
