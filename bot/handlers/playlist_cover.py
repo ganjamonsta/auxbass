@@ -191,8 +191,8 @@ async def handle_cover_upload(message: Message, state: FSMContext, bot: Bot):
             return
         
         # Generate cover URL through API proxy
-        # api_url may already contain /api, so use /images/ path only
-        base_url = settings.api_url.rstrip('/').removesuffix('/api')
+        # Use webapp_url for external access (api_url is internal Docker URL)
+        base_url = settings.webapp_url.rstrip('/')
         cover_url = f"{base_url}/api/images/{cover_file_id}"
         
         # Update playlist in database
@@ -357,7 +357,8 @@ async def handle_photo_reply_for_cover(message: Message, state: FSMContext, bot:
             )
             return
         
-        base_url = settings.api_url.rstrip('/').removesuffix('/api')
+        # Use webapp_url for external access (api_url is internal Docker URL)
+        base_url = settings.webapp_url.rstrip('/')
         cover_url = f"{base_url}/api/images/{cover_file_id}"
         
         async with get_session() as session:
