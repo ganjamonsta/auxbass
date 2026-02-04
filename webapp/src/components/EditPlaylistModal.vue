@@ -10,12 +10,15 @@
       <!-- Playlist name and settings -->
       <div class="edit-settings">
         <!-- Cover editor -->
-        <div class="edit-cover-wrapper" @click="changeCover" title="Изменить обложку">
+        <div class="edit-cover-wrapper" @click="changeCover" :title="waitingForCover ? 'Ожидание фото...' : 'Изменить обложку'">
             <img v-if="currentCoverUrl" :src="currentCoverUrl" class="edit-cover-img" />
             <div v-else class="edit-cover-placeholder">
                 <Camera :size="24" />
             </div>
-            <div class="edit-cover-overlay">
+            <div v-if="waitingForCover" class="edit-cover-overlay waiting">
+                <div class="cover-spinner"></div>
+            </div>
+            <div v-else class="edit-cover-overlay">
                 <Camera :size="16" />
             </div>
         </div>
@@ -138,6 +141,8 @@ const authStore = useAuthStore()
 
 // Track if we opened the cover upload link
 const pendingCoverUpload = ref(false)
+const waitingForCover = ref(false)
+let coverPollInterval = null
 // Current cover URL (local state for refresh)
 const currentCoverUrl = ref(null)
 
@@ -148,8 +153,9 @@ const changeCover = async () => {
     if (window.Telegram?.WebApp) {
         try {
             await api.post(`/playlists/${props.playlist.id}/request-cover`)
-            // Close modal - user will upload photo in bot chat
-            emit('close')
+            // Start polling for cover update
+            waitingForCover.value = true
+            startCoverPolling()
             return
         } catch (error) {
             console.error('Failed to request cover upload:', error)
@@ -172,6 +178,41 @@ const changeCover = async () => {
     } else {
         window.open(url, '_blank')
     }
+}
+
+// Start polling for cover updates
+const startCoverPolling = () => {
+    if (coverPollInterval) clearInterval(coverPollInterval)
+    
+    let attempts = 0
+    const maxAttempts = 30 // 30 seconds max
+    
+    coverPollInterval = setInterval(async () => {
+        attempts++
+        if (attempts >= maxAttempts) {
+            stopCoverPolling()
+            return
+        }
+        
+        try {
+            const response = await api.get(`/playlists/${props.playlist.id}`)
+            if (response.data?.cover_url && response.data.cover_url !== currentCoverUrl.value) {
+                currentCoverUrl.value = response.data.cover_url
+                emit('refresh', response.data)
+                stopCoverPolling()
+            }
+        } catch (error) {
+            console.error('Failed to poll cover:', error)
+        }
+    }, 1000)
+}
+
+const stopCoverPolling = () => {
+    if (coverPollInterval) {
+        clearInterval(coverPollInterval)
+        coverPollInterval = null
+    }
+    waitingForCover.value = false
 }
 
 // Refresh cover when returning from Telegram
@@ -205,6 +246,7 @@ onMounted(() => {
 
 onUnmounted(() => {
     document.removeEventListener('visibilitychange', handleVisibilityChange)
+    stopCoverPolling()
 })
 
 // Form state
@@ -502,8 +544,22 @@ const save = async () => {
     color: white;
 }
 
+.edit-cover-overlay.waiting {
+    opacity: 1;
+    background: rgba(0,0,0,0.7);
+}
+
 .edit-cover-wrapper:hover .edit-cover-overlay {
     opacity: 1;
+}
+
+.cover-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 0.8s linear infinite;
 }
 
 .edit-cover-loading {
