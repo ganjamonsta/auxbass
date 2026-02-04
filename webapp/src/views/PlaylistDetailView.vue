@@ -122,6 +122,7 @@ import TrackItem from '@/components/TrackItem.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import EditPlaylistModal from '@/components/EditPlaylistModal.vue'
 import api from '@/api/client'
+import apiCache from '@/utils/apiCache'
 import { Music, Check, Plus, Globe } from 'lucide-vue-next'
 import { getCoverUrl, CoverSize } from '@/utils'
 
@@ -215,6 +216,10 @@ const handlePlaylistRefresh = (updatedPlaylist) => {
     libraryPlaylist.cover_url = updatedPlaylist.cover_url
     libraryPlaylist.covers = updatedPlaylist.covers || [updatedPlaylist.cover_url]
   }
+  
+  // Invalidate API cache to ensure fresh data everywhere
+  // This forces PlaylistsView, Sidebar and other components to get updated covers
+  apiCache.invalidateRelated('playlist', playlist.value.id)
 }
 
 const handleTracksUpdate = (tracks) => {

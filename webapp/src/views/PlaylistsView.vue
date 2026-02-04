@@ -84,7 +84,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onActivated, nextTick } from 'vue'
+import { ref, computed, onMounted, onActivated, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { useAuthStore } from '@/stores/auth'
@@ -193,6 +193,24 @@ onMounted(() => {
 onActivated(() => {
   loadPlaylists()
 })
+
+// Sync cover updates from libraryStore (updated by PlaylistDetailView)
+// This ensures covers are updated without full reload
+watch(
+  () => libraryStore.playlists,
+  (storePlayists) => {
+    if (!storePlayists?.length || !playlists.value?.length) return
+    // Update local playlist covers from store
+    for (const storePlaylist of storePlayists) {
+      const localPlaylist = playlists.value.find(p => p.id === storePlaylist.id)
+      if (localPlaylist && storePlaylist.cover_url !== localPlaylist.cover_url) {
+        localPlaylist.cover_url = storePlaylist.cover_url
+        localPlaylist.covers = storePlaylist.covers
+      }
+    }
+  },
+  { deep: true }
+)
 
 // Focus input when modal opens
 const openModal = async () => {

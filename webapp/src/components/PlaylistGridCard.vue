@@ -8,7 +8,7 @@
       <div class="cover-grid" :class="{ 'single-cover': playlist.covers?.length === 1 }" v-if="playlist.covers?.length">
         <img
           v-for="(cover, i) in playlist.covers.slice(0, 4)"
-          :key="i"
+          :key="`${i}-${cover}`"
           :src="getCoverUrl(cover, CoverSize.SMALL)"
         />
       </div>
