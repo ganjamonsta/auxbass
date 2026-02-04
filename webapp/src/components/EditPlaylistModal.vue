@@ -149,6 +149,8 @@ const waitingForCover = ref(false)
 const coverUpdated = ref(false)
 // Current cover URL (local state for refresh)
 const currentCoverUrl = ref(null)
+// Original cover URL at the moment upload was requested (for comparison)
+let originalCoverUrlOnRequest = null
 // Poll interval reference
 let coverCheckInterval = null
 
@@ -162,7 +164,10 @@ const getCacheBustedUrl = (url) => {
 // Extract base URL without cache-busting parameter
 const getBaseUrl = (url) => {
     if (!url) return null
-    return url.replace(/[?&]_t=\d+$/, '').replace(/\?$/, '')
+    // Remove _t parameter from anywhere in query string
+    return url.replace(/([?&])_t=\d+(&|$)/, (match, prefix, suffix) => {
+        return suffix === '&' ? prefix : ''
+    }).replace(/\?$/, '')
 }
 
 const changeCover = async () => {
@@ -171,6 +176,8 @@ const changeCover = async () => {
     // Request cover upload via API (sends message to user, they reply with photo)
     if (window.Telegram?.WebApp) {
         try {
+            // Save the current cover URL before requesting new one
+            originalCoverUrlOnRequest = getBaseUrl(currentCoverUrl.value)
             await api.post(`/playlists/${props.playlist.id}/request-cover`)
             waitingForCover.value = true
             uiStore.toast.info('Отправьте фото', 'Ответьте на сообщение в Telegram')
@@ -179,6 +186,7 @@ const changeCover = async () => {
             return
         } catch (error) {
             console.error('Failed to request cover upload:', error)
+            originalCoverUrlOnRequest = null
             if (error.response?.data?.detail) {
                 uiStore.toast.error('Ошибка', error.response.data.detail)
                 return
@@ -187,29 +195,36 @@ const changeCover = async () => {
     }
 }
 
-// Check for cover updates (runs every 3 seconds for 30 seconds max)
+// Check for cover updates (runs every 3 seconds for 60 seconds max)
 const startCoverCheck = () => {
     stopCoverCheck()
     let attempts = 0
-    const maxAttempts = 10  // 30 seconds total
+    const maxAttempts = 20  // 60 seconds total (increased from 30)
     
     coverCheckInterval = setInterval(async () => {
         attempts++
         if (attempts >= maxAttempts || !waitingForCover.value) {
+            if (attempts >= maxAttempts) {
+                uiStore.toast.warning('Таймаут', 'Попробуйте отправить фото ещё раз')
+            }
             stopCoverCheck()
+            waitingForCover.value = false
+            originalCoverUrlOnRequest = null
             return
         }
         
         try {
             const response = await api.get(`/playlists/${props.playlist.id}`, { bypassCache: true })
             const newCoverUrl = response.data?.cover_url
-            const currentBase = getBaseUrl(currentCoverUrl.value)
             const newBase = getBaseUrl(newCoverUrl)
             
-            if (newBase && currentBase !== newBase) {
+            // Compare with the URL that was set when we started waiting
+            // This handles both new covers and cover updates
+            if (newBase && newBase !== originalCoverUrlOnRequest) {
                 currentCoverUrl.value = getCacheBustedUrl(newCoverUrl)
                 coverUpdated.value = true
                 waitingForCover.value = false
+                originalCoverUrlOnRequest = null
                 setTimeout(() => { coverUpdated.value = false }, 2000)
                 emit('refresh', response.data)
                 stopCoverCheck()
@@ -295,6 +310,7 @@ watch(() => props.show, (show) => {
     searchResults.value = []
     coverUpdated.value = false
     waitingForCover.value = false
+    originalCoverUrlOnRequest = null
     stopCoverCheck()
   }
 })
