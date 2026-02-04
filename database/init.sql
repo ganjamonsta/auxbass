@@ -98,6 +98,18 @@ CREATE TABLE IF NOT EXISTS playlist_subscriptions (
     CONSTRAINT uq_playlist_subscription UNIQUE (user_id, playlist_id)
 );
 
+-- Подписки пользователей друг на друга
+CREATE TABLE IF NOT EXISTS user_follows (
+    id SERIAL PRIMARY KEY,
+    follower_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    following_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    CONSTRAINT uq_user_follow UNIQUE (follower_id, following_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_follow_follower ON user_follows(follower_id);
+CREATE INDEX IF NOT EXISTS idx_user_follow_following ON user_follows(following_id);
+
 -- Индексы для быстрого поиска
 CREATE INDEX IF NOT EXISTS idx_tracks_uploader_id ON tracks(uploader_id);
 CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist);
