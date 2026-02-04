@@ -131,7 +131,7 @@ import TrackSearchItem from './TrackSearchItem.vue'
 import EditableTrackItem from './EditableTrackItem.vue'
 import { X, Music, Camera, Check } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
-import { useUiStore } from '@/stores/ui'
+import { useUIStore } from '@/stores/ui'
 
 const props = defineProps({
   show: Boolean,
@@ -142,7 +142,7 @@ const emit = defineEmits(['close', 'save', 'delete', 'update:tracks', 'refresh']
 
 const playerStore = usePlayerStore()
 const authStore = useAuthStore()
-const uiStore = useUiStore()
+const uiStore = useUIStore()
 
 // Track if we opened the cover upload link
 const pendingCoverUpload = ref(false)
