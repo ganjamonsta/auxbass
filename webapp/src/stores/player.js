@@ -1648,8 +1648,10 @@ export const usePlayerStore = defineStore('player', () => {
           response = await tracksApi.getAllIds({ sort_by: 'random' })
           break
         case 'artist':
-          if (!contextName) throw new Error('Artist name required')
-          response = await tracksApi.getArtistIds(contextName, { sort_by: 'random' })
+          // Artist name can be passed as contextName (3rd param) or contextId (2nd param) 
+          const artistName = contextName || contextId
+          if (!artistName) throw new Error('Artist name required')
+          response = await tracksApi.getArtistIds(artistName, { sort_by: 'random' })
           break
         case 'album':
           if (!contextId) throw new Error('Album ID required')
@@ -1676,7 +1678,9 @@ export const usePlayerStore = defineStore('player', () => {
       // Set lazy shuffle state
       lazyShuffleIds.value = ids
       lazyShuffleIndex.value = 0
-      lazyShuffleContext.value = { type: context, id: contextId, name: contextName }
+      // For artist, ensure name is saved (can come from contextName or contextId)
+      const effectiveName = context === 'artist' ? (contextName || contextId) : contextName
+      lazyShuffleContext.value = { type: context, id: contextId, name: effectiveName }
       
       // Enable shuffle mode
       shuffle.value = true
