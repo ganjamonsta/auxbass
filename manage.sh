@@ -425,6 +425,73 @@ db_restore() {
     log_ok "База данных восстановлена"
 }
 
+db_migrate() {
+    local migration_dir="database/migrations"
+    
+    if [ ! -d "$migration_dir" ]; then
+        log_error "Директория миграций не найдена: $migration_dir"
+        return 1
+    fi
+    
+    # Получить список всех миграций
+    local migrations=($(ls -1 "$migration_dir"/*.sql 2>/dev/null | sort))
+    
+    if [ ${#migrations[@]} -eq 0 ]; then
+        log_info "Нет миграций для выполнения"
+        return 0
+    fi
+    
+    echo ""
+    echo -e "${BOLD}Доступные миграции:${NC}"
+    for i in "${!migrations[@]}"; do
+        local file=$(basename "${migrations[$i]}")
+        echo -e "  ${CYAN}$((i+1))${NC}) $file"
+    done
+    echo -e "  ${CYAN}a${NC}) Выполнить все"
+    echo -e "  ${CYAN}0${NC}) Отмена"
+    echo ""
+    
+    read -p "Выбор: " choice
+    
+    case $choice in
+        0|"") return ;;
+        a|A)
+            log_step "Выполнение всех миграций..."
+            for migration in "${migrations[@]}"; do
+                local file=$(basename "$migration")
+                log_step "Выполняю: $file"
+                cat "$migration" | docker exec -i tg_player_db psql -U postgres tg_player
+                if [ $? -eq 0 ]; then
+                    log_ok "$file - выполнено"
+                else
+                    log_error "$file - ошибка!"
+                    return 1
+                fi
+            done
+            log_ok "Все миграции выполнены!"
+            ;;
+        [1-9]|[1-9][0-9])
+            local idx=$((choice-1))
+            if [ $idx -lt ${#migrations[@]} ]; then
+                local migration="${migrations[$idx]}"
+                local file=$(basename "$migration")
+                log_step "Выполняю: $file"
+                cat "$migration" | docker exec -i tg_player_db psql -U postgres tg_player
+                if [ $? -eq 0 ]; then
+                    log_ok "$file - выполнено"
+                else
+                    log_error "$file - ошибка!"
+                fi
+            else
+                log_error "Неверный выбор"
+            fi
+            ;;
+        *)
+            log_error "Неверный выбор"
+            ;;
+    esac
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 #  ИНТЕРАКТИВНОЕ МЕНЮ
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -455,6 +522,7 @@ show_menu() {
     echo ""
     echo -e "  ${BOLD}База данных${NC}"
     echo -e "    ${CYAN}d${NC}) Консоль БД"
+    echo -e "    ${CYAN}m${NC}) Миграции"
     echo -e "    ${CYAN}B${NC}) Бэкап базы"
     echo -e "    ${CYAN}R${NC}) Восстановить базу"
     echo ""
@@ -513,6 +581,10 @@ interactive_menu() {
                 ;;
             h) git_log; read -p "Нажми Enter для продолжения..." ;;
             d) db_submenu ;;
+            m)
+                db_migrate
+                read -p "Нажми Enter для продолжения..."
+                ;;
             B) 
                 db_backup
                 read -p "Нажми Enter для продолжения..."
@@ -569,6 +641,7 @@ show_help() {
     echo ""
     echo -e "${BOLD}Команды БД:${NC}"
     echo "  db shell                Открыть psql консоль"
+    echo "  db migrate              Выполнить миграции"
     echo "  db backup               Создать бэкап"
     echo "  db restore <файл>       Восстановить из бэкапа"
     echo ""
@@ -654,7 +727,8 @@ main() {
                 shell) db_shell ;;
                 backup) db_backup ;;
                 restore) db_restore "$3" ;;
-                *) log_error "Неизвестная db команда: $2"; echo "Доступно: shell, backup, restore" ;;
+                migrate) db_migrate ;;
+                *) log_error "Неизвестная db команда: $2"; echo "Доступно: shell, backup, restore, migrate" ;;
             esac
             ;;
             
