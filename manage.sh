@@ -296,16 +296,75 @@ update() {
 
 rebuild() {
     local service=$1
+    local no_cache=${2:-"yes"}  # По умолчанию без кэша
+    
+    local running=$(get_running_env)
     
     if [ -z "$service" ]; then
-        log_step "Пересборка всех образов (без кэша)..."
-        docker compose -f "$PROD_COMPOSE" build --no-cache
+        if [ "$no_cache" = "yes" ]; then
+            log_step "Пересборка всех образов (без кэша)..."
+            docker compose -f "$PROD_COMPOSE" build --no-cache
+        else
+            log_step "Пересборка всех образов..."
+            docker compose -f "$PROD_COMPOSE" build
+        fi
     else
-        log_step "Пересборка $service..."
-        docker compose -f "$PROD_COMPOSE" build --no-cache "$service"
+        if [ "$no_cache" = "yes" ]; then
+            log_step "Пересборка $service (без кэша)..."
+            docker compose -f "$PROD_COMPOSE" build --no-cache "$service"
+        else
+            log_step "Пересборка $service..."
+            docker compose -f "$PROD_COMPOSE" build "$service"
+        fi
     fi
     
-    log_ok "Пересборка завершена"
+    # Если production запущен - перезапустить с новыми образами
+    if [ "$running" = "prod" ]; then
+        log_step "Перезапуск с новыми образами..."
+        if [ -z "$service" ]; then
+            docker compose -f "$PROD_COMPOSE" up -d
+        else
+            docker compose -f "$PROD_COMPOSE" up -d "$service"
+        fi
+        log_ok "Пересборка и перезапуск завершены!"
+    else
+        log_ok "Пересборка завершена (сервисы не запущены)"
+    fi
+}
+
+rebuild_submenu() {
+    echo ""
+    echo -e "  ${BOLD}Пересборка образов${NC}"
+    echo ""
+    echo -e "    ${CYAN}1${NC}) Все сервисы (без кэша)"
+    echo -e "    ${CYAN}2${NC}) Все сервисы (с кэшем - быстрее)"
+    echo -e "    ${CYAN}3${NC}) Только API"
+    echo -e "    ${CYAN}4${NC}) Только Бот"
+    echo -e "    ${CYAN}5${NC}) Только WebApp"
+    echo -e "    ${CYAN}6${NC}) API + Бот (без webapp)"
+    echo -e "    ${CYAN}0${NC}) Назад"
+    echo ""
+    read -p "  Выбор: " choice
+    
+    case $choice in
+        1) rebuild "" "yes" ;;
+        2) rebuild "" "no" ;;
+        3) rebuild "api" "yes" ;;
+        4) rebuild "bot" "yes" ;;
+        5) rebuild "webapp" "yes" ;;
+        6) 
+            log_step "Пересборка API и Бота..."
+            docker compose -f "$PROD_COMPOSE" build --no-cache api bot
+            local running=$(get_running_env)
+            if [ "$running" = "prod" ]; then
+                log_step "Перезапуск API и Бота..."
+                docker compose -f "$PROD_COMPOSE" up -d api bot
+            fi
+            log_ok "Пересборка завершена!"
+            ;;
+        0|"") return ;;
+        *) log_error "Неверный выбор"; sleep 1 ;;
+    esac
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -570,7 +629,7 @@ interactive_menu() {
             2) stop_prod ;;
             3) restart_prod ;;
             u) update ;;
-            r) rebuild ;;
+            r) rebuild_submenu ;;
             s) show_status; read -p "Нажми Enter для продолжения..." ;;
             l) logs_submenu ;;
             g) git_status; read -p "Нажми Enter для продолжения..." ;;
