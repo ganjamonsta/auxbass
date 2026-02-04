@@ -200,12 +200,23 @@ watch(
   () => libraryStore.playlists,
   (storePlayists) => {
     if (!storePlayists?.length || !playlists.value?.length) return
-    // Update local playlist covers from store
+    // Update local playlist covers and other fields from store
     for (const storePlaylist of storePlayists) {
       const localPlaylist = playlists.value.find(p => p.id === storePlaylist.id)
-      if (localPlaylist && storePlaylist.cover_url !== localPlaylist.cover_url) {
+      if (!localPlaylist) continue
+      
+      // Check if cover_url or covers array changed
+      const coverUrlChanged = storePlaylist.cover_url !== localPlaylist.cover_url
+      const coversChanged = JSON.stringify(storePlaylist.covers) !== JSON.stringify(localPlaylist.covers)
+      
+      if (coverUrlChanged || coversChanged) {
         localPlaylist.cover_url = storePlaylist.cover_url
         localPlaylist.covers = storePlaylist.covers
+      }
+      
+      // Also sync name and other fields that might change
+      if (storePlaylist.name !== localPlaylist.name) {
+        localPlaylist.name = storePlaylist.name
       }
     }
   },

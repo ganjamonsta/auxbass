@@ -403,7 +403,12 @@ const save = async () => {
       currentCoverUrl.value = getCacheBustedUrl(response.data.cover_url)
     }
     
-    emit('save', { name: name.value.trim(), isPublic: isPublic.value, cover_url: response.data?.cover_url })
+    emit('save', { 
+      name: name.value.trim(), 
+      isPublic: isPublic.value, 
+      cover_url: response.data?.cover_url,
+      covers: response.data?.covers || []
+    })
   } catch (error) {
     console.error('Failed to save:', error)
   } finally {

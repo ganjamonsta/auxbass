@@ -191,30 +191,50 @@ const openEditModal = () => {
   showEditModal.value = true
 }
 
-const handleSavePlaylist = ({ name, isPublic }) => {
+const handleSavePlaylist = ({ name, isPublic, cover_url, covers }) => {
   playlist.value.name = name
   playlist.value.is_public = isPublic
+  
+  // Update cover if provided (from save response)
+  if (cover_url) {
+    playlist.value.cover_url = cover_url
+    playlist.value.covers = covers?.length ? covers : [cover_url]
+  } else if (covers?.length) {
+    // Track collage covers (no custom cover)
+    playlist.value.covers = covers
+  }
+  
   // Update in library store
   const libraryPlaylist = libraryStore.playlists.find(p => p.id === playlist.value.id)
   if (libraryPlaylist) {
     libraryPlaylist.name = name
     libraryPlaylist.is_public = isPublic
+    if (cover_url) {
+      libraryPlaylist.cover_url = cover_url
+      libraryPlaylist.covers = covers?.length ? covers : [cover_url]
+    } else if (covers?.length) {
+      libraryPlaylist.covers = covers
+    }
   }
+  
+  // Invalidate API cache to ensure fresh data everywhere
+  apiCache.invalidateRelated('playlist', playlist.value.id)
+  
   showEditModal.value = false
   uiStore.toast.success('Сохранено', 'Плейлист обновлён')
 }
 
 const handlePlaylistRefresh = (updatedPlaylist) => {
   // Update cover and other fields from refresh
-  if (updatedPlaylist.cover_url) {
-    playlist.value.cover_url = updatedPlaylist.cover_url
-    playlist.value.covers = updatedPlaylist.covers || [updatedPlaylist.cover_url]
-  }
+  // Always update cover_url and covers, even if cover_url is null (for track collage)
+  playlist.value.cover_url = updatedPlaylist.cover_url || null
+  playlist.value.covers = updatedPlaylist.covers || (updatedPlaylist.cover_url ? [updatedPlaylist.cover_url] : [])
+  
   // Update in library store (both cover_url and covers array)
   const libraryPlaylist = libraryStore.playlists.find(p => p.id === playlist.value.id)
-  if (libraryPlaylist && updatedPlaylist.cover_url) {
-    libraryPlaylist.cover_url = updatedPlaylist.cover_url
-    libraryPlaylist.covers = updatedPlaylist.covers || [updatedPlaylist.cover_url]
+  if (libraryPlaylist) {
+    libraryPlaylist.cover_url = updatedPlaylist.cover_url || null
+    libraryPlaylist.covers = updatedPlaylist.covers || (updatedPlaylist.cover_url ? [updatedPlaylist.cover_url] : [])
   }
   
   // Invalidate API cache to ensure fresh data everywhere
