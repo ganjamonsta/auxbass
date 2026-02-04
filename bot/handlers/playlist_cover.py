@@ -268,21 +268,27 @@ async def handle_photo_reply_for_cover(message: Message, state: FSMContext, bot:
     Parses playlist_id and channel_id from replied message text.
     No database storage needed!
     """
+    logger.debug(f"handle_photo_reply_for_cover triggered for user {message.from_user.id}")
+    
     # First check if FSM state is active (handled by handle_cover_upload)
     current_state = await state.get_state()
     if current_state == PlaylistCoverStates.waiting_for_cover:
+        logger.debug("Skipping - FSM state active, will be handled by handle_cover_upload")
         return  # Will be handled by handle_cover_upload
     
     # Check if replied message contains cover data
     reply_msg = message.reply_to_message
     if not reply_msg or not reply_msg.text:
+        logger.debug(f"Skipping - no reply_msg or no text: reply_msg={bool(reply_msg)}, text={bool(reply_msg.text) if reply_msg else False}")
         return  # Not a cover request reply
     
     # Parse cover data from message: cover:playlist_id:channel_id
     match = COVER_DATA_PATTERN.search(reply_msg.text)
     if not match:
+        logger.debug(f"Skipping - no cover pattern found in: {reply_msg.text[:100]}")
         return  # Not a cover request
     
+    logger.info(f"Processing cover upload reply for user {message.from_user.id}")
     playlist_id = int(match.group(1))
     channel_id = int(match.group(2))
     

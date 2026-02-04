@@ -518,14 +518,15 @@ async def request_cover_upload(
             detail="Подключите канал для загрузки обложек. Используйте /channel в боте."
         )
     
-    # Send message with ForceReply - encode data in hidden tag
-    # Format: <!-- cover:playlist_id:channel_id -->
+    # Send message with ForceReply - encode data in message for parsing on reply
+    # The cover:playlist_id:channel_id pattern is parsed by bot when user replies with photo
     bot_api_url = f"{settings.telegram_api_url}/bot{settings.bot_token}/sendMessage"
     message_text = (
         f"📷 <b>Загрузка обложки для плейлиста</b>\n\n"
         f"🎵 <i>{playlist.name}</i>\n\n"
-        f"<b>Ответьте на это сообщение фотографией</b>\n"
-        f"<code>cover:{playlist_id}:{channel.channel_id}</code>"
+        f"Ответьте на это сообщение фотографией.\n"
+        f"Я автоматически обрежу изображение до квадрата.\n\n"
+        f"<i>cover:{playlist_id}:{channel.channel_id}</i>"
     )
     
     try:

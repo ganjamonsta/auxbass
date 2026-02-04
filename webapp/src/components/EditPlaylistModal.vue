@@ -205,8 +205,8 @@ const startCoverPolling = () => {
     
     let attempts = 0
     const maxAttempts = 60 // 60 seconds max (user may need time to send photo)
-    // Store initial cover URL to detect changes
-    const initialCoverUrl = currentCoverUrl.value
+    // Store initial cover URL to detect changes (use base URL without cache-bust params)
+    const initialCoverBaseUrl = getBaseUrl(currentCoverUrl.value)
     
     coverPollInterval = setInterval(async () => {
         attempts++
@@ -220,9 +220,11 @@ const startCoverPolling = () => {
             // Bypass cache to get fresh data from server
             const response = await api.get(`/playlists/${props.playlist.id}`, { bypassCache: true })
             const newCoverUrl = response.data?.cover_url
-            console.log(`[Cover Poll #${attempts}] initial: ${initialCoverUrl}, new: ${newCoverUrl}`)
+            // Compare base URLs to properly detect changes (ignore cache-bust params)
+            const newCoverBaseUrl = getBaseUrl(newCoverUrl)
+            console.log(`[Cover Poll #${attempts}] initial: ${initialCoverBaseUrl}, new: ${newCoverBaseUrl}`)
             // Check if cover changed from initial value
-            if (newCoverUrl && newCoverUrl !== initialCoverUrl) {
+            if (newCoverBaseUrl && newCoverBaseUrl !== initialCoverBaseUrl) {
                 console.log('[Cover Poll] Cover changed! Updating...')
                 // Add cache-busting to force browser to load new image
                 currentCoverUrl.value = getCacheBustedUrl(newCoverUrl)
