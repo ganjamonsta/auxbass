@@ -173,7 +173,21 @@ export const useLibraryStore = defineStore('library', () => {
   const fetchPlaylists = async () => {
     try {
       const response = await playlistsApi.getAll()
-      playlists.value = response.data?.items || response.data || []
+      const raw = response.data?.items || response.data || []
+
+      // Cache-bust covers so UI reloads fresh images after updates
+      const stamp = Date.now()
+      const bust = (url) => {
+        if (!url) return null
+        const sep = url.includes('?') ? '&' : '?'
+        return `${url}${sep}_cb=${stamp}`
+      }
+
+      playlists.value = raw.map((p) => ({
+        ...p,
+        cover_url: bust(p.cover_url),
+        covers: (p.covers || (p.cover_url ? [p.cover_url] : [])).map(bust)
+      }))
     } catch (error) {
       console.error('Failed to fetch playlists:', error)
     }
