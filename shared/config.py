@@ -1,6 +1,8 @@
 """
 TG Player - Shared Configuration
 """
+import os
+import warnings
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
@@ -29,6 +31,8 @@ class Settings(BaseSettings):
     webapp_url: str = "http://localhost:5173"
     
     # Security
+    # ВАЖНО: SECRET_KEY должен быть одинаковым между перезапусками!
+    # Иначе все JWT токены станут невалидными и пользователей выкинет из аккаунтов.
     secret_key: str = "dev-secret-key"
     jwt_algorithm: str = "HS256"
     jwt_expire_days: int = 30  # JWT token expiration
@@ -43,4 +47,19 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    settings = Settings()
+    
+    # Предупреждение о дефолтном SECRET_KEY в production
+    if settings.secret_key == "dev-secret-key":
+        # Проверяем, запущено ли в Docker (признак production)
+        if os.path.exists("/.dockerenv") or os.environ.get("DOCKER_CONTAINER"):
+            warnings.warn(
+                "\n⚠️  ВНИМАНИЕ: Используется дефолтный SECRET_KEY!\n"
+                "   Это приведёт к выбросу пользователей из аккаунтов при перезапуске контейнера.\n"
+                "   Установите SECRET_KEY в .env файле с постоянным случайным значением.\n"
+                "   Пример: SECRET_KEY=$(openssl rand -hex 32)\n",
+                UserWarning,
+                stacklevel=2
+            )
+    
+    return settings
