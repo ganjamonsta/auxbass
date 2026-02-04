@@ -15,7 +15,10 @@
             <div v-else class="edit-cover-placeholder">
                 <Camera :size="24" />
             </div>
-            <div v-if="waitingForCover" class="edit-cover-overlay waiting">
+            <div v-if="coverUpdated" class="edit-cover-overlay success">
+                <Check :size="20" />
+            </div>
+            <div v-else-if="waitingForCover" class="edit-cover-overlay waiting">
                 <div class="cover-spinner"></div>
             </div>
             <div v-else class="edit-cover-overlay">
@@ -126,8 +129,9 @@ import { useDragReorder } from '@/composables/useDragReorder'
 import api from '@/api/client'
 import TrackSearchItem from './TrackSearchItem.vue'
 import EditableTrackItem from './EditableTrackItem.vue'
-import { X, Music, Camera } from 'lucide-vue-next'
+import { X, Music, Camera, Check } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
+import { useUiStore } from '@/stores/ui'
 
 const props = defineProps({
   show: Boolean,
@@ -138,13 +142,22 @@ const emit = defineEmits(['close', 'save', 'delete', 'update:tracks', 'refresh']
 
 const playerStore = usePlayerStore()
 const authStore = useAuthStore()
+const uiStore = useUiStore()
 
 // Track if we opened the cover upload link
 const pendingCoverUpload = ref(false)
 const waitingForCover = ref(false)
+const coverUpdated = ref(false)  // Show success state briefly
 let coverPollInterval = null
 // Current cover URL (local state for refresh)
 const currentCoverUrl = ref(null)
+
+// Add cache-busting to URL to force browser refresh
+const getCacheBustedUrl = (url) => {
+    if (!url) return null
+    const separator = url.includes('?') ? '&' : '?'
+    return `${url}${separator}_t=${Date.now()}`
+}
 
 const changeCover = async () => {
     if (!props.playlist?.id) return
@@ -185,21 +198,30 @@ const startCoverPolling = () => {
     if (coverPollInterval) clearInterval(coverPollInterval)
     
     let attempts = 0
-    const maxAttempts = 30 // 30 seconds max
+    const maxAttempts = 60 // 60 seconds max (user may need time to send photo)
+    // Store initial cover URL to detect changes
+    const initialCoverUrl = currentCoverUrl.value
     
     coverPollInterval = setInterval(async () => {
         attempts++
         if (attempts >= maxAttempts) {
             stopCoverPolling()
+            uiStore.toast.info('Время ожидания истекло', 'Попробуйте ещё раз')
             return
         }
         
         try {
             const response = await api.get(`/playlists/${props.playlist.id}`)
-            if (response.data?.cover_url && response.data.cover_url !== currentCoverUrl.value) {
-                currentCoverUrl.value = response.data.cover_url
+            // Check if cover changed from initial value
+            if (response.data?.cover_url && response.data.cover_url !== initialCoverUrl) {
+                // Add cache-busting to force browser to load new image
+                currentCoverUrl.value = getCacheBustedUrl(response.data.cover_url)
                 emit('refresh', response.data)
                 stopCoverPolling()
+                // Show success feedback
+                coverUpdated.value = true
+                uiStore.toast.success('Готово!', 'Обложка обновлена')
+                setTimeout(() => { coverUpdated.value = false }, 2000)
             }
         } catch (error) {
             console.error('Failed to poll cover:', error)
@@ -300,6 +322,8 @@ watch(() => props.show, (show) => {
     searchQuery.value = ''
     searchResults.value = []
     pendingCoverUpload.value = false
+    coverUpdated.value = false
+    stopCoverPolling()
   }
 })
 
@@ -547,6 +571,11 @@ const save = async () => {
 .edit-cover-overlay.waiting {
     opacity: 1;
     background: rgba(0,0,0,0.7);
+}
+
+.edit-cover-overlay.success {
+    opacity: 1;
+    background: rgba(34, 197, 94, 0.8);
 }
 
 .edit-cover-wrapper:hover .edit-cover-overlay {
