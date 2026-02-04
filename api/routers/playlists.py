@@ -40,6 +40,7 @@ class PlaylistUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     is_public: Optional[bool] = None
+    save_pending_cover: bool = False  # If true, finalize pending cover to channel
 
 
 class PlaylistResponse(BaseModel):
@@ -49,6 +50,7 @@ class PlaylistResponse(BaseModel):
     track_count: int = 0
     total_duration: int = 0
     cover_url: Optional[str] = None
+    pending_cover_url: Optional[str] = None  # Preview URL for pending cover (not yet saved)
     covers: List[str] = []  # Array of cover URLs for collage display
     tags: Optional[List[str]] = None  # Tags aggregated from playlist tracks
     is_public: bool = False
@@ -78,8 +80,18 @@ class ReorderRequest(BaseModel):
     track_ids: List[int]
 
 
-async def get_playlist_info(db: AsyncSession, playlist_id: int, playlist_cover_url: Optional[str] = None) -> tuple[int, int, Optional[str], List[str]]:
-    """Get track count, duration, cover, and covers array for a playlist"""
+async def get_playlist_info(
+    db: AsyncSession, 
+    playlist_id: int, 
+    playlist_cover_url: Optional[str] = None,
+    pending_cover_file_id: Optional[str] = None
+) -> tuple[int, int, Optional[str], Optional[str], List[str]]:
+    """
+    Get track count, duration, cover, pending_cover_url, and covers array for a playlist.
+    Returns: (track_count, total_duration, cover_url, pending_cover_url, covers)
+    """
+    settings = get_settings()
+    
     # Count and duration
     result = await db.execute(
         select(
@@ -115,7 +127,13 @@ async def get_playlist_info(db: AsyncSession, playlist_id: int, playlist_cover_u
         covers = track_covers[:4]  # Up to 4 for collage
         cover_url = track_covers[0] if track_covers else None
     
-    return track_count, total_duration, cover_url, covers
+    # Build pending cover URL if file_id exists
+    pending_cover_url = None
+    if pending_cover_file_id:
+        base_url = settings.webapp_url.rstrip('/')
+        pending_cover_url = f"{base_url}/api/images/{pending_cover_file_id}"
+    
+    return track_count, total_duration, cover_url, pending_cover_url, covers
 
 
 @router.get("", response_model=PlaylistsListResponse)
@@ -159,7 +177,7 @@ async def get_my_playlists(
     
     items = []
     for playlist, owner in owned_rows:
-        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
+        track_count, total_duration, cover_url, _, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
         items.append(PlaylistResponse(
             id=playlist.id,
             name=playlist.name,
@@ -194,7 +212,7 @@ async def get_my_playlists(
         subscribed_rows = result.all()
         
         for playlist, owner, subscription in subscribed_rows:
-            track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
+            track_count, total_duration, cover_url, _, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
             items.append(PlaylistResponse(
                 id=playlist.id,
                 name=playlist.name,
@@ -247,7 +265,9 @@ async def get_all_my_playlists(
     
     items = []
     for playlist, owner in rows:
-        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
+        track_count, total_duration, cover_url, pending_cover_url, covers = await get_playlist_info(
+            db, playlist.id, playlist.cover_url, playlist.pending_cover_file_id
+        )
         items.append(PlaylistResponse(
             id=playlist.id,
             name=playlist.name,
@@ -255,6 +275,7 @@ async def get_all_my_playlists(
             track_count=track_count,
             total_duration=total_duration,
             cover_url=cover_url,
+            pending_cover_url=pending_cover_url,
             covers=covers,
             is_public=playlist.is_public,
             owner_id=owner.id,
@@ -356,6 +377,13 @@ async def get_playlist(
         cover_url = track_covers[0] if track_covers else None
         covers = track_covers
     
+    # Build pending cover URL if exists
+    pending_cover_url = None
+    if playlist.pending_cover_file_id:
+        settings = get_settings()
+        base_url = settings.webapp_url.rstrip('/')
+        pending_cover_url = f"{base_url}/api/images/{playlist.pending_cover_file_id}"
+    
     # Check if user is subscribed to this playlist
     is_subscribed = False
     if playlist.owner_id != user.id:
@@ -396,6 +424,7 @@ async def get_playlist(
         track_count=track_count,
         total_duration=total_duration,
         cover_url=cover_url,
+        pending_cover_url=pending_cover_url,
         covers=covers,
         tags=playlist_tags,
         is_public=playlist.is_public,
@@ -454,7 +483,10 @@ async def update_playlist(
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update playlist."""
+    """Update playlist. If save_pending_cover=True, finalize cover to channel."""
+    import httpx
+    
+    settings = get_settings()
     playlist = await db.get(Playlist, playlist_id)
     
     if not playlist or playlist.owner_id != user.id:
@@ -467,9 +499,83 @@ async def update_playlist(
     if data.is_public is not None:
         playlist.is_public = data.is_public
     
+    # Finalize pending cover if requested
+    if data.save_pending_cover and playlist.pending_cover_file_id:
+        # Get user's channel
+        channel = await db.scalar(
+            select(UserChannel).where(
+                UserChannel.user_id == user.id,
+                UserChannel.is_active == True
+            )
+        )
+        
+        if channel:
+            try:
+                # Call bot API to finalize cover (send to channel, delete old, notify user)
+                bot_api_url = f"{settings.telegram_api_url}/bot{settings.bot_token}"
+                
+                async with httpx.AsyncClient() as client:
+                    # Delete old cover message from channel if exists
+                    if playlist.cover_message_id:
+                        try:
+                            await client.post(
+                                f"{bot_api_url}/deleteMessage",
+                                json={
+                                    "chat_id": channel.channel_id,
+                                    "message_id": playlist.cover_message_id
+                                }
+                            )
+                        except Exception:
+                            pass  # Ignore if message already deleted
+                    
+                    # Send new cover to channel
+                    response = await client.post(
+                        f"{bot_api_url}/sendPhoto",
+                        json={
+                            "chat_id": channel.channel_id,
+                            "photo": playlist.pending_cover_file_id,
+                            "caption": f"🎵 Обложка плейлиста: <b>{playlist.name}</b>",
+                            "parse_mode": "HTML"
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    
+                    if result.get("ok"):
+                        sent_msg = result["result"]
+                        # Get new file_id and message_id
+                        new_file_id = sent_msg["photo"][-1]["file_id"]
+                        new_message_id = sent_msg["message_id"]
+                        
+                        # Build cover URL
+                        base_url = settings.webapp_url.rstrip('/')
+                        cover_url = f"{base_url}/api/images/{new_file_id}"
+                        
+                        # Update playlist
+                        playlist.cover_url = cover_url
+                        playlist.cover_message_id = new_message_id
+                        playlist.pending_cover_file_id = None  # Clear pending
+                        
+                        # Notify user
+                        await client.post(
+                            f"{bot_api_url}/sendMessage",
+                            json={
+                                "chat_id": user.id,
+                                "text": f"✅ <b>Обложка установлена!</b>\n\n🎵 Плейлист: <i>{playlist.name}</i>",
+                                "parse_mode": "HTML"
+                            }
+                        )
+                        
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).exception(f"Failed to finalize cover: {e}")
+                # Don't fail the whole request, just log the error
+    
     await db.commit()
     
-    track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
+    track_count, total_duration, cover_url, pending_cover_url, covers = await get_playlist_info(
+        db, playlist.id, playlist.cover_url, playlist.pending_cover_file_id
+    )
     
     return PlaylistResponse(
         id=playlist.id,
@@ -478,6 +584,7 @@ async def update_playlist(
         track_count=track_count,
         total_duration=total_duration,
         cover_url=cover_url,
+        pending_cover_url=pending_cover_url,
         covers=covers,
         is_public=playlist.is_public,
         created_at=playlist.created_at,
@@ -706,7 +813,7 @@ async def get_public_playlists(
     
     items = []
     for playlist, owner in rows:
-        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
+        track_count, total_duration, cover_url, _, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
         
         # Check if current user is subscribed or is owner
         is_owner = playlist.owner_id == user.id
@@ -784,7 +891,7 @@ async def get_user_public_playlists(
     
     items = []
     for playlist in playlists:
-        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
+        track_count, total_duration, cover_url, _, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
         # Check if current user is subscribed
         is_subscribed = False
         if not is_own:

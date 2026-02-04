@@ -429,6 +429,11 @@ class Playlist(Base):
     description: Mapped[Optional[str]] = mapped_column(Text)
     cover_url: Mapped[Optional[str]] = mapped_column(String(500))
     
+    # Pending cover file_id (temporary, before save button is clicked)
+    pending_cover_file_id: Mapped[Optional[str]] = mapped_column(String(255))
+    # Message ID of cover in user's channel (for deletion when updating)
+    cover_message_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
     share_code: Mapped[Optional[str]] = mapped_column(String(50), unique=True)
     

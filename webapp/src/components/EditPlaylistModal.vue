@@ -199,14 +199,15 @@ const changeCover = async () => {
     }
 }
 
-// Start polling for cover updates
+// Track if pending cover exists (for save button logic)
+const hasPendingCover = ref(false)
+
+// Start polling for pending cover updates
 const startCoverPolling = () => {
     if (coverPollInterval) clearInterval(coverPollInterval)
     
     let attempts = 0
     const maxAttempts = 60 // 60 seconds max (user may need time to send photo)
-    // Store initial cover URL to detect changes (use base URL without cache-bust params)
-    const initialCoverBaseUrl = getBaseUrl(currentCoverUrl.value)
     
     coverPollInterval = setInterval(async () => {
         attempts++
@@ -219,20 +220,20 @@ const startCoverPolling = () => {
         try {
             // Bypass cache to get fresh data from server
             const response = await api.get(`/playlists/${props.playlist.id}`, { bypassCache: true })
-            const newCoverUrl = response.data?.cover_url
-            // Compare base URLs to properly detect changes (ignore cache-bust params)
-            const newCoverBaseUrl = getBaseUrl(newCoverUrl)
-            console.log(`[Cover Poll #${attempts}] initial: ${initialCoverBaseUrl}, new: ${newCoverBaseUrl}`)
-            // Check if cover changed from initial value
-            if (newCoverBaseUrl && newCoverBaseUrl !== initialCoverBaseUrl) {
-                console.log('[Cover Poll] Cover changed! Updating...')
-                // Add cache-busting to force browser to load new image
-                currentCoverUrl.value = getCacheBustedUrl(newCoverUrl)
-                emit('refresh', response.data)
+            const pendingCoverUrl = response.data?.pending_cover_url
+            
+            console.log(`[Cover Poll #${attempts}] pending_cover_url: ${pendingCoverUrl}`)
+            
+            // Check if pending cover appeared
+            if (pendingCoverUrl) {
+                console.log('[Cover Poll] Pending cover found! Showing preview...')
+                // Show pending cover as preview
+                currentCoverUrl.value = getCacheBustedUrl(pendingCoverUrl)
+                hasPendingCover.value = true
                 stopCoverPolling()
                 // Show success feedback
                 coverUpdated.value = true
-                uiStore.toast.success('Готово!', 'Обложка обновлена')
+                uiStore.toast.success('Превью готово!', 'Нажмите Сохранить для применения')
                 setTimeout(() => { coverUpdated.value = false }, 2000)
             }
         } catch (error) {
@@ -329,11 +330,15 @@ watch(() => props.playlist, (pl) => {
     // Skip update if we're waiting for cover (to not overwrite the loading state)
     // Also skip if base URL hasn't changed to avoid unnecessary re-renders
     if (!waitingForCover.value) {
+      // Prefer pending_cover_url if exists (for preview), otherwise use cover_url
+      const displayCover = pl.pending_cover_url || pl.cover_url || null
       const currentBase = getBaseUrl(currentCoverUrl.value)
-      const newBase = pl.cover_url || null
+      const newBase = getBaseUrl(displayCover)
       if (currentBase !== newBase) {
-        currentCoverUrl.value = getCacheBustedUrl(pl.cover_url)
+        currentCoverUrl.value = getCacheBustedUrl(displayCover)
       }
+      // Track if we have pending cover
+      hasPendingCover.value = !!pl.pending_cover_url
     }
   }
 }, { immediate: true })
@@ -344,6 +349,7 @@ watch(() => props.show, (show) => {
     searchResults.value = []
     pendingCoverUpload.value = false
     coverUpdated.value = false
+    hasPendingCover.value = false
     stopCoverPolling()
   }
 })
@@ -427,11 +433,19 @@ const save = async () => {
   if (!name.value.trim() || saving.value) return
   saving.value = true
   try {
-    await api.put(`/playlists/${props.playlist.id}`, {
+    const response = await api.put(`/playlists/${props.playlist.id}`, {
       name: name.value.trim(),
-      is_public: isPublic.value
+      is_public: isPublic.value,
+      save_pending_cover: hasPendingCover.value
     })
-    emit('save', { name: name.value.trim(), isPublic: isPublic.value })
+    
+    // Update cover URL from response if cover was finalized
+    if (response.data?.cover_url) {
+      currentCoverUrl.value = getCacheBustedUrl(response.data.cover_url)
+    }
+    
+    hasPendingCover.value = false
+    emit('save', { name: name.value.trim(), isPublic: isPublic.value, cover_url: response.data?.cover_url })
   } catch (error) {
     console.error('Failed to save:', error)
   } finally {

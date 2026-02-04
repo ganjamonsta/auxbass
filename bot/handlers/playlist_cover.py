@@ -109,13 +109,15 @@ async def cmd_start_cover(message: Message, command: CommandObject, state: FSMCo
 
 @router.message(PlaylistCoverStates.waiting_for_cover, F.photo)
 async def handle_cover_upload(message: Message, state: FSMContext, bot: Bot):
-    """Process uploaded cover photo"""
+    """
+    Process uploaded cover photo - prepare preview, don't save to channel yet.
+    Cover is finalized when user clicks Save in the editor.
+    """
     data = await state.get_data()
     playlist_id = data.get("playlist_id")
     playlist_name = data.get("playlist_name", "Плейлист")
-    channel_id = data.get("channel_id")
     
-    if not playlist_id or not channel_id:
+    if not playlist_id:
         await state.clear()
         await message.answer("❌ Ошибка: данные сессии потеряны. Попробуйте заново.")
         return
@@ -157,67 +159,30 @@ async def handle_cover_upload(message: Message, state: FSMContext, bot: Bot):
         img.save(output, format="JPEG", quality=90)
         output.seek(0)
         
-        # Upload to user's channel for persistent storage
-        await status_msg.edit_text("⏳ Сохраняю в ваш канал...")
+        # Send preview to user (this gives us a file_id for the processed image)
+        await status_msg.edit_text("⏳ Создаю превью...")
         
-        try:
-            # Send to user's backup channel
-            sent_msg = await bot.send_photo(
-                chat_id=channel_id,
-                photo=BufferedInputFile(output.read(), filename=f"cover_{playlist_id}.jpg"),
-                caption=f"🎵 Обложка плейлиста: <b>{playlist_name}</b>",
-                parse_mode="HTML"
-            )
-            
-            # Get file_id from sent message
-            cover_file_id = sent_msg.photo[-1].file_id
-            
-        except TelegramForbiddenError:
-            # Bot was removed from channel
-            await status_msg.edit_text(
-                "❌ Бот был удалён из вашего канала.\n\n"
-                "Переподключите канал командой /channel"
-            )
-            await state.clear()
-            return
-            
-        except TelegramBadRequest as e:
-            logger.error(f"Failed to upload cover to channel {channel_id}: {e}")
-            await status_msg.edit_text(
-                "❌ Не удалось загрузить обложку в канал.\n\n"
-                "Проверьте, что бот добавлен в канал как администратор."
-            )
-            await state.clear()
-            return
-        
-        # Generate cover URL through API proxy
-        # Use webapp_url for external access (api_url is internal Docker URL)
-        base_url = settings.webapp_url.rstrip('/')
-        cover_url = f"{base_url}/api/images/{cover_file_id}"
-        
-        # Update playlist in database
-        async with get_session() as session:
-            playlist = await session.get(Playlist, playlist_id)
-            if playlist:
-                playlist.cover_url = cover_url
-                # Note: get_session() auto-commits on successful exit
-                logger.info(f"Cover updated for playlist {playlist_id}: {cover_url}")
-        
-        # Send success message with preview
-        await status_msg.delete()
-        
-        # Re-read the buffer for preview
-        output.seek(0)
-        await message.answer_photo(
-            BufferedInputFile(output.read(), filename="cover_preview.jpg"),
+        preview_msg = await message.answer_photo(
+            BufferedInputFile(output.read(), filename=f"cover_{playlist_id}.jpg"),
             caption=(
-                f"✅ <b>Обложка обновлена!</b>\n\n"
+                f"📷 <b>Превью обложки</b>\n\n"
                 f"🎵 Плейлист: <i>{playlist_name}</i>\n\n"
-                f"Обложка сохранена в ваш канал и будет отображаться в плеере."
+                f"Нажмите <b>Сохранить</b> в редакторе плейлиста, чтобы применить обложку."
             ),
             parse_mode="HTML"
         )
         
+        # Get file_id from preview message
+        preview_file_id = preview_msg.photo[-1].file_id
+        
+        # Store pending cover in database for the playlist
+        async with get_session() as session:
+            playlist = await session.get(Playlist, playlist_id)
+            if playlist:
+                playlist.pending_cover_file_id = preview_file_id
+                logger.info(f"Pending cover set for playlist {playlist_id}: {preview_file_id[:20]}...")
+        
+        await status_msg.delete()
         await state.clear()
         
     except Exception as e:
@@ -265,8 +230,8 @@ async def cancel_cover_upload(callback: CallbackQuery, state: FSMContext):
 async def handle_photo_reply_for_cover(message: Message, state: FSMContext, bot: Bot):
     """
     Handle photo sent as reply to cover upload request.
-    Parses playlist_id and channel_id from replied message text.
-    No database storage needed!
+    Parses playlist_id from replied message text.
+    Saves pending cover - finalization happens when user clicks Save.
     """
     logger.debug(f"handle_photo_reply_for_cover triggered for user {message.from_user.id}")
     
@@ -290,7 +255,7 @@ async def handle_photo_reply_for_cover(message: Message, state: FSMContext, bot:
     
     logger.info(f"Processing cover upload reply for user {message.from_user.id}")
     playlist_id = int(match.group(1))
-    channel_id = int(match.group(2))
+    # channel_id is no longer needed here - we save to pending, not to channel
     
     user_id = message.from_user.id
     
@@ -337,42 +302,28 @@ async def handle_photo_reply_for_cover(message: Message, state: FSMContext, bot:
         img.save(output, format="JPEG", quality=90)
         output.seek(0)
         
-        await status_msg.edit_text("⏳ Сохраняю в ваш канал...")
+        await status_msg.edit_text("⏳ Создаю превью...")
         
-        try:
-            sent_msg = await bot.send_photo(
-                chat_id=channel_id,
-                photo=BufferedInputFile(output.read(), filename=f"cover_{playlist_id}.jpg"),
-                caption=f"🎵 Обложка плейлиста: <b>{playlist_name}</b>",
-                parse_mode="HTML"
-            )
-            cover_file_id = sent_msg.photo[-1].file_id
-            
-        except TelegramForbiddenError:
-            await status_msg.edit_text(
-                "❌ Бот был удалён из вашего канала.\n\n"
-                "Переподключите канал командой /channel"
-            )
-            return
-            
-        except TelegramBadRequest as e:
-            logger.error(f"Failed to upload cover to channel {channel_id}: {e}")
-            await status_msg.edit_text(
-                "❌ Не удалось загрузить обложку в канал.\n\n"
-                "Проверьте, что бот добавлен в канал как администратор."
-            )
-            return
+        # Send preview to user (this gives us a file_id for the processed image)
+        preview_msg = await message.answer_photo(
+            BufferedInputFile(output.read(), filename=f"cover_{playlist_id}.jpg"),
+            caption=(
+                f"📷 <b>Превью обложки</b>\n\n"
+                f"🎵 Плейлист: <i>{playlist_name}</i>\n\n"
+                f"Нажмите <b>Сохранить</b> в редакторе плейлиста, чтобы применить обложку."
+            ),
+            parse_mode="HTML"
+        )
         
-        # Use webapp_url for external access (api_url is internal Docker URL)
-        base_url = settings.webapp_url.rstrip('/')
-        cover_url = f"{base_url}/api/images/{cover_file_id}"
+        # Get file_id from preview message
+        preview_file_id = preview_msg.photo[-1].file_id
         
+        # Store pending cover in database for the playlist
         async with get_session() as session:
             playlist = await session.get(Playlist, playlist_id)
             if playlist:
-                playlist.cover_url = cover_url
-                # Note: get_session() auto-commits on successful exit
-                logger.info(f"Cover updated for playlist {playlist_id}: {cover_url}")
+                playlist.pending_cover_file_id = preview_file_id
+                logger.info(f"Pending cover set for playlist {playlist_id}: {preview_file_id[:20]}...")
         
         await status_msg.delete()
         
@@ -381,17 +332,6 @@ async def handle_photo_reply_for_cover(message: Message, state: FSMContext, bot:
             await reply_msg.delete()
         except Exception:
             pass  # Ignore if can't delete
-        
-        output.seek(0)
-        await message.answer_photo(
-            BufferedInputFile(output.read(), filename="cover_preview.jpg"),
-            caption=(
-                f"✅ <b>Обложка обновлена!</b>\n\n"
-                f"🎵 Плейлист: <i>{playlist_name}</i>\n\n"
-                f"Обложка сохранена в ваш канал и будет отображаться в плеере."
-            ),
-            parse_mode="HTML"
-        )
         
     except Exception as e:
         logger.exception(f"Error processing cover upload: {e}")
