@@ -113,7 +113,7 @@ async def cmd_login(message: Message):
     try:
         async with aiohttp.ClientSession() as http_session:
             async with http_session.post(
-                f"{settings.api_url}/auth/generate-code",
+                f"{settings.api_url}/api/auth/generate-code",
                 params={
                     "user_id": user.id,
                     "first_name": user.first_name,
