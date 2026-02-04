@@ -1,58 +1,25 @@
 <template>
   <div class="collections-view">
-    <!-- Albums Tab -->
+    <!-- Type Switcher (Tabs) - Desktop Only -->
+    <div class="neu-tab-bar collections-tabs">
+      <button 
+        class="neu-tab"
+        :class="{ active: activeTab === 'albums' }"
+        @click="setActiveTab('albums')"
+      >
+        <span class="neu-tab-content" data-text="Альбомы">Альбомы</span>
+      </button>
+      <button 
+        class="neu-tab"
+        :class="{ active: activeTab === 'playlists' }"
+        @click="setActiveTab('playlists')"
+      >
+        <span class="neu-tab-content" data-text="Плейлисты">Плейлисты</span>
+      </button>
+    </div>
+
+    <!-- Albums Tab - using unified component -->
     <div v-show="activeTab === 'albums'" class="tab-content">
-      <!-- Scope switcher for albums -->
-      <div v-if="!authStore.hasChannel" class="neu-tab-bar scope-switcher">
-        <button 
-          class="neu-tab" 
-          :class="{ active: albumScope === 'library' }"
-          @click="changeAlbumScope('library')"
-        >
-          <span class="neu-tab-content" data-text="Моя библиотека">Моя библиотека</span>
-        </button>
-        <button 
-          class="neu-tab" 
-          :class="{ active: albumScope === 'global' }"
-          @click="changeAlbumScope('global')"
-        >
-          <span class="neu-tab-content" data-text="Общая">Общая</span>
-        </button>
-      </div>
-
-      <!-- Info banner + Tabs combined -->
-      <div class="info-banner-with-tabs">
-        <div class="info-banner">
-          <div class="banner-icon">
-            <Disc3 :size="20" />
-          </div>
-          <div class="banner-text">
-            <div class="banner-title">{{ albumScope === 'global' ? 'Общая коллекция альбомов' : 'Альбомы в вашей библиотеке' }}</div>
-            <div class="banner-description">
-              {{ albumScope === 'global' ? 'Все альбомы, доступные в системе' : 'Альбомы из вашего канала' }}
-            </div>
-          </div>
-        </div>
-
-        <!-- Type Switcher (Tabs) - Neumorphic style - Desktop Only -->
-        <div class="neu-tab-bar collections-tabs">
-        <button 
-          class="neu-tab"
-          :class="{ active: activeTab === 'albums' }"
-          @click="setActiveTab('albums')"
-        >
-          <span class="neu-tab-content" data-text="Альбомы">Альбомы</span>
-        </button>
-        <button 
-          class="neu-tab"
-          :class="{ active: activeTab === 'playlists' }"
-          @click="setActiveTab('playlists')"
-        >
-          <span class="neu-tab-content" data-text="Плейлисты">Плейлисты</span>
-        </button>
-      </div>
-      </div>
-
       <!-- Search -->
       <SearchBar
         v-model="albumSearchQuery"
@@ -60,77 +27,24 @@
         @input="debouncedAlbumSearch"
       />
 
-      <div class="view-header">
-        <div class="header-left">
-          <span class="count">{{ albumsTotal }} альбомов</span>
-        </div>
-        <SortChips
-          :currentOption="albumSortOption"
-          :sortOrder="albumSortOrder"
-          @next="onNextAlbumSort"
-          @toggle-order="onToggleAlbumOrder"
-        />
-      </div>
-
-      <!-- Loading state with skeletons -->
-      <div v-if="loadingAlbums && !albumsInitialized" class="media-grid type-album">
-        <GridSkeleton v-for="i in 12" :key="i" type="album" />
-      </div>
-
-      <template v-else>
-        <MediaGrid
-          type="album"
-          :items="albums"
-          :loading="false"
-          @click="goToAlbum"
-          @play="playAlbum"
-        />
-
-        <!-- Infinite scroll trigger -->
-        <div ref="albumsLoadTrigger" class="load-trigger" v-show="hasMoreAlbums && !loadingAlbums"></div>
-
-        <!-- Loading more with skeletons -->
-        <div v-if="loadingMoreAlbums" class="media-grid type-album loading-more-grid">
-          <GridSkeleton 
-            v-for="i in albumsLoadingSkeletonCount" 
-            :key="'skeleton-more-' + i" 
-            type="album" 
-          />
-        </div>
-      </template>
+      <LibraryAlbums
+        ref="albumsRef"
+        scope="global"
+        :searchQuery="debouncedAlbumQuery"
+      />
     </div>
 
     <!-- Playlists Tab -->
     <div v-show="activeTab === 'playlists'" class="tab-content">
-      <!-- Info banner + Tabs combined -->
-      <div class="info-banner-with-tabs">
-        <div class="info-banner">
-          <div class="banner-icon">
-            <Folder :size="20" />
-          </div>
-          <div class="banner-text">
-            <div class="banner-title">Общие плейлисты</div>
-            <div class="banner-description">Все плейлисты, доступные в системе</div>
-          </div>
+      <!-- Info banner -->
+      <div class="info-banner">
+        <div class="banner-icon">
+          <Folder :size="20" />
         </div>
-
-        <!-- Type Switcher (Tabs) - Neumorphic style - Desktop Only -->
-        <div class="neu-tab-bar collections-tabs">
-        <button 
-          class="neu-tab"
-          :class="{ active: activeTab === 'albums' }"
-          @click="setActiveTab('albums')"
-        >
-          <span class="neu-tab-content" data-text="Альбомы">Альбомы</span>
-        </button>
-        <button 
-          class="neu-tab"
-          :class="{ active: activeTab === 'playlists' }"
-          @click="setActiveTab('playlists')"
-        >
-          <span class="neu-tab-content" data-text="Плейлисты">Плейлисты</span>
-        </button>
-      </div>
+        <div class="banner-text">
+          <div class="banner-title">Общие плейлисты</div>
+          <div class="banner-description">Все плейлисты, доступные в системе</div>
+        </div>
       </div>
 
       <!-- Search for playlists -->
@@ -209,21 +123,18 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
-import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
-import { useVirtualScroll } from '@/composables'
-import SortChips from '@/components/SortChips.vue'
+import { useDebouncedSearch } from '@/composables'
 import SearchBar from '@/components/ui/SearchBar.vue'
 import MediaGrid from '@/components/MediaGrid.vue'
-import GridSkeleton from '@/components/GridSkeleton.vue'
+import LibraryAlbums from '@/components/library/LibraryAlbums.vue'
 import api from '@/api/client'
-import { Disc3, Folder, Plus, Music, Globe, Search, Play } from 'lucide-vue-next'
+import { Folder, Plus, Music, Search } from 'lucide-vue-next'
 import { getCoverUrl, CoverSize } from '@/utils'
 
 const router = useRouter()
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
-const authStore = useAuthStore()
 const uiStore = useUIStore()
 
 // Tab state from uiStore
@@ -233,111 +144,24 @@ const setActiveTab = (tab) => {
   uiStore.setCollectionsTab(tab)
 }
 
-// Scope state for albums
-const ALBUM_SCOPE_KEY = 'albums-scope'
-const albumScope = ref(localStorage.getItem(ALBUM_SCOPE_KEY) || 'library')
+// Refs to child components
+const albumsRef = ref(null)
 
-const changeAlbumScope = (newScope) => {
-  // If trying to access library without channel, show prompt
-  if (newScope === 'library' && !authStore.hasChannel) {
-    authStore.promptChannelSetup()
-    return
-  }
-  albumScope.value = newScope
-  localStorage.setItem(ALBUM_SCOPE_KEY, newScope)
-  resetAlbums()
-}
-
-// Sort options for albums
-const ALBUM_SORT_OPTIONS = [
-  { value: 'release_date', label: 'Дата', icon: 'Calendar' },
-  { value: 'name', label: 'Название', icon: 'Type' },
-  { value: 'track_count', label: 'Треки', icon: 'Music' }
-]
-
-// Albums sort state
-const albumSortBy = ref('release_date')
-const albumSortOrder = ref('desc')
-
-// Album search state
-const albumSearchQuery = ref('')
-let albumSearchTimeout = null
-
-// Debounced album search
-const debouncedAlbumSearch = () => {
-  if (albumSearchTimeout) {
-    clearTimeout(albumSearchTimeout)
-  }
-  albumSearchTimeout = setTimeout(() => {
-    resetAlbums()
-  }, 300)
-}
-
-const albumSortOption = computed(() => {
-  return ALBUM_SORT_OPTIONS.find(opt => opt.value === albumSortBy.value) || ALBUM_SORT_OPTIONS[0]
-})
-
-const ALBUMS_PER_PAGE = 30
-
-// Fetch function for albums virtual scroll
-const fetchAlbumsData = async ({ offset, limit }) => {
-  const endpoint = albumScope.value === 'global' ? '/albums/global' : '/albums'
-  const params = {
-    offset,
-    limit,
-    sort_by: albumSortBy.value,
-    sort_order: albumSortOrder.value,
-    min_tracks: albumScope.value === 'global' ? 1 : 2
-  }
-  
-  if (albumSearchQuery.value) {
-    params.search = albumSearchQuery.value
-  }
-  
-  const response = await api.get(endpoint, { params })
-  return response.data
-}
-
-// Albums infinite scroll with unified composable
-const {
-  items: albums,
-  total: albumsTotal,
-  loading: loadingAlbums,
-  loadingMore: loadingMoreAlbums,
-  hasMore: hasMoreAlbums,
-  initialized: albumsInitialized,
-  loadTriggerRef: albumsLoadTrigger,
-  loadingSkeletonCount: albumsLoadingSkeletonCount,
-  reset: resetAlbums
-} = useVirtualScroll({
-  fetchFn: fetchAlbumsData,
-  limit: ALBUMS_PER_PAGE,
-  immediate: false, // Will load in onMounted based on activeTab
-  skeletonCount: 6
-})
+// Album search with debounce
+const { 
+  query: albumSearchQuery, 
+  debouncedQuery: debouncedAlbumQuery, 
+  search: debouncedAlbumSearch,
+  clear: clearAlbumSearch 
+} = useDebouncedSearch()
 
 // Playlists state
 const playlists = ref([])
 const publicPlaylists = ref([])
 const loadingPlaylists = ref(false)
-const likedCount = ref(0)
 
 // Playlist search state
 const playlistSearchQuery = ref('')
-
-// Filtered playlists computed - only public playlists
-const filteredPlaylists = computed(() => {
-  // Filter only public playlists first
-  const publicOnly = playlists.value.filter(p => p.is_public)
-  
-  if (!playlistSearchQuery.value) {
-    return publicOnly
-  }
-  const query = playlistSearchQuery.value.toLowerCase()
-  return publicOnly.filter(p => 
-    p.name.toLowerCase().includes(query)
-  )
-})
 
 // Filtered public playlists computed - combine own public + others public
 const filteredPublicPlaylists = computed(() => {
@@ -396,47 +220,12 @@ const togglePlaylistStatus = async (playlist) => {
   }
 }
 
-const goToAlbum = (album) => {
-  const query = albumScope.value === 'global' ? { scope: 'global' } : {}
-  router.push({ 
-    path: `/album/${album.id}`,
-    query
-  })
-}
-
-const onNextAlbumSort = () => {
-  const idx = ALBUM_SORT_OPTIONS.findIndex(opt => opt.value === albumSortBy.value)
-  const nextIdx = (idx + 1) % ALBUM_SORT_OPTIONS.length
-  albumSortBy.value = ALBUM_SORT_OPTIONS[nextIdx].value
-  resetAlbums()
-}
-
-const onToggleAlbumOrder = () => {
-  albumSortOrder.value = albumSortOrder.value === 'asc' ? 'desc' : 'asc'
-  resetAlbums()
-}
-
-const playAlbum = async (album) => {
+// Shuffle playlist using lazy loading - delegates to playerStore.playShuffleAll
+const shufflePlaylist = async (playlist) => {
   try {
-    const params = albumScope.value === 'global' ? { scope: 'global' } : {}
-    const response = await api.get(`/albums/${album.id}`, { params })
-    const albumData = response.data
-    
-    // Get playable tracks - from full_tracklist or tracks array
-    let tracks = []
-    if (albumData.full_tracklist?.length) {
-      tracks = albumData.full_tracklist
-        .filter(item => item.track)
-        .map(item => item.track)
-    } else if (albumData.tracks?.length) {
-      tracks = albumData.tracks
-    }
-    
-    if (tracks.length) {
-      playerStore.playTrack(tracks[0], tracks)
-    }
+    await playerStore.playShuffleAll('playlist', playlist.id)
   } catch (error) {
-    console.error('Failed to load album:', error)
+    console.error('Failed to shuffle playlist:', error)
   }
 }
 
@@ -465,54 +254,19 @@ const loadPublicPlaylists = async () => {
   }
 }
 
-const loadLikedCount = async () => {
-  try {
-    await libraryStore.fetchLikedTracks()
-    likedCount.value = libraryStore.likedTracks?.length || 0
-  } catch (e) {
-    console.error('Failed to load liked count:', e)
-  }
-}
-
-// Shuffle playlist using lazy loading - delegates to playerStore.playShuffleAll
-const shufflePlaylist = async (playlist) => {
-  try {
-    await playerStore.playShuffleAll('playlist', playlist.id)
-  } catch (error) {
-    console.error('Failed to shuffle playlist:', error)
-  }
-}
-
 // Load data on tab change
 watch(activeTab, (tab) => {
-  if (tab === 'albums' && albums.value.length === 0) {
-    resetAlbums()
-  } else if (tab === 'playlists' && playlists.value.length === 0) {
+  if (tab === 'playlists' && playlists.value.length === 0) {
     loadPlaylists()
     loadPublicPlaylists()
-    loadLikedCount()
   }
 })
 
 onMounted(() => {
-  // If no channel and scope is library, switch to global
-  if (!authStore.hasChannel && albumScope.value === 'library') {
-    albumScope.value = 'global'
-    localStorage.setItem(ALBUM_SCOPE_KEY, 'global')
-  }
-  
-  // If channel is present (Premium), force global scope as these sections are global-only for premium
-  if (authStore.hasChannel) {
-    albumScope.value = 'global' 
-  }
-  
   // Load initial tab data
-  if (activeTab.value === 'albums') {
-    resetAlbums()
-  } else {
+  if (activeTab.value === 'playlists') {
     loadPlaylists()
     loadPublicPlaylists()
-    loadLikedCount()
   }
   
   // Слушаем событие сброса состояния
@@ -525,12 +279,9 @@ const handleResetState = (event) => {
     // Сбрасываем состояние до базового
     if (activeTab.value === 'albums') {
       // Сброс поиска
-      albumSearchQuery.value = ''
-      // Сброс сортировки
-      albumSortBy.value = 'release_date'
-      albumSortOrder.value = 'desc'
-      // Сброс и перезагрузка
-      resetAlbums()
+      clearAlbumSearch()
+      // Сброс компонента альбомов
+      albumsRef.value?.reset()
     } else if (activeTab.value === 'playlists') {
       // Сброс поиска плейлистов
       playlistSearchQuery.value = ''
@@ -564,21 +315,6 @@ onUnmounted(() => {
 /* Override base .neu-tab-bar for this specific use case */
 .collections-tabs.neu-tab-bar {
   padding: 4px;
-}
-
-/* Info banner with tabs container */
-.info-banner-with-tabs {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 16px;
-}
-
-/* Adjust collections-tabs when inside info-banner-with-tabs */
-.info-banner-with-tabs .collections-tabs {
-  margin-bottom: 0;
-  flex-shrink: 0;
 }
 
 /* Info banner */
@@ -622,21 +358,11 @@ onUnmounted(() => {
   line-height: 1.4;
 }
 
-/* Mobile adjustments - compact banner on small screens */
+/* Mobile adjustments */
 @media (max-width: 1023px) {
-  .info-banner-with-tabs {
-    gap: 12px;
-  }
-
   .info-banner {
     padding: 12px;
-    margin-bottom: 0;
-    width: 100%;
     gap: 10px;
-  }
-
-  .banner-text {
-    flex: 1;
   }
 
   .banner-title {
@@ -652,20 +378,6 @@ onUnmounted(() => {
     width: 40px;
     height: 40px;
   }
-
-  /* Tabs are in PageHeader on mobile, keep them hidden here */
-  .info-banner-with-tabs .collections-tabs {
-    display: none;
-  }
-}
-
-/* Scope switcher uses neu-tab-bar from design-system */
-.scope-switcher {
-  margin-bottom: 16px;
-}
-
-.scope-switcher .neu-tab {
-  flex: 1;
 }
 
 .view-header {
@@ -692,22 +404,9 @@ onUnmounted(() => {
   cursor: pointer;
   width: auto !important;
   max-width: fit-content;
-}
-
-/* Playlists */
-.special-playlists {
-  margin-bottom: 20px;
-}
-
-.public-section {
-  margin-top: 32px;
-}
-
-.public-section h3 {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--c-text-1);
-  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 /* Empty state */
@@ -721,17 +420,6 @@ onUnmounted(() => {
   font-size: 48px;
   display: block;
   margin-bottom: 16px;
-}
-
-.create-first-btn {
-  margin-top: 16px;
-  background: var(--accent);
-  color: #000;
-  border: none;
-  border-radius: 20px;
-  padding: 12px 24px;
-  font-weight: 600;
-  cursor: pointer;
 }
 
 /* Modal */
@@ -845,17 +533,6 @@ onUnmounted(() => {
   margin-top: 2px;
 }
 
-.modal input[type="text"] {
-  width: 100%;
-  padding: 14px 16px;
-  background: var(--c-bg-1);
-  border: 1px solid var(--c-bg-4);
-  border-radius: 12px;
-  color: var(--c-text-1);
-  font-size: 16px;
-  margin-bottom: 16px;
-}
-
 .checkbox-label {
   display: flex;
   align-items: center;
@@ -915,40 +592,14 @@ onUnmounted(() => {
   gap: 12px;
 }
 
-.cancel-btn, .confirm-btn {
+.cancel-btn {
   flex: 1;
   padding: 12px;
   border-radius: 24px;
   font-weight: 600;
   cursor: pointer;
   border: none;
-}
-
-.cancel-btn {
   background: var(--c-bg-3);
   color: var(--c-text-1);
-}
-
-.confirm-btn {
-  background: var(--accent);
-  color: #000;
-}
-
-.confirm-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Loading */
-.loading {
-  display: flex;
-  justify-content: center;
-  padding: 24px;
-}
-
-/* spinner, load-trigger, loading-more are in design-system.css */
-
-.loading-more-grid {
-  margin-top: 16px;
 }
 </style>
