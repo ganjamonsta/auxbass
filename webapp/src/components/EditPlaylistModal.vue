@@ -144,11 +144,9 @@ const playerStore = usePlayerStore()
 const authStore = useAuthStore()
 const uiStore = useUIStore()
 
-// Track if we opened the cover upload link
-const pendingCoverUpload = ref(false)
+// Track if we're waiting for cover upload
 const waitingForCover = ref(false)
-const coverUpdated = ref(false)  // Show success state briefly
-let coverPollInterval = null
+const coverUpdated = ref(false)
 // Current cover URL (local state for refresh)
 const currentCoverUrl = ref(null)
 
@@ -168,110 +166,51 @@ const getBaseUrl = (url) => {
 const changeCover = async () => {
     if (!props.playlist?.id) return
   
-    // Try seamless upload via API (sends message to user, they just send photo)
+    // Request cover upload via API (sends message to user, they reply with photo)
     if (window.Telegram?.WebApp) {
         try {
             await api.post(`/playlists/${props.playlist.id}/request-cover`)
-            // Start polling for cover update
             waitingForCover.value = true
-            startCoverPolling()
+            uiStore.toast.info('Отправьте фото', 'Ответьте на сообщение в Telegram')
             return
         } catch (error) {
             console.error('Failed to request cover upload:', error)
-            // Show error if API failed (e.g., no channel connected)
             if (error.response?.data?.detail) {
-                alert(error.response.data.detail)
+                uiStore.toast.error('Ошибка', error.response.data.detail)
                 return
             }
         }
     }
-    
-    // Fallback: open deep link (requires user to send /start message)
-    const botUsername = authStore.appName
-    const url = `https://t.me/${botUsername}?start=cover_${props.playlist.id}`
-  
-    pendingCoverUpload.value = true
-  
-    if (window.Telegram?.WebApp) {
-        window.Telegram.WebApp.openTelegramLink(url)
-    } else {
-        window.open(url, '_blank')
-    }
 }
 
-// Track if pending cover exists (for save button logic)
-const hasPendingCover = ref(false)
-
-// Start polling for pending cover updates
-const startCoverPolling = () => {
-    if (coverPollInterval) clearInterval(coverPollInterval)
-    
-    let attempts = 0
-    const maxAttempts = 60 // 60 seconds max (user may need time to send photo)
-    
-    coverPollInterval = setInterval(async () => {
-        attempts++
-        if (attempts >= maxAttempts) {
-            stopCoverPolling()
-            uiStore.toast.info('Время ожидания истекло', 'Попробуйте ещё раз')
-            return
-        }
-        
-        try {
-            // Bypass cache to get fresh data from server
-            const response = await api.get(`/playlists/${props.playlist.id}`, { bypassCache: true })
-            const pendingCoverUrl = response.data?.pending_cover_url
-            
-            console.log(`[Cover Poll #${attempts}] pending_cover_url: ${pendingCoverUrl}`)
-            
-            // Check if pending cover appeared
-            if (pendingCoverUrl) {
-                console.log('[Cover Poll] Pending cover found! Showing preview...')
-                // Show pending cover as preview
-                currentCoverUrl.value = getCacheBustedUrl(pendingCoverUrl)
-                hasPendingCover.value = true
-                stopCoverPolling()
-                // Show success feedback
-                coverUpdated.value = true
-                uiStore.toast.success('Превью готово!', 'Нажмите Сохранить для применения')
-                setTimeout(() => { coverUpdated.value = false }, 2000)
-            }
-        } catch (error) {
-            console.error('Failed to poll cover:', error)
-        }
-    }, 1000)
-}
-
-const stopCoverPolling = () => {
-    if (coverPollInterval) {
-        clearInterval(coverPollInterval)
-        coverPollInterval = null
-    }
-    waitingForCover.value = false
-}
-
-// Refresh cover when returning from Telegram
-const refreshCover = async () => {
-    if (!pendingCoverUpload.value || !props.playlist?.id) return
+// Refresh playlist data (called when user returns from Telegram)
+const refreshPlaylist = async () => {
+    if (!waitingForCover.value || !props.playlist?.id) return
     
     try {
-        const response = await api.get(`/playlists/${props.playlist.id}`)
-        if (response.data?.cover_url && response.data.cover_url !== currentCoverUrl.value) {
-            currentCoverUrl.value = response.data.cover_url
+        const response = await api.get(`/playlists/${props.playlist.id}`, { bypassCache: true })
+        const newCoverUrl = response.data?.cover_url
+        const currentBase = getBaseUrl(currentCoverUrl.value)
+        const newBase = getBaseUrl(newCoverUrl)
+        
+        if (newBase && currentBase !== newBase) {
+            currentCoverUrl.value = getCacheBustedUrl(newCoverUrl)
+            coverUpdated.value = true
+            setTimeout(() => { coverUpdated.value = false }, 2000)
             emit('refresh', response.data)
         }
     } catch (error) {
-        console.error('Failed to refresh cover:', error)
+        console.error('Failed to refresh playlist:', error)
     } finally {
-        pendingCoverUpload.value = false
+        waitingForCover.value = false
     }
 }
 
 // Handle visibility change (when user returns from Telegram)
 const handleVisibilityChange = () => {
-    if (document.visibilityState === 'visible' && pendingCoverUpload.value) {
-        // Small delay to allow Telegram to process the upload
-        setTimeout(refreshCover, 1000)
+    if (document.visibilityState === 'visible' && waitingForCover.value) {
+        // Delay to allow bot to process the upload
+        setTimeout(refreshPlaylist, 1500)
     }
 }
 
@@ -281,7 +220,6 @@ onMounted(() => {
 
 onUnmounted(() => {
     document.removeEventListener('visibilitychange', handleVisibilityChange)
-    stopCoverPolling()
 })
 
 // Form state
@@ -326,19 +264,14 @@ watch(() => props.playlist, (pl) => {
     name.value = pl.name || ''
     isPublic.value = pl.is_public || false
     tracks.value = [...(pl.tracks || [])]
-    // Apply cache-busting to cover URL to ensure fresh image loads after updates
-    // Skip update if we're waiting for cover (to not overwrite the loading state)
-    // Also skip if base URL hasn't changed to avoid unnecessary re-renders
+    // Update cover URL if changed
     if (!waitingForCover.value) {
-      // Prefer pending_cover_url if exists (for preview), otherwise use cover_url
-      const displayCover = pl.pending_cover_url || pl.cover_url || null
+      const displayCover = pl.cover_url || null
       const currentBase = getBaseUrl(currentCoverUrl.value)
       const newBase = getBaseUrl(displayCover)
       if (currentBase !== newBase) {
         currentCoverUrl.value = getCacheBustedUrl(displayCover)
       }
-      // Track if we have pending cover
-      hasPendingCover.value = !!pl.pending_cover_url
     }
   }
 }, { immediate: true })
@@ -347,10 +280,8 @@ watch(() => props.show, (show) => {
   if (!show) {
     searchQuery.value = ''
     searchResults.value = []
-    pendingCoverUpload.value = false
     coverUpdated.value = false
-    hasPendingCover.value = false
-    stopCoverPolling()
+    waitingForCover.value = false
   }
 })
 
@@ -435,16 +366,13 @@ const save = async () => {
   try {
     const response = await api.put(`/playlists/${props.playlist.id}`, {
       name: name.value.trim(),
-      is_public: isPublic.value,
-      save_pending_cover: hasPendingCover.value
+      is_public: isPublic.value
     })
     
-    // Update cover URL from response if cover was finalized
     if (response.data?.cover_url) {
       currentCoverUrl.value = getCacheBustedUrl(response.data.cover_url)
     }
     
-    hasPendingCover.value = false
     emit('save', { name: name.value.trim(), isPublic: isPublic.value, cover_url: response.data?.cover_url })
   } catch (error) {
     console.error('Failed to save:', error)
