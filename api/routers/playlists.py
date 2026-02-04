@@ -17,7 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.database import get_db
-from shared.models import Playlist, PlaylistTrack, Track, UserLibrary, AlbumTrack, User, PlaylistSubscription, UserChannel
+from shared.models import Playlist, PlaylistTrack, Track, UserLibrary, AlbumTrack, User, PlaylistSubscription, UserChannel, TrackEnrichment
 from shared.config import get_settings
 
 from api.routers.auth import get_current_user, require_premium
@@ -104,7 +104,10 @@ async def get_playlist_info(
     covers_result = await db.execute(
         select(Track)
         .join(PlaylistTrack, PlaylistTrack.track_id == Track.id)
+        .join(TrackEnrichment, TrackEnrichment.track_id == Track.id)
         .where(PlaylistTrack.playlist_id == playlist_id)
+        .where(TrackEnrichment.cover_url.is_not(None))
+        .where(TrackEnrichment.cover_url != "")
         .options(selectinload(Track.enrichment))
         .order_by(PlaylistTrack.position)
         .limit(4)
