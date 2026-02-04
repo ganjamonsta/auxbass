@@ -149,6 +149,8 @@ const waitingForCover = ref(false)
 const coverUpdated = ref(false)
 // Current cover URL (local state for refresh)
 const currentCoverUrl = ref(null)
+// Poll interval reference
+let coverCheckInterval = null
 
 // Add cache-busting to URL to force browser refresh
 const getCacheBustedUrl = (url) => {
@@ -172,6 +174,8 @@ const changeCover = async () => {
             await api.post(`/playlists/${props.playlist.id}/request-cover`)
             waitingForCover.value = true
             uiStore.toast.info('Отправьте фото', 'Ответьте на сообщение в Telegram')
+            // Start checking for cover updates
+            startCoverCheck()
             return
         } catch (error) {
             console.error('Failed to request cover upload:', error)
@@ -183,43 +187,52 @@ const changeCover = async () => {
     }
 }
 
-// Refresh playlist data (called when user returns from Telegram)
-const refreshPlaylist = async () => {
-    if (!waitingForCover.value || !props.playlist?.id) return
+// Check for cover updates (runs every 3 seconds for 30 seconds max)
+const startCoverCheck = () => {
+    stopCoverCheck()
+    let attempts = 0
+    const maxAttempts = 10  // 30 seconds total
     
-    try {
-        const response = await api.get(`/playlists/${props.playlist.id}`, { bypassCache: true })
-        const newCoverUrl = response.data?.cover_url
-        const currentBase = getBaseUrl(currentCoverUrl.value)
-        const newBase = getBaseUrl(newCoverUrl)
-        
-        if (newBase && currentBase !== newBase) {
-            currentCoverUrl.value = getCacheBustedUrl(newCoverUrl)
-            coverUpdated.value = true
-            setTimeout(() => { coverUpdated.value = false }, 2000)
-            emit('refresh', response.data)
+    coverCheckInterval = setInterval(async () => {
+        attempts++
+        if (attempts >= maxAttempts || !waitingForCover.value) {
+            stopCoverCheck()
+            return
         }
-    } catch (error) {
-        console.error('Failed to refresh playlist:', error)
-    } finally {
-        waitingForCover.value = false
-    }
+        
+        try {
+            const response = await api.get(`/playlists/${props.playlist.id}`, { bypassCache: true })
+            const newCoverUrl = response.data?.cover_url
+            const currentBase = getBaseUrl(currentCoverUrl.value)
+            const newBase = getBaseUrl(newCoverUrl)
+            
+            if (newBase && currentBase !== newBase) {
+                currentCoverUrl.value = getCacheBustedUrl(newCoverUrl)
+                coverUpdated.value = true
+                waitingForCover.value = false
+                setTimeout(() => { coverUpdated.value = false }, 2000)
+                emit('refresh', response.data)
+                stopCoverCheck()
+            }
+        } catch (error) {
+            console.error('Failed to check cover:', error)
+        }
+    }, 3000)
 }
 
-// Handle visibility change (when user returns from Telegram)
-const handleVisibilityChange = () => {
-    if (document.visibilityState === 'visible' && waitingForCover.value) {
-        // Delay to allow bot to process the upload
-        setTimeout(refreshPlaylist, 1500)
+const stopCoverCheck = () => {
+    if (coverCheckInterval) {
+        clearInterval(coverCheckInterval)
+        coverCheckInterval = null
     }
 }
 
 onMounted(() => {
-    document.addEventListener('visibilitychange', handleVisibilityChange)
+    // Polling starts on demand when cover upload is requested
 })
 
 onUnmounted(() => {
-    document.removeEventListener('visibilitychange', handleVisibilityChange)
+    stopCoverCheck()
 })
 
 // Form state
@@ -282,6 +295,7 @@ watch(() => props.show, (show) => {
     searchResults.value = []
     coverUpdated.value = false
     waitingForCover.value = false
+    stopCoverCheck()
   }
 })
 
