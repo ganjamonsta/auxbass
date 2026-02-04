@@ -237,13 +237,14 @@ async def get_my_artists(
                         break
     
     # Sort (if album-based sort, do it now after loading album data)
+    # Use secondary sort by name for stable pagination
     reverse = (sort_order == "desc")
     if sort_by == "album_count":
-        aggregated.sort(key=lambda x: x["album_count"], reverse=reverse)
+        aggregated.sort(key=lambda x: (x["album_count"], x["name"].lower()), reverse=reverse)
     elif sort_by == "latest_release":
-        aggregated.sort(key=lambda x: x["latest_release_date"] or "", reverse=reverse)
+        aggregated.sort(key=lambda x: (x["latest_release_date"] or "", x["name"].lower()), reverse=reverse)
     elif sort_by == "track_count":
-        aggregated.sort(key=lambda x: x["track_count"], reverse=reverse)
+        aggregated.sort(key=lambda x: (x["track_count"], x["name"].lower()), reverse=reverse)
     else:  # name
         aggregated.sort(key=lambda x: x["name"].lower(), reverse=reverse)
     
@@ -365,15 +366,15 @@ async def get_global_artists(
     
     total = len(aggregated)
     
-    # Sort
+    # Sort - use secondary sort by name for stable pagination
     reverse = (sort_order == "desc")
     if sort_by == "track_count":
-        aggregated.sort(key=lambda x: x["track_count"], reverse=reverse)
+        aggregated.sort(key=lambda x: (x["track_count"], x["name"].lower()), reverse=reverse)
     elif sort_by == "album_count":
-        aggregated.sort(key=lambda x: x["album_count"], reverse=reverse)
+        aggregated.sort(key=lambda x: (x["album_count"], x["name"].lower()), reverse=reverse)
     elif sort_by == "latest_release":
         aggregated.sort(
-            key=lambda x: x["latest_release_date"] or "",
+            key=lambda x: (x["latest_release_date"] or "", x["name"].lower()),
             reverse=reverse
         )
     else:  # name

@@ -117,7 +117,7 @@ async def get_my_albums(
     # Count total
     total = await db.scalar(count_query) or 0
     
-    # Sorting
+    # Sorting - add secondary sort by ID for stable pagination
     if sort_by == "artist":
         sort_column = Album.artist
     elif sort_by == "release_date":
@@ -128,9 +128,9 @@ async def get_my_albums(
         sort_column = Album.name
     
     if sort_order == "desc":
-        query = query.order_by(desc(sort_column).nullslast())
+        query = query.order_by(desc(sort_column).nullslast(), desc(Album.id))
     else:
-        query = query.order_by(asc(sort_column).nullsfirst())
+        query = query.order_by(asc(sort_column).nullsfirst(), asc(Album.id))
     
     # Pagination
     query = query.offset(offset).limit(limit)
@@ -214,7 +214,7 @@ async def get_global_albums(
     # Count total
     total = await db.scalar(count_query) or 0
     
-    # Sorting
+    # Sorting - add secondary sort by ID for stable pagination
     if sort_by == "artist":
         sort_column = Album.artist
     elif sort_by == "release_date":
@@ -225,9 +225,9 @@ async def get_global_albums(
         sort_column = Album.name
     
     if sort_order == "desc":
-        query = query.order_by(desc(sort_column).nullslast())
+        query = query.order_by(desc(sort_column).nullslast(), desc(Album.id))
     else:
-        query = query.order_by(asc(sort_column).nullsfirst())
+        query = query.order_by(asc(sort_column).nullsfirst(), asc(Album.id))
     
     # Pagination
     query = query.offset(offset).limit(limit)

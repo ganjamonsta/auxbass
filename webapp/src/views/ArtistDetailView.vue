@@ -201,7 +201,7 @@ const loadArtist = async () => {
 
 // Handle track click from VirtualTrackList
 const handleTrackClick = ({ track, index, allTracks }) => {
-  playerStore.playTracks(allTracks, index)
+  playerStore.playTrack(track, allTracks)
 }
 
 // Handle track menu from VirtualTrackList

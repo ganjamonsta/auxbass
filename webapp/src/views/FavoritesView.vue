@@ -80,7 +80,7 @@ const goToLikedTracks = () => {
 
 const playLikedTracks = async () => {
   if (libraryStore.likedTracks?.length) {
-    playerStore.playTracks(libraryStore.likedTracks)
+    playerStore.playTrack(libraryStore.likedTracks[0], libraryStore.likedTracks)
   }
 }
 
