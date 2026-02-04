@@ -10,7 +10,7 @@
     <div class="view-header">
       <div class="header-left">
         <h1>Альбомы</h1>
-        <span class="count">{{ total }} альбомов</span>
+        <span class="count">{{ virtualGridRef?.total?.value ?? 0 }} альбомов</span>
       </div>
       <SortChips
         :currentOption="currentOption"
@@ -20,60 +20,48 @@
       />
     </div>
 
-    <!-- Loading state with skeletons -->
-    <div v-if="loading && !initialized" class="media-grid type-album">
-      <GridSkeleton v-for="i in 12" :key="i" type="album" />
-    </div>
-
-    <!-- Album grid with infinite scroll -->
-    <template v-else>
-      <MediaGrid
-        type="album"
-        :items="albums"
-        :loading="false"
-        @click="(album) => $router.push(`/album/${album.id}`)"
-        @play="playAlbum"
-        @contextmenu="handleContextMenu"
-      />
-
-      <!-- Infinite scroll trigger -->
-      <div ref="loadTriggerRef" class="load-trigger" v-show="hasMore && !loading"></div>
-      
-      <!-- Loading more with skeletons -->
-      <div v-if="loadingMore" class="media-grid type-album loading-more-grid">
-        <GridSkeleton 
-          v-for="i in loadingSkeletonCount" 
-          :key="'skeleton-more-' + i" 
-          type="album" 
-        />
-      </div>
-    </template>
+    <!-- Spotify-style virtual grid -->
+    <VirtualGrid
+      ref="virtualGridRef"
+      type="album"
+      :fetchFn="fetchAlbums"
+      :pageSize="30"
+      :skeletonCount="12"
+      @click="goToAlbum"
+      @play="playAlbum"
+      @contextmenu="handleContextMenu"
+    >
+      <template #empty>
+        <span class="empty-icon"><Disc3 :size="48" /></span>
+        <h3 v-if="searchQuery">Ничего не найдено</h3>
+        <p v-else>Нет альбомов</p>
+      </template>
+    </VirtualGrid>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
-import { useVirtualScroll, useSort, useDebouncedSearch } from '@/composables'
+import { useSort, useDebouncedSearch } from '@/composables'
 import { useContextMenu } from '@/composables/useContextMenu'
 import SortChips from '@/components/SortChips.vue'
-import MediaGrid from '@/components/MediaGrid.vue'
-import GridSkeleton from '@/components/GridSkeleton.vue'
+import VirtualGrid from '@/components/VirtualGrid.vue'
 import SearchBar from '@/components/ui/SearchBar.vue'
 import api from '@/api/client'
+import { Disc3 } from 'lucide-vue-next'
 
 // Universal context menu
 const { openMenu } = useContextMenu()
 
-const handleContextMenu = ({ item, event }) => {
-  openMenu('album', item, 'library', event)
-}
-
+const router = useRouter()
 const playerStore = usePlayerStore()
+const virtualGridRef = ref(null)
 
 // Debounced search using composable
 const { query: searchQuery, debouncedQuery: debouncedSearchQuery, search: debouncedSearch } = useDebouncedSearch({
-  onSearch: () => reset()
+  onSearch: () => virtualGridRef.value?.reset()
 })
 
 // Sort state (persisted to localStorage)
@@ -85,7 +73,7 @@ const {
   toggleOrder 
 } = useSort('albums-sort', 'albums', { sortBy: 'release_date', sortOrder: 'desc' })
 
-// Fetch function for virtual scroll
+// Fetch function for virtual grid
 const fetchAlbums = async ({ offset, limit }) => {
   const response = await api.get('/albums', {
     params: { 
@@ -99,35 +87,23 @@ const fetchAlbums = async ({ offset, limit }) => {
   return response.data
 }
 
-// Virtual scroll composable
-const {
-  items: albums,
-  total,
-  loading,
-  loadingMore,
-  hasMore,
-  initialized,
-  loadTriggerRef,
-  loadingSkeletonCount,
-  reset,
-  refresh
-} = useVirtualScroll({
-  fetchFn: fetchAlbums,
-  limit: 30,
-  skeletonCount: 6
-})
-
 // Sort handlers
 const onNextSort = () => {
   nextSort()
-  reset()
+  virtualGridRef.value?.reset()
 }
 
 const onToggleOrder = () => {
   toggleOrder()
-  reset()
+  virtualGridRef.value?.reset()
 }
 
+// Navigation
+const goToAlbum = (album) => {
+  router.push(`/album/${album.id}`)
+}
+
+// Play album
 const playAlbum = async (album) => {
   try {
     const response = await api.get(`/albums/${album.id}`)
@@ -138,25 +114,17 @@ const playAlbum = async (album) => {
     console.error('Failed to load album:', error)
   }
 }
+
+// Context menu
+const handleContextMenu = ({ item, event }) => {
+  openMenu('album', item, 'library', event)
+}
 </script>
+
 <style scoped>
 .albums-view {
   padding: 16px;
 }
 
-/* view-header, header-left, count, load-trigger, loading-more, spinner are in design-system.css */
-
-/* Grid skeleton layout */
-.media-grid.type-album {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 24px;
-}
-
-@media (max-width: 768px) {
-  .media-grid.type-album {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 16px;
-  }
-}
+/* view-header, header-left, count are in design-system.css */
 </style>

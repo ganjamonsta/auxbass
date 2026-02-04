@@ -119,11 +119,15 @@ const loadingMore = ref(false)
 const initialized = ref(false)
 const total = ref(0)
 const scrollTop = ref(0)
-const containerHeight = ref(0)
+const containerOffset = ref(Infinity) // Start with Infinity so relativeScroll = 0 until calculated
+const viewportHeight = ref(800)
 const containerWidth = ref(0)
 const loadedPages = ref(new Set())
 const pendingFetches = ref(new Set())
 const sparseItems = ref([])
+
+// Scroll container reference
+let scrollContainer = null
 
 // Calculate number of columns based on container width
 const columns = computed(() => {
@@ -137,14 +141,16 @@ const rowHeight = computed(() => ITEM_HEIGHT + GAP)
 // Calculate total rows
 const totalRows = computed(() => Math.ceil(total.value / columns.value))
 
-// Calculate visible row range
+// Calculate visible row range based on scroll position relative to container
 const startRow = computed(() => {
-  return Math.max(0, Math.floor(scrollTop.value / rowHeight.value) - props.overscanRows)
+  const relativeScroll = Math.max(0, scrollTop.value - containerOffset.value)
+  return Math.max(0, Math.floor(relativeScroll / rowHeight.value) - props.overscanRows)
 })
 
 const endRow = computed(() => {
-  const visibleRows = Math.ceil(containerHeight.value / rowHeight.value)
-  return Math.min(totalRows.value, Math.floor(scrollTop.value / rowHeight.value) + visibleRows + props.overscanRows)
+  const relativeScroll = Math.max(0, scrollTop.value - containerOffset.value)
+  const visibleRows = Math.ceil(viewportHeight.value / rowHeight.value)
+  return Math.min(totalRows.value, Math.floor(relativeScroll / rowHeight.value) + visibleRows + props.overscanRows)
 })
 
 // Calculate visible item indices
@@ -240,13 +246,47 @@ const loadVisiblePages = async () => {
   }
 }
 
+// Update container offset relative to scroll container
+const updateContainerOffset = () => {
+  if (containerRef.value && scrollContainer) {
+    if (scrollContainer === window) {
+      const rect = containerRef.value.getBoundingClientRect()
+      containerOffset.value = rect.top + window.scrollY
+    } else {
+      const containerRect = containerRef.value.getBoundingClientRect()
+      const scrollRect = scrollContainer.getBoundingClientRect()
+      containerOffset.value = containerRect.top - scrollRect.top + scrollContainer.scrollTop
+    }
+  }
+}
+
+// Find scroll container (parent with overflow)
+const findScrollContainer = (el) => {
+  let parent = el?.parentElement
+  while (parent) {
+    const style = getComputedStyle(parent)
+    if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+      return parent
+    }
+    parent = parent.parentElement
+  }
+  return window
+}
+
 // Scroll handler
 let ticking = false
 const handleScroll = () => {
   if (!ticking) {
     requestAnimationFrame(() => {
-      if (containerRef.value) {
-        scrollTop.value = containerRef.value.scrollTop
+      if (scrollContainer) {
+        if (scrollContainer === window) {
+          scrollTop.value = window.scrollY
+          viewportHeight.value = window.innerHeight
+        } else {
+          scrollTop.value = scrollContainer.scrollTop
+          viewportHeight.value = scrollContainer.clientHeight
+        }
+        updateContainerOffset()
         loadVisiblePages()
       }
       ticking = false
@@ -260,18 +300,33 @@ let resizeObserver = null
 
 onMounted(() => {
   if (containerRef.value) {
-    containerHeight.value = containerRef.value.clientHeight
     containerWidth.value = containerRef.value.clientWidth
+    
+    // Find scroll container
+    scrollContainer = findScrollContainer(containerRef.value)
+    
+    if (scrollContainer === window) {
+      window.addEventListener('scroll', handleScroll, { passive: true })
+      viewportHeight.value = window.innerHeight
+      scrollTop.value = window.scrollY
+    } else {
+      scrollContainer.addEventListener('scroll', handleScroll, { passive: true })
+      viewportHeight.value = scrollContainer.clientHeight
+      scrollTop.value = scrollContainer.scrollTop
+    }
     
     resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        containerHeight.value = entry.contentRect.height
         containerWidth.value = entry.contentRect.width
       }
     })
     resizeObserver.observe(containerRef.value)
     
-    containerRef.value.addEventListener('scroll', handleScroll, { passive: true })
+    // Calculate initial offset after next tick
+    nextTick(() => {
+      updateContainerOffset()
+      loadVisiblePages()
+    })
     
     // Initial load
     load()
@@ -282,8 +337,10 @@ onUnmounted(() => {
   if (resizeObserver) {
     resizeObserver.disconnect()
   }
-  if (containerRef.value) {
-    containerRef.value.removeEventListener('scroll', handleScroll)
+  if (scrollContainer === window) {
+    window.removeEventListener('scroll', handleScroll)
+  } else if (scrollContainer) {
+    scrollContainer.removeEventListener('scroll', handleScroll)
   }
 })
 
@@ -293,7 +350,10 @@ const load = async () => {
   try {
     await fetchPage(0)
     initialized.value = true
-    nextTick(() => loadVisiblePages())
+    nextTick(() => {
+      updateContainerOffset()
+      loadVisiblePages()
+    })
   } finally {
     loading.value = false
   }
@@ -309,8 +369,10 @@ const reset = async () => {
   total.value = 0
   scrollTop.value = 0
   
-  if (containerRef.value) {
-    containerRef.value.scrollTop = 0
+  if (scrollContainer === window) {
+    window.scrollTo(0, 0)
+  } else if (scrollContainer) {
+    scrollContainer.scrollTop = 0
   }
   
   await load()
@@ -331,8 +393,10 @@ const handleContextMenu = (item, event) => {
 
 // Scroll to top
 const scrollToTop = () => {
-  if (containerRef.value) {
-    containerRef.value.scrollTop = 0
+  if (scrollContainer === window) {
+    window.scrollTo(0, 0)
+  } else if (scrollContainer) {
+    scrollContainer.scrollTop = 0
   }
 }
 
@@ -346,14 +410,51 @@ defineExpose({
 
 <style scoped>
 .virtual-grid-container {
-  height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
+  position: relative;
 }
 
 .virtual-grid-spacer {
   position: relative;
+}
+
+.media-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.media-grid.type-album,
+.media-grid.type-playlist {
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+
+.media-grid.type-artist {
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+}
+
+@media (min-width: 500px) {
+  .media-grid.type-album,
+  .media-grid.type-playlist {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+  
+  .media-grid.type-artist {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+}
+
+@media (min-width: 700px) {
+  .media-grid {
+    gap: 20px;
+  }
+  
+  .media-grid.type-album,
+  .media-grid.type-playlist {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+  
+  .media-grid.type-artist {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
 }
 
 .loading-more-grid {

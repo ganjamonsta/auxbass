@@ -28,7 +28,7 @@
     <!-- Sort options -->
     <div class="sort-options">
       <div class="stats">
-        {{ total }} исполнителей
+        {{ virtualGridRef?.total?.value ?? 0 }} исполнителей
       </div>
       <SortChips
         :currentOption="currentOption"
@@ -38,53 +38,33 @@
       />
     </div>
 
-    <!-- Loading state with skeletons -->
-    <div v-if="loading && !initialized" class="media-grid type-artist">
-      <GridSkeleton v-for="i in 12" :key="i" type="artist" />
-    </div>
-
-    <!-- Artist grid with infinite scroll -->
-    <template v-else>
-      <MediaGrid
-        type="artist"
-        :items="artists"
-        :loading="false"
-        @click="goToArtist"
-        @contextmenu="handleContextMenu"
-      >
-        <template #empty>
-          <div class="empty-state">
-            <span class="empty-icon"><User :size="48" /></span>
-            <p v-if="searchQuery">Ничего не найдено</p>
-            <p v-else>Нет исполнителей</p>
-          </div>
-        </template>
-      </MediaGrid>
-
-      <!-- Infinite scroll trigger -->
-      <div ref="loadTriggerRef" class="load-trigger" v-show="hasMore && !loading"></div>
-      
-      <!-- Loading more with skeletons -->
-      <div v-if="loadingMore" class="media-grid type-artist loading-more-grid">
-        <GridSkeleton 
-          v-for="i in loadingSkeletonCount" 
-          :key="'skeleton-more-' + i" 
-          type="artist" 
-        />
-      </div>
-    </template>
+    <!-- Spotify-style virtual grid -->
+    <VirtualGrid
+      ref="virtualGridRef"
+      type="artist"
+      :fetchFn="fetchArtists"
+      :pageSize="30"
+      :skeletonCount="12"
+      @click="goToArtist"
+      @contextmenu="handleContextMenu"
+    >
+      <template #empty>
+        <span class="empty-icon"><User :size="48" /></span>
+        <p v-if="searchQuery">Ничего не найдено</p>
+        <p v-else>Нет исполнителей</p>
+      </template>
+    </VirtualGrid>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { useVirtualScroll, useSort, useDebouncedSearch } from '@/composables'
+import { useSort, useDebouncedSearch } from '@/composables'
 import { useContextMenu } from '@/composables/useContextMenu'
 import SortChips from '@/components/SortChips.vue'
-import MediaGrid from '@/components/MediaGrid.vue'
-import GridSkeleton from '@/components/GridSkeleton.vue'
+import VirtualGrid from '@/components/VirtualGrid.vue'
 import SearchBar from '@/components/ui/SearchBar.vue'
 import { artistsApi } from '@/api/client'
 import { User } from 'lucide-vue-next'
@@ -92,12 +72,9 @@ import { User } from 'lucide-vue-next'
 // Universal context menu
 const { openMenu } = useContextMenu()
 
-const handleContextMenu = ({ item, event }) => {
-  openMenu('artist', item, 'library', event)
-}
-
 const router = useRouter()
 const authStore = useAuthStore()
+const virtualGridRef = ref(null)
 
 // Scope state
 const SCOPE_KEY = 'artists-scope'
@@ -113,11 +90,11 @@ const {
 } = useSort('artists-sort', 'artists', { sortBy: 'name', sortOrder: 'asc' })
 
 // Debounced search using composable
-const { query: searchQuery, debouncedQuery: debouncedSearchQuery, search: debouncedSearch, clear: clearSearch } = useDebouncedSearch({
-  onSearch: () => reset()
-})
+const { query: searchQuery, debouncedQuery: debouncedSearchQuery, search: debouncedSearch, clear: clearSearch } = useDebouncedSearch(
+  () => virtualGridRef.value?.reset()
+)
 
-// Fetch function for virtual scroll
+// Fetch function for virtual grid
 const fetchArtists = async ({ offset, limit }) => {
   const params = {
     offset,
@@ -138,25 +115,6 @@ const fetchArtists = async ({ offset, limit }) => {
   return response.data
 }
 
-// Virtual scroll composable
-const {
-  items: artists,
-  total,
-  loading,
-  loadingMore,
-  hasMore,
-  initialized,
-  loadTriggerRef,
-  loadingSkeletonCount,
-  reset,
-  refresh
-} = useVirtualScroll({
-  fetchFn: fetchArtists,
-  limit: 30,
-  immediate: false, // We'll load after scope is set
-  skeletonCount: 6
-})
-
 // Change scope handler
 const changeScope = (newScope) => {
   // If trying to access library without channel, show prompt
@@ -166,18 +124,18 @@ const changeScope = (newScope) => {
   }
   scope.value = newScope
   localStorage.setItem(SCOPE_KEY, newScope)
-  reset()
+  virtualGridRef.value?.reset()
 }
 
 // Sort change handlers
 const onNextSort = () => {
   nextSort()
-  reset()
+  virtualGridRef.value?.reset()
 }
 
 const onToggleOrder = () => {
   toggleOrder()
-  reset()
+  virtualGridRef.value?.reset()
 }
 
 // Navigation
@@ -189,6 +147,11 @@ const goToArtist = (artist) => {
   })
 }
 
+// Context menu
+const handleContextMenu = ({ item, event }) => {
+  openMenu('artist', item, 'library', event)
+}
+
 // Обработчик сброса состояния
 const handleResetState = (event) => {
   if (event.detail.route === '/artists') {
@@ -198,7 +161,7 @@ const handleResetState = (event) => {
     sortBy.value = 'name'
     sortOrder.value = 'asc'
     // Перезагружаем список
-    reset()
+    virtualGridRef.value?.reset()
   }
 }
 
@@ -214,9 +177,6 @@ onMounted(() => {
   if (authStore.hasChannel) {
     scope.value = 'global'
   }
-
-  // Initial load
-  reset()
   
   // Слушаем событие сброса состояния
   window.addEventListener('reset-view-state', handleResetState)
@@ -241,19 +201,5 @@ onUnmounted(() => {
   flex: 1;
 }
 
-/* sort-options, stats, empty-state, empty-icon, load-trigger, loading-more, spinner are in design-system.css */
-
-/* Grid skeleton layout */
-.media-grid.type-artist {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 24px;
-}
-
-@media (max-width: 768px) {
-  .media-grid.type-artist {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 16px;
-  }
-}
+/* sort-options, stats, empty-state, empty-icon are in design-system.css */
 </style>
