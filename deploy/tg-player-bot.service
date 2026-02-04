@@ -1,0 +1,16 @@
+[Unit]
+Description=TG Player Bot
+After=network.target
+
+[Service]
+Type=simple
+User=ganja
+Group=ganja
+WorkingDirectory=/opt/tg_player
+Environment=PATH=/opt/tg_player/venv/bin
+ExecStart=/opt/tg_player/venv/bin/python bot/main.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
