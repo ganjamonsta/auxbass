@@ -79,47 +79,37 @@
       </div>
     </section>
 
-    <!-- Tracks section with pagination -->
-    <section class="section">
-      <h2>Все треки</h2>
-      
-      <!-- Loading state with skeletons -->
-      <div v-if="tracksLoading && !tracksInitialized" class="track-list">
-        <TrackSkeleton v-for="i in 10" :key="i" />
+    <!-- Tracks section with virtual scrolling -->
+    <section class="section tracks-section">
+      <div class="section-header">
+        <h2>Все треки</h2>
+        <span v-if="tracksTotal > 0" class="tracks-count">{{ tracksTotal }}</span>
       </div>
       
-      <!-- Track list with infinite scroll -->
-      <template v-else>
-        <div class="track-list">
-          <TrackItem
-            v-for="(track, index) in tracks"
-            :key="track.id"
-            :track="track"
-            :isPlaying="playerStore.currentTrack?.id === track.id"
-            :isLiked="track.is_liked"
-            :showAlbum="true"
-            :showAddToLibrary="isGlobal"
-            :inLibrary="track.in_library"
-            @click="playTrack(track, index)"
-            @like="handleLikeTrack(track)"
-            @addToLibrary="handleAddToLibrary(track)"
-            @menu="(e) => openMenu('track', track, 'artist', e)"
-            @download="handleDirectDownload(track)"
-            @hdNotice="handleHdNotice"
-          />
-        </div>
-        
-        <!-- Infinite scroll trigger -->
-        <div ref="loadTriggerRef" class="load-trigger" v-show="hasMoreTracks && !tracksLoadingMore"></div>
-        
-        <!-- Loading more with skeletons -->
-        <div v-if="tracksLoadingMore" class="track-list loading-more-tracks">
-          <TrackSkeleton 
-            v-for="i in tracksLoadingSkeletonCount" 
-            :key="'skeleton-more-' + i" 
-          />
-        </div>
-      </template>
+      <!-- Virtual track list with Spotify-style skeleton loading -->
+      <div class="virtual-tracks-container" :style="virtualContainerStyle">
+        <VirtualTrackList
+          ref="virtualTrackListRef"
+          :fetchFn="fetchArtistTracks"
+          :pageSize="50"
+          :skeletonCount="12"
+          :showAlbum="true"
+          :showAddToLibrary="isGlobal"
+          menuContext="artist"
+          @click="handleTrackClick"
+          @like="handleLikeTrack"
+          @menu="handleTrackMenu"
+          @download="handleDirectDownload"
+          @addToLibrary="handleAddToLibrary"
+          @hdNotice="handleHdNotice"
+          @update:total="tracksTotal = $event"
+        >
+          <template #empty>
+            <span class="empty-icon"><Music :size="48" /></span>
+            <p>Нет треков</p>
+          </template>
+        </VirtualTrackList>
+      </div>
     </section>
   </div>
 
@@ -142,13 +132,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
-import { useVirtualScroll } from '@/composables'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useTrackActions, usePlaybackActions } from '@/composables'
-import TrackItem from '@/components/TrackItem.vue'
-import TrackSkeleton from '@/components/TrackSkeleton.vue'
+import VirtualTrackList from '@/components/VirtualTrackList.vue'
 import api, { playerApi } from '@/api/client'
-import { User, Disc3, Globe } from 'lucide-vue-next'
+import { User, Disc3, Globe, Music } from 'lucide-vue-next'
 import { getCoverUrl, CoverSize } from '@/utils'
 
 // Universal context menu
@@ -166,6 +154,8 @@ const { handleDirectDownload, handleHdNotice, handleLikeTrack, handleAddToLibrar
 const artist = ref(null)
 const loading = ref(true)
 const notInLibrary = ref(false)
+const tracksTotal = ref(0)
+const virtualTrackListRef = ref(null)
 
 // Get scope from query param
 const scope = computed(() => route.query.scope || 'library')
@@ -173,6 +163,12 @@ const isGlobal = computed(() => scope.value === 'global')
 
 // Tracks pagination with virtual scroll
 const artistName = computed(() => route.params.name ? decodeURIComponent(route.params.name) : null)
+
+// Calculate container height for virtual list (viewport - header)
+const virtualContainerStyle = computed(() => ({
+  height: 'calc(100vh - 400px)',
+  minHeight: '300px'
+}))
 
 const fetchArtistTracks = async ({ offset, limit }) => {
   if (!artistName.value) return { items: [], total: 0 }
@@ -183,22 +179,6 @@ const fetchArtistTracks = async ({ offset, limit }) => {
   return response.data
 }
 
-const {
-  items: tracks,
-  loading: tracksLoading,
-  loadingMore: tracksLoadingMore,
-  hasMore: hasMoreTracks,
-  initialized: tracksInitialized,
-  loadTriggerRef,
-  loadingSkeletonCount: tracksLoadingSkeletonCount,
-  reset: resetTracks
-} = useVirtualScroll({
-  fetchFn: fetchArtistTracks,
-  limit: 30,
-  immediate: false, // Load after artist info is fetched
-  skeletonCount: 8
-})
-
 const loadArtist = async () => {
   loading.value = true
   notInLibrary.value = false
@@ -208,8 +188,10 @@ const loadArtist = async () => {
     // Use the lightweight /info endpoint (no tracks loaded here)
     const response = await api.get(`/artists/${encodeURIComponent(name)}/info`, { params })
     artist.value = response.data
-    // Load tracks separately via infinite scroll
-    resetTracks()
+    // Reset virtual track list
+    if (virtualTrackListRef.value) {
+      virtualTrackListRef.value.reset()
+    }
   } catch (error) {
     // If artist not found in library, show option to view global
     if (error.response?.status === 404 && !isGlobal.value) {
@@ -223,8 +205,20 @@ const loadArtist = async () => {
   }
 }
 
+// Handle track click from VirtualTrackList
+const handleTrackClick = ({ track, index, allTracks }) => {
+  playerStore.playTracks(allTracks, index)
+}
+
+// Handle track menu from VirtualTrackList
+const handleTrackMenu = ({ track, index, event }) => {
+  openMenu('track', track, 'artist', event)
+}
+
 // Unified playback actions - use shufflePlayFull for lazy loading all artist tracks
-const { playAll, shufflePlayFull, isShuffling, playTrack } = usePlaybackActions(tracks)
+const { playAll, shufflePlayFull, isShuffling } = usePlaybackActions(() => 
+  virtualTrackListRef.value?.getLoadedTracks() || []
+)
 
 // Shuffle play handler using lazy loading
 const shufflePlay = () => {
@@ -510,6 +504,38 @@ watch(
 .album-year {
   color: var(--text-tertiary);
   font-size: 12px;
+}
+
+/* Tracks section */
+.tracks-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.section-header h2 {
+  margin: 0;
+}
+
+.tracks-count {
+  color: var(--text-tertiary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.virtual-tracks-container {
+  flex: 1;
+  min-height: 0;
+  border-radius: var(--neu-radius-md, 12px);
+  overflow: hidden;
 }
 
 .track-list {

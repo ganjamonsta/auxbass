@@ -22,8 +22,32 @@
       />
     </div>
 
-    <!-- Track list -->
-    <div class="track-list" ref="trackListRef">
+    <!-- Virtual track list (without search) -->
+    <div v-if="!searchQuery" class="virtual-tracks-section">
+      <VirtualTrackList
+        ref="virtualTrackListRef"
+        :fetchFn="fetchTracks"
+        :pageSize="50"
+        :skeletonCount="12"
+        :showAlbum="false"
+        menuContext="library"
+        @click="handleVirtualClick"
+        @like="handleLikeTrack"
+        @menu="handleVirtualMenu"
+        @download="handleDirectDownload"
+        @hdNotice="handleHdNotice"
+        @update:total="virtualTotal = $event"
+      >
+        <template #empty>
+          <span class="empty-icon"><Music :size="48" /></span>
+          <h3>Библиотека пуста</h3>
+          <p>Отправьте аудио боту, чтобы добавить треки</p>
+        </template>
+      </VirtualTrackList>
+    </div>
+
+    <!-- Regular track list with search (friends/global sections) -->
+    <div v-else class="track-list search-results" ref="trackListRef">
       <!-- Loading state with skeletons -->
       <template v-if="loading && !tracks.length">
         <TrackSkeleton v-for="i in 12" :key="i" />
@@ -31,7 +55,7 @@
       
       <template v-else>
         <!-- Section: My Library results -->
-        <template v-if="searchQuery && tracks.length">
+        <template v-if="tracks.length">
           <div class="section-header">
             <span class="section-title">Моя библиотека</span>
             <span class="section-count">{{ tracks.length }}</span>
@@ -52,15 +76,8 @@
           @hdNotice="handleHdNotice"
         />
         
-        <div v-if="hasMore && !searchQuery" class="load-trigger" ref="loadTriggerRef"></div>
-        
-        <!-- Loading more indicator -->
-        <div v-if="loadingMore && !searchQuery" class="loading-more">
-          <div class="spinner small"></div>
-        </div>
-        
-        <!-- Section: Friends' Libraries results (only when searching) -->
-        <template v-if="searchQuery && friendsTracks.length">
+        <!-- Section: Friends' Libraries results -->
+        <template v-if="friendsTracks.length">
           <div class="section-header friends-section">
             <span class="section-title"><Users :size="16" /> У друзей</span>
             <span class="section-count">{{ friendsTracks.length }}</span>
@@ -85,13 +102,13 @@
         </template>
         
         <!-- Loading friends results -->
-        <div v-if="searchQuery && friendsLoading" class="global-loading">
+        <div v-if="friendsLoading" class="global-loading">
           <div class="spinner small"></div>
           <span>Поиск у друзей...</span>
         </div>
         
-        <!-- Section: Global Network results (only when searching) -->
-        <template v-if="searchQuery && globalTracks.length">
+        <!-- Section: Global Network results -->
+        <template v-if="globalTracks.length">
           <div class="section-header global-section">
             <span class="section-title"><Globe :size="16" /> Общая сеть</span>
             <span class="section-count">{{ globalTracks.length }}</span>
@@ -116,18 +133,14 @@
         </template>
         
         <!-- Loading global results -->
-        <div v-if="searchQuery && globalLoading" class="global-loading">
+        <div v-if="globalLoading" class="global-loading">
           <div class="spinner small"></div>
           <span>Поиск в общей сети...</span>
         </div>
         
         <div v-if="!tracks.length && !friendsTracks.length && !globalTracks.length && !loading && !friendsLoading && !globalLoading" class="empty-state">
           <span class="empty-icon"><Music :size="48" /></span>
-          <h3 v-if="searchQuery">Ничего не найдено</h3>
-          <template v-else>
-            <h3>Библиотека пуста</h3>
-            <p>Отправьте аудио боту, чтобы добавить треки</p>
-          </template>
+          <h3>Ничего не найдено</h3>
         </div>
       </template>
     </div>
@@ -143,6 +156,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import { useSort, useTrackActions } from '@/composables'
 import { useContextMenu } from '@/composables/useContextMenu'
+import VirtualTrackList from '@/components/VirtualTrackList.vue'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackSkeleton from '@/components/TrackSkeleton.vue'
 import SortChips from '@/components/SortChips.vue'
@@ -177,12 +191,16 @@ const {
   toggleOrder 
 } = useSort('library-sort', 'library', { sortBy: 'added_at', sortOrder: 'desc' })
 
+// Virtual track list ref
+const virtualTrackListRef = ref(null)
+const virtualTotal = ref(0)
+
 const loading = ref(true)
 const loadingMore = ref(false)
 const shuffling = ref(false)
 const tracks = ref([])
 const page = ref(1)
-const total = ref(0)
+const total = computed(() => props.searchQuery ? tracks.value.length : virtualTotal.value)
 const perPage = 50
 const loadTriggerRef = ref(null)
 let observer = null
@@ -197,7 +215,30 @@ const friendsLoading = ref(false)
 
 const hasMore = computed(() => tracks.value.length < total.value)
 
-const loadTracks = async () => {
+// Fetch function for VirtualTrackList (without search)
+const fetchTracks = async ({ offset, limit }) => {
+  const response = await api.get('/tracks', {
+    params: {
+      offset,
+      limit,
+      sort_by: sortBy.value,
+      sort_order: sortOrder.value
+    }
+  })
+  return response.data
+}
+
+// Handle click from VirtualTrackList
+const handleVirtualClick = ({ track, index, allTracks }) => {
+  playerStore.playTrack(track, allTracks)
+}
+
+// Handle menu from VirtualTrackList  
+const handleVirtualMenu = ({ track, index, event }) => {
+  openMenu('track', track, 'library', event)
+}
+
+const loadSearchTracks = async () => {
   loading.value = true
   try {
     await libraryStore.fetchTracks({
@@ -257,7 +298,7 @@ const loadMore = async () => {
   if (loadingMore.value || loading.value || !hasMore.value) return
   loadingMore.value = true
   page.value++
-  await loadTracks()
+  await loadSearchTracks()
 }
 
 // Setup IntersectionObserver for infinite scroll
@@ -338,29 +379,43 @@ const searchFriends = async (query) => {
 watch(() => props.searchQuery, async (newVal) => {
   // If query changes, reset page
   page.value = 1
-  await loadTracks()
   
-  // Also search in friends' libraries and global when there's a search query
   if (newVal) {
+    // Search mode - load tracks via library store
+    await loadSearchTracks()
     // Search friends first, then global
     await searchFriends(newVal)
     await searchGlobal(newVal)
   } else {
+    // No search - reset to virtual list mode
+    tracks.value = []
     friendsTracks.value = []
     globalTracks.value = []
+    // Reset virtual list
+    if (virtualTrackListRef.value) {
+      virtualTrackListRef.value.reset()
+    }
   }
 })
 
 const onNextSort = () => {
   nextSort()
   page.value = 1
-  loadTracks()
+  if (props.searchQuery) {
+    loadSearchTracks()
+  } else if (virtualTrackListRef.value) {
+    virtualTrackListRef.value.reset()
+  }
 }
 
 const onToggleOrder = () => {
   toggleOrder()
   page.value = 1
-  loadTracks()
+  if (props.searchQuery) {
+    loadSearchTracks()
+  } else if (virtualTrackListRef.value) {
+    virtualTrackListRef.value.reset()
+  }
 }
 
 // Like track
@@ -423,7 +478,8 @@ const shuffleAll = async () => {
 }
 
 onMounted(() => {
-  loadTracks()
+  // VirtualTrackList handles initial load automatically
+  // Only need observer for search mode
 })
 
 onUnmounted(() => {
@@ -435,6 +491,18 @@ onUnmounted(() => {
 /* Reuse existing styles */
 .library-tracks {
   padding-bottom: 20px;
+}
+
+/* Virtual tracks section for Spotify-style scrolling */
+.virtual-tracks-section {
+  min-height: 200px;
+}
+
+/* Search results section */
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .sort-options {

@@ -514,7 +514,8 @@ html, body {
 .app.desktop-layout :deep(.now-playing-sidebar) {
   grid-area: nowplaying;
   height: 100%;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .app.desktop-layout :deep(.desktop-player) {
