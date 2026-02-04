@@ -159,6 +159,12 @@ const getCacheBustedUrl = (url) => {
     return `${url}${separator}_t=${Date.now()}`
 }
 
+// Extract base URL without cache-busting parameter
+const getBaseUrl = (url) => {
+    if (!url) return null
+    return url.replace(/[?&]_t=\d+$/, '').replace(/\?$/, '')
+}
+
 const changeCover = async () => {
     if (!props.playlist?.id) return
   
@@ -317,7 +323,16 @@ watch(() => props.playlist, (pl) => {
     name.value = pl.name || ''
     isPublic.value = pl.is_public || false
     tracks.value = [...(pl.tracks || [])]
-    currentCoverUrl.value = pl.cover_url || null
+    // Apply cache-busting to cover URL to ensure fresh image loads after updates
+    // Skip update if we're waiting for cover (to not overwrite the loading state)
+    // Also skip if base URL hasn't changed to avoid unnecessary re-renders
+    if (!waitingForCover.value) {
+      const currentBase = getBaseUrl(currentCoverUrl.value)
+      const newBase = pl.cover_url || null
+      if (currentBase !== newBase) {
+        currentCoverUrl.value = getCacheBustedUrl(pl.cover_url)
+      }
+    }
   }
 }, { immediate: true })
 
