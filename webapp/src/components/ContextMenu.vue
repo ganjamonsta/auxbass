@@ -241,8 +241,8 @@
             ref="createPlaylistInput"
           />
           <div class="modal-actions">
-            <button class="modal-btn cancel" @click="closeCreatePlaylist">Отмена</button>
-            <button class="modal-btn confirm" @click="confirmCreatePlaylist">Создать</button>
+            <button type="button" class="modal-btn cancel" @click="closeCreatePlaylist">Отмена</button>
+            <button type="button" class="modal-btn confirm" @click="confirmCreatePlaylist">Создать</button>
           </div>
         </div>
       </div>
@@ -264,8 +264,8 @@
             ref="renameInput"
           />
           <div class="modal-actions">
-            <button class="modal-btn cancel" @click="closeRenameModal">Отмена</button>
-            <button class="modal-btn confirm" @click="confirmRename">Сохранить</button>
+            <button type="button" class="modal-btn cancel" @click="closeRenameModal">Отмена</button>
+            <button type="button" class="modal-btn confirm" @click="confirmRename">Сохранить</button>
           </div>
         </div>
       </div>

@@ -88,8 +88,9 @@
           @keyup.enter="createPlaylist"
         />
         <div class="modal-actions">
-          <button class="cancel-btn" @click="closeModal">Отмена</button>
+          <button type="button" class="cancel-btn" @click="closeModal">Отмена</button>
           <button 
+            type="button"
             class="confirm-btn" 
             @click="createPlaylist"
             :disabled="!newPlaylistName.trim()"
