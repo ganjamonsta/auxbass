@@ -211,7 +211,8 @@ const startCoverPolling = () => {
         }
         
         try {
-            const response = await api.get(`/playlists/${props.playlist.id}`)
+            // Bypass cache to get fresh data from server
+            const response = await api.get(`/playlists/${props.playlist.id}`, { bypassCache: true })
             const newCoverUrl = response.data?.cover_url
             console.log(`[Cover Poll #${attempts}] initial: ${initialCoverUrl}, new: ${newCoverUrl}`)
             // Check if cover changed from initial value
