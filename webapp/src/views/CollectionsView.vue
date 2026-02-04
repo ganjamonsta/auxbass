@@ -92,7 +92,7 @@
           >
             <div class="playlist-manage-info">
               <div class="playlist-manage-cover">
-                <img v-if="playlist.cover_url" :src="getCoverUrl(playlist.cover_url, CoverSize.SMALL)" />
+                <img v-if="playlist.covers?.length" :src="getCoverUrl(playlist.covers[0], CoverSize.SMALL)" />
                 <div v-else class="playlist-manage-placeholder"><Music :size="20" /></div>
               </div>
               <div class="playlist-manage-text">

@@ -80,12 +80,12 @@ class ReorderRequest(BaseModel):
 
 async def get_playlist_info(
     db: AsyncSession, 
-    playlist_id: int, 
-    playlist_cover_url: Optional[str] = None
+    playlist_id: int
 ) -> tuple[int, int, Optional[str], List[str]]:
     """
     Get track count, duration, cover, and covers array for a playlist.
     Returns: (track_count, total_duration, cover_url, covers)
+    Cover is built from track covers (collage of up to 4 track covers).
     """
     # Count and duration
     result = await db.execute(
@@ -117,13 +117,9 @@ async def get_playlist_info(
         if track.enrichment and track.enrichment.cover_url:
             track_covers.append(track.enrichment.cover_url)
     
-    # Build covers array: if playlist has own cover, use it alone; otherwise use track covers
-    if playlist_cover_url:
-        covers = [playlist_cover_url]
-        cover_url = playlist_cover_url
-    else:
-        covers = track_covers[:4]  # Up to 4 for collage
-        cover_url = track_covers[0] if track_covers else None
+    # Build covers array from track covers (up to 4 for collage)
+    covers = track_covers[:4]
+    cover_url = track_covers[0] if track_covers else None
     
     return track_count, total_duration, cover_url, covers
 
@@ -169,7 +165,7 @@ async def get_my_playlists(
     
     items = []
     for playlist, owner in owned_rows:
-        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
+        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id)
         items.append(PlaylistResponse(
             id=playlist.id,
             name=playlist.name,
@@ -204,7 +200,7 @@ async def get_my_playlists(
         subscribed_rows = result.all()
         
         for playlist, owner, subscription in subscribed_rows:
-            track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
+            track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id)
             items.append(PlaylistResponse(
                 id=playlist.id,
                 name=playlist.name,
@@ -257,9 +253,7 @@ async def get_all_my_playlists(
     
     items = []
     for playlist, owner in rows:
-        track_count, total_duration, cover_url, covers = await get_playlist_info(
-            db, playlist.id, playlist.cover_url
-        )
+        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id)
         items.append(PlaylistResponse(
             id=playlist.id,
             name=playlist.name,
@@ -354,19 +348,13 @@ async def get_playlist(
     track_count = len(tracks_response)
     total_duration = sum(t.duration or 0 for t in [row[0] for row in rows])
     
-    # Build covers array and cover_url
-    # If playlist has own cover, use it; otherwise use track covers for collage
-    if playlist.cover_url:
-        cover_url = playlist.cover_url
-        covers = [playlist.cover_url]
-    else:
-        # Get up to 4 track covers for collage
-        track_covers = []
-        for track, _ in rows:
-            if track.enrichment and track.enrichment.cover_url and len(track_covers) < 4:
-                track_covers.append(track.enrichment.cover_url)
-        cover_url = track_covers[0] if track_covers else None
-        covers = track_covers
+    # Build covers array from track covers (up to 4 for collage)
+    track_covers = []
+    for track, _ in rows:
+        if track.enrichment and track.enrichment.cover_url and len(track_covers) < 4:
+            track_covers.append(track.enrichment.cover_url)
+    cover_url = track_covers[0] if track_covers else None
+    covers = track_covers
     
     # Check if user is subscribed to this playlist
     is_subscribed = False
@@ -481,9 +469,7 @@ async def update_playlist(
     
     await db.commit()
     
-    track_count, total_duration, cover_url, covers = await get_playlist_info(
-        db, playlist.id, playlist.cover_url
-    )
+    track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id)
     
     return PlaylistResponse(
         id=playlist.id,
@@ -497,69 +483,6 @@ async def update_playlist(
         created_at=playlist.created_at,
     )
 
-
-@router.post("/{playlist_id}/request-cover")
-async def request_cover_upload(
-    playlist_id: int,
-    user: TelegramUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Request cover upload from webapp.
-    Sends message with ForceReply - user replies with photo.
-    No database storage needed - playlist_id and channel_id encoded in message.
-    """
-    import httpx
-    
-    settings = get_settings()
-    
-    # Verify playlist ownership
-    playlist = await db.get(Playlist, playlist_id)
-    if not playlist or playlist.owner_id != user.id:
-        raise HTTPException(status_code=404, detail="Playlist not found")
-    
-    # Check user has connected channel
-    channel = await db.scalar(
-        select(UserChannel).where(
-            UserChannel.user_id == user.id,
-            UserChannel.is_active == True
-        )
-    )
-    
-    if not channel:
-        raise HTTPException(
-            status_code=400, 
-            detail="Подключите канал для загрузки обложек. Используйте /channel в боте."
-        )
-    
-    # Send message with ForceReply - encode data in message for parsing on reply
-    # The cover:playlist_id:channel_id pattern is parsed by bot when user replies with photo
-    bot_api_url = f"{settings.telegram_api_url}/bot{settings.bot_token}/sendMessage"
-    message_text = (
-        f"📷 <b>Загрузка обложки для плейлиста</b>\n\n"
-        f"🎵 <i>{playlist.name}</i>\n\n"
-        f"Ответьте на это сообщение фотографией.\n"
-        f"Я автоматически обрежу изображение до квадрата.\n\n"
-        f"<i>cover:{playlist_id}:{channel.channel_id}</i>"
-    )
-    
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(bot_api_url, json={
-                "chat_id": user.id,
-                "text": message_text,
-                "parse_mode": "HTML",
-                "reply_markup": {
-                    "force_reply": True,
-                    "selective": True,
-                    "input_field_placeholder": "Отправьте фото..."
-                }
-            })
-            response.raise_for_status()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Не удалось отправить сообщение: {e}")
-    
-    return {"status": "pending", "message": "Ответьте на сообщение фото"}
 
 
 @router.delete("/{playlist_id}")
@@ -720,7 +643,7 @@ async def get_public_playlists(
     
     items = []
     for playlist, owner in rows:
-        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
+        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id)
         
         # Check if current user is subscribed or is owner
         is_owner = playlist.owner_id == user.id
@@ -798,7 +721,7 @@ async def get_user_public_playlists(
     
     items = []
     for playlist in playlists:
-        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.cover_url)
+        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id)
         # Check if current user is subscribed
         is_subscribed = False
         if not is_own:

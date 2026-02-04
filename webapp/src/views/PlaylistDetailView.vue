@@ -88,7 +88,6 @@
       @save="handleSavePlaylist"
       @delete="showDeleteConfirm = true"
       @update:tracks="handleTracksUpdate"
-      @refresh="handlePlaylistRefresh"
     />
 
     <!-- Delete confirm -->
@@ -170,9 +169,11 @@ const isOwner = computed(() => {
 })
 
 const coverImages = computed(() => {
-  // If playlist has its own cover, use it (single image in array for consistent template)
-  if (playlist.value?.cover_url) {
-    return [getCoverUrl(playlist.value.cover_url, CoverSize.LARGE)]
+  // Use covers array from API (track covers collage, up to 4)
+  if (playlist.value?.covers?.length) {
+    // Use large size for single cover, small for multi-cover grid
+    const size = playlist.value.covers.length === 1 ? CoverSize.LARGE : CoverSize.SMALL
+    return playlist.value.covers.map(url => getCoverUrl(url, size))
   }
   // Fallback to track covers for collage (use small size for grid)
   if (!playlist.value?.tracks) return []
@@ -198,17 +199,12 @@ const openEditModal = () => {
   showEditModal.value = true
 }
 
-const handleSavePlaylist = ({ name, isPublic, cover_url, covers }) => {
+const handleSavePlaylist = ({ name, isPublic, covers }) => {
   playlist.value.name = name
   playlist.value.is_public = isPublic
   
-  // Update cover if provided (from save response)
-  if (cover_url) {
-    const bustedCover = addCacheBust(cover_url)
-    playlist.value.cover_url = bustedCover
-    playlist.value.covers = (covers?.length ? covers : [cover_url]).map(addCacheBust)
-  } else if (covers?.length) {
-    // Track collage covers (no custom cover)
+  // Update covers array (track collage covers from save response)
+  if (covers?.length) {
     playlist.value.covers = covers.map(addCacheBust)
   }
   
@@ -217,11 +213,7 @@ const handleSavePlaylist = ({ name, isPublic, cover_url, covers }) => {
   if (libraryPlaylist) {
     libraryPlaylist.name = name
     libraryPlaylist.is_public = isPublic
-    if (cover_url) {
-      const bustedCover = addCacheBust(cover_url)
-      libraryPlaylist.cover_url = bustedCover
-      libraryPlaylist.covers = (covers?.length ? covers : [cover_url]).map(addCacheBust)
-    } else if (covers?.length) {
+    if (covers?.length) {
       libraryPlaylist.covers = covers.map(addCacheBust)
     }
   }
@@ -231,25 +223,6 @@ const handleSavePlaylist = ({ name, isPublic, cover_url, covers }) => {
   
   showEditModal.value = false
   uiStore.toast.success('Сохранено', 'Плейлист обновлён')
-}
-
-const handlePlaylistRefresh = (updatedPlaylist) => {
-  // Update cover and other fields from refresh
-  // Always update cover_url and covers, even if cover_url is null (for track collage)
-  const bustedCover = updatedPlaylist.cover_url ? addCacheBust(updatedPlaylist.cover_url) : null
-  playlist.value.cover_url = bustedCover
-  playlist.value.covers = (updatedPlaylist.covers || (updatedPlaylist.cover_url ? [updatedPlaylist.cover_url] : [])).map(addCacheBust)
-  
-  // Update in library store (both cover_url and covers array)
-  const libraryPlaylist = libraryStore.playlists.find(p => p.id === playlist.value.id)
-  if (libraryPlaylist) {
-    libraryPlaylist.cover_url = bustedCover
-    libraryPlaylist.covers = (updatedPlaylist.covers || (updatedPlaylist.cover_url ? [updatedPlaylist.cover_url] : [])).map(addCacheBust)
-  }
-  
-  // Invalidate API cache to ensure fresh data everywhere
-  // This forces PlaylistsView, Sidebar and other components to get updated covers
-  apiCache.invalidateRelated('playlist', playlist.value.id)
 }
 
 const handleTracksUpdate = (tracks) => {

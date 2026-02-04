@@ -76,9 +76,9 @@ const isAlbum = computed(() => props.playlist?.is_auto_album)
 
 // Cover styling
 const getCoverStyle = computed(() => {
-  if (props.playlist?.cover_url) {
+  if (props.playlist?.covers?.length) {
     return {
-      backgroundImage: `url(${props.playlist.cover_url})`,
+      backgroundImage: `url(${props.playlist.covers[0]})`,
       backgroundSize: 'cover',
       backgroundPosition: 'center'
     }
@@ -90,7 +90,7 @@ const getCoverStyle = computed(() => {
 })
 
 const coverIcon = computed(() => {
-  if (props.playlist?.cover_url || props.playlist?.cover_gradient) return null
+  if (props.playlist?.covers?.length || props.playlist?.cover_gradient) return null
   return isAlbum.value ? Disc3 : Music
 })
 

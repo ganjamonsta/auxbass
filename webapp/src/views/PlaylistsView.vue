@@ -216,12 +216,10 @@ watch(
       const localPlaylist = playlists.value.find(p => p.id === storePlaylist.id)
       if (!localPlaylist) continue
       
-      // Check if cover_url or covers array changed
-      const coverUrlChanged = storePlaylist.cover_url !== localPlaylist.cover_url
+      // Check if covers array changed
       const coversChanged = JSON.stringify(storePlaylist.covers) !== JSON.stringify(localPlaylist.covers)
       
-      if (coverUrlChanged || coversChanged) {
-        localPlaylist.cover_url = storePlaylist.cover_url
+      if (coversChanged) {
         localPlaylist.covers = storePlaylist.covers
       }
       

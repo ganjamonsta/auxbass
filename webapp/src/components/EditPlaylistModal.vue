@@ -9,23 +9,6 @@
       
       <!-- Playlist name and settings -->
       <div class="edit-settings">
-        <!-- Cover editor -->
-        <div class="edit-cover-wrapper" @click="changeCover" :title="waitingForCover ? 'Ожидание фото...' : 'Изменить обложку'">
-            <img v-if="currentCoverUrl" :src="currentCoverUrl" class="edit-cover-img" />
-            <div v-else class="edit-cover-placeholder">
-                <Camera :size="24" />
-            </div>
-            <div v-if="coverUpdated" class="edit-cover-overlay success">
-                <Check :size="20" />
-            </div>
-            <div v-else-if="waitingForCover" class="edit-cover-overlay waiting">
-                <div class="cover-spinner"></div>
-            </div>
-            <div v-else class="edit-cover-overlay">
-                <Camera :size="16" />
-            </div>
-        </div>
-
         <input
           v-model="name"
           type="text"
@@ -123,13 +106,13 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, watch } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { useDragReorder } from '@/composables/useDragReorder'
 import api from '@/api/client'
 import TrackSearchItem from './TrackSearchItem.vue'
 import EditableTrackItem from './EditableTrackItem.vue'
-import { X, Music, Camera, Check } from 'lucide-vue-next'
+import { X, Music } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 
@@ -138,117 +121,11 @@ const props = defineProps({
   playlist: Object
 })
 
-const emit = defineEmits(['close', 'save', 'delete', 'update:tracks', 'refresh'])
+const emit = defineEmits(['close', 'save', 'delete', 'update:tracks'])
 
 const playerStore = usePlayerStore()
 const authStore = useAuthStore()
 const uiStore = useUIStore()
-
-// Track if we're waiting for cover upload
-const waitingForCover = ref(false)
-const coverUpdated = ref(false)
-// Current cover URL (local state for refresh)
-const currentCoverUrl = ref(null)
-// Original cover URL at the moment upload was requested (for comparison)
-let originalCoverUrlOnRequest = null
-// Poll interval reference
-let coverCheckInterval = null
-
-// Add cache-busting to URL to force browser refresh
-const getCacheBustedUrl = (url) => {
-    if (!url) return null
-    const separator = url.includes('?') ? '&' : '?'
-    return `${url}${separator}_t=${Date.now()}`
-}
-
-// Extract base URL without cache-busting parameter
-const getBaseUrl = (url) => {
-    if (!url) return null
-    // Remove _t parameter from anywhere in query string
-    return url.replace(/([?&])_t=\d+(&|$)/, (match, prefix, suffix) => {
-        return suffix === '&' ? prefix : ''
-    }).replace(/\?$/, '')
-}
-
-const changeCover = async () => {
-    if (!props.playlist?.id) return
-  
-    // Request cover upload via API (sends message to user, they reply with photo)
-    if (window.Telegram?.WebApp) {
-        try {
-            // Save the current cover URL before requesting new one
-            originalCoverUrlOnRequest = getBaseUrl(currentCoverUrl.value)
-            await api.post(`/playlists/${props.playlist.id}/request-cover`)
-            waitingForCover.value = true
-            uiStore.toast.info('Отправьте фото', 'Ответьте на сообщение в Telegram')
-            // Start checking for cover updates
-            startCoverCheck()
-            return
-        } catch (error) {
-            console.error('Failed to request cover upload:', error)
-            originalCoverUrlOnRequest = null
-            if (error.response?.data?.detail) {
-                uiStore.toast.error('Ошибка', error.response.data.detail)
-                return
-            }
-        }
-    }
-}
-
-// Check for cover updates (runs every 3 seconds for 60 seconds max)
-const startCoverCheck = () => {
-    stopCoverCheck()
-    let attempts = 0
-    const maxAttempts = 20  // 60 seconds total (increased from 30)
-    
-    coverCheckInterval = setInterval(async () => {
-        attempts++
-        if (attempts >= maxAttempts || !waitingForCover.value) {
-            if (attempts >= maxAttempts) {
-                uiStore.toast.warning('Таймаут', 'Попробуйте отправить фото ещё раз')
-            }
-            stopCoverCheck()
-            waitingForCover.value = false
-            originalCoverUrlOnRequest = null
-            return
-        }
-        
-        try {
-            const response = await api.get(`/playlists/${props.playlist.id}`, { bypassCache: true })
-            const newCoverUrl = response.data?.cover_url
-            const newBase = getBaseUrl(newCoverUrl)
-            
-            // Compare with the URL that was set when we started waiting
-            // This handles both new covers and cover updates
-            if (newBase && newBase !== originalCoverUrlOnRequest) {
-                currentCoverUrl.value = getCacheBustedUrl(newCoverUrl)
-                coverUpdated.value = true
-                waitingForCover.value = false
-                originalCoverUrlOnRequest = null
-                setTimeout(() => { coverUpdated.value = false }, 2000)
-                emit('refresh', response.data)
-                stopCoverCheck()
-            }
-        } catch (error) {
-            console.error('Failed to check cover:', error)
-        }
-    }, 3000)
-}
-
-const stopCoverCheck = () => {
-    if (coverCheckInterval) {
-        clearInterval(coverCheckInterval)
-        coverCheckInterval = null
-    }
-}
-
-onMounted(() => {
-    // Polling starts on demand when cover upload is requested
-})
-
-onUnmounted(() => {
-    stopCoverCheck()
-})
 
 // Form state
 const name = ref('')
@@ -292,15 +169,6 @@ watch(() => props.playlist, (pl) => {
     name.value = pl.name || ''
     isPublic.value = pl.is_public || false
     tracks.value = [...(pl.tracks || [])]
-    // Update cover URL if changed
-    if (!waitingForCover.value) {
-      const displayCover = pl.cover_url || null
-      const currentBase = getBaseUrl(currentCoverUrl.value)
-      const newBase = getBaseUrl(displayCover)
-      if (currentBase !== newBase) {
-        currentCoverUrl.value = getCacheBustedUrl(displayCover)
-      }
-    }
   }
 }, { immediate: true })
 
@@ -308,10 +176,6 @@ watch(() => props.show, (show) => {
   if (!show) {
     searchQuery.value = ''
     searchResults.value = []
-    coverUpdated.value = false
-    waitingForCover.value = false
-    originalCoverUrlOnRequest = null
-    stopCoverCheck()
   }
 })
 
@@ -399,14 +263,9 @@ const save = async () => {
       is_public: isPublic.value
     })
     
-    if (response.data?.cover_url) {
-      currentCoverUrl.value = getCacheBustedUrl(response.data.cover_url)
-    }
-    
     emit('save', { 
       name: name.value.trim(), 
       isPublic: isPublic.value, 
-      cover_url: response.data?.cover_url,
       covers: response.data?.covers || []
     })
   } catch (error) {
@@ -526,85 +385,6 @@ const save = async () => {
   border-radius: 8px;
   color: var(--text-primary);
   font-size: 15px;
-}
-
-.edit-cover-wrapper {
-    width: 48px;
-    height: 48px;
-    border-radius: 4px;
-    background: var(--bg-highlight);
-    position: relative;
-    cursor: pointer;
-    overflow: hidden;
-    flex-shrink: 0;
-}
-
-.edit-cover-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.edit-cover-placeholder {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-tertiary);
-}
-
-.edit-cover-overlay {
-    position: absolute;
-    inset: 0;
-    background: rgba(0,0,0,0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    transition: opacity 0.2s;
-    color: white;
-}
-
-.edit-cover-overlay.waiting {
-    opacity: 1;
-    background: rgba(0,0,0,0.7);
-}
-
-.edit-cover-overlay.success {
-    opacity: 1;
-    background: rgba(34, 197, 94, 0.8);
-}
-
-.edit-cover-wrapper:hover .edit-cover-overlay {
-    opacity: 1;
-}
-
-.cover-spinner {
-    width: 20px;
-    height: 20px;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-radius: 50%;
-    border-top-color: #fff;
-    animation: spin 0.8s linear infinite;
-}
-
-.edit-cover-loading {
-    position: absolute;
-    inset: 0;
-    background: rgba(0,0,0,0.7);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.edit-cover-loading .spinner {
-    width: 20px;
-    height: 20px;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-radius: 50%;
-    border-top-color: #fff;
-    animation: spin 1s linear infinite;
 }
 
 .edit-name-input {

@@ -1,12 +1,9 @@
 <template>
   <div class="playlist-card" @click="$emit('click')">
     <div class="playlist-cover" :class="coverClass">
-      <!-- Single cover image (albums or custom cover) -->
-      <img v-if="playlist.cover_url" :key="playlist.cover_url" :src="getCoverUrl(playlist.cover_url, CoverSize.MEDIUM)" alt="" class="cover-image" />
-      
-      <!-- Collage from track covers -->
-      <div v-else-if="collageCovers.length > 0" class="cover-collage" :class="'collage-' + collageCovers.length">
-        <img v-for="(cover, i) in collageCovers" :key="`${i}-${cover}`" :src="getCoverUrl(cover, CoverSize.SMALL)" alt="" class="collage-img" />
+      <!-- Collage from track covers (using covers array from API) -->
+      <div v-if="displayCovers.length > 0" class="cover-collage" :class="'collage-' + displayCovers.length">
+        <img v-for="(cover, i) in displayCovers" :key="`${i}-${cover}`" :src="getCoverUrl(cover, CoverSize.SMALL)" alt="" class="collage-img" />
       </div>
       
       <!-- Fallback icon -->
@@ -37,14 +34,17 @@ const props = defineProps({
 
 const emit = defineEmits(['click'])
 
-// Get up to 4 unique covers for collage
-const collageCovers = computed(() => {
-  if (!props.playlist.track_covers) return []
-  return props.playlist.track_covers.slice(0, 4)
+// Get up to 4 unique covers for collage from API covers array or fallback to track_covers
+const displayCovers = computed(() => {
+  // Use covers array from API (already limited to 4)
+  if (props.playlist.covers?.length) return props.playlist.covers
+  // Fallback to track_covers if available
+  if (props.playlist.track_covers?.length) return props.playlist.track_covers.slice(0, 4)
+  return []
 })
 
 const coverClass = computed(() => ({
-  'has-image': props.playlist.cover_url || collageCovers.value.length > 0
+  'has-image': displayCovers.value.length > 0
 }))
 
 const coverIcon = computed(() => {

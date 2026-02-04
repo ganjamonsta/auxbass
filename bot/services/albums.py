@@ -463,7 +463,7 @@ class AlbumAssemblyService:
     ) -> Optional[Playlist]:
         """
         Merge multiple duplicate playlists into one.
-        Keeps the playlist with best metadata (cover_url, track count).
+        Keeps the playlist with best metadata (release_date, track count).
         Moves all tracks to the survivor, removes duplicates.
         """
         if len(playlists) < 2:
@@ -473,13 +473,9 @@ class AlbumAssemblyService:
             # Re-fetch playlists in this session
             playlists = [await session.merge(pl) for pl in playlists]
             
-            # Score each playlist to find the best one
+            # Score each playlist to find the best one (by release_date presence)
             def score_playlist(pl: Playlist) -> int:
-                return (
-                    (50 if pl.cover_url and 'dzcdn.net' in pl.cover_url else 0) +
-                    (10 if pl.cover_url else 0) +
-                    (5 if pl.release_date else 0)
-                )
+                return (5 if pl.release_date else 0)
             
             # Sort by score descending
             playlists.sort(key=score_playlist, reverse=True)
@@ -533,8 +529,6 @@ class AlbumAssemblyService:
             
             # Update survivor metadata from merged playlists if better
             for pl in to_merge:
-                if not survivor.cover_url and pl.cover_url:
-                    survivor.cover_url = pl.cover_url
                 if not survivor.release_date and pl.release_date:
                     survivor.release_date = pl.release_date
             
@@ -672,8 +666,7 @@ class AlbumAssemblyService:
         user_id: int,
         artist: str,
         album: str,
-        tracks: List[Track],
-        cover_url: Optional[str] = None
+        tracks: List[Track]
     ) -> Playlist:
         """Create a new auto-album playlist from tracks"""
         async with get_session() as session:
@@ -695,7 +688,6 @@ class AlbumAssemblyService:
                 album_artist=artist,  # Artist stored separately
                 description=f"Автоальбом • {len(tracks)} треков",
                 is_auto_album=True,
-                cover_url=cover_url,
                 release_date=release_date,
             )
             session.add(playlist)
@@ -722,21 +714,14 @@ class AlbumAssemblyService:
         self,
         playlist: Playlist,
         tracks: List[Track],
-        cover_url: Optional[str] = None,
         reorder: bool = False
     ) -> bool:
-        """Update existing album playlist with new tracks and cover.
+        """Update existing album playlist with new tracks.
         If reorder=True or new tracks are added, reorders all tracks alphabetically.
         """
         async with get_session() as session:
             # Attach playlist to this session
             playlist = await session.merge(playlist)
-            
-            # Update cover if not set and we have one
-            cover_updated = False
-            if cover_url and not playlist.cover_url:
-                playlist.cover_url = cover_url
-                cover_updated = True
             
             # Update release_date if not set (using Last.fm)
             release_date_updated = False
@@ -854,9 +839,7 @@ class AlbumAssemblyService:
             
             if existing:
                 # Update existing playlist
-                updated = await self.update_album_playlist(
-                    existing, tracks, cover_url
-                )
+                updated = await self.update_album_playlist(existing, tracks)
                 if updated:
                     stats["updated"] += 1
                     stats["albums"].append({
@@ -871,8 +854,7 @@ class AlbumAssemblyService:
                     user_id=user_id,
                     artist=artist_display,
                     album=album,
-                    tracks=tracks,
-                    cover_url=cover_url
+                    tracks=tracks
                 )
                 stats["created"] += 1
                 stats["albums"].append({
