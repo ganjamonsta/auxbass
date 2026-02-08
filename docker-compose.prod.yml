@@ -94,7 +94,8 @@ services:
     networks:
       - tg_player_net
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     restart: unless-stopped
 
 networks:
