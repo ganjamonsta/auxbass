@@ -6,13 +6,9 @@ Periodically processes tracks with pending enrichment status.
 import asyncio
 import logging
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import select, func
-
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from shared.database import get_session
 from shared.models import Track, TrackEnrichment, EnrichmentStatus
@@ -164,7 +160,7 @@ class EnrichmentWorker:
                         enrichment.lastfm_url = result.lastfm_url
                     
                     enrichment.confidence = result.confidence
-                    enrichment.enriched_at = datetime.utcnow()
+                    enrichment.enriched_at = datetime.now(timezone.utc)
                     
                     track.enrichment_status = EnrichmentStatus.COMPLETED
                     self._stats["success"] += 1

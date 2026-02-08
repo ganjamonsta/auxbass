@@ -4,7 +4,7 @@ Manages temporary state like playlist creation mode
 """
 from dataclasses import dataclass, field
 from typing import Optional, Dict, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 @dataclass
@@ -13,7 +13,7 @@ class PlaylistSession:
     user_id: int
     name: str
     track_ids: List[int] = field(default_factory=list)
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     
     def add_track(self, track_id: int):
         self.track_ids.append(track_id)
@@ -23,7 +23,7 @@ class PlaylistSession:
         return len(self.track_ids)
     
     def is_expired(self, timeout_minutes: int = 30) -> bool:
-        return datetime.utcnow() - self.created_at > timedelta(minutes=timeout_minutes)
+        return datetime.now(timezone.utc) - self.created_at > timedelta(minutes=timeout_minutes)
 
 
 class SessionManager:

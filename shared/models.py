@@ -9,7 +9,7 @@ Changes from v1:
 - Cleaner Track model without denormalized fields
 - EnrichmentData as separate entity for external API data
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from enum import Enum
 from sqlalchemy import (
@@ -88,8 +88,8 @@ class User(Base):
     notify_subscription: Mapped[bool] = mapped_column(Boolean, default=True)  # Notify when subscription event occurs
     
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     uploaded_tracks: Mapped[List["Track"]] = relationship(
@@ -170,8 +170,8 @@ class Track(Base):
     forward_source_username: Mapped[Optional[str]] = mapped_column(String(255))
     
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     uploader: Mapped["User"] = relationship(back_populates="uploaded_tracks", foreign_keys=[uploader_id])
@@ -296,7 +296,7 @@ class TrackEnrichment(Base):
     confidence: Mapped[int] = mapped_column(Integer, default=0)
     
     # Timestamps
-    enriched_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    enriched_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relationship
     track: Mapped["Track"] = relationship(back_populates="enrichment")
@@ -337,8 +337,8 @@ class Album(Base):
     deezer_album_id: Mapped[Optional[int]] = mapped_column(BigInteger, unique=True)
     
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     tracks: Mapped[List["AlbumTrack"]] = relationship(
@@ -366,7 +366,7 @@ class AlbumTrack(Base):
     track_number: Mapped[int] = mapped_column(Integer, default=0)
     
     # Timestamps
-    added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relationships
     album: Mapped["Album"] = relationship(back_populates="tracks")
@@ -400,7 +400,7 @@ class UserLibrary(Base):
     last_played_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     
     # Timestamps
-    added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relationships
     user: Mapped["User"] = relationship(back_populates="library_entries")
@@ -432,8 +432,8 @@ class Playlist(Base):
     share_code: Mapped[Optional[str]] = mapped_column(String(50), unique=True)
     
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     owner: Mapped["User"] = relationship(back_populates="playlists")
@@ -453,7 +453,7 @@ class PlaylistTrack(Base):
     track_id: Mapped[int] = mapped_column(Integer, ForeignKey("tracks.id", ondelete="CASCADE"))
     
     position: Mapped[int] = mapped_column(Integer, nullable=False)
-    added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relationships
     playlist: Mapped["Playlist"] = relationship(back_populates="tracks")
@@ -486,8 +486,8 @@ class SourceCollection(Base):
     cover_url: Mapped[Optional[str]] = mapped_column(String(500))
     
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     tracks: Mapped[List["SourceCollectionTrack"]] = relationship(
@@ -510,7 +510,7 @@ class SourceCollectionTrack(Base):
     collection_id: Mapped[int] = mapped_column(Integer, ForeignKey("source_collections.id", ondelete="CASCADE"))
     track_id: Mapped[int] = mapped_column(Integer, ForeignKey("tracks.id", ondelete="CASCADE"))
     
-    added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relationships
     collection: Mapped["SourceCollection"] = relationship(back_populates="tracks")
@@ -544,8 +544,8 @@ class UserChannel(Base):
     include_hashtags: Mapped[bool] = mapped_column(Boolean, default=True)
     
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     user: Mapped["User"] = relationship(back_populates="channel")
@@ -573,8 +573,8 @@ class ChannelMessage(Base):
     hashtags: Mapped[Optional[str]] = mapped_column(Text)  # JSON array or comma-separated
     
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     channel: Mapped["UserChannel"] = relationship(back_populates="messages")
@@ -601,7 +601,7 @@ class PlaylistSubscription(Base):
     playlist_id: Mapped[int] = mapped_column(Integer, ForeignKey("playlists.id", ondelete="CASCADE"))
     
     # Timestamps
-    subscribed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    subscribed_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     __table_args__ = (
         UniqueConstraint("user_id", "playlist_id", name="uq_playlist_subscription"),
@@ -624,7 +624,7 @@ class UserFollow(Base):
     following_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
     
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     __table_args__ = (
         UniqueConstraint("follower_id", "following_id", name="uq_user_follow"),

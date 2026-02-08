@@ -5,16 +5,11 @@ Artist-related endpoints.
 Artists are not stored separately - derived from tracks.
 Uses normalization to group variations (BLADEE, Bladee, Bladee & Ecco2k -> Bladee)
 """
-import sys
 import logging
 import re
-from pathlib import Path
 from typing import Optional, List
 from collections import defaultdict
 from urllib.parse import unquote
-
-# Add parent directory to path for shared/bot imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select, func, desc, asc
@@ -27,8 +22,10 @@ from shared.models import (
 )
 from shared.matching import normalize_artist, normalize_artist_display, extract_featured_artists, get_all_track_artists, extract_artists_from_filename
 
+# NOTE: Cross-layer dependency — enrichment clients are pure API clients
+# but live inside bot/services/. TODO: Extract to shared/services/
 from bot.services.enrichment.lastfm import lastfm_client
-from bot.services.metadata import metadata_service
+from bot.services.enrichment.deezer import deezer_client
 
 from api.routers.auth import get_current_user
 from api.schemas.artists import (
@@ -621,9 +618,8 @@ async def get_artist(
         )
         user_library_ids = set(row[0] for row in user_lib_result.all())
         
-        from api.routers.library import track_to_response_global
         all_tracks_response = [
-            track_to_response_global(track, in_library=track.id in user_library_ids)
+            track_to_response(track, in_library=track.id in user_library_ids)
             for track in matching_tracks
         ]
     else:
@@ -790,10 +786,9 @@ async def get_artist_tracks(
         )
         user_library_ids = set(row[0] for row in user_lib_result.all())
         
-        from api.routers.library import track_to_response_global
         # Preserve order from matching_ids
         tracks_response = [
-            track_to_response_global(tracks_map[tid], in_library=tid in user_library_ids)
+            track_to_response(tracks_map[tid], in_library=tid in user_library_ids)
             for tid in page_ids if tid in tracks_map
         ]
     else:
@@ -901,7 +896,7 @@ async def get_artist_image(
     
     # Priority 2: Try Deezer
     try:
-        deezer_info = await metadata_service.search_deezer_artist(artist_name)
+        deezer_info = await deezer_client.search_artist(artist_name)
         if deezer_info and deezer_info.get("picture_url"):
             logger.debug(f"Artist image from Deezer: {artist_name}")
             return {

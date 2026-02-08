@@ -181,6 +181,52 @@ class DeezerClient:
             return data["data"]
         return []
 
+    async def search_artist(self, artist_name: str) -> Optional[Dict[str, Any]]:
+        """
+        Search Deezer for artist info (for artist avatar).
+        Returns: dict with name, picture_url, deezer_id or None.
+        """
+        if not artist_name:
+            return None
+
+        clean_name = clean_for_search(artist_name)
+        data = await self._request("search/artist", {"q": clean_name, "limit": 5})
+
+        if not data or not data.get("data"):
+            return None
+
+        artists = data["data"]
+
+        # Find best matching artist using shared fuzzy matching
+        for artist in artists:
+            deezer_name = artist.get("name", "")
+            if fuzzy_match_artist(artist_name, deezer_name) >= ARTIST_MATCH_THRESHOLD:
+                picture = (
+                    artist.get("picture_xl")
+                    or artist.get("picture_big")
+                    or artist.get("picture_medium")
+                    or artist.get("picture")
+                )
+                return {
+                    "name": deezer_name,
+                    "picture_url": picture,
+                    "deezer_id": artist.get("id"),
+                }
+
+        # Fallback to first result
+        first = artists[0]
+        picture = (
+            first.get("picture_xl")
+            or first.get("picture_big")
+            or first.get("picture_medium")
+            or first.get("picture")
+        )
+        return {
+            "name": first.get("name"),
+            "picture_url": picture,
+            "deezer_id": first.get("id"),
+        }
+
 
 # Global instance
 deezer_client = DeezerClient()

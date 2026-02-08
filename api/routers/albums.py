@@ -12,10 +12,6 @@ from sqlalchemy import select, func, desc, asc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 from shared.database import get_db
 from shared.models import (
     Track, Album, AlbumTrack, UserLibrary
@@ -267,7 +263,7 @@ async def get_album(
     if not album:
         raise HTTPException(status_code=404, detail="Album not found")
     
-    from api.routers.library import track_to_response, track_to_response_global
+    from api.routers.library import track_to_response
     
     if scope == "global":
         # Get all public tracks from this album
@@ -295,7 +291,7 @@ async def get_album(
         user_library_ids = set(row[0] for row in user_lib_result.all())
         
         tracks = [
-            track_to_response_global(track, in_library=track.id in user_library_ids)
+            track_to_response(track, in_library=track.id in user_library_ids)
             for track, at in rows
         ]
         
@@ -333,7 +329,7 @@ async def get_album(
                         deezer_id=item.get("deezer_id"),
                         in_library=matched_track.id in user_library_ids if matched_track else False,
                         track_id=matched_track.id if matched_track else None,
-                        track=track_to_response_global(matched_track, in_library=matched_track.id in user_library_ids) if matched_track else None,
+                        track=track_to_response(matched_track, in_library=matched_track.id in user_library_ids) if matched_track else None,
                     )
                     full_tracklist.append(tracklist_item)
             except (json.JSONDecodeError, Exception):
@@ -407,13 +403,13 @@ async def get_album(
                     in_library = matched_track.id in user_lib_entries if matched_track else False
                     matched_lib = user_lib_entries.get(matched_track.id) if matched_track else None
                     
-                    # For tracks in library, use track_to_response; for others use track_to_response_global
+                    # For tracks in library, use track_to_response with or without library_entry
                     track_response = None
                     if matched_track:
                         if matched_lib:
                             track_response = track_to_response(matched_track, matched_lib)
                         else:
-                            track_response = track_to_response_global(matched_track, in_library=False)
+                            track_response = track_to_response(matched_track, in_library=False)
                     
                     tracklist_item = AlbumTracklistItem(
                         track_number=item.get("track_number", 0),

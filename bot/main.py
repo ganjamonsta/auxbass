@@ -5,11 +5,6 @@ Uses new modular service architecture.
 """
 import asyncio
 import logging
-import sys
-from pathlib import Path
-
-# Add parent directory to path for shared imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode

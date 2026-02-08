@@ -7,10 +7,6 @@ Uses new modular service architecture.
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 from shared.config import get_settings
 from shared.database import get_session
 from shared.models import User, Track, LibrarySource, ForwardSourceType, UserChannel
@@ -67,7 +63,7 @@ def extract_forward_info(message: Message) -> dict:
         if chat.type == "channel":
             info["source_type"] = ForwardSourceType.CHANNEL
         else:
-            info["source_type"] = ForwardSourceType.CHAT
+            info["source_type"] = ForwardSourceType.SUPERGROUP
         info["source_id"] = chat.id
         info["source_name"] = chat.title or chat.username or str(chat.id)
     
@@ -299,7 +295,7 @@ async def handle_audio(message: Message):
             ForwardSourceType.BOT: "🤖",
             ForwardSourceType.USER: "👤",
             ForwardSourceType.CHANNEL: "📢",
-            ForwardSourceType.CHAT: "👥",
+            ForwardSourceType.SUPERGROUP: "👥",
         }.get(forward_info["source_type"], "📁")
         source_note = f"\n{source_emoji} Источник: <b>{forward_info['source_name']}</b>"
     

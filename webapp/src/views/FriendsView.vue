@@ -320,7 +320,7 @@ import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { getDisplayTitle, getDisplayArtist, getCoverUrl, CoverSize } from '@/utils'
-import api from '@/api/client'
+import api, { socialApi } from '@/api/client'
 import SearchBar from '@/components/ui/SearchBar.vue'
 import { Users, User, Search, Check, X, Music, Folder, Disc3, Lightbulb } from 'lucide-vue-next'
 
@@ -379,7 +379,7 @@ const getInitials = (user) => {
 const loadFollowing = async () => {
   loading.value = true
   try {
-    const response = await api.get('/social/following')
+    const response = await socialApi.getFollowing()
     following.value = response.data.items || []
   } catch (error) {
     console.error('Failed to load following:', error)
@@ -391,7 +391,7 @@ const loadFollowing = async () => {
 const loadFollowers = async () => {
   loading.value = true
   try {
-    const response = await api.get('/social/followers')
+    const response = await socialApi.getFollowers()
     followers.value = response.data.items || []
   } catch (error) {
     console.error('Failed to load followers:', error)
@@ -413,9 +413,7 @@ const searchUsers = async () => {
   
   searching.value = true
   try {
-    const response = await api.get('/social/search', {
-      params: { q: searchQuery.value }
-    })
+    const response = await socialApi.searchUsers(searchQuery.value)
     searchResults.value = response.data.items || []
   } catch (error) {
     console.error('Search failed:', error)
@@ -430,7 +428,7 @@ const followUser = async (user) => {
     return
   }
   try {
-    await api.post('/social/follow', { user_id: user.id })
+    await socialApi.follow(user.id)
     user.is_following = true
     // Add to following list if not there
     if (!following.value.find(u => u.id === user.id)) {
@@ -451,7 +449,7 @@ const unfollowUser = async (user) => {
     return
   }
   try {
-    await api.post('/social/unfollow', { user_id: user.id })
+    await socialApi.unfollow(user.id)
     user.is_following = false
     // Remove from following list
     following.value = following.value.filter(u => u.id !== user.id)
@@ -481,9 +479,7 @@ const loadUserLibrary = async () => {
   if (!selectedUser.value) return
   loadingUserContent.value = true
   try {
-    const response = await api.get(`/social/user/${selectedUser.value.id}/library`, {
-      params: { per_page: 20 }
-    })
+    const response = await socialApi.getUserLibrary(selectedUser.value.id, { per_page: 20 })
     userTracks.value = response.data.items || []
   } catch (error) {
     console.error('Failed to load user library:', error)
@@ -509,9 +505,7 @@ const loadUserAlbums = async () => {
   if (!selectedUser.value) return
   loadingUserContent.value = true
   try {
-    const response = await api.get(`/social/user/${selectedUser.value.id}/albums`, {
-      params: { per_page: 20 }
-    })
+    const response = await socialApi.getUserAlbums(selectedUser.value.id, { per_page: 20 })
     userAlbums.value = response.data.items || []
   } catch (error) {
     console.error('Failed to load user albums:', error)
@@ -527,7 +521,7 @@ const playTrack = (track) => {
 // Load user by ID (for direct navigation from NowPlayingSidebar)
 const loadUserById = async (userId) => {
   try {
-    const response = await api.get(`/social/user/${userId}`)
+    const response = await socialApi.getUser(userId)
     if (response.data) {
       selectedUser.value = response.data
       profileTab.value = 'library'

@@ -9,15 +9,11 @@ import random
 import string
 from urllib.parse import parse_qsl, unquote
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Header, Depends
 from pydantic import BaseModel
 import jwt
-
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.config import get_settings
 from shared.database import get_session, get_db
@@ -44,7 +40,7 @@ auth_codes: dict = {}
 
 def create_jwt_token(user: TelegramUser) -> str:
     """Create JWT token for browser authentication"""
-    expire = datetime.utcnow() + timedelta(days=settings.jwt_expire_days)
+    expire = datetime.now(timezone.utc) + timedelta(days=settings.jwt_expire_days)
     payload = {
         "user_id": user.id,
         "username": user.username,
@@ -52,7 +48,7 @@ def create_jwt_token(user: TelegramUser) -> str:
         "last_name": user.last_name,
         "photo_url": user.photo_url,
         "exp": expire,
-        "iat": datetime.utcnow(),
+        "iat": datetime.now(timezone.utc),
     }
     return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)
 
@@ -109,7 +105,7 @@ def validate_init_data(init_data: str, bot_token: str) -> Optional[dict]:
         
         # Check auth_date (optional: reject if too old)
         auth_date = int(parsed.get("auth_date", 0))
-        now = int(datetime.utcnow().timestamp())
+        now = int(datetime.now(timezone.utc).timestamp())
         if now - auth_date > 86400:  # 24 hours
             return None
         
@@ -141,7 +137,7 @@ def generate_auth_code() -> str:
 
 def cleanup_expired_codes():
     """Remove expired codes from storage"""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     expired = [code for code, data in auth_codes.items() if data["expires"] < now]
     for code in expired:
         del auth_codes[code]
@@ -395,7 +391,7 @@ async def generate_code_for_user(
             "last_name": last_name,
             "username": username,
         },
-        "expires": datetime.utcnow() + timedelta(seconds=expires_in)
+        "expires": datetime.now(timezone.utc) + timedelta(seconds=expires_in)
     }
     
     return CodeGenerated(code=code, expires_in=expires_in)
@@ -418,7 +414,7 @@ async def verify_auth_code(data: CodeVerify):
     code_data = auth_codes[code]
     
     # Check expiration
-    if datetime.utcnow() > code_data["expires"]:
+    if datetime.now(timezone.utc) > code_data["expires"]:
         del auth_codes[code]
         raise HTTPException(status_code=401, detail="Код истёк")
     

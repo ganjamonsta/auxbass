@@ -7,10 +7,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 import asyncio
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 from shared.database import get_session
 from shared.models import Track, Playlist, PlaylistTrack
 

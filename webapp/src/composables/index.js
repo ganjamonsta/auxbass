@@ -3,7 +3,6 @@
  * Re-exports all composables for convenient imports
  */
 
-export { useNavigation } from './useNavigation'
 export { useSearch } from './useSearch'
 export { usePullToRefresh } from './usePullToRefresh'
 export { useModals } from './useModals'
@@ -19,7 +18,3 @@ export { useLayoutScroll } from './useLayoutScroll'
 export { useTrackActions } from './useTrackActions'
 export { usePlaybackActions } from './usePlaybackActions'
 export { useDebouncedSearch } from './useDebouncedSearch'
-
-// Legacy - can be removed after migration
-export { useTrackContextMenu } from './useTrackContextMenu'
-export { usePlaylistContextMenu } from './usePlaylistContextMenu'

@@ -239,4 +239,12 @@ export const playerApi = {
 // Social
 export const socialApi = {
   searchFriends: (search, perPage = 30) => api.get('/social/friends/search', { params: { search, per_page: perPage } }),
+  getFollowing: () => api.get('/social/following'),
+  getFollowers: () => api.get('/social/followers'),
+  searchUsers: (query, page = 1, perPage = 30) => api.get('/social/search', { params: { query, page, per_page: perPage } }),
+  follow: (userId) => api.post('/social/follow', { user_id: userId }),
+  unfollow: (userId) => api.post('/social/unfollow', { user_id: userId }),
+  getUserLibrary: (userId, params = {}) => api.get(`/social/user/${userId}/library`, { params }),
+  getUserAlbums: (userId, params = {}) => api.get(`/social/user/${userId}/albums`, { params }),
+  getUser: (userId) => api.get(`/social/user/${userId}`),
 }

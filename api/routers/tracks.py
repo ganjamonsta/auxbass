@@ -6,17 +6,13 @@ Delegates to library, artists, albums routers where appropriate.
 """
 import logging
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, desc, asc, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.database import get_db
 from shared.models import (
@@ -25,10 +21,13 @@ from shared.models import (
 )
 from shared.matching import normalize_artist
 
+# NOTE: Cross-layer dependency — channel_service requires aiogram Bot.
+# The API lifespan initializes the bot and channel_service.
+# TODO: Extract channel forwarding logic into shared/ layer.
 from bot.services.channels import get_channel_service
 
 from api.routers.auth import get_current_user, require_premium, get_optional_user
-from api.routers.library import track_to_response, track_to_response_global
+from api.routers.library import track_to_response
 from api.schemas.tracks import (
     TrackResponse,
     TracksListResponse,
@@ -598,7 +597,10 @@ async def get_global_tracks(
             )
         )
     
-    count_query = select(func.count(Track.id)).where(Track.is_public == True)
+    count_query = select(func.count(Track.id)).where(
+        Track.is_public == True,
+        Track.is_unavailable == False
+    )
     if search:
         count_query = count_query.where(
             or_(
@@ -624,7 +626,7 @@ async def get_global_tracks(
         user_track_ids = set(lib_result.scalars().all())
     
     return TracksListResponse(
-        items=[track_to_response_global(t, in_library=(t.id in user_track_ids)) for t in tracks],
+        items=[track_to_response(t, in_library=(t.id in user_track_ids)) for t in tracks],
         total=total,
         page=page,
         per_page=per_page,
@@ -822,7 +824,7 @@ async def update_track(
     if data.artist is not None:
         track.artist = data.artist
     
-    track.updated_at = datetime.utcnow()
+    track.updated_at = datetime.now(timezone.utc)
     track.enrichment_status = EnrichmentStatus.PENDING
     
     await db.commit()
@@ -885,7 +887,7 @@ async def like_track(
             track_id=track_id,
             source=LibrarySource.ADDED,
             is_liked=True,
-            liked_at=datetime.utcnow(),
+            liked_at=datetime.now(timezone.utc),
         )
         db.add(entry)
         added_to_library = True
@@ -902,7 +904,7 @@ async def like_track(
             logger.warning(f"Failed to forward track {track_id} to channel: {e}")
     else:
         entry.is_liked = True
-        entry.liked_at = datetime.utcnow()
+        entry.liked_at = datetime.now(timezone.utc)
         await db.commit()
     
     return {"status": "liked", "track_id": track_id, "added_to_library": added_to_library, "forwarded": forwarded}

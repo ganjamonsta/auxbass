@@ -7,15 +7,11 @@ Uses new model structure with AlbumTrack association.
 import json
 import logging
 from typing import Optional, List, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass
 
-from sqlalchemy import select, func, and_, or_, delete, update
+from sqlalchemy import select, func, and_, delete
 from sqlalchemy.orm import selectinload
-
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from shared.database import get_session
 from shared.models import (
@@ -93,7 +89,7 @@ class AlbumService:
             
             # Fuzzy match against candidates
             for candidate in candidates:
-                if fuzzy_match_album(album_name, candidate.name):
+                if fuzzy_match_album(album_name, candidate.name) >= ALBUM_MATCH_THRESHOLD:
                     await self._update_album_if_needed(
                         candidate, cover_url, release_date, full_tracklist
                     )
@@ -133,7 +129,7 @@ class AlbumService:
             album.release_date = release_date
         if full_tracklist and not album.full_tracklist:
             album.full_tracklist = json.dumps(full_tracklist)
-        album.updated_at = datetime.utcnow()
+        album.updated_at = datetime.now(timezone.utc)
     
     async def assign_track_to_album(
         self,

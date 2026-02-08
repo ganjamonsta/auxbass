@@ -8,22 +8,18 @@ Unified service for track management with new model structure:
 """
 import logging
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass
 
 from sqlalchemy import select, func, and_, or_, desc, delete
 from sqlalchemy.orm import selectinload
-
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from shared.database import get_session
 from shared.models import (
     Track, TrackEnrichment, Album, AlbumTrack, User, UserLibrary,
     EnrichmentStatus, LibrarySource, ForwardSourceType
 )
-from shared.matching import normalize_artist, normalize_title
+from shared.matching import normalize_artist
 
 from ..enrichment import enrichment_worker, enrichment_processor
 from ..albums import album_service
@@ -363,7 +359,7 @@ class TrackService:
                     changed = True
             
             if changed:
-                track.updated_at = datetime.utcnow()
+                track.updated_at = datetime.now(timezone.utc)
                 track.enrichment_status = EnrichmentStatus.PENDING
                 
                 # Remove from current albums (will be re-assigned after enrichment)

@@ -78,7 +78,7 @@ export function usePlaylistContextMenu(options = {}) {
       // Загрузить треки плейлиста и запустить воспроизведение
       const tracks = await loadPlaylistTracks(p)
       if (tracks?.length) {
-        playerStore.playTrackList(tracks, 0)
+        playerStore.play(tracks[0], tracks)
         uiStore.toast.success('Воспроизведение', `Играет: ${p.name}`)
       }
     } catch (error) {
@@ -141,7 +141,7 @@ export function usePlaylistContextMenu(options = {}) {
     
     try {
       await playlistsApi.update(p.id, { name: renameValue.value.trim() })
-      await libraryStore.loadPlaylists()
+      await libraryStore.fetchPlaylists()
       uiStore.toast.success('Переименовано', `Плейлист: ${renameValue.value.trim()}`)
       options.onPlaylistRenamed?.(p, renameValue.value.trim())
       closeRenameModal()
@@ -161,7 +161,7 @@ export function usePlaylistContextMenu(options = {}) {
     if (confirm(`Удалить плейлист "${p.name}"?`)) {
       try {
         await playlistsApi.delete(p.id)
-        await libraryStore.loadPlaylists()
+        await libraryStore.fetchPlaylists()
         uiStore.toast.success('Удалено', `Плейлист "${p.name}" удалён`)
         options.onPlaylistDeleted?.(p)
       } catch (error) {
@@ -178,10 +178,10 @@ export function usePlaylistContextMenu(options = {}) {
     
     try {
       if (playlist.is_auto_album) {
-        const response = await albumsApi.getTracks(playlist.id)
+        const response = await albumsApi.getOne(playlist.id)
         return response?.tracks || response || []
       } else {
-        const response = await playlistsApi.getTracks(playlist.id)
+        const response = await playlistsApi.getOne(playlist.id)
         return response?.tracks || response || []
       }
     } catch (error) {

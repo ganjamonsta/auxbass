@@ -4,17 +4,13 @@ TG Player - Deduplication Service
 Service for finding and resolving duplicate tracks.
 """
 import logging
-from typing import List, Dict, Optional, Tuple
+from typing import List, Optional, Tuple
 from collections import defaultdict
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 from shared.database import get_session
-from shared.models import Track, TrackEnrichment, UserLibrary
+from shared.models import Track, UserLibrary
 from shared.matching import normalize_unicode
 
 logger = logging.getLogger(__name__)
@@ -265,7 +261,6 @@ class DeduplicationService:
                      if track and track.uploader_id == user_id:
                          await session.delete(track)
 
-            await session.commit()
             return True
 
     async def delete_single_track(self, track_id: int, user_id: int) -> bool:
@@ -295,7 +290,6 @@ class DeduplicationService:
                 if track and track.uploader_id == user_id:
                     await session.delete(track)
             
-            await session.commit()
             return True
 
     async def find_potential_duplicates(

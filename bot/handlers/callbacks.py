@@ -9,10 +9,6 @@ from aiogram.fsm.context import FSMContext
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 from shared.config import get_settings
 from shared.database import get_session
 from shared.models import Track, Playlist, PlaylistTrack

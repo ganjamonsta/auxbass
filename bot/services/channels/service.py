@@ -8,7 +8,7 @@ Features:
 - Update messages when enrichment completes
 """
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from collections import deque
 from dataclasses import dataclass
 import json
@@ -20,13 +20,10 @@ from aiogram import Bot
 from aiogram.types import Message
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter
 
-import sys
 import asyncio
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from shared.models import (
-    UserChannel, ChannelMessage, Track, TrackEnrichment
+    UserChannel, ChannelMessage, Track
 )
 from shared.matching import generate_hashtags, format_hashtags
 from shared.database import get_session
@@ -141,7 +138,7 @@ class ChannelService:
         item = ForwardQueueItem(
             user_id=user_id,
             track_id=track_id,
-            added_at=datetime.utcnow(),
+            added_at=datetime.now(timezone.utc),
         )
         self._forward_queue.append(item)
         logger.debug(f"Track {track_id} queued for forward (queue size: {len(self._forward_queue)})")
@@ -233,7 +230,7 @@ class ChannelService:
                 existing.channel_username = channel_username
                 existing.channel_title = channel_title
                 existing.is_active = True
-                existing.updated_at = datetime.utcnow()
+                existing.updated_at = datetime.now(timezone.utc)
                 logger.info(f"Channel updated for user {user_id}: {channel_id}")
                 return existing
             
@@ -349,7 +346,7 @@ class ChannelService:
             
             if channel:
                 channel.is_active = False
-                channel.updated_at = datetime.utcnow()
+                channel.updated_at = datetime.now(timezone.utc)
                 return True
             
             return False
@@ -580,7 +577,7 @@ class ChannelService:
                     )
                     
                     msg.hashtags = json.dumps(new_hashtags)
-                    msg.updated_at = datetime.utcnow()
+                    msg.updated_at = datetime.now(timezone.utc)
                     updated += 1
                     
                 except TelegramBadRequest as e:
@@ -730,7 +727,7 @@ class ChannelService:
                     )
                     
                     msg.hashtags = json.dumps(expected_hashtags)
-                    msg.updated_at = datetime.utcnow()
+                    msg.updated_at = datetime.now(timezone.utc)
                     stats["updated"] += 1
                     batch_count += 1
                     

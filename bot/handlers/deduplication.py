@@ -11,10 +11,6 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 from shared.matching import generate_hashtags, format_hashtags
 from shared.models import Track
 from bot.services.deduplication import deduplication_service, get_approx_bitrate, is_hd_version

@@ -10,72 +10,27 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from pydantic import BaseModel
-
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.database import get_db
-from shared.models import Playlist, PlaylistTrack, Track, UserLibrary, AlbumTrack, User, PlaylistSubscription, UserChannel, TrackEnrichment
+from shared.models import Playlist, PlaylistTrack, Track, UserLibrary, AlbumTrack, User, PlaylistSubscription, TrackEnrichment
 from shared.config import get_settings
 
 from api.routers.auth import get_current_user, require_premium
 from api.routers.library import track_to_response
 from api.schemas.common import TelegramUser, PaginatedResponse
 from api.schemas.tracks import TrackResponse
+from api.schemas.playlists import (
+    PlaylistCreate,
+    PlaylistUpdate,
+    PlaylistResponse,
+    PlaylistDetailResponse,
+    PlaylistsListResponse,
+    AddTrackRequest,
+    ReorderRequest,
+)
 
 
 router = APIRouter(tags=["Playlists"])
-
-
-# Schemas
-class PlaylistCreate(BaseModel):
-    name: str
-    description: Optional[str] = None
-    is_public: bool = True  # Default to public
-
-
-class PlaylistUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    is_public: Optional[bool] = None
-
-
-class PlaylistResponse(BaseModel):
-    id: int
-    name: str
-    description: Optional[str] = None
-    track_count: int = 0
-    total_duration: int = 0
-    cover_url: Optional[str] = None
-    covers: List[str] = []  # Array of cover URLs for collage display
-    tags: Optional[List[str]] = None  # Tags aggregated from playlist tracks
-    is_public: bool = False
-    owner_id: Optional[int] = None
-    owner_name: Optional[str] = None
-    is_subscribed: bool = False  # Whether current user is subscribed
-    is_owner: bool = False  # Whether current user is the owner
-    created_at: datetime
-    
-    class Config:
-        from_attributes = True
-
-
-class PlaylistDetailResponse(PlaylistResponse):
-    tracks: List[TrackResponse]
-
-
-class PlaylistsListResponse(PaginatedResponse):
-    items: List[PlaylistResponse]
-
-
-class AddTrackRequest(BaseModel):
-    track_id: int
-
-
-class ReorderRequest(BaseModel):
-    track_ids: List[int]
 
 
 async def get_playlist_info(

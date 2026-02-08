@@ -3,15 +3,11 @@ TG Player API v2 - Entry Point
 
 Uses new modular architecture with separated routers.
 """
-import sys
 import time
 import re
 from pathlib import Path
 from contextlib import asynccontextmanager
 from collections import defaultdict
-
-# Add parent directory to path for shared imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse

@@ -8,7 +8,7 @@ import re
 import time
 import hashlib
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Header, Response
 from fastapi.responses import StreamingResponse
@@ -18,17 +18,13 @@ from sqlalchemy.orm import selectinload
 import aiohttp
 import asyncio
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 from shared.config import get_settings
 from shared.database import get_db
 from shared.models import Track, UserLibrary, ChannelMessage, UserChannel
 from shared.matching import normalize_title, normalize_artist
 
 from .auth import get_current_user
-from .library import is_streamable, is_hd_format, STREAMABLE_MIME_TYPES, HD_MIME_TYPES
+from .library import is_streamable, HD_MIME_TYPES
 from api.schemas.player import StreamUrlResponse, DownloadPlaylistRequest
 from api.schemas.common import TelegramUser
 
@@ -1071,7 +1067,7 @@ async def record_play(
     
     # Increment global play count
     track.play_count = (track.play_count or 0) + 1
-    track.last_played_at = datetime.utcnow()
+    track.last_played_at = datetime.now(timezone.utc)
     
     # Update user's library entry if exists
     lib_entry = await db.scalar(
@@ -1083,7 +1079,7 @@ async def record_play(
     
     if lib_entry:
         lib_entry.play_count = (lib_entry.play_count or 0) + 1
-        lib_entry.last_played_at = datetime.utcnow()
+        lib_entry.last_played_at = datetime.now(timezone.utc)
     
     await db.commit()
     
@@ -1329,7 +1325,7 @@ async def get_player_diagnostics():
         telegram_status = f"error: {type(e).__name__}"
     
     return {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "stream_tokens": {
             "active": active_tokens,
             "expired": expired_tokens,

@@ -5,23 +5,19 @@ User's personal music library endpoints.
 Uses UserLibrary to track user-track relationships.
 """
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, or_, desc, asc
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload, joinedload
-
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from sqlalchemy.orm import selectinload
 
 from shared.database import get_db
 from shared.models import (
     Track, TrackEnrichment, Album, AlbumTrack, User, UserLibrary,
     EnrichmentStatus, LibrarySource
 )
-from shared.matching import normalize_artist, normalize_title
+from shared.matching import normalize_artist
 
 from api.routers.auth import get_current_user, require_premium
 from api.schemas.tracks import (
@@ -83,9 +79,14 @@ def is_hd_format(mime_type: Optional[str]) -> bool:
     return mime_type.lower() in HD_MIME_TYPES
 
 
-def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None) -> TrackResponse:
-    """Convert Track model to response"""
-    # Safe access to relationships - check if loaded to avoid lazy loading errors
+def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None, *, in_library: Optional[bool] = None) -> TrackResponse:
+    """Convert Track model to response. Works for both library and global contexts.
+    
+    Args:
+        track: The Track model
+        library_entry: Optional UserLibrary entry (for user's library tracks)
+        in_library: Override for in_library flag. Auto-detected from library_entry if None.
+    """
     enrichment = track.__dict__.get('enrichment')
     
     # Get first album if any (only if already loaded)
@@ -98,11 +99,11 @@ def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None)
             album_info = {
                 "id": album.id,
                 "name": album.name,
-                "artist": album.artist,  # Album artist (may differ from track artist for remixes)
+                "artist": album.artist,
                 "cover_url": album.cover_url,
             }
     
-    # Determine library source
+    # Extract library context (defaults for global tracks)
     source = None
     added_at = track.created_at
     is_liked = False
@@ -115,31 +116,26 @@ def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None)
         liked_at = library_entry.liked_at
         play_count = library_entry.play_count or 0
     
-    # Check if track is streamable
     track_is_streamable = is_streamable(track.mime_type)
     
-    # Initialize IDs for alternative versions
-    streamable_id = None  # MP3 version if this is HD
-    hd_id = None  # HD version if this is MP3
-    
-    # Note: Alternative version lookup happens on-demand during playback
-    # Here we just set flags and return original track info
-    # The API will auto-substitute during /stream/{track_id} request
+    # Auto-detect in_library from library_entry if not explicitly set
+    if in_library is None:
+        in_library = library_entry is not None
     
     return TrackResponse(
         id=track.id,
         telegram_file_id=track.file_id,
         title=track.title,
         artist=track.artist,
-        file_name=track.file_name,  # Original filename for fallback display
+        file_name=track.file_name,
         duration=track.duration,
         file_size=track.file_size,
         mime_type=track.mime_type,
         library_source=source,
         enrichment_status=track.enrichment_status.value if track.enrichment_status else None,
         is_streamable=track_is_streamable,
-        streamable_id=streamable_id,  # Will be resolved on-demand
-        hd_id=hd_id,  # Will be resolved on-demand
+        streamable_id=None,
+        hd_id=None,
         album=album_info,
         album_name=album_info["name"] if album_info else None,
         cover_url=enrichment.cover_url if enrichment else None,
@@ -150,59 +146,7 @@ def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None)
         liked_at=liked_at,
         play_count=play_count,
         added_at=added_at,
-        in_library=True,  # Track is from user's library
-    )
-
-
-def track_to_response_global(track: Track, in_library: bool = False) -> TrackResponse:
-    """
-    Convert Track model to response for global library.
-    Similar to track_to_response but without library_entry.
-    Uses in_library flag to indicate if user has this track.
-    """
-    enrichment = track.__dict__.get('enrichment')
-    
-    album_info = None
-    album_tracks = track.__dict__.get('album_tracks')
-    if album_tracks:
-        first_album_track = album_tracks[0]
-        album = first_album_track.__dict__.get('album') if first_album_track else None
-        if album:
-            album_info = {
-                "id": album.id,
-                "name": album.name,
-                "artist": album.artist,  # Album artist (may differ from track artist for remixes)
-                "cover_url": album.cover_url,
-            }
-    
-    # Check if track is streamable
-    track_is_streamable = is_streamable(track.mime_type)
-    
-    return TrackResponse(
-        id=track.id,
-        telegram_file_id=track.file_id,
-        title=track.title,
-        artist=track.artist,
-        file_name=track.file_name,  # Original filename for fallback display
-        duration=track.duration,
-        file_size=track.file_size,
-        mime_type=track.mime_type,
-        library_source="global",
-        enrichment_status=track.enrichment_status.value if track.enrichment_status else None,
-        is_streamable=track_is_streamable,
-        streamable_id=None,  # Will be resolved on-demand
-        hd_id=None,  # Will be resolved on-demand
-        album=album_info,
-        album_name=album_info["name"] if album_info else None,
-        cover_url=enrichment.cover_url if enrichment else None,
-        genre=enrichment.genre if enrichment else None,
-        tags=enrichment.tags if enrichment else None,
-        release_date=enrichment.release_date if enrichment else None,
-        is_liked=False,
-        liked_at=None,
-        play_count=0,
-        added_at=track.created_at,
-        in_library=in_library,  # Extra field for global tracks
+        in_library=in_library,
     )
 
 
@@ -521,7 +465,7 @@ async def update_track(
     if changed:
         # Schedule re-enrichment
         track.enrichment_status = EnrichmentStatus.PENDING
-        track.updated_at = datetime.utcnow()
+        track.updated_at = datetime.now(timezone.utc)
     
     await db.commit()
     
@@ -636,7 +580,7 @@ async def like_track(
             track_id=track_id,
             source=LibrarySource.ADDED,
             is_liked=True,
-            liked_at=datetime.utcnow(),
+            liked_at=datetime.now(timezone.utc),
         )
         db.add(lib_entry)
         added_to_library = True
@@ -646,7 +590,7 @@ async def like_track(
     # Toggle like
     lib_entry.is_liked = not lib_entry.is_liked
     if lib_entry.is_liked:
-        lib_entry.liked_at = datetime.utcnow()
+        lib_entry.liked_at = datetime.now(timezone.utc)
     else:
         lib_entry.liked_at = None
     
