@@ -14,7 +14,7 @@
     <!-- Sort options (Stats + SortChips) -->
     <div class="sort-options">
       <div class="stats">
-        {{ virtualGridRef?.total?.value ?? 0 }} альбомов
+        {{ virtualGridRef?.total ?? 0 }} альбомов
       </div>
       <SortChips
         :currentOption="currentOption"
