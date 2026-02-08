@@ -63,7 +63,7 @@ def get_help_player_keyboard() -> InlineKeyboardMarkup:
         )],
         [InlineKeyboardButton(
             text="🌐 Открыть сайт",
-            url="https://aux.ganjacraft.ru"
+            url="https://aux.ganj4craft.ru"
         )]
     ])
 
