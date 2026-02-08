@@ -22,6 +22,7 @@ def utcnow() -> datetime:
     timestamps as naive-UTC which matches the DB schema.
     """
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
 from sqlalchemy import (
     BigInteger, Integer, String, Text, Boolean, 
     DateTime, ForeignKey, UniqueConstraint, Index,
