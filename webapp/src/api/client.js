@@ -184,7 +184,9 @@ export const tracksApi = {
 
 // Playlists
 export const playlistsApi = {
-  getAll: cacheable(() => api.get('/playlists')),
+  getAll: cacheable((params = {}) => api.get('/playlists', { params })),
+  getGlobal: cacheable((params = {}) => api.get('/playlists/global', { params })),
+  getManageAll: cacheable(() => api.get('/playlists/manage/all')),
   getOne: cacheable((id) => api.get(`/playlists/${id}`)),
   // Bypass cache when shuffle is requested to get fresh random order
   // Add timestamp to ensure truly random results on every call

@@ -25,6 +25,12 @@ export const SORT_OPTIONS = {
     { key: 'release_date', label: 'Дата', icon: 'Calendar' },
     { key: 'track_count', label: 'Треки', icon: 'Music' },
   ],
+  // For playlists
+  playlists: [
+    { key: 'created_at', label: 'Дата', icon: 'Calendar' },
+    { key: 'name', label: 'Название', icon: 'Type' },
+    { key: 'track_count', label: 'Треки', icon: 'Music' },
+  ],
 }
 
 /**
@@ -33,6 +39,7 @@ export const SORT_OPTIONS = {
  */
 const DEFAULT_DESC = {
   added_at: true,
+  created_at: true,
   latest_release: true,
   release_date: true,
   track_count: true,
