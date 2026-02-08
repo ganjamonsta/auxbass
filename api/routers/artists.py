@@ -185,55 +185,7 @@ async def get_my_artists(
     
     total = len(aggregated)
     
-    # Only load album data if we need it for sorting or display
-    needs_album_data = sort_by in ("album_count", "latest_release")
-    
-    if needs_album_data:  # Only query albums when actually needed
-        # Get album counts and latest dates efficiently with a single query
-        # Only for artists we'll actually display (after pagination for simple sorts)
-        
-        # For album-based sorts, we need all artists' album data first
-        if sort_by in ("album_count", "latest_release"):
-            normalized_artists = [a["normalized"] for a in aggregated]
-        else:
-            # For name/track_count sorts, pre-sort and get only page artists
-            reverse = (sort_order == "desc")
-            if sort_by == "track_count":
-                aggregated.sort(key=lambda x: x["track_count"], reverse=reverse)
-            else:  # name
-                aggregated.sort(key=lambda x: x["name"].lower(), reverse=reverse)
-            
-            page_items_presort = aggregated[offset:offset + limit]
-            normalized_artists = [a["normalized"] for a in page_items_presort]
-        
-        # Load albums only for relevant artists
-        if normalized_artists:
-            albums_result = await db.execute(
-                select(Album)
-                .where(Album.artist.isnot(None))
-            )
-            all_albums = albums_result.scalars().all()
-            
-            # Build album lookup
-            albums_by_artist: dict[str, list] = defaultdict(list)
-            for album in all_albums:
-                norm = normalize_artist(album.artist)
-                if norm in normalized_artists or sort_by in ("album_count", "latest_release"):
-                    albums_by_artist[norm].append(album)
-            
-            # Update aggregated with album data
-            for item in aggregated:
-                artist_albums = albums_by_artist.get(item["normalized"], [])
-                item["album_count"] = len(artist_albums)
-                item["albums"] = artist_albums
-                
-                # Get latest release date
-                for album in sorted(artist_albums, key=lambda a: a.release_date or "", reverse=True):
-                    if album.release_date:
-                        item["latest_release_date"] = album.release_date
-                        break
-    
-    # Sort (if album-based sort, do it now after loading album data)
+    # Always sort first to determine which artists are on this page
     # Use secondary sort by name for stable pagination
     reverse = (sort_order == "desc")
     if sort_by == "album_count":
@@ -244,6 +196,37 @@ async def get_my_artists(
         aggregated.sort(key=lambda x: (x["track_count"], x["name"].lower()), reverse=reverse)
     else:  # name
         aggregated.sort(key=lambda x: x["name"].lower(), reverse=reverse)
+    
+    # Determine which artists are on this page
+    page_items_presort = aggregated[offset:offset + limit]
+    normalized_artists = [a["normalized"] for a in page_items_presort]
+    
+    # Load albums for artists we'll display (needed for cover_url and album counts)
+    if normalized_artists:
+        albums_result = await db.execute(
+            select(Album)
+            .where(Album.artist.isnot(None))
+        )
+        all_albums = albums_result.scalars().all()
+        
+        # Build album lookup
+        albums_by_artist: dict[str, list] = defaultdict(list)
+        for album in all_albums:
+            norm = normalize_artist(album.artist)
+            if norm in normalized_artists:
+                albums_by_artist[norm].append(album)
+        
+        # Update page items with album data
+        for item in page_items_presort:
+            artist_albums = albums_by_artist.get(item["normalized"], [])
+            item["album_count"] = len(artist_albums)
+            item["albums"] = artist_albums
+            
+            # Get latest release date
+            for album in sorted(artist_albums, key=lambda a: a.release_date or "", reverse=True):
+                if album.release_date:
+                    item["latest_release_date"] = album.release_date
+                    break
     
     # Paginate
     page_items = aggregated[offset:offset + limit]
