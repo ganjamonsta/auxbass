@@ -9,8 +9,6 @@ import unicodedata
 from typing import Optional, List, Tuple
 from functools import lru_cache
 
-from shared.utils import split_artists
-
 
 # ============== Constants ==============
 
@@ -680,6 +678,7 @@ def generate_hashtags(
     
     if artist:
         # Split multiple artists and create separate hashtags for each
+        from shared.utils import split_artists
         artists = split_artists(artist)
         for single_artist in artists:
             tag = artist_to_tag(single_artist)
