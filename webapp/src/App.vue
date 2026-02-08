@@ -380,40 +380,16 @@ onMounted(async () => {
   // Listen for auth:logout events from API interceptor
   window.addEventListener('auth:logout', handleAuthLogout)
   
-  // Initialize auth - check if we're in a Telegram Mini App or have valid token
-  // In Telegram Mini App, initData might be available even if JWT is not in localStorage
-  const tg = window.Telegram?.WebApp
-  const isTelegramMiniApp = !!(tg?.initData)
-  const hasToken = !!localStorage.getItem('tg_player_auth_token')
-  const shouldInitAuth = (isTelegramMiniApp || hasToken) && !authStore.initialized
-  
-  console.log('[App] Init check:', {
-    isTelegramMiniApp,
-    hasToken,
-    initialized: authStore.initialized,
-    shouldInitAuth
-  })
-  
-  if (shouldInitAuth) {
-    try {
-      await authStore.initialize()
-      
-      if (authStore.isAuthenticated) {
-        console.log('[App] Auth successful')
-        
-        // Initialize library after auth
-        await libraryStore.init()
-        
-        // Restore player state if available (persisted queue, track, position)
-        if (playerStore.hasSavedState()) {
-          await playerStore.restoreState()
-        }
-      } else {
-        console.warn('[App] Auth failed - not authenticated after initialize()')
-      }
-    } catch (err) {
-      console.error('[App] Initialization error:', err.message)
-      // Continue - router guard will redirect to login if needed
+  // Initialize auth
+  if (authStore.isAuthenticated && !authStore.initialized) {
+    await authStore.initialize()
+    
+    // Initialize library after auth
+    await libraryStore.init()
+    
+    // Restore player state if available (persisted queue, track, position)
+    if (playerStore.hasSavedState()) {
+      await playerStore.restoreState()
     }
   }
   

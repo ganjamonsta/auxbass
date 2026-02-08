@@ -30,36 +30,21 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
     
     try {
-      console.log('[Auth] Initializing - checking authentication...')
-      
-      // Validate existing auth (send X-Telegram-Init-Data header if available)
+      // Validate existing auth
       const response = await authApi.validate()
-      
       if (response.data?.user) {
-        console.log('[Auth] Authentication successful for user:', response.data.user.id)
         user.value = response.data.user
         authStorage.setUser(response.data.user)
-        
-        // Save JWT token for future browser-based auth (if provided)
-        if (response.data?.token) {
-          authStorage.setToken(response.data.token)
-          console.log('[Auth] JWT token saved for browser auth')
-        }
-        
-        initialized.value = true
-        
-        // Fetch channel status and config after auth
-        await Promise.all([fetchStatus(), fetchConfig()])
-      } else {
-        console.warn('[Auth] Validation returned no user data')
-        throw new Error('No user data in response')
       }
+      initialized.value = true
+      
+      // Fetch channel status and config after auth
+      await Promise.all([fetchStatus(), fetchConfig()])
     } catch (err) {
-      console.error('[Auth] Initialization failed:', err.message)
       // Auth failed - clear storage
       authStorage.clear()
       user.value = null
-      error.value = 'Authentication failed: ' + (err.message || 'Unknown error')
+      error.value = 'Authentication failed'
     } finally {
       loading.value = false
     }

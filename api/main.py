@@ -171,6 +171,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         settings.webapp_url,
+        "https://aux.ganj4craft.ru",
         "https://telegram.org",
         "https://*.telegram.org",
     ],

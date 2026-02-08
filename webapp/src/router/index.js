@@ -106,32 +106,21 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   
-  // Initialize auth on first navigation if we're authenticated or in Telegram Mini App
-  if (!authStore.initialized && !authStore.loading) {
-    const tg = window.Telegram?.WebApp
-    const isTelegramMiniApp = !!(tg?.initData)
-    const hasToken = !!localStorage.getItem('tg_player_auth_token')
-    
-    // Try to initialize if we have any auth credentials
-    if (isTelegramMiniApp || hasToken) {
-      try {
-        console.log('[Router] Initializing auth in beforeEach guard')
-        await authStore.initialize()
-      } catch (e) {
-        console.error('[Router] Auth initialization failed:', e.message)
-        // Auth failed, continue to check
-      }
+  // Initialize auth on first navigation
+  if (!authStore.initialized && authStore.isAuthenticated) {
+    try {
+      await authStore.initialize()
+    } catch (e) {
+      // Auth failed, continue to check
     }
   }
   
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    console.log('[Router] Redirecting to login - not authenticated')
     next({ name: 'login', query: { redirect: to.fullPath } })
     return
   }
   
   if (to.name === 'login' && authStore.isAuthenticated) {
-    console.log('[Router] Redirecting from login to library - already authenticated')
     next({ name: 'library' })
     return
   }

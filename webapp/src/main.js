@@ -5,14 +5,11 @@ import router from './router'
 import './style.css'
 import './styles/index.css'
 
-// Wait for Telegram SDK to load
-function getTelegramWebApp() {
-  return window.Telegram?.WebApp
-}
+// Initialize Telegram WebApp
+const tg = window.Telegram?.WebApp
 
 // Update viewport CSS variables and force layout recalculation
 function updateViewportHeight() {
-  const tg = getTelegramWebApp()
   if (tg) {
     const vh = tg.viewportHeight
     const svh = tg.viewportStableHeight
@@ -31,14 +28,7 @@ function updateViewportHeight() {
   }
 }
 
-function initializeTelegramApp() {
-  const tg = getTelegramWebApp()
-  if (!tg) {
-    console.warn('[TG] Telegram WebApp SDK not available')
-    return
-  }
-  
-  console.log('[TG] Initializing Telegram WebApp')
+if (tg) {
   tg.ready()
   tg.expand()
   
@@ -74,28 +64,11 @@ function initializeTelegramApp() {
   })
 }
 
-// Initialize immediately if SDK is already available, otherwise wait
-if (getTelegramWebApp()) {
-  initializeTelegramApp()
-} else {
-  // Wait up to 5 seconds for SDK to load
-  let attempts = 0
-  const checkSDK = setInterval(() => {
-    if (getTelegramWebApp()) {
-      clearInterval(checkSDK)
-      initializeTelegramApp()
-    } else if (attempts++ > 50) {
-      clearInterval(checkSDK)
-      console.warn('[TG] Telegram WebApp SDK did not load within timeout')
-    }
-  }, 100)
-}
-
 const app = createApp(App)
 app.use(createPinia())
 app.use(router)
 
 // Provide Telegram WebApp globally
-app.provide('telegram', getTelegramWebApp())
+app.provide('telegram', tg)
 
 app.mount('#app')
