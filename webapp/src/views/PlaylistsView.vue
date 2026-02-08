@@ -1,5 +1,13 @@
 <template>
   <div class="playlists-view">
+    <!-- Header with create button -->
+    <div class="header">
+      <h1>Плейлисты</h1>
+      <button class="create-btn" @click="handleCreatePlaylist">
+        <Plus :size="16" /> Создать
+      </button>
+    </div>
+
     <!-- Search -->
     <SearchBar
       v-model="searchQuery"
@@ -15,14 +23,6 @@
         <div class="banner-title">Общая коллекция плейлистов</div>
         <div class="banner-description">Все плейлисты, доступные в системе</div>
       </div>
-    </div>
-
-    <!-- Header with create button -->
-    <div class="header">
-      <h1>Плейлисты</h1>
-      <button class="create-btn" @click="handleCreatePlaylist">
-        <Plus :size="16" /> Создать
-      </button>
     </div>
 
     <!-- Loading state with skeletons -->
