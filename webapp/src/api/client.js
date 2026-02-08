@@ -53,11 +53,19 @@ api.interceptors.request.use((config) => {
   // Prefer Telegram WebApp auth if available
   if (tg?.initData) {
     config.headers['X-Telegram-Init-Data'] = tg.initData
+    if (config.url === '/auth/validate') {
+      console.log('[API] Using Telegram Mini App auth for', config.url)
+    }
   } else {
     // Fall back to JWT token for browser auth
     const token = authStorage.getToken()
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`
+      if (config.url === '/auth/validate') {
+        console.log('[API] Using JWT token auth for', config.url)
+      }
+    } else if (config.url === '/auth/validate') {
+      console.warn('[API] No auth method available for', config.url)
     }
   }
   
