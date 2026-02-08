@@ -86,20 +86,8 @@
       :playlist="playlist"
       @close="showEditModal = false"
       @save="handleSavePlaylist"
-      @delete="showDeleteConfirm = true"
+      @delete="deletePlaylist"
       @update:tracks="handleTracksUpdate"
-    />
-
-    <!-- Delete confirm -->
-    <ConfirmDialog
-      :show="showDeleteConfirm"
-      type="danger"
-      title="Удалить плейлист?"
-      :message="`Вы уверены, что хотите удалить '${playlist?.name}'?`"
-      confirmText="Удалить"
-      cancelText="Отмена"
-      @confirm="deletePlaylist"
-      @cancel="showDeleteConfirm = false"
     />
   </div>
 
@@ -118,7 +106,6 @@ import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useTrackActions, usePlaybackActions } from '@/composables'
 import TrackItem from '@/components/TrackItem.vue'
-import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import EditPlaylistModal from '@/components/EditPlaylistModal.vue'
 import api from '@/api/client'
 import { Music, Check, Plus, Globe } from 'lucide-vue-next'
@@ -141,7 +128,6 @@ const { handleDirectDownload, handleHdNotice, handleLikeTrack } = useTrackAction
 const playlist = ref(null)
 const loading = ref(true)
 const showEditModal = ref(false)
-const showDeleteConfirm = ref(false)
 const subscribing = ref(false)
 
 // Cache-bust helper to force image reload in UI when cover changes

@@ -557,7 +557,7 @@ async def process_playlist_rename(message: Message, state: FSMContext):
     
     async with get_session() as session:
         playlist = await session.get(Playlist, playlist_id)
-        if playlist and playlist.user_id == message.from_user.id:
+        if playlist and playlist.owner_id == message.from_user.id:
             old_name = playlist.name
             playlist.name = new_name
             await message.answer(

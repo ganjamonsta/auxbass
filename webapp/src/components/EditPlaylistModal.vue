@@ -86,11 +86,15 @@
       
       <!-- Footer -->
       <div class="edit-footer">
-        <button class="delete-playlist-btn" @click="$emit('delete')">
+        <button 
+          class="delete-playlist-btn" 
+          :class="{ 'confirm-state': deleteConfirmPending }"
+          @click="handleDeleteClick"
+        >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
             <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
           </svg>
-          <span class="delete-text">Удалить плейлист</span>
+          <span class="delete-text">{{ deleteConfirmPending ? 'Точно удалить?' : 'Удалить плейлист' }}</span>
         </button>
         <button 
           class="save-btn" 
@@ -136,6 +140,25 @@ const isPublic = ref(false)
 const tracks = ref([])
 const saving = ref(false)
 
+// Delete confirmation (double-click pattern)
+const deleteConfirmPending = ref(false)
+let deleteConfirmTimer = null
+
+const handleDeleteClick = () => {
+  if (deleteConfirmPending.value) {
+    // Second click — confirm deletion
+    clearTimeout(deleteConfirmTimer)
+    deleteConfirmPending.value = false
+    emit('delete')
+  } else {
+    // First click — enter confirm state
+    deleteConfirmPending.value = true
+    deleteConfirmTimer = setTimeout(() => {
+      deleteConfirmPending.value = false
+    }, 3000)
+  }
+}
+
 // Search state
 const searchQuery = ref('')
 const searchResults = ref([])
@@ -180,6 +203,8 @@ watch(() => props.show, (show) => {
   if (!show) {
     searchQuery.value = ''
     searchResults.value = []
+    deleteConfirmPending.value = false
+    if (deleteConfirmTimer) clearTimeout(deleteConfirmTimer)
   }
 })
 
@@ -560,6 +585,19 @@ const save = async () => {
 .delete-playlist-btn:hover {
   border-color: var(--danger, #e53935);
   color: var(--danger, #e53935);
+}
+
+.delete-playlist-btn.confirm-state {
+  border-color: var(--danger, #e53935);
+  color: #fff;
+  background: var(--danger, #e53935);
+  animation: pulse-danger 0.3s ease;
+}
+
+@keyframes pulse-danger {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
 }
 
 .save-btn {

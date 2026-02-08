@@ -716,14 +716,14 @@ async def handle_playlist_menu(callback: CallbackQuery):
     async with get_session() as session:
         playlist = await session.get(
             Playlist, playlist_id,
-            options=[selectinload(Playlist.track_associations)]
+            options=[selectinload(Playlist.tracks)]
         )
         
-        if not playlist or playlist.user_id != user_id:
+        if not playlist or playlist.owner_id != user_id:
             await callback.answer("Плейлист не найден", show_alert=True)
             return
         
-        track_count = len(playlist.track_associations) if playlist.track_associations else 0
+        track_count = len(playlist.tracks) if playlist.tracks else 0
         playlist_name = playlist.name
         created_at = playlist.created_at.strftime('%d.%m.%Y')
     
@@ -771,7 +771,7 @@ async def handle_playlist_rename_start(callback: CallbackQuery, state: FSMContex
     async with get_session() as session:
         playlist = await session.get(Playlist, playlist_id)
         
-        if not playlist or playlist.user_id != user_id:
+        if not playlist or playlist.owner_id != user_id:
             await callback.answer("Плейлист не найден", show_alert=True)
             return
         
@@ -803,14 +803,14 @@ async def handle_playlist_delete_confirm(callback: CallbackQuery):
     async with get_session() as session:
         playlist = await session.get(
             Playlist, playlist_id,
-            options=[selectinload(Playlist.track_associations)]
+            options=[selectinload(Playlist.tracks)]
         )
         
-        if not playlist or playlist.user_id != user_id:
+        if not playlist or playlist.owner_id != user_id:
             await callback.answer("Плейлист не найден", show_alert=True)
             return
         
-        track_count = len(playlist.track_associations) if playlist.track_associations else 0
+        track_count = len(playlist.tracks) if playlist.tracks else 0
         playlist_name = playlist.name
     
     await callback.message.edit_text(
@@ -843,7 +843,7 @@ async def handle_playlist_delete(callback: CallbackQuery):
     async with get_session() as session:
         playlist = await session.get(Playlist, playlist_id)
         
-        if not playlist or playlist.user_id != user_id:
+        if not playlist or playlist.owner_id != user_id:
             await callback.answer("Плейлист не найден", show_alert=True)
             return
         
