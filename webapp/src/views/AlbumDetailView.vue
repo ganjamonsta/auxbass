@@ -32,6 +32,16 @@
           </span>
           <span v-else>{{ album.track_count }} треков</span>
         </p>
+        <!-- Album tags from enrichment -->
+        <TagChips
+          v-if="album.tags?.length"
+          :tags="album.tags"
+          :max="4"
+          size="sm"
+          :clickable="true"
+          class="album-tags"
+          @tagClick="handleTagClick"
+        />
       </div>
     </div>
 
@@ -184,6 +194,7 @@ import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useTrackActions, usePlaybackActions } from '@/composables'
 import TrackItem from '@/components/TrackItem.vue'
+import TagChips from '@/components/TagChips.vue'
 import api from '@/api/client'
 import { Disc3, Check, Music, X } from 'lucide-vue-next'
 import { splitArtists, getCoverUrl, CoverSize } from '@/utils/formatters'
@@ -345,6 +356,11 @@ const goToArtistByName = (artistName) => {
   }
 }
 
+// Handle tag click (future: navigate to tag-based playlist)
+const handleTagClick = (tag) => {
+  console.log('[AlbumDetail] Tag clicked:', tag)
+}
+
 // Track actions (handleLikeTrack, handleAddToLibrary, handleDirectDownload, handleHdNotice) 
 // are provided by useTrackActions composable above
 
@@ -478,6 +494,10 @@ watch(
   color: var(--text-tertiary);
   font-size: 13px;
   margin: 0;
+}
+
+.album-tags {
+  margin-top: 8px;
 }
 
 .album-actions {

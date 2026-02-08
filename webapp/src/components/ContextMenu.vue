@@ -31,6 +31,15 @@
               </button>
             </div>
 
+            <!-- Tags (for tracks with enrichment tags) -->
+            <TagChips
+              v-if="menuType === 'track' && data?.tags?.length"
+              :tags="data.tags"
+              :max="5"
+              size="sm"
+              class="menu-tags"
+            />
+
             <!-- Menu Items -->
             <div class="menu-items">
               <!-- ═══ TRACK MENU ═══ -->
@@ -281,6 +290,7 @@ import { usePlayerStore } from '@/stores/player'
 import { getAllTrackArtists } from '@/utils/formatters'
 import PlaylistPicker from '@/components/PlaylistPicker.vue'
 import EditTrackModal from '@/components/EditTrackModal.vue'
+import TagChips from '@/components/TagChips.vue'
 import { 
   X, User, Disc3, Play, ListMusic, Plus, Minus, Pencil, 
   Download, Trash2, FolderOpen, Shuffle, Music, Mic2, ChevronRight, ChevronDown
@@ -696,6 +706,11 @@ const getTracksWord = (count) => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+}
+
+.menu-tags {
+  padding: 4px 16px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .menu-items {

@@ -49,6 +49,7 @@
         <span v-if="!hideArtist" class="track-artist">{{ getDisplayArtist(track) }}</span>
         <span v-if="showAlbum && albumName" class="track-album">{{ albumName }}</span>
         <span v-else-if="track.play_count && !hideArtist" class="play-count">• {{ track.play_count }} прослушиваний</span>
+        <span v-if="firstTag && !compact" class="track-tag-badge">#{{ firstTag }}</span>
       </div>
     </div>
     
@@ -221,6 +222,10 @@ const fileSizeMB = computed(() => {
 
 const albumName = computed(() => {
   return props.track?.album?.name || props.track?.album_name || null
+})
+
+const firstTag = computed(() => {
+  return props.track?.tags?.[0] || null
 })
 </script>
 
@@ -652,5 +657,16 @@ const albumName = computed(() => {
 .track-album::before {
   content: '•';
   margin: 0 4px;
+}
+
+/* ─── Track Tag Badge (inline) ─── */
+.track-tag-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--c-accent, #E53935);
+  opacity: 0.6;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: 4px;
 }
 </style>

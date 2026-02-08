@@ -89,6 +89,16 @@
         </template>
         <span v-else>{{ getDisplayArtist(track) }}</span>
       </p>
+      <!-- Tags from Last.fm enrichment -->
+      <TagChips
+        v-if="track?.tags?.length"
+        :tags="track.tags"
+        :max="4"
+        size="sm"
+        :clickable="true"
+        class="player-tags"
+        @tagClick="handleTagClick"
+      />
     </div>
 
     <!-- Progress bar -->
@@ -268,6 +278,7 @@
 import { ref, computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { getTrackCoverStyle, getTrackInitials, splitArtists, getDisplayTitle, getDisplayArtist, getAllTrackArtists, getCoverUrl, CoverSize } from '@/utils'
+import TagChips from '@/components/TagChips.vue'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useContextMenu } from '@/composables/useContextMenu'
@@ -367,6 +378,13 @@ const goToArtist = (artistName) => {
     router.push(`/artist/${encodeURIComponent(artistName)}`)
     emit('close')
   }
+}
+
+// Navigate to tag (future: tag-based playlist)
+const handleTagClick = (tag) => {
+  // TODO: navigate to tag-based generated playlist view
+  // For now just log it — will be used when tag playlists are implemented
+  console.log('[FullPlayer] Tag clicked:', tag)
 }
 
 // Open track context menu (uses unified context menu)
@@ -840,6 +858,12 @@ const formatTime = (seconds) => {
 .track-artist .artist-sep {
   color: var(--xm-text-secondary);
   opacity: 0.6;
+}
+
+/* ─── Tags ─── */
+.player-tags {
+  justify-content: center;
+  margin-top: 8px;
 }
 
 /* ─── Progress Bar ─── */

@@ -55,12 +55,25 @@
         <span class="meta-value">{{ track.bitrate }} kbps</span>
       </div>
     </div>
+
+    <!-- Tags from Last.fm enrichment -->
+    <TagChips
+      v-if="track?.tags?.length"
+      :tags="track.tags"
+      :max="5"
+      size="md"
+      :wrap="true"
+      :clickable="true"
+      class="track-tags"
+      @tagClick="(tag) => $emit('tagClick', tag)"
+    />
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
 import { splitArtists } from '@/utils/formatters'
+import TagChips from '@/components/TagChips.vue'
 
 const props = defineProps({
   track: Object,
@@ -68,7 +81,7 @@ const props = defineProps({
   isLiked: Boolean
 })
 
-defineEmits(['goToAlbum', 'goToArtist'])
+defineEmits(['goToAlbum', 'goToArtist', 'tagClick'])
 
 // Parse artists into separate names
 const parsedArtists = computed(() => {
@@ -257,5 +270,11 @@ const formatTime = (seconds) => {
 .meta-value.clickable:hover {
   color: #e85c7c;
   text-shadow: 0 2px 4px rgba(232, 92, 124, 0.3);
+}
+
+.track-tags {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #1a1a28;
 }
 </style>
