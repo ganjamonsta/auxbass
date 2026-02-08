@@ -9,6 +9,8 @@ import unicodedata
 from typing import Optional, List, Tuple
 from functools import lru_cache
 
+from shared.utils import split_artists
+
 
 # ============== Constants ==============
 
@@ -675,13 +677,6 @@ def generate_hashtags(
         # Remove spaces and special chars, keep only word characters
         tag = re.sub(r'[^\w]', '', tag)
         return tag if tag and len(tag) > 1 else None
-    
-    def split_artists(artist_str: str) -> List[str]:
-        """Split artist string into individual artists."""
-        # Split by common separators: comma, &, x, vs, feat, ft
-        # But be careful with "x" - it should have spaces around it
-        parts = re.split(r'\s*[,&]\s*|\s+(?:vs\.?|x|feat\.?|ft\.?)\s+', artist_str, flags=re.IGNORECASE)
-        return [p.strip() for p in parts if p.strip()]
     
     if artist:
         # Split multiple artists and create separate hashtags for each

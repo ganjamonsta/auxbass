@@ -419,54 +419,6 @@ async def search_friends_libraries(
     }
 
 
-@router.get("/debug/friend-tracks/{friend_id}")
-async def debug_friend_tracks(
-    friend_id: int,
-    search: Optional[str] = None,
-    user: TelegramUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Debug endpoint to check tracks in friend's library.
-    Shows raw data including exact artist names.
-    """
-    # Get tracks from friend's library
-    query = (
-        select(Track.id, Track.title, Track.artist)
-        .join(UserLibrary, UserLibrary.track_id == Track.id)
-        .where(UserLibrary.user_id == friend_id)
-        .order_by(UserLibrary.added_at.desc())
-        .limit(50)
-    )
-    
-    if search:
-        search_term = f"%{search}%"
-        query = query.where(
-            or_(
-                Track.title.ilike(search_term),
-                Track.artist.ilike(search_term),
-            )
-        )
-    
-    result = await db.execute(query)
-    tracks = result.all()
-    
-    return {
-        "friend_id": friend_id,
-        "search": search,
-        "count": len(tracks),
-        "tracks": [
-            {
-                "id": t.id,
-                "title": t.title,
-                "artist": t.artist,
-                "artist_hex": t.artist.encode('utf-8').hex() if t.artist else None,
-            }
-            for t in tracks
-        ]
-    }
-
-
 # ============== User Profile & Library ==============
 
 @router.get("/user/{user_id}", response_model=UserProfileResponse)

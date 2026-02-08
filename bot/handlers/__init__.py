@@ -1,4 +1,4 @@
 """Bot handlers"""
-from . import commands, audio, callbacks, download
+from . import commands, audio, callbacks, download, deduplication
 
-__all__ = ["commands", "audio", "callbacks", "download"]
+__all__ = ["commands", "audio", "callbacks", "download", "deduplication"]

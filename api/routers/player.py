@@ -1202,7 +1202,7 @@ async def download_playlist(
     if total_batches > 1:
         header_text += f"\n📦 Будет отправлено {total_batches} сообщениями"
     
-    header_url = f"https://api.telegram.org/bot{settings.bot_token}/sendMessage"
+    header_url = f"{settings.telegram_api_url}/bot{settings.bot_token}/sendMessage"
     header_payload = {
         "chat_id": user.id,
         "text": header_text,
@@ -1212,10 +1212,10 @@ async def download_playlist(
     try:
         async with session.post(header_url, json=header_payload) as resp:
             pass  # Header sent
-    except:
+    except Exception:
         pass  # Continue even if header fails
     
-    api_url = f"https://api.telegram.org/bot{settings.bot_token}/sendMediaGroup"
+    api_url = f"{settings.telegram_api_url}/bot{settings.bot_token}/sendMediaGroup"
     
     batch_size = 10
     total_sent = 0
@@ -1251,7 +1251,7 @@ async def download_playlist(
                     # If media group fails, try sending individually
                     for track in batch:
                         try:
-                            single_url = f"https://api.telegram.org/bot{settings.bot_token}/sendAudio"
+                            single_url = f"{settings.telegram_api_url}/bot{settings.bot_token}/sendAudio"
                             single_payload = {
                                 "chat_id": user.id,
                                 "audio": track.file_id,
@@ -1261,7 +1261,7 @@ async def download_playlist(
                             async with session.post(single_url, json=single_payload) as single_resp:
                                 if (await single_resp.json()).get("ok"):
                                     total_sent += 1
-                        except:
+                        except Exception:
                             continue
             
             # Delay between batches to avoid flood limits

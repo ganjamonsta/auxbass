@@ -6,7 +6,6 @@ Uses new modular service architecture.
 """
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
-from typing import Optional
 
 import sys
 from pathlib import Path
@@ -24,7 +23,6 @@ from bot.services.deduplication import (
     get_approx_bitrate_raw,
     is_hd_quality_raw,
     is_hd_version,
-    UploadQualityDecision,
 )
 from bot.services.session import session_manager
 from bot.handlers.keyboards import (
@@ -201,23 +199,23 @@ async def handle_audio(message: Message):
             
             # Format duplicate info
             dup_list = []
-        for idx, dup in enumerate(potential_duplicates[:3]):
-            dup_meta = []
-            if dup.duration:
-                m, s = divmod(dup.duration, 60)
-                dup_meta.append(f"{m}:{s:02d}")
-            if dup.file_size:
-                dup_meta.append(f"{dup.file_size / (1024*1024):.1f}MB")
-            bitrate = get_approx_bitrate(dup)
-            if bitrate:
-                dup_meta.append(f"~{int(bitrate)}kbps")
+            for idx, dup in enumerate(potential_duplicates[:3]):
+                dup_meta = []
+                if dup.duration:
+                    m, s = divmod(dup.duration, 60)
+                    dup_meta.append(f"{m}:{s:02d}")
+                if dup.file_size:
+                    dup_meta.append(f"{dup.file_size / (1024*1024):.1f}MB")
+                bitrate = get_approx_bitrate(dup)
+                if bitrate:
+                    dup_meta.append(f"~{int(bitrate)}kbps")
+                
+                meta_str = " • ".join(dup_meta) if dup_meta else ""
+                dup_list.append(
+                    f"<b>#{idx+1}</b>: {dup.artist or 'Неизвестный'} - {dup.title or 'Без названия'}\n"
+                    f"   └ {meta_str}"
+                )
             
-            meta_str = " • ".join(dup_meta) if dup_meta else ""
-            dup_list.append(
-                f"<b>#{idx+1}</b>: {dup.artist or 'Неизвестный'} - {dup.title or 'Без названия'}\n"
-                f"   └ {meta_str}"
-            )
-        
             dup_text = "\n".join(dup_list)
             
             # Store pending upload data in session

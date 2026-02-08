@@ -10,14 +10,25 @@ from shared.config import get_settings
 router = APIRouter(tags=["Images"])
 settings = get_settings()
 
+# Shared bot instance for image proxy (avoids creating a new Bot per request)
+_image_bot: Bot = None
+
+
+def _get_bot() -> Bot:
+    """Get or create shared bot instance for image proxy."""
+    global _image_bot
+    if _image_bot is None or _image_bot.session.closed:
+        _image_bot = Bot(
+            token=settings.bot_token,
+            default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+        )
+    return _image_bot
+
+
 @router.get("/images/{file_id}")
 async def get_image(file_id: str):
     """Proxy image from Telegram"""
-    # Create bot instance just to get file path
-    bot = Bot(
-        token=settings.bot_token,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML)
-    )
+    bot = _get_bot()
     
     try:
         # Get file path
@@ -25,13 +36,8 @@ async def get_image(file_id: str):
         file_path = file_info.file_path
         
         # Construct download URL
-        # Handle custom API URL (e.g. local server)
         base_url = settings.telegram_api_url.rstrip("/")
-        if "api.telegram.org" in base_url:
-            url = f"{base_url}/file/bot{settings.bot_token}/{file_path}"
-        else:
-            # Local server usually follows same structure
-            url = f"{base_url}/file/bot{settings.bot_token}/{file_path}"
+        url = f"{base_url}/file/bot{settings.bot_token}/{file_path}"
             
         # Download and serve
         async with aiohttp.ClientSession() as session:
@@ -48,9 +54,13 @@ async def get_image(file_id: str):
                 elif file_path.endswith(".webp"):
                     content_type = "image/webp"
                 
-                return Response(content=content, media_type=content_type)
+                return Response(
+                    content=content, 
+                    media_type=content_type,
+                    headers={"Cache-Control": "public, max-age=86400"}  # Cache for 24h
+                )
                 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
-    finally:
-        await bot.session.close()

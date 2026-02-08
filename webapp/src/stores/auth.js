@@ -128,14 +128,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // Listen for logout events from API interceptor
-  window.addEventListener('auth:logout', () => {
-    logout()
-    if (window.location.pathname !== '/login') {
-      window.location.href = '/login'
-    }
-  })
-
   return {
     // State
     user,

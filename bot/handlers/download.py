@@ -129,7 +129,7 @@ async def handle_download_playlist(callback: CallbackQuery):
                         )
                         total_sent += 1
                         await asyncio.sleep(0.3)
-                    except:
+                    except Exception:
                         continue
         
         if total_sent == len(valid_tracks):

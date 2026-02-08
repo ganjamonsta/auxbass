@@ -191,7 +191,7 @@ async def get_my_artists(
     # Only load album data if we need it for sorting or display
     needs_album_data = sort_by in ("album_count", "latest_release")
     
-    if needs_album_data or True:  # Always need for covers, but optimize the query
+    if needs_album_data:  # Only query albums when actually needed
         # Get album counts and latest dates efficiently with a single query
         # Only for artists we'll actually display (after pagination for simple sorts)
         

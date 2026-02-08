@@ -1,19 +1,19 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-// Views
-import LibraryView from '@/views/LibraryView.vue'
-import AlbumsView from '@/views/AlbumsView.vue'
-import ArtistsView from '@/views/ArtistsView.vue'
-import PlaylistsView from '@/views/PlaylistsView.vue'
-import CollectionsView from '@/views/CollectionsView.vue'
-import FriendsView from '@/views/FriendsView.vue'
-import AlbumDetailView from '@/views/AlbumDetailView.vue'
-import ArtistDetailView from '@/views/ArtistDetailView.vue'
-import PlaylistDetailView from '@/views/PlaylistDetailView.vue'
-import LikedTracksView from '@/views/LikedTracksView.vue'
-import FavoritesView from '@/views/FavoritesView.vue'
-import SettingsView from '@/views/SettingsView.vue'
-import LoginView from '@/views/LoginView.vue'
+// Lazy-loaded views
+const LibraryView = () => import('@/views/LibraryView.vue')
+const AlbumsView = () => import('@/views/AlbumsView.vue')
+const ArtistsView = () => import('@/views/ArtistsView.vue')
+const PlaylistsView = () => import('@/views/PlaylistsView.vue')
+const CollectionsView = () => import('@/views/CollectionsView.vue')
+const FriendsView = () => import('@/views/FriendsView.vue')
+const AlbumDetailView = () => import('@/views/AlbumDetailView.vue')
+const ArtistDetailView = () => import('@/views/ArtistDetailView.vue')
+const PlaylistDetailView = () => import('@/views/PlaylistDetailView.vue')
+const LikedTracksView = () => import('@/views/LikedTracksView.vue')
+const FavoritesView = () => import('@/views/FavoritesView.vue')
+const SettingsView = () => import('@/views/SettingsView.vue')
+const LoginView = () => import('@/views/LoginView.vue')
 
 import { useAuthStore } from '@/stores/auth'
 

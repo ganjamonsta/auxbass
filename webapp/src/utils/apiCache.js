@@ -48,7 +48,7 @@ class ApiCache {
     if (url.includes('/tracks/global/stats')) return this.ttls.stats
     if (url.includes('/library/stats')) return this.ttls.stats
     if (url.includes('/tracks/genres')) return this.ttls.genres
-    if (url.includes('/tracks/artists')) return this.ttls.genres
+    if (url.includes('/artists')) return this.ttls.genres
     if (url.includes('/artists/') && url.includes('/info')) return this.ttls.artistDetail
     if (url.includes('/artists/') && url.includes('/tracks')) return this.ttls.artistDetail
     if (url.includes('/artists')) return this.ttls.artists
@@ -156,7 +156,7 @@ class ApiCache {
         
       case 'artist':
         this.invalidatePattern('/artists')
-        this.invalidatePattern('/tracks/artists')
+        this.invalidatePattern('/artists')
         if (id) this.invalidatePattern(`/artists/${id}`)
         break
         

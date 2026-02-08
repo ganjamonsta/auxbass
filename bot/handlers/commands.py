@@ -10,7 +10,6 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 
 import sys
 from pathlib import Path
@@ -148,34 +147,10 @@ async def cmd_login(message: Message):
 @router.message(Command("stats"))
 async def cmd_stats(message: Message):
     """Handle /stats command"""
-    user_id = message.from_user.id
+    from bot.handlers.helpers import format_stats_text
     
-    stats = await track_service.get_library_stats(user_id)
-    
-    # Format duration
-    total_seconds = stats.get("total_duration_seconds", 0)
-    hours = total_seconds // 3600
-    minutes = (total_seconds % 3600) // 60
-    
-    # Enrichment info
-    enrichment = stats.get("enrichment", {})
-    completed = enrichment.get("completed", 0)
-    pending = enrichment.get("pending", 0)
-    failed = enrichment.get("failed", 0)
-    
-    enrichment_text = ""
-    if pending > 0:
-        enrichment_text = f"\n🔄 Обогащение: {pending} в очереди"
-    elif failed > 0:
-        enrichment_text = f"\n⚠️ Не обогащено: {failed} треков"
-    
-    await message.answer(
-        "📊 <b>Статистика библиотеки</b>\n\n"
-        f"🎵 Треков: <b>{stats['total_tracks']}</b>\n"
-        f"💿 Альбомов: <b>{stats['album_count']}</b>\n"
-        f"⏱ Общая длительность: <b>{hours}ч {minutes}мин</b>{enrichment_text}",
-        reply_markup=get_stats_keyboard()
-    )
+    text = await format_stats_text(message.from_user.id)
+    await message.answer(text, reply_markup=get_stats_keyboard())
 
 
 @router.message(Command("channel"))
@@ -544,60 +519,23 @@ async def process_playlist_name(message: Message, state: FSMContext):
 @router.message(Command("playlists", "плейлисты"))
 async def cmd_playlists(message: Message):
     """Handle /playlists command"""
-    user_id = message.from_user.id
+    from bot.handlers.helpers import get_playlist_list_data, format_playlist_list
     
-    async with get_session() as session:
-        result = await session.execute(
-            select(Playlist)
-            .options(selectinload(Playlist.track_associations))
-            .where(Playlist.user_id == user_id)
-            .order_by(Playlist.created_at.desc())
-        )
-        playlists = result.scalars().all()
-        
-        playlist_data = []
-        for pl in playlists[:20]:
-            track_count = len(pl.track_associations) if pl.track_associations else 0
-            playlist_data.append({
-                'id': pl.id,
-                'name': pl.name,
-                'track_count': track_count
-            })
+    playlist_data = await get_playlist_list_data(message.from_user.id)
+    text, keyboard = format_playlist_list(playlist_data)
     
-    if not playlist_data:
-        await message.answer(
-            "📁 <b>Мои плейлисты</b>\n\n"
-            "У тебя пока нет плейлистов.\n\n"
-            "<b>Как создать?</b>\n"
-            "• /playlist — интерактивное создание\n"
-            '• /playlist "Название" — быстрое создание'
-        )
+    if keyboard is None:
+        # No playlists - add creation hints
+        await message.answer(text)
         return
     
-    text = "📁 <b>Мои плейлисты</b>\n\n"
-    keyboard = []
-    
-    for pl in playlist_data:
-        text += f"• <b>{pl['name']}</b> — {pl['track_count']} 🎵\n"
-        
-        keyboard.append([
-            InlineKeyboardButton(
-                text=f"📁 {pl['name']}",
-                callback_data=f"pl:menu:{pl['id']}"
-            )
-        ])
-    
     text += (
-        "\n<b>Управление:</b> нажми на плейлист\n\n"
-        "<b>Создать новый:</b>\n"
+        "\n\n<b>Создать новый:</b>\n"
         "• /playlist — с указанием названия\n"
         '• /playlist "Имя" — быстро'
     )
     
-    await message.answer(
-        text,
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
-    )
+    await message.answer(text, reply_markup=keyboard)
 
 
 @router.message(PlaylistStates.waiting_for_rename)

@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from shared.database import get_session
 from shared.models import Track, TrackEnrichment, UserLibrary
-from shared.matching import normalize_unicode, generate_hashtags
+from shared.matching import normalize_unicode
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +36,7 @@ def get_approx_bitrate(track: Track) -> Optional[float]:
     Calculate approximate bitrate in kbps.
     Returns None if duration or file_size is not available.
     """
-    if not track.duration or not track.file_size or track.duration == 0:
-        return None
-    # file_size in bytes, duration in seconds
-    # bitrate = (file_size * 8) / duration / 1000 = kbps
-    return (track.file_size * 8) / track.duration / 1000
+    return get_approx_bitrate_raw(track.duration, track.file_size)
 
 
 def get_approx_bitrate_raw(duration: Optional[int], file_size: Optional[int]) -> Optional[float]:
@@ -53,6 +49,13 @@ def get_approx_bitrate_raw(duration: Optional[int], file_size: Optional[int]) ->
     return (file_size * 8) / duration / 1000
 
 
+# Lossless audio MIME types (shared constant)
+LOSSLESS_MIME_TYPES = frozenset({
+    'audio/flac', 'audio/x-flac', 'audio/wav', 'audio/x-wav',
+    'audio/alac', 'audio/x-alac', 'audio/aiff', 'audio/x-aiff'
+})
+
+
 def is_hd_quality_raw(duration: Optional[int], file_size: Optional[int], mime_type: Optional[str] = None) -> bool:
     """
     Check if track is likely an HD/lossless version from raw values.
@@ -60,13 +63,9 @@ def is_hd_quality_raw(duration: Optional[int], file_size: Optional[int], mime_ty
     - Higher bitrate (> 500 kbps suggests lossless)
     - FLAC, WAV, ALAC mime types
     """
-    # Check mime type for lossless formats
-    lossless_types = {'audio/flac', 'audio/x-flac', 'audio/wav', 'audio/x-wav', 
-                      'audio/alac', 'audio/x-alac', 'audio/aiff', 'audio/x-aiff'}
-    if mime_type and mime_type.lower() in lossless_types:
+    if mime_type and mime_type.lower() in LOSSLESS_MIME_TYPES:
         return True
     
-    # Check by bitrate (> 500 kbps is likely lossless or high quality)
     bitrate = get_approx_bitrate_raw(duration, file_size)
     if bitrate and bitrate > 500:
         return True
@@ -77,22 +76,9 @@ def is_hd_quality_raw(duration: Optional[int], file_size: Optional[int], mime_ty
 def is_hd_version(track: Track) -> bool:
     """
     Check if track is likely an HD/lossless version.
-    HD versions typically have:
-    - Higher bitrate (> 500 kbps suggests lossless)
-    - FLAC, WAV, ALAC mime types
+    Delegates to is_hd_quality_raw with track fields.
     """
-    # Check mime type for lossless formats
-    lossless_types = {'audio/flac', 'audio/x-flac', 'audio/wav', 'audio/x-wav', 
-                      'audio/alac', 'audio/x-alac', 'audio/aiff', 'audio/x-aiff'}
-    if track.mime_type and track.mime_type.lower() in lossless_types:
-        return True
-    
-    # Check by bitrate (> 500 kbps is likely lossless or high quality)
-    bitrate = get_approx_bitrate(track)
-    if bitrate and bitrate > 500:
-        return True
-    
-    return False
+    return is_hd_quality_raw(track.duration, track.file_size, track.mime_type)
 
 
 def are_same_quality_version(track1: Track, track2: Track) -> bool:

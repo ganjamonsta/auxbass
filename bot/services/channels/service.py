@@ -34,6 +34,36 @@ from shared.database import get_session
 logger = logging.getLogger(__name__)
 
 
+def build_track_caption(track, hashtags=None, *, enrichment_override=None):
+    """Build a standard caption for a track in a channel message.
+    
+    Args:
+        track: Track model instance
+        hashtags: Optional list of hashtag strings
+        enrichment_override: If provided, use this instead of track.enrichment
+    
+    Returns:
+        Caption string or None if no parts
+    """
+    caption_parts = []
+    if hasattr(track, 'has_metadata') and not track.has_metadata:
+        caption_parts.append(f"🎵 {track.display_title}")
+    else:
+        if track.title:
+            caption_parts.append(f"🎵 {track.title}")
+        if track.artist:
+            caption_parts.append(f"👤 {track.artist}")
+        enr = enrichment_override if enrichment_override is not None else getattr(track, 'enrichment', None)
+        if enr and enr.album_name:
+            caption_parts.append(f"💿 {enr.album_name}")
+    
+    if hashtags:
+        caption_parts.append("")
+        caption_parts.append(format_hashtags(hashtags))
+    
+    return "\n".join(caption_parts) if caption_parts else None
+
+
 @dataclass
 class ForwardQueueItem:
     """Item in the forward queue"""
@@ -443,25 +473,7 @@ class ChannelService:
                         extra_tags=enrichment.tags if enrichment else None,
                     )
                 
-                # Build caption (use display_title for tracks without metadata)
-                caption_parts = []
-                if track.has_metadata:
-                    # Track has real metadata - show title/artist/album
-                    if track.title:
-                        caption_parts.append(f"🎵 {track.title}")
-                    if track.artist:
-                        caption_parts.append(f"👤 {track.artist}")
-                    if track.enrichment and track.enrichment.album_name:
-                        caption_parts.append(f"💿 {track.enrichment.album_name}")
-                else:
-                    # No metadata - use filename as title
-                    caption_parts.append(f"🎵 {track.display_title}")
-                
-                if hashtags:
-                    caption_parts.append("")
-                    caption_parts.append(format_hashtags(hashtags))
-                
-                caption = "\n".join(caption_parts) if caption_parts else None
+                caption = build_track_caption(track, hashtags)
                 
                 # Forward the audio
                 sent_message = await use_bot.send_audio(
@@ -557,20 +569,7 @@ class ChannelService:
                     extra_tags=track.enrichment.tags if track.enrichment else None,
                 )
                 
-                # Build new caption
-                caption_parts = []
-                if track.title:
-                    caption_parts.append(f"🎵 {track.title}")
-                if track.artist:
-                    caption_parts.append(f"👤 {track.artist}")
-                if track.enrichment and track.enrichment.album_name:
-                    caption_parts.append(f"💿 {track.enrichment.album_name}")
-                
-                if new_hashtags:
-                    caption_parts.append("")
-                    caption_parts.append(format_hashtags(new_hashtags))
-                
-                caption = "\n".join(caption_parts)
+                caption = build_track_caption(track, new_hashtags)
                 
                 try:
                     await use_bot.edit_message_caption(
@@ -681,20 +680,7 @@ class ChannelService:
                     stats["skipped"] += 1
                     continue  # Already up to date
                 
-                # Build new caption
-                caption_parts = []
-                if track.title:
-                    caption_parts.append(f"🎵 {track.title}")
-                if track.artist:
-                    caption_parts.append(f"👤 {track.artist}")
-                if enrichment and enrichment.album_name:
-                    caption_parts.append(f"💿 {enrichment.album_name}")
-                
-                if expected_hashtags:
-                    caption_parts.append("")
-                    caption_parts.append(format_hashtags(expected_hashtags))
-                
-                caption = "\n".join(caption_parts)
+                caption = build_track_caption(track, expected_hashtags, enrichment_override=enrichment)
                 
                 messages_to_update.append({
                     "msg": msg,
@@ -907,20 +893,7 @@ class ChannelService:
                                 extra_tags=enrichment.tags if enrichment else None,
                             )
                         
-                        # Build caption
-                        caption_parts = []
-                        if track.title:
-                            caption_parts.append(f"🎵 {track.title}")
-                        if track.artist:
-                            caption_parts.append(f"👤 {track.artist}")
-                        if track.enrichment and track.enrichment.album_name:
-                            caption_parts.append(f"💿 {track.enrichment.album_name}")
-                        
-                        if hashtags:
-                            caption_parts.append("")
-                            caption_parts.append(format_hashtags(hashtags))
-                        
-                        caption = "\n".join(caption_parts) if caption_parts else None
+                        caption = build_track_caption(track, hashtags)
                         
                         # Send audio
                         sent_message = await use_bot.send_audio(

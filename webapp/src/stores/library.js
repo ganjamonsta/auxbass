@@ -703,6 +703,22 @@ export const useLibraryStore = defineStore('library', () => {
     selectedUserTracks.value = []
   }
 
+  // Search tracks by query
+  const search = async (query, scope = 'library') => {
+    if (scope === 'global') {
+      await fetchGlobalTracks({ search: query })
+    } else {
+      await fetchTracks({ search: query })
+    }
+  }
+
+  // Clear search results and reload unfiltered
+  const clearSearch = async () => {
+    currentSearchParams.value = {}
+    globalSearchParams.value = {}
+    await fetchTracks()
+  }
+
   return {
     // My library
     tracks,
@@ -775,6 +791,10 @@ export const useLibraryStore = defineStore('library', () => {
     addToLibrary,
     removeFromLibrary,
     isInLibrary,
+    
+    // Search
+    search,
+    clearSearch,
     
     // Cache management
     clearApiCache: () => apiCache.clear(),

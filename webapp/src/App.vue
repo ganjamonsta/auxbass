@@ -188,7 +188,6 @@ import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
 import { useModals } from '@/composables/useModals'
 import PageHeader from '@/components/PageHeader.vue'
-import MiniPlayer from '@/components/MiniPlayer.vue'
 import FullPlayer from '@/components/FullPlayer.vue'
 import ChannelBanner from '@/components/ChannelBanner.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
@@ -346,6 +345,7 @@ const handleGoToUser = (user) => {
 
 // Handle auth:logout event (triggered by API interceptor on 401)
 const handleAuthLogout = () => {
+  authStore.logout()
   playerStore.stop()
   // Force full page reload to clear all store states
   window.location.href = '/login'
