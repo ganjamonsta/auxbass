@@ -1,5 +1,22 @@
 <template>
   <div class="playlists-view">
+    <!-- Search -->
+    <SearchBar
+      v-model="searchQuery"
+      placeholder="Поиск плейлистов..."
+    />
+
+    <!-- Info banner for global scope -->
+    <div class="info-banner">
+      <div class="banner-icon">
+        <FileText :size="20" />
+      </div>
+      <div class="banner-text">
+        <div class="banner-title">Общая коллекция плейлистов</div>
+        <div class="banner-description">Все плейлисты, доступные в системе</div>
+      </div>
+    </div>
+
     <!-- Header with create button -->
     <div class="header">
       <h1>Плейлисты</h1>
@@ -7,12 +24,6 @@
         <Plus :size="16" /> Создать
       </button>
     </div>
-
-    <!-- Search -->
-    <SearchBar
-      v-model="searchQuery"
-      placeholder="Поиск плейлистов..."
-    />
 
     <!-- Loading state with skeletons -->
     <div v-if="loading" class="media-grid type-playlist">
@@ -243,6 +254,47 @@ const openModal = async () => {
 <style scoped>
 .playlists-view {
   padding: 16px;
+}
+
+/* Info banner */
+.info-banner {
+  display: flex;
+  align-items: start;
+  gap: 12px;
+  padding: 16px;
+  background: var(--c-bg-2);
+  border-radius: 12px;
+  margin-bottom: 16px;
+  border: 1px solid var(--c-bg-3);
+}
+
+.banner-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: #000;
+  border-radius: 10px;
+}
+
+.banner-text {
+  flex: 1;
+}
+
+.banner-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-text-1);
+  margin-bottom: 4px;
+}
+
+.banner-description {
+  font-size: 13px;
+  color: var(--c-text-2);
+  line-height: 1.4;
 }
 
 .header {
