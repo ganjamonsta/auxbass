@@ -1,15 +1,12 @@
 <template>
   <div class="library-albums">
     <!-- Info banner for global scope -->
-    <div v-if="scope === 'global'" class="info-banner">
-      <div class="banner-icon">
-        <Disc3 :size="20" />
-      </div>
-      <div class="banner-text">
-        <div class="banner-title">Общая коллекция альбомов</div>
-        <div class="banner-description">Все альбомы, доступные в системе</div>
-      </div>
-    </div>
+    <InfoBanner
+      v-if="scope === 'global'"
+      :icon="Disc3"
+      title="Общая коллекция альбомов"
+      description="Все альбомы, доступные в системе"
+    />
 
     <!-- Sort options (Stats + SortChips) -->
     <div class="sort-options">
@@ -52,6 +49,7 @@ import { useSort } from '@/composables'
 import { useContextMenu } from '@/composables/useContextMenu'
 import SortChips from '@/components/SortChips.vue'
 import VirtualGrid from '@/components/VirtualGrid.vue'
+import InfoBanner from '@/components/InfoBanner.vue'
 import api from '@/api/client'
 import { Disc3 } from 'lucide-vue-next'
 
@@ -177,47 +175,6 @@ defineExpose({
 <style scoped>
 .library-albums {
   padding-bottom: 20px;
-}
-
-/* Info banner for global scope */
-.info-banner {
-  display: flex;
-  align-items: start;
-  gap: 12px;
-  padding: 16px;
-  background: var(--c-bg-2);
-  border-radius: 12px;
-  margin-bottom: 16px;
-  border: 1px solid var(--c-bg-3);
-}
-
-.banner-icon {
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--accent);
-  color: #000;
-  border-radius: 10px;
-}
-
-.banner-text {
-  flex: 1;
-}
-
-.banner-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--c-text-1);
-  margin-bottom: 4px;
-}
-
-.banner-description {
-  font-size: 13px;
-  color: var(--c-text-2);
-  line-height: 1.4;
 }
 
 .sort-options {

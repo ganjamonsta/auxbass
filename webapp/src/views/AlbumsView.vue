@@ -1,59 +1,31 @@
 <template>
-  <div class="albums-view">
+  <div class="collection-view">
     <!-- Search -->
     <SearchBar
       v-model="searchQuery"
       placeholder="Поиск альбомов..."
-      @input="debouncedSearch"
+      @input="search"
     />
 
     <!-- Unified albums component with global scope -->
     <LibraryAlbums
-      ref="albumsRef"
+      ref="contentRef"
       scope="global"
-      :searchQuery="debouncedSearchQuery"
+      :searchQuery="debouncedQuery"
     />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import { useDebouncedSearch } from '@/composables'
+import { useCollectionView } from '@/composables'
 import SearchBar from '@/components/ui/SearchBar.vue'
 import LibraryAlbums from '@/components/library/LibraryAlbums.vue'
 
-// Refs to child components
-const albumsRef = ref(null)
-
-// Debounced search using composable
-const { 
-  query: searchQuery, 
-  debouncedQuery: debouncedSearchQuery, 
-  search: debouncedSearch, 
-  clear: clearSearch 
-} = useDebouncedSearch()
-
-// Обработчик сброса состояния
-const handleResetState = (event) => {
-  if (event.detail.route === '/albums') {
-    // Сбрасываем поиск
-    clearSearch()
-    // Сбрасываем компонент
-    albumsRef.value?.reset()
-  }
-}
-
-onMounted(() => {
-  window.addEventListener('reset-view-state', handleResetState)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('reset-view-state', handleResetState)
-})
+const { searchQuery, debouncedQuery, search, contentRef } = useCollectionView('/albums')
 </script>
 
 <style scoped>
-.albums-view {
+.collection-view {
   padding: 16px;
 }
 </style>

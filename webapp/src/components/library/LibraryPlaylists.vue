@@ -1,80 +1,61 @@
 <template>
   <div class="library-playlists">
-    <!-- Header with create button (if needed, or just keep it floating/top) -->
+    <!-- Info banner for global scope -->
+    <InfoBanner
+      v-if="scope === 'global'"
+      :icon="FileText"
+      title="Общая коллекция плейлистов"
+      description="Все плейлисты, доступные в системе"
+    />
+
+    <!-- Actions header -->
     <div class="actions-header">
-       <div class="liked-quick-access" @click="goToLiked">
-        <div class="liked-icon"><Heart :size="20" class="heart-icon" /></div>
-        <span>Любимое ({{ likedCount }})</span>
+      <div class="stats">
+        {{ filteredPlaylists.length }} плейлистов
       </div>
-      <button class="create-btn" @click="showCreateModal = true">
+      <button class="create-btn" @click="handleCreatePlaylist">
         <Plus :size="16" /> Создать
       </button>
     </div>
 
     <!-- Loading state with skeletons -->
     <div v-if="loading" class="playlists-grid">
-      <!-- Liked card skeleton -->
-      <div class="playlist-card liked-card skeleton-liked">
-        <div class="playlist-cover liked-cover"></div>
-        <div class="skeleton-text"></div>
-        <div class="skeleton-meta"></div>
-      </div>
-      <GridSkeleton v-for="i in 8" :key="i" type="playlist" />
+      <GridSkeleton v-for="i in 9" :key="i" type="playlist" />
     </div>
 
     <!-- Playlists grid -->
-    <div class="playlists-grid" v-else-if="playlists.length">
-        <!-- Liked tracks special card - maybe redundant if we have quick access above, but consistent with PlaylistsView -->
-        <!-- Actually I moved liked card to `actions-header` or keep it in grid? -->
-        <!-- PlaylistsView has it as a special card. Let's keep consistency. -->
-      <div class="playlist-card liked-card" @click="goToLiked">
-        <div class="playlist-cover liked-cover">
-          <span class="liked-icon"><Heart :size="24" class="heart-icon" /></span>
-        </div>
-        <div class="playlist-name">Понравившиеся</div>
-        <div class="playlist-meta">{{ likedCount }} треков</div>
-      </div>
-
-      <div
-        v-for="playlist in playlists"
-        :key="playlist.id"
-        class="playlist-card"
-        :class="{ 'subscribed-playlist': playlist.is_subscribed }"
-        @click="goToPlaylist(playlist)"
-        @contextmenu.prevent="openMenu('playlist', playlist, 'library', $event)"
-      >
-        <div class="playlist-cover">
-          <div class="cover-grid" :class="{ 'single-cover': playlist.covers?.length === 1 }" v-if="playlist.covers?.length">
-            <img
-              v-for="(cover, i) in playlist.covers.slice(0, 4)"
-              :key="i"
-              :src="getCoverUrl(cover, CoverSize.SMALL)"
-            />
+    <MediaGrid
+      v-else
+      type="playlist"
+      :items="filteredPlaylists"
+      :loading="false"
+      @click="goToPlaylist"
+      @contextmenu="handleContextMenu"
+    >
+      <template #prepend-grid>
+        <!-- Liked tracks special card -->
+        <div class="playlist-card liked-card" @click="goToLiked">
+          <div class="playlist-cover liked-cover">
+            <span class="liked-icon"><Heart :size="24" class="heart-icon" /></span>
           </div>
-          <div v-else class="cover-placeholder"><Music :size="24" /></div>
-          <div v-if="playlist.is_subscribed" class="subscribed-badge" title="Подписан"><Link :size="14" /></div>
+          <div class="playlist-name">Понравившиеся</div>
+          <div class="playlist-meta">{{ likedCount }} треков</div>
         </div>
-        <div class="playlist-name">{{ playlist.name }}</div>
-        <div class="playlist-meta">
-          <span>{{ playlist.track_count }} треков</span>
-          <span v-if="playlist.owner_name" class="owner-tag">от {{ playlist.owner_name }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Empty state -->
-    <div v-else-if="!loading" class="empty-state">
-      <span class="empty-icon"><FileText :size="48" /></span>
-      <h3 v-if="searchQuery">Плейлисты не найдены</h3>
-      <template v-else>
-         <p>У вас пока нет плейлистов</p>
-         <button class="create-first-btn" @click="showCreateModal = true">
-            Создать плейлист
-         </button>
       </template>
-    </div>
 
-
+      <template #empty>
+        <div class="empty-state">
+          <span class="empty-icon"><FileText :size="48" /></span>
+          <h3 v-if="searchQuery">Плейлисты не найдены</h3>
+          <template v-else>
+            <p>У вас пока нет плейлистов</p>
+            <button class="create-first-btn" @click="handleCreatePlaylist">
+              Создать плейлист
+            </button>
+          </template>
+        </div>
+      </template>
+    </MediaGrid>
 
     <!-- Create modal -->
     <div v-if="showCreateModal" class="modal-overlay" @click.self="closeModal">
@@ -104,14 +85,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onActivated, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
+import { useAuthStore } from '@/stores/auth'
 import { useContextMenu } from '@/composables/useContextMenu'
-import { getCoverUrl, CoverSize } from '@/utils'
 import api from '@/api/client'
-import { Heart, Plus, Music, Link, FileText } from 'lucide-vue-next'
+import { Heart, Plus, FileText } from 'lucide-vue-next'
+import MediaGrid from '@/components/MediaGrid.vue'
 import GridSkeleton from '@/components/GridSkeleton.vue'
+import InfoBanner from '@/components/InfoBanner.vue'
 
 // Universal context menu
 const { openMenu } = useContextMenu()
@@ -120,11 +103,17 @@ const props = defineProps({
   searchQuery: {
     type: String,
     default: ''
+  },
+  scope: {
+    type: String,
+    default: 'library',
+    validator: v => ['library', 'global'].includes(v)
   }
 })
 
 const router = useRouter()
 const libraryStore = useLibraryStore()
+const authStore = useAuthStore()
 
 const playlists = ref([])
 const loading = ref(true)
@@ -132,58 +121,64 @@ const showCreateModal = ref(false)
 const newPlaylistName = ref('')
 const nameInput = ref(null)
 const likedCount = ref(0)
-const fullPlaylists = ref([]) // Store full list for local search if needed
 
-const loadPlaylists = async () => {
-    loading.value = true
-    try {
-        // Fetch liked count
-        const likedRes = await api.get('/tracks/liked') 
-        likedCount.value = likedRes.data.total
-        
-        await libraryStore.fetchPlaylists() // Populates libraryStore.playlists
-        playlists.value = libraryStore.playlists
-        fullPlaylists.value = libraryStore.playlists 
-        
-        // Filter if query exists
-        if (props.searchQuery) {
-            playlists.value = fullPlaylists.value.filter(p => p.name.toLowerCase().includes(props.searchQuery.toLowerCase()))
-        }
-        
-    } finally {
-        loading.value = false
-    }
-}
-
-watch(() => props.searchQuery, (query) => {
-    if (!query) {
-        playlists.value = fullPlaylists.value
-    } else {
-        playlists.value = fullPlaylists.value.filter(p => p.name.toLowerCase().includes(query.toLowerCase()))
-    }
+// Filtered playlists based on search
+const filteredPlaylists = computed(() => {
+  if (!props.searchQuery) return playlists.value
+  const query = props.searchQuery.toLowerCase()
+  return playlists.value.filter(p => p.name.toLowerCase().includes(query))
 })
 
-const createPlaylist = async () => {
-  if (!newPlaylistName.value.trim()) return
-  
+// Context menu
+const handleContextMenu = ({ item, event }) => {
+  openMenu('playlist', item, props.scope, event)
+}
+
+// Handle create playlist - check for channel
+const handleCreatePlaylist = () => {
+  if (!authStore.hasChannel) {
+    authStore.promptChannelSetup()
+    return
+  }
+  showCreateModal.value = true
+}
+
+// Load playlists — with cache busting for covers
+const loadPlaylists = async () => {
+  loading.value = true
   try {
-    const response = await api.post('/playlists', {
-      name: newPlaylistName.value
-    })
-    
-    closeModal()
-    loadPlaylists() // Reload
-    // Optionally push to router? No, stay here.
-  } catch (error) {
-    console.error('Failed to create playlist:', error)
+    const response = await api.get('/playlists')
+    const raw = response.data.items || response.data
+    const stamp = Date.now()
+    const bust = (url) => {
+      if (!url) return null
+      const sep = url.includes('?') ? '&' : '?'
+      return `${url}${sep}_cb=${stamp}`
+    }
+    playlists.value = raw.map(p => ({
+      ...p,
+      cover_url: bust(p.cover_url),
+      covers: (p.covers || (p.cover_url ? [p.cover_url] : [])).map(bust)
+    }))
+
+    // Update library store cache
+    libraryStore.playlists = playlists.value
+  } finally {
+    loading.value = false
   }
 }
 
-const closeModal = () => {
-  showCreateModal.value = false
-  newPlaylistName.value = ''
+// Load liked count
+const loadLikedCount = async () => {
+  try {
+    await libraryStore.fetchLikedTracks()
+    likedCount.value = libraryStore.likedTracks?.length || 0
+  } catch (e) {
+    console.error('Failed to load liked count:', e)
+  }
 }
 
+// Navigation
 const goToPlaylist = (playlist) => {
   router.push(`/playlist/${playlist.id}`)
 }
@@ -192,137 +187,121 @@ const goToLiked = () => {
   router.push('/liked')
 }
 
-// Watch for modal open to focus input
+// Modal
+const closeModal = () => {
+  showCreateModal.value = false
+  newPlaylistName.value = ''
+}
+
+const createPlaylist = async () => {
+  if (!newPlaylistName.value.trim()) return
+  
+  try {
+    const response = await api.post('/playlists', {
+      name: newPlaylistName.value.trim(),
+      is_public: props.scope === 'global'
+    })
+    playlists.value.unshift(response.data)
+    closeModal()
+    router.push(`/playlist/${response.data.id}`)
+  } catch (error) {
+    console.error('Failed to create playlist:', error)
+  }
+}
+
+// Sync cover updates from libraryStore
+watch(
+  () => libraryStore.playlists,
+  (storePlaylists) => {
+    if (!storePlaylists?.length || !playlists.value?.length) return
+    for (const sp of storePlaylists) {
+      const local = playlists.value.find(p => p.id === sp.id)
+      if (!local) continue
+      if (JSON.stringify(sp.covers) !== JSON.stringify(local.covers)) {
+        local.covers = sp.covers
+      }
+      if (sp.name !== local.name) {
+        local.name = sp.name
+      }
+    }
+  },
+  { deep: true }
+)
+
+// Focus input when modal opens
 watch(showCreateModal, (val) => {
   if (val) {
-    nextTick(() => {
-      nameInput.value?.focus()
-    })
+    nextTick(() => nameInput.value?.focus())
   }
 })
 
 onMounted(() => {
   loadPlaylists()
+  loadLikedCount()
+})
+
+// Reload on keep-alive re-enter
+onActivated(() => {
+  loadPlaylists()
+})
+
+// Expose for parent reset
+defineExpose({
+  reset: () => loadPlaylists(),
+  refresh: () => loadPlaylists()
 })
 </script>
 
 <style scoped>
 .library-playlists {
-    padding-bottom: 20px;
+  padding-bottom: 20px;
 }
+
 .actions-header {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    margin-bottom: 16px;
-}
-
-.liked-quick-access {
-    display: none; /* Hide in header, show in grid instead */
-}
-
-.create-btn {
-    padding: 10px 16px;
-    background: var(--accent);
-    border: none;
-    border-radius: 20px;
-    color: #000;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform 0.2s, opacity 0.2s;
-    width: auto !important;
-    max-width: fit-content;
-}
-
-.create-btn:hover {
-    opacity: 0.9;
-}
-
-.create-btn:active {
-    transform: scale(0.97);
-}
-
-/* Reusing PlaylistsView styles */
-.playlists-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
   gap: 12px;
 }
 
-@media (min-width: 400px) {
-  .playlists-grid {
-    gap: 16px;
-  }
+.stats {
+  color: var(--text-secondary);
+  font-size: 14px;
 }
 
-@media (min-width: 500px) {
-  .playlists-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-@media (min-width: 700px) {
-  .playlists-grid {
-    grid-template-columns: repeat(5, 1fr);
-    gap: 20px;
-  }
-}
-
-@media (min-width: 900px) {
-  .playlists-grid {
-    grid-template-columns: repeat(6, 1fr);
-  }
-}
-
-.playlist-card {
+.create-btn {
+  padding: 10px 16px;
+  background: var(--accent);
+  border: none;
+  border-radius: 20px;
+  color: #000;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  transition: transform 0.2s;
-}
-
-.playlist-card:active {
-  transform: scale(0.98);
-}
-
-.playlist-cover {
-  position: relative;
-  aspect-ratio: 1;
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--bg-elevated);
-  margin-bottom: 8px;
-}
-
-.cover-placeholder {
+  transition: transform 0.2s, opacity 0.2s;
+  width: auto !important;
+  max-width: fit-content;
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  font-size: 40px;
+  gap: 4px;
 }
 
-.cover-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-  width: 100%;
-  height: 100%;
+.create-btn:hover {
+  opacity: 0.9;
 }
 
-.cover-grid.single-cover {
-  grid-template-columns: 1fr;
-  grid-template-rows: 1fr;
+.create-btn:active {
+  transform: scale(0.97);
 }
 
-.cover-grid img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+/* Liked card */
+.liked-card {
+  cursor: pointer;
 }
 
-.liked-card .playlist-cover {
-  background: linear-gradient(135deg, #7c3aed, #a855f7);
+.liked-cover {
+  background: linear-gradient(135deg, #7c3aed, #a855f7) !important;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -345,51 +324,36 @@ onMounted(() => {
 .playlist-meta {
   font-size: 11px;
   color: var(--text-secondary);
+}
+
+/* Empty state */
+.empty-state {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-}
-
-.owner-tag {
-  font-size: 10px;
-  color: var(--text-tertiary);
-}
-
-.subscribed-playlist .playlist-cover {
-  position: relative;
-}
-
-.subscribed-badge {
-  position: absolute;
-  bottom: 4px;
-  right: 4px;
-  width: 20px;
-  height: 20px;
-  background: var(--accent);
-  border-radius: 50%;
-  display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  padding: 48px 24px;
+  text-align: center;
 }
 
-.loading {
-  display: flex;
-  justify-content: center;
-  padding: 24px;
+.empty-icon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 16px;
 }
 
-.spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--bg-highlight);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+.create-first-btn {
+  margin-top: 16px;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 20px;
+  padding: 12px 24px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
-/* Modal styles - should be global? Keeping scoped for safety */
+/* Modal */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -400,96 +364,73 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 1000;
+  padding: 16px;
 }
 
 .modal {
-  background: var(--bg-card);
+  background: var(--bg-elevated, var(--c-bg-2));
+  border-radius: 16px;
   padding: 24px;
-  border-radius: 12px;
-  width: 90%;
-  max-width: 400px;
+  width: 100%;
+  max-width: 360px;
 }
 
 .modal h2 {
-  margin-top: 0;
-  margin-bottom: 16px;
+  margin: 0 0 20px 0;
+  font-size: 20px;
   color: var(--text-primary);
 }
 
 .modal input {
   width: 100%;
-  padding: 12px;
-  background: var(--bg-input);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  padding: 14px 16px;
+  background: var(--bg-primary, var(--c-bg-1));
+  border: 1px solid var(--border-color, var(--c-bg-3));
+  border-radius: 10px;
   color: var(--text-primary);
-  margin-bottom: 16px;
   font-size: 16px;
+  margin-bottom: 20px;
+}
+
+.modal input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.modal input:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 .modal-actions {
   display: flex;
-  justify-content: flex-end;
   gap: 12px;
 }
 
-.modal button {
-  padding: 8px 16px;
-  border-radius: 6px;
-  border: none;
+.cancel-btn {
+  flex: 1;
+  padding: 12px;
+  border-radius: 10px;
   font-weight: 500;
   cursor: pointer;
-}
-
-.cancel-btn {
+  border: 1px solid var(--border-color, var(--c-bg-3));
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--text-primary);
 }
 
 .confirm-btn {
+  flex: 1;
+  padding: 12px;
   background: var(--accent);
-  color: white;
+  border: none;
+  border-radius: 10px;
+  color: #000;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .confirm-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px 24px;
-  text-align: center;
-}
-
-/* Skeleton styles */
-.skeleton-liked .playlist-cover {
-  background: var(--bg-tertiary);
-}
-
-.skeleton-text {
-  height: 14px;
-  width: 80%;
-  background: var(--bg-tertiary);
-  border-radius: 4px;
-  margin-top: 8px;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-.skeleton-meta {
-  height: 12px;
-  width: 50%;
-  background: var(--bg-tertiary);
-  border-radius: 4px;
-  margin-top: 6px;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.7; }
 }
 </style>
