@@ -20,7 +20,7 @@ import asyncio
 
 from shared.config import get_settings
 from shared.database import get_db
-from shared.models import Track, UserLibrary, ChannelMessage, UserChannel
+from shared.models import Track, UserLibrary, ChannelMessage, UserChannel, utcnow
 from shared.matching import normalize_title, normalize_artist
 
 from .auth import get_current_user
@@ -1067,7 +1067,7 @@ async def record_play(
     
     # Increment global play count
     track.play_count = (track.play_count or 0) + 1
-    track.last_played_at = datetime.now(timezone.utc)
+    track.last_played_at = utcnow()
     
     # Update user's library entry if exists
     lib_entry = await db.scalar(
@@ -1079,7 +1079,7 @@ async def record_play(
     
     if lib_entry:
         lib_entry.play_count = (lib_entry.play_count or 0) + 1
-        lib_entry.last_played_at = datetime.now(timezone.utc)
+        lib_entry.last_played_at = utcnow()
     
     await db.commit()
     

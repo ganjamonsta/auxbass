@@ -23,7 +23,7 @@ from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, Teleg
 import asyncio
 
 from shared.models import (
-    UserChannel, ChannelMessage, Track
+    UserChannel, ChannelMessage, Track, utcnow
 )
 from shared.matching import generate_hashtags, format_hashtags
 from shared.database import get_session
@@ -230,7 +230,7 @@ class ChannelService:
                 existing.channel_username = channel_username
                 existing.channel_title = channel_title
                 existing.is_active = True
-                existing.updated_at = datetime.now(timezone.utc)
+                existing.updated_at = utcnow()
                 logger.info(f"Channel updated for user {user_id}: {channel_id}")
                 return existing
             
@@ -346,7 +346,7 @@ class ChannelService:
             
             if channel:
                 channel.is_active = False
-                channel.updated_at = datetime.now(timezone.utc)
+                channel.updated_at = utcnow()
                 return True
             
             return False
@@ -577,7 +577,7 @@ class ChannelService:
                     )
                     
                     msg.hashtags = json.dumps(new_hashtags)
-                    msg.updated_at = datetime.now(timezone.utc)
+                    msg.updated_at = utcnow()
                     updated += 1
                     
                 except TelegramBadRequest as e:
@@ -727,7 +727,7 @@ class ChannelService:
                     )
                     
                     msg.hashtags = json.dumps(expected_hashtags)
-                    msg.updated_at = datetime.now(timezone.utc)
+                    msg.updated_at = utcnow()
                     stats["updated"] += 1
                     batch_count += 1
                     

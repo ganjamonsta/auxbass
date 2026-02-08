@@ -15,7 +15,7 @@ from sqlalchemy.orm import selectinload
 from shared.database import get_db
 from shared.models import (
     Track, TrackEnrichment, Album, AlbumTrack, User, UserLibrary,
-    EnrichmentStatus, LibrarySource
+    EnrichmentStatus, LibrarySource, utcnow
 )
 from shared.matching import normalize_artist
 
@@ -465,7 +465,7 @@ async def update_track(
     if changed:
         # Schedule re-enrichment
         track.enrichment_status = EnrichmentStatus.PENDING
-        track.updated_at = datetime.now(timezone.utc)
+        track.updated_at = utcnow()
     
     await db.commit()
     
@@ -580,7 +580,7 @@ async def like_track(
             track_id=track_id,
             source=LibrarySource.ADDED,
             is_liked=True,
-            liked_at=datetime.now(timezone.utc),
+            liked_at=utcnow(),
         )
         db.add(lib_entry)
         added_to_library = True
@@ -590,7 +590,7 @@ async def like_track(
     # Toggle like
     lib_entry.is_liked = not lib_entry.is_liked
     if lib_entry.is_liked:
-        lib_entry.liked_at = datetime.now(timezone.utc)
+        lib_entry.liked_at = utcnow()
     else:
         lib_entry.liked_at = None
     

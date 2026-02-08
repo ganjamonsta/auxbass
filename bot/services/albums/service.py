@@ -15,7 +15,7 @@ from sqlalchemy.orm import selectinload
 
 from shared.database import get_session
 from shared.models import (
-    Track, TrackEnrichment, Album, AlbumTrack, UserLibrary
+    Track, TrackEnrichment, Album, AlbumTrack, UserLibrary, utcnow
 )
 from shared.matching import (
     normalize_artist, normalize_title, fuzzy_match_album,
@@ -129,7 +129,7 @@ class AlbumService:
             album.release_date = release_date
         if full_tracklist and not album.full_tracklist:
             album.full_tracklist = json.dumps(full_tracklist)
-        album.updated_at = datetime.now(timezone.utc)
+        album.updated_at = utcnow()
     
     async def assign_track_to_album(
         self,

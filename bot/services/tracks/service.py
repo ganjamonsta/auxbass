@@ -17,7 +17,7 @@ from sqlalchemy.orm import selectinload
 from shared.database import get_session
 from shared.models import (
     Track, TrackEnrichment, Album, AlbumTrack, User, UserLibrary,
-    EnrichmentStatus, LibrarySource, ForwardSourceType
+    EnrichmentStatus, LibrarySource, ForwardSourceType, utcnow
 )
 from shared.matching import normalize_artist
 
@@ -359,7 +359,7 @@ class TrackService:
                     changed = True
             
             if changed:
-                track.updated_at = datetime.now(timezone.utc)
+                track.updated_at = utcnow()
                 track.enrichment_status = EnrichmentStatus.PENDING
                 
                 # Remove from current albums (will be re-assigned after enrichment)

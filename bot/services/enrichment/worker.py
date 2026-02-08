@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select, func
 
 from shared.database import get_session
-from shared.models import Track, TrackEnrichment, EnrichmentStatus
+from shared.models import Track, TrackEnrichment, EnrichmentStatus, utcnow
 from .processor import enrichment_processor, EnrichmentResult
 
 logger = logging.getLogger(__name__)
@@ -160,7 +160,7 @@ class EnrichmentWorker:
                         enrichment.lastfm_url = result.lastfm_url
                     
                     enrichment.confidence = result.confidence
-                    enrichment.enriched_at = datetime.now(timezone.utc)
+                    enrichment.enriched_at = utcnow()
                     
                     track.enrichment_status = EnrichmentStatus.COMPLETED
                     self._stats["success"] += 1

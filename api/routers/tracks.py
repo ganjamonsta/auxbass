@@ -17,7 +17,7 @@ from sqlalchemy.orm import selectinload
 from shared.database import get_db
 from shared.models import (
     Track, TrackEnrichment, Album, AlbumTrack, User, UserLibrary,
-    EnrichmentStatus, LibrarySource
+    EnrichmentStatus, LibrarySource, utcnow
 )
 from shared.matching import normalize_artist
 
@@ -824,7 +824,7 @@ async def update_track(
     if data.artist is not None:
         track.artist = data.artist
     
-    track.updated_at = datetime.now(timezone.utc)
+    track.updated_at = utcnow()
     track.enrichment_status = EnrichmentStatus.PENDING
     
     await db.commit()
@@ -887,7 +887,7 @@ async def like_track(
             track_id=track_id,
             source=LibrarySource.ADDED,
             is_liked=True,
-            liked_at=datetime.now(timezone.utc),
+            liked_at=utcnow(),
         )
         db.add(entry)
         added_to_library = True
@@ -904,7 +904,7 @@ async def like_track(
             logger.warning(f"Failed to forward track {track_id} to channel: {e}")
     else:
         entry.is_liked = True
-        entry.liked_at = datetime.now(timezone.utc)
+        entry.liked_at = utcnow()
         await db.commit()
     
     return {"status": "liked", "track_id": track_id, "added_to_library": added_to_library, "forwarded": forwarded}
