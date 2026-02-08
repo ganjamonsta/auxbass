@@ -337,13 +337,25 @@ export const useLibraryStore = defineStore('library', () => {
   }
 
   // Create playlist
-  const createPlaylist = async (name, description = '') => {
+  const createPlaylist = async (name, description = '', isPublic = false) => {
     try {
-      const response = await playlistsApi.create({ name, description })
-      playlists.value.unshift(response.data)
+      const response = await playlistsApi.create({ name, description, is_public: isPublic })
+      await notifyPlaylistChange(response.data.id)
       return response.data
     } catch (error) {
       console.error('Failed to create playlist:', error)
+      return null
+    }
+  }
+
+  // Update playlist
+  const updatePlaylist = async (id, data) => {
+    try {
+      const response = await playlistsApi.update(id, data)
+      await notifyPlaylistChange(id)
+      return response.data
+    } catch (error) {
+      console.error('Failed to update playlist:', error)
       return null
     }
   }
@@ -352,18 +364,35 @@ export const useLibraryStore = defineStore('library', () => {
   const deletePlaylist = async (id) => {
     try {
       await playlistsApi.delete(id)
-      playlists.value = playlists.value.filter(p => p.id !== id)
+      await notifyPlaylistChange(id)
     } catch (error) {
       console.error('Failed to delete playlist:', error)
     }
+  }
+
+  // ============== Unified Playlist Change Notification ==============
+  
+  /**
+   * Notify the entire app that playlist data has changed.
+   * Call this after ANY playlist mutation (create, delete, update, add/remove track, reorder, subscribe).
+   * 
+   * 1. Invalidates API cache for playlists
+   * 2. Refetches playlists in store (sidebar, PlaylistPicker auto-update via reactive ref)
+   * 3. Dispatches event for VirtualGrid and other non-Pinia listeners
+   */
+  const notifyPlaylistChange = async (playlistId = null) => {
+    apiCache.invalidateRelated('playlist', playlistId)
+    await fetchPlaylists()
+    window.dispatchEvent(new CustomEvent('playlist:changed', {
+      detail: { playlistId }
+    }))
   }
 
   // Add track to playlist
   const addTrackToPlaylist = async (playlistId, trackId) => {
     try {
       await playlistsApi.addTrack(playlistId, trackId)
-      // Refetch playlists to get updated covers and track counts
-      await fetchPlaylists()
+      await notifyPlaylistChange(playlistId)
       return true
     } catch (error) {
       console.error('Failed to add track to playlist:', error)
@@ -375,8 +404,7 @@ export const useLibraryStore = defineStore('library', () => {
   const removeTrackFromPlaylist = async (playlistId, trackId) => {
     try {
       await playlistsApi.removeTrack(playlistId, trackId)
-      // Refetch playlists to get updated covers and track counts
-      await fetchPlaylists()
+      await notifyPlaylistChange(playlistId)
       return true
     } catch (error) {
       console.error('Failed to remove track from playlist:', error)
@@ -769,9 +797,11 @@ export const useLibraryStore = defineStore('library', () => {
     getArtistImage,
     clearArtistImagesCache,
     createPlaylist,
+    updatePlaylist,
     deletePlaylist,
     addTrackToPlaylist,
     removeTrackFromPlaylist,
+    notifyPlaylistChange,
     updateTrack,
     deleteTrack,
     toggleLike,

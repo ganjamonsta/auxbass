@@ -108,7 +108,9 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { usePlayerStore } from '@/stores/player'
+import { useLibraryStore } from '@/stores/library'
 import { useDragReorder } from '@/composables/useDragReorder'
+import { playlistsApi } from '@/api/client'
 import api from '@/api/client'
 import TrackSearchItem from './TrackSearchItem.vue'
 import EditableTrackItem from './EditableTrackItem.vue'
@@ -124,6 +126,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'save', 'delete', 'update:tracks'])
 
 const playerStore = usePlayerStore()
+const libraryStore = useLibraryStore()
 const authStore = useAuthStore()
 const uiStore = useUIStore()
 
@@ -149,6 +152,7 @@ const onTracksReorder = async (reordered) => {
     await api.put(`/playlists/${props.playlist.id}/reorder`, {
       track_ids: reordered.map(t => t.id)
     })
+    await libraryStore.notifyPlaylistChange(props.playlist.id)
   } catch (error) {
     console.error('Failed to reorder tracks:', error)
   }
@@ -219,9 +223,10 @@ const addTrack = async (track) => {
   if (addingTrackId.value) return
   addingTrackId.value = track.id
   try {
-    await api.post(`/playlists/${props.playlist.id}/tracks`, { track_id: track.id })
+    await playlistsApi.addTrack(props.playlist.id, track.id)
     tracks.value.push(track)
     emit('update:tracks', tracks.value)
+    await libraryStore.notifyPlaylistChange(props.playlist.id)
   } catch (error) {
     console.error('Failed to add track:', error)
   } finally {
@@ -233,9 +238,10 @@ const removeTrack = async (track) => {
   if (removingTrackId.value) return
   removingTrackId.value = track.id
   try {
-    await api.delete(`/playlists/${props.playlist.id}/tracks/${track.id}`)
+    await playlistsApi.removeTrack(props.playlist.id, track.id)
     tracks.value = tracks.value.filter(t => t.id !== track.id)
     emit('update:tracks', tracks.value)
+    await libraryStore.notifyPlaylistChange(props.playlist.id)
   } catch (error) {
     console.error('Failed to remove track:', error)
   } finally {
@@ -245,9 +251,10 @@ const removeTrack = async (track) => {
 
 const removeTrackFromList = async (track, index) => {
   try {
-    await api.delete(`/playlists/${props.playlist.id}/tracks/${track.id}`)
+    await playlistsApi.removeTrack(props.playlist.id, track.id)
     tracks.value.splice(index, 1)
     emit('update:tracks', tracks.value)
+    await libraryStore.notifyPlaylistChange(props.playlist.id)
   } catch (error) {
     console.error('Failed to remove track:', error)
   }
@@ -258,7 +265,7 @@ const save = async () => {
   if (!name.value.trim() || saving.value) return
   saving.value = true
   try {
-    const response = await api.put(`/playlists/${props.playlist.id}`, {
+    const response = await libraryStore.updatePlaylist(props.playlist.id, {
       name: name.value.trim(),
       is_public: isPublic.value
     })
@@ -266,7 +273,7 @@ const save = async () => {
     emit('save', { 
       name: name.value.trim(), 
       isPublic: isPublic.value, 
-      covers: response.data?.covers || []
+      covers: response?.covers || []
     })
   } catch (error) {
     console.error('Failed to save:', error)

@@ -132,7 +132,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { useAuthStore } from '@/stores/auth'
@@ -266,14 +266,15 @@ const closeCreateModal = () => {
 const createPlaylist = async () => {
   if (!newPlaylistName.value.trim()) return
   try {
-    const response = await api.post('/playlists', {
-      name: newPlaylistName.value.trim(),
-      is_public: props.scope === 'global'
-    })
+    const result = await libraryStore.createPlaylist(
+      newPlaylistName.value.trim(),
+      '',
+      props.scope === 'global'
+    )
     closeCreateModal()
-    router.push(`/playlist/${response.data.id}`)
-    // Refresh grid after creating
-    virtualGridRef.value?.reset()
+    if (result?.id) {
+      router.push(`/playlist/${result.id}`)
+    }
   } catch (error) {
     console.error('Failed to create playlist:', error)
   }
@@ -300,19 +301,10 @@ const closeManageModal = () => {
 const togglePlaylistStatus = async (playlist) => {
   try {
     const newStatus = !playlist.is_public
-    await api.put(`/playlists/${playlist.id}`, { is_public: newStatus })
+    await libraryStore.updatePlaylist(playlist.id, { is_public: newStatus })
     playlist.is_public = newStatus
     
-    // Update in library store
-    const libraryPlaylist = libraryStore.playlists.find(p => p.id === playlist.id)
-    if (libraryPlaylist) {
-      libraryPlaylist.is_public = newStatus
-    }
-    
     uiStore.toast.success('Сохранено', `Плейлист ${newStatus ? 'добавлен в коллекции' : 'удален из коллекций'}`)
-    
-    // Refresh grid to reflect changes
-    virtualGridRef.value?.reset()
   } catch (error) {
     console.error('Failed to toggle playlist status:', error)
     uiStore.toast.error('Ошибка', 'Не удалось обновить статус')
@@ -334,8 +326,18 @@ const loadLikedCount = async () => {
   }
 }
 
+// Listen for playlist:changed events to auto-refresh the grid
+const onPlaylistChanged = () => {
+  virtualGridRef.value?.reset()
+}
+
 onMounted(() => {
   loadLikedCount()
+  window.addEventListener('playlist:changed', onPlaylistChanged)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('playlist:changed', onPlaylistChanged)
 })
 
 // Watch scope changes to reload

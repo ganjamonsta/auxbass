@@ -121,7 +121,6 @@ import TrackItem from '@/components/TrackItem.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import EditPlaylistModal from '@/components/EditPlaylistModal.vue'
 import api from '@/api/client'
-import apiCache from '@/utils/apiCache'
 import { Music, Check, Plus, Globe } from 'lucide-vue-next'
 import { getCoverUrl, CoverSize } from '@/utils'
 
@@ -199,7 +198,7 @@ const openEditModal = () => {
   showEditModal.value = true
 }
 
-const handleSavePlaylist = ({ name, isPublic, covers }) => {
+const handleSavePlaylist = async ({ name, isPublic, covers }) => {
   playlist.value.name = name
   playlist.value.is_public = isPublic
   
@@ -208,18 +207,8 @@ const handleSavePlaylist = ({ name, isPublic, covers }) => {
     playlist.value.covers = covers.map(addCacheBust)
   }
   
-  // Update in library store
-  const libraryPlaylist = libraryStore.playlists.find(p => p.id === playlist.value.id)
-  if (libraryPlaylist) {
-    libraryPlaylist.name = name
-    libraryPlaylist.is_public = isPublic
-    if (covers?.length) {
-      libraryPlaylist.covers = covers.map(addCacheBust)
-    }
-  }
-  
-  // Invalidate API cache to ensure fresh data everywhere
-  apiCache.invalidateRelated('playlist', playlist.value.id)
+  // Notify entire app (sidebar, grids, cache)
+  await libraryStore.notifyPlaylistChange(playlist.value.id)
   
   showEditModal.value = false
   uiStore.toast.success('Сохранено', 'Плейлист обновлён')
@@ -228,16 +217,12 @@ const handleSavePlaylist = ({ name, isPublic, covers }) => {
 const handleTracksUpdate = (tracks) => {
   playlist.value.tracks = tracks
   playlist.value.track_count = tracks.length
-  // Update track_count in library store
-  const libraryPlaylist = libraryStore.playlists.find(p => p.id === playlist.value.id)
-  if (libraryPlaylist) {
-    libraryPlaylist.track_count = tracks.length
-  }
+  // Notify app about track list change (updates sidebar counts, covers, cache)
+  libraryStore.notifyPlaylistChange(playlist.value.id)
 }
 
 const deletePlaylist = async () => {
   try {
-    await api.delete(`/playlists/${playlist.value.id}`)
     await libraryStore.deletePlaylist(playlist.value.id)
     uiStore.toast.success('Удалено', 'Плейлист удален')
     router.push('/playlists')
@@ -264,8 +249,8 @@ const toggleSubscription = async () => {
       playlist.value.is_subscribed = true
       uiStore.toast.success('Добавлено', 'Плейлист добавлен в медиатеку')
     }
-    // Refresh library playlists
-    await libraryStore.fetchPlaylists()
+    // Notify entire app about subscription change
+    await libraryStore.notifyPlaylistChange(playlist.value.id)
   } catch (error) {
     console.error('Failed to toggle subscription:', error)
     const errorMsg = error.response?.data?.detail || 'Ошибка'
