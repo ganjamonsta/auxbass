@@ -35,7 +35,7 @@
       </div>
       
       <!-- Content area -->
-      <div class="edit-content">
+      <div class="edit-content" ref="scrollContentRef">
         <!-- Search results -->
         <div v-if="searchQuery && hasAnyResults" class="search-results">
           <!-- Section: My Library -->
@@ -105,7 +105,7 @@
           <div class="section-label">Треки в плейлисте ({{ tracks.length }})</div>
           <div v-if="tracks.length" class="tracks-editor">
             <EditableTrackItem
-              v-for="(track, index) in tracks"
+              v-for="(track, index) in virtualTracks"
               :key="'edit-' + track.id"
               :track="track"
               :index="index"
@@ -117,6 +117,10 @@
               @drop="onDrop($event, index)"
               @remove="removeTrackFromList(track, index)"
             />
+            <!-- Infinite scroll trigger -->
+            <div ref="loadTriggerRef" v-if="hasMoreTracks" class="load-trigger"></div>
+            <!-- Loading skeletons -->
+            <TrackSkeleton v-for="i in loadingSkeletonCount" :key="'skel-' + i" />
           </div>
           <div v-else class="empty-playlist-hint">
             <span><Music :size="32" /></span>
@@ -152,15 +156,17 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useDragReorder } from '@/composables/useDragReorder'
 import { useTrackSearch } from '@/composables/useTrackSearch'
+import { useVirtualScroll } from '@/composables/useVirtualScroll'
 import { playlistsApi } from '@/api/client'
 import api from '@/api/client'
 import TrackSearchItem from './TrackSearchItem.vue'
 import EditableTrackItem from './EditableTrackItem.vue'
+import TrackSkeleton from './TrackSkeleton.vue'
 import SearchBar from './ui/SearchBar.vue'
 import { X, Music, Users, Globe } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
@@ -183,6 +189,28 @@ const name = ref('')
 const isPublic = ref(false)
 const tracks = ref([])
 const saving = ref(false)
+
+// Infinite scroll for playlist tracks
+const scrollContentRef = ref(null)
+
+const {
+  items: virtualTracks,
+  hasMore: hasMoreTracks,
+  loadTriggerRef,
+  loadingMore: virtualLoadingMore,
+  loadingSkeletonCount,
+  reset: resetVirtualScroll,
+  clear: clearVirtualScroll,
+} = useVirtualScroll({
+  fetchFn: async ({ offset, limit }) => ({
+    items: tracks.value.slice(offset, offset + limit),
+    total: tracks.value.length
+  }),
+  limit: 50,
+  immediate: false,
+  scrollContainer: scrollContentRef,
+  skeletonCount: 6
+})
 
 // Delete confirmation (double-click pattern)
 const deleteConfirmPending = ref(false)
@@ -224,6 +252,7 @@ const removingTrackId = ref(null)
 const onTracksReorder = async (reordered) => {
   tracks.value = reordered
   emit('update:tracks', reordered)
+  nextTick(() => resetVirtualScroll())
   try {
     await api.put(`/playlists/${props.playlist.id}/reorder`, {
       track_ids: reordered.map(t => t.id)
@@ -249,12 +278,19 @@ watch(() => props.playlist, (pl) => {
     name.value = pl.name || ''
     isPublic.value = pl.is_public || false
     tracks.value = [...(pl.tracks || [])]
+    if (props.show) {
+      nextTick(() => resetVirtualScroll())
+    }
   }
 }, { immediate: true })
 
 watch(() => props.show, (show) => {
+  if (show && tracks.value.length) {
+    nextTick(() => resetVirtualScroll())
+  }
   if (!show) {
     clearSearch()
+    clearVirtualScroll()
     deleteConfirmPending.value = false
     if (deleteConfirmTimer) clearTimeout(deleteConfirmTimer)
   }
@@ -270,6 +306,7 @@ const addTrack = async (track) => {
     await playlistsApi.addTrack(props.playlist.id, track.id)
     tracks.value.push(track)
     emit('update:tracks', tracks.value)
+    nextTick(() => resetVirtualScroll())
     await libraryStore.notifyPlaylistChange(props.playlist.id)
   } catch (error) {
     console.error('Failed to add track:', error)
@@ -285,6 +322,7 @@ const removeTrack = async (track) => {
     await playlistsApi.removeTrack(props.playlist.id, track.id)
     tracks.value = tracks.value.filter(t => t.id !== track.id)
     emit('update:tracks', tracks.value)
+    nextTick(() => resetVirtualScroll())
     await libraryStore.notifyPlaylistChange(props.playlist.id)
   } catch (error) {
     console.error('Failed to remove track:', error)
@@ -296,8 +334,10 @@ const removeTrack = async (track) => {
 const removeTrackFromList = async (track, index) => {
   try {
     await playlistsApi.removeTrack(props.playlist.id, track.id)
-    tracks.value.splice(index, 1)
+    const idx = tracks.value.findIndex(t => t.id === track.id)
+    if (idx !== -1) tracks.value.splice(idx, 1)
     emit('update:tracks', tracks.value)
+    nextTick(() => resetVirtualScroll())
     await libraryStore.notifyPlaylistChange(props.playlist.id)
   } catch (error) {
     console.error('Failed to remove track:', error)
@@ -549,6 +589,11 @@ const save = async () => {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+.load-trigger {
+  height: 1px;
+  width: 100%;
 }
 
 .no-results {
