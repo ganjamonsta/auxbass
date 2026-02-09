@@ -4,6 +4,7 @@ TG Player API v2 - Library Router
 User's personal music library endpoints.
 Uses UserLibrary to track user-track relationships.
 """
+import logging
 from typing import Optional, List
 from datetime import datetime, timezone
 
@@ -20,6 +21,9 @@ from shared.models import (
 from shared.matching import normalize_artist
 
 from api.routers.auth import get_current_user, require_premium
+
+# NOTE: Cross-layer dependency — channel_service requires aiogram Bot.
+from bot.services.channels import get_channel_service
 from api.schemas.tracks import (
     TrackResponse,
     TracksListResponse,
@@ -585,6 +589,14 @@ async def like_track(
         db.add(lib_entry)
         added_to_library = True
         await db.commit()
+        
+        # Pin track message in user's channel
+        try:
+            channel_svc = get_channel_service()
+            await channel_svc.pin_track_in_channel(user.id, track_id)
+        except Exception as e:
+            logging.getLogger(__name__).warning(f"Failed to pin track {track_id} in channel: {e}")
+        
         return {"status": "liked", "track_id": track_id, "added_to_library": True}
     
     # Toggle like
@@ -595,6 +607,16 @@ async def like_track(
         lib_entry.liked_at = None
     
     await db.commit()
+    
+    # Pin or unpin track message in user's channel based on new like state
+    try:
+        channel_svc = get_channel_service()
+        if lib_entry.is_liked:
+            await channel_svc.pin_track_in_channel(user.id, track_id)
+        else:
+            await channel_svc.unpin_track_in_channel(user.id, track_id)
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"Failed to pin/unpin track {track_id} in channel: {e}")
     
     return {"status": "liked" if lib_entry.is_liked else "unliked", "track_id": track_id, "added_to_library": False}
 

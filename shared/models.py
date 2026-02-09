@@ -195,6 +195,10 @@ class Track(Base):
         back_populates="track", 
         cascade="all, delete-orphan"
     )
+    track_tags: Mapped[List["TrackTag"]] = relationship(
+        back_populates="track",
+        cascade="all, delete-orphan"
+    )
     album_tracks: Mapped[List["AlbumTrack"]] = relationship(
         back_populates="track",
         cascade="all, delete-orphan"
@@ -315,6 +319,68 @@ class TrackEnrichment(Base):
     __table_args__ = (
         Index("idx_enrichment_deezer_album", "deezer_album_id"),
         Index("idx_enrichment_album_name", "album_name"),
+    )
+
+
+# ============== Track Tags (User-Generated & Enrichment) ==============
+
+class TagSource(str, Enum):
+    """How the tag was created"""
+    ENRICHMENT = "enrichment"  # Auto-imported from Last.fm
+    USER = "user"              # Manually added by user
+
+
+class TrackTag(Base):
+    """
+    A tag associated with a track.
+    Tags can come from enrichment (Last.fm) or be added by users.
+    Each tag accumulates votes (endorsements) from users.
+    """
+    __tablename__ = "track_tags"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    track_id: Mapped[int] = mapped_column(Integer, ForeignKey("tracks.id", ondelete="CASCADE"))
+    tag: Mapped[str] = mapped_column(String(50), nullable=False)  # Normalized: lowercase, trimmed
+    source: Mapped[TagSource] = enum_column(TagSource, default=TagSource.USER)
+    created_by: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="SET NULL"))
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    
+    # Relationships
+    track: Mapped["Track"] = relationship(back_populates="track_tags")
+    votes: Mapped[List["TrackTagVote"]] = relationship(
+        back_populates="track_tag",
+        cascade="all, delete-orphan"
+    )
+    
+    __table_args__ = (
+        UniqueConstraint("track_id", "tag", name="uq_track_tag"),
+        Index("idx_track_tag_track", "track_id"),
+        Index("idx_track_tag_name", "tag"),
+    )
+
+
+class TrackTagVote(Base):
+    """
+    User's vote (endorsement) on a track tag.
+    One vote per user per tag.
+    """
+    __tablename__ = "track_tag_votes"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    track_tag_id: Mapped[int] = mapped_column(Integer, ForeignKey("track_tags.id", ondelete="CASCADE"))
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    
+    # Relationships
+    track_tag: Mapped["TrackTag"] = relationship(back_populates="votes")
+    
+    __table_args__ = (
+        UniqueConstraint("track_tag_id", "user_id", name="uq_track_tag_vote"),
+        Index("idx_track_tag_vote_user", "user_id"),
     )
 
 

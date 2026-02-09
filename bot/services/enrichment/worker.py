@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select, func
 
 from shared.database import get_session
-from shared.models import Track, TrackEnrichment, EnrichmentStatus, utcnow
+from shared.models import Track, TrackEnrichment, TrackTag, TagSource, EnrichmentStatus, utcnow
 from .processor import enrichment_processor, EnrichmentResult
 
 logger = logging.getLogger(__name__)
@@ -146,6 +146,22 @@ class EnrichmentWorker:
                         enrichment.genre = result.genre
                     if result.tags:
                         enrichment.tags = result.tags
+                        # Also populate normalized track_tags table
+                        for tag_text in result.tags:
+                            normalized = tag_text.strip().lower()[:50]
+                            if normalized:
+                                existing = await session.scalar(
+                                    select(TrackTag).where(
+                                        TrackTag.track_id == track_id,
+                                        TrackTag.tag == normalized,
+                                    )
+                                )
+                                if not existing:
+                                    session.add(TrackTag(
+                                        track_id=track_id,
+                                        tag=normalized,
+                                        source=TagSource.ENRICHMENT,
+                                    ))
                     if result.cover_url:
                         enrichment.cover_url = result.cover_url
                     if result.release_date:

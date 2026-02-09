@@ -942,6 +942,205 @@ class ChannelService:
                 # Always clear sync status when done
                 self._clear_sync_status(user_id)
     
+    async def pin_track_in_channel(
+        self,
+        user_id: int,
+        track_id: int,
+        bot: Optional[Bot] = None,
+    ) -> bool:
+        """
+        Pin a track message in user's channel (called when track is liked).
+        
+        Args:
+            user_id: User who owns the channel
+            track_id: Track ID to pin
+            bot: Bot instance for pinning
+        
+        Returns:
+            True if pinned successfully, False otherwise
+        """
+        use_bot = bot or self.bot
+        if not use_bot:
+            logger.error("No bot instance available for pinning")
+            return False
+        
+        async with get_session() as session:
+            # Get channel
+            channel = await session.scalar(
+                select(UserChannel).where(
+                    UserChannel.user_id == user_id,
+                    UserChannel.is_active == True
+                )
+            )
+            
+            if not channel:
+                return False
+            
+            # Get channel message record for this track
+            result = await session.execute(
+                select(ChannelMessage).where(
+                    ChannelMessage.channel_id == channel.id,
+                    ChannelMessage.track_id == track_id,
+                )
+            )
+            channel_message = result.scalar_one_or_none()
+            
+            if not channel_message:
+                logger.debug(f"No channel message for track {track_id}, can't pin")
+                return False
+            
+            try:
+                await use_bot.pin_chat_message(
+                    chat_id=channel.channel_id,
+                    message_id=channel_message.message_id,
+                    disable_notification=True,
+                )
+                logger.info(f"Pinned track {track_id} in channel {channel.channel_id}")
+                return True
+                
+            except TelegramForbiddenError:
+                logger.warning(f"Bot removed from channel {channel.channel_id}")
+                return False
+            except TelegramBadRequest as e:
+                logger.warning(f"Failed to pin message in channel: {e}")
+                return False
+    
+    async def unpin_track_in_channel(
+        self,
+        user_id: int,
+        track_id: int,
+        bot: Optional[Bot] = None,
+    ) -> bool:
+        """
+        Unpin a track message in user's channel (called when track is unliked).
+        
+        Args:
+            user_id: User who owns the channel
+            track_id: Track ID to unpin
+            bot: Bot instance for unpinning
+        
+        Returns:
+            True if unpinned successfully, False otherwise
+        """
+        use_bot = bot or self.bot
+        if not use_bot:
+            logger.error("No bot instance available for unpinning")
+            return False
+        
+        async with get_session() as session:
+            # Get channel
+            channel = await session.scalar(
+                select(UserChannel).where(
+                    UserChannel.user_id == user_id,
+                    UserChannel.is_active == True
+                )
+            )
+            
+            if not channel:
+                return False
+            
+            # Get channel message record for this track
+            result = await session.execute(
+                select(ChannelMessage).where(
+                    ChannelMessage.channel_id == channel.id,
+                    ChannelMessage.track_id == track_id,
+                )
+            )
+            channel_message = result.scalar_one_or_none()
+            
+            if not channel_message:
+                logger.debug(f"No channel message for track {track_id}, can't unpin")
+                return False
+            
+            try:
+                await use_bot.unpin_chat_message(
+                    chat_id=channel.channel_id,
+                    message_id=channel_message.message_id,
+                )
+                logger.info(f"Unpinned track {track_id} in channel {channel.channel_id}")
+                return True
+                
+            except TelegramForbiddenError:
+                logger.warning(f"Bot removed from channel {channel.channel_id}")
+                return False
+            except TelegramBadRequest as e:
+                # Message might not be pinned
+                logger.warning(f"Failed to unpin message in channel: {e}")
+                return False
+    
+    async def find_track_by_channel_message(
+        self,
+        telegram_channel_id: int,
+        message_id: int,
+    ) -> Optional[tuple[int, int]]:
+        """
+        Find track and user by a Telegram channel message.
+        Used for reverse direction: pin in channel → like in library.
+        
+        Args:
+            telegram_channel_id: Telegram channel ID (negative number)
+            message_id: Telegram message ID that was pinned
+        
+        Returns:
+            Tuple of (user_id, track_id) if found, None otherwise
+        """
+        async with get_session() as session:
+            result = await session.execute(
+                select(UserChannel, ChannelMessage)
+                .join(ChannelMessage, ChannelMessage.channel_id == UserChannel.id)
+                .where(
+                    UserChannel.channel_id == telegram_channel_id,
+                    UserChannel.is_active == True,
+                    ChannelMessage.message_id == message_id,
+                )
+            )
+            row = result.first()
+            if row:
+                channel, msg = row
+                return (channel.user_id, msg.track_id)
+            return None
+    
+    async def like_track_from_pin(
+        self,
+        user_id: int,
+        track_id: int,
+    ) -> bool:
+        """
+        Mark a track as liked in user's library (called when message is pinned in channel).
+        
+        Args:
+            user_id: User ID
+            track_id: Track ID
+        
+        Returns:
+            True if liked successfully, False otherwise
+        """
+        from shared.models import UserLibrary
+        
+        async with get_session() as session:
+            result = await session.execute(
+                select(UserLibrary).where(
+                    UserLibrary.user_id == user_id,
+                    UserLibrary.track_id == track_id,
+                )
+            )
+            entry = result.scalar_one_or_none()
+            
+            if not entry:
+                logger.warning(f"Track {track_id} not in library for user {user_id}, can't like from pin")
+                return False
+            
+            if entry.is_liked:
+                logger.debug(f"Track {track_id} already liked by user {user_id}")
+                return True
+            
+            entry.is_liked = True
+            entry.liked_at = utcnow()
+            await session.commit()
+            
+            logger.info(f"Track {track_id} liked from channel pin by user {user_id}")
+            return True
+    
     async def verify_channel_access(
         self,
         channel_id: int,

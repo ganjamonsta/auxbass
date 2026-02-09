@@ -89,13 +89,13 @@
         </template>
         <span v-else>{{ getDisplayArtist(track) }}</span>
       </p>
-      <!-- Tags from Last.fm enrichment -->
-      <TagChips
-        v-if="track?.tags?.length"
-        :tags="track.tags"
-        :max="4"
-        size="sm"
-        :clickable="true"
+      <!-- Interactive tags with voting -->
+      <TrackTags
+        v-if="track?.id"
+        :trackId="track.id"
+        :tags="track.tags || []"
+        :interactive="true"
+        :max="6"
         class="player-tags"
         @tagClick="handleTagClick"
       />
@@ -279,6 +279,7 @@ import { ref, computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { getTrackCoverStyle, getTrackInitials, splitArtists, getDisplayTitle, getDisplayArtist, getAllTrackArtists, getCoverUrl, CoverSize } from '@/utils'
 import TagChips from '@/components/TagChips.vue'
+import TrackTags from '@/components/TrackTags.vue'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useContextMenu } from '@/composables/useContextMenu'

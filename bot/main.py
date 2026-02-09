@@ -19,6 +19,7 @@ from bot.handlers.commands import router as commands_router
 from bot.handlers.callbacks import router as callbacks_router
 from bot.handlers.download import router as download_router
 from bot.handlers.deduplication import router as deduplication_router
+from bot.handlers.channel_pins import router as channel_pins_router
 
 from bot.services.enrichment import enrichment_worker
 from bot.services.channels import init_channel_service, start_channel_service, stop_channel_service
@@ -70,6 +71,7 @@ async def main():
     dp.include_router(audio_router)
     dp.include_router(callbacks_router)
     dp.include_router(download_router)
+    dp.include_router(channel_pins_router)
     
     # Start polling
     logger.info("Starting bot v2...")

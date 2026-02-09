@@ -126,3 +126,28 @@ CREATE INDEX IF NOT EXISTS idx_playlist_subscription_playlist ON playlist_subscr
 -- Полнотекстовый поиск (PostgreSQL)
 CREATE INDEX IF NOT EXISTS idx_tracks_search ON tracks 
     USING gin(to_tsvector('simple', coalesce(title, '') || ' ' || coalesce(artist, '') || ' ' || coalesce(album, '')));
+
+-- Теги треков (пользовательские + из обогащения)
+CREATE TABLE IF NOT EXISTS track_tags (
+    id SERIAL PRIMARY KEY,
+    track_id INTEGER NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
+    tag VARCHAR(50) NOT NULL,
+    source VARCHAR(20) NOT NULL DEFAULT 'user',
+    created_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    CONSTRAINT uq_track_tag UNIQUE (track_id, tag)
+);
+
+CREATE INDEX IF NOT EXISTS idx_track_tag_track ON track_tags(track_id);
+CREATE INDEX IF NOT EXISTS idx_track_tag_name ON track_tags(tag);
+
+-- Голоса за теги
+CREATE TABLE IF NOT EXISTS track_tag_votes (
+    id SERIAL PRIMARY KEY,
+    track_tag_id INTEGER NOT NULL REFERENCES track_tags(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    CONSTRAINT uq_track_tag_vote UNIQUE (track_tag_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_track_tag_vote_user ON track_tag_votes(user_id);

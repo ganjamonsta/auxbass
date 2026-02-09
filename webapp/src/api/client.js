@@ -221,6 +221,13 @@ export const tracksApi = {
   // Library management (mutations)
   addToLibrary: nonCacheable((trackId) => api.post(`/tracks/${trackId}/add-to-library`), 'track'),
   removeFromLibrary: nonCacheable((trackId) => api.delete(`/tracks/${trackId}/remove-from-library`), 'track'),
+
+  // Tags (user-generated with voting)
+  getTrackTags: (trackId) => api.get(`/tracks/${trackId}/tags`),
+  addTag: nonCacheable((trackId, tag) => api.post(`/tracks/${trackId}/tags`, { tag }), 'tag'),
+  voteTag: nonCacheable((trackId, tagId) => api.post(`/tracks/${trackId}/tags/${tagId}/vote`), 'tag'),
+  unvoteTag: nonCacheable((trackId, tagId) => api.delete(`/tracks/${trackId}/tags/${tagId}/vote`), 'tag'),
+  deleteTag: nonCacheable((trackId, tagId) => api.delete(`/tracks/${trackId}/tags/${tagId}`), 'tag'),
 }
 
 // Playlists

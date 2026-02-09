@@ -56,14 +56,13 @@
       </div>
     </div>
 
-    <!-- Tags from Last.fm enrichment -->
-    <TagChips
-      v-if="track?.tags?.length"
-      :tags="track.tags"
-      :max="5"
-      size="md"
-      :wrap="true"
-      :clickable="true"
+    <!-- Interactive tags with voting -->
+    <TrackTags
+      v-if="track?.id"
+      :trackId="track.id"
+      :tags="track.tags || []"
+      :interactive="true"
+      :max="8"
       class="track-tags"
       @tagClick="(tag) => $emit('tagClick', tag)"
     />
@@ -74,6 +73,7 @@
 import { computed } from 'vue'
 import { splitArtists } from '@/utils/formatters'
 import TagChips from '@/components/TagChips.vue'
+import TrackTags from '@/components/TrackTags.vue'
 
 const props = defineProps({
   track: Object,

@@ -404,7 +404,7 @@ async def get_genres(
     ]
 
 
-# ============== Tags (Last.fm) ==============
+# ============== Tags (Last.fm + User) ==============
 
 @router.get("/tags")
 async def get_tags(
@@ -416,41 +416,46 @@ async def get_tags(
     """
     Get unique tags from tracks with counts.
     
-    Tags are more detailed than genres (e.g., 'cloud rap', 'witch house', 'drain gang')
-    and come from Last.fm user-generated data.
+    Now reads from normalized track_tags table (includes both
+    enrichment tags from Last.fm and user-generated tags).
     """
-    from collections import Counter
+    from shared.models import TrackTag, TrackTagVote
     
-    # Get tracks with tags
     if scope == "library":
         query = (
-            select(TrackEnrichment.tags)
-            .join(Track, Track.id == TrackEnrichment.track_id)
+            select(
+                TrackTag.tag,
+                func.count(func.distinct(TrackTag.track_id)).label("track_count"),
+                func.count(TrackTagVote.id).label("total_votes"),
+            )
+            .outerjoin(TrackTagVote, TrackTagVote.track_tag_id == TrackTag.id)
+            .join(Track, Track.id == TrackTag.track_id)
             .join(UserLibrary, UserLibrary.track_id == Track.id)
             .where(UserLibrary.user_id == user.id)
-            .where(TrackEnrichment.tags.isnot(None))
+            .group_by(TrackTag.tag)
+            .order_by(desc("track_count"))
+            .limit(limit)
         )
     else:
         query = (
-            select(TrackEnrichment.tags)
-            .join(Track, Track.id == TrackEnrichment.track_id)
+            select(
+                TrackTag.tag,
+                func.count(func.distinct(TrackTag.track_id)).label("track_count"),
+                func.count(TrackTagVote.id).label("total_votes"),
+            )
+            .outerjoin(TrackTagVote, TrackTagVote.track_tag_id == TrackTag.id)
+            .join(Track, Track.id == TrackTag.track_id)
             .where(Track.is_public == True)
-            .where(TrackEnrichment.tags.isnot(None))
+            .group_by(TrackTag.tag)
+            .order_by(desc("track_count"))
+            .limit(limit)
         )
     
     result = await db.execute(query)
     
-    # Count tags across all tracks
-    tag_counter = Counter()
-    for (tags_list,) in result.all():
-        if tags_list:
-            for tag in tags_list:
-                tag_counter[tag] += 1
-    
-    # Return sorted by count
     return [
-        {"name": tag, "track_count": count}
-        for tag, count in tag_counter.most_common(limit)
+        {"name": tag, "track_count": track_count, "total_votes": total_votes}
+        for tag, track_count, total_votes in result.all()
     ]
 
 
@@ -907,7 +912,15 @@ async def like_track(
         entry.liked_at = utcnow()
         await db.commit()
     
-    return {"status": "liked", "track_id": track_id, "added_to_library": added_to_library, "forwarded": forwarded}
+    # Pin track message in user's channel
+    pinned = False
+    try:
+        channel_svc = get_channel_service()
+        pinned = await channel_svc.pin_track_in_channel(user.id, track_id)
+    except Exception as e:
+        logger.warning(f"Failed to pin track {track_id} in channel: {e}")
+    
+    return {"status": "liked", "track_id": track_id, "added_to_library": added_to_library, "forwarded": forwarded, "pinned": pinned}
 
 
 @router.delete("/{track_id}/like")
@@ -930,6 +943,13 @@ async def unlike_track(
     entry.is_liked = False
     entry.liked_at = None
     await db.commit()
+    
+    # Unpin track message in user's channel
+    try:
+        channel_svc = get_channel_service()
+        await channel_svc.unpin_track_in_channel(user.id, track_id)
+    except Exception as e:
+        logger.warning(f"Failed to unpin track {track_id} in channel: {e}")
     
     return {"status": "unliked", "track_id": track_id}
 
