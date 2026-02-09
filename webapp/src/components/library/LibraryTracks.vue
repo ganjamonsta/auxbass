@@ -155,12 +155,13 @@ import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import { useSort, useTrackActions } from '@/composables'
+import { useTrackSearch } from '@/composables/useTrackSearch'
 import { useContextMenu } from '@/composables/useContextMenu'
 import VirtualTrackList from '@/components/VirtualTrackList.vue'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackSkeleton from '@/components/TrackSkeleton.vue'
 import SortChips from '@/components/SortChips.vue'
-import api, { tracksApi, socialApi } from '@/api/client'
+import api from '@/api/client'
 import { Users, Music, Globe } from 'lucide-vue-next'
 
 // Universal context menu
@@ -205,15 +206,17 @@ const perPage = 50
 const loadTriggerRef = ref(null)
 let observer = null
 
-// Global search results
-const globalTracks = ref([])
-const globalLoading = ref(false)
-
-// Friends search results
-const friendsTracks = ref([])
-const friendsLoading = ref(false)
-
 const hasMore = computed(() => tracks.value.length < total.value)
+
+// Unified friends + global search (via composable)
+const {
+  friendsResults: friendsTracks,
+  globalResults: globalTracks,
+  isFriendsLoading: friendsLoading,
+  isGlobalLoading: globalLoading,
+  searchFriendsAndGlobal,
+  clearSearch: clearSecondarySearch,
+} = useTrackSearch({ perPage: 30 })
 
 // Fetch function for VirtualTrackList (without search)
 const fetchTracks = async ({ offset, limit }) => {
@@ -324,57 +327,6 @@ watch(loadTriggerRef, (el) => {
   if (el) setupObserver()
 })
 
-// Search global library for additional results
-const searchGlobal = async (query) => {
-  if (!query) {
-    globalTracks.value = []
-    return
-  }
-  
-  globalLoading.value = true
-  try {
-    const response = await tracksApi.getGlobal({
-      search: query,
-      per_page: 30
-    })
-    
-    const globalResults = response.data.items || []
-    
-    // Filter out tracks that are already in user's library or in friends results
-    const libraryIds = new Set(tracks.value.map(t => t.id))
-    const friendsIds = new Set(friendsTracks.value.map(t => t.id))
-    globalTracks.value = globalResults.filter(t => !libraryIds.has(t.id) && !friendsIds.has(t.id))
-  } catch (error) {
-    console.error('Failed to search global library:', error)
-    globalTracks.value = []
-  } finally {
-    globalLoading.value = false
-  }
-}
-
-// Search in friends' libraries (users we follow)
-const searchFriends = async (query) => {
-  if (!query) {
-    friendsTracks.value = []
-    return
-  }
-  
-  friendsLoading.value = true
-  try {
-    const response = await socialApi.searchFriends(query, 30)
-    const friendsResults = response.data.items || []
-    
-    // Filter out tracks that are already in user's library
-    const libraryIds = new Set(tracks.value.map(t => t.id))
-    friendsTracks.value = friendsResults.filter(t => !libraryIds.has(t.id))
-  } catch (error) {
-    console.error('Failed to search friends libraries:', error)
-    friendsTracks.value = []
-  } finally {
-    friendsLoading.value = false
-  }
-}
-
 // Watch searchQuery prop
 watch(() => props.searchQuery, async (newVal) => {
   // If query changes, reset page
@@ -383,14 +335,12 @@ watch(() => props.searchQuery, async (newVal) => {
   if (newVal) {
     // Search mode - load tracks via library store
     await loadSearchTracks()
-    // Search friends first, then global
-    await searchFriends(newVal)
-    await searchGlobal(newVal)
+    // Search friends + global via unified composable
+    await searchFriendsAndGlobal(newVal, tracks.value)
   } else {
     // No search - reset to virtual list mode
     tracks.value = []
-    friendsTracks.value = []
-    globalTracks.value = []
+    clearSecondarySearch()
     // Reset virtual list
     if (virtualTrackListRef.value) {
       virtualTrackListRef.value.reset()

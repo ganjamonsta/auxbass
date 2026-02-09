@@ -25,36 +25,78 @@
       
       <!-- Search input -->
       <div class="search-input-wrapper">
-        <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-        </svg>
-        <input
+        <SearchBar
           v-model="searchQuery"
-          type="text"
           placeholder="Поиск треков для добавления..."
+          :loading="searching"
           @input="debouncedSearch"
+          @clear="clearSearch"
         />
-        <div v-if="searching" class="search-spinner"></div>
       </div>
       
       <!-- Content area -->
       <div class="edit-content">
         <!-- Search results -->
-        <div v-if="searchQuery && searchResults.length" class="search-results">
-          <div class="section-label">Результаты поиска</div>
-          <TrackSearchItem
-            v-for="track in searchResults"
-            :key="'search-' + track.id"
-            :track="track"
-            :isInPlaylist="isTrackInPlaylist(track.id)"
-            :isAdding="addingTrackId === track.id"
-            :isRemoving="removingTrackId === track.id"
-            @add="addTrack"
-            @remove="removeTrack"
-          />
+        <div v-if="searchQuery && hasAnyResults" class="search-results">
+          <!-- Section: My Library -->
+          <template v-if="libraryResults.length">
+            <div class="section-label">Моя библиотека</div>
+            <TrackSearchItem
+              v-for="track in libraryResults"
+              :key="'lib-' + track.id"
+              :track="track"
+              :isInPlaylist="isTrackInPlaylist(track.id)"
+              :isAdding="addingTrackId === track.id"
+              :isRemoving="removingTrackId === track.id"
+              @add="addTrack"
+              @remove="removeTrack"
+            />
+          </template>
+
+          <!-- Section: Friends -->
+          <template v-if="friendsResults.length">
+            <div class="section-label friends-label"><Users :size="14" /> У друзей</div>
+            <TrackSearchItem
+              v-for="track in friendsResults"
+              :key="'friend-' + track.id"
+              :track="track"
+              :isInPlaylist="isTrackInPlaylist(track.id)"
+              :isAdding="addingTrackId === track.id"
+              :isRemoving="removingTrackId === track.id"
+              @add="addTrack"
+              @remove="removeTrack"
+            />
+          </template>
+
+          <!-- Loading friends -->
+          <div v-if="friendsLoading" class="search-section-loading">
+            <div class="search-spinner-inline"></div>
+            <span>Поиск у друзей...</span>
+          </div>
+
+          <!-- Section: Global -->
+          <template v-if="globalResults.length">
+            <div class="section-label global-label"><Globe :size="14" /> Общая сеть</div>
+            <TrackSearchItem
+              v-for="track in globalResults"
+              :key="'global-' + track.id"
+              :track="track"
+              :isInPlaylist="isTrackInPlaylist(track.id)"
+              :isAdding="addingTrackId === track.id"
+              :isRemoving="removingTrackId === track.id"
+              @add="addTrack"
+              @remove="removeTrack"
+            />
+          </template>
+
+          <!-- Loading global -->
+          <div v-if="globalLoading" class="search-section-loading">
+            <div class="search-spinner-inline"></div>
+            <span>Поиск в общей сети...</span>
+          </div>
         </div>
         
-        <div v-else-if="searchQuery && !searching" class="no-results">
+        <div v-else-if="searchQuery && !searching && !friendsLoading && !globalLoading" class="no-results">
           Ничего не найдено
         </div>
         
@@ -110,15 +152,17 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useDragReorder } from '@/composables/useDragReorder'
+import { useTrackSearch } from '@/composables/useTrackSearch'
 import { playlistsApi } from '@/api/client'
 import api from '@/api/client'
 import TrackSearchItem from './TrackSearchItem.vue'
 import EditableTrackItem from './EditableTrackItem.vue'
-import { X, Music } from 'lucide-vue-next'
+import SearchBar from './ui/SearchBar.vue'
+import { X, Music, Users, Globe } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 
@@ -159,13 +203,22 @@ const handleDeleteClick = () => {
   }
 }
 
-// Search state
-const searchQuery = ref('')
-const searchResults = ref([])
-const searching = ref(false)
+// Search (unified three-tier: library → friends → global)
+const {
+  searchQuery,
+  libraryResults,
+  friendsResults,
+  globalResults,
+  isSearching: searching,
+  isFriendsLoading: friendsLoading,
+  isGlobalLoading: globalLoading,
+  hasAnyResults,
+  debouncedSearch,
+  clearSearch,
+} = useTrackSearch({ perPage: 20 })
+
 const addingTrackId = ref(null)
 const removingTrackId = ref(null)
-let searchTimeout = null
 
 // Drag & drop
 const onTracksReorder = async (reordered) => {
@@ -201,45 +254,11 @@ watch(() => props.playlist, (pl) => {
 
 watch(() => props.show, (show) => {
   if (!show) {
-    searchQuery.value = ''
-    searchResults.value = []
+    clearSearch()
     deleteConfirmPending.value = false
     if (deleteConfirmTimer) clearTimeout(deleteConfirmTimer)
   }
 })
-
-// Search
-const debouncedSearch = () => {
-  if (searchTimeout) clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(search, 300)
-}
-
-const search = async () => {
-  if (!searchQuery.value.trim()) {
-    searchResults.value = []
-    return
-  }
-  
-  searching.value = true
-  try {
-    const [libraryRes, globalRes] = await Promise.all([
-      api.get('/library', { params: { search: searchQuery.value, per_page: 20 } }),
-      api.get('/tracks/global', { params: { search: searchQuery.value, per_page: 20 } })
-    ])
-    
-    const libraryTracks = libraryRes.data.items || []
-    const globalTracks = globalRes.data.items || []
-    const seenIds = new Set(libraryTracks.map(t => t.id))
-    const uniqueGlobal = globalTracks.filter(t => !seenIds.has(t.id))
-    
-    searchResults.value = [...libraryTracks, ...uniqueGlobal].slice(0, 30)
-  } catch (error) {
-    console.error('Failed to search:', error)
-    searchResults.value = []
-  } finally {
-    searching.value = false
-  }
-}
 
 // Track management
 const isTrackInPlaylist = (trackId) => tracks.value.some(t => t.id === trackId)
@@ -473,39 +492,11 @@ const save = async () => {
 }
 
 .search-input-wrapper {
-  position: relative;
   padding: 16px 20px;
 }
 
-.search-input-wrapper input {
-  width: 100%;
-  padding: 12px 40px 12px 40px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color, rgba(255,255,255,0.1));
-  border-radius: 10px;
-  color: var(--text-primary);
-  font-size: 15px;
-}
-
-.search-icon {
-  position: absolute;
-  left: 32px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-tertiary);
-}
-
-.search-spinner {
-  position: absolute;
-  right: 32px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--bg-highlight);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+.search-input-wrapper :deep(.search-bar) {
+  margin-bottom: 0;
 }
 
 .edit-content {
@@ -526,6 +517,32 @@ const save = async () => {
 
 .search-results, .current-tracks {
   padding-bottom: 16px;
+}
+
+.section-label.friends-label,
+.section-label.global-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.search-section-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+.search-spinner-inline {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--bg-highlight);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
 
 .tracks-editor {
@@ -617,7 +634,7 @@ const save = async () => {
 }
 
 @keyframes spin {
-  to { transform: translateY(-50%) rotate(360deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* Mobile compact styles */
@@ -638,18 +655,6 @@ const save = async () => {
   
   .search-input-wrapper {
     padding: 10px 12px;
-  }
-  
-  .search-input-wrapper input {
-    padding: 10px 36px;
-  }
-  
-  .search-icon {
-    left: 24px;
-  }
-  
-  .search-spinner {
-    right: 24px;
   }
   
   .edit-content {
