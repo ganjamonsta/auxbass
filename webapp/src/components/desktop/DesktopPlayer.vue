@@ -24,6 +24,22 @@
         <div class="lcd-screen" @click="handleLcdClick">
           <!-- Title row -->
           <div class="lcd-title-row">
+            <!-- Network issue indicator -->
+            <span 
+              v-if="networkMonitor.hasIssues.value" 
+              class="lcd-net-icon"
+              :class="{ pulse: networkMonitor.connectionState.value === 'reconnecting' }"
+              :title="networkMonitor.connectionState.value === 'offline' ? 'Нет сети' : networkMonitor.connectionState.value === 'reconnecting' ? 'Восстановление...' : 'Медленная сеть'"
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="1" y1="1" x2="23" y2="23"/>
+                <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+                <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+                <path d="M10.71 5.05A16 16 0 0 1 22.56 9"/>
+                <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+                <line x1="12" y1="20" x2="12.01" y2="20"/>
+              </svg>
+            </span>
             <div class="lcd-text-container" ref="textContainer">
               <div class="lcd-text" :class="{ scrolling: shouldScroll }">
                 <span class="segment-text">{{ displayText }}</span>
@@ -121,10 +137,12 @@ import { useLibraryStore } from '@/stores/library'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { getCoverUrl, CoverSize } from '@/utils'
 import { Play, Square, Pause, Volume2, VolumeX, SkipBack, SkipForward } from 'lucide-vue-next'
+import { useNetworkMonitor } from '@/composables/useNetworkMonitor'
 
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
 const { openMenu } = useContextMenu()
+const networkMonitor = useNetworkMonitor()
 
 const emit = defineEmits(['expand'])
 
@@ -474,6 +492,23 @@ onUnmounted(() => {
   gap: 8px;
   flex: 1;
   min-width: 0;
+}
+
+.lcd-net-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: #ff6b6b;
+  filter: drop-shadow(0 0 4px rgba(255, 107, 107, 0.8));
+}
+
+.lcd-net-icon.pulse {
+  animation: desktop-net-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes desktop-net-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
 }
 
 .lcd-progress-row {

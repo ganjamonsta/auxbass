@@ -173,6 +173,9 @@
       <!-- Global context menu (universal for all element types) -->
       <ContextMenu />
       
+      <!-- Network status banner -->
+      <NetworkBanner />
+      
       <!-- Global toast notifications -->
       <ToastContainer />
     </template>
@@ -192,6 +195,8 @@ import FullPlayer from '@/components/FullPlayer.vue'
 import ChannelBanner from '@/components/ChannelBanner.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
 import ContextMenu from '@/components/ContextMenu.vue'
+import NetworkBanner from '@/components/NetworkBanner.vue'
+import { useNetworkMonitor } from '@/composables/useNetworkMonitor'
 import { MobileFooter } from '@/components/layout'
 import { Music, Disc3, User, Folder } from 'lucide-vue-next'
 // Desktop components
@@ -207,6 +212,7 @@ const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
 const uiStore = useUIStore()
 const telegram = inject('telegram')
+const networkMonitor = useNetworkMonitor()
 
 const { showFullPlayer } = useModals(telegram)
 
@@ -363,6 +369,50 @@ watch(
   { immediate: true }
 )
 
+// === Player error toast handlers (hoisted for cleanup in onUnmounted) ===
+const handlePlayerError = (e) => {
+  const { type, track, message, errorCode } = e.detail || {}
+  const trackTitle = track?.title || 'Трек'
+  
+  switch (type) {
+    case 'cascade_error':
+      uiStore.toast.error('Воспроизведение остановлено', 'Слишком много ошибок подряд. Попробуйте позже.')
+      break
+    case 'audio_error':
+      if (errorCode === 2) {
+        uiStore.toast.warning('Ошибка сети', `Не удалось загрузить «${trackTitle}», переключаем...`)
+      } else if (errorCode === 3) {
+        uiStore.toast.warning('Ошибка декодирования', `Не удалось декодировать «${trackTitle}»`)
+      } else {
+        uiStore.toast.warning('Ошибка аудио', `Проблема с «${trackTitle}», переключаем...`)
+      }
+      break
+    case 'stall_timeout':
+      uiStore.toast.warning('Медленная загрузка', `Трек «${trackTitle}» не загрузился за 10с`)
+      break
+    case 'not_found':
+      uiStore.toast.error('Трек не найден', `«${trackTitle}» больше недоступен`)
+      break
+    case 'playback_error':
+      uiStore.toast.warning('Ошибка воспроизведения', message || `Проблема с «${trackTitle}»`)
+      break
+    case 'auth_expired':
+      // Silent — will auto-skip, not worth showing toast
+      break
+  }
+}
+
+const handleStallRecovered = (e) => {
+  const { track, attempt } = e.detail || {}
+  if (attempt > 1) {
+    uiStore.toast.info('Восстановлено', `Воспроизведение «${track?.title || 'Трек'}» восстановлено`)
+  }
+}
+
+const handleNetworkRecovered = () => {
+  uiStore.toast.success('Сеть восстановлена', 'Соединение восстановлено')
+}
+
 // Initialize auth on mount
 onMounted(async () => {
   // Apply initial scale
@@ -392,6 +442,14 @@ onMounted(async () => {
       await playerStore.restoreState()
     }
   }
+  
+  // === Start network monitoring ===
+  networkMonitor.startMonitoring()
+  
+  // === Player event listeners ===
+  window.addEventListener('player:error', handlePlayerError)
+  window.addEventListener('player:stall-recovered', handleStallRecovered)
+  window.addEventListener('player:network-recovered', handleNetworkRecovered)
   
   // Handle unavailable tracks - show notification with helpful message
   playerStore.setOnTrackUnavailable((track, message, isLargeFile) => {
@@ -423,6 +481,10 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('resize', updateDesktopState)
   window.removeEventListener('auth:logout', handleAuthLogout)
+  window.removeEventListener('player:error', handlePlayerError)
+  window.removeEventListener('player:stall-recovered', handleStallRecovered)
+  window.removeEventListener('player:network-recovered', handleNetworkRecovered)
+  networkMonitor.stopMonitoring()
   // Reset zoom on unmount
   document.body.style.zoom = '1'
 })

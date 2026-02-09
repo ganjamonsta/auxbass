@@ -11,6 +11,23 @@
           </div>
         </div>
         <div class="lcd-indicators">
+          <!-- Network issue indicator -->
+          <span 
+            v-if="networkMonitor.hasIssues.value" 
+            class="lcd-indicator net-indicator active" 
+            :class="{ pulse: networkMonitor.connectionState.value === 'reconnecting' }"
+            :title="networkMonitor.connectionState.value === 'offline' ? 'Нет сети' : networkMonitor.connectionState.value === 'reconnecting' ? 'Восстановление...' : 'Медленная сеть'"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="1" y1="1" x2="23" y2="23"/>
+              <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+              <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+              <path d="M10.71 5.05A16 16 0 0 1 22.56 9"/>
+              <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+              <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+              <line x1="12" y1="20" x2="12.01" y2="20"/>
+            </svg>
+          </span>
           <span v-if="playerStore.hdTrackInfo" class="lcd-indicator hd-indicator active" title="HD версия">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
               <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-8 12H9.5v-2h-2v2H6V9h1.5v2.5h2V9H11v6zm2-6h4c.55 0 1 .45 1 1v4c0 .55-.45 1-1 1h-4V9zm1.5 4.5h2v-3h-2v3z"/>
@@ -88,9 +105,11 @@ import { computed } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { getDisplayTitle, getDisplayArtist } from '@/utils'
+import { useNetworkMonitor } from '@/composables/useNetworkMonitor'
 
 const playerStore = usePlayerStore()
 const { openMenu } = useContextMenu()
+const networkMonitor = useNetworkMonitor()
 
 const props = defineProps({
   track: {
@@ -334,6 +353,21 @@ const formatTime = (seconds) => {
 .lcd-indicator.hd-indicator.active {
   color: #ffd700;
   text-shadow: 0 0 8px rgba(255, 215, 0, 0.8);
+}
+
+.lcd-indicator.net-indicator.active {
+  color: #ff6b6b;
+  text-shadow: 0 0 8px rgba(255, 107, 107, 0.8);
+  cursor: default;
+}
+
+.lcd-indicator.net-indicator.pulse {
+  animation: net-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes net-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
 }
 
 /* ─── Row 2: Controls ─── */

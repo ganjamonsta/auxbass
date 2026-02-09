@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { playerApi, tracksApi, playlistsApi, albumsApi } from '../api/client'
+import { useNetworkMonitor } from '../composables/useNetworkMonitor'
 
 // HD MIME types that cannot be streamed directly (lossless formats)
 const HD_MIME_TYPES = [
@@ -122,6 +123,110 @@ export const usePlayerStore = defineStore('player', () => {
   let lastSkipTime = 0
   const MAX_CONSECUTIVE_SKIPS = 3
   const SKIP_RESET_TIMEOUT = 5000  // Reset counter after 5 seconds of stable playback
+  
+  // ============== Stall Recovery ==============
+  const STALL_TIMEOUT = 10_000        // 10 секунд до попытки recovery
+  const STALL_MAX_RETRIES = 2         // Макс попыток перезагрузки при stall
+  let stallTimer = null
+  let stallRetryCount = 0
+  
+  // ============== Audio Error Retry ==============
+  const AUDIO_RETRY_DELAY = 1500      // Задержка перед retry при NETWORK ошибке
+  let audioRetryCount = 0
+  const MAX_AUDIO_RETRIES = 1         // 1 retry перед skip
+  
+  // Network monitor (lazy init)
+  let _networkMonitor = null
+  const getNetworkMonitor = () => {
+    if (!_networkMonitor) _networkMonitor = useNetworkMonitor()
+    return _networkMonitor
+  }
+  
+  // ============== Stall Recovery Helpers ==============
+  const startStallTimer = () => {
+    clearStallTimer()
+    stallTimer = setTimeout(() => {
+      handleStallTimeout()
+    }, STALL_TIMEOUT)
+  }
+  
+  const clearStallTimer = () => {
+    if (stallTimer) {
+      clearTimeout(stallTimer)
+      stallTimer = null
+    }
+  }
+  
+  const handleStallTimeout = async () => {
+    if (!audio.value || !currentTrack.value) return
+    
+    // Проверить: может уже играет нормально?
+    if (!audio.value.paused && audio.value.readyState >= 3) {
+      console.log('[Stall Recovery] Audio recovered by itself')
+      stallRetryCount = 0
+      return
+    }
+    
+    stallRetryCount++
+    const track = currentTrack.value
+    console.warn(`[Stall Recovery] Audio stalled for ${STALL_TIMEOUT/1000}s, attempt ${stallRetryCount}/${STALL_MAX_RETRIES}`)
+    
+    if (stallRetryCount <= STALL_MAX_RETRIES) {
+      // Попытка 1: перезагрузить текущий src
+      try {
+        const currentTime = audio.value.currentTime
+        const src = audio.value.src
+        
+        if (stallRetryCount === 1 && src) {
+          // Первая попытка — просто reload с того же места
+          console.log('[Stall Recovery] Attempting reload at', currentTime.toFixed(2))
+          audio.value.load()
+          audio.value.currentTime = currentTime
+          await audio.value.play()
+          console.log('[Stall Recovery] Reload successful')
+          // Уведомление через событие
+          window.dispatchEvent(new CustomEvent('player:stall-recovered', { 
+            detail: { track, attempt: stallRetryCount }
+          }))
+          return
+        } else {
+          // Вторая попытка — получить свежий URL
+          console.log('[Stall Recovery] Fetching fresh URL')
+          const response = await playerApi.getStreamUrl(track.id)
+          const newUrl = response.data.url
+          setCachedUrl(track.id, newUrl, response.data.expires_at)
+          
+          audio.value.src = newUrl
+          audio.value.currentTime = Math.max(0, currentTime - 0.5) // Немного назад
+          await audio.value.play()
+          console.log('[Stall Recovery] Fresh URL successful')
+          window.dispatchEvent(new CustomEvent('player:stall-recovered', { 
+            detail: { track, attempt: stallRetryCount }
+          }))
+          return
+        }
+      } catch (e) {
+        console.error('[Stall Recovery] Attempt failed:', e)
+      }
+    }
+    
+    // Все попытки исчерпаны — уведомить и скипнуть
+    console.warn('[Stall Recovery] All attempts failed, skipping track')
+    lastError.value = {
+      type: 'stall_timeout',
+      track: track,
+      message: 'Не удалось загрузить аудио — проблемы с сетью'
+    }
+    window.dispatchEvent(new CustomEvent('player:error', { 
+      detail: { type: 'stall_timeout', track, message: lastError.value.message }
+    }))
+    
+    isSkipping = true
+    setTimeout(() => {
+      next()
+      isSkipping = false
+    }, 500)
+  }
   
   // Callback for track unavailable
   let onTrackUnavailableCallback = null
@@ -632,201 +737,18 @@ export const usePlayerStore = defineStore('player', () => {
     // Setup global keyboard shortcuts (for desktop media control)
     setupKeyboardShortcuts()
     
-    // canplay event - audio ready to play
-    audio.value.addEventListener('canplay', () => {
-      loading.value = false
-    })
-
-    // playing event - actually playing
-    audio.value.addEventListener('playing', () => {
-       loading.value = false
-    })
+    // Attach all core event listeners via shared factory
+    setupAudioListeners(audio.value)
     
-    // waiting event - buffering
-    audio.value.addEventListener('waiting', () => {
-      // Only show loading if we are really stalled (buffer < 0.5s ahead)
-      // Sometimes browsers fire 'waiting' momentarily during seek
-      if (audio.value.readyState < 3) { 
-        loading.value = true
-        console.log(`[Audio Waiting] readyState=${audio.value.readyState}, currentTime=${audio.value.currentTime.toFixed(2)}, buffered=${buffered.value.toFixed(2)}`)
-      }
-    })
-    
-    // stalled event - network stall detection
-    audio.value.addEventListener('stalled', () => {
-      const track = currentTrack.value
-      console.warn(`[Audio Stalled] Network stall detected! track=${track?.id}, title="${track?.title}", currentTime=${audio.value.currentTime.toFixed(2)}, readyState=${audio.value.readyState}, networkState=${audio.value.networkState}`)
-    })
-    
-    // suspend event - browser stopped fetching
-    audio.value.addEventListener('suspend', () => {
-      console.log(`[Audio Suspend] Browser paused fetching, buffered=${buffered.value.toFixed(2)}s, duration=${duration.value.toFixed(2)}s`)
-    })
-    
-    audio.value.addEventListener('timeupdate', () => {
-      progress.value = audio.value.currentTime
-      
-      // Update buffered state
-      if (audio.value.buffered.length > 0) {
-        // Find the buffered range that covers the current time
-        for (let i = 0; i < audio.value.buffered.length; i++) {
-          if (audio.value.buffered.start(i) <= audio.value.currentTime && 
-              audio.value.buffered.end(i) >= audio.value.currentTime) {
-            buffered.value = audio.value.buffered.end(i)
-            break
-          }
-        }
-      }
-
-      // Update position state every second for media session (throttled)
-      const now = Date.now()
-      if (now - lastPositionUpdate >= 1000) {
-        lastPositionUpdate = now
-        updatePositionState()
-      }
-    })
-    
-    
-    // progress event - download progress
-    audio.value.addEventListener('progress', () => {
-       if (audio.value.buffered.length > 0) {
-        // Just take the end of the last buffered range or the one covering current time
-        // Often a simple approximation of the last range is enough for simple UI
-        const lastIndex = audio.value.buffered.length - 1
-        buffered.value = audio.value.buffered.end(lastIndex)
-        
-        // Ensure loading is false if we have enough buffer
-        if (loading.value && buffered.value - progress.value > 2) {
-           loading.value = false
-        }
-      }
-    })
-
-    audio.value.addEventListener('durationchange', () => {
-      duration.value = audio.value.duration
-      updatePositionState()
-    })
-    
-    audio.value.addEventListener('ended', (e) => {
-      // Ignore ended events from obsolete (swapped out) audio elements
-      if (e.target?._obsolete) {
-        console.log('[Audio Ended] Ignoring ended event from obsolete audio element')
-        return
-      }
-      handleEnded()
-    })
-    
-    audio.value.addEventListener('play', () => {
-      // Clear obsolete flag on successful play (audio is active now)
-      if (audio.value) audio.value._obsolete = false
-      isPlaying.value = true
-      isSkipping = false  // Reset skip flag on successful playback
-      consecutiveSkipCount = 0  // Reset skip counter on successful play
-      const track = currentTrack.value
-      console.log(`[Audio Play] Starting playback: id=${track?.id}, title="${track?.title}", readyState=${audio.value.readyState}`)
-      updatePlaybackState()
-      startStateSaving()
-    })
-    
-    audio.value.addEventListener('pause', () => {
-      isPlaying.value = false
-      updatePlaybackState()
-      persistState() // Save state on pause
-    })
-    
-    audio.value.addEventListener('error', (e) => {
-      console.error('Audio error:', e)
-      loading.value = false
-      
-      // Ignore errors from obsolete (swapped out) audio elements
-      if (e.target?._obsolete) {
-        console.log('[Audio Error] Ignoring error from obsolete audio element')
-        return
-      }
-      
-      const errorCode = audio.value?.error?.code
-      const errorMsg = audio.value?.error?.message || 'Ошибка воспроизведения'
-      
-      // Error code 1 = ABORTED - this is normal during src change, always ignore
-      if (errorCode === 1) {
-        console.log('[Audio Error] ABORTED (code 1) - normal during src change, ignoring')
-        return
-      }
-      
-      // Ignore errors during track change
-      if (isSkipping) {
-        console.log('[Audio Error] Ignoring error during track skip')
-        return
-      }
-      
-      // Protection against cascading skips
-      const now = Date.now()
-      if (now - lastSkipTime < 2000) {
-        consecutiveSkipCount++
-      } else {
-        consecutiveSkipCount = 1
-      }
-      lastSkipTime = now
-      
-      if (consecutiveSkipCount > MAX_CONSECUTIVE_SKIPS) {
-        console.warn(`[Audio Error] Too many consecutive skips (${consecutiveSkipCount}), stopping`)
-        lastError.value = {
-          type: 'cascade_error',
-          track: currentTrack.value,
-          message: 'Слишком много ошибок подряд, воспроизведение остановлено'
-        }
-        isPlaying.value = false
-        return
-      }
-      
-      // Auto-skip on audio element errors (network issues, decode errors, etc.)
-      // Error codes: 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED
-      if (errorCode && errorCode >= 2) {
-        const errorNames = { 2: 'NETWORK', 3: 'DECODE', 4: 'SRC_NOT_SUPPORTED' }
-        const track = currentTrack.value
-        console.warn(`[Audio Error] Code ${errorCode} (${errorNames[errorCode] || 'UNKNOWN'}): ${errorMsg}`)
-        console.warn(`[Audio Error] Track: id=${track?.id}, title="${track?.title}", artist="${track?.artist}"`)
-        console.warn(`[Audio Error] State: currentTime=${audio.value?.currentTime?.toFixed(3) || 0}s, duration=${duration.value.toFixed(2)}s, readyState=${audio.value?.readyState}, networkState=${audio.value?.networkState}`)
-        console.warn(`[Audio Error] Auto-skipping (${consecutiveSkipCount}/${MAX_CONSECUTIVE_SKIPS})`)
-        
-        lastError.value = {
-          type: 'audio_error',
-          track: currentTrack.value,
-          message: `Ошибка аудио: ${errorNames[errorCode] || errorCode} - ${errorMsg}`,
-          details: {
-            errorCode,
-            currentTime: audio.value?.currentTime,
-            readyState: audio.value?.readyState,
-            networkState: audio.value?.networkState
-          }
-        }
-        // Auto-skip to keep music playing
-        isSkipping = true
-        setTimeout(() => {
-          next()
-          isSkipping = false
-        }, 1000)
-      }
-    })
-    
-    // Preload next track ASAP - when current track can play through
-    audio.value.addEventListener('canplaythrough', () => {
-      if (!preloadTriggered && duration.value > 0) {
-        console.log('[Instant Preload] Triggering on canplaythrough')
-        preloadTriggered = true
-        preloadNextTracks()
-      }
-    })
-    
-    // Fallback: Also trigger preload on timeupdate if canplaythrough didn't fire
-    audio.value.addEventListener('timeupdate', () => {
-      // Trigger after 0.5 seconds of playback as fallback
+    // Fallback preload on timeupdate
+    const _initTimeupdatePreload = () => {
       if (duration.value > 0 && !preloadTriggered && progress.value > 0.5) {
         console.log(`[Instant Preload] Fallback trigger at ${progress.value.toFixed(1)}s`)
         preloadTriggered = true
         preloadNextTracks()
       }
-    })
+    }
+    audio.value.addEventListener('timeupdate', _initTimeupdatePreload)
     
     // Reset preload flag on new track
     audio.value.addEventListener('loadstart', () => {
@@ -834,127 +756,177 @@ export const usePlayerStore = defineStore('player', () => {
     })
   }
 
-  // Re-attach event listeners when swapping audio elements
-  const reattachAudioListeners = () => {
-    if (!audio.value) return
+  // ============== Unified Audio Event Listener Factory ==============
+  // Single source of truth for all audio element events.
+  // Used by both initAudio() and reattachAudioListeners() — NO duplication.
+  const setupAudioListeners = (el) => {
+    if (!el) return
     
-    audio.value.addEventListener('canplay', () => {
+    // --- canplay: audio is ready ---
+    el.addEventListener('canplay', () => {
       loading.value = false
+      clearStallTimer()
+      stallRetryCount = 0
     })
-    
-    audio.value.addEventListener('canplaythrough', () => {
-      // Trigger preload on canplaythrough for faster next track start
-      if (!preloadTriggered && duration.value > 0) {
-        console.log('[Instant Preload] Triggering on canplaythrough (reattached)')
-        preloadTriggered = true
-        preloadNextTracks()
-      }
-    })
-    
-    audio.value.addEventListener('playing', () => {
+
+    // --- playing: actually outputting audio ---
+    el.addEventListener('playing', () => {
       loading.value = false
+      clearStallTimer()
+      stallRetryCount = 0
+      audioRetryCount = 0
     })
     
-    audio.value.addEventListener('waiting', () => {
-      if (audio.value.readyState < 3) {
+    // --- waiting: buffer underrun ---
+    el.addEventListener('waiting', () => {
+      if (el.readyState < 3) { 
         loading.value = true
-        console.log(`[Audio Waiting] (reattached) readyState=${audio.value.readyState}, currentTime=${audio.value.currentTime.toFixed(2)}`)
+        startStallTimer()
+        console.log(`[Audio Waiting] readyState=${el.readyState}, currentTime=${el.currentTime.toFixed(2)}, buffered=${buffered.value.toFixed(2)}`)
       }
     })
     
-    // stalled event - network stall detection (reattached)
-    audio.value.addEventListener('stalled', () => {
+    // --- stalled: network stall detected ---
+    el.addEventListener('stalled', () => {
       const track = currentTrack.value
-      console.warn(`[Audio Stalled] (reattached) Network stall! track=${track?.id}, currentTime=${audio.value.currentTime.toFixed(2)}, networkState=${audio.value.networkState}`)
+      console.warn(`[Audio Stalled] Network stall detected! track=${track?.id}, title="${track?.title}", currentTime=${el.currentTime.toFixed(2)}, readyState=${el.readyState}, networkState=${el.networkState}`)
+      if (!el.paused || loading.value) {
+        startStallTimer()
+      }
     })
     
-    audio.value.addEventListener('timeupdate', () => {
-      progress.value = audio.value.currentTime
+    // --- suspend: browser stopped fetching (normal) ---
+    el.addEventListener('suspend', () => {
+      console.log(`[Audio Suspend] Browser paused fetching, buffered=${buffered.value.toFixed(2)}s, duration=${duration.value.toFixed(2)}s`)
+    })
+    
+    // --- timeupdate: playback progress ---
+    el.addEventListener('timeupdate', () => {
+      progress.value = el.currentTime
       
-      if (audio.value.buffered.length > 0) {
-        for (let i = 0; i < audio.value.buffered.length; i++) {
-          if (audio.value.buffered.start(i) <= audio.value.currentTime && 
-              audio.value.buffered.end(i) >= audio.value.currentTime) {
-            buffered.value = audio.value.buffered.end(i)
+      if (el.buffered.length > 0) {
+        for (let i = 0; i < el.buffered.length; i++) {
+          if (el.buffered.start(i) <= el.currentTime && 
+              el.buffered.end(i) >= el.currentTime) {
+            buffered.value = el.buffered.end(i)
             break
           }
         }
       }
-      
-      if (Math.floor(progress.value) % 5 === 0) {
+
+      // Stall recovery: progress is moving — all OK
+      clearStallTimer()
+
+      const now = Date.now()
+      if (now - lastPositionUpdate >= 1000) {
+        lastPositionUpdate = now
         updatePositionState()
-      }
-      
-      // Fallback preload trigger (if canplaythrough didn't fire)
-      if (duration.value > 0 && !preloadTriggered && progress.value > 0.5) {
-        preloadTriggered = true
-        preloadNextTracks()
       }
     })
     
-    audio.value.addEventListener('progress', () => {
-      if (audio.value.buffered.length > 0) {
-        const lastIndex = audio.value.buffered.length - 1
-        buffered.value = audio.value.buffered.end(lastIndex)
+    // --- progress: download progress ---
+    el.addEventListener('progress', () => {
+      if (el.buffered.length > 0) {
+        const lastIndex = el.buffered.length - 1
+        buffered.value = el.buffered.end(lastIndex)
+        
         if (loading.value && buffered.value - progress.value > 2) {
           loading.value = false
+          clearStallTimer()
         }
       }
     })
-    
-    audio.value.addEventListener('durationchange', () => {
-      duration.value = audio.value.duration
+
+    // --- durationchange ---
+    el.addEventListener('durationchange', () => {
+      duration.value = el.duration
       updatePositionState()
     })
     
-    audio.value.addEventListener('ended', (e) => {
-      // Ignore ended events from obsolete (swapped out) audio elements
+    // --- ended ---
+    el.addEventListener('ended', (e) => {
       if (e.target?._obsolete) {
         console.log('[Audio Ended] Ignoring ended event from obsolete audio element')
         return
       }
+      clearStallTimer()
       handleEnded()
     })
     
-    audio.value.addEventListener('play', () => {
-      // Clear obsolete flag on successful play (audio is active now)
+    // --- play: playback started successfully ---
+    el.addEventListener('play', () => {
       if (audio.value) audio.value._obsolete = false
       isPlaying.value = true
-      isSkipping = false  // Reset skip flag on successful playback
-      consecutiveSkipCount = 0  // Reset consecutive skip counter
+      isSkipping = false
+      consecutiveSkipCount = 0
+      audioRetryCount = 0
+      stallRetryCount = 0
+      clearStallTimer()
+      const track = currentTrack.value
+      console.log(`[Audio Play] Starting playback: id=${track?.id}, title="${track?.title}", readyState=${el.readyState}`)
       updatePlaybackState()
       startStateSaving()
     })
     
-    audio.value.addEventListener('pause', () => {
+    // --- pause ---
+    el.addEventListener('pause', () => {
       isPlaying.value = false
+      clearStallTimer()
       updatePlaybackState()
       persistState()
     })
     
-    audio.value.addEventListener('error', (e) => {
+    // --- error: audio element error with retry logic ---
+    el.addEventListener('error', async (e) => {
       console.error('Audio error:', e)
       loading.value = false
+      clearStallTimer()
       
-      // Ignore errors from obsolete (swapped out) audio elements
       if (e.target?._obsolete) {
-        console.log('[Audio Error] (reattached) Ignoring error from obsolete audio element')
+        console.log('[Audio Error] Ignoring error from obsolete audio element')
         return
       }
       
-      const errorCode = audio.value?.error?.code
-      const errorMsg = audio.value?.error?.message || 'Ошибка воспроизведения'
+      const errorCode = el?.error?.code
+      const errorMsg = el?.error?.message || 'Ошибка воспроизведения'
       
-      // Error code 1 = ABORTED - this is normal during src change, always ignore
       if (errorCode === 1) {
         console.log('[Audio Error] ABORTED (code 1) - normal during src change, ignoring')
         return
       }
       
-      // Ignore errors during track change
       if (isSkipping) {
         console.log('[Audio Error] Ignoring error during track skip')
         return
+      }
+      
+      const errorNames = { 2: 'NETWORK', 3: 'DECODE', 4: 'SRC_NOT_SUPPORTED' }
+      const track = currentTrack.value
+      
+      // === NETWORK error retry (code 2) ===
+      if (errorCode === 2 && audioRetryCount < MAX_AUDIO_RETRIES && track) {
+        audioRetryCount++
+        console.warn(`[Audio Error] NETWORK error - retrying (${audioRetryCount}/${MAX_AUDIO_RETRIES})`)
+        loading.value = true
+        
+        try {
+          await new Promise(r => setTimeout(r, AUDIO_RETRY_DELAY))
+          const response = await playerApi.getStreamUrl(track.id)
+          const newUrl = response.data.url
+          setCachedUrl(track.id, newUrl, response.data.expires_at)
+          
+          const savedTime = el.currentTime || 0
+          el.src = newUrl
+          if (savedTime > 1) el.currentTime = savedTime - 0.5
+          await el.play()
+          console.log('[Audio Error] NETWORK retry successful')
+          loading.value = false
+          window.dispatchEvent(new CustomEvent('player:network-recovered', { detail: { track } }))
+          return
+        } catch (retryError) {
+          console.error('[Audio Error] NETWORK retry failed:', retryError)
+          loading.value = false
+        }
       }
       
       // Protection against cascading skips
@@ -970,21 +942,31 @@ export const usePlayerStore = defineStore('player', () => {
         console.warn(`[Audio Error] Too many consecutive skips (${consecutiveSkipCount}), stopping`)
         lastError.value = {
           type: 'cascade_error',
-          track: currentTrack.value,
+          track: track,
           message: 'Слишком много ошибок подряд, воспроизведение остановлено'
         }
+        window.dispatchEvent(new CustomEvent('player:error', { 
+          detail: { type: 'cascade_error', track, message: lastError.value.message }
+        }))
         isPlaying.value = false
         return
       }
       
-      // Auto-skip on audio element errors (network issues, decode errors, etc.)
       if (errorCode && errorCode >= 2) {
-        console.warn(`[Audio Error] Code ${errorCode}: ${errorMsg}, auto-skipping (${consecutiveSkipCount}/${MAX_CONSECUTIVE_SKIPS})`)
+        console.warn(`[Audio Error] Code ${errorCode} (${errorNames[errorCode] || 'UNKNOWN'}): ${errorMsg}`)
+        console.warn(`[Audio Error] Track: id=${track?.id}, title="${track?.title}", artist="${track?.artist}"`)
+        console.warn(`[Audio Error] Auto-skipping (${consecutiveSkipCount}/${MAX_CONSECUTIVE_SKIPS})`)
+        
         lastError.value = {
           type: 'audio_error',
-          track: currentTrack.value,
-          message: `Ошибка аудио: ${errorMsg}`
+          track: track,
+          message: `Ошибка аудио: ${errorNames[errorCode] || errorCode} - ${errorMsg}`,
+          details: { errorCode, currentTime: el?.currentTime, readyState: el?.readyState, networkState: el?.networkState }
         }
+        window.dispatchEvent(new CustomEvent('player:error', { 
+          detail: { type: 'audio_error', track, errorCode, message: lastError.value.message }
+        }))
+        
         isSkipping = true
         setTimeout(() => {
           next()
@@ -992,6 +974,21 @@ export const usePlayerStore = defineStore('player', () => {
         }, 1000)
       }
     })
+    
+    // --- Preload trigger on canplaythrough ---
+    el.addEventListener('canplaythrough', () => {
+      if (!preloadTriggered && duration.value > 0) {
+        console.log('[Instant Preload] Triggering on canplaythrough')
+        preloadTriggered = true
+        preloadNextTracks()
+      }
+    })
+  }
+
+  // Re-attach event listeners when swapping audio elements (thin wrapper)
+  const reattachAudioListeners = () => {
+    if (!audio.value) return
+    setupAudioListeners(audio.value)
   }
   // Preload next 2-3 tracks using batch API for instant playback
   // Uses Audio preload="auto" for the immediate next track
@@ -1535,6 +1532,9 @@ export const usePlayerStore = defineStore('player', () => {
           track: track,
           message: 'Слишком много ошибок подряд, воспроизведение остановлено'
         }
+        window.dispatchEvent(new CustomEvent('player:error', { 
+          detail: { type: 'cascade_error', track, message: lastError.value.message }
+        }))
         isPlaying.value = false
         loading.value = false
         return
@@ -1592,6 +1592,9 @@ export const usePlayerStore = defineStore('player', () => {
           track: track,
           message: 'Токен истёк, переключаем трек...'
         }
+        window.dispatchEvent(new CustomEvent('player:error', { 
+          detail: { type: 'auth_expired', track, message: lastError.value.message }
+        }))
         setTimeout(() => next(), 500)
       } else if (statusCode === 404) {
         // Track/file not found
@@ -1601,6 +1604,9 @@ export const usePlayerStore = defineStore('player', () => {
           track: track,
           message: 'Трек не найден'
         }
+        window.dispatchEvent(new CustomEvent('player:error', { 
+          detail: { type: 'not_found', track, message: lastError.value.message }
+        }))
         try {
           await tracksApi.markUnavailable(track.id)
           track.is_unavailable = true
@@ -1616,6 +1622,9 @@ export const usePlayerStore = defineStore('player', () => {
           track: track,
           message: errorDetail
         }
+        window.dispatchEvent(new CustomEvent('player:error', { 
+          detail: { type: 'playback_error', track, message: errorDetail }
+        }))
         setTimeout(() => next(), 1000)
       }
     } finally {

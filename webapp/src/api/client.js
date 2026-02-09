@@ -1,5 +1,21 @@
 import axios from 'axios'
 import apiCache from '../utils/apiCache'
+import { useNetworkMonitor } from '../composables/useNetworkMonitor'
+
+// Lazy reference to network monitor (initialized on first use)
+let _networkMonitor = null
+const getNetworkMonitor = () => {
+  if (!_networkMonitor) _networkMonitor = useNetworkMonitor()
+  return _networkMonitor
+}
+
+// ============== Retry Configuration ==============
+const RETRY_CONFIG = {
+  maxRetries: 1,           // Одна повторная попытка
+  retryDelay: 1000,        // Задержка перед retry (мс)
+  retryableStatuses: [502, 503, 504, 0], // 0 = network error
+  retryableMethods: ['get', 'head', 'options'], // Только идемпотентные
+}
 
 // Use relative path for production, env variable for development
 const API_URL = import.meta.env.VITE_API_URL || '/api'
@@ -91,9 +107,33 @@ api.interceptors.response.use(
       apiCache.set(cacheKey, response.data)
     }
     
+    // Notify network monitor of successful request
+    try { getNetworkMonitor().recordSuccessfulRequest() } catch {}
+    
     return response
   },
-  (error) => {
+  async (error) => {
+    const config = error.config
+    
+    // Notify network monitor of failed request
+    try { getNetworkMonitor().recordFailedRequest(error) } catch {}
+    
+    // === Retry logic for transient errors ===
+    if (config && !config._retried) {
+      const status = error.response?.status || 0
+      const isRetryable = RETRY_CONFIG.retryableStatuses.includes(status)
+      const isIdempotent = RETRY_CONFIG.retryableMethods.includes(config.method)
+      const isNetworkError = !error.response && error.code !== 'ERR_CANCELED'
+      
+      if ((isRetryable && isIdempotent) || (isNetworkError && isIdempotent)) {
+        config._retried = true
+        console.warn(`[API Retry] Retrying ${config.method?.toUpperCase()} ${config.url} after ${status || 'network'} error`)
+        
+        await new Promise(resolve => setTimeout(resolve, RETRY_CONFIG.retryDelay))
+        return api(config)
+      }
+    }
+    
     // If 401 and we're using JWT, clear the token
     if (error.response?.status === 401 && !window.Telegram?.WebApp?.initData) {
       authStorage.clear()
