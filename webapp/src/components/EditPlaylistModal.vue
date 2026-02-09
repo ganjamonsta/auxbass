@@ -54,6 +54,12 @@
             <!-- Infinite scroll trigger for library search -->
             <div ref="searchLoadTrigger" v-if="hasMoreSearchResults" class="load-trigger"></div>
             <TrackSkeleton v-for="i in searchSkeletonCount" :key="'search-skel-' + i" />
+            <!-- Spacer for full scroll height of remaining library results -->
+            <div
+              v-if="librarySearchTotal - librarySearchItems.length > 0"
+              class="scroll-spacer"
+              :style="{ height: (librarySearchTotal - librarySearchItems.length) * 54 + 'px' }"
+            ></div>
           </template>
 
           <!-- Section: Friends -->
@@ -209,7 +215,7 @@ const {
     items: tracks.value.slice(offset, offset + limit),
     total: tracks.value.length
   }),
-  limit: 50,
+  limit: 9999,
   immediate: false,
   scrollContainer: scrollContentRef,
   skeletonCount: 6
@@ -648,6 +654,11 @@ const save = async () => {
 .load-trigger {
   height: 1px;
   width: 100%;
+}
+
+.scroll-spacer {
+  width: 100%;
+  pointer-events: none;
 }
 
 .no-results {
