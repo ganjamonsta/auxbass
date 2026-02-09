@@ -351,7 +351,11 @@ async def handle_channel_settings(callback: CallbackQuery):
                 callback_data="channel:sync"
             )],
             [InlineKeyboardButton(
-                text="🔍 Найти дубликаты",
+                text="🔍 Сканировать канал",
+                callback_data="channel:scan"
+            )],
+            [InlineKeyboardButton(
+                text="🔎 Найти дубликаты",
                 callback_data="channel:duplicates"
             )],
             [InlineKeyboardButton(
@@ -441,6 +445,35 @@ async def handle_channel_sync(callback: CallbackQuery):
         await callback.answer()
         return
     
+    # If many tracks to sync, suggest scanning the channel first
+    # to restore missing records and avoid sending duplicates
+    if stats["to_sync"] > 50:
+        await callback.message.edit_text(
+            f"⚠️ <b>Нужно отправить {stats['to_sync']} треков</b>\n\n"
+            f"📢 {stats['channel_title']}\n"
+            f"🎵 В базе: <b>{stats['already_synced']}</b> из <b>{stats['total_tracks']}</b>\n\n"
+            f"Если треки уже есть в канале, сначала запустите "
+            f"<b>🔍 Сканирование</b>, чтобы восстановить записи "
+            f"и не создавать дубликаты.\n\n"
+            f"Если канал пустой — запускайте синхронизацию.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(
+                    text="🔍 Сканировать канал",
+                    callback_data="channel:scan"
+                )],
+                [InlineKeyboardButton(
+                    text="🔄 Всё равно синхронизировать",
+                    callback_data="channel:sync_force"
+                )],
+                [InlineKeyboardButton(
+                    text="◀️ Назад",
+                    callback_data="channel:settings"
+                )]
+            ])
+        )
+        await callback.answer()
+        return
+    
     # Show sync started with detailed stats
     await callback.message.edit_text(
         f"🔄 <b>Синхронизация...</b>\n\n"
@@ -520,7 +553,173 @@ async def handle_channel_sync_cancel(callback: CallbackQuery):
     """Cancel ongoing sync"""
     user_id = callback.from_user.id
     channel_service.request_cancel_sync(user_id)
-    await callback.answer("⛔ Прерывание синхронизации...", show_alert=True)
+    await callback.answer("⛔ Прерывание...", show_alert=True)
+
+
+@router.callback_query(F.data == "channel:sync_force")
+async def handle_channel_sync_force(callback: CallbackQuery):
+    """Force sync without scanning first"""
+    user_id = callback.from_user.id
+    
+    if channel_service.is_sync_active(user_id):
+        await callback.answer("Синхронизация уже идёт!", show_alert=True)
+        return
+    
+    channel = await channel_service.get_user_channel(user_id)
+    if not channel:
+        await callback.answer("Канал не найден", show_alert=True)
+        return
+    
+    stats = await channel_service.get_sync_stats(user_id)
+    channel_title = stats.get('channel_title', 'Канал')
+    
+    await callback.message.edit_text(
+        f"🔄 <b>Синхронизация...</b>\n\n"
+        f"📢 {channel_title}\n"
+        f"📤 К отправке: <b>{stats.get('to_sync', '?')}</b> треков\n\n"
+        f"⏳ Отправлено: 0/{stats.get('to_sync', '?')}",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="⛔ Прервать",
+                callback_data="channel:sync_cancel"
+            )]
+        ])
+    )
+    await callback.answer()
+    
+    async def progress_callback(current, total, synced):
+        try:
+            await callback.message.edit_text(
+                f"🔄 <b>Синхронизация...</b>\n\n"
+                f"📢 {channel_title}\n"
+                f"📤 К отправке: <b>{total}</b> треков\n\n"
+                f"⏳ Отправлено: {synced}/{total}",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(
+                        text="⛔ Прервать",
+                        callback_data="channel:sync_cancel"
+                    )]
+                ])
+            )
+        except:
+            pass
+    
+    result = await channel_service.sync_all_tracks(
+        user_id=user_id,
+        bot=callback.bot,
+        progress_callback=progress_callback
+    )
+    
+    if result.get("error"):
+        await callback.message.edit_text(
+            f"❌ Ошибка синхронизации: {result['error']}",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="channel:settings")]
+            ])
+        )
+        return
+    
+    if result.get("cancelled"):
+        await callback.message.edit_text(
+            f"⛔ <b>Синхронизация прервана</b>\n\n"
+            f"📤 Успешно отправлено: <b>{result['synced']}</b>\n"
+            f"⏭️ Уже было в канале: <b>{result['skipped']}</b>",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="channel:settings")]
+            ])
+        )
+        return
+    
+    await callback.message.edit_text(
+        f"✅ <b>Синхронизация завершена!</b>\n\n"
+        f"📤 Добавлено в канал: <b>{result['synced']}</b>\n"
+        f"⏭️ Уже было в канале: <b>{result['skipped']}</b>\n"
+        f"❌ Ошибок: <b>{result['failed']}</b>\n"
+        f"📊 Всего треков: <b>{result['total']}</b>",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="channel:settings")]
+        ])
+    )
+
+
+@router.callback_query(F.data == "channel:scan")
+async def handle_channel_scan(callback: CallbackQuery):
+    """Scan channel to rebuild message index from actual Telegram channel content"""
+    user_id = callback.from_user.id
+    
+    # Check if sync is already running
+    if channel_service.is_sync_active(user_id):
+        await callback.answer("Синхронизация уже идёт!", show_alert=True)
+        return
+    
+    channel = await channel_service.get_user_channel(user_id)
+    if not channel:
+        await callback.answer("Канал не найден", show_alert=True)
+        return
+    
+    await callback.message.edit_text(
+        f"🔍 <b>Сканирование канала...</b>\n\n"
+        f"📢 {channel.channel_title or 'Канал'}\n"
+        f"⏳ Проверяю сообщения в канале...\n\n"
+        f"<i>Бот проверяет историю сообщений канала и восстанавливает\n"
+        f"записи о треках, которые уже были отправлены.</i>",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="⛔ Прервать",
+                callback_data="channel:sync_cancel"
+            )]
+        ])
+    )
+    await callback.answer()
+    
+    channel_title = channel.channel_title or 'Канал'
+    
+    async def scan_progress(scanned, audio_found, restored):
+        try:
+            await callback.message.edit_text(
+                f"🔍 <b>Сканирование канала...</b>\n\n"
+                f"📢 {channel_title}\n"
+                f"📨 Проверено сообщений: <b>{scanned}</b>\n"
+                f"🎵 Найдено аудио: <b>{audio_found}</b>\n"
+                f"🔄 Восстановлено записей: <b>{restored}</b>",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(
+                        text="⛔ Прервать",
+                        callback_data="channel:sync_cancel"
+                    )]
+                ])
+            )
+        except Exception:
+            pass
+    
+    result = await channel_service.scan_channel(
+        user_id=user_id,
+        bot=callback.bot,
+        progress_callback=scan_progress,
+    )
+    
+    if result.get("error"):
+        await callback.message.edit_text(
+            f"❌ Ошибка сканирования: {result['error']}",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="◀️ Назад", callback_data="channel:settings")]
+            ])
+        )
+        return
+    
+    cancelled_text = "\n⛔ <i>Сканирование прервано</i>" if result.get("cancelled") else ""
+    
+    await callback.message.edit_text(
+        f"✅ <b>Сканирование завершено!</b>{cancelled_text}\n\n"
+        f"📢 {channel_title}\n"
+        f"📨 Проверено сообщений: <b>{result['scanned']}</b>\n"
+        f"🎵 Найдено аудио: <b>{result['audio_found']}</b>\n"
+        f"🔄 Восстановлено записей: <b>{result['restored']}</b>\n"
+        f"✅ Уже были в базе: <b>{result['already_known']}</b>",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="◀️ Назад", callback_data="channel:settings")]
+        ])
+    )
 
 
 @router.callback_query(F.data == "channel:duplicates")

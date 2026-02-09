@@ -1141,6 +1141,221 @@ class ChannelService:
             logger.info(f"Track {track_id} liked from channel pin by user {user_id}")
             return True
     
+    async def scan_channel(
+        self,
+        user_id: int,
+        bot: Optional[Bot] = None,
+        progress_callback=None,
+    ) -> dict:
+        """
+        Scan Telegram channel to rebuild channel_messages index.
+        
+        Iterates through channel message history using copyMessage 
+        (forward to self + delete) to find audio files and match them 
+        to library tracks by file_unique_id. Creates missing 
+        ChannelMessage records.
+        
+        This fixes the situation where tracks exist in the channel 
+        but channel_messages DB records are missing.
+        
+        Args:
+            user_id: User who owns the channel
+            bot: Bot instance
+            progress_callback: Optional async callback(scanned, found, restored)
+            
+        Returns:
+            Dict with: {scanned, audio_found, restored, already_known, failed, total_in_channel}
+        """
+        use_bot = bot or self.bot
+        if not use_bot:
+            return {"error": "Bot not initialized"}
+        
+        async with get_session() as session:
+            # Get channel
+            channel = await session.scalar(
+                select(UserChannel).where(
+                    UserChannel.user_id == user_id,
+                    UserChannel.is_active == True
+                )
+            )
+            if not channel:
+                return {"error": "No channel configured"}
+            
+            # Get existing channel_message records (track_id -> message_id)
+            existing_result = await session.execute(
+                select(ChannelMessage).where(
+                    ChannelMessage.channel_id == channel.id
+                )
+            )
+            existing_messages = existing_result.scalars().all()
+            known_message_ids = {msg.message_id for msg in existing_messages}
+            known_track_ids = {msg.track_id for msg in existing_messages}
+            
+            # Build file_unique_id -> Track mapping for user's library
+            from shared.models import UserLibrary
+            track_result = await session.execute(
+                select(Track)
+                .join(UserLibrary, UserLibrary.track_id == Track.id)
+                .where(UserLibrary.user_id == user_id)
+            )
+            tracks = track_result.scalars().all()
+            fuid_to_track = {t.file_unique_id: t for t in tracks}
+            
+            stats = {
+                "scanned": 0,
+                "audio_found": 0,
+                "restored": 0,
+                "already_known": 0,
+                "not_in_library": 0,
+                "failed": 0,
+                "errors": 0,
+            }
+            
+            # We need a chat to forward messages to temporarily.
+            # Use user's own chat (DM with bot) as temp destination.
+            temp_chat_id = user_id
+            
+            # Determine max message_id by trying a high number and binary-searching down
+            # OR: start from 1 and go up until we get consistent "not found" errors
+            logger.info(f"Starting channel scan for user {user_id}, channel {channel.channel_id}")
+            
+            consecutive_not_found = 0
+            max_consecutive_not_found = 50  # Stop after 50 consecutive missing messages
+            message_id = 0
+            
+            # Clear cancel flag
+            self.clear_cancel_flag(user_id)
+            
+            while True:
+                message_id += 1
+                
+                # Check for cancellation
+                if self.is_sync_cancelled(user_id):
+                    self.clear_cancel_flag(user_id)
+                    stats["cancelled"] = True
+                    break
+                
+                try:
+                    # Forward message to user's DM to read its content
+                    forwarded = await use_bot.forward_message(
+                        chat_id=temp_chat_id,
+                        from_chat_id=channel.channel_id,
+                        message_id=message_id,
+                    )
+                    consecutive_not_found = 0
+                    stats["scanned"] += 1
+                    
+                    # Delete the forwarded copy immediately
+                    try:
+                        await use_bot.delete_message(
+                            chat_id=temp_chat_id,
+                            message_id=forwarded.message_id,
+                        )
+                    except Exception:
+                        pass
+                    
+                    # Check if it's an audio message
+                    if forwarded.audio:
+                        stats["audio_found"] += 1
+                        file_unique_id = forwarded.audio.file_unique_id
+                        
+                        # Already known in DB?
+                        if message_id in known_message_ids:
+                            stats["already_known"] += 1
+                        elif file_unique_id in fuid_to_track:
+                            # Found a track matching our library!
+                            track = fuid_to_track[file_unique_id]
+                            
+                            # Don't create duplicate if track already has a record
+                            if track.id in known_track_ids:
+                                stats["already_known"] += 1
+                            else:
+                                # Restore the channel_message record
+                                channel_message = ChannelMessage(
+                                    channel_id=channel.id,
+                                    track_id=track.id,
+                                    message_id=message_id,
+                                )
+                                session.add(channel_message)
+                                known_track_ids.add(track.id)
+                                known_message_ids.add(message_id)
+                                stats["restored"] += 1
+                                
+                                # Commit in batches of 50
+                                if stats["restored"] % 50 == 0:
+                                    await session.commit()
+                        else:
+                            stats["not_in_library"] += 1
+                    
+                    # Progress callback every 100 messages
+                    if progress_callback and stats["scanned"] % 100 == 0:
+                        try:
+                            await progress_callback(
+                                stats["scanned"],
+                                stats["audio_found"],
+                                stats["restored"],
+                            )
+                        except Exception:
+                            pass
+                    
+                    # Rate limit: ~20 requests/sec
+                    await asyncio.sleep(0.05)
+                    
+                except TelegramBadRequest as e:
+                    error_text = str(e).lower()
+                    if "message to forward not found" in error_text or "message not found" in error_text:
+                        consecutive_not_found += 1
+                        if consecutive_not_found >= max_consecutive_not_found:
+                            # Reached the end of channel messages
+                            break
+                    else:
+                        stats["errors"] += 1
+                        logger.warning(f"Scan error at msg {message_id}: {e}")
+                        consecutive_not_found += 1
+                        if consecutive_not_found >= max_consecutive_not_found:
+                            break
+                    
+                    # Even for not-found, small delay to avoid hammering
+                    await asyncio.sleep(0.03)
+                    
+                except TelegramRetryAfter as e:
+                    logger.warning(f"Rate limited during scan, waiting {e.retry_after}s")
+                    await asyncio.sleep(e.retry_after + 1)
+                    message_id -= 1  # Retry this message
+                    
+                except TelegramForbiddenError:
+                    stats["error"] = "Bot lost access to channel"
+                    break
+                    
+                except Exception as e:
+                    stats["errors"] += 1
+                    logger.error(f"Unexpected scan error at msg {message_id}: {e}")
+                    consecutive_not_found += 1
+                    if consecutive_not_found >= max_consecutive_not_found:
+                        break
+            
+            # Final commit
+            await session.commit()
+            
+            logger.info(
+                f"Channel scan completed for user {user_id}: "
+                f"scanned={stats['scanned']}, audio={stats['audio_found']}, "
+                f"restored={stats['restored']}, already_known={stats['already_known']}"
+            )
+            
+            # Final progress callback
+            if progress_callback:
+                try:
+                    await progress_callback(
+                        stats["scanned"],
+                        stats["audio_found"],
+                        stats["restored"],
+                    )
+                except Exception:
+                    pass
+            
+            return stats
+
     async def verify_channel_access(
         self,
         channel_id: int,
