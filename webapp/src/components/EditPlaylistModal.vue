@@ -39,10 +39,10 @@
         <!-- Search results -->
         <div v-if="searchQuery && hasAnyResults" class="search-results">
           <!-- Section: My Library -->
-          <template v-if="libraryResults.length">
-            <div class="section-label">Моя библиотека</div>
+          <template v-if="librarySearchItems.length">
+            <div class="section-label">Моя библиотека ({{ librarySearchTotal }})</div>
             <TrackSearchItem
-              v-for="track in libraryResults"
+              v-for="track in librarySearchItems"
               :key="'lib-' + track.id"
               :track="track"
               :isInPlaylist="isTrackInPlaylist(track.id)"
@@ -51,6 +51,9 @@
               @add="addTrack"
               @remove="removeTrack"
             />
+            <!-- Infinite scroll trigger for library search -->
+            <div ref="searchLoadTrigger" v-if="hasMoreSearchResults" class="load-trigger"></div>
+            <TrackSkeleton v-for="i in searchSkeletonCount" :key="'search-skel-' + i" />
           </template>
 
           <!-- Section: Friends -->
@@ -118,9 +121,9 @@
               @remove="removeTrackFromList(track, index)"
             />
             <!-- Infinite scroll trigger -->
-            <div ref="loadTriggerRef" v-if="hasMoreTracks" class="load-trigger"></div>
+            <div ref="tracksLoadTrigger" v-if="hasMoreTracks" class="load-trigger"></div>
             <!-- Loading skeletons -->
-            <TrackSkeleton v-for="i in loadingSkeletonCount" :key="'skel-' + i" />
+            <TrackSkeleton v-for="i in tracksSkeletonCount" :key="'skel-' + i" />
           </div>
           <div v-else class="empty-playlist-hint">
             <span><Music :size="32" /></span>
@@ -196,9 +199,9 @@ const scrollContentRef = ref(null)
 const {
   items: virtualTracks,
   hasMore: hasMoreTracks,
-  loadTriggerRef,
+  loadTriggerRef: tracksLoadTrigger,
   loadingMore: virtualLoadingMore,
-  loadingSkeletonCount,
+  loadingSkeletonCount: tracksSkeletonCount,
   reset: resetVirtualScroll,
   clear: clearVirtualScroll,
 } = useVirtualScroll({
@@ -231,19 +234,69 @@ const handleDeleteClick = () => {
   }
 }
 
-// Search (unified three-tier: library → friends → global)
+// Search: friends & global from useTrackSearch, library via infinite scroll
 const {
   searchQuery,
-  libraryResults,
   friendsResults,
   globalResults,
-  isSearching: searching,
   isFriendsLoading: friendsLoading,
   isGlobalLoading: globalLoading,
-  hasAnyResults,
-  debouncedSearch,
-  clearSearch,
-} = useTrackSearch({ perPage: 20 })
+  searchFriendsAndGlobal,
+  clearSearch: clearTrackSearch,
+} = useTrackSearch({ perPage: 30 })
+
+// Infinite scroll for library search results
+const {
+  items: librarySearchItems,
+  total: librarySearchTotal,
+  hasMore: hasMoreSearchResults,
+  loading: librarySearchLoading,
+  loadTriggerRef: searchLoadTrigger,
+  loadingSkeletonCount: searchSkeletonCount,
+  reset: resetLibrarySearch,
+  clear: clearLibrarySearch,
+} = useVirtualScroll({
+  fetchFn: async ({ offset, limit }) => {
+    const page = Math.floor(offset / limit) + 1
+    const res = await api.get('/library', {
+      params: { search: searchQuery.value, per_page: limit, page }
+    })
+    return { items: res.data.items || [], total: res.data.total || 0 }
+  },
+  limit: 30,
+  immediate: false,
+  scrollContainer: scrollContentRef,
+  skeletonCount: 4
+})
+
+// Computed search state
+const searching = computed(() => librarySearchLoading.value)
+const hasAnyResults = computed(() =>
+  librarySearchItems.value.length > 0 ||
+  friendsResults.value.length > 0 ||
+  globalResults.value.length > 0
+)
+
+// Debounced search: library via virtual scroll, friends/global via useTrackSearch
+let searchDebounceTimer = null
+const debouncedSearch = () => {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+  searchDebounceTimer = setTimeout(async () => {
+    const query = searchQuery.value.trim()
+    if (!query) {
+      clearLibrarySearch()
+      return
+    }
+    await resetLibrarySearch()
+    searchFriendsAndGlobal(query, librarySearchItems.value)
+  }, 300)
+}
+
+const clearSearch = () => {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+  clearTrackSearch()
+  clearLibrarySearch()
+}
 
 const addingTrackId = ref(null)
 const removingTrackId = ref(null)
@@ -291,6 +344,7 @@ watch(() => props.show, (show) => {
   if (!show) {
     clearSearch()
     clearVirtualScroll()
+    clearLibrarySearch()
     deleteConfirmPending.value = false
     if (deleteConfirmTimer) clearTimeout(deleteConfirmTimer)
   }
