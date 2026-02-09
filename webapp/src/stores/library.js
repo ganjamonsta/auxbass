@@ -370,7 +370,7 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
-  // ============== Unified Playlist Change Notification ==============
+  // ============== Unified Change Notifications ==============
   
   /**
    * Notify the entire app that playlist data has changed.
@@ -385,6 +385,44 @@ export const useLibraryStore = defineStore('library', () => {
     await fetchPlaylists()
     window.dispatchEvent(new CustomEvent('playlist:changed', {
       detail: { playlistId }
+    }))
+  }
+
+  /**
+   * Notify the entire app that track data has changed.
+   * Call this after ANY track mutation (edit title/artist/album/genre).
+   *
+   * 1. Invalidates API cache for tracks
+   * 2. Patches track in-place in all library lists (tracks, globalTracks, likedTracks, etc.)
+   * 3. Patches playerStore.currentTrack and queue entries if they match
+   * 4. Dispatches event for VirtualTrackList and other non-Pinia listeners
+   */
+  const notifyTrackChange = async (trackId, updatedData) => {
+    // 1. Invalidate API cache
+    apiCache.invalidateRelated('track', trackId)
+
+    // 2. Patch track in all local lists
+    const patchInList = (list) => {
+      const idx = list.findIndex(t => t.id === trackId)
+      if (idx !== -1) {
+        Object.assign(list[idx], updatedData)
+      }
+    }
+    patchInList(tracks.value)
+    patchInList(globalTracks.value)
+    patchInList(recentUploads.value)
+    patchInList(popularTracks.value)
+    patchInList(likedTracks.value)
+    patchInList(selectedUserTracks.value)
+
+    // 3. Patch in player store (currentTrack + queue + mediaSession) — dynamic import to avoid circular deps
+    const { usePlayerStore } = await import('./player')
+    const playerStore = usePlayerStore()
+    playerStore.patchTrack(trackId, updatedData)
+
+    // 4. Dispatch event for VirtualTrackList and other listeners
+    window.dispatchEvent(new CustomEvent('track:changed', {
+      detail: { trackId, data: updatedData }
     }))
   }
 
@@ -416,10 +454,8 @@ export const useLibraryStore = defineStore('library', () => {
   const updateTrack = async (id, data) => {
     try {
       const response = await tracksApi.update(id, data)
-      const index = tracks.value.findIndex(t => t.id === id)
-      if (index !== -1) {
-        tracks.value[index] = response.data
-      }
+      // Notify entire app about the track change
+      await notifyTrackChange(id, response.data)
       // Refresh artists list if artist was changed
       if (data.artist !== undefined) {
         fetchArtists(artistScope.value)
@@ -802,6 +838,7 @@ export const useLibraryStore = defineStore('library', () => {
     addTrackToPlaylist,
     removeTrackFromPlaylist,
     notifyPlaylistChange,
+    notifyTrackChange,
     updateTrack,
     deleteTrack,
     toggleLike,

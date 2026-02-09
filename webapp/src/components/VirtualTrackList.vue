@@ -380,6 +380,17 @@ const getLoadedTracks = () => {
   return sparseItems.value.filter(Boolean)
 }
 
+// Listen for track:changed events to patch tracks in-place
+const onTrackChanged = (event) => {
+  const { trackId, data } = event.detail || {}
+  if (!trackId || !data) return
+  for (let i = 0; i < sparseItems.value.length; i++) {
+    if (sparseItems.value[i]?.id === trackId) {
+      Object.assign(sparseItems.value[i], data)
+    }
+  }
+}
+
 // Setup
 onMounted(() => {
   scrollContainer = findScrollContainer(containerRef.value)
@@ -401,6 +412,7 @@ onMounted(() => {
     loadVisiblePages()
   })
   
+  window.addEventListener('track:changed', onTrackChanged)
   load()
 })
 
@@ -410,6 +422,7 @@ onUnmounted(() => {
   } else if (scrollContainer) {
     scrollContainer.removeEventListener('scroll', handleScroll)
   }
+  window.removeEventListener('track:changed', onTrackChanged)
 })
 
 // Expose methods

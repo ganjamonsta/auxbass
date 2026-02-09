@@ -2594,6 +2594,22 @@ export const usePlayerStore = defineStore('player', () => {
     clearPlayerState()
   }
 
+  /**
+   * Patch track data in-place (currentTrack + queue).
+   * Used by notifyTrackChange to keep player UI in sync after track edits.
+   */
+  const patchTrack = (trackId, data) => {
+    if (currentTrack.value?.id === trackId) {
+      Object.assign(currentTrack.value, data)
+      updateMediaSession()
+    }
+    for (const qTrack of queue.value) {
+      if (qTrack.id === trackId) {
+        Object.assign(qTrack, data)
+      }
+    }
+  }
+
   return {
     currentTrack,
     queue,
@@ -2643,6 +2659,7 @@ export const usePlayerStore = defineStore('player', () => {
     toggleRepeat,
     playFromQueue,
     stop,
+    patchTrack,
     setOnTrackUnavailable,
     restoreState,
     resumeFromState,
