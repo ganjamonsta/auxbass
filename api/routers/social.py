@@ -328,13 +328,15 @@ async def get_followers(
 @router.get("/friends/search")
 async def search_friends_libraries(
     search: str = Query(..., min_length=1),
-    per_page: int = Query(30, ge=1, le=100),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=100),
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Search tracks in libraries of users you follow.
     Returns tracks from friends that match the search query.
+    Supports pagination via page/per_page.
     """
     # Get list of users we follow
     following_result = await db.execute(
@@ -349,35 +351,50 @@ async def search_friends_libraries(
         return {
             "items": [],
             "total": 0,
+            "page": page,
+            "per_page": per_page,
         }
     
     # Search tracks in friends' libraries
     # Use ilike for case-insensitive search (works better with Cyrillic in PostgreSQL)
     search_term = f"%{search}%"
     
+    search_filter = or_(
+        Track.title.ilike(search_term),
+        Track.artist.ilike(search_term),
+    )
+    
+    # Count total unique tracks matching search across friends
+    # Use a subquery to count distinct track_ids
+    count_query = (
+        select(func.count(func.distinct(Track.id)))
+        .join(UserLibrary, UserLibrary.track_id == Track.id)
+        .where(UserLibrary.user_id.in_(following_ids))
+        .where(search_filter)
+    )
+    total = await db.scalar(count_query) or 0
+    
+    offset = (page - 1) * per_page
+    
     query = (
         select(Track, UserLibrary, User)
         .join(UserLibrary, UserLibrary.track_id == Track.id)
         .join(User, User.id == UserLibrary.user_id)
         .where(UserLibrary.user_id.in_(following_ids))
-        .where(
-            or_(
-                Track.title.ilike(search_term),
-                Track.artist.ilike(search_term),
-            )
-        )
+        .where(search_filter)
         .options(
             selectinload(Track.enrichment),
             selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
         )
         .order_by(UserLibrary.added_at.desc())
+        .offset(offset)
         .limit(per_page)
     )
     
     result = await db.execute(query)
     rows = result.unique().all()
     
-    logger.info(f"[Social Search] Found {len(rows)} tracks for '{search}'")
+    logger.info(f"[Social Search] Found {len(rows)} tracks (total: {total}) for '{search}' page={page}")
     if rows:
         for track, lib_entry, owner in rows[:3]:
             logger.info(f"[Social Search]   - '{track.artist}' - '{track.title}'")
@@ -411,7 +428,9 @@ async def search_friends_libraries(
     
     return {
         "items": items,
-        "total": len(items),
+        "total": total,
+        "page": page,
+        "per_page": per_page,
     }
 
 

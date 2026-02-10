@@ -288,7 +288,7 @@ export const playerApi = {
 
 // Social
 export const socialApi = {
-  searchFriends: (search, perPage = 30) => api.get('/social/friends/search', { params: { search, per_page: perPage } }),
+  searchFriends: (search, perPage = 50, page = 1) => api.get('/social/friends/search', { params: { search, per_page: perPage, page } }),
   getFollowing: () => api.get('/social/following'),
   getFollowers: () => api.get('/social/followers'),
   searchUsers: (query, page = 1, perPage = 30) => api.get('/social/search', { params: { query, page, per_page: perPage } }),

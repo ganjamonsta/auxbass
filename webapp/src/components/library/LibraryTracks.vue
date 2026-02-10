@@ -80,7 +80,7 @@
         <template v-if="friendsTracks.length">
           <div class="section-header friends-section">
             <span class="section-title"><Users :size="16" /> У друзей</span>
-            <span class="section-count">{{ friendsTracks.length }}</span>
+            <span class="section-count">{{ friendsTracks.length }}<template v-if="friendsTotal > friendsTracks.length"> из {{ friendsTotal }}</template></span>
           </div>
           
           <TrackItem
@@ -99,6 +99,17 @@
             @hdNotice="handleHdNotice"
             @addToLibrary="handleAddToLibrary(track)"
           />
+
+          <!-- Load more friends -->
+          <button v-if="hasMoreFriends" class="load-more-btn" :disabled="friendsLoadingMore" @click="loadMoreFriends">
+            <template v-if="friendsLoadingMore">
+              <div class="spinner small"></div>
+              <span>Загрузка...</span>
+            </template>
+            <template v-else>
+              <span>Показать ещё</span>
+            </template>
+          </button>
         </template>
         
         <!-- Loading friends results -->
@@ -111,7 +122,7 @@
         <template v-if="globalTracks.length">
           <div class="section-header global-section">
             <span class="section-title"><Globe :size="16" /> Общая сеть</span>
-            <span class="section-count">{{ globalTracks.length }}</span>
+            <span class="section-count">{{ globalTracks.length }}<template v-if="globalTotal > globalTracks.length"> из {{ globalTotal }}</template></span>
           </div>
           
           <TrackItem
@@ -130,6 +141,17 @@
             @hdNotice="handleHdNotice"
             @addToLibrary="handleAddToLibrary(track)"
           />
+
+          <!-- Load more global -->
+          <button v-if="hasMoreGlobal" class="load-more-btn" :disabled="globalLoadingMore" @click="loadMoreGlobal">
+            <template v-if="globalLoadingMore">
+              <div class="spinner small"></div>
+              <span>Загрузка...</span>
+            </template>
+            <template v-else>
+              <span>Показать ещё</span>
+            </template>
+          </button>
         </template>
         
         <!-- Loading global results -->
@@ -222,9 +244,17 @@ const {
   globalResults: globalTracks,
   isFriendsLoading: friendsLoading,
   isGlobalLoading: globalLoading,
+  isFriendsLoadingMore: friendsLoadingMore,
+  isGlobalLoadingMore: globalLoadingMore,
+  hasMoreFriends,
+  hasMoreGlobal,
+  friendsTotal,
+  globalTotal,
   searchFriendsAndGlobal,
+  loadMoreFriends,
+  loadMoreGlobal,
   clearSearch: clearSecondarySearch,
-} = useTrackSearch({ perPage: 30 })
+} = useTrackSearch({ perPage: 50 })
 
 // Fetch function for VirtualTrackList (without search)
 const fetchTracks = async ({ offset, limit }) => {
@@ -531,6 +561,33 @@ onUnmounted(() => {
   padding: 16px;
   color: var(--text-secondary);
   font-size: 13px;
+}
+
+.load-more-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  margin-top: 8px;
+  background: var(--bg-elevated, rgba(255, 255, 255, 0.05));
+  color: var(--accent);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.load-more-btn:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.08));
+}
+
+.load-more-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* load-trigger is in design-system.css */
