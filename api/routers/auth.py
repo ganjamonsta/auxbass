@@ -11,7 +11,7 @@ from urllib.parse import parse_qsl, unquote
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, HTTPException, Header, Depends
+from fastapi import APIRouter, HTTPException, Header, Depends, Response
 from pydantic import BaseModel
 import jwt
 
@@ -333,6 +333,12 @@ async def validate_auth(
 async def get_me(user: TelegramUser = Depends(get_current_user)):
     """Get current user info"""
     return user
+
+
+@router.head("/status")
+async def head_status():
+    """HEAD endpoint for network latency checks (used by webapp NetworkMonitor)"""
+    return Response(status_code=200)
 
 
 @router.get("/status", response_model=UserStatusResponse)

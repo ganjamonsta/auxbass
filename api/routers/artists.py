@@ -195,7 +195,7 @@ def get_best_display_name(artist_names: list[str]) -> str:
 @router.get("", response_model=ArtistsListResponse)
 async def get_my_artists(
     offset: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=500),
     search: Optional[str] = None,
     sort_by: str = Query("name", pattern="^(name|track_count|album_count|latest_release)$"),
     sort_order: str = Query("asc", pattern="^(asc|desc)$"),

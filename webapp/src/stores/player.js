@@ -126,28 +126,38 @@ export const usePlayerStore = defineStore('player', () => {
   
   // ============== Stall Recovery ==============
   const STALL_TIMEOUT = 10_000        // 10 секунд до попытки recovery
+  const STALL_INITIAL_TIMEOUT = 15_000 // 15 секунд для первоначальной загрузки (readyState=0)
   const STALL_MAX_RETRIES = 2         // Макс попыток перезагрузки при stall
   let stallTimer = null
   let stallRetryCount = 0
+
+  // Play generation counter — prevents stale stall recovery / error handling
+  let _playGeneration = 0
   
   // ============== Audio Error Retry ==============
   const AUDIO_RETRY_DELAY = 1500      // Задержка перед retry при NETWORK ошибке
   let audioRetryCount = 0
   const MAX_AUDIO_RETRIES = 1         // 1 retry перед skip
   
-  // Network monitor (lazy init)
-  let _networkMonitor = null
-  const getNetworkMonitor = () => {
-    if (!_networkMonitor) _networkMonitor = useNetworkMonitor()
-    return _networkMonitor
-  }
+  // Network monitor — auto-retry playback on network recovery
+  const _networkMonitor = useNetworkMonitor()
+  // Watch networkRecovered signal: when network comes back during a stall, retry current track
+  watch(() => _networkMonitor.networkRecovered.value, (recovered) => {
+    if (recovered && currentTrack.value && !isPlaying.value && lastError.value?.type === 'stall_timeout') {
+      console.log('[Player] Network recovered, retrying last stalled track')
+      lastError.value = null
+      stallRetryCount = 0
+      play(currentTrack.value)
+    }
+  })
   
   // ============== Stall Recovery Helpers ==============
-  const startStallTimer = () => {
+  const startStallTimer = (initial = false) => {
     clearStallTimer()
+    const timeout = initial ? STALL_INITIAL_TIMEOUT : STALL_TIMEOUT
     stallTimer = setTimeout(() => {
       handleStallTimeout()
-    }, STALL_TIMEOUT)
+    }, timeout)
   }
   
   const clearStallTimer = () => {
@@ -159,6 +169,8 @@ export const usePlayerStore = defineStore('player', () => {
   
   const handleStallTimeout = async () => {
     if (!audio.value || !currentTrack.value) return
+    
+    const generation = _playGeneration
     
     // Проверить: может уже играет нормально?
     if (!audio.value.paused && audio.value.readyState >= 3) {
@@ -172,7 +184,6 @@ export const usePlayerStore = defineStore('player', () => {
     console.warn(`[Stall Recovery] Audio stalled for ${STALL_TIMEOUT/1000}s, attempt ${stallRetryCount}/${STALL_MAX_RETRIES}`)
     
     if (stallRetryCount <= STALL_MAX_RETRIES) {
-      // Попытка 1: перезагрузить текущий src
       try {
         const currentTime = audio.value.currentTime
         const src = audio.value.src
@@ -183,8 +194,14 @@ export const usePlayerStore = defineStore('player', () => {
           audio.value.load()
           audio.value.currentTime = currentTime
           await audio.value.play()
+          
+          // Check if we're still on the same track
+          if (generation !== _playGeneration) {
+            console.log('[Stall Recovery] Track changed during recovery, aborting')
+            return
+          }
+          
           console.log('[Stall Recovery] Reload successful')
-          // Уведомление через событие
           window.dispatchEvent(new CustomEvent('player:stall-recovered', { 
             detail: { track, attempt: stallRetryCount }
           }))
@@ -193,6 +210,13 @@ export const usePlayerStore = defineStore('player', () => {
           // Вторая попытка — получить свежий URL
           console.log('[Stall Recovery] Fetching fresh URL')
           const response = await playerApi.getStreamUrl(track.id)
+          
+          // Check if we're still on the same track
+          if (generation !== _playGeneration) {
+            console.log('[Stall Recovery] Track changed during recovery, aborting')
+            return
+          }
+          
           const newUrl = response.data.url
           setCachedUrl(track.id, newUrl, response.data.expires_at)
           
@@ -206,9 +230,22 @@ export const usePlayerStore = defineStore('player', () => {
           return
         }
       } catch (e) {
+        // AbortError means play() was interrupted by a new load (e.g. next track)
+        if (e.name === 'AbortError') {
+          console.log('[Stall Recovery] Interrupted by new load request, aborting recovery')
+          return
+        }
+        // Track changed while we were recovering
+        if (generation !== _playGeneration) {
+          console.log('[Stall Recovery] Track changed during recovery, aborting')
+          return
+        }
         console.error('[Stall Recovery] Attempt failed:', e)
       }
     }
+    
+    // Check once more if track changed
+    if (generation !== _playGeneration) return
     
     // Все попытки исчерпаны — уведомить и скипнуть
     console.warn('[Stall Recovery] All attempts failed, skipping track')
@@ -781,8 +818,10 @@ export const usePlayerStore = defineStore('player', () => {
     el.addEventListener('waiting', () => {
       if (el.readyState < 3) { 
         loading.value = true
-        startStallTimer()
-        console.log(`[Audio Waiting] readyState=${el.readyState}, currentTime=${el.currentTime.toFixed(2)}, buffered=${buffered.value.toFixed(2)}`)
+        // Use longer timeout for initial load (no data yet) vs mid-stream buffer
+        const isInitialLoad = el.readyState === 0 && el.currentTime === 0
+        startStallTimer(isInitialLoad)
+        console.log(`[Audio Waiting] readyState=${el.readyState}, currentTime=${el.currentTime.toFixed(2)}, buffered=${buffered.value.toFixed(2)}${isInitialLoad ? ' (initial load)' : ''}`)
       }
     })
     
@@ -1381,6 +1420,9 @@ export const usePlayerStore = defineStore('player', () => {
     currentTrack.value = track
     lastError.value = null
     
+    // Increment play generation to invalidate stale stall recovery / error handlers
+    const generation = ++_playGeneration
+    
     // Update Media Session
     updateMediaSession()
     
@@ -1506,6 +1548,21 @@ export const usePlayerStore = defineStore('player', () => {
       // Preload is now triggered by canplaythrough event for faster start
       
     } catch (error) {
+      // AbortError = play() was interrupted by a new load request (src change, next track, etc.)
+      // This is NOT a real playback error — just ignore it
+      if (error.name === 'AbortError' || 
+          (error.message && error.message.includes('interrupted by a new load request'))) {
+        console.log(`[Play] Interrupted by new load request for track ${track?.id}, ignoring`)
+        loading.value = false
+        return
+      }
+      
+      // Stale play() — a newer play() has started, ignore this error
+      if (generation !== _playGeneration) {
+        console.log(`[Play] Stale play error for track ${track?.id} (gen ${generation} vs ${_playGeneration}), ignoring`)
+        return
+      }
+      
       console.error('[Play Error] Failed to play track:', error)
       console.error(`[Play Error] Track: id=${track?.id}, title="${track?.title}", artist="${track?.artist}"`)
       

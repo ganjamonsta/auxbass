@@ -388,7 +388,7 @@ const handlePlayerError = (e) => {
       }
       break
     case 'stall_timeout':
-      uiStore.toast.warning('Медленная загрузка', `Трек «${trackTitle}» не загрузился за 10с`)
+      uiStore.toast.warning('Медленная загрузка', `Трек «${trackTitle}» не загружается — проблемы с сетью`)
       break
     case 'not_found':
       uiStore.toast.error('Трек не найден', `«${trackTitle}» больше недоступен`)
