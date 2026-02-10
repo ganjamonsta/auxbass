@@ -142,6 +142,13 @@
           <span class="empty-icon"><Music :size="48" /></span>
           <h3>Ничего не найдено</h3>
         </div>
+
+        <!-- Load more trigger for search infinite scroll -->
+        <div v-if="hasMore" ref="loadTriggerRef" class="load-trigger">
+          <div v-if="loadingMore" class="loading-more">
+            <div class="spinner small"></div>
+          </div>
+        </div>
       </template>
     </div>
   </div>
@@ -201,7 +208,8 @@ const loadingMore = ref(false)
 const shuffling = ref(false)
 const tracks = ref([])
 const page = ref(1)
-const total = computed(() => props.searchQuery ? tracks.value.length : virtualTotal.value)
+const searchTotal = ref(0) // Real total from API during search
+const total = computed(() => props.searchQuery ? searchTotal.value : virtualTotal.value)
 const perPage = 50
 const loadTriggerRef = ref(null)
 let observer = null
@@ -290,7 +298,7 @@ const loadSearchTracks = async () => {
     // Code: `await libraryStore.fetchTracks(...)` then `tracks.value = libraryStore.tracks`.
     
     tracks.value = libraryStore.tracks
-    total.value = libraryStore.total
+    searchTotal.value = libraryStore.total
   } finally {
     loading.value = false
     loadingMore.value = false
