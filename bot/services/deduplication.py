@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from shared.database import get_session
 from shared.models import Track, UserLibrary, ChannelMessage, ChannelMessageStatus, UserChannel
 from shared.matching import normalize_unicode
+from bot.services.channels import get_channel_service
 
 logger = logging.getLogger(__name__)
 
@@ -217,7 +218,8 @@ class DeduplicationService:
 
     async def resolve_duplicates(self, keep_track_id: int, delete_track_ids: List[int], user_id: int) -> bool:
         """
-        Keep one track and remove others from UserLibrary (and optionally delete Track if no other owners).
+        Keep one track and remove others from UserLibrary.
+        Also removes deleted tracks from user's channel (channel = mirror).
         """
         async with get_session() as session:
             # Delete from UserLibrary
@@ -229,43 +231,30 @@ class DeduplicationService:
             
             for entry in entries:
                 await session.delete(entry)
-                
-            # Optional: Check if tracks are orphaned (no other library entries) and delete them
-            # For now, let's strictly follow the user request: "remove duplicates"
-            # If the user uploaded them, and no one else added them, maybe we should delete the Track?
-            # Safe logic: Remove from Library. If Track.uploader is this user and no other library entries, delete Track.
             
             for tid in delete_track_ids:
-                # Check if anyone else has this track
                 other_usage = await session.scalar(
                     select(func.count(UserLibrary.id)).where(UserLibrary.track_id == tid)
                 )
                 
-                # If we just deleted the entry, count should be 0 (if transaction not committed yet? Session tracks it)
-                # Actually, wait, we 'await session.delete(entry)' but not committed.
-                # SQLAlchemy session will know it's deleted.
-                
                 if other_usage == 0:
-                     # Check if it's used in any playlists?
-                     # Models show PlaylistTrack -> cascade delete if Track deleted?
-                     # Let's verify Track model:
-                     # playlist_tracks: Mapped[List["PlaylistTrack"]] = relationship(back_populates="track", cascade="all, delete-orphan")
-                     # Yes.
-                     
-                     # Only delete actual Track if user is uploader or admin logic?
-                     # Let's just remove from Library for safety, or Delete Track if explicitly asked.
-                     # User said: "чтоб их послуушать можно было и уудалить какие внатуре дубликаты"
-                     # Implies deleting the file/track entry.
-                     
                      track = await session.get(Track, tid)
                      if track and track.uploader_id == user_id:
                          await session.delete(track)
 
-            return True
+        # Channel = mirror of library: delete duplicates from channel
+        try:
+            channel_service = get_channel_service()
+            for tid in delete_track_ids:
+                await channel_service.delete_track_from_channel(user_id, tid)
+        except Exception as e:
+            logger.warning(f"Failed to delete duplicates from channel: {e}")
+
+        return True
 
     async def delete_single_track(self, track_id: int, user_id: int) -> bool:
         """
-        Delete a single track from user's library.
+        Delete a single track from user's library and channel.
         If track has no other users, delete the Track entity as well.
         """
         async with get_session() as session:
@@ -285,12 +274,18 @@ class DeduplicationService:
             )
             
             if other_usage == 0:
-                # No one else has this track, delete the Track entity
                 track = await session.get(Track, track_id)
                 if track and track.uploader_id == user_id:
                     await session.delete(track)
             
-            return True
+        # Channel = mirror of library
+        try:
+            channel_service = get_channel_service()
+            await channel_service.delete_track_from_channel(user_id, track_id)
+        except Exception as e:
+            logger.warning(f"Failed to delete track {track_id} from channel: {e}")
+        
+        return True
 
     async def find_potential_duplicates(
         self,

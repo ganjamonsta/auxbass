@@ -556,7 +556,7 @@ async def delete_all_unavailable(
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Remove all unavailable tracks from user's library"""
+    """Remove all unavailable tracks from user's library and channel"""
     # Get unavailable tracks in user's library
     result = await db.execute(
         select(UserLibrary)
@@ -566,11 +566,21 @@ async def delete_all_unavailable(
     )
     entries = result.scalars().all()
     
+    track_ids = [entry.track_id for entry in entries]
     count = len(entries)
     for entry in entries:
         await db.delete(entry)
     
     await db.commit()
+    
+    # Channel = mirror of library: delete from channel too
+    if track_ids:
+        try:
+            channel_service = get_channel_service()
+            for tid in track_ids:
+                await channel_service.delete_track_from_channel(user.id, tid)
+        except Exception as e:
+            logger.warning(f"Failed to delete unavailable tracks from channel: {e}")
     
     return {"removed": count}
 
@@ -861,7 +871,7 @@ async def delete_track(
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete track from library (removes from user library, not globally)"""
+    """Delete track from library and channel (channel = mirror of library)"""
     result = await db.execute(
         select(UserLibrary)
         .where(UserLibrary.track_id == track_id)
@@ -875,7 +885,15 @@ async def delete_track(
     await db.delete(entry)
     await db.commit()
     
-    return {"status": "deleted", "track_id": track_id}
+    # Channel = mirror of library: delete from channel too
+    deleted_from_channel = False
+    try:
+        channel_service = get_channel_service()
+        deleted_from_channel = await channel_service.delete_track_from_channel(user.id, track_id)
+    except Exception as e:
+        logger.warning(f"Failed to delete track {track_id} from channel: {e}")
+    
+    return {"status": "deleted", "track_id": track_id, "deleted_from_channel": deleted_from_channel}
 
 
 @router.post("/{track_id}/like")
@@ -1057,7 +1075,7 @@ async def remove_from_library(
     user: TelegramUser = Depends(require_premium),
     db: AsyncSession = Depends(get_db),
 ):
-    """Remove a track from user's library and delete from channel."""
+    """Remove a track from user's library and channel (channel = mirror of library)."""
     result = await db.execute(
         select(UserLibrary)
         .where(UserLibrary.track_id == track_id)
@@ -1068,22 +1086,16 @@ async def remove_from_library(
     if not entry:
         raise HTTPException(status_code=404, detail="Track not found in your library")
     
-    # Check if track was added from global library (not uploaded by user)
-    is_added = entry.source == LibrarySource.ADDED
-    
     await db.delete(entry)
     await db.commit()
     
-    # Delete from channel if it was added from global library
+    # Channel = mirror of library: always delete from channel
     deleted_from_channel = False
-    if is_added:
-        try:
-            channel_service = get_channel_service()
-            deleted_from_channel = await channel_service.delete_track_from_channel(user.id, track_id)
-            if deleted_from_channel:
-                logger.info(f"Track {track_id} message deleted from channel for user {user.id}")
-        except Exception as e:
-            logger.warning(f"Failed to delete track {track_id} from channel: {e}")
+    try:
+        channel_service = get_channel_service()
+        deleted_from_channel = await channel_service.delete_track_from_channel(user.id, track_id)
+    except Exception as e:
+        logger.warning(f"Failed to delete track {track_id} from channel: {e}")
     
     return {"status": "removed", "track_id": track_id, "deleted_from_channel": deleted_from_channel}
 
