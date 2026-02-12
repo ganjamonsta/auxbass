@@ -1250,79 +1250,35 @@ class ChannelService:
         buffer_chat_id: int,
     ) -> int:
         """
-        Binary-search for the highest existing message_id in a channel.
+        Find the latest message_id in a channel by sending a temporary
+        message and immediately deleting it. The returned message_id
+        equals the current max in the channel.
         
-        Probes message IDs by trying to forward them. If a forward succeeds
-        or returns "can't be forwarded" (service msg), the ID exists.
-        If "not found", the ID doesn't exist.
-        
-        Returns the approximate max message_id (may overshoot slightly, 
-        which is fine — the scanner handles not-found gracefully).
+        This is the only reliable way — Telegram Bot API has no
+        getHistory/getMessages, and binary search fails on sparse channels.
         """
-        # Step 1: Exponentially probe to find an upper bound
-        probe = 1
-        last_found = 0
-        
-        while probe <= 1_000_000:
-            exists = await self._message_exists(bot, channel_id, buffer_chat_id, probe)
-            if exists:
-                last_found = probe
-                probe *= 2
-            else:
-                break
-            await asyncio.sleep(0.03)
-        
-        if last_found == 0:
-            # Try a few small IDs — channel might start from 1-10
-            for test_id in [1, 2, 3, 5, 10]:
-                if await self._message_exists(bot, channel_id, buffer_chat_id, test_id):
-                    last_found = test_id
-                    break
-                await asyncio.sleep(0.03)
-            if last_found == 0:
-                return 0
-        
-        # Step 2: Binary search between last_found and probe (upper bound)
-        lo, hi = last_found, probe
-        while hi - lo > 1:
-            mid = (lo + hi) // 2
-            if await self._message_exists(bot, channel_id, buffer_chat_id, mid):
-                lo = mid
-            else:
-                hi = mid
-            await asyncio.sleep(0.03)
-        
-        logger.debug(f"Binary search found max_msg_id ≈ {lo}")
-        return lo
-    
-    async def _message_exists(
-        self,
-        bot: Bot,
-        channel_id: int,
-        buffer_chat_id: int,
-        message_id: int,
-    ) -> bool:
-        """Check if a message_id exists in the channel by trying to forward it."""
         try:
-            fwd = await bot.forward_message(
-                chat_id=buffer_chat_id,
-                from_chat_id=channel_id,
-                message_id=message_id,
+            # Send a dot message to the channel — its ID = current max
+            tmp = await bot.send_message(
+                chat_id=channel_id,
+                text="⏳",
                 disable_notification=True,
             )
-            # Clean up the forwarded copy
+            max_id = tmp.message_id
+            # Delete immediately — user won't see it
             try:
-                await bot.delete_message(chat_id=buffer_chat_id, message_id=fwd.message_id)
+                await bot.delete_message(chat_id=channel_id, message_id=tmp.message_id)
             except Exception:
                 pass
-            return True
-        except TelegramBadRequest as e:
-            error_text = str(e).lower()
-            if "can't be forwarded" in error_text or "cannot be forwarded" in error_text:
-                return True  # Exists but is a service message
-            return False
-        except Exception:
-            return False
+            # The temp message consumed one ID, so actual content ends at max_id - 1
+            logger.debug(f"Channel {channel_id}: max_msg_id = {max_id - 1}")
+            return max_id - 1
+        except TelegramForbiddenError:
+            logger.error(f"Bot can't post to channel {channel_id} — not admin or no post rights")
+            return 0
+        except Exception as e:
+            logger.error(f"Failed to determine max_msg_id for channel {channel_id}: {e}")
+            return 0
 
     async def scan_channel(
         self,
@@ -1413,8 +1369,8 @@ class ChannelService:
                     buffer_chat_id = user_id
                     use_buffer = False
             
-            # --- Find the max message_id via binary search ---
-            # This avoids scanning thousands of empty IDs linearly.
+            # --- Find the max message_id ---
+            # Send a temp message to the channel and read its ID.
             max_msg_id = await self._find_max_message_id(
                 use_bot, channel.channel_id, buffer_chat_id
             )
