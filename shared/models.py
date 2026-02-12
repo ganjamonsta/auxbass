@@ -62,6 +62,19 @@ class ForwardSourceType(str, Enum):
     HIDDEN = "hidden"
 
 
+class ChannelMessageStatus(str, Enum):
+    """Status of a channel message record.
+    
+    Write-ahead pattern: record is created BEFORE sending to Telegram,
+    then updated to SENT on success or FAILED on error.
+    This ensures the DB always knows about pending operations.
+    """
+    PENDING = "pending"      # Record created, message not yet sent to Telegram
+    SENT = "sent"            # Message successfully sent, message_id is valid
+    FAILED = "failed"        # Send attempt failed, no message in channel
+    DELETED = "deleted"      # Message was confirmed deleted from channel
+
+
 # Helper function to create enum columns that store lowercase values
 def enum_column(enum_class, **kwargs):
     """
@@ -635,7 +648,15 @@ class UserChannel(Base):
 class ChannelMessage(Base):
     """
     Record of a track message in user's channel.
-    Used to update messages when enrichment completes (edit hashtags, etc.)
+    
+    SOURCE OF TRUTH for whether a track is in the channel.
+    Uses write-ahead pattern:
+      1. INSERT with status=PENDING before sending to Telegram
+      2. UPDATE to status=SENT + set message_id on success
+      3. UPDATE to status=FAILED on error (can be retried)
+    
+    Invariant: a track is considered "in the channel" IFF
+    a ChannelMessage exists with status=SENT and a valid message_id.
     """
     __tablename__ = "channel_messages"
     
@@ -643,11 +664,18 @@ class ChannelMessage(Base):
     channel_id: Mapped[int] = mapped_column(Integer, ForeignKey("user_channels.id", ondelete="CASCADE"))
     track_id: Mapped[int] = mapped_column(Integer, ForeignKey("tracks.id", ondelete="CASCADE"))
     
-    # Telegram message reference
-    message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    # Status of the message (write-ahead pattern)
+    status: Mapped[str] = enum_column(ChannelMessageStatus, default=ChannelMessageStatus.PENDING)
+    
+    # Telegram message reference (nullable: not known until successfully sent)
+    message_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     
     # Hashtags stored with message
-    hashtags: Mapped[Optional[str]] = mapped_column(Text)  # JSON array or comma-separated
+    hashtags: Mapped[Optional[str]] = mapped_column(Text)  # JSON array
+    
+    # Retry tracking
+    retry_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
@@ -657,9 +685,15 @@ class ChannelMessage(Base):
     channel: Mapped["UserChannel"] = relationship(back_populates="messages")
     track: Mapped["Track"] = relationship(back_populates="channel_messages")
     
+    @property
+    def is_in_channel(self) -> bool:
+        """Whether this message is confirmed to exist in the Telegram channel."""
+        return self.status == ChannelMessageStatus.SENT and self.message_id is not None
+    
     __table_args__ = (
         UniqueConstraint("channel_id", "track_id", name="uq_channel_message_track"),
         Index("idx_channel_message_track", "track_id"),
+        Index("idx_channel_message_status", "channel_id", "status"),
     )
 
 

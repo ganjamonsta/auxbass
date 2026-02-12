@@ -20,7 +20,7 @@ import asyncio
 
 from shared.config import get_settings
 from shared.database import get_db
-from shared.models import Track, UserLibrary, ChannelMessage, UserChannel, utcnow
+from shared.models import Track, UserLibrary, ChannelMessage, ChannelMessageStatus, UserChannel, utcnow
 from shared.matching import normalize_title, normalize_artist
 
 from .auth import get_current_user
@@ -373,6 +373,7 @@ async def refresh_file_id_from_channel(track_id: int, db: AsyncSession) -> Optio
         select(ChannelMessage, UserChannel)
         .join(UserChannel, ChannelMessage.channel_id == UserChannel.id)
         .where(ChannelMessage.track_id == track_id)
+        .where(ChannelMessage.status == ChannelMessageStatus.SENT)
         .where(UserChannel.is_active == True)
         .limit(1)
     )

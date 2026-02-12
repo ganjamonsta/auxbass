@@ -10,7 +10,7 @@ from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload
 
 from shared.database import get_session
-from shared.models import Track, UserLibrary
+from shared.models import Track, UserLibrary, ChannelMessage, ChannelMessageStatus, UserChannel
 from shared.matching import normalize_unicode
 
 logger = logging.getLogger(__name__)
@@ -305,7 +305,14 @@ class DeduplicationService:
         Uses fuzzy matching on artist/title.
         Excludes the exact same file (by file_unique_id).
         
-        Returns list of potential duplicate tracks from user's library.
+        Checks TWO sources:
+          1. UserLibrary — tracks the user already has
+          2. ChannelMessage(status=SENT) — tracks already in the user's channel
+        
+        This prevents re-uploading a track that is already forwarded
+        to the channel even if the user deleted it from their library.
+        
+        Returns list of potential duplicate tracks.
         """
         if not artist and not title:
             return []
@@ -317,15 +324,38 @@ class DeduplicationService:
             return []
         
         async with get_session() as session:
-            # Fetch all user's tracks
-            result = await session.execute(
+            # 1) Tracks from UserLibrary
+            lib_result = await session.execute(
                 select(Track)
                 .join(UserLibrary)
                 .where(UserLibrary.user_id == user_id)
-                .where(Track.file_unique_id != file_unique_id)  # Exclude exact same file
+                .where(Track.file_unique_id != file_unique_id)
                 .options(selectinload(Track.enrichment))
             )
-            tracks = result.scalars().all()
+            library_tracks = list(lib_result.scalars().all())
+            
+            # 2) Tracks already SENT to the user's channel (may not be in library)
+            channel_result = await session.execute(
+                select(Track)
+                .join(ChannelMessage, ChannelMessage.track_id == Track.id)
+                .join(UserChannel, UserChannel.id == ChannelMessage.channel_id)
+                .where(
+                    UserChannel.user_id == user_id,
+                    UserChannel.is_active == True,
+                    ChannelMessage.status == ChannelMessageStatus.SENT,
+                    Track.file_unique_id != file_unique_id,
+                )
+                .options(selectinload(Track.enrichment))
+            )
+            channel_tracks = list(channel_result.scalars().all())
+            
+            # Merge, deduplicate by track id
+            seen_ids = set()
+            tracks: List[Track] = []
+            for t in library_tracks + channel_tracks:
+                if t.id not in seen_ids:
+                    seen_ids.add(t.id)
+                    tracks.append(t)
             
             # Find matches by normalized artist+title
             matches = []

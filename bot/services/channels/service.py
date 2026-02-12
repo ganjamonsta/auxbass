@@ -23,10 +23,12 @@ from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, Teleg
 import asyncio
 
 from shared.models import (
-    UserChannel, ChannelMessage, Track, utcnow
+    UserChannel, ChannelMessage, ChannelMessageStatus, Track, utcnow
 )
 from shared.matching import generate_hashtags, format_hashtags
 from shared.database import get_session
+
+MAX_RETRY_COUNT = 3
 
 logger = logging.getLogger(__name__)
 
@@ -260,10 +262,11 @@ class ChannelService:
                 )
             )
             if channel:
-                # Eagerly load message count
+                # Eagerly load message count (only SENT = actually in channel)
                 count = await session.scalar(
                     select(func.count(ChannelMessage.id)).where(
-                        ChannelMessage.channel_id == channel.id
+                        ChannelMessage.channel_id == channel.id,
+                        ChannelMessage.status == ChannelMessageStatus.SENT,
                     )
                 )
                 # Add as dynamic attribute
@@ -289,7 +292,8 @@ class ChannelService:
             
             count = await session.scalar(
                 select(func.count(ChannelMessage.id)).where(
-                    ChannelMessage.channel_id == channel.id
+                    ChannelMessage.channel_id == channel.id,
+                    ChannelMessage.status == ChannelMessageStatus.SENT,
                 )
             )
             return count or 0
@@ -320,10 +324,11 @@ class ChannelService:
                 )
             ) or 0
             
-            # Count already synced
+            # Count already synced (only SENT status = confirmed in channel)
             already_synced = await session.scalar(
                 select(func.count(ChannelMessage.id)).where(
-                    ChannelMessage.channel_id == channel.id
+                    ChannelMessage.channel_id == channel.id,
+                    ChannelMessage.status == ChannelMessageStatus.SENT,
                 )
             ) or 0
             
@@ -386,7 +391,7 @@ class ChannelService:
             if not channel or not channel.auto_forward:
                 return False
             
-            # Check if track already sent to channel
+            # Check if track already sent (SENT) or pending send
             existing = await session.scalar(
                 select(ChannelMessage).where(
                     ChannelMessage.channel_id == channel.id,
@@ -394,8 +399,16 @@ class ChannelService:
                 )
             )
             if existing:
-                logger.debug(f"Track {track_id} already in channel, skipping queue")
-                return True  # Already sent, consider success
+                if existing.status == ChannelMessageStatus.SENT:
+                    logger.debug(f"Track {track_id} already in channel, skipping queue")
+                    return True
+                if existing.status == ChannelMessageStatus.PENDING:
+                    logger.debug(f"Track {track_id} already pending, skipping queue")
+                    return True
+                if existing.status == ChannelMessageStatus.FAILED and existing.retry_count >= MAX_RETRY_COUNT:
+                    logger.debug(f"Track {track_id} failed {existing.retry_count} times, skipping")
+                    return False
+                # FAILED with retries left, or DELETED — re-queue
         
         # Add to queue for rate-limited sending
         self.queue_track_for_forward(user_id, track_id)
@@ -409,12 +422,15 @@ class ChannelService:
     ) -> bool:
         """
         Forward a track to user's channel immediately (internal use).
-        Used by queue worker and sync_all_tracks.
+        Uses write-ahead pattern:
+          1. INSERT/UPDATE ChannelMessage with status=PENDING (committed to DB)
+          2. Send to Telegram
+          3. UPDATE to status=SENT + message_id (on success)
+             or status=FAILED + last_error (on failure)
         
-        Args:
-            user_id: User who owns the channel
-            track_id: Track ID to forward
-            bot: Bot instance for sending
+        This guarantees the DB always knows about in-flight operations.
+        If the bot crashes between steps 2 and 3, the PENDING record
+        will be picked up and reconciled on next sync.
         
         Returns:
             True if forwarded successfully, False otherwise
@@ -436,18 +452,63 @@ class ChannelService:
             if not channel or not channel.auto_forward:
                 return False
             
-            # Check if already sent (avoid duplicates from queue)
+            # Check existing record
             existing = await session.scalar(
                 select(ChannelMessage).where(
                     ChannelMessage.channel_id == channel.id,
                     ChannelMessage.track_id == track_id,
                 )
             )
-            if existing:
-                logger.debug(f"Track {track_id} already sent to channel, skipping")
-                return True
             
-            # Get track with enrichment (eager load)
+            if existing:
+                if existing.status == ChannelMessageStatus.SENT:
+                    logger.debug(f"Track {track_id} already sent to channel, skipping")
+                    return True
+                if existing.status == ChannelMessageStatus.PENDING:
+                    # Another worker is handling this — skip to avoid double-send
+                    logger.debug(f"Track {track_id} already pending, skipping")
+                    return True
+                if existing.status == ChannelMessageStatus.FAILED and existing.retry_count >= MAX_RETRY_COUNT:
+                    logger.warning(f"Track {track_id} exceeded max retries ({MAX_RETRY_COUNT})")
+                    return False
+                # FAILED (retries left) or DELETED → reuse the record
+                channel_message = existing
+                channel_message.status = ChannelMessageStatus.PENDING
+                channel_message.message_id = None
+                channel_message.last_error = None
+                channel_message.updated_at = utcnow()
+            else:
+                # STEP 1: Write-ahead — create PENDING record before sending
+                channel_message = ChannelMessage(
+                    channel_id=channel.id,
+                    track_id=track_id,
+                    status=ChannelMessageStatus.PENDING,
+                    message_id=None,
+                )
+                session.add(channel_message)
+            
+            await session.commit()  # PENDING record is now durable
+        
+        # STEP 2: Send to Telegram (outside DB transaction)
+        # From here, if we crash, PENDING record survives and will be reconciled
+        
+        async with get_session() as session:
+            # Re-load the record (new session)
+            channel_message = await session.scalar(
+                select(ChannelMessage).where(
+                    ChannelMessage.channel_id == channel.id,
+                    ChannelMessage.track_id == track_id,
+                )
+            )
+            if not channel_message or channel_message.status != ChannelMessageStatus.PENDING:
+                return channel_message.status == ChannelMessageStatus.SENT if channel_message else False
+            
+            channel = await session.scalar(
+                select(UserChannel).where(UserChannel.id == channel_message.channel_id)
+            )
+            if not channel:
+                return False
+            
             result = await session.execute(
                 select(Track)
                 .options(selectinload(Track.enrichment))
@@ -455,6 +516,9 @@ class ChannelService:
             )
             track = result.scalar_one_or_none()
             if not track:
+                channel_message.status = ChannelMessageStatus.FAILED
+                channel_message.last_error = "Track not found"
+                await session.commit()
                 return False
             
             try:
@@ -472,7 +536,7 @@ class ChannelService:
                 
                 caption = build_track_caption(track, hashtags)
                 
-                # Forward the audio
+                # Send to Telegram
                 sent_message = await use_bot.send_audio(
                     chat_id=channel.channel_id,
                     audio=track.file_id,
@@ -480,35 +544,48 @@ class ChannelService:
                     parse_mode="HTML",
                 )
                 
-                # Save message record
-                channel_message = ChannelMessage(
-                    channel_id=channel.id,
-                    track_id=track.id,
-                    message_id=sent_message.message_id,
-                    hashtags=json.dumps(hashtags) if hashtags else None,
-                )
-                session.add(channel_message)
-                await session.flush()
+                # STEP 3a: Mark as SENT with message_id
+                channel_message.status = ChannelMessageStatus.SENT
+                channel_message.message_id = sent_message.message_id
+                channel_message.hashtags = json.dumps(hashtags) if hashtags else None
+                channel_message.last_error = None
+                channel_message.updated_at = utcnow()
+                await session.commit()
                 
                 logger.info(f"Track {track_id} forwarded to channel {channel.channel_id}")
                 return True
                 
             except TelegramRetryAfter as e:
-                # Rate limited - wait and retry
+                # STEP 3b: Rate limited — mark FAILED for retry
                 logger.warning(f"Rate limited, waiting {e.retry_after} seconds")
+                channel_message.status = ChannelMessageStatus.FAILED
+                channel_message.retry_count += 1
+                channel_message.last_error = f"Rate limited ({e.retry_after}s)"
+                channel_message.updated_at = utcnow()
+                await session.commit()
+                
                 await asyncio.sleep(e.retry_after + 1)
-                # Re-queue for retry
+                # Re-queue for retry (will check retry_count)
                 self.queue_track_for_forward(user_id, track_id)
                 return False
                 
             except TelegramForbiddenError:
                 # Bot was removed from channel
                 logger.warning(f"Bot removed from channel {channel.channel_id}, disabling")
+                channel_message.status = ChannelMessageStatus.FAILED
+                channel_message.last_error = "Bot removed from channel"
+                channel_message.updated_at = utcnow()
                 channel.is_active = False
+                await session.commit()
                 return False
                 
             except TelegramBadRequest as e:
                 logger.error(f"Failed to forward to channel: {e}")
+                channel_message.status = ChannelMessageStatus.FAILED
+                channel_message.retry_count += 1
+                channel_message.last_error = str(e)[:500]
+                channel_message.updated_at = utcnow()
+                await session.commit()
                 return False
     
     async def update_channel_message(
@@ -519,6 +596,7 @@ class ChannelService:
         """
         Update all channel messages for a track (after enrichment).
         Updates hashtags based on new metadata.
+        Only updates messages with status=SENT (confirmed in channel).
         
         Returns:
             Number of messages updated
@@ -539,12 +617,13 @@ class ChannelService:
             if not track:
                 return 0
             
-            # Get all channel messages for this track
+            # Get all SENT channel messages for this track
             result = await session.execute(
                 select(ChannelMessage)
                 .join(UserChannel)
                 .where(
                     ChannelMessage.track_id == track_id,
+                    ChannelMessage.status == ChannelMessageStatus.SENT,
                     UserChannel.is_active == True,
                     UserChannel.include_hashtags == True,
                 )
@@ -583,6 +662,12 @@ class ChannelService:
                 except TelegramBadRequest as e:
                     if "message is not modified" in str(e):
                         pass  # Same content, skip
+                    elif "message to edit not found" in str(e).lower():
+                        # Message was deleted from channel — mark as DELETED
+                        msg.status = ChannelMessageStatus.DELETED
+                        msg.last_error = "Message deleted from channel"
+                        msg.updated_at = utcnow()
+                        logger.info(f"Channel message {msg.message_id} marked DELETED (not found during edit)")
                     else:
                         logger.error(f"Failed to update message: {e}")
                 except TelegramForbiddenError:
@@ -629,6 +714,7 @@ class ChannelService:
                 .join(UserChannel, ChannelMessage.channel_id == UserChannel.id)
                 .outerjoin(TrackEnrichment, Track.id == TrackEnrichment.track_id)
                 .where(
+                    ChannelMessage.status == ChannelMessageStatus.SENT,
                     UserChannel.is_active == True,
                     UserChannel.include_hashtags == True,
                 )
@@ -741,8 +827,10 @@ class ChannelService:
                     if "message is not modified" in str(e):
                         pass  # Same content - no delay needed
                     elif "message to edit not found" in str(e).lower():
-                        # Message was deleted, remove record
-                        await session.delete(msg)
+                        # Message was deleted from channel — mark as DELETED
+                        msg.status = ChannelMessageStatus.DELETED
+                        msg.last_error = "Message deleted from channel"
+                        msg.updated_at = utcnow()
                     else:
                         logger.error(f"Failed to update message {msg.message_id}: {e}")
                         stats["failed"] += 1
@@ -775,16 +863,25 @@ class ChannelService:
         progress_callback=None,
     ) -> dict:
         """
-        Sync all user's library tracks to their channel.
-        Only sends tracks that haven't been sent yet.
+        Idempotent sync: ensure every track in UserLibrary has a SENT
+        ChannelMessage, and every ChannelMessage whose track is no longer
+        in the library is cleaned up.
+        
+        Safe to run repeatedly — never creates duplicate messages.
+        
+        Phases:
+          1. Reconcile PENDING records (crash recovery)
+          2. Clean up orphaned records (track removed from library)
+          3. Re-send DELETED records (message removed from channel)
+          4. Send new tracks (not yet in channel_messages at all)
         
         Args:
             user_id: User ID
             bot: Bot instance
-            progress_callback: Optional async callback(current, total) for progress updates
+            progress_callback: Optional async callback(current, total, synced)
         
         Returns:
-            Dict with sync results: {synced, skipped, failed, total}
+            Dict with sync results: {synced, skipped, failed, deleted, recovered, total}
         """
         use_bot = bot or self.bot
         if not use_bot:
@@ -813,63 +910,102 @@ class ChannelService:
                 .order_by(UserLibrary.added_at.asc())
             )
             tracks = result.scalars().all()
+            library_track_ids = {t.id for t in tracks}
+            tracks_by_id = {t.id: t for t in tracks}
             
-            # Get already synced track IDs and messages
+            # Get ALL channel message records (any status)
             synced_result = await session.execute(
                 select(ChannelMessage).where(
                     ChannelMessage.channel_id == channel.id
                 )
             )
-            synced_messages = synced_result.scalars().all()
-            synced_track_ids = {msg.track_id for msg in synced_messages}
+            all_messages = synced_result.scalars().all()
+            messages_by_track = {msg.track_id: msg for msg in all_messages}
             
-            # Find tracks to delete (in channel but not in library anymore)
-            library_track_ids = {t.id for t in tracks}
-            tracks_to_delete = [msg for msg in synced_messages if msg.track_id not in library_track_ids]
+            stats = {
+                "synced": 0, "skipped": 0, "failed": 0, "deleted": 0,
+                "recovered": 0, "total": len(tracks), "cancelled": False,
+            }
             
-            stats = {"synced": 0, "skipped": 0, "failed": 0, "deleted": 0, "total": len(tracks), "cancelled": False}
+            # --- Phase 1: Reconcile PENDING records (crash recovery) ---
+            pending_messages = [m for m in all_messages if m.status == ChannelMessageStatus.PENDING]
+            for msg in pending_messages:
+                if msg.track_id not in library_track_ids:
+                    # Track removed from library while PENDING — clean up
+                    await session.delete(msg)
+                    stats["deleted"] += 1
+                else:
+                    # PENDING from a previous crash — mark FAILED so it gets retried below
+                    msg.status = ChannelMessageStatus.FAILED
+                    msg.last_error = "Recovered from PENDING after restart"
+                    msg.updated_at = utcnow()
+                    stats["recovered"] += 1
             
-            # Delete tracks that were removed from library
-            for msg in tracks_to_delete:
-                try:
-                    await use_bot.delete_message(
-                        chat_id=channel.channel_id,
-                        message_id=msg.message_id
-                    )
-                except (TelegramBadRequest, TelegramForbiddenError) as e:
-                    logger.debug(f"Could not delete message {msg.message_id}: {e}")
+            # --- Phase 2: Clean up orphaned records ---
+            orphaned = [m for m in all_messages
+                       if m.track_id not in library_track_ids
+                       and m.status != ChannelMessageStatus.PENDING]  # PENDING handled above
+            for msg in orphaned:
+                if msg.status == ChannelMessageStatus.SENT and msg.message_id:
+                    try:
+                        await use_bot.delete_message(
+                            chat_id=channel.channel_id,
+                            message_id=msg.message_id
+                        )
+                    except (TelegramBadRequest, TelegramForbiddenError) as e:
+                        logger.debug(f"Could not delete message {msg.message_id}: {e}")
                 
-                # Always delete the record (message may have been deleted manually)
                 await session.delete(msg)
                 stats["deleted"] += 1
             
-            if tracks_to_delete:
+            if pending_messages or orphaned:
                 await session.commit()
-                logger.info(f"Deleted {len(tracks_to_delete)} removed tracks from channel for user {user_id}")
+                # Rebuild messages_by_track after cleanup
+                synced_result = await session.execute(
+                    select(ChannelMessage).where(
+                        ChannelMessage.channel_id == channel.id
+                    )
+                )
+                all_messages = synced_result.scalars().all()
+                messages_by_track = {msg.track_id: msg for msg in all_messages}
             
-            # Calculate tracks to sync
-            to_sync_count = len([t for t in tracks if t.id not in synced_track_ids])
+            # --- Phase 3 & 4: Build list of tracks that need sending ---
+            # A track needs sending if:
+            #   - No ChannelMessage record at all (new track)
+            #   - ChannelMessage with status FAILED (retry)
+            #   - ChannelMessage with status DELETED (re-send)
+            tracks_to_send = []
+            for track in tracks:
+                msg = messages_by_track.get(track.id)
+                if msg is None:
+                    tracks_to_send.append(track)
+                elif msg.status == ChannelMessageStatus.SENT:
+                    stats["skipped"] += 1
+                elif msg.status in (ChannelMessageStatus.FAILED, ChannelMessageStatus.DELETED):
+                    if msg.status == ChannelMessageStatus.FAILED and msg.retry_count >= MAX_RETRY_COUNT:
+                        stats["failed"] += 1  # Exhausted retries
+                    else:
+                        tracks_to_send.append(track)
+                else:
+                    stats["skipped"] += 1  # PENDING (shouldn't happen after Phase 1)
+            
+            to_sync_count = len(tracks_to_send)
             
             # Clear any previous cancel flag and set active sync
             self.clear_cancel_flag(user_id)
             self._update_sync_status(user_id, 0, to_sync_count, 0)
             
             try:
-                sent_count = 0  # Actual sent counter for progress
+                sent_count = 0
                 
-                for i, track in enumerate(tracks):
+                for i, track in enumerate(tracks_to_send):
                     # Check for cancellation
                     if self.is_sync_cancelled(user_id):
                         stats["cancelled"] = True
                         self.clear_cancel_flag(user_id)
                         break
                     
-                    # Skip already synced
-                    if track.id in synced_track_ids:
-                        stats["skipped"] += 1
-                        continue
-                    
-                    # Update sync status and call progress callback BEFORE sending
+                    # Update sync status and call progress callback
                     self._update_sync_status(user_id, sent_count, to_sync_count, stats["synced"])
                     if progress_callback:
                         try:
@@ -877,64 +1013,22 @@ class ChannelService:
                         except:
                             pass
                     
-                    try:
-                        # Generate hashtags
-                        hashtags = []
-                        if channel.include_hashtags:
-                            enrichment = track.enrichment
-                            hashtags = generate_hashtags(
-                                artist=track.artist,
-                                title=track.title,
-                                album=enrichment.album_name if enrichment else None,
-                                genre=enrichment.genre if enrichment else None,
-                                extra_tags=enrichment.tags if enrichment else None,
-                            )
-                        
-                        caption = build_track_caption(track, hashtags)
-                        
-                        # Send audio
-                        sent_message = await use_bot.send_audio(
-                            chat_id=channel.channel_id,
-                            audio=track.file_id,
-                            caption=caption,
-                            parse_mode="HTML",
-                        )
-                        
-                        # Save message record IMMEDIATELY to prevent duplicates on restart
-                        channel_message = ChannelMessage(
-                            channel_id=channel.id,
-                            track_id=track.id,
-                            message_id=sent_message.message_id,
-                            hashtags=json.dumps(hashtags) if hashtags else None,
-                        )
-                        session.add(channel_message)
-                        await session.commit()  # Commit after each track!
-                        
+                    # Use _forward_track_immediately which handles write-ahead
+                    success = await self._forward_track_immediately(
+                        user_id=user_id,
+                        track_id=track.id,
+                        bot=use_bot,
+                    )
+                    
+                    if success:
                         stats["synced"] += 1
-                        sent_count += 1
-                        
-                        # Delay to avoid rate limiting (Telegram allows ~20 msg/min to channels)
-                        await asyncio.sleep(3)
-                        
-                    except TelegramRetryAfter as e:
-                        # Rate limited - wait and retry
-                        logger.warning(f"Rate limited, waiting {e.retry_after} seconds")
-                        await asyncio.sleep(e.retry_after + 1)
-                        # Don't count as failed, will be retried on next sync
-                        sent_count += 1
-                        continue
-                        
-                    except TelegramForbiddenError:
-                        channel.is_active = False
+                    else:
                         stats["failed"] += 1
-                        await session.commit()
-                        break  # Stop sync if access lost
-                        
-                    except TelegramBadRequest as e:
-                        logger.error(f"Failed to sync track {track.id}: {e}")
-                        stats["failed"] += 1
-                        sent_count += 1
-                        continue
+                    
+                    sent_count += 1
+                    
+                    # Delay to avoid rate limiting
+                    await asyncio.sleep(3)
                 
                 logger.info(f"Sync completed for user {user_id}: {stats}")
                 return stats
@@ -976,17 +1070,18 @@ class ChannelService:
             if not channel:
                 return False
             
-            # Get channel message record for this track
+            # Get channel message record for this track (must be SENT)
             result = await session.execute(
                 select(ChannelMessage).where(
                     ChannelMessage.channel_id == channel.id,
                     ChannelMessage.track_id == track_id,
+                    ChannelMessage.status == ChannelMessageStatus.SENT,
                 )
             )
             channel_message = result.scalar_one_or_none()
             
-            if not channel_message:
-                logger.debug(f"No channel message for track {track_id}, can't pin")
+            if not channel_message or not channel_message.message_id:
+                logger.debug(f"No SENT channel message for track {track_id}, can't pin")
                 return False
             
             try:
@@ -1002,6 +1097,10 @@ class ChannelService:
                 logger.warning(f"Bot removed from channel {channel.channel_id}")
                 return False
             except TelegramBadRequest as e:
+                if "message to pin not found" in str(e).lower():
+                    channel_message.status = ChannelMessageStatus.DELETED
+                    channel_message.last_error = "Message not found during pin"
+                    channel_message.updated_at = utcnow()
                 logger.warning(f"Failed to pin message in channel: {e}")
                 return False
     
@@ -1039,17 +1138,18 @@ class ChannelService:
             if not channel:
                 return False
             
-            # Get channel message record for this track
+            # Get channel message record for this track (must be SENT)
             result = await session.execute(
                 select(ChannelMessage).where(
                     ChannelMessage.channel_id == channel.id,
                     ChannelMessage.track_id == track_id,
+                    ChannelMessage.status == ChannelMessageStatus.SENT,
                 )
             )
             channel_message = result.scalar_one_or_none()
             
-            if not channel_message:
-                logger.debug(f"No channel message for track {track_id}, can't unpin")
+            if not channel_message or not channel_message.message_id:
+                logger.debug(f"No SENT channel message for track {track_id}, can't unpin")
                 return False
             
             try:
@@ -1064,7 +1164,7 @@ class ChannelService:
                 logger.warning(f"Bot removed from channel {channel.channel_id}")
                 return False
             except TelegramBadRequest as e:
-                # Message might not be pinned
+                # Message might not be pinned or already deleted
                 logger.warning(f"Failed to unpin message in channel: {e}")
                 return False
     
@@ -1092,6 +1192,7 @@ class ChannelService:
                     UserChannel.channel_id == telegram_channel_id,
                     UserChannel.is_active == True,
                     ChannelMessage.message_id == message_id,
+                    ChannelMessage.status == ChannelMessageStatus.SENT,
                 )
             )
             row = result.first()
@@ -1270,11 +1371,12 @@ class ChannelService:
                             if track.id in known_track_ids:
                                 stats["already_known"] += 1
                             else:
-                                # Restore the channel_message record
+                                # Restore the channel_message record with SENT status
                                 channel_message = ChannelMessage(
                                     channel_id=channel.id,
                                     track_id=track.id,
                                     message_id=message_id,
+                                    status=ChannelMessageStatus.SENT,
                                 )
                                 session.add(channel_message)
                                 known_track_ids.add(track.id)
@@ -1395,6 +1497,7 @@ class ChannelService:
     ) -> bool:
         """
         Delete a track message from user's channel.
+        Marks ChannelMessage as DELETED (preserves audit trail).
         
         Args:
             user_id: User who owns the channel
@@ -1421,7 +1524,7 @@ class ChannelService:
             if not channel:
                 return False
             
-            # Get channel message record
+            # Get channel message record (any status that has a message_id)
             result = await session.execute(
                 select(ChannelMessage).where(
                     ChannelMessage.channel_id == channel.id,
@@ -1431,37 +1534,37 @@ class ChannelService:
             channel_message = result.scalar_one_or_none()
             
             if not channel_message:
-                # No message to delete
+                # No record at all
                 return False
             
-            try:
-                # Delete message from Telegram
-                await use_bot.delete_message(
-                    chat_id=channel.channel_id,
-                    message_id=channel_message.message_id
-                )
-                
-                # Delete record from database
-                await session.delete(channel_message)
-                await session.commit()
-                
-                logger.info(f"Track {track_id} message deleted from channel {channel.channel_id}")
+            if channel_message.status == ChannelMessageStatus.DELETED:
+                # Already marked deleted
                 return True
-                
-            except TelegramForbiddenError:
-                logger.warning(f"Bot removed from channel {channel.channel_id}")
-                return False
-                
-            except TelegramBadRequest as e:
-                # Message might already be deleted
-                if "message to delete not found" in str(e).lower():
-                    # Still delete the record
-                    await session.delete(channel_message)
-                    await session.commit()
-                    logger.info(f"Track {track_id} message record deleted (message already gone)")
-                    return True
-                logger.error(f"Failed to delete message from channel: {e}")
-                return False
+            
+            # Try to delete from Telegram if we have a message_id
+            if channel_message.message_id:
+                try:
+                    await use_bot.delete_message(
+                        chat_id=channel.channel_id,
+                        message_id=channel_message.message_id
+                    )
+                except TelegramForbiddenError:
+                    logger.warning(f"Bot removed from channel {channel.channel_id}")
+                    return False
+                except TelegramBadRequest as e:
+                    if "message to delete not found" not in str(e).lower():
+                        logger.error(f"Failed to delete message from channel: {e}")
+                        return False
+                    # Message already gone — that's fine, mark DELETED below
+            
+            # Mark as DELETED
+            channel_message.status = ChannelMessageStatus.DELETED
+            channel_message.last_error = "Deleted by user"
+            channel_message.updated_at = utcnow()
+            await session.commit()
+            
+            logger.info(f"Track {track_id} message marked DELETED in channel {channel.channel_id}")
+            return True
 
 
 # Global singleton instance
