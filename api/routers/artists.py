@@ -18,7 +18,7 @@ from sqlalchemy.orm import selectinload
 
 from shared.database import get_db
 from shared.models import (
-    Track, Album, AlbumTrack, UserLibrary
+    Track, Album, AlbumTrack, UserLibrary, User
 )
 from shared.matching import normalize_artist, normalize_artist_display, extract_featured_artists, get_all_track_artists, extract_artists_from_filename
 
@@ -101,8 +101,10 @@ async def find_artist_track_ids(
     if scope == "global":
         primary = await db.execute(
             select(Track.id)
+            .join(User, User.id == Track.uploader_id)
             .where(Track.is_public == True)
             .where(Track.is_unavailable == False)
+            .where(User.hide_profile == False)
             .where(Track.normalized_artist == normalized_search)
         )
     else:
@@ -139,8 +141,10 @@ async def find_artist_track_ids(
     if scope == "global":
         broad = await db.execute(
             select(Track.id, Track.artist, Track.title, Track.file_name)
+            .join(User, User.id == Track.uploader_id)
             .where(Track.is_public == True)
             .where(Track.is_unavailable == False)
+            .where(User.hide_profile == False)
             .where(or_(Track.normalized_artist != normalized_search, Track.normalized_artist.is_(None)))
             .where(broad_filter)
             .limit(PHASE2_CANDIDATE_LIMIT)
@@ -359,11 +363,13 @@ async def get_global_artists(
     Shows all artists that have public tracks in the system.
     Also includes artists extracted from track titles and filenames.
     """
-    # Get all tracks from public library (including those without artist metadata)
+    # Get all tracks from public library (excluding hidden profiles)
     query = (
         select(Track.artist, Track.title, Track.file_name)
+        .join(User, User.id == Track.uploader_id)
         .where(Track.is_public == True)
         .where(Track.is_unavailable == False)
+        .where(User.hide_profile == False)
     )
     
     result = await db.execute(query)
@@ -634,7 +640,7 @@ async def get_artist(
                 selectinload(Track.enrichment),
                 selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
             )
-            .order_by(Track.created_at.desc())
+            .order_by(Track.play_count.desc(), Track.created_at.desc())
         )
         matching_tracks = list(tracks_result.unique().scalars().all())
         track_count = len(matching_tracks)
@@ -771,7 +777,7 @@ async def get_artist_tracks(
         ids_result = await db.execute(
             select(Track.id)
             .where(Track.id.in_(all_track_ids))
-            .order_by(Track.created_at.desc())
+            .order_by(Track.play_count.desc(), Track.created_at.desc())
             .offset(offset)
             .limit(limit)
         )

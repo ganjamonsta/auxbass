@@ -154,7 +154,9 @@ async def get_artists(
     else:
         query = (
             select(Track.artist)
+            .join(User, User.id == Track.uploader_id)
             .where(Track.is_public == True)
+            .where(User.hide_profile == False)
             .where(Track.artist.isnot(None))
             .where(Track.artist != "")
         )
@@ -270,13 +272,15 @@ async def get_artist_detail(
     else:
         query = (
             select(Track)
+            .join(User, User.id == Track.uploader_id)
             .where(Track.is_public == True)
+            .where(User.hide_profile == False)
             .where(Track.artist.isnot(None))
             .options(
                 selectinload(Track.enrichment),
                 selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
             )
-            .order_by(desc(Track.created_at))
+            .order_by(desc(Track.play_count), desc(Track.created_at))
         )
     
     result = await db.execute(query)

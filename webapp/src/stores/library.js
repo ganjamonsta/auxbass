@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { tracksApi, playlistsApi, playerApi } from '../api/client'
+import { tracksApi, playlistsApi, playerApi, artistsApi } from '../api/client'
 import apiCache from '../utils/apiCache'
 
 export const useLibraryStore = defineStore('library', () => {
@@ -208,17 +208,24 @@ export const useLibraryStore = defineStore('library', () => {
   const fetchArtists = async (scope = 'library') => {
     try {
       artistScope.value = scope
-      const response = await tracksApi.getArtists(scope)
       
+      let artistList
       if (scope === 'global') {
-        globalArtists.value = response.data
-        // Fetch images for ALL global artists in background
-        fetchArtistImages(response.data)
+        // Use the dedicated global artists endpoint
+        const response = await artistsApi.getGlobal({ limit: 500 })
+        // Handle paginated response (ArtistsListResponse has .items)
+        artistList = response.data?.items || response.data || []
+        globalArtists.value = artistList
       } else {
-        artists.value = response.data
-        // Fetch images for ALL artists in background
-        fetchArtistImages(response.data)
+        // Use paginated library artists endpoint
+        const response = await artistsApi.getAll({ limit: 500 })
+        // Handle paginated response (ArtistsListResponse has .items)
+        artistList = response.data?.items || response.data || []
+        artists.value = artistList
       }
+      
+      // Fetch images for ALL artists in background
+      fetchArtistImages(artistList)
     } catch (error) {
       console.error('Failed to fetch artists:', error)
     }
