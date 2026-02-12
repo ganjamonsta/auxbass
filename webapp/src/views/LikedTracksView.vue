@@ -87,9 +87,8 @@ import { useLibraryStore } from '@/stores/library'
 import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
-import { useTrackActions, usePlaybackActions } from '@/composables'
+import { useTrackActions, usePlaybackActions, useTrackSync } from '@/composables'
 import TrackItem from '@/components/TrackItem.vue'
-import api from '@/api/client'
 
 // Universal context menu
 const { openMenu } = useContextMenu()
@@ -107,8 +106,11 @@ const goToChannelSetup = () => {
   router.push('/settings#channel')
 }
 
-const tracks = ref([])
+const tracks = computed(() => libraryStore.likedTracks)
 const loading = ref(true)
+
+// Sync liked tracks with global track events
+useTrackSync(() => libraryStore.likedTracks)
 
 const sortedTracks = computed(() => {
   return [...tracks.value].sort((a, b) => {
@@ -118,25 +120,12 @@ const sortedTracks = computed(() => {
   })
 })
 
-const loadLikedTracks = async () => {
-  loading.value = true
-  try {
-    const response = await api.get('/tracks/liked')
-    tracks.value = response.data.items || response.data || []
-  } catch (error) {
-    console.error('Failed to load liked tracks:', error)
-  } finally {
-    loading.value = false
-  }
-}
-
 // Unified playback actions
 const { playAll, shufflePlay, playTrack } = usePlaybackActions(sortedTracks)
 
 const unlikeTrack = async (track) => {
   try {
     await libraryStore.toggleLike(track.id)
-    tracks.value = tracks.value.filter(t => t.id !== track.id)
   } catch (error) {
     console.error('Failed to unlike track:', error)
   }
@@ -144,8 +133,10 @@ const unlikeTrack = async (track) => {
 
 // Track actions (handleDirectDownload, handleHdNotice) provided by useTrackActions above
 
-onMounted(() => {
-  loadLikedTracks()
+onMounted(async () => {
+  loading.value = true
+  await libraryStore.fetchLikedTracks()
+  loading.value = false
 })
 </script>
 

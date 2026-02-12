@@ -1243,6 +1243,87 @@ class ChannelService:
             logger.info(f"Track {track_id} liked from channel pin by user {user_id}")
             return True
     
+    async def _find_max_message_id(
+        self,
+        bot: Bot,
+        channel_id: int,
+        buffer_chat_id: int,
+    ) -> int:
+        """
+        Binary-search for the highest existing message_id in a channel.
+        
+        Probes message IDs by trying to forward them. If a forward succeeds
+        or returns "can't be forwarded" (service msg), the ID exists.
+        If "not found", the ID doesn't exist.
+        
+        Returns the approximate max message_id (may overshoot slightly, 
+        which is fine — the scanner handles not-found gracefully).
+        """
+        # Step 1: Exponentially probe to find an upper bound
+        probe = 1
+        last_found = 0
+        
+        while probe <= 1_000_000:
+            exists = await self._message_exists(bot, channel_id, buffer_chat_id, probe)
+            if exists:
+                last_found = probe
+                probe *= 2
+            else:
+                break
+            await asyncio.sleep(0.03)
+        
+        if last_found == 0:
+            # Try a few small IDs — channel might start from 1-10
+            for test_id in [1, 2, 3, 5, 10]:
+                if await self._message_exists(bot, channel_id, buffer_chat_id, test_id):
+                    last_found = test_id
+                    break
+                await asyncio.sleep(0.03)
+            if last_found == 0:
+                return 0
+        
+        # Step 2: Binary search between last_found and probe (upper bound)
+        lo, hi = last_found, probe
+        while hi - lo > 1:
+            mid = (lo + hi) // 2
+            if await self._message_exists(bot, channel_id, buffer_chat_id, mid):
+                lo = mid
+            else:
+                hi = mid
+            await asyncio.sleep(0.03)
+        
+        logger.debug(f"Binary search found max_msg_id ≈ {lo}")
+        return lo
+    
+    async def _message_exists(
+        self,
+        bot: Bot,
+        channel_id: int,
+        buffer_chat_id: int,
+        message_id: int,
+    ) -> bool:
+        """Check if a message_id exists in the channel by trying to forward it."""
+        try:
+            fwd = await bot.forward_message(
+                chat_id=buffer_chat_id,
+                from_chat_id=channel_id,
+                message_id=message_id,
+                disable_notification=True,
+            )
+            # Clean up the forwarded copy
+            try:
+                await bot.delete_message(chat_id=buffer_chat_id, message_id=fwd.message_id)
+            except Exception:
+                pass
+            return True
+        except TelegramBadRequest as e:
+            error_text = str(e).lower()
+            if "can't be forwarded" in error_text or "cannot be forwarded" in error_text:
+                return True  # Exists but is a service message
+            return False
+        except Exception:
+            return False
+
     async def scan_channel(
         self,
         user_id: int,
@@ -1320,24 +1401,43 @@ class ChannelService:
             buffer_chat_id = settings.scanner_buffer_chat_id or user_id
             use_buffer = settings.scanner_buffer_chat_id != 0
             
+            # --- Validate buffer chat access before starting ---
+            if use_buffer:
+                try:
+                    await use_bot.get_chat(buffer_chat_id)
+                except Exception as e:
+                    logger.warning(
+                        f"Buffer chat {buffer_chat_id} not accessible ({e}), "
+                        f"falling back to user DM"
+                    )
+                    buffer_chat_id = user_id
+                    use_buffer = False
+            
+            # --- Find the max message_id via binary search ---
+            # This avoids scanning thousands of empty IDs linearly.
+            max_msg_id = await self._find_max_message_id(
+                use_bot, channel.channel_id, buffer_chat_id
+            )
+            
             logger.info(
-                f"Starting channel scan for user {user_id}, channel {channel.channel_id}, "
+                f"Starting channel scan for user {user_id}, "
+                f"channel {channel.channel_id}, "
+                f"max_msg_id={max_msg_id}, "
                 f"buffer={'configured' if use_buffer else 'user DM'}"
             )
             
-            consecutive_not_found = 0
-            max_consecutive_not_found = 300
-            message_id = 0
+            if max_msg_id == 0:
+                logger.info("Channel appears empty, nothing to scan")
+                return stats
             
             # Collect forwarded message IDs for batch deletion
             pending_delete_ids: list[int] = []
-            BATCH_DELETE_SIZE = 80  # delete_messages supports up to 100
+            BATCH_DELETE_SIZE = 80
             
             # Clear cancel flag
             self.clear_cancel_flag(user_id)
             
-            while True:
-                message_id += 1
+            for message_id in range(1, max_msg_id + 1):
                 
                 # Check for cancellation
                 if self.is_sync_cancelled(user_id):
@@ -1404,13 +1504,15 @@ class ChannelService:
                             pass
                         pending_delete_ids.clear()
                     
-                    # Progress callback every 100 messages
+                    # Progress callback every 100 scanned messages
                     if progress_callback and stats["scanned"] % 100 == 0:
                         try:
                             await progress_callback(
                                 stats["scanned"],
                                 stats["audio_found"],
                                 stats["restored"],
+                                message_id,
+                                max_msg_id,
                             )
                         except Exception:
                             pass
@@ -1421,37 +1523,69 @@ class ChannelService:
                 except TelegramBadRequest as e:
                     error_text = str(e).lower()
                     if "chat not found" in error_text or "chat_not_found" in error_text:
-                        # Buffer chat is misconfigured — abort immediately
                         if use_buffer:
                             logger.error(
-                                f"Buffer chat {buffer_chat_id} not found. "
-                                f"Make sure the bot is added to the group and it's a supergroup. "
-                                f"Falling back to user DM for this scan."
+                                f"Buffer chat {buffer_chat_id} lost during scan, "
+                                f"falling back to user DM"
                             )
                             buffer_chat_id = user_id
                             use_buffer = False
-                            message_id -= 1  # Retry this message with new buffer
+                            # Can't retry easily in for-loop, just skip this one
                         else:
                             stats["error"] = "Не удалось переслать: чат не найден"
                             break
                     elif "message to forward not found" in error_text or "message not found" in error_text:
-                        consecutive_not_found += 1
-                        if consecutive_not_found >= max_consecutive_not_found:
-                            break
+                        pass  # Normal — message deleted or doesn't exist
                     elif "can't be forwarded" in error_text or "cannot be forwarded" in error_text:
-                        # Service message — exists but can't be forwarded
-                        consecutive_not_found = 0
-                        stats["scanned"] += 1
+                        stats["scanned"] += 1  # Service message — exists, just can't forward
                     else:
                         stats["errors"] += 1
                         logger.warning(f"Scan error at msg {message_id}: {e}")
+                    
+                    # Progress update on ID milestones even during gaps
+                    if progress_callback and message_id % 500 == 0:
+                        try:
+                            await progress_callback(
+                                stats["scanned"],
+                                stats["audio_found"],
+                                stats["restored"],
+                                message_id,
+                                max_msg_id,
+                            )
+                        except Exception:
+                            pass
                     
                     await asyncio.sleep(0.03)
                     
                 except TelegramRetryAfter as e:
                     logger.warning(f"Rate limited during scan, waiting {e.retry_after}s")
                     await asyncio.sleep(e.retry_after + 1)
-                    message_id -= 1  # Retry this message
+                    # Retry this message_id after cooldown
+                    try:
+                        forwarded = await use_bot.forward_message(
+                            chat_id=buffer_chat_id,
+                            from_chat_id=channel.channel_id,
+                            message_id=message_id,
+                            disable_notification=True,
+                        )
+                        stats["scanned"] += 1
+                        pending_delete_ids.append(forwarded.message_id)
+                        if forwarded.audio:
+                            stats["audio_found"] += 1
+                            fuid = forwarded.audio.file_unique_id
+                            if fuid in fuid_to_track:
+                                track = fuid_to_track[fuid]
+                                if track.id not in known_track_ids:
+                                    cm = ChannelMessage(
+                                        channel_id=channel.id, track_id=track.id,
+                                        message_id=message_id, status=ChannelMessageStatus.SENT,
+                                    )
+                                    session.add(cm)
+                                    known_track_ids.add(track.id)
+                                    known_message_ids.add(message_id)
+                                    stats["restored"] += 1
+                    except Exception:
+                        pass  # Will be skipped
                     
                 except TelegramForbiddenError:
                     stats["error"] = "Bot lost access to channel"
@@ -1460,9 +1594,6 @@ class ChannelService:
                 except Exception as e:
                     stats["errors"] += 1
                     logger.error(f"Unexpected scan error at msg {message_id}: {e}")
-                    consecutive_not_found += 1
-                    if consecutive_not_found >= max_consecutive_not_found:
-                        break
             
             # Delete remaining forwarded copies
             if pending_delete_ids:
@@ -1490,6 +1621,8 @@ class ChannelService:
                         stats["scanned"],
                         stats["audio_found"],
                         stats["restored"],
+                        max_msg_id,
+                        max_msg_id,
                     )
                 except Exception:
                     pass

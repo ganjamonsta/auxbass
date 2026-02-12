@@ -883,10 +883,11 @@ async def cb_channel_scan(callback: CallbackQuery):
     )
     await callback.answer()
 
-    async def progress(scanned, audio_found, restored):
+    async def progress(scanned, audio_found, restored, current_id=0, max_id=0):
+        pct = f" ({current_id * 100 // max_id}%)" if max_id else ""
         try:
             await callback.message.edit_text(
-                f"🔍 <b>Проверка канала...</b>\n\n"
+                f"🔍 <b>Проверка канала...{pct}</b>\n\n"
                 f"📢 {title}\n"
                 f"📨 Проверено: <b>{scanned}</b>\n"
                 f"🎵 Аудио: <b>{audio_found}</b>\n"
@@ -1050,10 +1051,11 @@ async def cb_channel_reset(callback: CallbackQuery):
     )
     await callback.answer()
 
-    async def progress(scanned, audio_found, restored):
+    async def progress(scanned, audio_found, restored, current_id=0, max_id=0):
+        pct = f" ({current_id * 100 // max_id}%)" if max_id else ""
         try:
             await callback.message.edit_text(
-                f"🔍 <b>Пересканирование...</b>\n\n"
+                f"🔍 <b>Пересканирование...{pct}</b>\n\n"
                 f"📢 {title}\n"
                 f"📨 Проверено: <b>{scanned}</b>\n"
                 f"🎵 Аудио: <b>{audio_found}</b>\n"

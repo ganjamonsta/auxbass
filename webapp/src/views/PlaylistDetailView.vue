@@ -104,7 +104,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
-import { useTrackActions, usePlaybackActions } from '@/composables'
+import { useTrackActions, usePlaybackActions, useTrackSync } from '@/composables'
 import TrackItem from '@/components/TrackItem.vue'
 import EditPlaylistModal from '@/components/EditPlaylistModal.vue'
 import api from '@/api/client'
@@ -127,6 +127,9 @@ const { handleDirectDownload, handleHdNotice, handleLikeTrack } = useTrackAction
 // State
 const playlist = ref(null)
 const loading = ref(true)
+
+// Sync playlist tracks with global track events
+useTrackSync(() => playlist.value?.tracks)
 const showEditModal = ref(false)
 const subscribing = ref(false)
 

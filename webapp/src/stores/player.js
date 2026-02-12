@@ -923,6 +923,22 @@ export const usePlayerStore = defineStore('player', () => {
     if (idx > queueIndex.value && idx < queue.value.length) { queue.value.splice(idx, 1); persistState() }
   }
 
+  /**
+   * Remove all occurrences of a track (by id) from the queue.
+   * Adjusts queueIndex if items before it are removed.
+   */
+  const removeTrackFromQueue = (trackId) => {
+    let i = queue.value.length
+    while (i--) {
+      if (queue.value[i].id === trackId) {
+        if (i === queueIndex.value) continue // don't remove currently playing
+        queue.value.splice(i, 1)
+        if (i < queueIndex.value) queueIndex.value--
+      }
+    }
+    persistState()
+  }
+
   const moveInQueue = (fromRel, toRel) => {
     const from = queueIndex.value + 1 + fromRel
     const to = queueIndex.value + 1 + toRel
@@ -1052,6 +1068,7 @@ export const usePlayerStore = defineStore('player', () => {
     playNext,
     addToQueue,
     removeFromQueue,
+    removeTrackFromQueue,
     moveInQueue,
     toggleShuffle,
     toggleRepeat,

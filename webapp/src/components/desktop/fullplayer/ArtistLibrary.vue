@@ -91,6 +91,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { tracksApi } from '@/api/client'
+import { useTrackSync } from '@/composables/useTrackSync'
 import { getTrackCoverStyle, getTrackInitials, getCoverUrl, CoverSize } from '@/utils'
 
 const props = defineProps({
@@ -101,6 +102,9 @@ const emit = defineEmits(['play'])
 
 const artistTracks = ref([])
 const isLoadingArtistTracks = ref(false)
+
+// Sync artist tracks with global track events
+useTrackSync(artistTracks)
 const artistSort = ref('plays')
 
 const loadArtistTracks = async () => {

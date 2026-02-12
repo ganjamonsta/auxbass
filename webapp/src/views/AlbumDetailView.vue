@@ -192,7 +192,7 @@ import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
-import { useTrackActions, usePlaybackActions } from '@/composables'
+import { useTrackActions, usePlaybackActions, useTrackSync } from '@/composables'
 import TrackItem from '@/components/TrackItem.vue'
 import TagChips from '@/components/TagChips.vue'
 import api from '@/api/client'
@@ -213,6 +213,9 @@ const { handleDirectDownload, handleHdNotice, handleLikeTrack, handleAddToLibrar
 
 const album = ref(null)
 const loading = ref(true)
+
+// Sync album tracks with global track events
+useTrackSync(() => album.value?.tracks)
 
 // Scope from query
 const scope = computed(() => route.query.scope || 'library')

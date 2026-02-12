@@ -674,10 +674,11 @@ async def handle_channel_scan(callback: CallbackQuery):
     
     channel_title = channel.channel_title or 'Канал'
     
-    async def scan_progress(scanned, audio_found, restored):
+    async def scan_progress(scanned, audio_found, restored, current_id=0, max_id=0):
+        pct = f" ({current_id * 100 // max_id}%)" if max_id else ""
         try:
             await callback.message.edit_text(
-                f"🔍 <b>Сканирование канала...</b>\n\n"
+                f"🔍 <b>Сканирование канала...{pct}</b>\n\n"
                 f"📢 {channel_title}\n"
                 f"📨 Проверено сообщений: <b>{scanned}</b>\n"
                 f"🎵 Найдено аудио: <b>{audio_found}</b>\n"

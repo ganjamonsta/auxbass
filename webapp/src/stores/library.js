@@ -421,6 +421,21 @@ export const useLibraryStore = defineStore('library', () => {
     patchInList(popularTracks.value)
     patchInList(likedTracks.value)
     patchInList(selectedUserTracks.value)
+    patchInList(history.value)
+
+    // Patch in currentArtist tracks and album tracks
+    if (currentArtist.value) {
+      if (currentArtist.value.tracks) {
+        patchInList(currentArtist.value.tracks)
+      }
+      if (currentArtist.value.albums) {
+        for (const album of currentArtist.value.albums) {
+          if (album.tracks) {
+            patchInList(album.tracks)
+          }
+        }
+      }
+    }
 
     // 3. Patch in player store (currentTrack + queue + mediaSession) — dynamic import to avoid circular deps
     const { usePlayerStore } = await import('./player')
@@ -430,6 +445,54 @@ export const useLibraryStore = defineStore('library', () => {
     // 4. Dispatch event for VirtualTrackList and other listeners
     window.dispatchEvent(new CustomEvent('track:changed', {
       detail: { trackId, data: updatedData }
+    }))
+  }
+
+  /**
+   * Notify the entire app that a track has been removed.
+   * Removes track from all store arrays, player queue, and dispatches window event.
+   */
+  const notifyTrackRemoved = async (trackId) => {
+    // 1. Invalidate API cache
+    apiCache.invalidateRelated('trackRemoved', trackId)
+
+    // 2. Remove from all local lists
+    const removeFromList = (list) => {
+      const idx = list.findIndex(t => t.id === trackId)
+      if (idx !== -1) list.splice(idx, 1)
+    }
+    removeFromList(tracks.value)
+    removeFromList(globalTracks.value)
+    removeFromList(recentUploads.value)
+    removeFromList(popularTracks.value)
+    removeFromList(likedTracks.value)
+    removeFromList(selectedUserTracks.value)
+    removeFromList(history.value)
+
+    // Remove from currentArtist tracks and album tracks
+    if (currentArtist.value) {
+      if (currentArtist.value.tracks) {
+        removeFromList(currentArtist.value.tracks)
+      }
+      if (currentArtist.value.albums) {
+        for (const album of currentArtist.value.albums) {
+          if (album.tracks) {
+            removeFromList(album.tracks)
+          }
+        }
+      }
+    }
+
+    // 3. Remove from player queue
+    const { usePlayerStore } = await import('./player')
+    const playerStore = usePlayerStore()
+    if (typeof playerStore.removeTrackFromQueue === 'function') {
+      playerStore.removeTrackFromQueue(trackId)
+    }
+
+    // 4. Dispatch event for View components and other listeners
+    window.dispatchEvent(new CustomEvent('track:removed', {
+      detail: { trackId }
     }))
   }
 
@@ -478,8 +541,7 @@ export const useLibraryStore = defineStore('library', () => {
   const deleteTrack = async (id) => {
     try {
       await tracksApi.delete(id)
-      tracks.value = tracks.value.filter(t => t.id !== id)
-      likedTracks.value = likedTracks.value.filter(t => t.id !== id)
+      await notifyTrackRemoved(id)
       total.value--
       // Refresh artists list as this track's artist may no longer have tracks
       fetchArtists(artistScope.value)
@@ -534,13 +596,11 @@ export const useLibraryStore = defineStore('library', () => {
     try {
       if (isLiked) {
         await tracksApi.unlike(trackId)
-        // Update local state
-        if (track) track.is_liked = false
+        await notifyTrackChange(trackId, { is_liked: false, liked_at: null })
         likedTracks.value = likedTracks.value.filter(t => t.id !== trackId)
       } else {
         await tracksApi.like(trackId)
-        // Update local state
-        if (track) track.is_liked = true
+        await notifyTrackChange(trackId, { is_liked: true, liked_at: new Date().toISOString() })
         // Refetch liked tracks to get proper order
         await fetchLikedTracks()
       }
@@ -668,27 +728,15 @@ export const useLibraryStore = defineStore('library', () => {
   const addToLibrary = async (trackId) => {
     try {
       await tracksApi.addToLibrary(trackId)
-      // Update local state - check all possible track sources
-      const updateTrackInLibrary = (list) => {
-        const track = list.find(t => t.id === trackId)
-        if (track) {
-          track.in_library = true
-        }
-        return track
-      }
-      
-      // Update in_library flag in all lists where track might exist
-      const track = updateTrackInLibrary(globalTracks.value) ||
-                    updateTrackInLibrary(recentUploads.value) ||
-                    updateTrackInLibrary(popularTracks.value) ||
-                    updateTrackInLibrary(selectedUserTracks.value)
-      
-      if (track) {
-        // Also add to tracks list
-        if (!tracks.value.find(t => t.id === trackId)) {
-          tracks.value.unshift({ ...track, in_library: true })
-          total.value = (total.value || 0) + 1
-        }
+      await notifyTrackChange(trackId, { in_library: true })
+      // Also add to tracks list from a global source if found
+      const source = globalTracks.value.find(t => t.id === trackId) ||
+                     recentUploads.value.find(t => t.id === trackId) ||
+                     popularTracks.value.find(t => t.id === trackId) ||
+                     selectedUserTracks.value.find(t => t.id === trackId)
+      if (source && !tracks.value.find(t => t.id === trackId)) {
+        tracks.value.unshift({ ...source, in_library: true })
+        total.value = (total.value || 0) + 1
       }
       // Refresh artists list for new artist
       fetchArtists(artistScope.value)
@@ -709,19 +757,12 @@ export const useLibraryStore = defineStore('library', () => {
   const removeFromLibrary = async (trackId) => {
     try {
       await tracksApi.removeFromLibrary(trackId)
-      // Update local state
+      // Remove from library lists
       tracks.value = tracks.value.filter(t => t.id !== trackId)
       likedTracks.value = likedTracks.value.filter(t => t.id !== trackId)
       total.value = Math.max(0, (total.value || 0) - 1)
-      // Update in_library flag in global lists
-      const updateInLibrary = (list) => {
-        const track = list.find(t => t.id === trackId)
-        if (track) track.in_library = false
-      }
-      updateInLibrary(globalTracks.value)
-      updateInLibrary(recentUploads.value)
-      updateInLibrary(popularTracks.value)
-      updateInLibrary(selectedUserTracks.value)
+      // Notify all lists about in_library change
+      await notifyTrackChange(trackId, { in_library: false })
       // Refresh artists list as this track's artist may no longer have tracks in library
       fetchArtists(artistScope.value)
       return true
@@ -846,6 +887,7 @@ export const useLibraryStore = defineStore('library', () => {
     removeTrackFromPlaylist,
     notifyPlaylistChange,
     notifyTrackChange,
+    notifyTrackRemoved,
     updateTrack,
     deleteTrack,
     toggleLike,

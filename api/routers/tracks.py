@@ -837,9 +837,22 @@ async def update_track(
     track.enrichment_status = EnrichmentStatus.PENDING
     
     await db.commit()
-    await db.refresh(track)
+
+    # Re-fetch with all relations to match GET /tracks response
+    result = await db.execute(
+        select(Track, UserLibrary)
+        .join(UserLibrary, UserLibrary.track_id == Track.id)
+        .where(Track.id == track_id)
+        .where(UserLibrary.user_id == user.id)
+        .options(
+            selectinload(Track.enrichment),
+            selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
+        )
+    )
+    row = result.unique().first()
+    track, lib_entry = row if row else (None, None)
     
-    return track_to_response(track)
+    return track_to_response(track, lib_entry)
 
 
 @router.delete("/{track_id}")

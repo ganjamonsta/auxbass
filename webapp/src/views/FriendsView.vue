@@ -321,6 +321,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { getDisplayTitle, getDisplayArtist, getCoverUrl, CoverSize } from '@/utils'
 import api, { socialApi } from '@/api/client'
+import { useTrackSync } from '@/composables/useTrackSync'
 import SearchBar from '@/components/ui/SearchBar.vue'
 import { Users, User, Search, Check, X, Music, Folder, Disc3, Lightbulb } from 'lucide-vue-next'
 
@@ -360,6 +361,10 @@ const selectedUser = ref(null)
 const profileTab = ref('library')
 const loadingUserContent = ref(false)
 const userTracks = ref([])
+
+// Sync user tracks with global track events
+useTrackSync(userTracks)
+
 const userPlaylists = ref([])
 const userAlbums = ref([])
 
