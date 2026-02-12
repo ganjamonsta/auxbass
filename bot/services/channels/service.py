@@ -1390,6 +1390,11 @@ class ChannelService:
             pending_delete_ids: list[int] = []
             BATCH_DELETE_SIZE = 80
             
+            # Adaptive throttling: start conservative, increase on rate limits
+            scan_delay = 0.35  # ~3 req/sec — safe for Telegram
+            MAX_RATE_LIMIT_WAIT = 120  # Abort scan if Telegram says wait > 2 min
+            MAX_TIMEOUT_RETRIES = 2  # Retry timeout errors up to N times
+            
             # Clear cancel flag
             self.clear_cancel_flag(user_id)
             
@@ -1403,25 +1408,97 @@ class ChannelService:
                 
                 # Skip message IDs we already know about
                 if message_id in known_message_ids:
-                    consecutive_not_found = 0
                     stats["already_known"] += 1
                     continue
                 
-                try:
-                    # Forward message to buffer chat to read its content
-                    forwarded = await use_bot.forward_message(
-                        chat_id=buffer_chat_id,
-                        from_chat_id=channel.channel_id,
-                        message_id=message_id,
-                        disable_notification=True,
-                    )
-                    consecutive_not_found = 0
+                # --- Forward with retry on timeout ---
+                forwarded = None
+                for attempt in range(1, MAX_TIMEOUT_RETRIES + 2):
+                    try:
+                        forwarded = await use_bot.forward_message(
+                            chat_id=buffer_chat_id,
+                            from_chat_id=channel.channel_id,
+                            message_id=message_id,
+                            disable_notification=True,
+                        )
+                        break  # Success
+                        
+                    except TelegramBadRequest as e:
+                        error_text = str(e).lower()
+                        if "chat not found" in error_text or "chat_not_found" in error_text:
+                            if use_buffer:
+                                logger.error(
+                                    f"Buffer chat {buffer_chat_id} lost during scan, "
+                                    f"falling back to user DM"
+                                )
+                                buffer_chat_id = user_id
+                                use_buffer = False
+                                break  # Will retry in next attempt
+                            else:
+                                stats["error"] = "Не удалось переслать: чат не найден"
+                                break
+                        elif "message to forward not found" in error_text or "message not found" in error_text:
+                            break  # Normal — message deleted or doesn't exist
+                        elif "can't be forwarded" in error_text or "cannot be forwarded" in error_text:
+                            stats["scanned"] += 1  # Service message
+                            break
+                        else:
+                            stats["errors"] += 1
+                            logger.warning(f"Scan error at msg {message_id}: {e}")
+                            break
+                            
+                    except TelegramRetryAfter as e:
+                        if e.retry_after > MAX_RATE_LIMIT_WAIT:
+                            logger.error(
+                                f"Rate limit too long ({e.retry_after}s > {MAX_RATE_LIMIT_WAIT}s), "
+                                f"aborting scan at msg {message_id}/{max_msg_id}"
+                            )
+                            stats["error"] = f"Rate limit {e.retry_after}s — скан остановлен"
+                            # Notify user
+                            if progress_callback:
+                                try:
+                                    await progress_callback(
+                                        stats["scanned"],
+                                        stats["audio_found"],
+                                        stats["restored"],
+                                        message_id,
+                                        max_msg_id,
+                                    )
+                                except Exception:
+                                    pass
+                            break
+                        logger.warning(f"Rate limited during scan, waiting {e.retry_after}s")
+                        await asyncio.sleep(e.retry_after + 1)
+                        # Slow down after rate limit
+                        scan_delay = min(scan_delay * 2, 2.0)
+                        logger.info(f"Increased scan delay to {scan_delay:.2f}s")
+                        continue  # Retry same message
+                        
+                    except TelegramForbiddenError:
+                        stats["error"] = "Bot lost access to channel"
+                        break
+                        
+                    except Exception as e:
+                        if attempt <= MAX_TIMEOUT_RETRIES:
+                            logger.warning(
+                                f"Scan error at msg {message_id} (attempt {attempt}/"
+                                f"{MAX_TIMEOUT_RETRIES + 1}): {e}, retrying..."
+                            )
+                            await asyncio.sleep(2 * attempt)
+                            continue
+                        stats["errors"] += 1
+                        logger.error(f"Scan error at msg {message_id} after {attempt} attempts: {e}")
+                        break
+                
+                # Abort on fatal errors
+                if "error" in stats and isinstance(stats.get("error"), str):
+                    break
+                
+                # Process forwarded message
+                if forwarded:
                     stats["scanned"] += 1
-                    
-                    # Queue forwarded copy for batch deletion
                     pending_delete_ids.append(forwarded.message_id)
                     
-                    # Check if it's an audio message
                     if forwarded.audio:
                         stats["audio_found"] += 1
                         file_unique_id = forwarded.audio.file_unique_id
@@ -1432,7 +1509,6 @@ class ChannelService:
                             if track.id in known_track_ids:
                                 stats["already_known"] += 1
                             else:
-                                # Restore the channel_message record
                                 channel_message = ChannelMessage(
                                     channel_id=channel.id,
                                     track_id=track.id,
@@ -1449,7 +1525,7 @@ class ChannelService:
                         else:
                             stats["not_in_library"] += 1
                     
-                    # Batch-delete forwarded copies to minimize visual spam
+                    # Batch-delete forwarded copies
                     if len(pending_delete_ids) >= BATCH_DELETE_SIZE:
                         try:
                             await use_bot.delete_messages(
@@ -1459,97 +1535,23 @@ class ChannelService:
                         except Exception:
                             pass
                         pending_delete_ids.clear()
-                    
-                    # Progress callback every 100 scanned messages
-                    if progress_callback and stats["scanned"] % 100 == 0:
-                        try:
-                            await progress_callback(
-                                stats["scanned"],
-                                stats["audio_found"],
-                                stats["restored"],
-                                message_id,
-                                max_msg_id,
-                            )
-                        except Exception:
-                            pass
-                    
-                    # Rate limit: ~20 requests/sec
-                    await asyncio.sleep(0.05)
-                    
-                except TelegramBadRequest as e:
-                    error_text = str(e).lower()
-                    if "chat not found" in error_text or "chat_not_found" in error_text:
-                        if use_buffer:
-                            logger.error(
-                                f"Buffer chat {buffer_chat_id} lost during scan, "
-                                f"falling back to user DM"
-                            )
-                            buffer_chat_id = user_id
-                            use_buffer = False
-                            # Can't retry easily in for-loop, just skip this one
-                        else:
-                            stats["error"] = "Не удалось переслать: чат не найден"
-                            break
-                    elif "message to forward not found" in error_text or "message not found" in error_text:
-                        pass  # Normal — message deleted or doesn't exist
-                    elif "can't be forwarded" in error_text or "cannot be forwarded" in error_text:
-                        stats["scanned"] += 1  # Service message — exists, just can't forward
-                    else:
-                        stats["errors"] += 1
-                        logger.warning(f"Scan error at msg {message_id}: {e}")
-                    
-                    # Progress update on ID milestones even during gaps
-                    if progress_callback and message_id % 500 == 0:
-                        try:
-                            await progress_callback(
-                                stats["scanned"],
-                                stats["audio_found"],
-                                stats["restored"],
-                                message_id,
-                                max_msg_id,
-                            )
-                        except Exception:
-                            pass
-                    
-                    await asyncio.sleep(0.03)
-                    
-                except TelegramRetryAfter as e:
-                    logger.warning(f"Rate limited during scan, waiting {e.retry_after}s")
-                    await asyncio.sleep(e.retry_after + 1)
-                    # Retry this message_id after cooldown
+                
+                # Progress callback
+                msg_count = stats["scanned"] + stats["errors"]
+                if progress_callback and (msg_count % 100 == 0 or message_id % 500 == 0):
                     try:
-                        forwarded = await use_bot.forward_message(
-                            chat_id=buffer_chat_id,
-                            from_chat_id=channel.channel_id,
-                            message_id=message_id,
-                            disable_notification=True,
+                        await progress_callback(
+                            stats["scanned"],
+                            stats["audio_found"],
+                            stats["restored"],
+                            message_id,
+                            max_msg_id,
                         )
-                        stats["scanned"] += 1
-                        pending_delete_ids.append(forwarded.message_id)
-                        if forwarded.audio:
-                            stats["audio_found"] += 1
-                            fuid = forwarded.audio.file_unique_id
-                            if fuid in fuid_to_track:
-                                track = fuid_to_track[fuid]
-                                if track.id not in known_track_ids:
-                                    cm = ChannelMessage(
-                                        channel_id=channel.id, track_id=track.id,
-                                        message_id=message_id, status=ChannelMessageStatus.SENT,
-                                    )
-                                    session.add(cm)
-                                    known_track_ids.add(track.id)
-                                    known_message_ids.add(message_id)
-                                    stats["restored"] += 1
                     except Exception:
-                        pass  # Will be skipped
-                    
-                except TelegramForbiddenError:
-                    stats["error"] = "Bot lost access to channel"
-                    break
-                    
-                except Exception as e:
-                    stats["errors"] += 1
-                    logger.error(f"Unexpected scan error at msg {message_id}: {e}")
+                        pass
+                
+                # Adaptive delay
+                await asyncio.sleep(scan_delay)
             
             # Delete remaining forwarded copies
             if pending_delete_ids:
