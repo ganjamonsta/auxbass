@@ -1420,7 +1420,21 @@ class ChannelService:
                     
                 except TelegramBadRequest as e:
                     error_text = str(e).lower()
-                    if "message to forward not found" in error_text or "message not found" in error_text:
+                    if "chat not found" in error_text or "chat_not_found" in error_text:
+                        # Buffer chat is misconfigured — abort immediately
+                        if use_buffer:
+                            logger.error(
+                                f"Buffer chat {buffer_chat_id} not found. "
+                                f"Make sure the bot is added to the group and it's a supergroup. "
+                                f"Falling back to user DM for this scan."
+                            )
+                            buffer_chat_id = user_id
+                            use_buffer = False
+                            message_id -= 1  # Retry this message with new buffer
+                        else:
+                            stats["error"] = "Не удалось переслать: чат не найден"
+                            break
+                    elif "message to forward not found" in error_text or "message not found" in error_text:
                         consecutive_not_found += 1
                         if consecutive_not_found >= max_consecutive_not_found:
                             break
