@@ -27,6 +27,7 @@ from shared.models import (
 )
 from shared.matching import generate_hashtags, format_hashtags
 from shared.database import get_session
+from shared.config import get_settings
 
 MAX_RETRY_COUNT = 3
 
@@ -1251,13 +1252,13 @@ class ChannelService:
         """
         Scan Telegram channel to rebuild channel_messages index.
         
-        Iterates through channel message history using copyMessage 
-        (forward to self + delete) to find audio files and match them 
+        Uses forward_message to read channel messages and match audio
         to library tracks by file_unique_id. Creates missing 
         ChannelMessage records.
         
-        This fixes the situation where tracks exist in the channel 
-        but channel_messages DB records are missing.
+        To avoid spamming the user's DM, forwards are sent to a buffer
+        chat (configured via SCANNER_BUFFER_CHAT_ID). If not configured,
+        falls back to user DM with disable_notification + batch delete.
         
         Args:
             user_id: User who owns the channel
@@ -1265,11 +1266,13 @@ class ChannelService:
             progress_callback: Optional async callback(scanned, found, restored)
             
         Returns:
-            Dict with: {scanned, audio_found, restored, already_known, failed, total_in_channel}
+            Dict with scan statistics
         """
         use_bot = bot or self.bot
         if not use_bot:
             return {"error": "Bot not initialized"}
+        
+        settings = get_settings()
         
         async with get_session() as session:
             # Get channel
@@ -1282,14 +1285,14 @@ class ChannelService:
             if not channel:
                 return {"error": "No channel configured"}
             
-            # Get existing channel_message records (track_id -> message_id)
+            # Get existing channel_message records
             existing_result = await session.execute(
                 select(ChannelMessage).where(
                     ChannelMessage.channel_id == channel.id
                 )
             )
             existing_messages = existing_result.scalars().all()
-            known_message_ids = {msg.message_id for msg in existing_messages}
+            known_message_ids = {msg.message_id for msg in existing_messages if msg.message_id}
             known_track_ids = {msg.track_id for msg in existing_messages}
             
             # Build file_unique_id -> Track mapping for user's library
@@ -1312,17 +1315,23 @@ class ChannelService:
                 "errors": 0,
             }
             
-            # We need a chat to forward messages to temporarily.
-            # Use user's own chat (DM with bot) as temp destination.
-            temp_chat_id = user_id
+            # Determine where to forward messages for reading.
+            # Buffer chat = no spam in user's DM; fallback = user DM (with silent mode).
+            buffer_chat_id = settings.scanner_buffer_chat_id or user_id
+            use_buffer = settings.scanner_buffer_chat_id != 0
             
-            # Determine max message_id by trying a high number and binary-searching down
-            # OR: start from 1 and go up until we get consistent "not found" errors
-            logger.info(f"Starting channel scan for user {user_id}, channel {channel.channel_id}")
+            logger.info(
+                f"Starting channel scan for user {user_id}, channel {channel.channel_id}, "
+                f"buffer={'configured' if use_buffer else 'user DM'}"
+            )
             
             consecutive_not_found = 0
-            max_consecutive_not_found = 300  # Stop after 300 consecutive missing messages
+            max_consecutive_not_found = 300
             message_id = 0
+            
+            # Collect forwarded message IDs for batch deletion
+            pending_delete_ids: list[int] = []
+            BATCH_DELETE_SIZE = 80  # delete_messages supports up to 100
             
             # Clear cancel flag
             self.clear_cancel_flag(user_id)
@@ -1336,42 +1345,38 @@ class ChannelService:
                     stats["cancelled"] = True
                     break
                 
+                # Skip message IDs we already know about
+                if message_id in known_message_ids:
+                    consecutive_not_found = 0
+                    stats["already_known"] += 1
+                    continue
+                
                 try:
-                    # Forward message to user's DM to read its content
+                    # Forward message to buffer chat to read its content
                     forwarded = await use_bot.forward_message(
-                        chat_id=temp_chat_id,
+                        chat_id=buffer_chat_id,
                         from_chat_id=channel.channel_id,
                         message_id=message_id,
+                        disable_notification=True,
                     )
                     consecutive_not_found = 0
                     stats["scanned"] += 1
                     
-                    # Delete the forwarded copy immediately
-                    try:
-                        await use_bot.delete_message(
-                            chat_id=temp_chat_id,
-                            message_id=forwarded.message_id,
-                        )
-                    except Exception:
-                        pass
+                    # Queue forwarded copy for batch deletion
+                    pending_delete_ids.append(forwarded.message_id)
                     
                     # Check if it's an audio message
                     if forwarded.audio:
                         stats["audio_found"] += 1
                         file_unique_id = forwarded.audio.file_unique_id
                         
-                        # Already known in DB?
-                        if message_id in known_message_ids:
-                            stats["already_known"] += 1
-                        elif file_unique_id in fuid_to_track:
-                            # Found a track matching our library!
+                        if file_unique_id in fuid_to_track:
                             track = fuid_to_track[file_unique_id]
                             
-                            # Don't create duplicate if track already has a record
                             if track.id in known_track_ids:
                                 stats["already_known"] += 1
                             else:
-                                # Restore the channel_message record with SENT status
+                                # Restore the channel_message record
                                 channel_message = ChannelMessage(
                                     channel_id=channel.id,
                                     track_id=track.id,
@@ -1383,11 +1388,21 @@ class ChannelService:
                                 known_message_ids.add(message_id)
                                 stats["restored"] += 1
                                 
-                                # Commit in batches of 50
                                 if stats["restored"] % 50 == 0:
                                     await session.commit()
                         else:
                             stats["not_in_library"] += 1
+                    
+                    # Batch-delete forwarded copies to minimize visual spam
+                    if len(pending_delete_ids) >= BATCH_DELETE_SIZE:
+                        try:
+                            await use_bot.delete_messages(
+                                chat_id=buffer_chat_id,
+                                message_ids=pending_delete_ids,
+                            )
+                        except Exception:
+                            pass
+                        pending_delete_ids.clear()
                     
                     # Progress callback every 100 messages
                     if progress_callback and stats["scanned"] % 100 == 0:
@@ -1406,24 +1421,17 @@ class ChannelService:
                 except TelegramBadRequest as e:
                     error_text = str(e).lower()
                     if "message to forward not found" in error_text or "message not found" in error_text:
-                        # Message truly doesn't exist at this ID
                         consecutive_not_found += 1
                         if consecutive_not_found >= max_consecutive_not_found:
-                            # Reached the end of channel messages
                             break
                     elif "can't be forwarded" in error_text or "cannot be forwarded" in error_text:
-                        # Message EXISTS but is a service message (channel created,
-                        # pinned notification, etc.) that can't be forwarded.
-                        # This proves messages exist here — reset the gap counter.
+                        # Service message — exists but can't be forwarded
                         consecutive_not_found = 0
                         stats["scanned"] += 1
-                        logger.debug(f"Scan: msg {message_id} exists but can't be forwarded (service msg)")
                     else:
                         stats["errors"] += 1
                         logger.warning(f"Scan error at msg {message_id}: {e}")
-                        # Unknown error — DON'T count as gap, just skip
                     
-                    # Small delay to avoid hammering
                     await asyncio.sleep(0.03)
                     
                 except TelegramRetryAfter as e:
@@ -1441,6 +1449,16 @@ class ChannelService:
                     consecutive_not_found += 1
                     if consecutive_not_found >= max_consecutive_not_found:
                         break
+            
+            # Delete remaining forwarded copies
+            if pending_delete_ids:
+                try:
+                    await use_bot.delete_messages(
+                        chat_id=buffer_chat_id,
+                        message_ids=pending_delete_ids,
+                    )
+                except Exception:
+                    pass
             
             # Final commit
             await session.commit()

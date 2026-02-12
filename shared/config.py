@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     # Last.fm API (for artist images)
     lastfm_api_key: str = ""
     
+    # Scanner buffer chat ID (private group where bot forwards messages for scanning)
+    # If set, scan_channel will forward to this chat instead of user's DM — no spam.
+    # Create a private group, add the bot as admin, set the group's chat_id here.
+    scanner_buffer_chat_id: int = 0
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
