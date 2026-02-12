@@ -14,9 +14,8 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from shared.config import get_settings
 from shared.database import init_db, close_db
 
+from bot.handlers.menu import router as menu_router
 from bot.handlers.audio import router as audio_router
-from bot.handlers.commands import router as commands_router
-from bot.handlers.callbacks import router as callbacks_router
 from bot.handlers.download import router as download_router
 from bot.handlers.deduplication import router as deduplication_router
 from bot.handlers.channel_pins import router as channel_pins_router
@@ -65,11 +64,10 @@ async def main():
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
     
-    # Register routers
+    # Register routers — menu_router first (handles /start, /menu, all menu callbacks)
     dp.include_router(deduplication_router)
-    dp.include_router(commands_router)
+    dp.include_router(menu_router)
     dp.include_router(audio_router)
-    dp.include_router(callbacks_router)
     dp.include_router(download_router)
     dp.include_router(channel_pins_router)
     

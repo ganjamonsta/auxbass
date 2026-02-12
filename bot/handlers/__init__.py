@@ -1,4 +1,6 @@
 """Bot handlers"""
-from . import commands, audio, callbacks, download, deduplication, channel_pins
+from . import menu, audio, download, deduplication, channel_pins
 
-__all__ = ["commands", "audio", "callbacks", "download", "deduplication", "channel_pins"]
+# menu.py replaces the old commands.py + callbacks.py
+# It provides the unified hierarchical menu with FSM and all callback handlers.
+__all__ = ["menu", "audio", "download", "deduplication", "channel_pins"]
