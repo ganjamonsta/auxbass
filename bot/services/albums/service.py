@@ -223,6 +223,29 @@ class AlbumService:
                 logger.debug(f"Skipping album assignment for track {track_id} - no real metadata")
                 return None
             
+            # Require BOTH title AND artist for album assignment.
+            # Title-only matches (no artist) are unreliable and produce garbage
+            # albums where random unrelated tracks get grouped together.
+            has_real_title = bool(track.title and track.title != "Без названия")
+            has_real_artist = bool(track.artist and track.artist.strip())
+            if not (has_real_title and has_real_artist):
+                logger.debug(
+                    f"Skipping album assignment for track {track_id} - "
+                    f"missing title or artist (title='{track.title}', artist='{track.artist}')"
+                )
+                return None
+            
+            # Require minimum confidence for album assignment.
+            # Low-confidence enrichment matches (e.g. title-only Deezer search)
+            # often return wrong albums.
+            MIN_ALBUM_CONFIDENCE = 55
+            if enrichment.confidence < MIN_ALBUM_CONFIDENCE:
+                logger.debug(
+                    f"Skipping album assignment for track {track_id} - "
+                    f"low confidence ({enrichment.confidence} < {MIN_ALBUM_CONFIDENCE})"
+                )
+                return None
+            
             # Load full tracklist - Last.fm first (richer database), Deezer fallback
             full_tracklist = None
             total_tracks = None

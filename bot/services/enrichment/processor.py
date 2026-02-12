@@ -14,6 +14,15 @@ from shared.matching import normalize_genre, GENRE_MAPPINGS, fuzzy_match_album, 
 
 logger = logging.getLogger(__name__)
 
+# Placeholder artist values that indicate the artist is unknown/missing.
+# Tracks with these "artists" should NOT be assigned to albums because
+# Deezer/Last.fm matches by title alone are unreliable.
+PLACEHOLDER_ARTISTS = {
+    "", "неизвестен", "неизвестный", "неизвестный исполнитель",
+    "unknown", "unknown artist", "various", "various artists",
+    "va", "разные исполнители", "разные",
+}
+
 
 @dataclass
 class EnrichmentResult:
@@ -69,6 +78,11 @@ class EnrichmentProcessor:
         # Skip placeholder titles - no point searching for "Без названия"
         if title == "Без названия" or title.lower() in ["untitled", "unknown", "без названия"]:
             return EnrichmentResult(success=False, confidence=0)
+        
+        # Detect placeholder artist — enrichment can still find tags/genre,
+        # but album assignment must be blocked (title-only Deezer matches
+        # are unreliable and produce garbage albums)
+        artist_is_placeholder = not artist or artist.strip().lower() in PLACEHOLDER_ARTISTS
         
         result = EnrichmentResult(success=False, confidence=0, source="none")
         
@@ -157,9 +171,24 @@ class EnrichmentProcessor:
             if deezer_data.get("release_date"):
                 result.release_date = deezer_data["release_date"]
         
+        # --- Strip album info when artist is unknown ---
+        # Title-only matches produce garbage albums (random tracks matched
+        # to unrelated albums). Keep tags/genre/cover but drop album assignment.
+        if artist_is_placeholder and result.album_name:
+            logger.info(
+                f"Dropping album '{result.album_name}' for '{title}' — "
+                f"artist is placeholder ('{artist}')"
+            )
+            result.album_name = None
+            result.deezer_album_id = None
+            result.track_number = None
+            # Lower confidence — we can't be sure about anything without artist
+            result.confidence = min(result.confidence, 40)
+        
         # 3. FALLBACK: If still no album found, try tracklist matching
         # Searches through artist album tracklists (from Last.fm) to find the track
-        if not result.album_name and artist and lastfm_client.is_configured:
+        # Skip fallback for placeholder artists — tracklist matching needs a real artist
+        if not result.album_name and artist and not artist_is_placeholder and lastfm_client.is_configured:
             tracklist_match = await self._enrich_from_tracklist(title, artist)
             
             if tracklist_match:
