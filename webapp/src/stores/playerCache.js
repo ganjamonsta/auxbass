@@ -93,6 +93,17 @@ export const setCachedAudio = (trackId, blobUrl) => {
 }
 
 /**
+ * Delete a single audio blob from cache
+ */
+export const deleteCachedAudio = (trackId) => {
+  const url = audioCache.get(trackId)
+  if (url) {
+    URL.revokeObjectURL(url)
+    audioCache.delete(trackId)
+  }
+}
+
+/**
  * Clear audio cache
  */
 export const clearAudioCache = () => {

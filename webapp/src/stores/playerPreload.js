@@ -1,0 +1,230 @@
+/**
+ * Player Preload Module
+ * Batch-fetches stream URLs and manages Audio-element preloading for next tracks.
+ * Extracted from player.js to reduce god-object.
+ */
+import {
+  getCachedUrl,
+  setCachedUrl,
+  getCachedAudio,
+  preloadTrackWithAudio,
+  getPreloadTrackId,
+} from './playerCache'
+
+// ============== Adaptive Preload System ==============
+let _lastDownloadSpeed = 0
+let _userInteractionTime = 0
+const USER_INTERACTION_COOLDOWN = 1000
+
+export const markUserInteraction = () => {
+  _userInteractionTime = Date.now()
+}
+
+export const isUserActivelyBrowsing = () => {
+  return Date.now() - _userInteractionTime < USER_INTERACTION_COOLDOWN
+}
+
+// Active preload controllers
+const _preloadingTracks = new Map()
+
+/**
+ * Cancel preloads that are no longer relevant (not in next N positions).
+ *
+ * @param {Set<number>} relevantIds - track IDs that should be kept
+ */
+export function cancelIrrelevantPreloads(relevantIds) {
+  for (const [trackId, controller] of _preloadingTracks.entries()) {
+    if (!relevantIds.has(trackId)) {
+      console.log(`[Preload] Cancelling irrelevant preload: track ${trackId}`)
+      controller.abort()
+      _preloadingTracks.delete(trackId)
+    }
+  }
+}
+
+/**
+ * Collect the set of track IDs that are relevant for the next 1-3 positions.
+ * Works for all modes: lazy shuffle, regular shuffle, normal.
+ */
+export function collectRelevantIds({
+  isLazy, lazyShuffleIds, lazyShuffleIndex,
+  shuffle, shuffleOrder, shuffleIndex,
+  queue, queueIndex, repeat
+}) {
+  const ids = new Set()
+  const N = 3
+
+  if (isLazy) {
+    for (let off = 1; off <= N; off++) {
+      let idx = lazyShuffleIndex + off
+      if (idx >= lazyShuffleIds.length) {
+        if (repeat === 'all') idx = idx % lazyShuffleIds.length
+        else continue
+      }
+      ids.add(lazyShuffleIds[idx])
+    }
+  } else if (shuffle && shuffleOrder.length > 0) {
+    for (let off = 1; off <= N; off++) {
+      let si = shuffleIndex + off
+      if (si >= shuffleOrder.length) {
+        if (repeat === 'all') si = si % shuffleOrder.length
+        else continue
+      }
+      const qi = shuffleOrder[si]
+      if (queue[qi]) ids.add(queue[qi].id)
+    }
+  } else {
+    for (let off = 1; off <= N; off++) {
+      let idx = queueIndex + off
+      if (idx >= queue.length) {
+        if (repeat === 'all') idx = idx % queue.length
+        else continue
+      }
+      if (queue[idx]) ids.add(queue[idx].id)
+    }
+  }
+  return ids
+}
+
+/**
+ * Collect track objects/IDs that need preloading (not yet cached).
+ * Returns { trackIds: number[], nextTrack: object|null }
+ */
+export function collectTracksToPreload({
+  isLazy, lazyShuffleIds, lazyShuffleIndex,
+  shuffle, shuffleOrder, shuffleIndex,
+  queue, queueIndex, repeat,
+  getNextTrackForPreload
+}) {
+  const idsToFetch = []
+  const N = 3
+
+  if (isLazy) {
+    for (let off = 1; off <= N; off++) {
+      let idx = lazyShuffleIndex + off
+      if (idx >= lazyShuffleIds.length) {
+        if (repeat === 'all' && idx < lazyShuffleIds.length + N) {
+          idx = idx % lazyShuffleIds.length
+        } else continue
+      }
+      const tid = lazyShuffleIds[idx]
+      if (!getCachedUrl(tid) && !getCachedAudio(tid)) idsToFetch.push(tid)
+    }
+    return { trackIds: idsToFetch, nextTrack: null, isLazy: true }
+  }
+
+  const tracksToPreload = []
+  if (shuffle && shuffleOrder.length > 0) {
+    for (let off = 1; off <= N; off++) {
+      let si = shuffleIndex + off
+      if (si >= shuffleOrder.length) {
+        if (repeat === 'all' && si < shuffleOrder.length + N) {
+          si = si % shuffleOrder.length
+        } else continue
+      }
+      const qi = shuffleOrder[si]
+      const t = queue[qi]
+      if (t && !getCachedUrl(t.id) && !getCachedAudio(t.id)) tracksToPreload.push(t)
+    }
+  } else {
+    for (let off = 1; off <= N; off++) {
+      let idx = queueIndex + off
+      if (idx >= queue.length) {
+        if (repeat === 'all') idx = idx % queue.length
+        else break
+      }
+      const t = queue[idx]
+      if (t && !getCachedUrl(t.id) && !getCachedAudio(t.id)) tracksToPreload.push(t)
+    }
+  }
+
+  return {
+    trackIds: tracksToPreload.map(t => t.id),
+    tracks: tracksToPreload,
+    nextTrack: getNextTrackForPreload ? getNextTrackForPreload() : null,
+    isLazy: false
+  }
+}
+
+/**
+ * Execute the batch URL fetch and start Audio-element preloading.
+ *
+ * @param {Object} params
+ * @param {number[]} params.trackIds
+ * @param {Function} params.getBatchUrls — playerApi.getBatchUrls
+ * @param {Object|null} params.nextTrack — object with .id for Audio preload
+ * @param {Function} params.onNextPreloaded — setter for nextTrackPreloaded ref
+ */
+export async function executeBatchPreload({ trackIds, getBatchUrls, nextTrack, onNextPreloaded }) {
+  if (trackIds.length === 0) {
+    // All cached — just ensure Audio preload for immediate next
+    if (nextTrack) {
+      const url = getCachedUrl(nextTrack.id)
+      if (url && getPreloadTrackId() !== nextTrack.id) {
+        preloadTrackWithAudio(nextTrack.id, url)
+        if (onNextPreloaded) onNextPreloaded({ track: nextTrack, url, audioPreloaded: true })
+      }
+    }
+    return
+  }
+
+  try {
+    console.log(`[Preload] Fetching batch URLs for ${trackIds.length} tracks`)
+    const response = await getBatchUrls(trackIds)
+    const urlData = response.data.urls || []
+
+    for (const item of urlData) {
+      if (item.url && !item.error && item.url.startsWith('/api/player/audio/')) {
+        setCachedUrl(item.track_id, item.url, item.expires_at)
+      } else if (item.error) {
+        console.warn(`[Preload] Track ${item.track_id} error: ${item.error}`)
+      }
+    }
+
+    // Start Audio preload for immediate next
+    if (nextTrack) {
+      const nextUrl = getCachedUrl(nextTrack.id)
+      if (nextUrl && getPreloadTrackId() !== nextTrack.id) {
+        preloadTrackWithAudio(nextTrack.id, nextUrl)
+        if (onNextPreloaded) onNextPreloaded({ track: nextTrack, url: nextUrl, audioPreloaded: true })
+      }
+    }
+
+    console.log(`[Preload] Cached ${urlData.filter(u => u.url).length} URLs`)
+  } catch (e) {
+    console.error('[Preload] Batch URL fetch failed:', e)
+  }
+}
+
+/**
+ * Preload a single track fully (blob download + cache).
+ */
+export async function preloadSingleTrack(track, getStreamUrl, setCachedAudioFn) {
+  if (getCachedAudio(track.id) || _preloadingTracks.has(track.id)) return
+
+  const controller = new AbortController()
+  _preloadingTracks.set(track.id, controller)
+
+  const startTime = Date.now()
+  try {
+    const response = await getStreamUrl(track.id)
+    const streamUrl = response.data.url
+    const audioResponse = await fetch(streamUrl, { signal: controller.signal })
+    if (!audioResponse.ok) return
+
+    const blob = await audioResponse.blob()
+    const blobUrl = URL.createObjectURL(blob)
+
+    const downloadTime = (Date.now() - startTime) / 1000
+    if (downloadTime > 0) {
+      _lastDownloadSpeed = blob.size / downloadTime
+    }
+
+    setCachedAudioFn(track.id, blobUrl)
+    console.log(`[Preload] Cached: ${track.title} (${(blob.size / 1024 / 1024).toFixed(1)}MB in ${downloadTime.toFixed(1)}s)`)
+  } catch (e) {
+    if (e.name !== 'AbortError') console.error('Failed to preload track:', track.title, e)
+  } finally {
+    if (_preloadingTracks.get(track.id) === controller) _preloadingTracks.delete(track.id)
+  }
+}

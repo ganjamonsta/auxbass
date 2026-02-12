@@ -55,8 +55,13 @@ export function usePlaybackActions(tracksSource) {
   const shufflePlay = () => {
     const tracks = getTracks()
     if (tracks.length > 0) {
-      const shuffled = [...tracks].sort(() => Math.random() - 0.5)
-      playerStore.playTrack(shuffled[0], shuffled, 0)
+      // Fisher-Yates shuffle (unbiased)
+      const shuffled = [...tracks]
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+      }
+      playerStore.playTrack(shuffled[0], shuffled)
     }
   }
 
