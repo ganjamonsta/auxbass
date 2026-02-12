@@ -137,15 +137,27 @@ class DeezerClient:
             title_score = fuzzy_match_title(title, deezer_title)
             artist_score = fuzzy_match_artist(artist, deezer_artist) if artist else 0.5
             
+            # Skip if title match is too low — prevents accepting random tracks
+            # by the same artist (e.g. searching "Ivy" and getting "HUMBLE.")
+            if title_score < TITLE_MATCH_THRESHOLD:
+                continue
+            
             # Combined score (weighted)
             combined = (title_score * 0.6) + (artist_score * 0.4)
+            
+            # Prefer tracks from albums over singles (album type "single")
+            # Deezer returns album.type: "album", "single", "compile"
+            album_type = track.get("album", {}).get("type", "")
+            if album_type == "album" and combined > 0.6:
+                # Small bonus for album tracks (more reliable album info)
+                combined += 0.05
             
             if combined > best_score:
                 best_score = combined
                 best_match = track
         
-        # Verify match quality
-        if best_match and best_score >= 0.5:
+        # Verify match quality (raised from 0.5 to 0.65)
+        if best_match and best_score >= 0.65:
             return best_match
         
         return None

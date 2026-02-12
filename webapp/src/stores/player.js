@@ -642,7 +642,7 @@ export const usePlayerStore = defineStore('player', () => {
         case 'artist': {
           const name = contextName || contextId
           if (!name) throw new Error('Artist name required')
-          response = await tracksApi.getArtistIds(name, { sort_by: 'random' })
+          response = await tracksApi.getArtistIds(name, { shuffle: true, role: 'primary' })
           break
         }
         case 'album':    if (!contextId) throw new Error('Album ID required'); response = await albumsApi.getIds(contextId, { shuffle: true }); break

@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from .deezer import deezer_client
 from .lastfm import lastfm_client
 from .tracklist_matcher import album_tracklist_matcher
-from shared.matching import normalize_genre, GENRE_MAPPINGS
+from shared.matching import normalize_genre, GENRE_MAPPINGS, fuzzy_match_album, ALBUM_MATCH_THRESHOLD
 
 logger = logging.getLogger(__name__)
 
@@ -112,13 +112,47 @@ class EnrichmentProcessor:
             if deezer_data.get("track_number"):
                 result.track_number = deezer_data["track_number"]
             
-            # Use Deezer album only if Last.fm didn't find one
-            if not result.album_name and deezer_data.get("album"):
-                result.album_name = deezer_data["album"]
+            # --- Album cross-validation ---
+            # Deezer is more structured (has album IDs, tracklists), so prefer it
+            # for album name. Only keep Last.fm album if Deezer has no data.
+            deezer_album = deezer_data.get("album")
             
-            # Always take Deezer IDs
+            if result.album_name and deezer_album:
+                # Both sources returned album names — cross-validate
+                album_similarity = fuzzy_match_album(result.album_name, deezer_album)
+                
+                if album_similarity >= ALBUM_MATCH_THRESHOLD:
+                    # Albums agree — prefer Deezer name (canonical) and keep IDs
+                    result.album_name = deezer_album
+                    result.deezer_album_id = deezer_data.get("deezer_album_id")
+                    result.confidence = min(100, result.confidence + 10)
+                    logger.debug(
+                        f"Album cross-validated: '{deezer_album}' "
+                        f"(similarity={album_similarity:.2f})"
+                    )
+                else:
+                    # Albums disagree — Last.fm may have returned a compilation/wrong album
+                    # Prefer Deezer (has structured album ID + tracklist)
+                    logger.info(
+                        f"Album mismatch for '{title}': "
+                        f"Last.fm='{result.album_name}' vs Deezer='{deezer_album}' "
+                        f"(similarity={album_similarity:.2f}). Using Deezer."
+                    )
+                    result.album_name = deezer_album
+                    result.deezer_album_id = deezer_data.get("deezer_album_id")
+                    # Lower confidence due to disagreement
+                    result.confidence = max(50, result.confidence - 10)
+            elif deezer_album:
+                # Only Deezer has album — use it
+                result.album_name = deezer_album
+                result.deezer_album_id = deezer_data.get("deezer_album_id")
+            else:
+                # Only Last.fm has album (or neither) — NO deezer_album_id
+                # This prevents storing a mismatched deezer_album_id
+                pass
+            
+            # Always take Deezer track ID
             result.deezer_track_id = deezer_data.get("deezer_track_id")
-            result.deezer_album_id = deezer_data.get("deezer_album_id")
             
             if deezer_data.get("release_date"):
                 result.release_date = deezer_data["release_date"]

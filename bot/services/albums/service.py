@@ -18,17 +18,11 @@ from shared.models import (
     Track, TrackEnrichment, Album, AlbumTrack, UserLibrary, utcnow
 )
 from shared.matching import (
-    normalize_artist, normalize_title, fuzzy_match_album,
+    normalize_artist, normalize_title, normalize_album, fuzzy_match_album,
     ALBUM_MATCH_THRESHOLD
 )
 
 logger = logging.getLogger(__name__)
-
-
-# Alias for backward compatibility
-def normalize_album(s: str) -> str:
-    """Normalize album name for matching"""
-    return normalize_title(s)
 
 
 @dataclass

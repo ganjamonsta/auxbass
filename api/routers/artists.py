@@ -84,6 +84,7 @@ async def find_artist_track_ids(
     normalized_search: str,
     user_id: int = None,
     scope: str = "library",
+    primary_only: bool = False,
 ) -> set[int]:
     """
     Find all track IDs where an artist appears — as primary artist, featured,
@@ -92,6 +93,7 @@ async def find_artist_track_ids(
     Two-phase search:
     1. Fast indexed SQL on normalized_artist column (primary artist)
     2. SQL ILIKE pre-filter + Python-level matching for feat/collab appearances
+       (skipped when primary_only=True)
     """
     found_ids = set()
 
@@ -111,6 +113,10 @@ async def find_artist_track_ids(
             .where(Track.normalized_artist == normalized_search)
         )
     found_ids.update(row[0] for row in primary.all())
+
+    # If primary_only, skip Phase 2 (featured/collab/remix/prod)
+    if primary_only:
+        return found_ids
 
     # Phase 2: Broad SQL pre-filter + precise Python matching for featured appearances
     search_words = [w for w in normalized_search.split() if len(w) >= 2]
@@ -734,20 +740,22 @@ async def get_artist_tracks(
     offset: int = Query(0, ge=0),
     limit: int = Query(30, ge=1, le=100),
     scope: str = Query("library", pattern="^(library|global)$"),
+    role: str = Query("all", pattern="^(all|primary)$"),
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Get paginated tracks for an artist.
     
-    Finds all tracks where the artist appears as primary, featured,
-    collaborator, remix artist, or producer.
+    Finds tracks where the artist appears.
+    role=all (default): primary + featured/collab/remix/prod
+    role=primary: only tracks where this is the main artist
     """
     artist_name = unquote(artist_name)
     normalized_search = normalize_artist(artist_name)
     
-    # Find ALL tracks where this artist appears (primary + featured/collab/remix/prod)
-    all_track_ids = await find_artist_track_ids(db, normalized_search, user.id, scope)
+    # Find tracks where this artist appears
+    all_track_ids = await find_artist_track_ids(db, normalized_search, user.id, scope, primary_only=(role == "primary"))
     total = len(all_track_ids)
     
     if not all_track_ids:
@@ -844,6 +852,7 @@ async def get_artist_tracks(
 async def get_artist_track_ids(
     artist_name: str,
     shuffle: bool = False,
+    role: str = Query("all", pattern="^(all|primary)$"),
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -851,12 +860,13 @@ async def get_artist_track_ids(
     Get all track IDs for an artist.
     
     Lightweight endpoint for shuffle - returns only IDs.
-    Finds all tracks where the artist appears (primary + featured/collab/remix/prod).
+    role=all (default): primary + featured/collab/remix/prod
+    role=primary: only tracks where this is the main artist
     """
     normalized_search = normalize_artist(artist_name)
     
-    # Find ALL tracks where this artist appears
-    all_track_ids = await find_artist_track_ids(db, normalized_search, user.id, "library")
+    # Find tracks where this artist appears
+    all_track_ids = await find_artist_track_ids(db, normalized_search, user.id, "library", primary_only=(role == "primary"))
     
     if not all_track_ids:
         return {"ids": [], "total": 0}

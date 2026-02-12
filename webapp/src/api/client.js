@@ -191,13 +191,13 @@ export const tracksApi = {
   getArtists: cacheable((scope = 'library') => api.get('/artists', { params: { scope, limit: 500 } })),
   getArtistImage: cacheable((artistName) => api.get(`/artists/${encodeURIComponent(artistName)}/image`)),
   getArtistDetail: cacheable((artistName, scope = 'library') => api.get(`/artists/${encodeURIComponent(artistName)}`, { params: { scope } })),
-  // Bypass cache when sort_by is 'random' to get fresh shuffled order each time
+  // Bypass cache when shuffle is requested to get fresh shuffled order each time
   // Add timestamp to ensure truly random results on every call
   getArtistIds: (artistName, params = {}) => api.get(`/artists/${encodeURIComponent(artistName)}/ids`, { 
-    params: params.sort_by === 'random' 
+    params: params.shuffle 
       ? { ...params, _t: Date.now() }  // Add timestamp to bypass any caching
       : params, 
-    bypassCache: params.sort_by === 'random' 
+    bypassCache: !!params.shuffle 
   }),
   getGenres: cacheable((scope = 'library') => api.get('/tracks/genres', { params: { scope } })),
   getTags: cacheable((scope = 'library', limit = 50) => api.get('/tracks/tags', { params: { scope, limit } })),

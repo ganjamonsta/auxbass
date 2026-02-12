@@ -547,10 +547,13 @@ def fuzzy_match_artist(artist1: str, artist2: str) -> float:
 def fuzzy_match_album(album1: str, album2: str) -> float:
     """
     Calculate similarity between two album names (0.0 to 1.0).
-    Similar to title matching but with album-specific adjustments.
+    Uses normalize_album for album-specific logic (Deluxe/Remastered preserved).
+    Combines word-based Jaccard with SequenceMatcher for robustness.
     """
-    norm1 = normalize_title(album1)
-    norm2 = normalize_title(album2)
+    from difflib import SequenceMatcher
+    
+    norm1 = normalize_album(album1)
+    norm2 = normalize_album(album2)
     
     if not norm1 or not norm2:
         return 0.0
@@ -566,11 +569,22 @@ def fuzzy_match_album(album1: str, album2: str) -> float:
     if compact1 == compact2:
         return 1.0
     
-    # Word-based matching
+    # One contains the other (e.g. "Album" vs "Album Deluxe")
+    if compact1 in compact2 or compact2 in compact1:
+        len_ratio = min(len(compact1), len(compact2)) / max(len(compact1), len(compact2))
+        return 0.75 + (0.15 * len_ratio)
+    
+    # Word-based Jaccard similarity
     words1 = set(norm1.split())
     words2 = set(norm2.split())
+    jaccard = jaccard_similarity(words1, words2)
     
-    return jaccard_similarity(words1, words2)
+    # SequenceMatcher for character-level similarity
+    # Better for short names and slight misspellings (e.g. "D&G" vs "DG")
+    seq_ratio = SequenceMatcher(None, compact1, compact2).ratio()
+    
+    # Take the best of the two approaches
+    return max(jaccard, seq_ratio)
 
 
 def albums_match(album1: str, album2: str, threshold: float = ALBUM_MATCH_THRESHOLD) -> bool:
