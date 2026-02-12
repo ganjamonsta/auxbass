@@ -1321,7 +1321,7 @@ class ChannelService:
             logger.info(f"Starting channel scan for user {user_id}, channel {channel.channel_id}")
             
             consecutive_not_found = 0
-            max_consecutive_not_found = 50  # Stop after 50 consecutive missing messages
+            max_consecutive_not_found = 300  # Stop after 300 consecutive missing messages
             message_id = 0
             
             # Clear cancel flag
@@ -1406,18 +1406,24 @@ class ChannelService:
                 except TelegramBadRequest as e:
                     error_text = str(e).lower()
                     if "message to forward not found" in error_text or "message not found" in error_text:
+                        # Message truly doesn't exist at this ID
                         consecutive_not_found += 1
                         if consecutive_not_found >= max_consecutive_not_found:
                             # Reached the end of channel messages
                             break
+                    elif "can't be forwarded" in error_text or "cannot be forwarded" in error_text:
+                        # Message EXISTS but is a service message (channel created,
+                        # pinned notification, etc.) that can't be forwarded.
+                        # This proves messages exist here — reset the gap counter.
+                        consecutive_not_found = 0
+                        stats["scanned"] += 1
+                        logger.debug(f"Scan: msg {message_id} exists but can't be forwarded (service msg)")
                     else:
                         stats["errors"] += 1
                         logger.warning(f"Scan error at msg {message_id}: {e}")
-                        consecutive_not_found += 1
-                        if consecutive_not_found >= max_consecutive_not_found:
-                            break
+                        # Unknown error — DON'T count as gap, just skip
                     
-                    # Even for not-found, small delay to avoid hammering
+                    # Small delay to avoid hammering
                     await asyncio.sleep(0.03)
                     
                 except TelegramRetryAfter as e:
