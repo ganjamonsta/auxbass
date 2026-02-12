@@ -524,8 +524,12 @@ export const useLibraryStore = defineStore('library', () => {
   const updateTrack = async (id, data) => {
     try {
       const response = await tracksApi.update(id, data)
-      // Notify entire app about the track change
-      await notifyTrackChange(id, response.data)
+      // Notify entire app about the track change (non-blocking — modal must close even if this fails)
+      try {
+        await notifyTrackChange(id, response.data)
+      } catch (e) {
+        console.error('notifyTrackChange failed:', e)
+      }
       // Refresh artists list if artist was changed
       if (data.artist !== undefined) {
         fetchArtists(artistScope.value)

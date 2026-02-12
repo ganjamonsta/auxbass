@@ -216,6 +216,12 @@ const loading = ref(true)
 
 // Sync album tracks with global track events
 useTrackSync(() => album.value?.tracks)
+// Also sync tracks inside full_tracklist entries
+useTrackSync(() => {
+  const fl = album.value?.full_tracklist
+  if (!fl) return null
+  return fl.filter(item => item.track).map(item => item.track)
+})
 
 // Scope from query
 const scope = computed(() => route.query.scope || 'library')

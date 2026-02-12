@@ -165,11 +165,12 @@ class AlbumTracklistMatcher:
         for i, t in enumerate(tracks_data, 1):
             name = t.get("name", "")
             if name:
+                raw_duration = t.get("duration")
                 tracks.append({
                     "name": name,
                     "normalized": normalize_title(name),
                     "track_number": i,
-                    "duration": int(t.get("duration", 0)),
+                    "duration": int(raw_duration) if raw_duration is not None else 0,
                 })
         
         # Cache result
