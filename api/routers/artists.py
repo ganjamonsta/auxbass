@@ -28,6 +28,7 @@ from bot.services.enrichment.lastfm import lastfm_client
 from bot.services.enrichment.deezer import deezer_client
 
 from api.routers.auth import get_current_user
+from api.routers.library import track_to_response
 from api.schemas.artists import (
     ArtistResponse,
     ArtistDetailResponse,
@@ -694,7 +695,6 @@ async def get_artist(
             matching_tracks[0][0].artist if matching_tracks else None
         )
         
-        from api.routers.library import track_to_response
         all_tracks_response = [track_to_response(track, lib_entry) for track, lib_entry in matching_tracks]
     
     actual_name = normalize_artist_display(sample_artist) if sample_artist else artist_name
@@ -839,7 +839,6 @@ async def get_artist_tracks(
         )
         tracks_map = {t.id: (t, lib) for t, lib in tracks_result.unique().all()}
         
-        from api.routers.library import track_to_response
         # Preserve order from matching_ids
         tracks_response = [
             track_to_response(tracks_map[tid][0], tracks_map[tid][1])
