@@ -38,7 +38,7 @@
 
     <!-- Playlists Section -->
     <div v-if="displayedPlaylists.length > 0" class="sidebar-section playlists-section">
-      <div class="section-header clickable" @click="$router.push('/playlists')">
+      <div class="section-header clickable" @click="goToPersonalPlaylists">
         <span>Плейлисты</span>
         <span class="section-count">{{ userPlaylists.length }}</span>
       </div>
@@ -68,7 +68,7 @@
         <div 
           v-if="hasMorePlaylists"
           class="nav-item show-more-btn"
-          @click="$router.push('/playlists')"
+          @click="goToPersonalPlaylists"
         >
           <span class="show-more-text">Показать все {{ userPlaylists.length }}</span>
         </div>
@@ -135,6 +135,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { useAuthStore } from '@/stores/auth'
+import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { getCoverUrl, CoverSize } from '@/utils'
 
@@ -142,6 +143,7 @@ const route = useRoute()
 const router = useRouter()
 const libraryStore = useLibraryStore()
 const authStore = useAuthStore()
+const uiStore = useUIStore()
 
 // Universal context menu
 const { openMenu } = useContextMenu()
@@ -168,6 +170,12 @@ const displayedPlaylists = computed(() => {
 const hasMorePlaylists = computed(() => {
   return userPlaylists.value.length > 5
 })
+
+// Navigation
+const goToPersonalPlaylists = () => {
+  uiStore.setLibraryTab('playlists')
+  router.push('/')
+}
 
 // Format large numbers
 const formatCount = (count) => {
