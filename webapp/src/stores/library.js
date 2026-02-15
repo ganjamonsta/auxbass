@@ -209,18 +209,26 @@ export const useLibraryStore = defineStore('library', () => {
     try {
       artistScope.value = scope
       
-      let artistList
+      let artistList = []
+      const limit = 100 // API max limit per page
+      let offset = 0
+      let total = limit // Initialize with limit to enter loop
+      
+      // Fetch all pages
+      while (offset < total) {
+        const response = scope === 'global'
+          ? await artistsApi.getGlobal({ offset, limit })
+          : await artistsApi.getAll({ offset, limit })
+        
+        const pageItems = response.data?.items || response.data?.items || []
+        artistList = [...artistList, ...pageItems]
+        total = response.data?.total || total
+        offset += limit
+      }
+      
       if (scope === 'global') {
-        // Use the dedicated global artists endpoint
-        const response = await artistsApi.getGlobal({ limit: 500 })
-        // Handle paginated response (ArtistsListResponse has .items)
-        artistList = response.data?.items || response.data || []
         globalArtists.value = artistList
       } else {
-        // Use paginated library artists endpoint
-        const response = await artistsApi.getAll({ limit: 500 })
-        // Handle paginated response (ArtistsListResponse has .items)
-        artistList = response.data?.items || response.data || []
         artists.value = artistList
       }
       
