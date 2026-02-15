@@ -156,11 +156,13 @@ const artistCount = computed(() => libraryStore.artists?.length || 0)
 const playlists = computed(() => libraryStore.playlists || [])
 
 const albums = computed(() => {
-  return playlists.value.filter(p => p.is_auto_album && p.track_count > 0)
+  // Albums are now separate entities fetched from /albums endpoint, not playlists
+  // This filter would always return empty since is_auto_album doesn't exist in playlist responses
+  return []
 })
 
 const userPlaylists = computed(() => {
-  return playlists.value.filter(p => !p.is_auto_album && !p.is_auto_source)
+  return playlists.value
 })
 
 const displayedPlaylists = computed(() => {

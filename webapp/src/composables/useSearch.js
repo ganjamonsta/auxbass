@@ -37,15 +37,11 @@ export function useSearch(libraryStore) {
 
   /**
    * Search results - albums matching query
+   * Albums are now separate entities fetched from /albums endpoint
    */
   const searchResultAlbums = computed(() => {
-    if (!searchQueryLower.value) return []
-    return libraryStore.playlists.filter(p => 
-      p.is_auto_album && 
-      p.track_count > 0 &&
-      (p.name?.toLowerCase().includes(searchQueryLower.value) ||
-       p.album_artist?.toLowerCase().includes(searchQueryLower.value))
-    ).slice(0, 5)
+    // Albums are not in playlists list anymore
+    return []
   })
 
   /**
@@ -54,8 +50,6 @@ export function useSearch(libraryStore) {
   const searchResultPlaylists = computed(() => {
     if (!searchQueryLower.value) return []
     return libraryStore.playlists.filter(p => 
-      !p.is_auto_album && 
-      !p.is_auto_source &&
       p.name?.toLowerCase().includes(searchQueryLower.value)
     ).slice(0, 5)
   })

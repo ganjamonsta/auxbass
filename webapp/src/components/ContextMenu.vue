@@ -540,7 +540,8 @@ const playlistId = computed(() => {
 
 // Playlist-specific
 const isAutoAlbum = computed(() => {
-  return menuData.value?.is_auto_album
+  // Albums are now separate entities, not stored as playlists in API response
+  return false
 })
 
 const isPlaylistOwner = computed(() => {

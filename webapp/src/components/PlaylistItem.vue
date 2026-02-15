@@ -13,7 +13,6 @@
       <div v-if="playlist.album_artist" class="artist-overlay">
         <span class="artist-text">{{ playlist.album_artist }}</span>
       </div>
-      <span v-else-if="playlist.is_auto_source" class="type-badge">{{ sourceLabel }}</span>
     </div>
     <div class="playlist-name">{{ playlist.name }}</div>
     <div class="playlist-meta">{{ playlist.track_count }} треков</div>
@@ -48,14 +47,7 @@ const coverClass = computed(() => ({
 }))
 
 const coverIcon = computed(() => {
-  if (props.playlist.is_auto_source) {
-    const type = props.playlist.source_type
-    if (type === 'bot') return Bot
-    if (type === 'channel') return Megaphone
-    if (type === 'user') return User
-    return Folder
-  }
-  if (props.playlist.is_auto_album) return Disc3
+  // All playlists from API are user playlists (SourceCollections and Albums are separate entities)
   return Folder
 })
 

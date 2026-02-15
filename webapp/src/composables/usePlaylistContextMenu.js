@@ -60,11 +60,8 @@ export function usePlaylistContextMenu(options = {}) {
     closePlaylistMenu()
     if (!p) return
     
-    if (p.is_auto_album) {
-      router.push(`/album/${p.id}`)
-    } else {
-      router.push(`/playlist/${p.id}`)
-    }
+    // All playlists returned by API are user playlists (albums are separate entities)
+    router.push(`/playlist/${p.id}`)
   }
 
   // ========== Playback Handlers ==========
@@ -123,7 +120,7 @@ export function usePlaylistContextMenu(options = {}) {
   const handleRename = (playlist) => {
     const p = playlist || selectedPlaylist.value
     closePlaylistMenu()
-    if (!p || p.is_auto_album) return
+    if (!p) return
     
     renameValue.value = p.name || ''
     selectedPlaylist.value = p
@@ -156,7 +153,7 @@ export function usePlaylistContextMenu(options = {}) {
   const handleDelete = async (playlist) => {
     const p = playlist || selectedPlaylist.value
     closePlaylistMenu()
-    if (!p?.id || p.is_auto_album) return
+    if (!p?.id) return
     
     if (confirm(`Удалить плейлист "${p.name}"?`)) {
       try {
@@ -177,13 +174,9 @@ export function usePlaylistContextMenu(options = {}) {
     if (!playlist?.id) return []
     
     try {
-      if (playlist.is_auto_album) {
-        const response = await albumsApi.getOne(playlist.id)
-        return response?.tracks || response || []
-      } else {
-        const response = await playlistsApi.getOne(playlist.id)
-        return response?.tracks || response || []
-      }
+      // All playlists from API are user playlists (albums are separate entities)
+      const response = await playlistsApi.getOne(playlist.id)
+      return response?.tracks || response || []
     } catch (error) {
       console.error('Failed to load playlist tracks:', error)
       return []
