@@ -552,6 +552,125 @@ db_migrate() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  СКРИПТЫ
+# ═══════════════════════════════════════════════════════════════════════════════
+
+run_script() {
+    local script_dir="scripts"
+    local script_name=$1
+    
+    if [ ! -d "$script_dir" ]; then
+        log_error "Директория скриптов не найдена: $script_dir"
+        return 1
+    fi
+    
+    # Собираем все скрипты (.py и .sh)
+    local scripts=($(ls -1 "$script_dir"/*.{py,sh} 2>/dev/null | sort))
+    
+    if [ ${#scripts[@]} -eq 0 ]; then
+        log_info "Нет доступных скриптов"
+        return 0
+    fi
+    
+    # Если передано имя скрипта — запускаем напрямую
+    if [ -n "$script_name" ]; then
+        local found=""
+        for s in "${scripts[@]}"; do
+            local fname=$(basename "$s")
+            if [ "$fname" = "$script_name" ] || [ "${fname%.*}" = "$script_name" ]; then
+                found="$s"
+                break
+            fi
+        done
+        
+        if [ -z "$found" ]; then
+            log_error "Скрипт не найден: $script_name"
+            echo -e "  Доступные скрипты:"
+            for s in "${scripts[@]}"; do
+                echo -e "    - $(basename "$s")"
+            done
+            return 1
+        fi
+        
+        _exec_script "$found"
+        return $?
+    fi
+    
+    # Интерактивный выбор
+    echo ""
+    echo -e "${BOLD}📜 Доступные скрипты:${NC}"
+    echo ""
+    for i in "${!scripts[@]}"; do
+        local file=$(basename "${scripts[$i]}")
+        local ext="${file##*.}"
+        local desc=""
+        
+        # Извлечь описание из docstring/комментария
+        if [ "$ext" = "py" ]; then
+            desc=$(sed -n 's/^"""\(.*\)"""$/\1/p; s/^"""//p' "${scripts[$i]}" | head -1)
+            if [ -z "$desc" ]; then
+                desc=$(grep -m1 '^#.*' "${scripts[$i]}" | sed 's/^#\s*//' | head -1)
+            fi
+        elif [ "$ext" = "sh" ]; then
+            desc=$(grep -m1 '^#[^!]' "${scripts[$i]}" | sed 's/^#\s*//' | head -1)
+        fi
+        
+        if [ -n "$desc" ]; then
+            echo -e "  ${CYAN}$((i+1))${NC}) ${WHITE}$file${NC}  ${DIM}— $desc${NC}"
+        else
+            echo -e "  ${CYAN}$((i+1))${NC}) ${WHITE}$file${NC}"
+        fi
+    done
+    echo -e "  ${CYAN}0${NC}) Отмена"
+    echo ""
+    
+    read -p "Выбор: " choice
+    
+    case $choice in
+        0|"") return ;;
+        [1-9]|[1-9][0-9])
+            local idx=$((choice-1))
+            if [ $idx -lt ${#scripts[@]} ]; then
+                _exec_script "${scripts[$idx]}"
+            else
+                log_error "Неверный выбор"
+            fi
+            ;;
+        *)
+            log_error "Неверный выбор"
+            ;;
+    esac
+}
+
+_exec_script() {
+    local script=$1
+    local ext="${script##*.}"
+    local fname=$(basename "$script")
+    
+    echo ""
+    log_step "Запускаю: $fname"
+    echo ""
+    
+    if [ "$ext" = "py" ]; then
+        python3 "$script" "${@:2}"
+    elif [ "$ext" = "sh" ]; then
+        bash "$script" "${@:2}"
+    else
+        log_error "Неизвестный тип скрипта: $ext"
+        return 1
+    fi
+    
+    local exit_code=$?
+    echo ""
+    if [ $exit_code -eq 0 ]; then
+        log_ok "$fname завершён успешно"
+    else
+        log_error "$fname завершён с ошибкой (код: $exit_code)"
+    fi
+    return $exit_code
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  ИНТЕРАКТИВНОЕ МЕНЮ
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -584,6 +703,9 @@ show_menu() {
     echo -e "    ${CYAN}m${NC}) Миграции"
     echo -e "    ${CYAN}B${NC}) Бэкап базы"
     echo -e "    ${CYAN}R${NC}) Восстановить базу"
+    echo ""
+    echo -e "  ${BOLD}Утилиты${NC}"
+    echo -e "    ${CYAN}x${NC}) Запустить скрипт"
     echo ""
     echo -e "    ${CYAN}q${NC}) Выход"
     echo ""
@@ -648,6 +770,10 @@ interactive_menu() {
                 db_backup
                 read -p "Нажми Enter для продолжения..."
                 ;;
+            x)
+                run_script
+                read -p "Нажми Enter для продолжения..."
+                ;;
             R)
                 read -p "  Файл бэкапа: " file
                 db_restore "$file"
@@ -704,12 +830,18 @@ show_help() {
     echo "  db backup               Создать бэкап"
     echo "  db restore <файл>       Восстановить из бэкапа"
     echo ""
+    echo -e "${BOLD}Утилиты:${NC}"
+    echo "  script                  Список и запуск скриптов"
+    echo "  script <имя>            Запустить конкретный скрипт"
+    echo ""
     echo -e "${BOLD}Примеры:${NC}"
     echo "  ./manage.sh start"
     echo "  ./manage.sh logs api"
     echo "  ./manage.sh update"
     echo "  ./manage.sh git checkout develop"
     echo "  ./manage.sh db backup"
+    echo "  ./manage.sh script"
+    echo "  ./manage.sh script diagnose"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -789,6 +921,11 @@ main() {
                 migrate) db_migrate ;;
                 *) log_error "Неизвестная db команда: $2"; echo "Доступно: shell, backup, restore, migrate" ;;
             esac
+            ;;
+        
+        # Скрипты
+        script|scripts)
+            run_script "$2"
             ;;
             
         # Помощь

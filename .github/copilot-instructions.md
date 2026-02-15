@@ -10,6 +10,8 @@ api/        → REST API (FastAPI, mounted at /api)
 webapp/     → Telegram Mini App (Vue 3, Pinia, Tailwind, Vite)
 shared/     → Config, DB engine, SQLAlchemy models, matching utils
 database/   → init.sql schema + numbered migration .sql files
+scripts/    → Utility scripts (cleanup, diagnostics, etc.)
+deploy/     → Production deploy configs and scripts
 ```
 
 **Data flow:** Users send audio files to the **bot** → bot saves `Track` (keyed by `file_unique_id`) and `UserLibrary` entry → background `enrichment_worker` enriches metadata from Deezer/Last.fm → **api** serves tracks/albums/playlists to the **webapp** which streams audio via Telegram Bot API proxy (`/api/player/audio/`).
