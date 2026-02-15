@@ -838,29 +838,50 @@ async def update_track(
     if not track:
         raise HTTPException(status_code=404, detail="Track not found or not owned")
     
-    if data.title is not None:
-        track.title = data.title
-    if data.artist is not None:
-        track.artist = data.artist
+    # Validate and update metadata
+    changed = False
+    if data.title is not None and data.title.strip():
+        track.title = data.title.strip()
+        changed = True
     
-    track.updated_at = utcnow()
-    track.enrichment_status = EnrichmentStatus.PENDING
+    if data.artist is not None and data.artist.strip():
+        track.artist = data.artist.strip()
+        changed = True
+    
+    # Update genre if provided
+    if hasattr(data, 'genre') and data.genre is not None and data.genre.strip():
+        # Genre updates come through enrichment
+        if not track.enrichment:
+            track.enrichment = TrackEnrichment(track_id=track.id)
+        track.enrichment.genre = data.genre.strip()
+        changed = True
+    
+    if changed:
+        track.updated_at = utcnow()
+        track.enrichment_status = EnrichmentStatus.PENDING
     
     await db.commit()
 
-    # Re-fetch with all relations to match GET /tracks response
+    # Re-fetch track with all relations (just refresh from DB)
     result = await db.execute(
-        select(Track, UserLibrary)
-        .join(UserLibrary, UserLibrary.track_id == Track.id)
+        select(Track)
         .where(Track.id == track_id)
-        .where(UserLibrary.user_id == user.id)
         .options(
             selectinload(Track.enrichment),
             selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
         )
     )
-    row = result.unique().first()
-    track, lib_entry = row if row else (None, None)
+    track = result.scalar_one_or_none()
+    
+    if not track:
+        raise HTTPException(status_code=500, detail="Track disappeared after update")
+    
+    # Get UserLibrary entry if it exists
+    lib_result = await db.execute(
+        select(UserLibrary)
+        .where(UserLibrary.user_id == user.id, UserLibrary.track_id == track_id)
+    )
+    lib_entry = lib_result.scalar_one_or_none()
     
     return track_to_response(track, lib_entry)
 

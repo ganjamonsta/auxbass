@@ -63,6 +63,7 @@ class TrackUpdate(BaseModel):
     """Track update request"""
     title: Optional[str] = None
     artist: Optional[str] = None
+    genre: Optional[str] = None  # Genre (stored in enrichment)
 
 
 class TrackCreate(BaseModel):

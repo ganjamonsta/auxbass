@@ -384,6 +384,10 @@ async def create_playlist(
     )
     db.add(playlist)
     await db.flush()
+    await db.commit()
+    
+    # Get user info for response
+    owner = await db.get(User, user.id)
     
     return PlaylistResponse(
         id=playlist.id,
@@ -392,7 +396,12 @@ async def create_playlist(
         track_count=0,
         total_duration=0,
         cover_url=None,
+        covers=[],
         is_public=playlist.is_public,
+        owner_id=owner.id,
+        owner_name=owner.display_name,
+        is_owner=True,
+        is_subscribed=False,
         created_at=playlist.created_at,
     )
 

@@ -436,7 +436,7 @@ async def update_track(
     """
     Update track metadata.
     
-    If title or artist changes, track will be re-enriched.
+    If title, artist, or genre changes, track will be re-enriched.
     Only the uploader can edit track metadata.
     """
     # Check user has track in library and is uploader
@@ -458,13 +458,21 @@ async def update_track(
     
     changed = False
     
-    if update.title and update.title != track.title:
-        track.title = update.title
+    if update.title and update.title.strip() and update.title.strip() != track.title:
+        track.title = update.title.strip()
         changed = True
     
-    if update.artist and update.artist != track.artist:
-        track.artist = update.artist
+    if update.artist and update.artist.strip() and update.artist.strip() != track.artist:
+        track.artist = update.artist.strip()
         changed = True
+    
+    # Update genre if provided
+    if hasattr(update, 'genre') and update.genre is not None and update.genre.strip():
+        if not track.enrichment:
+            track.enrichment = TrackEnrichment(track_id=track.id)
+        if track.enrichment.genre != update.genre.strip():
+            track.enrichment.genre = update.genre.strip()
+            changed = True
     
     if changed:
         # Schedule re-enrichment
@@ -484,6 +492,10 @@ async def update_track(
         )
     )
     row = result.first()
+    
+    if not row:
+        raise HTTPException(status_code=500, detail="Track disappeared after update")
+    
     track, lib_entry = row
     
     return track_to_response(track, lib_entry)
