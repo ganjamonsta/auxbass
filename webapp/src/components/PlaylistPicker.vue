@@ -151,7 +151,7 @@ const handleSelect = async (playlist) => {
 
 .playlist-list {
   flex: 1;
-  min-h-0;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 12px;
