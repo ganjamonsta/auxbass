@@ -187,6 +187,9 @@
       <!-- Global context menu (universal for all element types) -->
       <ContextMenu />
       
+      <!-- Maintenance status banner -->
+      <MaintenanceBanner />
+
       <!-- Network status banner -->
       <NetworkBanner />
       
@@ -210,6 +213,7 @@ import ChannelBanner from '@/components/ChannelBanner.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
 import ContextMenu from '@/components/ContextMenu.vue'
 import NetworkBanner from '@/components/NetworkBanner.vue'
+import MaintenanceBanner from '@/components/MaintenanceBanner.vue'
 import { useNetworkMonitor } from '@/composables/useNetworkMonitor'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
 import { MobileFooter } from '@/components/layout'
