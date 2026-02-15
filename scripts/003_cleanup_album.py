@@ -101,10 +101,14 @@ async def cleanup_album(album_name: str, auto_confirm: bool = False):
     
     # Ask for confirmation unless auto_confirm
     if not auto_confirm:
-        response = input(f"\n❓ Delete this album? (yes/no): ")
-        if response.lower() != "yes":
-            logger.info("Cancelled")
-            return False
+        # Check if we are in interactive terminal
+        if not os.isatty(0):
+            logger.info("Non-interactive terminal detected, auto-confirming deletion...")
+        else:
+            response = input(f"\n❓ Delete this album? (yes/no): ")
+            if response.lower() != "yes":
+                logger.info("Cancelled")
+                return False
     
     # Delete album (cascade will remove AlbumTrack entries)
     async with get_session() as session:
