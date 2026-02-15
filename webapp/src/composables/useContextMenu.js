@@ -255,8 +255,6 @@ export function useContextMenu() {
     open: (playlist) => {
       closeMenu()
       if (!playlist?.id) return
-      
-      // All playlists from API are user playlists (albums are separate entities)
       router.push(`/playlist/${playlist.id}`)
     },
 
@@ -332,7 +330,7 @@ export function useContextMenu() {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // ALBUM ACTIONS (similar to playlist but with album-specific logic)
+  // ALBUM ACTIONS
   // ═══════════════════════════════════════════════════════════
 
   const albumActions = {
@@ -552,7 +550,6 @@ export function useContextMenu() {
     if (!playlist?.id) return []
     
     try {
-      // All playlists from API are user playlists (albums are separate entities)
       const response = await playlistsApi.getOne(playlist.id)
       return response?.data?.tracks || []
     } catch (error) {

@@ -36,15 +36,6 @@ export function useSearch(libraryStore) {
   })
 
   /**
-   * Search results - albums matching query
-   * Albums are now separate entities fetched from /albums endpoint
-   */
-  const searchResultAlbums = computed(() => {
-    // Albums are not in playlists list anymore
-    return []
-  })
-
-  /**
    * Search results - playlists matching query
    */
   const searchResultPlaylists = computed(() => {
@@ -59,7 +50,6 @@ export function useSearch(libraryStore) {
    */
   const hasSearchResults = computed(() => {
     return searchResultArtists.value.length > 0 ||
-           searchResultAlbums.value.length > 0 ||
            searchResultPlaylists.value.length > 0
   })
 
@@ -169,7 +159,6 @@ export function useSearch(libraryStore) {
     // Computed
     searchQueryLower,
     searchResultArtists,
-    searchResultAlbums,
     searchResultPlaylists,
     hasSearchResults,
     

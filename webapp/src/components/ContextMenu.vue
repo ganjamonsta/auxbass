@@ -153,8 +153,8 @@
                   <span>Добавить в очередь</span>
                 </button>
 
-                <!-- Only for user playlists that user owns (not auto-albums) -->
-                <template v-if="!isAutoAlbum && isPlaylistOwner">
+                <!-- Only for user playlists that user owns -->
+                <template v-if="isPlaylistOwner">
                   <div class="menu-divider" />
                   <button class="menu-item" @click="exec('rename')">
                     <Pencil :size="18" />
@@ -536,12 +536,6 @@ const playlistId = computed(() => {
     return menuContext.value.split(':')[1]
   }
   return null
-})
-
-// Playlist-specific
-const isAutoAlbum = computed(() => {
-  // Albums are now separate entities, not stored as playlists in API response
-  return false
 })
 
 const isPlaylistOwner = computed(() => {

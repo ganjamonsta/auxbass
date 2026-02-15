@@ -9,10 +9,6 @@
       <!-- Fallback icon -->
       <component v-else :is="coverIcon" :size="32" class="cover-icon" />
       
-      <!-- Artist overlay on cover for albums -->
-      <div v-if="playlist.album_artist" class="artist-overlay">
-        <span class="artist-text">{{ playlist.album_artist }}</span>
-      </div>
     </div>
     <div class="playlist-name">{{ playlist.name }}</div>
     <div class="playlist-meta">{{ playlist.track_count }} треков</div>
@@ -46,18 +42,7 @@ const coverClass = computed(() => ({
   'has-image': displayCovers.value.length > 0
 }))
 
-const coverIcon = computed(() => {
-  // All playlists from API are user playlists (SourceCollections and Albums are separate entities)
-  return Folder
-})
-
-const sourceLabel = computed(() => {
-  const type = props.playlist.source_type
-  if (type === 'bot') return 'Бот'
-  if (type === 'channel') return 'Канал'
-  if (type === 'user') return 'Юзер'
-  return ''
-})
+const coverIcon = computed(() => Folder)
 </script>
 
 <style scoped>
@@ -147,43 +132,7 @@ const sourceLabel = computed(() => {
   object-fit: cover;
 }
 
-/* Artist overlay on album cover */
-.artist-overlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: linear-gradient(transparent 0%, rgba(0,0,0,0.9) 100%);
-  padding: 18px 6px 6px;
-}
 
-.artist-text {
-  display: block;
-  font-size: 10px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.95);
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.7);
-}
-
-.type-badge {
-  position: absolute;
-  bottom: 5px;
-  right: 5px;
-  font-size: 8px;
-  padding: 3px 5px;
-  border-radius: var(--neu-radius-sm, 8px);
-  background: var(--xm-bg-deep, #0D0D0D);
-  color: var(--xm-accent, #E53935);
-  font-weight: 700;
-  text-transform: uppercase;
-  box-shadow: 
-    2px 2px 4px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
-    -1px -1px 2px var(--neu-shadow-light, rgba(255, 255, 255, 0.03));
-}
 
 .playlist-name {
   font-size: 12px;
