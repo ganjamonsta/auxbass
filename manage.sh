@@ -607,9 +607,15 @@ run_script() {
         
         # Извлечь описание из docstring/комментария
         if [ "$ext" = "py" ]; then
-            desc=$(sed -n 's/^"""\(.*\)"""$/\1/p; s/^"""//p' "${scripts[$i]}" | head -1)
+            # Однострочный docstring: """текст"""
+            desc=$(sed -n 's/^"""\(.*\)"""$/\1/p' "${scripts[$i]}" | head -1)
+            # Многострочный docstring: строка после открывающего """
             if [ -z "$desc" ]; then
-                desc=$(grep -m1 '^#.*' "${scripts[$i]}" | sed 's/^#\s*//' | head -1)
+                desc=$(awk 'BEGIN{f=0} /^"""/{f++; next} f==1{gsub(/^[ \t]+/,""); if(length>0){print; exit}}' "${scripts[$i]}")
+            fi
+            # Fallback: комментарий (не shebang)
+            if [ -z "$desc" ]; then
+                desc=$(grep -m1 '^#[^!]' "${scripts[$i]}" | sed 's/^#\s*//' | head -1)
             fi
         elif [ "$ext" = "sh" ]; then
             desc=$(grep -m1 '^#[^!]' "${scripts[$i]}" | sed 's/^#\s*//' | head -1)
@@ -652,7 +658,11 @@ _exec_script() {
     echo ""
     
     if [ "$ext" = "py" ]; then
-        python3 "$script" "${@:2}"
+        # Python-скрипты запускаются внутри контейнера API (там есть все зависимости)
+        log_info "Запуск в Docker контейнере API..."
+        docker compose -f "$PROD_COMPOSE" run --rm \
+            -v "$SCRIPT_DIR/scripts:/app/scripts" \
+            api python "/app/scripts/$fname" "${@:2}"
     elif [ "$ext" = "sh" ]; then
         bash "$script" "${@:2}"
     else
