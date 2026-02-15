@@ -350,6 +350,7 @@ export const usePlayerStore = defineStore('player', () => {
     onEnded: (e) => {
       if (e.target?._obsolete) return
       clearStallTimer()
+      if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none'
       handleEnded()
     },
     onPlay: () => {
@@ -504,6 +505,8 @@ export const usePlayerStore = defineStore('player', () => {
         try {
           await audio.value.play()
           recyclePreloadAudio(oldAudio)
+          // Re-assert MediaSession metadata after audio element swap (Android 8 fix)
+          updateMediaSession()
         } catch (e) {
           console.error('[Play] Preloaded audio failed, falling back:', e)
           audio.value = oldAudio

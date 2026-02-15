@@ -6,6 +6,17 @@
 import { getDisplayTitle, getDisplayArtist } from '../utils/formatters'
 
 /**
+ * Fallback artwork for Media Session when track has no cover.
+ * Android 8 may not show lock-screen controls without artwork.
+ */
+const FALLBACK_ARTWORK = [
+  { src: '/icons/icon-96x96.png', sizes: '96x96', type: 'image/png' },
+  { src: '/icons/icon-128x128.png', sizes: '128x128', type: 'image/png' },
+  { src: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+  { src: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png' },
+]
+
+/**
  * Update Media Session metadata from current track.
  */
 export function updateMediaSession(track, updatePlaybackStateFn) {
@@ -17,7 +28,7 @@ export function updateMediaSession(track, updatePlaybackStateFn) {
     { src: coverUrl, sizes: '128x128', type: 'image/jpeg' },
     { src: coverUrl, sizes: '256x256', type: 'image/jpeg' },
     { src: coverUrl, sizes: '512x512', type: 'image/jpeg' },
-  ] : []
+  ] : FALLBACK_ARTWORK
 
   navigator.mediaSession.metadata = new MediaMetadata({
     title: getDisplayTitle(track),
@@ -61,24 +72,46 @@ export function updatePositionState(audio, progressVal, durationVal) {
 export function setupMediaSession(actions) {
   if (!('mediaSession' in navigator)) return
 
-  navigator.mediaSession.setActionHandler('play', actions.play)
-  navigator.mediaSession.setActionHandler('pause', actions.pause)
-  navigator.mediaSession.setActionHandler('previoustrack', actions.prev)
-  navigator.mediaSession.setActionHandler('nexttrack', actions.next)
+  const ms = navigator.mediaSession
 
-  navigator.mediaSession.setActionHandler('seekto', (details) => {
-    if (details.seekTime !== undefined) actions.seek(details.seekTime)
+  ms.setActionHandler('play', () => {
+    console.log('[MediaSession] action: play')
+    actions.play()
   })
-  navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+  ms.setActionHandler('pause', () => {
+    console.log('[MediaSession] action: pause')
+    actions.pause()
+  })
+  ms.setActionHandler('previoustrack', () => {
+    console.log('[MediaSession] action: previoustrack')
+    actions.prev()
+  })
+  ms.setActionHandler('nexttrack', () => {
+    console.log('[MediaSession] action: nexttrack')
+    actions.next()
+  })
+
+  ms.setActionHandler('seekto', (details) => {
+    console.log('[MediaSession] action: seekto', details.seekTime)
+    if (details.seekTime != null) actions.seek(details.seekTime)
+  })
+  ms.setActionHandler('seekbackward', (details) => {
+    console.log('[MediaSession] action: seekbackward', details.seekOffset)
     actions.seekBackward(details.seekOffset || 10)
   })
-  navigator.mediaSession.setActionHandler('seekforward', (details) => {
+  ms.setActionHandler('seekforward', (details) => {
+    console.log('[MediaSession] action: seekforward', details.seekOffset)
     actions.seekForward(details.seekOffset || 10)
   })
 
   try {
-    navigator.mediaSession.setActionHandler('stop', actions.stop)
+    ms.setActionHandler('stop', () => {
+      console.log('[MediaSession] action: stop')
+      actions.stop()
+    })
   } catch (_) { /* not supported in all browsers */ }
+
+  console.log('[MediaSession] All action handlers registered')
 }
 
 let _keyboardAttached = false

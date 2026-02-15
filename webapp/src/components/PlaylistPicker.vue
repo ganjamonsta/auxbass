@@ -101,7 +101,9 @@ const handleSelect = async (playlist) => {
   border-radius: var(--neu-radius-xl, 24px);
   width: 100%;
   max-width: 400px;
-  max-height: 70vh;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   box-shadow: 
     12px 12px 24px var(--neu-shadow-dark, rgba(0, 0, 0, 0.6)),
@@ -148,8 +150,9 @@ const handleSelect = async (playlist) => {
 }
 
 .playlist-list {
-  max-height: calc(70vh - 70px);
-  overflow-y: overlay;
+  flex: 1;
+  min-h-0;
+  overflow-y: auto;
   overflow-x: hidden;
   padding: 12px;
   scrollbar-gutter: auto;
