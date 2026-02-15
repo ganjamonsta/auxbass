@@ -105,8 +105,8 @@ class User(Base):
     is_premium: Mapped[bool] = mapped_column(Boolean, default=False)
     
     # Privacy settings
-    hide_from_search: Mapped[bool] = mapped_column(Boolean, default=False)  # Hide from user search, keep library visible
-    hide_profile: Mapped[bool] = mapped_column(Boolean, default=False)  # Hide library and albums from others
+    hide_from_search: Mapped[bool] = mapped_column(Boolean, default=True)  # Hide from user search, keep library visible
+    hide_profile: Mapped[bool] = mapped_column(Boolean, default=True)  # Hide library and albums from others
     
     # Notification settings
     notify_subscription: Mapped[bool] = mapped_column(Boolean, default=True)  # Notify when subscription event occurs

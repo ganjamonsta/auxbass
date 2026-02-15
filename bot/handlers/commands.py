@@ -151,7 +151,7 @@ async def cmd_stats(message: Message):
 
 @router.message(Command("channel"))
 async def cmd_channel(message: Message, state: FSMContext):
-    """Handle /channel command - setup backup channel"""
+    """Handle /channel command - setup cloud sync channel"""
     user_id = message.from_user.id
     
     # Check if user already has a channel
@@ -160,8 +160,8 @@ async def cmd_channel(message: Message, state: FSMContext):
     if channel:
         from bot.handlers.keyboards import get_channel_keyboard
         await message.answer(
-            f"☁️ <b>Ваш канал для бекапа</b>\n\n"
-            f"📢 {channel.channel_title or 'Канал'}\n"
+            f"☁️ <b>Облачная синхронизация</b>\n\n"
+            f"📢 {channel.channel_title or 'Ваш канал'}\n"
             f"🎵 Сохранено треков: {getattr(channel, '_message_count', 0)}",
             reply_markup=get_channel_keyboard(channel.channel_id, channel.channel_username)
         )
@@ -169,14 +169,16 @@ async def cmd_channel(message: Message, state: FSMContext):
     
     bot_info = await message.bot.get_me()
     await message.answer(
-        "☁️ <b>Настройка канала для бекапа</b>\n\n"
-        "Создайте приватный канал в Telegram и добавьте меня администратором.\n\n"
-        "<b>Инструкция:</b>\n"
-        "1. Создайте новый канал (приватный)\n"
-        f"2. Добавьте @{bot_info.username} как администратора\n"
-        "3. Дайте права на публикацию сообщений\n"
-        "4. Перешлите мне любое сообщение из канала\n\n"
-        "Все новые треки будут автоматически сохраняться в ваш канал с хэштегами.",
+        "☁️ <b>Облачная синхронизация (бекап)</b>\n\n"
+        "Вы можете подключить свой приватный канал для автоматического сохранения всей вашей музыки.\n\n"
+        "<b>Зачем это нужно?</b>\n"
+        "• Ваша музыка всегда под рукой в отдельном канале\n"
+        "• Удобный поиск по хэштегам исполнителей\n"
+        "• Постоянное хранение, даже если бот станет недоступен\n\n"
+        "<b>Как настроить:</b>\n"
+        "1. Создайте приватный канал\n"
+        f"2. Добавьте @{bot_info.username} администратором\n"
+        "3. Перешлите любое сообщение из этого канала сюда.",
         reply_markup=get_channel_setup_keyboard()
     )
     

@@ -98,32 +98,11 @@ async def handle_audio(message: Message):
     user = message.from_user
     user_id = user.id
     
-    # Check if user has connected channel (required to save tracks)
-    async with get_session() as session:
-        from sqlalchemy import select
-        channel = await session.scalar(
-            select(UserChannel).where(
-                UserChannel.user_id == user_id,
-                UserChannel.is_active == True
-            )
-        )
-        
-        if not channel:
-            await message.reply(
-                "🔒 <b>Подключите канал для сохранения музыки</b>\n\n"
-                "Чтобы загружать треки и пользоваться библиотекой, "
-                "нужно подключить ваш Telegram-канал.\n\n"
-                "Используйте команду /channel для подключения.\n\n"
-                "<i>После подключения вы сможете:</i>\n"
-                "• 📁 Загружать треки в библиотеку\n"
-                "• ❤️ Лайкать и сохранять музыку\n"
-                "• 📋 Создавать плейлисты\n"
-                "• ☁️ Автоматический бэкап в канал",
-                parse_mode="HTML"
-            )
-            return
+    # Determine library source from message
+    forward_info = extract_forward_info(message)
+    library_source = get_library_source(message)
     
-    # Extract metadata
+    # Metadata for processing
     title = audio.title
     artist = audio.performer
     duration = audio.duration
@@ -261,7 +240,7 @@ async def handle_audio(message: Message):
     track_id = result.track_id
     is_new = result.is_new
     
-    # If user has backup channel, queue track for forwarding
+    # Check if user has backup channel, queue track for forwarding
     channel_queued = False
     try:
         channel_queued = await channel_service.forward_track_to_channel(
@@ -270,8 +249,18 @@ async def handle_audio(message: Message):
             bot=message.bot,
         )
     except Exception as e:
-        # Channel forwarding is optional, don't fail the main operation
         pass
+    
+    # Channel backup note - now shows queued status
+    channel_note = ""
+    if channel_queued:
+        queue_size = channel_service.get_queue_size(user_id)
+        if queue_size > 1:
+            channel_note = f"\n☁️ <i>В очереди на бекап ({queue_size})</i>"
+        else:
+            channel_note = "\n☁️ <i>Сохраняется в ваш канал...</i>"
+    else:
+        channel_note = "\n⚠️ <i>Канал не подключен. Используйте /channel, чтобы не потерять библиотеку в случае блокировки бота.</i>"
     
     # Build response
     duration_str = format_duration(duration) if duration else ""
@@ -299,15 +288,6 @@ async def handle_audio(message: Message):
         }.get(forward_info["source_type"], "📁")
         source_note = f"\n{source_emoji} Источник: <b>{forward_info['source_name']}</b>"
     
-    # Channel backup note - now shows queued status
-    channel_note = ""
-    if channel_queued:
-        queue_size = channel_service.get_queue_size(user_id)
-        if queue_size > 1:
-            channel_note = f"\n☁️ <i>В очереди на бекап ({queue_size})</i>"
-        else:
-            channel_note = "\n☁️ <i>Сохраняется в ваш канал...</i>"
-    
     # Status
     if not is_new:
         # Track already existed
@@ -323,7 +303,7 @@ async def handle_audio(message: Message):
             await message.reply(
                 "⚠️ Этот трек уже есть в твоей библиотеке!\n\n"
                 f"🎵 <b>{display_title}</b>\n"
-                f"👤 {artist or 'Неизвестный исполнитель'}",
+                f"👤 {artist or 'Неизвестный исполнитель'}{channel_note}",
                 reply_markup=get_track_keyboard(track_id)
             )
         return
