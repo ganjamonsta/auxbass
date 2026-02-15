@@ -794,6 +794,10 @@ async def update_track(
         select(Track)
         .where(Track.id == track_id)
         .where(Track.uploader_id == user.id)
+        .options(
+            selectinload(Track.enrichment),
+            selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
+        )
     )
     track = result.scalar_one_or_none()
     
@@ -824,7 +828,7 @@ async def update_track(
     
     await db.commit()
 
-    # Re-fetch track with all relations (just refresh from DB)
+    # Re-fetch track with all relations to return fresh data
     result = await db.execute(
         select(Track)
         .where(Track.id == track_id)

@@ -430,6 +430,10 @@ async def update_track(
         select(Track, UserLibrary)
         .join(UserLibrary, UserLibrary.track_id == Track.id)
         .where(Track.id == track_id, UserLibrary.user_id == user.id)
+        .options(
+            selectinload(Track.enrichment),
+            selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
+        )
     )
     row = result.first()
     
@@ -467,7 +471,7 @@ async def update_track(
     
     await db.commit()
     
-    # Reload with relationships
+    # Reload with relationships to return fresh data
     result = await db.execute(
         select(Track, UserLibrary)
         .join(UserLibrary, UserLibrary.track_id == Track.id)
