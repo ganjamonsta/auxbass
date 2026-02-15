@@ -150,7 +150,7 @@ const { openMenu } = useContextMenu()
 
 // Stats
 const likedCount = computed(() => libraryStore.likedTracks?.length || 0)
-const artistCount = computed(() => libraryStore.artists?.length || 0)
+const artistCount = computed(() => libraryStore.globalArtists?.length || 0)
 
 // Playlists
 const playlists = computed(() => libraryStore.playlists || [])

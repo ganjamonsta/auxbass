@@ -61,8 +61,9 @@
     <section class="section">
       <h2>Аккаунт</h2>
       <div class="user-info" v-if="authStore.user">
-        <div class="avatar">
-          {{ authStore.user.first_name?.charAt(0) || '?' }}
+        <div class="avatar" :style="avatarGradient">
+          <User v-if="!authStore.user.first_name" :size="24" />
+          <span v-else class="avatar-letter">{{ authStore.user.first_name.charAt(0) }}</span>
         </div>
         <div class="user-details">
           <span class="user-name">
@@ -136,7 +137,7 @@
 
     <!-- Notification settings -->
     <section class="section">
-      <h2>🔔 Уведомления</h2>
+      <h2><Bell :size="20" /> Уведомления</h2>
       
       <div class="setting-row">
         <div class="setting-info">
@@ -156,7 +157,7 @@
 
     <!-- Cache section -->
     <section class="section">
-      <h2>� Интерфейс</h2>
+      <h2><Sliders :size="20" /> Интерфейс</h2>
 
       <div class="setting-row slider-row">
         <div class="setting-info">
@@ -177,7 +178,7 @@
 
     <!-- Cache section -->
     <section class="section">
-      <h2>�🎛️ Аудио (Enhancer)</h2>
+      <h2><Headphones :size="20" /> Аудио (Enhancer)</h2>
 
       <div class="setting-row">
         <div class="setting-info">
@@ -266,7 +267,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
 import api, { authApi } from '@/api/client'
-import { Megaphone, Check, Folder, Heart, ListMusic, Cloud, RefreshCw, Lock } from 'lucide-vue-next'
+import { Megaphone, Check, Folder, Heart, ListMusic, Cloud, RefreshCw, Lock, User, Bell, Sliders, Headphones } from 'lucide-vue-next'
 import SettingsSkeleton from '@/components/SettingsSkeleton.vue'
 
 const router = useRouter()
@@ -282,6 +283,15 @@ const privacySettings = ref({
   hide_from_search: false,
   hide_profile: false,
   notify_subscription: true,
+})
+
+// Avatar gradient based on user ID for unique colors
+const avatarGradient = computed(() => {
+  const id = authStore.user?.id || 0
+  const hue = (id * 137) % 360
+  return {
+    background: `linear-gradient(135deg, hsl(${hue}, 60%, 45%) 0%, hsl(${(hue + 40) % 360}, 50%, 35%) 100%)`
+  }
 })
 
 const repeatModeText = computed(() => {
@@ -425,111 +435,154 @@ const handleResetState = (event) => {
 </script>
 
 <style scoped>
+/* ═══════════════════════════════════════════════
+   Settings View — Unified spacing & alignment
+   Uses design-system tokens: --sp-*, --r-*, --c-*
+   ═══════════════════════════════════════════════ */
+
 .settings-view {
-  padding: 16px;
+  padding: var(--sp-4);
+  max-width: 640px;
+  margin: 0 auto;
 }
 
 h1 {
   font-size: 28px;
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 24px 0;
+  margin: 0 0 var(--sp-6) 0;
 }
 
+/* ─── Sections ─── */
 .section {
-  margin-bottom: 32px;
+  margin-bottom: var(--sp-6);
 }
 
 .section h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
   font-size: 14px;
   font-weight: 600;
   color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin: 0 0 16px 0;
+  margin: 0 0 var(--sp-4) 0;
+  line-height: 1.4;
 }
 
+/* ─── Account ─── */
 .user-info {
   display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-4);
 }
 
 .avatar {
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
-  background: var(--accent);
-  color: #000;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
-  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.avatar-letter {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
 .user-details {
   display: flex;
   flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .user-name {
   color: var(--text-primary);
   font-weight: 500;
   font-size: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .user-id {
   color: var(--text-tertiary);
   font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 
 .logout-btn {
   width: 100%;
-  padding: 12px;
+  padding: var(--sp-3);
   background: transparent;
   border: 1px solid var(--danger);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   color: var(--danger);
   font-weight: 500;
+  font-size: 14px;
   cursor: pointer;
+  transition: background 0.2s;
 }
 
+.logout-btn:hover {
+  background: rgba(244, 67, 54, 0.1);
+}
+
+/* ─── Library Stats Grid ─── */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: var(--sp-3);
 }
 
 .stat-item {
   background: var(--bg-elevated);
-  border-radius: 12px;
-  padding: 16px;
+  border-radius: var(--r-md);
+  padding: var(--sp-4);
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .stat-value {
   display: block;
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 700;
   color: var(--text-primary);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .stat-label {
   display: block;
   color: var(--text-tertiary);
   font-size: 13px;
-  margin-top: 4px;
+  margin-top: var(--sp-1);
+  line-height: 1.3;
 }
 
+/* ─── Setting Rows (toggle + description) ─── */
 .setting-row {
   display: flex;
+  flex-direction: row;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 0;
+  padding: var(--sp-3) 0;
   border-bottom: 1px solid var(--border);
-  gap: 16px;
+  gap: var(--sp-4);
 }
 
 .setting-row:last-child {
@@ -541,22 +594,27 @@ h1 {
   flex-direction: column;
   flex: 1;
   min-width: 0;
+  gap: 2px;
 }
 
 .setting-name {
   color: var(--text-primary);
   font-size: 15px;
+  line-height: 1.4;
 }
 
 .setting-desc {
   color: var(--text-tertiary);
   font-size: 13px;
-  margin-top: 2px;
+  line-height: 1.4;
+  margin-top: 0;
 }
 
+/* ─── Toggle Switch ─── */
 .toggle {
   position: relative;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   width: 48px;
   height: 28px;
   flex-shrink: 0;
@@ -566,18 +624,16 @@ h1 {
   opacity: 0;
   width: 0;
   height: 0;
+  position: absolute;
 }
 
 .toggle-slider {
   position: absolute;
   cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background: var(--bg-highlight);
   border-radius: 14px;
-  transition: 0.3s;
+  transition: background 0.25s ease;
 }
 
 .toggle-slider::before {
@@ -589,7 +645,7 @@ h1 {
   bottom: 3px;
   background: white;
   border-radius: 50%;
-  transition: 0.3s;
+  transition: transform 0.25s ease;
 }
 
 .toggle input:checked + .toggle-slider {
@@ -600,6 +656,7 @@ h1 {
   transform: translateX(20px);
 }
 
+/* ─── Buttons ─── */
 .repeat-btn {
   width: 44px;
   height: 44px;
@@ -612,26 +669,29 @@ h1 {
 
 .clear-cache-btn {
   width: 100%;
-  padding: 12px;
+  padding: var(--sp-3);
   background: var(--bg-elevated);
   border: none;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   color: var(--text-primary);
   font-weight: 500;
+  font-size: 14px;
   cursor: pointer;
+  transition: background 0.2s;
 }
 
 .clear-cache-btn:hover {
   background: var(--bg-highlight);
 }
 
+/* ─── About ─── */
 .about {
   text-align: center;
 }
 
 .about p {
   color: var(--text-primary);
-  margin: 8px 0;
+  margin: var(--sp-2) 0;
 }
 
 .about-desc {
@@ -639,11 +699,13 @@ h1 {
   font-size: 14px;
 }
 
-/* Channel Section */
+/* ═══════════════════════════════════════════════
+   Channel Section
+   ═══════════════════════════════════════════════ */
 .channel-section {
   background: var(--bg-elevated);
-  border-radius: 12px;
-  padding: 16px;
+  border-radius: var(--r-md);
+  padding: var(--sp-4);
 }
 
 .channel-section.not-connected {
@@ -654,13 +716,14 @@ h1 {
 .channel-connected {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--sp-4);
 }
 
 .channel-info {
   display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: 12px;
+  gap: var(--sp-3);
 }
 
 .channel-icon {
@@ -672,18 +735,22 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
-  font-weight: 600;
+  flex-shrink: 0;
 }
 
 .channel-details {
   display: flex;
   flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .channel-title {
   color: var(--text-primary);
   font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .channel-username {
@@ -694,26 +761,33 @@ h1 {
 .channel-features {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--sp-2);
 }
 
 .feature-item {
-  background: rgba(29, 185, 84, 0.2);
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  background: rgba(29, 185, 84, 0.15);
   color: var(--accent);
-  padding: 4px 12px;
-  border-radius: 12px;
+  padding: 6px 12px;
+  border-radius: var(--r-full);
   font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .channel-not-connected {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--sp-3);
 }
 
 .channel-desc {
   color: var(--text-secondary);
   margin: 0;
+  line-height: 1.5;
 }
 
 .feature-list {
@@ -722,25 +796,30 @@ h1 {
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--sp-2);
 }
 
 .feature-list li {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--sp-2);
   color: var(--text-primary);
   font-size: 14px;
+  line-height: 1.4;
 }
 
 .setup-steps {
-  background: var(--bg-secondary);
-  border-radius: 8px;
-  padding: 12px;
-  margin-top: 8px;
+  background: var(--bg-secondary, var(--bg-elevated));
+  border-radius: var(--r-sm);
+  padding: var(--sp-3);
+  margin-top: var(--sp-2);
 }
 
 .setup-steps h3 {
   color: var(--text-primary);
   font-size: 14px;
-  margin: 0 0 8px 0;
+  margin: 0 0 var(--sp-2) 0;
 }
 
 .setup-steps ol {
@@ -758,21 +837,24 @@ h1 {
 .setup-steps code {
   background: var(--bg-highlight);
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   font-family: monospace;
   color: var(--text-primary);
 }
 
 .refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border: none;
   color: white;
   padding: 12px 24px;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   font-size: 15px;
   font-weight: 500;
   cursor: pointer;
-  margin-top: 8px;
+  margin-top: var(--sp-2);
   transition: opacity 0.2s;
 }
 
@@ -780,24 +862,27 @@ h1 {
   opacity: 0.9;
 }
 
-/* Range slider styles */
+/* ═══════════════════════════════════════════════
+   Range Slider
+   ═══════════════════════════════════════════════ */
 .slider-row {
   flex-direction: column;
-  align-items: stretch !important;
-  gap: 15px;
-  padding-bottom: 20px;
+  align-items: stretch;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-5);
 }
 
 .slider-row .setting-info {
-  display: flex;
+  flex-direction: row;
   justify-content: space-between;
+  align-items: baseline;
   width: 100%;
 }
 
 .range-slider {
   width: 100%;
   height: 6px;
-  background: var(--bg-tertiary);
+  background: var(--bg-tertiary, var(--bg-highlight));
   border-radius: 3px;
   outline: none;
   -webkit-appearance: none;
@@ -806,28 +891,74 @@ h1 {
 .range-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: var(--accent);
   cursor: pointer;
-  transition: transform 0.1s;
+  transition: transform 0.15s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
 .range-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.1);
+  transform: scale(1.15);
+}
+
+.range-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: none;
 }
 
 .setting-value {
   color: var(--accent);
-  font-weight: 500;
+  font-weight: 600;
   font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .scale-desc {
   color: var(--text-tertiary);
   font-size: 13px;
-  margin-top: 8px;
+  margin-top: 0;
   display: block;
+  line-height: 1.4;
+}
+
+/* ═══════════════════════════════════════════════
+   Responsive
+   ═══════════════════════════════════════════════ */
+@media (max-width: 400px) {
+  .settings-view {
+    padding: var(--sp-3);
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--sp-2);
+  }
+
+  .stat-value {
+    font-size: 22px;
+  }
+
+  .stat-item {
+    padding: var(--sp-3);
+  }
+
+  .feature-item {
+    font-size: 12px;
+    padding: 5px 10px;
+  }
+}
+
+@media (min-width: 768px) {
+  .stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 </style>
