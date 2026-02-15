@@ -109,10 +109,6 @@ async def handle_audio(message: Message):
     file_size = audio.file_size
     file_name = audio.file_name  # Original filename for fallback display
     
-    # Extract forward info
-    forward_info = extract_forward_info(message)
-    library_source = get_library_source(message)
-    
     # Check if in playlist creation mode
     playlist_session = session_manager.get_playlist_session(user_id)
     
