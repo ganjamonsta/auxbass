@@ -7,10 +7,10 @@
       @input="search"
     />
 
-    <!-- Unified albums component with global scope -->
+    <!-- User's albums -->
     <LibraryAlbums
       ref="contentRef"
-      scope="global"
+      scope="user"
       :searchQuery="debouncedQuery"
     />
   </div>

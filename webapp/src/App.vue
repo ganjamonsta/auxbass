@@ -56,7 +56,21 @@
         </PageHeader>
 
         <!-- Router view -->
-        <main class="main-content">
+        <main ref="scrollRef" class="main-content">
+          <!-- Pull-to-refresh indicator -->
+          <div
+            v-if="pullDistance > 0 || isRefreshing"
+            class="pull-to-refresh-indicator"
+            :style="{ transform: `translateY(${isRefreshing ? 60 : pullDistance}px)` }"
+          >
+            <div class="ptr-spinner" :class="{ active: isRefreshing, ready: isPulling }">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+              </svg>
+            </div>
+            <span class="ptr-text">{{ isRefreshing ? 'Обновление…' : isPulling ? 'Отпустите' : 'Потяните вниз' }}</span>
+          </div>
+
           <router-view v-slot="{ Component }">
             <keep-alive :include="['LibraryView', 'AlbumsView', 'ArtistsView', 'PlaylistsView']">
               <component :is="Component" />
@@ -197,6 +211,7 @@ import ToastContainer from '@/components/ToastContainer.vue'
 import ContextMenu from '@/components/ContextMenu.vue'
 import NetworkBanner from '@/components/NetworkBanner.vue'
 import { useNetworkMonitor } from '@/composables/useNetworkMonitor'
+import { usePullToRefresh } from '@/composables/usePullToRefresh'
 import { MobileFooter } from '@/components/layout'
 import { Music, Disc3, User, Folder } from 'lucide-vue-next'
 // Desktop components
@@ -213,6 +228,12 @@ const libraryStore = useLibraryStore()
 const uiStore = useUIStore()
 const telegram = inject('telegram')
 const networkMonitor = useNetworkMonitor()
+
+// Pull-to-refresh — bound to .main-content via scrollRef
+const { scrollRef, pullDistance, isPulling, isRefreshing } = usePullToRefresh(
+  () => libraryStore.refresh(),
+  { telegram }
+)
 
 const { showFullPlayer } = useModals(telegram)
 
@@ -605,6 +626,48 @@ html, body {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   min-height: 0;
+  position: relative; /* for pull indicator positioning */
+}
+
+/* Pull-to-refresh indicator */
+.pull-to-refresh-indicator {
+  position: absolute;
+  top: -60px;
+  left: 0;
+  right: 0;
+  height: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  z-index: 10;
+  pointer-events: none;
+  transition: none;
+  will-change: transform;
+}
+
+.ptr-spinner {
+  width: 24px;
+  height: 24px;
+  color: var(--text-secondary);
+  transition: color 0.15s;
+}
+
+.ptr-spinner.ready {
+  color: var(--accent);
+}
+
+.ptr-spinner.active {
+  color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+
+.ptr-text {
+  font-size: 11px;
+  opacity: 0.7;
 }
 
 /* Mobile: no extra padding needed since footer is in flex layout */
