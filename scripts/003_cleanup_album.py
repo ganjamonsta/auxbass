@@ -175,10 +175,10 @@ async def main():
     
     logger.info(f"\n Found {len(problematic)} problematic album(s)")
     
-    # Cleanup the specific album
-    target_album = "МЕЖДУ ДОБРОМ И ЗЛОМ"
-    logger.info(f"\n=== Attempting to clean up '{target_album}' ===")
-    await cleanup_album(target_album)
+    # Cleanup all problematic albums found
+    logger.info(f"\n=== Cleaning up {len(problematic)} problematic album(s) ===")
+    for album, _ in problematic:
+        await cleanup_album(album.name, auto_confirm=True)
     
     # Re-scan to verify
     logger.info("\n=== Re-scanning after cleanup ===")
