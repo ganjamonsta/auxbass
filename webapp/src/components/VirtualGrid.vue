@@ -109,8 +109,8 @@ const emit = defineEmits(['click', 'play', 'contextmenu'])
 
 // Constants for grid layout
 const ITEM_HEIGHT = 200 // Approximate height of grid card
-const GAP = 16
-const MIN_ITEM_WIDTH = 140
+const GAP = 14
+const MIN_ITEM_WIDTH = 130
 
 // State
 const containerRef = ref(null)
@@ -130,9 +130,10 @@ const sparseItems = ref([])
 let scrollContainer = null
 
 // Calculate number of columns based on container width
+// Formula matches CSS auto-fill: N = floor((width + gap) / (minWidth + gap))
 const columns = computed(() => {
-  if (containerWidth.value === 0) return 2 // Default
-  return Math.max(2, Math.floor(containerWidth.value / MIN_ITEM_WIDTH))
+  if (containerWidth.value === 0) return 3 // Default
+  return Math.max(3, Math.floor((containerWidth.value + GAP) / (MIN_ITEM_WIDTH + GAP)))
 })
 
 // Calculate row height (item + gap)
@@ -419,41 +420,27 @@ defineExpose({
 
 .media-grid {
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 
 .media-grid.type-album,
 .media-grid.type-playlist {
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
 }
 
 .media-grid.type-artist {
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
 }
 
 @media (min-width: 500px) {
-  .media-grid.type-album,
-  .media-grid.type-playlist {
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  }
-  
   .media-grid.type-artist {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   }
 }
 
 @media (min-width: 700px) {
-  .media-grid {
-    gap: 20px;
-  }
-  
-  .media-grid.type-album,
-  .media-grid.type-playlist {
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  }
-  
   .media-grid.type-artist {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   }
 }
 

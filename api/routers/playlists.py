@@ -91,10 +91,11 @@ async def get_my_playlists(
     db: AsyncSession = Depends(get_db),
 ):
     """Get user's public playlists (owned and subscribed). Supports search, sort and offset/limit pagination."""
-    # Build set of user's visible playlist IDs (owned and subscribed)
+    # Build set of user's visible playlist IDs (owned public + subscribed)
     owned_ids_q = (
         select(Playlist.id)
         .where(Playlist.owner_id == user.id)
+        .where(Playlist.is_public == True)
     )
     
     if include_subscribed:
@@ -107,7 +108,7 @@ async def get_my_playlists(
         all_ids_subq = union_all(owned_ids_q, subscribed_ids_q).subquery()
         base_filter = Playlist.id.in_(select(all_ids_subq.c.id))
     else:
-        base_filter = (Playlist.owner_id == user.id)
+        base_filter = (Playlist.owner_id == user.id) & (Playlist.is_public == True)
     
     # Track count subquery (for display and sort)
     track_count_subq = (
