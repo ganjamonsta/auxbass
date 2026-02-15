@@ -661,6 +661,7 @@ _exec_script() {
         # Python-скрипты запускаются внутри контейнера API (там есть все зависимости)
         log_info "Запуск в Docker контейнере API..."
         docker compose -f "$PROD_COMPOSE" run --rm \
+            -e PYTHONPATH=/app \
             -v "$SCRIPT_DIR/scripts:/app/scripts" \
             api python "/app/scripts/$fname" "${@:2}"
     elif [ "$ext" = "sh" ]; then
