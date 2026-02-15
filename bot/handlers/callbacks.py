@@ -784,7 +784,7 @@ async def handle_playlist_finish(callback: CallbackQuery):
     
     async with get_session() as session:
         playlist = Playlist(
-            user_id=user_id,
+            owner_id=user_id,
             name=playlist_session.name,
             is_public=True,  # Default to public
         )

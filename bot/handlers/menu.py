@@ -669,7 +669,7 @@ async def cb_playlist_finish(callback: CallbackQuery):
         return
 
     async with get_session() as session:
-        playlist = Playlist(user_id=user_id, name=ps.name, is_public=True)
+        playlist = Playlist(owner_id=user_id, name=ps.name, is_public=True)
         session.add(playlist)
         await session.flush()
         for pos, tid in enumerate(ps.track_ids):
