@@ -353,7 +353,8 @@ export const usePlayerStore = defineStore('player', () => {
       if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none'
       handleEnded()
     },
-    onPlay: () => {
+    onPlay: (e) => {
+      if (e?.target?._obsolete) return
       if (audio.value) audio.value._obsolete = false
       isPlaying.value = true
       isSkipping = false
@@ -362,7 +363,10 @@ export const usePlayerStore = defineStore('player', () => {
       updatePlaybackState()
       startStateSaving()
     },
-    onPause: () => {
+    onPause: (e) => {
+      // Skip MediaSession update when old audio element is paused during swap.
+      // Without this, the brief 'paused' state can dismiss the Android notification.
+      if (e?.target?._obsolete) return
       isPlaying.value = false
       clearStallTimer()
       updatePlaybackState()
@@ -437,6 +441,20 @@ export const usePlayerStore = defineStore('player', () => {
     })
   }
 
+  // ===================== MEDIA SESSION ACTIONS =====================
+  // Extracted so we can re-register after audio element swap (Android fix).
+  // Uses refs/closures — always accesses current audio.value at call time.
+  const _msActions = () => ({
+    play: () => audio.value?.play(),
+    pause: () => audio.value?.pause(),
+    prev: () => prev(),
+    next: () => next(),
+    seek: (t) => seek(t),
+    seekBackward: (s) => seek(Math.max(0, progress.value - s)),
+    seekForward: (s) => seek(Math.min(duration.value, progress.value + s)),
+    stop: () => { if (audio.value) { audio.value.pause(); audio.value.currentTime = 0 }; isPlaying.value = false; updatePlaybackState() },
+  })
+
   // ===================== INIT AUDIO =====================
   const initAudio = () => {
     if (audio.value) return
@@ -445,16 +463,7 @@ export const usePlayerStore = defineStore('player', () => {
     initAudioContext()
     connectEnhancer(audio.value)
 
-    setupMediaSession({
-      play: () => audio.value?.play(),
-      pause: () => audio.value?.pause(),
-      prev: () => prev(),
-      next: () => next(),
-      seek: (t) => seek(t),
-      seekBackward: (s) => seek(Math.max(0, progress.value - s)),
-      seekForward: (s) => seek(Math.min(duration.value, progress.value + s)),
-      stop: () => { if (audio.value) { audio.value.pause(); audio.value.currentTime = 0 }; isPlaying.value = false; updatePlaybackState() },
-    })
+    setupMediaSession(_msActions())
 
     setupKeyboardShortcuts({
       toggle, next, prev, seek,
@@ -492,8 +501,10 @@ export const usePlayerStore = defineStore('player', () => {
       }
       case 'preloaded': {
         if (audio.value) {
-          audio.value.pause()
+          // Mark obsolete BEFORE pause — so onPause handler skips MediaSession update.
+          // Without this, the brief 'paused' state dismisses the Android notification.
           audio.value._obsolete = true
+          audio.value.pause()
           audio.value.src = ''
         }
         const oldAudio = audio.value
@@ -505,8 +516,12 @@ export const usePlayerStore = defineStore('player', () => {
         try {
           await audio.value.play()
           recyclePreloadAudio(oldAudio)
-          // Re-assert MediaSession metadata after audio element swap (Android 8 fix)
+          // Re-register handlers + metadata after audio element swap.
+          // On Android/Firefox the browser may lose the MediaSession association
+          // when the playing audio element changes.
+          setupMediaSession(_msActions())
           updateMediaSession()
+          updatePlaybackState()
         } catch (e) {
           console.error('[Play] Preloaded audio failed, falling back:', e)
           audio.value = oldAudio

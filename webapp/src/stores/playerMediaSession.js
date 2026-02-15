@@ -67,6 +67,8 @@ export function updatePositionState(audio, progressVal, durationVal) {
 
 /**
  * Register Media Session action handlers.
+ * Safe to call multiple times (re-registers = replaces handlers).
+ * Each registration and callback is wrapped in try-catch for Android/Firefox resilience.
  * @param {Object} actions - { play, pause, prev, next, seek, stop }
  */
 export function setupMediaSession(actions) {
@@ -74,42 +76,43 @@ export function setupMediaSession(actions) {
 
   const ms = navigator.mediaSession
 
-  ms.setActionHandler('play', () => {
-    console.log('[MediaSession] action: play')
-    actions.play()
-  })
-  ms.setActionHandler('pause', () => {
-    console.log('[MediaSession] action: pause')
-    actions.pause()
-  })
-  ms.setActionHandler('previoustrack', () => {
-    console.log('[MediaSession] action: previoustrack')
-    actions.prev()
-  })
-  ms.setActionHandler('nexttrack', () => {
-    console.log('[MediaSession] action: nexttrack')
-    actions.next()
-  })
+  // Wrap each setActionHandler in try-catch: if a browser doesn't support
+  // a specific action, we skip it without breaking subsequent registrations.
+  // Wrap each callback in try-catch: prevents unhandled errors from
+  // causing the browser to deactivate the Media Session (Android/Firefox issue).
+  const safeSet = (name, fn) => {
+    try {
+      ms.setActionHandler(name, (...args) => {
+        try {
+          console.log(`[MediaSession] action: ${name}`)
+          const result = fn(...args)
+          // Catch promise rejections from async handlers (next/prev)
+          if (result instanceof Promise) {
+            result.catch(e => console.warn(`[MediaSession] ${name} async error:`, e))
+          }
+        } catch (e) {
+          console.error(`[MediaSession] ${name} handler error:`, e)
+        }
+      })
+    } catch (_) {
+      console.warn(`[MediaSession] ${name} not supported`)
+    }
+  }
 
-  ms.setActionHandler('seekto', (details) => {
-    console.log('[MediaSession] action: seekto', details.seekTime)
+  safeSet('play', () => actions.play())
+  safeSet('pause', () => actions.pause())
+  safeSet('previoustrack', () => actions.prev())
+  safeSet('nexttrack', () => actions.next())
+  safeSet('seekto', (details) => {
     if (details.seekTime != null) actions.seek(details.seekTime)
   })
-  ms.setActionHandler('seekbackward', (details) => {
-    console.log('[MediaSession] action: seekbackward', details.seekOffset)
+  safeSet('seekbackward', (details) => {
     actions.seekBackward(details.seekOffset || 10)
   })
-  ms.setActionHandler('seekforward', (details) => {
-    console.log('[MediaSession] action: seekforward', details.seekOffset)
+  safeSet('seekforward', (details) => {
     actions.seekForward(details.seekOffset || 10)
   })
-
-  try {
-    ms.setActionHandler('stop', () => {
-      console.log('[MediaSession] action: stop')
-      actions.stop()
-    })
-  } catch (_) { /* not supported in all browsers */ }
+  safeSet('stop', () => actions.stop())
 
   console.log('[MediaSession] All action handlers registered')
 }
