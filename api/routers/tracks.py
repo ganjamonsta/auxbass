@@ -95,44 +95,6 @@ async def get_track_ids(
     return {"ids": ids, "total": len(ids)}
 
 
-# ============== Enrichment Status ==============
-
-@router.get("/enrichment/status")
-async def get_enrichment_status(
-    user: TelegramUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Get enrichment status for user's library"""
-    result = await db.execute(
-        select(Track.enrichment_status, func.count(Track.id))
-        .join(UserLibrary, UserLibrary.track_id == Track.id)
-        .where(UserLibrary.user_id == user.id)
-        .group_by(Track.enrichment_status)
-    )
-    
-    stats = {
-        "pending": 0,
-        "processing": 0,
-        "completed": 0,
-        "failed": 0,
-    }
-    
-    for status, count in result.all():
-        if status:
-            stats[status.value] = count
-    
-    total = sum(stats.values())
-    
-    return {
-        "total": total,
-        "pending": stats["pending"],
-        "processing": stats["processing"],
-        "completed": stats["completed"],
-        "failed": stats["failed"],
-        "progress": round((stats["completed"] / total * 100) if total > 0 else 0, 1)
-    }
-
-
 # ============== Artists from Tracks ==============
 
 @router.get("/artists")

@@ -12,4 +12,3 @@ class LibraryStatsResponse(BaseModel):
     album_count: int
     artist_count: int
     by_source: Dict[str, int]
-    enrichment: Dict[str, int]

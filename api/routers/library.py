@@ -136,7 +136,6 @@ def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None,
         file_size=track.file_size,
         mime_type=track.mime_type,
         library_source=source,
-        enrichment_status=track.enrichment_status.value if track.enrichment_status else None,
         is_streamable=track_is_streamable,
         streamable_id=None,
         hd_id=None,
@@ -362,18 +361,6 @@ async def get_library_stats(
         for source, count in source_result.all()
     }
     
-    # Enrichment stats
-    enrichment_result = await db.execute(
-        select(Track.enrichment_status, func.count(Track.id))
-        .join(UserLibrary, UserLibrary.track_id == Track.id)
-        .where(UserLibrary.user_id == user.id)
-        .group_by(Track.enrichment_status)
-    )
-    enrichment_stats = {
-        status.value if status else "unknown": count
-        for status, count in enrichment_result.all()
-    }
-    
     # Album count (albums that have tracks in user's library)
     album_count = await db.scalar(
         select(func.count(func.distinct(AlbumTrack.album_id)))
@@ -397,7 +384,6 @@ async def get_library_stats(
         album_count=album_count,
         artist_count=artist_count,
         by_source=by_source,
-        enrichment=enrichment_stats,
     )
 
 

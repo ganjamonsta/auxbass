@@ -27,7 +27,6 @@ class TrackResponse(BaseModel):
     file_size: Optional[int] = None
     mime_type: Optional[str] = None  # audio/mpeg, audio/flac, etc.
     library_source: Optional[str] = None
-    enrichment_status: Optional[str] = None
     
     # Streaming compatibility
     is_streamable: bool = True  # False for HD formats (FLAC, WAV, etc.)

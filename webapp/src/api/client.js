@@ -201,7 +201,6 @@ export const tracksApi = {
   }),
   getGenres: cacheable((scope = 'library') => api.get('/tracks/genres', { params: { scope } })),
   getTags: cacheable((scope = 'library', limit = 50) => api.get('/tracks/tags', { params: { scope, limit } })),
-  getEnrichmentStatus: cacheable(() => api.get('/tracks/enrichment/status')),
   getHistory: cacheable((limit = 50) => api.get('/tracks/history', { params: { limit } })),
   getLiked: cacheable(() => api.get('/tracks/liked')),
   like: nonCacheable((id) => api.post(`/tracks/${id}/like`), 'like'),
