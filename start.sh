@@ -2,11 +2,13 @@
 # ═══════════════════════════════════════════════════════════════════
 #  TG Player - Pterodactyl Startup & Auto-Update Script
 # ═══════════════════════════════════════════════════════════════════
-set -e
 
 echo "========================================================"
 echo "          🎵 TG Player - Pterodactyl Starter            "
 echo "========================================================"
+
+# Disable interactive git prompts to prevent server hang
+export GIT_TERMINAL_PROMPT=0
 
 # Allow git operations in Docker container directory
 git config --global --add safe.directory "*" 2>/dev/null || true
@@ -14,29 +16,41 @@ git config --global init.defaultBranch main 2>/dev/null || true
 
 # 1. Auto-update from Git
 DEFAULT_REPO="https://github.com/ganjamonsta/auxbass.git"
-REPO_URL="${GIT_ADDRESS:-$DEFAULT_REPO}"
 
-echo "📦 [1/3] Проверка обновлений Git ($REPO_URL)..."
+# Support GITHUB_TOKEN or GIT_TOKEN for private repos
+if [ -n "$GITHUB_TOKEN" ]; then
+    REPO_URL="https://${GITHUB_TOKEN}@github.com/ganjamonsta/auxbass.git"
+elif [ -n "$GIT_TOKEN" ]; then
+    REPO_URL="https://${GIT_TOKEN}@github.com/ganjamonsta/auxbass.git"
+else
+    REPO_URL="${GIT_ADDRESS:-$DEFAULT_REPO}"
+fi
+
+echo "📦 [1/3] Проверка обновлений Git..."
 if [ ! -d ".git" ]; then
-    git init
+    git init 2>/dev/null || true
 fi
 
-git remote add origin "$REPO_URL" 2>/dev/null || git remote set-url origin "$REPO_URL" || true
-echo "⬇️ Подтягиваем свежий код из репозитория..."
-git fetch origin main || git fetch origin master || git fetch origin || true
+git remote add origin "$REPO_URL" 2>/dev/null || git remote set-url origin "$REPO_URL" 2>/dev/null || true
 
-BRANCH="main"
-if git show-ref --verify --quiet refs/remotes/origin/main; then
+echo "⬇️ Подтягиваем изменения с GitHub..."
+if git fetch origin main --depth=1 2>/dev/null || git fetch origin 2>/dev/null; then
     BRANCH="main"
-elif git show-ref --verify --quiet refs/remotes/origin/master; then
-    BRANCH="master"
+    if git show-ref --verify --quiet refs/remotes/origin/main; then
+        BRANCH="main"
+    elif git show-ref --verify --quiet refs/remotes/origin/master; then
+        BRANCH="master"
+    fi
+    git checkout -B "$BRANCH" "origin/$BRANCH" 2>/dev/null || git reset --hard "origin/$BRANCH" 2>/dev/null || true
+    echo "✅ Код успешно обновлен!"
+else
+    echo "⚠️ Не удалось обновить через Git (приватный репозиторий или нет доступа)."
+    echo "ℹ️ Запускаем сервер на текущих локальных файлах."
 fi
-
-git checkout -B "$BRANCH" "origin/$BRANCH" 2>/dev/null || git reset --hard "origin/$BRANCH" 2>/dev/null || git pull origin "$BRANCH" 2>/dev/null || true
 
 # 2. Update Python dependencies
 if [ -f "requirements.txt" ]; then
-    echo "🐍 [2/3] Установка/обновление зависимостей Python..."
+    echo "🐍 [2/3] Проверка зависимостей Python..."
     pip install --no-cache-dir -r requirements.txt || pip install -r requirements.txt || true
 fi
 
