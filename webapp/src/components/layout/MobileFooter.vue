@@ -37,7 +37,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MiniPlayer from '@/components/MiniPlayer.vue'
-import { ListMusic, Disc3, Users, Music2, Settings } from 'lucide-vue-next'
+import { ListMusic, Disc3, Users, Heart, Settings } from 'lucide-vue-next'
 
 const props = defineProps({
   // Player props
@@ -78,8 +78,8 @@ const props = defineProps({
     type: Array,
     default: () => [
       { path: '/', icon: ListMusic, label: 'Библиотека', matchPaths: ['/'] },
+      { path: '/liked', icon: Heart, label: 'Любимое', matchPaths: ['/liked'] },
       { path: '/collections', icon: Disc3, label: 'Коллекции', matchPaths: ['/collections', '/albums', '/playlists'] },
-      { path: '/artists', icon: Music2, label: 'Артисты', matchPaths: ['/artists'] },
       { path: '/friends', icon: Users, label: 'Кенты', matchPaths: ['/friends'] },
       { path: '/settings', icon: Settings, label: 'Настройки', matchPaths: ['/settings'] },
     ]

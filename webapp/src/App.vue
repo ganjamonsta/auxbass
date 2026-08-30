@@ -72,7 +72,7 @@
           </div>
 
           <router-view v-slot="{ Component }">
-            <keep-alive :include="['LibraryView', 'AlbumsView', 'ArtistsView', 'PlaylistsView']">
+            <keep-alive :include="['LibraryView', 'CollectionsView', 'LikedTracksView', 'FriendsView']">
               <component :is="Component" />
             </keep-alive>
           </router-view>

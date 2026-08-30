@@ -2,16 +2,12 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 // Lazy-loaded views
 const LibraryView = () => import('@/views/LibraryView.vue')
-const AlbumsView = () => import('@/views/AlbumsView.vue')
-const ArtistsView = () => import('@/views/ArtistsView.vue')
-const PlaylistsView = () => import('@/views/PlaylistsView.vue')
 const CollectionsView = () => import('@/views/CollectionsView.vue')
 const FriendsView = () => import('@/views/FriendsView.vue')
 const AlbumDetailView = () => import('@/views/AlbumDetailView.vue')
 const ArtistDetailView = () => import('@/views/ArtistDetailView.vue')
 const PlaylistDetailView = () => import('@/views/PlaylistDetailView.vue')
 const LikedTracksView = () => import('@/views/LikedTracksView.vue')
-const FavoritesView = () => import('@/views/FavoritesView.vue')
 const SettingsView = () => import('@/views/SettingsView.vue')
 const LoginView = () => import('@/views/LoginView.vue')
 
@@ -31,33 +27,15 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
-    path: '/albums',
-    name: 'albums',
-    component: AlbumsView,
-    meta: { requiresAuth: true }
-  },
-  {
     path: '/album/:id',
     name: 'album-detail',
     component: AlbumDetailView,
     meta: { requiresAuth: true }
   },
   {
-    path: '/artists',
-    name: 'artists',
-    component: ArtistsView,
-    meta: { requiresAuth: true }
-  },
-  {
     path: '/artist/:name',
     name: 'artist-detail',
     component: ArtistDetailView,
-    meta: { requiresAuth: true }
-  },
-  {
-    path: '/playlists',
-    name: 'playlists',
-    component: PlaylistsView,
     meta: { requiresAuth: true }
   },
   {
@@ -79,12 +57,6 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
-    path: '/favorites',
-    name: 'favorites',
-    component: FavoritesView,
-    meta: { requiresAuth: true }
-  },
-  {
     path: '/settings',
     name: 'settings',
     component: SettingsView,
@@ -94,7 +66,12 @@ const routes = [
     path: '/login',
     name: 'login',
     component: LoginView
-  }
+  },
+  // Legacy redirects
+  { path: '/favorites', redirect: '/liked' },
+  { path: '/albums', redirect: '/collections' },
+  { path: '/playlists', redirect: '/collections' },
+  { path: '/artists', redirect: '/' }
 ]
 
 const router = createRouter({
