@@ -372,13 +372,13 @@ defineExpose({
 }
 
 .stats {
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-size: 14px;
 }
 
 .action-btn {
   padding: 8px 14px;
-  background: var(--accent);
+  background: var(--c-accent);
   border: none;
   border-radius: 20px;
   color: #000;
@@ -443,12 +443,12 @@ defineExpose({
 .liked-title {
   font-weight: 600;
   font-size: 14px;
-  color: var(--text-primary);
+  color: var(--c-text-1);
 }
 
 .liked-count {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
 }
 
 /* Liked card -- end above -- */
@@ -456,7 +456,7 @@ defineExpose({
 /* Create first button */
 .create-first-btn {
   margin-top: 16px;
-  background: var(--accent);
+  background: var(--c-accent);
   color: #000;
   border: none;
   border-radius: 20px;
@@ -481,7 +481,7 @@ defineExpose({
 }
 
 .modal {
-  background: var(--bg-elevated, var(--c-bg-2));
+  background: var(--c-bg-3));
   border-radius: 16px;
   padding: 24px;
   width: 100%;
@@ -491,27 +491,27 @@ defineExpose({
 .modal h2 {
   margin: 0 0 20px 0;
   font-size: 20px;
-  color: var(--text-primary);
+  color: var(--c-text-1);
 }
 
 .modal input {
   width: 100%;
   padding: 14px 16px;
-  background: var(--bg-primary, var(--c-bg-1));
-  border: 1px solid var(--border-color, var(--c-bg-3));
+  background: var(--c-bg-1));
+  border: 1px solid var(--c-bg-4));
   border-radius: 10px;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   font-size: 16px;
   margin-bottom: 20px;
 }
 
 .modal input::placeholder {
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
 }
 
 .modal input:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--c-accent);
 }
 
 .modal-actions {
@@ -525,15 +525,15 @@ defineExpose({
   border-radius: 10px;
   font-weight: 500;
   cursor: pointer;
-  border: 1px solid var(--border-color, var(--c-bg-3));
+  border: 1px solid var(--c-bg-4));
   background: transparent;
-  color: var(--text-primary);
+  color: var(--c-text-1);
 }
 
 .confirm-btn {
   flex: 1;
   padding: 12px;
-  background: var(--accent);
+  background: var(--c-accent);
   border: none;
   border-radius: 10px;
   color: #000;
@@ -556,7 +556,7 @@ defineExpose({
 
 .hint-text {
   font-size: 12px;
-  color: var(--c-text-3, var(--text-tertiary));
+  color: var(--c-text-3, var(--c-text-3));
   margin-bottom: 16px;
 }
 
@@ -572,7 +572,7 @@ defineExpose({
   align-items: center;
   justify-content: space-between;
   padding: 12px;
-  background: var(--c-bg-3, var(--bg-elevated));
+  background: var(--c-bg-3, var(--c-bg-3));
   border-radius: 12px;
   margin-bottom: 8px;
   cursor: pointer;
@@ -580,7 +580,7 @@ defineExpose({
 }
 
 .playlist-manage-item:hover {
-  background: var(--c-bg-4, var(--bg-highlight));
+  background: var(--c-bg-4, var(--c-bg-4));
 }
 
 .playlist-manage-info {
@@ -595,7 +595,7 @@ defineExpose({
   height: 48px;
   border-radius: 8px;
   overflow: hidden;
-  background: var(--c-bg-1, var(--bg-primary));
+  background: var(--c-bg-1, var(--c-bg-1));
   flex-shrink: 0;
 }
 
@@ -611,7 +611,7 @@ defineExpose({
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--c-text-3, var(--text-tertiary));
+  color: var(--c-text-3, var(--c-text-3));
 }
 
 .playlist-manage-text {
@@ -622,7 +622,7 @@ defineExpose({
 .playlist-manage-name {
   font-size: 15px;
   font-weight: 600;
-  color: var(--c-text-1, var(--text-primary));
+  color: var(--c-text-1, var(--c-text-1));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -630,7 +630,7 @@ defineExpose({
 
 .playlist-manage-count {
   font-size: 13px;
-  color: var(--c-text-3, var(--text-tertiary));
+  color: var(--c-text-3, var(--c-text-3));
   margin-top: 2px;
 }
 
@@ -638,7 +638,7 @@ defineExpose({
   display: flex;
   align-items: center;
   gap: 12px;
-  color: var(--c-text-2, var(--text-secondary));
+  color: var(--c-text-2, var(--c-text-2));
   font-size: 14px;
   margin-bottom: 12px;
   cursor: pointer;
@@ -650,7 +650,7 @@ defineExpose({
   -webkit-appearance: none;
   width: 44px;
   height: 24px;
-  background: var(--c-bg-3, var(--bg-elevated));
+  background: var(--c-bg-3, var(--c-bg-3));
   border-radius: 12px;
   position: relative;
   cursor: pointer;
@@ -670,7 +670,7 @@ defineExpose({
 }
 
 .checkbox-label input[type="checkbox"]:checked {
-  background: var(--accent);
+  background: var(--c-accent);
 }
 
 .checkbox-label input[type="checkbox"]:checked::before {

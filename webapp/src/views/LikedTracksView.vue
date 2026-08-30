@@ -176,12 +176,12 @@ onMounted(async () => {
 .liked-info h1 {
   font-size: 24px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   margin: 0 0 8px 0;
 }
 
 .liked-info .meta {
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   font-size: 14px;
   margin: 0;
 }
@@ -252,7 +252,7 @@ onMounted(async () => {
 .spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid var(--bg-highlight);
+  border: 3px solid var(--c-bg-4);
   border-top-color: #ff4564;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -271,7 +271,7 @@ onMounted(async () => {
 .empty-state {
   text-align: center;
   padding: 48px 16px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
 }
 
 .empty-state .empty-icon {
@@ -287,7 +287,7 @@ onMounted(async () => {
 
 .empty-state .hint {
   font-size: 13px;
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
 }
 
 /* No channel prompt */
@@ -307,14 +307,14 @@ onMounted(async () => {
 }
 
 .no-channel-prompt h2 {
-  color: var(--text-primary);
+  color: var(--c-text-1);
   font-size: 24px;
   font-weight: 700;
   margin: 0 0 12px 0;
 }
 
 .no-channel-prompt p {
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-size: 15px;
   line-height: 1.5;
   margin: 0 0 24px 0;

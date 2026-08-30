@@ -62,8 +62,8 @@ const coverIcon = computed(() => Folder)
 .playlist-cover {
   width: 100px;
   height: 100px;
-  border-radius: var(--neu-radius-md, 12px);
-  background: var(--xm-bg-elevated, #1A1A1A);
+  border-radius: var(--r-md);
+  background: var(--c-bg-2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -71,15 +71,15 @@ const coverIcon = computed(() => Folder)
   overflow: hidden;
   position: relative;
   box-shadow: 
-    6px 6px 12px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
-    -3px -3px 6px var(--neu-shadow-light, rgba(255, 255, 255, 0.03));
+    6px 6px 12px var(--sh-dark)),
+    -3px -3px 6px var(--sh-light));
   transition: box-shadow 0.15s ease;
 }
 
 .playlist-card:active .playlist-cover {
   box-shadow: 
-    inset 3px 3px 6px var(--neu-shadow-inset-dark, rgba(0, 0, 0, 0.4)),
-    inset -2px -2px 4px var(--neu-shadow-inset-light, rgba(255, 255, 255, 0.02));
+    inset 3px 3px 6px var(--sh-inset-dark)),
+    inset -2px -2px 4px var(--sh-inset-light));
 }
 
 .playlist-cover.has-image {
@@ -141,12 +141,12 @@ const coverIcon = computed(() => Folder)
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--xm-text-primary, #fff);
+  color: var(--c-text-1);
 }
 
 .playlist-meta {
   font-size: 11px;
-  color: var(--xm-text-muted, #888);
+  color: var(--c-text-3);
   white-space: nowrap;
 }
 </style>

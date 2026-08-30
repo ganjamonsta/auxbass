@@ -69,7 +69,7 @@ const toggleOrder = () => {
 .sort-buttons {
   display: flex;
   border-radius: 28px;
-  background: var(--accent);
+  background: var(--c-accent);
   box-shadow: 
     6px 6px 12px rgba(0, 0, 0, 0.3),
     -3px -3px 8px rgba(255, 255, 255, 0.1),

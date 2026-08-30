@@ -490,7 +490,7 @@ const handleToggleLike = async () => {
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #1DB954 0%, #169c46 100%);
+  background: linear-gradient(135deg, var(--c-accent) 0%, var(--c-accent-dark) 100%);
   transform: translate(-50%, -50%);
 }
 
@@ -561,7 +561,7 @@ const handleToggleLike = async () => {
 }
 
 .artist-link-inline:hover {
-  color: #1DB954;
+  color: var(--c-accent);
   text-decoration: underline;
 }
 
@@ -603,11 +603,11 @@ const handleToggleLike = async () => {
 }
 
 .artist-link:hover {
-  color: #1DB954;
+  color: var(--c-accent);
 }
 
 .album-link:hover {
-  color: #1db954;
+  color: var(--c-accent);
 }
 
 .forward-link:hover {
@@ -771,7 +771,7 @@ const handleToggleLike = async () => {
 }
 
 .queue-item.current .queue-item-title {
-  color: #1DB954;
+  color: var(--c-accent);
 }
 
 .queue-item-number {
@@ -786,11 +786,11 @@ const handleToggleLike = async () => {
 }
 
 .queue-item.current .queue-item-number {
-  color: #1DB954;
+  color: var(--c-accent);
 }
 
 .playing-icon {
-  fill: #1DB954;
+  fill: var(--c-accent);
 }
 
 .queue-item-cover {

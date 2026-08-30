@@ -82,15 +82,15 @@ const icon = computed(() => {
 }
 
 .confirm-dialog {
-  background: var(--xm-bg-elevated, #1A1A1A);
-  border-radius: var(--neu-radius-xl, 24px);
+  background: var(--c-bg-2);
+  border-radius: var(--r-xl);
   padding: 28px;
   width: 100%;
   max-width: 320px;
   text-align: center;
   box-shadow: 
-    12px 12px 24px var(--neu-shadow-dark, rgba(0, 0, 0, 0.6)),
-    -6px -6px 12px var(--neu-shadow-light, rgba(255, 255, 255, 0.03)),
+    12px 12px 24px var(--sh-dark)),
+    -6px -6px 12px var(--sh-light)),
     0 0 40px rgba(0, 0, 0, 0.5);
 }
 
@@ -104,23 +104,23 @@ const icon = computed(() => {
   justify-content: center;
   margin-left: auto;
   margin-right: auto;
-  border-radius: var(--neu-radius-full, 9999px);
-  background: var(--xm-bg-surface, #222);
+  border-radius: var(--r-full);
+  background: var(--c-bg-3);
   box-shadow: 
-    inset 4px 4px 8px var(--neu-shadow-inset-dark, rgba(0, 0, 0, 0.4)),
-    inset -2px -2px 4px var(--neu-shadow-inset-light, rgba(255, 255, 255, 0.02));
+    inset 4px 4px 8px var(--sh-inset-dark)),
+    inset -2px -2px 4px var(--sh-inset-light));
 }
 
 .confirm-title {
   font-size: 18px;
   font-weight: 700;
   margin-bottom: 10px;
-  color: var(--xm-text-primary, #fff);
+  color: var(--c-text-1);
 }
 
 .confirm-message {
   font-size: 14px;
-  color: var(--xm-text-muted, #888);
+  color: var(--c-text-3);
   margin-bottom: 26px;
   line-height: 1.5;
 }
@@ -135,7 +135,7 @@ const icon = computed(() => {
   flex: 1;
   padding: 16px;
   border: none;
-  border-radius: var(--neu-radius-md, 12px);
+  border-radius: var(--r-md);
   font-size: 16px;
   font-weight: 700;
   cursor: pointer;
@@ -143,26 +143,26 @@ const icon = computed(() => {
 }
 
 .btn-cancel {
-  background: var(--xm-bg-surface, #222);
-  color: var(--xm-text-secondary, #ccc);
+  background: var(--c-bg-3);
+  color: var(--c-text-2);
   box-shadow: 
-    4px 4px 10px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
-    -2px -2px 6px var(--neu-shadow-light, rgba(255, 255, 255, 0.03));
+    4px 4px 10px var(--sh-dark)),
+    -2px -2px 6px var(--sh-light));
 }
 
 .btn-cancel:active {
   box-shadow: 
-    inset 2px 2px 4px var(--neu-shadow-inset-dark, rgba(0, 0, 0, 0.4)),
-    inset -1px -1px 2px var(--neu-shadow-inset-light, rgba(255, 255, 255, 0.02));
+    inset 2px 2px 4px var(--sh-inset-dark)),
+    inset -1px -1px 2px var(--sh-inset-light));
 }
 
 .btn-confirm {
-  background: linear-gradient(180deg, var(--xm-accent, #1db954) 0%, var(--xm-accent-dark, #169c46) 100%);
+  background: linear-gradient(180deg, var(--c-accent) 0%, var(--c-accent-dark) 100%);
   color: white;
   box-shadow: 
-    4px 4px 10px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
-    -2px -2px 6px var(--neu-shadow-light, rgba(255, 255, 255, 0.03)),
-    0 4px 15px var(--xm-accent-glow, rgba(229, 57, 53, 0.3));
+    4px 4px 10px var(--sh-dark)),
+    -2px -2px 6px var(--sh-light)),
+    0 4px 15px var(--c-accent-glow));
 }
 
 .btn-confirm:active {
@@ -175,16 +175,16 @@ const icon = computed(() => {
 .btn-confirm.danger {
   background: linear-gradient(180deg, #F44336 0%, #D32F2F 100%);
   box-shadow: 
-    4px 4px 10px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
-    -2px -2px 6px var(--neu-shadow-light, rgba(255, 255, 255, 0.03)),
+    4px 4px 10px var(--sh-dark)),
+    -2px -2px 6px var(--sh-light)),
     0 4px 15px rgba(244, 67, 54, 0.3);
 }
 
 .btn-confirm.warning {
   background: linear-gradient(180deg, #FF9800 0%, #F57C00 100%);
   box-shadow: 
-    4px 4px 10px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
-    -2px -2px 6px var(--neu-shadow-light, rgba(255, 255, 255, 0.03)),
+    4px 4px 10px var(--sh-dark)),
+    -2px -2px 6px var(--sh-light)),
     0 4px 15px rgba(255, 152, 0, 0.3);
 }
 

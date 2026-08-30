@@ -217,7 +217,7 @@ const formatTime = (seconds) => {
 }
 
 .track-artist-main .artist-link:hover {
-  color: #1DB954;
+  color: var(--c-accent);
   text-decoration: underline;
 }
 

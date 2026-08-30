@@ -42,7 +42,7 @@ defineEmits(['dragstart', 'dragend', 'dragover', 'drop', 'remove'])
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--c-accent);
   border: none;
   color: #000;
   font-size: 18px;
@@ -56,7 +56,7 @@ defineEmits(['dragstart', 'dragend', 'dragover', 'drop', 'remove'])
 }
 
 .remove-btn:hover { 
-  background: var(--danger, #1db954); 
+  background: var(--c-error); 
   color: #fff;
   transform: scale(1.1);
 }

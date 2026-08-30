@@ -158,7 +158,7 @@ defineExpose({
 }
 
 .stats {
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-size: 14px;
 }
 </style>

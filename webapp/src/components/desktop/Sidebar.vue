@@ -242,7 +242,7 @@ const getPlaylistCoverStyle = (playlist) => {
 .logo-icon {
   width: 40px;
   height: 40px;
-  background: linear-gradient(135deg, #1DB954, #1ed760);
+  background: linear-gradient(135deg, var(--c-accent), var(--c-accent-light));
   border-radius: 10px;
   display: flex;
   align-items: center;
@@ -286,11 +286,11 @@ const getPlaylistCoverStyle = (playlist) => {
 
 .nav-item.active {
   background: rgba(29, 185, 84, 0.2);
-  color: #1DB954;
+  color: var(--c-accent);
 }
 
 .nav-item.active svg {
-  color: #1DB954;
+  color: var(--c-accent);
 }
 
 .nav-item svg {
@@ -428,7 +428,7 @@ const getPlaylistCoverStyle = (playlist) => {
 }
 
 .show-more-btn:hover .show-more-text {
-  color: #1DB954;
+  color: var(--c-accent);
 }
 
 .playlist-info {

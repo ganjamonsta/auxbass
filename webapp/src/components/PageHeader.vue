@@ -41,7 +41,7 @@ defineEmits(['goBack'])
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  background: var(--bg-primary);
+  background: var(--c-bg-1);
   position: sticky;
   top: 0;
   z-index: 50;
@@ -53,7 +53,7 @@ defineEmits(['goBack'])
   border-radius: 50%;
   background: transparent;
   border: none;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -61,14 +61,14 @@ defineEmits(['goBack'])
 }
 
 .back-btn:hover {
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
 }
 
 .page-title {
   flex: 1;
   font-size: 20px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -86,7 +86,7 @@ defineEmits(['goBack'])
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  color: var(--text-primary);
+  color: var(--c-text-1);
 }
 
 .title-text {

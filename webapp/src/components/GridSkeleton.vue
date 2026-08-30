@@ -28,11 +28,11 @@ defineProps({
 .skeleton-image {
   aspect-ratio: 1;
   width: 100%;
-  border-radius: var(--neu-radius-md, 12px);
-  background: var(--xm-bg-surface, #222);
+  border-radius: var(--r-md);
+  background: var(--c-bg-3);
   box-shadow: 
-    inset 2px 2px 4px var(--neu-shadow-inset-dark, rgba(0, 0, 0, 0.4)),
-    inset -1px -1px 2px var(--neu-shadow-inset-light, rgba(255, 255, 255, 0.02));
+    inset 2px 2px 4px var(--sh-inset-dark)),
+    inset -1px -1px 2px var(--sh-inset-light));
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -49,7 +49,7 @@ defineProps({
 
 .skeleton-title {
   height: 14px;
-  background: var(--xm-bg-surface, #222);
+  background: var(--c-bg-3);
   border-radius: 4px;
   width: 80%;
   animation: pulse 1.5s ease-in-out infinite;
@@ -58,7 +58,7 @@ defineProps({
 
 .skeleton-subtitle {
   height: 12px;
-  background: var(--xm-bg-surface, #222);
+  background: var(--c-bg-3);
   border-radius: 4px;
   width: 50%;
   animation: pulse 1.5s ease-in-out infinite;

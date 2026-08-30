@@ -628,7 +628,7 @@ const handleResetState = (event) => {
 .search-hint {
   text-align: center;
   padding: 48px 24px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
 }
 
 .hint-icon {
@@ -649,21 +649,21 @@ const handleResetState = (event) => {
   align-items: center;
   gap: 12px;
   padding: 12px;
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
   border-radius: 12px;
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .user-card:active {
-  background: var(--bg-highlight);
+  background: var(--c-bg-4);
 }
 
 .user-avatar {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), #8b5cf6);
+  background: linear-gradient(135deg, var(--c-accent), #8b5cf6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -679,13 +679,13 @@ const handleResetState = (event) => {
 
 .user-name {
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   font-size: 15px;
 }
 
 .user-meta {
   font-size: 13px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   margin-top: 2px;
 }
 
@@ -699,20 +699,20 @@ const handleResetState = (event) => {
 }
 
 .follow-btn {
-  background: var(--accent);
+  background: var(--c-accent);
   color: #000;
 }
 
 .unfollow-btn {
-  background: var(--bg-highlight);
-  color: var(--text-secondary);
+  background: var(--c-bg-4);
+  color: var(--c-text-2);
 }
 
 /* Empty state */
 .empty-state {
   text-align: center;
   padding: 48px 24px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
 }
 
 .empty-icon {
@@ -723,7 +723,7 @@ const handleResetState = (event) => {
 
 .action-btn {
   margin-top: 16px;
-  background: var(--accent);
+  background: var(--c-accent);
   color: #000;
   border: none;
   border-radius: 20px;
@@ -747,7 +747,7 @@ const handleResetState = (event) => {
 }
 
 .profile-modal {
-  background: var(--bg-secondary);
+  background: var(--c-bg-2);
   border-radius: 24px 24px 0 0;
   width: 100%;
   max-height: 85vh;
@@ -772,7 +772,7 @@ const handleResetState = (event) => {
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), #8b5cf6);
+  background: linear-gradient(135deg, var(--c-accent), #8b5cf6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -788,12 +788,12 @@ const handleResetState = (event) => {
 .profile-info h2 {
   margin: 0;
   font-size: 20px;
-  color: var(--text-primary);
+  color: var(--c-text-1);
 }
 
 .profile-info p {
   margin: 4px 0 0;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-size: 14px;
 }
 
@@ -801,9 +801,9 @@ const handleResetState = (event) => {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
   border: none;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-size: 16px;
   cursor: pointer;
 }
@@ -812,8 +812,8 @@ const handleResetState = (event) => {
   display: flex;
   justify-content: space-around;
   padding: 16px 24px;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  border-top: 1px solid var(--c-bg-4);
+  border-bottom: 1px solid var(--c-bg-4);
 }
 
 .stat {
@@ -824,12 +824,12 @@ const handleResetState = (event) => {
   display: block;
   font-size: 20px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--c-text-1);
 }
 
 .stat-label {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
 }
 
 .profile-actions {
@@ -840,14 +840,14 @@ const handleResetState = (event) => {
 
 .action-btn.primary {
   flex: 1;
-  background: var(--accent);
+  background: var(--c-accent);
   color: #000;
 }
 
 .action-btn.secondary {
   flex: 1;
-  background: var(--bg-elevated);
-  color: var(--text-primary);
+  background: var(--c-bg-3);
+  color: var(--c-text-1);
 }
 
 .profile-content {
@@ -863,17 +863,17 @@ const handleResetState = (event) => {
 
 .content-tabs button {
   padding: 8px 16px;
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
   border: none;
   border-radius: 20px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-size: 13px;
   white-space: nowrap;
   cursor: pointer;
 }
 
 .content-tabs button.active {
-  background: var(--accent);
+  background: var(--c-accent);
   color: #000;
 }
 
@@ -889,7 +889,7 @@ const handleResetState = (event) => {
   align-items: center;
   gap: 12px;
   padding: 10px;
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
   border-radius: 10px;
   cursor: pointer;
 }
@@ -898,7 +898,7 @@ const handleResetState = (event) => {
   width: 44px;
   height: 44px;
   border-radius: 6px;
-  background: var(--bg-highlight);
+  background: var(--c-bg-4);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -919,7 +919,7 @@ const handleResetState = (event) => {
 .track-title {
   font-size: 14px;
   font-weight: 500;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -927,7 +927,7 @@ const handleResetState = (event) => {
 
 .track-artist {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
 }
 
 /* Playlists list */
@@ -942,7 +942,7 @@ const handleResetState = (event) => {
   align-items: center;
   gap: 12px;
   padding: 12px;
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
   border-radius: 10px;
   cursor: pointer;
 }
@@ -957,12 +957,12 @@ const handleResetState = (event) => {
 
 .playlist-name {
   font-weight: 500;
-  color: var(--text-primary);
+  color: var(--c-text-1);
 }
 
 .playlist-meta {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
 }
 
 /* Albums grid small */
@@ -982,7 +982,7 @@ const handleResetState = (event) => {
   aspect-ratio: 1;
   border-radius: 8px;
   object-fit: cover;
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -992,7 +992,7 @@ const handleResetState = (event) => {
 .album-item .album-name {
   margin-top: 6px;
   font-size: 12px;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1000,7 +1000,7 @@ const handleResetState = (event) => {
 
 .empty-hint {
   text-align: center;
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   padding: 24px;
   font-size: 14px;
 }
@@ -1030,14 +1030,14 @@ const handleResetState = (event) => {
 }
 
 .no-channel-prompt h2 {
-  color: var(--text-primary);
+  color: var(--c-text-1);
   font-size: 24px;
   font-weight: 700;
   margin: 0 0 12px 0;
 }
 
 .no-channel-prompt p {
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-size: 15px;
   line-height: 1.5;
   margin: 0 0 24px 0;
@@ -1045,7 +1045,7 @@ const handleResetState = (event) => {
 }
 
 .no-channel-prompt .setup-btn {
-  background: linear-gradient(135deg, var(--accent) 0%, #00c853 100%);
+  background: linear-gradient(135deg, var(--c-accent) 0%, #00c853 100%);
   border: none;
   border-radius: 24px;
   color: #000;
@@ -1063,8 +1063,8 @@ const handleResetState = (event) => {
 .spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid var(--bg-highlight);
-  border-top-color: var(--accent);
+  border: 3px solid var(--c-bg-4);
+  border-top-color: var(--c-accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }

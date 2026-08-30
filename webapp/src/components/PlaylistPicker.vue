@@ -97,8 +97,8 @@ const handleSelect = async (playlist) => {
 }
 
 .modal {
-  background: var(--xm-bg-elevated, #1A1A1A);
-  border-radius: var(--neu-radius-xl, 24px);
+  background: var(--c-bg-2);
+  border-radius: var(--r-xl);
   width: 100%;
   max-width: 400px;
   max-height: 90vh;
@@ -106,8 +106,8 @@ const handleSelect = async (playlist) => {
   flex-direction: column;
   overflow: hidden;
   box-shadow: 
-    12px 12px 24px var(--neu-shadow-dark, rgba(0, 0, 0, 0.6)),
-    -6px -6px 12px var(--neu-shadow-light, rgba(255, 255, 255, 0.03)),
+    12px 12px 24px var(--sh-dark)),
+    -6px -6px 12px var(--sh-light)),
     0 0 40px rgba(0, 0, 0, 0.5);
 }
 
@@ -116,37 +116,37 @@ const handleSelect = async (playlist) => {
   align-items: center;
   justify-content: space-between;
   padding: 18px 22px;
-  border-bottom: 1px solid var(--xm-bg-surface, #222);
+  border-bottom: 1px solid var(--c-bg-3);
 }
 
 .modal-header h3 {
   font-size: 18px;
   font-weight: 700;
-  color: var(--xm-text-primary, #fff);
+  color: var(--c-text-1);
 }
 
 .modal-close {
   width: 36px;
   height: 36px;
   border: none;
-  background: var(--xm-bg-surface, #222);
-  border-radius: var(--neu-radius-full, 9999px);
+  background: var(--c-bg-3);
+  border-radius: var(--r-full);
   font-size: 16px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--xm-text-muted, #888);
+  color: var(--c-text-3);
   box-shadow: 
-    4px 4px 8px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
-    -2px -2px 4px var(--neu-shadow-light, rgba(255, 255, 255, 0.03));
+    4px 4px 8px var(--sh-dark)),
+    -2px -2px 4px var(--sh-light));
   transition: all 0.15s ease;
 }
 
 .modal-close:active {
   box-shadow: 
-    inset 2px 2px 4px var(--neu-shadow-inset-dark, rgba(0, 0, 0, 0.4)),
-    inset -1px -1px 2px var(--neu-shadow-inset-light, rgba(255, 255, 255, 0.02));
+    inset 2px 2px 4px var(--sh-inset-dark)),
+    inset -1px -1px 2px var(--sh-inset-light));
 }
 
 .playlist-list {
@@ -168,27 +168,27 @@ const handleSelect = async (playlist) => {
 }
 
 .playlist-list::-webkit-scrollbar-thumb {
-  background: var(--xm-accent-glow, rgba(229, 57, 53, 0.3));
+  background: var(--c-accent-glow));
   border-radius: 3px;
 }
 
 .create-first {
   width: 100%;
   padding: 40px 20px;
-  background: var(--xm-bg-surface, #222);
-  border: 2px dashed var(--xm-accent, #1db954);
-  border-radius: var(--neu-radius-lg, 16px);
+  background: var(--c-bg-3);
+  border: 2px dashed var(--c-accent);
+  border-radius: var(--r-lg);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 14px;
-  color: var(--xm-accent, #1db954);
+  color: var(--c-accent);
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   box-shadow: 
-    inset 4px 4px 8px var(--neu-shadow-inset-dark, rgba(0, 0, 0, 0.4)),
-    inset -2px -2px 4px var(--neu-shadow-inset-light, rgba(255, 255, 255, 0.02));
+    inset 4px 4px 8px var(--sh-inset-dark)),
+    inset -2px -2px 4px var(--sh-inset-light));
 }
 
 .create-icon {
@@ -201,27 +201,27 @@ const handleSelect = async (playlist) => {
   align-items: center;
   gap: 14px;
   padding: 14px;
-  background: var(--xm-bg-surface, #222);
+  background: var(--c-bg-3);
   border: none;
-  border-radius: var(--neu-radius-md, 12px);
+  border-radius: var(--r-md);
   cursor: pointer;
   text-align: left;
   transition: all 0.15s ease;
   margin-bottom: 10px;
   box-shadow: 
-    4px 4px 8px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
-    -2px -2px 4px var(--neu-shadow-light, rgba(255, 255, 255, 0.03));
+    4px 4px 8px var(--sh-dark)),
+    -2px -2px 4px var(--sh-light));
 }
 
 .playlist-option:active {
   box-shadow: 
-    inset 2px 2px 4px var(--neu-shadow-inset-dark, rgba(0, 0, 0, 0.4)),
-    inset -1px -1px 2px var(--neu-shadow-inset-light, rgba(255, 255, 255, 0.02));
+    inset 2px 2px 4px var(--sh-inset-dark)),
+    inset -1px -1px 2px var(--sh-inset-light));
 }
 
 .playlist-option.create {
-  color: var(--xm-accent, #1db954);
-  background: linear-gradient(180deg, var(--xm-bg-surface, #222) 0%, var(--xm-bg-elevated, #1A1A1A) 100%);
+  color: var(--c-accent);
+  background: linear-gradient(180deg, var(--c-bg-3) 0%, var(--c-bg-2) 100%);
 }
 
 .playlist-icon {
@@ -239,13 +239,13 @@ const handleSelect = async (playlist) => {
   display: block;
   font-size: 16px;
   font-weight: 600;
-  color: var(--xm-text-primary, #fff);
+  color: var(--c-text-1);
 }
 
 .playlist-count {
   display: block;
   font-size: 13px;
-  color: var(--xm-text-muted, #888);
+  color: var(--c-text-3);
   margin-top: 2px;
 }
 

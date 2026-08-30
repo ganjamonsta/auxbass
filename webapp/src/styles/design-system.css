@@ -113,18 +113,6 @@
   --desktop-player-height: 100px;
   --sidebar-width: 280px;
   --now-playing-width: 320px;
-  
-  /* ─── Legacy Aliases (compatibility) ─── */
-  --bg-primary: var(--c-bg-1);
-  --bg-secondary: var(--c-bg-2);
-  --bg-elevated: var(--c-bg-3);
-  --bg-highlight: var(--c-bg-4);
-  --bg-card: var(--c-bg-2);
-  --text-primary: var(--c-text-1);
-  --text-secondary: var(--c-text-2);
-  --text-tertiary: var(--c-text-3);
-  --danger: var(--c-error);
-  --border: var(--c-bg-4);
 }
 
 /* ═══════════════════════════════════════════════════════════

@@ -416,7 +416,7 @@ watch(
   height: 160px;
   border-radius: 8px;
   overflow: hidden;
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
   flex-shrink: 0;
 }
 
@@ -444,13 +444,13 @@ watch(
 .album-info h1 {
   font-size: 24px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   margin: 0 0 8px 0;
   line-height: 1.2;
 }
 
 .artist {
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   margin: 0 0 4px 0;
   cursor: pointer;
 }
@@ -470,7 +470,7 @@ watch(
 .artists-icon {
   flex-shrink: 0;
   opacity: 0.7;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
 }
 
 .artists-links {
@@ -483,7 +483,7 @@ watch(
 .artist-link-inline {
   background: none;
   border: none;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-size: inherit;
   cursor: pointer;
   padding: 0;
@@ -491,16 +491,16 @@ watch(
 }
 
 .artist-link-inline:hover {
-  color: var(--accent);
+  color: var(--c-accent);
   text-decoration: underline;
 }
 
 .artist-separator {
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
 }
 
 .meta {
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   font-size: 13px;
   margin: 0;
 }
@@ -518,7 +518,7 @@ watch(
 .action-buttons {
   display: flex;
   border-radius: 28px;
-  background: var(--accent);
+  background: var(--c-accent);
   box-shadow: 
     6px 6px 12px rgba(0, 0, 0, 0.3),
     -3px -3px 8px rgba(255, 255, 255, 0.1),
@@ -584,7 +584,7 @@ watch(
 }
 
 .tracklist-item:hover {
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
 }
 
 .tracklist-item.missing {
@@ -598,7 +598,7 @@ watch(
 .track-number {
   width: 24px;
   text-align: center;
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   font-size: 14px;
 }
 
@@ -612,26 +612,26 @@ watch(
 
 .track-title {
   font-size: 15px;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .track-title.missing-title {
-  color: var(--text-secondary);
+  color: var(--c-text-2);
 }
 
 .track-artist {
   font-size: 13px;
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .track-duration {
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   font-size: 13px;
   min-width: 40px;
   text-align: right;
@@ -641,7 +641,7 @@ watch(
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--c-accent);
   color: #000;
   border: none;
   font-size: 18px;
@@ -660,7 +660,7 @@ watch(
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--c-accent);
   color: #000;
   border: none;
   font-size: 18px;
@@ -677,7 +677,7 @@ watch(
 }
 
 .in-library-indicator {
-  color: var(--accent);
+  color: var(--c-accent);
   font-size: 14px;
   font-weight: bold;
   width: 28px;
@@ -708,7 +708,7 @@ watch(
 }
 
 .modal-content {
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
   border-radius: 16px;
   padding: 24px;
   max-width: 400px;
@@ -729,7 +729,7 @@ watch(
 
 .modal-loading p {
   margin-top: 12px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
 }
 
 .modal-found,
@@ -738,17 +738,17 @@ watch(
 }
 
 .success-message {
-  color: var(--accent);
+  color: var(--c-accent);
   margin-bottom: 12px;
 }
 
 .info-message {
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   margin-bottom: 8px;
 }
 
 .hint {
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   font-size: 13px;
 }
 
@@ -763,18 +763,18 @@ watch(
 }
 
 .found-track-info strong {
-  color: var(--text-primary);
+  color: var(--c-text-1);
 }
 
 .found-track-info span {
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-size: 14px;
 }
 
 .primary-btn {
   width: 100%;
   padding: 12px;
-  background: var(--accent);
+  background: var(--c-accent);
   color: #000;
   border: none;
   border-radius: 8px;
@@ -791,7 +791,7 @@ watch(
   width: 100%;
   padding: 12px;
   background: var(--bg-base);
-  color: var(--text-primary);
+  color: var(--c-text-1);
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -803,7 +803,7 @@ watch(
   right: 16px;
   background: none;
   border: none;
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   font-size: 20px;
   cursor: pointer;
 }

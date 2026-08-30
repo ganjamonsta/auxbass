@@ -505,7 +505,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: var(--accent);
+  background: var(--c-accent);
   color: #000;
   border: none;
   border-radius: 20px;
@@ -517,7 +517,7 @@ onUnmounted(() => {
   box-shadow:
     3px 3px 6px var(--sh-dark),
     -2px -2px 4px var(--sh-light),
-    0 0 10px var(--accent-glow, var(--c-accent-glow));
+    0 0 10px var(--c-accent-glow));
   transition: all 0.15s ease;
 }
 
@@ -525,7 +525,7 @@ onUnmounted(() => {
   transform: scale(0.97);
   box-shadow:
     inset 2px 2px 4px rgba(0, 0, 0, 0.3),
-    0 0 8px var(--accent-glow, var(--c-accent-glow));
+    0 0 8px var(--c-accent-glow));
 }
 
 .shuffle-all-btn:disabled {
@@ -540,7 +540,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 48px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
 }
 
 /* Empty state, section headers, spinner, loading-more are in design-system.css */
@@ -550,7 +550,7 @@ onUnmounted(() => {
 .section-header.friends-section {
   margin-top: 24px;
   padding-top: 16px;
-  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  border-top: 1px solid var(--c-bg-4));
 }
 
 .global-loading {
@@ -559,7 +559,7 @@ onUnmounted(() => {
   justify-content: center;
   gap: 8px;
   padding: 16px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-size: 13px;
 }
 
@@ -571,9 +571,9 @@ onUnmounted(() => {
   width: 100%;
   padding: 12px;
   margin-top: 8px;
-  background: var(--bg-elevated, rgba(255, 255, 255, 0.05));
-  color: var(--accent);
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  background: var(--c-bg-3));
+  color: var(--c-accent);
+  border: 1px solid var(--c-bg-4));
   border-radius: 10px;
   font-size: 13px;
   font-weight: 500;

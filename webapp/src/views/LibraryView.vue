@@ -151,14 +151,14 @@ onUnmounted(() => {
 }
 
 .no-channel-prompt h2 {
-  color: var(--text-primary);
+  color: var(--c-text-1);
   font-size: 24px;
   font-weight: 700;
   margin: 0 0 12px 0;
 }
 
 .no-channel-prompt p {
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-size: 15px;
   line-height: 1.5;
   margin: 0 0 24px 0;
@@ -166,7 +166,7 @@ onUnmounted(() => {
 }
 
 .no-channel-prompt .setup-btn {
-  background: linear-gradient(135deg, var(--accent) 0%, #00c853 100%);
+  background: linear-gradient(135deg, var(--c-accent) 0%, #00c853 100%);
   border: none;
   border-radius: 24px;
   color: #000;

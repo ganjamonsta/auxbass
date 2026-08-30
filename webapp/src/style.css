@@ -7,59 +7,16 @@
    ═══════════════════════════════════════════════════════════════════════════════
    
    Design system & tokens: ./styles/design-system.css
-   This file: base resets, Telegram overrides, legacy class aliases.
+   This file: base resets, Telegram overrides, utilities.
+   
+   All legacy aliases (--spotify-*, --xm-*, --neu-*) have been removed.
+   Components now use --c-*, --sh-*, --r-* tokens directly.
    
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 :root {
   --tg-viewport-height: 100dvh;
   --tg-viewport-stable-height: 100dvh;
-  
-  /* ─── Legacy Variable Aliases ───
-     Map old variable names to design system tokens.
-     TODO: migrate components to use --c-* directly, then remove these. */
-  
-  --xm-accent: var(--c-accent);
-  --xm-accent-light: var(--c-accent-light);
-  --xm-accent-dark: var(--c-accent-dark);
-  --xm-accent-glow: var(--c-accent-glow);
-  --xm-secondary: var(--c-secondary);
-  --xm-secondary-glow: var(--c-secondary-glow);
-  
-  --xm-bg-deep: var(--c-bg-0);
-  --xm-bg-base: var(--c-bg-1);
-  --xm-bg-elevated: var(--c-bg-2);
-  --xm-bg-surface: var(--c-bg-3);
-  --xm-bg-hover: var(--c-bg-4);
-  --xm-bg-card: var(--c-bg-2);
-  
-  --xm-text-primary: var(--c-text-1);
-  --xm-text-secondary: var(--c-text-2);
-  --xm-text-muted: var(--c-text-3);
-  --xm-text-disabled: var(--c-text-4);
-  
-  --spotify-green: var(--c-accent);
-  --spotify-green-dark: var(--c-accent-dark);
-  --spotify-black: var(--c-bg-1);
-  --spotify-gray-dark: var(--c-bg-2);
-  --spotify-gray: var(--c-bg-3);
-  --spotify-gray-light: var(--c-bg-4);
-  --spotify-text: var(--c-text-1);
-  --spotify-text-secondary: var(--c-text-2);
-  --spotify-text-muted: var(--c-text-3);
-  
-  --neu-bg: var(--c-bg-2);
-  --neu-radius: var(--r-lg);
-  --neu-radius-sm: var(--r-sm);
-  --neu-radius-md: var(--r-md);
-  --neu-radius-lg: var(--r-lg);
-  --neu-radius-xl: var(--r-xl);
-  --neu-radius-full: var(--r-full);
-  
-  --neu-shadow-dark: var(--sh-dark);
-  --neu-shadow-light: var(--sh-light);
-  --neu-shadow-inset-dark: var(--sh-inset-dark);
-  --neu-shadow-inset-light: var(--sh-inset-light);
 }
 
 /* ═══════════════════════════════════════════════════════════

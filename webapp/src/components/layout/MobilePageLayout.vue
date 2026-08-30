@@ -134,7 +134,7 @@ defineExpose({
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  background: var(--bg-primary);
+  background: var(--c-bg-1);
 }
 
 /* Fixed Header */
@@ -142,7 +142,7 @@ defineExpose({
   flex-shrink: 0;
   position: relative;
   z-index: var(--z-sticky, 20);
-  background: var(--bg-primary);
+  background: var(--c-bg-1);
 }
 
 .header-primary {
@@ -171,7 +171,7 @@ defineExpose({
   min-height: 0;
   /* Custom scrollbar */
   scrollbar-width: thin;
-  scrollbar-color: var(--bg-highlight) transparent;
+  scrollbar-color: var(--c-bg-4) transparent;
 }
 
 .layout-content::-webkit-scrollbar {
@@ -183,12 +183,12 @@ defineExpose({
 }
 
 .layout-content::-webkit-scrollbar-thumb {
-  background: var(--bg-highlight);
+  background: var(--c-bg-4);
   border-radius: 3px;
 }
 
 .layout-content::-webkit-scrollbar-thumb:hover {
-  background: var(--text-tertiary);
+  background: var(--c-text-3);
 }
 
 /* Fixed Footer */
@@ -196,7 +196,7 @@ defineExpose({
   flex-shrink: 0;
   position: relative;
   z-index: var(--z-sticky, 20);
-  background: var(--bg-primary);
+  background: var(--c-bg-1);
 }
 
 /* Player adjustment */

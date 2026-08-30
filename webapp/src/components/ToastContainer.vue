@@ -61,7 +61,7 @@ const uiStore = useUIStore()
   align-items: flex-start;
   gap: 12px;
   padding: 12px 16px;
-  background: var(--bg-elevated, #282828);
+  background: var(--c-bg-3);
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
   pointer-events: auto;
@@ -69,7 +69,7 @@ const uiStore = useUIStore()
 }
 
 .toast.success {
-  border-left: 3px solid #1db954;
+  border-left: 3px solid var(--c-accent);
 }
 
 .toast.error {
@@ -91,7 +91,7 @@ const uiStore = useUIStore()
 }
 
 .toast.success .toast-icon {
-  color: #1db954;
+  color: var(--c-accent);
 }
 
 .toast.error .toast-icon {
@@ -114,13 +114,13 @@ const uiStore = useUIStore()
 .toast-title {
   font-size: 14px;
   font-weight: 500;
-  color: var(--text-primary, #fff);
+  color: var(--c-text-1);
   line-height: 1.3;
 }
 
 .toast-message {
   font-size: 12px;
-  color: var(--text-secondary, #b3b3b3);
+  color: var(--c-text-2);
   margin-top: 4px;
   line-height: 1.4;
 }
@@ -131,7 +131,7 @@ const uiStore = useUIStore()
   border: none;
   padding: 4px;
   cursor: pointer;
-  color: var(--text-secondary, #b3b3b3);
+  color: var(--c-text-2);
   opacity: 0.6;
   transition: opacity 0.2s;
 }

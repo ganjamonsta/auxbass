@@ -201,9 +201,9 @@ const startTouchDrag = (event) => {
   position: relative;
 }
 
-.base-track-item:hover { background: var(--bg-elevated); }
+.base-track-item:hover { background: var(--c-bg-3); }
 .base-track-item.is-dragging { opacity: 0.5; transform: scale(0.98); }
-.base-track-item.drag-over { background: var(--bg-highlight); }
+.base-track-item.drag-over { background: var(--c-bg-4); }
 .base-track-item.is-playing { background: rgba(29, 185, 84, 0.1); }
 .base-track-item.dimmed { opacity: 0.6; }
 
@@ -214,7 +214,7 @@ const startTouchDrag = (event) => {
   left: 0;
   right: 0;
   height: 2px;
-  background: var(--accent);
+  background: var(--c-accent);
 }
 
 .drag-handle {
@@ -224,7 +224,7 @@ const startTouchDrag = (event) => {
   width: 24px;
   height: 32px;
   cursor: grab;
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   flex-shrink: 0;
 }
 
@@ -234,7 +234,7 @@ const startTouchDrag = (event) => {
   width: 20px;
   text-align: center;
   font-size: 12px;
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   flex-shrink: 0;
 }
 
@@ -251,7 +251,7 @@ const startTouchDrag = (event) => {
 .cover {
   width: 100%;
   height: 100%;
-  background: var(--bg-highlight);
+  background: var(--c-bg-4);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -288,7 +288,7 @@ const startTouchDrag = (event) => {
 .track-title {
   font-size: 14px;
   font-weight: 500;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -296,7 +296,7 @@ const startTouchDrag = (event) => {
 
 .track-artist {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -327,7 +327,7 @@ const startTouchDrag = (event) => {
   position: absolute;
   left: 0;
   height: 3px;
-  background: var(--accent);
+  background: var(--c-accent);
   border-radius: 2px;
   pointer-events: none;
 }
@@ -336,7 +336,7 @@ const startTouchDrag = (event) => {
   position: absolute;
   width: 10px;
   height: 10px;
-  background: var(--accent);
+  background: var(--c-accent);
   border-radius: 50%;
   transform: translateX(-50%);
   opacity: 0;
@@ -348,7 +348,7 @@ const startTouchDrag = (event) => {
 
 .time {
   font-size: 12px;
-  color: var(--accent);
+  color: var(--c-accent);
   font-variant-numeric: tabular-nums;
   min-width: 36px;
   text-align: right;

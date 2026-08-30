@@ -46,7 +46,7 @@ defineEmits(['add', 'remove'])
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--c-accent);
   border: none;
   color: #000;
   font-size: 18px;
@@ -61,5 +61,5 @@ defineEmits(['add', 'remove'])
 
 .action-btn:hover { transform: scale(1.1); }
 .action-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-.action-btn.check:hover { background: var(--danger, #1db954); color: #fff; }
+.action-btn.check:hover { background: var(--c-error); color: #fff; }
 </style>

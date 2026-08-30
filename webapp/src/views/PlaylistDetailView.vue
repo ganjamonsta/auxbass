@@ -279,7 +279,7 @@ watch(
   height: 140px;
   border-radius: 8px;
   overflow: hidden;
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
   flex-shrink: 0;
 }
 
@@ -320,13 +320,13 @@ watch(
 .playlist-info h1 {
   font-size: 24px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   margin: 0 0 8px 0;
   line-height: 1.2;
 }
 
 .meta {
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-size: 14px;
   margin: 0;
 }
@@ -340,7 +340,7 @@ watch(
 .action-buttons {
   display: flex;
   border-radius: 28px;
-  background: var(--accent);
+  background: var(--c-accent);
   box-shadow: 
     6px 6px 12px rgba(0, 0, 0, 0.3),
     -3px -3px 8px rgba(255, 255, 255, 0.1),
@@ -424,7 +424,7 @@ watch(
 .empty-state {
   text-align: center;
   padding: 48px 16px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
 }
 
 .empty-icon {
@@ -434,7 +434,7 @@ watch(
 }
 
 .hint {
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   font-size: 14px;
   margin-top: 8px;
 }
@@ -448,8 +448,8 @@ watch(
 .spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid var(--bg-highlight);
-  border-top-color: var(--accent);
+  border: 3px solid var(--c-bg-4);
+  border-top-color: var(--c-accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -462,12 +462,12 @@ watch(
   display: inline-block;
   margin-left: 8px;
   font-size: 12px;
-  color: var(--accent);
+  color: var(--c-accent);
 }
 
 .owner-info {
   font-size: 13px;
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   margin-top: 4px;
 }
 

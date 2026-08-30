@@ -37,7 +37,7 @@ defineEmits(['click', 'contextmenu'])
   aspect-ratio: 1;
   border-radius: 50%;
   overflow: hidden;
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
   margin-bottom: 8px;
 }
 
@@ -58,7 +58,7 @@ defineEmits(['click', 'contextmenu'])
 }
 
 .artist-name {
-  color: var(--text-primary);
+  color: var(--c-text-1);
   font-weight: 600;
   font-size: 13px;
   overflow: hidden;
@@ -68,7 +68,7 @@ defineEmits(['click', 'contextmenu'])
 }
 
 .artist-meta {
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   font-size: 11px;
   line-height: 1.3;
 }

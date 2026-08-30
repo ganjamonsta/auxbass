@@ -241,22 +241,22 @@ const firstTag = computed(() => {
   gap: 10px;
   padding: 8px 6px 8px 12px; /* Less right padding, scrollbar is there */
   margin: 4px 0 4px 8px; /* No right margin - scrollbar takes that space */
-  border-radius: var(--neu-radius-md);
+  border-radius: var(--r-md);
   cursor: pointer;
   transition: all 0.15s ease;
   background: transparent;
 }
 
 .track-item:active {
-  background: var(--xm-bg-surface);
+  background: var(--c-bg-3);
   transform: scale(0.98);
 }
 
 .track-item.playing {
-  background: var(--xm-bg-surface);
+  background: var(--c-bg-3);
   box-shadow: 
-    inset 2px 2px 4px var(--neu-shadow-inset-dark),
-    inset -1px -1px 3px var(--neu-shadow-inset-light);
+    inset 2px 2px 4px var(--sh-inset-dark),
+    inset -1px -1px 3px var(--sh-inset-light);
 }
 
 .track-item.compact {
@@ -268,7 +268,7 @@ const firstTag = computed(() => {
 .track-cover {
   width: 48px;
   height: 48px;
-  border-radius: var(--neu-radius-md);
+  border-radius: var(--r-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -276,15 +276,15 @@ const firstTag = computed(() => {
   position: relative;
   overflow: hidden;
   box-shadow: 
-    4px 4px 8px var(--neu-shadow-dark),
-    -2px -2px 4px var(--neu-shadow-light);
+    4px 4px 8px var(--sh-dark),
+    -2px -2px 4px var(--sh-light);
   transition: box-shadow 0.2s ease;
 }
 
 .track-item.playing .track-cover {
   box-shadow: 
-    4px 4px 8px var(--neu-shadow-dark),
-    -2px -2px 4px var(--neu-shadow-light);
+    4px 4px 8px var(--sh-dark),
+    -2px -2px 4px var(--sh-light);
 }
 
 .compact .track-cover {
@@ -322,10 +322,10 @@ const firstTag = computed(() => {
 
 .playing-indicator .bar {
   width: 4px;
-  background: var(--xm-accent);
+  background: var(--c-accent);
   border-radius: 2px;
   animation: equalizer 0.8s ease-in-out infinite;
-  box-shadow: 0 0 6px var(--xm-accent-glow);
+  box-shadow: 0 0 6px var(--c-accent-glow);
 }
 
 .playing-indicator .bar:nth-child(1) {
@@ -360,7 +360,7 @@ const firstTag = computed(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--xm-text-primary);
+  color: var(--c-text-1);
   transition: color 0.15s ease;
 }
 
@@ -369,7 +369,7 @@ const firstTag = computed(() => {
 }
 
 .track-item.playing .track-title {
-  color: var(--xm-accent);
+  color: var(--c-accent);
 }
 
 .track-meta {
@@ -383,7 +383,7 @@ const firstTag = computed(() => {
 
 .track-artist {
   font-size: 12px;
-  color: var(--xm-text-muted);
+  color: var(--c-text-3);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -397,7 +397,7 @@ const firstTag = computed(() => {
 
 .play-count {
   font-size: 10px;
-  color: var(--xm-text-muted);
+  color: var(--c-text-3);
   white-space: nowrap;
 }
 
@@ -405,7 +405,7 @@ const firstTag = computed(() => {
 .track-duration {
   font-size: 12px;
   font-weight: 500;
-  color: var(--xm-text-muted);
+  color: var(--c-text-3);
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
 }
@@ -438,7 +438,7 @@ const firstTag = computed(() => {
 .track-download {
   width: 32px;
   height: 32px;
-  background: var(--xm-bg-surface);
+  background: var(--c-bg-3);
   border: none;
   display: flex;
   align-items: center;
@@ -447,10 +447,10 @@ const firstTag = computed(() => {
   cursor: pointer;
   transition: all 0.15s ease;
   flex-shrink: 0;
-  border-radius: var(--neu-radius-sm);
+  border-radius: var(--r-sm);
   box-shadow: 
-    2px 2px 4px var(--neu-shadow-dark),
-    -1px -1px 2px var(--neu-shadow-light);
+    2px 2px 4px var(--sh-dark),
+    -1px -1px 2px var(--sh-light);
 }
 
 .track-download:hover,
@@ -472,34 +472,34 @@ const firstTag = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--xm-text-muted);
+  color: var(--c-text-3);
   cursor: pointer;
   opacity: 0.5;
   transition: all 0.2s ease;
   flex-shrink: 0;
-  border-radius: var(--neu-radius-full);
+  border-radius: var(--r-full);
 }
 
 .track-like:hover,
 .track-like:active {
   opacity: 1;
-  background: var(--xm-bg-surface);
+  background: var(--c-bg-3);
 }
 
 .track-like.liked {
-  color: var(--xm-accent);
+  color: var(--c-accent);
   opacity: 1;
 }
 
 .track-like.liked svg {
-  filter: drop-shadow(0 0 6px var(--xm-accent-glow));
+  filter: drop-shadow(0 0 6px var(--c-accent-glow));
 }
 
 /* ─── Add to Library Button ─── */
 .track-add-library {
   width: 32px;
   height: 32px;
-  background: var(--accent);
+  background: var(--c-accent);
   border: none;
   display: flex;
   align-items: center;
@@ -508,26 +508,26 @@ const firstTag = computed(() => {
   cursor: pointer;
   transition: all 0.2s ease;
   flex-shrink: 0;
-  border-radius: var(--neu-radius-full);
+  border-radius: var(--r-full);
   box-shadow: 
-    2px 2px 4px var(--neu-shadow-dark),
-    -1px -1px 2px var(--neu-shadow-light),
-    0 0 8px var(--accent-glow, rgba(29, 185, 84, 0.3));
+    2px 2px 4px var(--sh-dark),
+    -1px -1px 2px var(--sh-light),
+    0 0 8px var(--c-accent-glow));
 }
 
 .track-add-library:hover {
   transform: scale(1.05);
   box-shadow: 
-    3px 3px 6px var(--neu-shadow-dark),
-    -2px -2px 4px var(--neu-shadow-light),
-    0 0 12px var(--accent-glow, rgba(29, 185, 84, 0.5));
+    3px 3px 6px var(--sh-dark),
+    -2px -2px 4px var(--sh-light),
+    0 0 12px var(--c-accent-glow));
 }
 
 .track-add-library:active {
   transform: scale(0.95);
   box-shadow: 
     inset 1px 1px 2px rgba(0, 0, 0, 0.2),
-    0 0 8px var(--accent-glow, rgba(29, 185, 84, 0.4));
+    0 0 8px var(--c-accent-glow));
 }
 
 .in-library-badge {
@@ -536,7 +536,7 @@ const firstTag = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--accent);
+  color: var(--c-accent);
   font-size: 16px;
   font-weight: bold;
   flex-shrink: 0;
@@ -551,17 +551,17 @@ const firstTag = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--xm-text-muted);
+  color: var(--c-text-3);
   cursor: pointer;
   opacity: 0.6;
   transition: all 0.2s ease;
-  border-radius: var(--neu-radius-full);
+  border-radius: var(--r-full);
   margin-right: -4px; /* Pull closer to edge, let scrollbar use that space */
 }
 
 .track-menu:active {
   opacity: 1;
-  background: var(--xm-bg-surface);
+  background: var(--c-bg-3);
 }
 
 /* ─── Unavailable Track Styles ─── */
@@ -571,7 +571,7 @@ const firstTag = computed(() => {
 
 .track-item.unavailable .track-title {
   text-decoration: line-through;
-  color: var(--xm-text-muted);
+  color: var(--c-text-3);
 }
 
 .track-item.unavailable .track-cover {
@@ -585,7 +585,7 @@ const firstTag = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--xm-accent);
+  color: var(--c-accent);
 }
 
 
@@ -594,7 +594,7 @@ const firstTag = computed(() => {
 .track-number {
   width: 28px;
   text-align: center;
-  color: var(--xm-text-muted);
+  color: var(--c-text-3);
   font-size: 14px;
   font-weight: 500;
   flex-shrink: 0;
@@ -602,7 +602,7 @@ const firstTag = computed(() => {
 }
 
 .track-item.playing .track-number {
-  color: var(--xm-accent);
+  color: var(--c-accent);
 }
 
 /* ─── Mini Cover for hideCover mode ─── */
@@ -625,7 +625,7 @@ const firstTag = computed(() => {
 
 .playing-indicator-mini .bar {
   width: 2px;
-  background: var(--xm-accent);
+  background: var(--c-accent);
   border-radius: 1px;
   animation: equalizer 0.8s ease-in-out infinite;
 }
@@ -648,7 +648,7 @@ const firstTag = computed(() => {
 /* ─── Track Album ─── */
 .track-album {
   font-size: 11px;
-  color: var(--xm-text-muted);
+  color: var(--c-text-3);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

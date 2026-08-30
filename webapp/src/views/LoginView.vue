@@ -187,7 +187,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: var(--bg-primary);
+  background: var(--c-bg-1);
 }
 
 .login-container {
@@ -204,46 +204,46 @@ onMounted(async () => {
 h1 {
   font-size: 32px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   margin: 0 0 8px 0;
 }
 
 .subtitle {
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   margin: 0 0 40px 0;
 }
 
 .auth-info p {
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   margin-bottom: 24px;
 }
 
 .auth-info code {
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
   padding: 4px 8px;
   border-radius: 4px;
-  color: var(--accent);
+  color: var(--c-accent);
 }
 
 .bot-link {
   display: block;
   padding: 14px 24px;
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
   border-radius: 12px;
-  color: var(--accent);
+  color: var(--c-accent);
   text-decoration: none;
   font-weight: 500;
   margin-bottom: 16px;
 }
 
 .bot-link:hover {
-  background: var(--bg-highlight);
+  background: var(--c-bg-4);
 }
 
 .primary-btn {
   width: 100%;
   padding: 14px 24px;
-  background: var(--accent);
+  background: var(--c-accent);
   border: none;
   border-radius: 12px;
   color: #000;
@@ -258,7 +258,7 @@ h1 {
 }
 
 .code-input-section p {
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   margin-bottom: 24px;
 }
 
@@ -275,19 +275,19 @@ h1 {
   text-align: center;
   font-size: 24px;
   font-weight: 600;
-  background: var(--bg-elevated);
-  border: 2px solid var(--border);
+  background: var(--c-bg-3);
+  border: 2px solid var(--c-bg-4);
   border-radius: 12px;
-  color: var(--text-primary);
+  color: var(--c-text-1);
 }
 
 .code-digit:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--c-accent);
 }
 
 .error {
-  color: var(--danger);
+  color: var(--c-error);
   margin-bottom: 16px;
 }
 
@@ -297,13 +297,13 @@ h1 {
   padding: 14px;
   background: transparent;
   border: none;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-size: 15px;
   cursor: pointer;
   margin-top: 12px;
 }
 
 .text-btn:hover {
-  color: var(--text-primary);
+  color: var(--c-text-1);
 }
 </style>

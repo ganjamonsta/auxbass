@@ -79,7 +79,7 @@ defineExpose({
   box-shadow:
     inset 3px 3px 6px var(--sh-inset-dark),
     inset -2px -2px 4px var(--sh-inset-light),
-    0 0 0 2px var(--accent-glow);
+    0 0 0 2px var(--c-accent-glow);
 }
 
 .search-bar input {
@@ -123,8 +123,8 @@ defineExpose({
 .search-spinner {
   width: 20px;
   height: 20px;
-  border: 2px solid var(--c-bg-2, var(--bg-highlight));
-  border-top-color: var(--accent);
+  border: 2px solid var(--c-bg-2, var(--c-bg-4));
+  border-top-color: var(--c-accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   flex-shrink: 0;

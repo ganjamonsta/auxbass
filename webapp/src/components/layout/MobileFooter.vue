@@ -133,15 +133,15 @@ const handleNavClick = (path) => {
 .mobile-footer {
   flex-shrink: 0;
   z-index: var(--z-overlay, 100);
-  background: var(--bg-secondary);
-  border-top: 2px solid var(--border);
+  background: var(--c-bg-2);
+  border-top: 2px solid var(--c-bg-4);
   padding-bottom: env(safe-area-inset-bottom);
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
 }
 
 /* Player section */
 .footer-player {
-  background: var(--bg-primary);
+  background: var(--c-bg-1);
   padding: 8px 0;
 }
 
@@ -152,7 +152,7 @@ const handleNavClick = (path) => {
   justify-content: space-around;
   align-items: center;
   padding: 8px 0;
-  background: var(--bg-secondary);
+  background: var(--c-bg-2);
 }
 
 .nav-item {
@@ -162,7 +162,7 @@ const handleNavClick = (path) => {
   justify-content: center;
   gap: 6px;
   text-decoration: none;
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   font-size: 11px;
   padding: 10px 12px;
   transition: all 0.2s ease;
@@ -177,7 +177,7 @@ const handleNavClick = (path) => {
 }
 
 .nav-item.active {
-  color: var(--accent);
+  color: var(--c-accent);
 }
 
 .nav-item.active::before {
@@ -188,7 +188,7 @@ const handleNavClick = (path) => {
   transform: translateX(-50%);
   width: 32px;
   height: 3px;
-  background: var(--accent);
+  background: var(--c-accent);
   border-radius: 0 0 3px 3px;
 }
 

@@ -440,7 +440,7 @@ const save = async () => {
 }
 
 .edit-playlist-modal {
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
   border-radius: 16px;
   height: 85vh;
   max-height: 700px;
@@ -502,22 +502,22 @@ const save = async () => {
   align-items: center;
   justify-content: space-between;
   padding: 20px 20px 16px;
-  border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.1));
+  border-bottom: 1px solid var(--c-bg-4));
 }
 
 .edit-header h2 {
   margin: 0;
   font-size: 18px;
-  color: var(--text-primary);
+  color: var(--c-text-1);
 }
 
 .close-modal-btn {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--bg-highlight);
+  background: var(--c-bg-4);
   border: none;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-size: 16px;
   cursor: pointer;
   display: flex;
@@ -531,20 +531,20 @@ const save = async () => {
   flex-direction: row;
   align-items: center;
   gap: 12px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color, rgba(255,255,255,0.1));
+  background: var(--c-bg-1);
+  border: 1px solid var(--c-bg-4));
   border-radius: 8px;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   font-size: 15px;
 }
 
 .edit-name-input {
   flex: 1;
   padding: 10px 14px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color, rgba(255,255,255,0.1));
+  background: var(--c-bg-1);
+  border: 1px solid var(--c-bg-4));
   border-radius: 8px;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   font-size: 15px;
 }
 
@@ -556,7 +556,7 @@ const save = async () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-size: 14px;
   cursor: pointer;
 }
@@ -565,7 +565,7 @@ const save = async () => {
   appearance: none;
   width: 36px;
   height: 20px;
-  background: var(--bg-highlight);
+  background: var(--c-bg-4);
   border-radius: 10px;
   position: relative;
   cursor: pointer;
@@ -584,7 +584,7 @@ const save = async () => {
 }
 
 .checkbox-label.compact input[type="checkbox"]:checked {
-  background: var(--accent);
+  background: var(--c-accent);
 }
 
 .checkbox-label.compact input[type="checkbox"]:checked::before {
@@ -608,7 +608,7 @@ const save = async () => {
 .section-label {
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 12px;
@@ -632,15 +632,15 @@ const save = async () => {
   align-items: center;
   gap: 8px;
   padding: 12px 0;
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   font-size: 13px;
 }
 
 .search-spinner-inline {
   width: 16px;
   height: 16px;
-  border: 2px solid var(--bg-highlight);
-  border-top-color: var(--accent);
+  border: 2px solid var(--c-bg-4);
+  border-top-color: var(--c-accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -666,13 +666,13 @@ const save = async () => {
   align-items: center;
   justify-content: center;
   padding: 32px 16px;
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
 }
 
 .empty-playlist-hint {
   text-align: center;
   padding: 32px 16px;
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
 }
 
 .empty-playlist-hint span {
@@ -690,8 +690,8 @@ const save = async () => {
   justify-content: space-between;
   gap: 12px;
   padding: 16px 20px;
-  border-top: 1px solid var(--border-color, rgba(255,255,255,0.1));
-  background: var(--bg-elevated);
+  border-top: 1px solid var(--c-bg-4));
+  background: var(--c-bg-3);
 }
 
 .delete-playlist-btn {
@@ -700,9 +700,9 @@ const save = async () => {
   gap: 6px;
   padding: 10px 14px;
   background: transparent;
-  border: 1px solid var(--text-tertiary);
+  border: 1px solid var(--c-text-3);
   border-radius: 8px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -710,14 +710,14 @@ const save = async () => {
 }
 
 .delete-playlist-btn:hover {
-  border-color: var(--danger, #1db954);
-  color: var(--danger, #1db954);
+  border-color: var(--c-error);
+  color: var(--c-error);
 }
 
 .delete-playlist-btn.confirm-state {
-  border-color: var(--danger, #1db954);
+  border-color: var(--c-error);
   color: #fff;
-  background: var(--danger, #1db954);
+  background: var(--c-error);
   animation: pulse-danger 0.3s ease;
 }
 
@@ -729,7 +729,7 @@ const save = async () => {
 
 .save-btn {
   padding: 12px 24px;
-  background: var(--accent);
+  background: var(--c-accent);
   border: none;
   border-radius: 8px;
   color: #000;

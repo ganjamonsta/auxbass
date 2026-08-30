@@ -46,7 +46,7 @@ defineProps({
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--accent);
+  background: var(--c-accent);
   color: #000;
   border-radius: 10px;
 }

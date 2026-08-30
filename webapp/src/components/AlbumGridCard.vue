@@ -54,7 +54,7 @@ defineEmits(['click', 'play', 'contextmenu'])
   aspect-ratio: 1;
   border-radius: 8px;
   overflow: hidden;
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
   margin-bottom: 8px;
 }
 
@@ -81,7 +81,7 @@ defineEmits(['click', 'play', 'contextmenu'])
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--c-accent);
   border: none;
   color: #000;
   font-size: 14px;
@@ -111,7 +111,7 @@ defineEmits(['click', 'play', 'contextmenu'])
   top: 8px;
   right: 8px;
   background: rgba(0, 0, 0, 0.7);
-  color: var(--accent);
+  color: var(--c-accent);
   font-size: 11px;
   font-weight: 600;
   padding: 4px 8px;
@@ -127,7 +127,7 @@ defineEmits(['click', 'play', 'contextmenu'])
 
 .album-name {
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -136,7 +136,7 @@ defineEmits(['click', 'play', 'contextmenu'])
 
 .album-artist {
   font-size: 11px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -144,6 +144,6 @@ defineEmits(['click', 'play', 'contextmenu'])
 
 .track-count {
   font-size: 11px;
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
 }
 </style>

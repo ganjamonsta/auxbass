@@ -65,7 +65,7 @@ defineEmits(['click', 'play', 'contextmenu'])
 .playlist-cover {
   width: 100%;
   aspect-ratio: 1;
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
   border-radius: 8px;
   overflow: hidden;
   margin-bottom: 8px;
@@ -97,7 +97,7 @@ defineEmits(['click', 'play', 'contextmenu'])
   justify-content: center;
   width: 100%;
   height: 100%;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
 }
 
 .playlist-info {
@@ -111,12 +111,12 @@ defineEmits(['click', 'play', 'contextmenu'])
   overflow: hidden;
   text-overflow: ellipsis;
   margin-bottom: 4px;
-  color: var(--text-primary);
+  color: var(--c-text-1);
 }
 
 .playlist-meta {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -124,7 +124,7 @@ defineEmits(['click', 'play', 'contextmenu'])
 
 .public-badge {
   display: flex;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
 }
 
 .owner-badge {
@@ -160,7 +160,7 @@ defineEmits(['click', 'play', 'contextmenu'])
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--c-accent);
   border: none;
   color: #000;
   font-size: 14px;

@@ -753,7 +753,7 @@ const getTracksWord = (count) => {
 
 .submenu {
   background: rgba(0, 0, 0, 0.2);
-  border-left: 2px solid #1DB954;
+  border-left: 2px solid var(--c-accent);
   margin-left: 16px;
 }
 
@@ -823,7 +823,7 @@ const getTracksWord = (count) => {
 }
 
 .modal-input:focus {
-  border-color: #1DB954;
+  border-color: var(--c-accent);
 }
 
 .modal-actions {
@@ -848,7 +848,7 @@ const getTracksWord = (count) => {
 }
 
 .modal-btn.confirm {
-  background: #1DB954;
+  background: var(--c-accent);
   color: white;
 }
 

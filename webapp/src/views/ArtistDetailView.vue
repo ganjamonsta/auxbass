@@ -295,18 +295,18 @@ watch(
 .not-in-library-content h2 {
   font-size: 24px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   margin: 0 0 8px 0;
 }
 
 .not-in-library-content p {
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   margin: 0 0 24px 0;
 }
 
 .not-in-library-content .primary-btn {
   background: var(--accent-color);
-  color: var(--accent-text, #000);
+  color: var(--c-accent-text);
   border: none;
   border-radius: 24px;
   padding: 12px 24px;
@@ -332,7 +332,7 @@ watch(
   height: 140px;
   border-radius: 50%;
   overflow: hidden;
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
   flex-shrink: 0;
 }
 
@@ -360,13 +360,13 @@ watch(
 .artist-info h1 {
   font-size: 28px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   margin: 0 0 8px 0;
   line-height: 1.2;
 }
 
 .meta {
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-size: 14px;
   margin: 0;
 }
@@ -380,7 +380,7 @@ watch(
 .action-buttons {
   display: flex;
   border-radius: 28px;
-  background: var(--accent);
+  background: var(--c-accent);
   box-shadow: 
     6px 6px 12px rgba(0, 0, 0, 0.3),
     -3px -3px 8px rgba(255, 255, 255, 0.1),
@@ -435,7 +435,7 @@ watch(
 .section h2 {
   font-size: 20px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   margin: 0 0 16px 0;
 }
 
@@ -452,7 +452,7 @@ watch(
 }
 
 .albums-row::-webkit-scrollbar-thumb {
-  background: var(--bg-highlight);
+  background: var(--c-bg-4);
   border-radius: 2px;
 }
 
@@ -467,7 +467,7 @@ watch(
   height: 140px;
   border-radius: 8px;
   overflow: hidden;
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
   margin-bottom: 8px;
 }
 
@@ -487,7 +487,7 @@ watch(
 }
 
 .album-name {
-  color: var(--text-primary);
+  color: var(--c-text-1);
   font-size: 14px;
   font-weight: 500;
   overflow: hidden;
@@ -496,7 +496,7 @@ watch(
 }
 
 .album-year {
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   font-size: 12px;
 }
 
@@ -520,7 +520,7 @@ watch(
 }
 
 .tracks-count {
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   font-size: 14px;
   font-weight: 500;
 }
@@ -528,7 +528,7 @@ watch(
 .virtual-tracks-container {
   flex: 1;
   min-height: 0;
-  border-radius: var(--neu-radius-md, 12px);
+  border-radius: var(--r-md);
   overflow: hidden;
 }
 
@@ -554,14 +554,14 @@ watch(
 
 /* Page skeleton styles */
 .skeleton-image {
-  background: var(--xm-bg-surface, #222);
+  background: var(--c-bg-3);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
 .skeleton-title {
   height: 28px;
   width: 180px;
-  background: var(--xm-bg-surface, #222);
+  background: var(--c-bg-3);
   border-radius: 4px;
   margin-bottom: 8px;
   animation: pulse 1.5s ease-in-out infinite;
@@ -570,7 +570,7 @@ watch(
 .skeleton-meta {
   height: 16px;
   width: 140px;
-  background: var(--xm-bg-surface, #222);
+  background: var(--c-bg-3);
   border-radius: 4px;
   animation: pulse 1.5s ease-in-out infinite;
   animation-delay: 0.1s;
@@ -579,7 +579,7 @@ watch(
 .skeleton-buttons {
   width: 100px;
   height: 48px;
-  background: var(--xm-bg-surface, #222);
+  background: var(--c-bg-3);
   border-radius: 24px;
   animation: pulse 1.5s ease-in-out infinite;
   animation-delay: 0.2s;
@@ -588,7 +588,7 @@ watch(
 .skeleton-section-title {
   height: 20px;
   width: 100px;
-  background: var(--xm-bg-surface, #222);
+  background: var(--c-bg-3);
   border-radius: 4px;
   margin-bottom: 16px;
   animation: pulse 1.5s ease-in-out infinite;

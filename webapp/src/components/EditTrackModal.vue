@@ -133,8 +133,8 @@ const handleSubmit = async () => {
 }
 
 .modal {
-  background: var(--xm-bg-elevated, #1A1A1A);
-  border-radius: var(--neu-radius-xl, 24px);
+  background: var(--c-bg-2);
+  border-radius: var(--r-xl);
   width: 100%;
   max-width: 400px;
   max-height: 90vh;
@@ -142,8 +142,8 @@ const handleSubmit = async () => {
   overflow-x: hidden;
   scrollbar-gutter: auto;
   box-shadow: 
-    12px 12px 24px var(--neu-shadow-dark, rgba(0, 0, 0, 0.6)),
-    -6px -6px 12px var(--neu-shadow-light, rgba(255, 255, 255, 0.03)),
+    12px 12px 24px var(--sh-dark)),
+    -6px -6px 12px var(--sh-light)),
     0 0 40px rgba(0, 0, 0, 0.5);
 }
 
@@ -157,7 +157,7 @@ const handleSubmit = async () => {
 }
 
 .modal::-webkit-scrollbar-thumb {
-  background: var(--xm-accent-glow, rgba(229, 57, 53, 0.3));
+  background: var(--c-accent-glow));
   border-radius: 3px;
 }
 
@@ -166,37 +166,37 @@ const handleSubmit = async () => {
   align-items: center;
   justify-content: space-between;
   padding: 18px 22px;
-  border-bottom: 1px solid var(--xm-bg-surface, #222);
+  border-bottom: 1px solid var(--c-bg-3);
 }
 
 .modal-header h3 {
   font-size: 18px;
   font-weight: 700;
-  color: var(--xm-text-primary, #fff);
+  color: var(--c-text-1);
 }
 
 .modal-close {
   width: 36px;
   height: 36px;
   border: none;
-  background: var(--xm-bg-surface, #222);
-  border-radius: var(--neu-radius-full, 9999px);
+  background: var(--c-bg-3);
+  border-radius: var(--r-full);
   font-size: 16px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--xm-text-muted, #888);
+  color: var(--c-text-3);
   box-shadow: 
-    4px 4px 8px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
-    -2px -2px 4px var(--neu-shadow-light, rgba(255, 255, 255, 0.03));
+    4px 4px 8px var(--sh-dark)),
+    -2px -2px 4px var(--sh-light));
   transition: all 0.15s ease;
 }
 
 .modal-close:active {
   box-shadow: 
-    inset 2px 2px 4px var(--neu-shadow-inset-dark, rgba(0, 0, 0, 0.4)),
-    inset -1px -1px 2px var(--neu-shadow-inset-light, rgba(255, 255, 255, 0.02));
+    inset 2px 2px 4px var(--sh-inset-dark)),
+    inset -1px -1px 2px var(--sh-inset-light));
 }
 
 .modal-form {
@@ -211,7 +211,7 @@ const handleSubmit = async () => {
   display: block;
   font-size: 13px;
   font-weight: 600;
-  color: var(--xm-text-muted, #888);
+  color: var(--c-text-3);
   margin-bottom: 8px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -221,26 +221,26 @@ const handleSubmit = async () => {
   width: 100%;
   padding: 14px 16px;
   border: none;
-  border-radius: var(--neu-radius-md, 12px);
-  background: var(--xm-bg-surface, #222);
-  color: var(--xm-text-primary, #fff);
+  border-radius: var(--r-md);
+  background: var(--c-bg-3);
+  color: var(--c-text-1);
   font-size: 16px;
   outline: none;
   transition: all 0.2s ease;
   box-shadow: 
-    inset 4px 4px 8px var(--neu-shadow-inset-dark, rgba(0, 0, 0, 0.4)),
-    inset -2px -2px 4px var(--neu-shadow-inset-light, rgba(255, 255, 255, 0.02));
+    inset 4px 4px 8px var(--sh-inset-dark)),
+    inset -2px -2px 4px var(--sh-inset-light));
 }
 
 .form-input:focus {
   box-shadow: 
-    inset 4px 4px 8px var(--neu-shadow-inset-dark, rgba(0, 0, 0, 0.4)),
-    inset -2px -2px 4px var(--neu-shadow-inset-light, rgba(255, 255, 255, 0.02)),
-    0 0 0 2px var(--xm-accent, #1db954);
+    inset 4px 4px 8px var(--sh-inset-dark)),
+    inset -2px -2px 4px var(--sh-inset-light)),
+    0 0 0 2px var(--c-accent);
 }
 
 .form-input::placeholder {
-  color: var(--xm-text-muted, #888);
+  color: var(--c-text-3);
 }
 
 .modal-actions {
@@ -254,7 +254,7 @@ const handleSubmit = async () => {
   flex: 1;
   padding: 16px;
   border: none;
-  border-radius: var(--neu-radius-md, 12px);
+  border-radius: var(--r-md);
   font-size: 16px;
   font-weight: 700;
   cursor: pointer;
@@ -262,12 +262,12 @@ const handleSubmit = async () => {
 }
 
 .btn-primary {
-  background: linear-gradient(180deg, var(--xm-accent, #1db954) 0%, var(--xm-accent-dark, #169c46) 100%);
+  background: linear-gradient(180deg, var(--c-accent) 0%, var(--c-accent-dark) 100%);
   color: white;
   box-shadow: 
-    4px 4px 10px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
-    -2px -2px 6px var(--neu-shadow-light, rgba(255, 255, 255, 0.03)),
-    0 4px 15px var(--xm-accent-glow, rgba(229, 57, 53, 0.3));
+    4px 4px 10px var(--sh-dark)),
+    -2px -2px 6px var(--sh-light)),
+    0 4px 15px var(--c-accent-glow));
 }
 
 .btn-primary:active {
@@ -283,17 +283,17 @@ const handleSubmit = async () => {
 }
 
 .btn-secondary {
-  background: var(--xm-bg-surface, #222);
-  color: var(--xm-text-secondary, #ccc);
+  background: var(--c-bg-3);
+  color: var(--c-text-2);
   box-shadow: 
-    4px 4px 10px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),
-    -2px -2px 6px var(--neu-shadow-light, rgba(255, 255, 255, 0.03));
+    4px 4px 10px var(--sh-dark)),
+    -2px -2px 6px var(--sh-light));
 }
 
 .btn-secondary:active {
   box-shadow: 
-    inset 2px 2px 4px var(--neu-shadow-inset-dark, rgba(0, 0, 0, 0.4)),
-    inset -1px -1px 2px var(--neu-shadow-inset-light, rgba(255, 255, 255, 0.02));
+    inset 2px 2px 4px var(--sh-inset-dark)),
+    inset -1px -1px 2px var(--sh-inset-light));
 }
 
 /* Animation */

@@ -261,15 +261,7 @@ const handleAddToPlaylist = () => {
 </script>
 
 <style scoped>
-:root {
-  --neu-bg: #12121e;
-  --neu-shadow-light: #1a1a28;
-  --neu-shadow-dark: #08080f;
-  --neu-accent: #db2220;
-  --neu-accent-light: #e85c7c;
-  --neu-text: #e8ecf1;
-  --neu-text-light: #9ca3af;
-}
+/* Design tokens come from design-system.css */
 
 .fullplayer-desktop {
   position: fixed;

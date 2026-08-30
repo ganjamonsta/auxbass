@@ -126,7 +126,7 @@
 .skeleton-title-main {
   height: 32px;
   width: 140px;
-  background: var(--xm-bg-surface, #222);
+  background: var(--c-bg-3);
   border-radius: 8px;
   margin-bottom: 24px;
   animation: pulse 1.5s ease-in-out infinite;
@@ -139,7 +139,7 @@
 .skeleton-section-title {
   height: 14px;
   width: 100px;
-  background: var(--xm-bg-surface, #222);
+  background: var(--c-bg-3);
   border-radius: 6px;
   margin-bottom: 16px;
   animation: pulse 1.5s ease-in-out infinite;
@@ -147,7 +147,7 @@
 
 /* Channel skeleton */
 .skeleton-channel-box {
-  background: var(--xm-bg-elevated, #1A1A1A);
+  background: var(--c-bg-2);
   border-radius: 12px;
   padding: 16px;
 }
@@ -163,7 +163,7 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: var(--xm-bg-surface, #222);
+  background: var(--c-bg-3);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -183,7 +183,7 @@
 .skeleton-feature-item {
   height: 16px;
   width: 60%;
-  background: var(--xm-bg-surface, #222);
+  background: var(--c-bg-3);
   border-radius: 6px;
   animation: pulse 1.5s ease-in-out infinite;
 }
@@ -210,7 +210,7 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: var(--xm-bg-surface, #222);
+  background: var(--c-bg-3);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -224,7 +224,7 @@
 .skeleton-button {
   height: 44px;
   width: 100%;
-  background: var(--xm-bg-surface, #222);
+  background: var(--c-bg-3);
   border-radius: 10px;
   animation: pulse 1.5s ease-in-out infinite;
 }
@@ -237,7 +237,7 @@
 }
 
 .skeleton-stat-item {
-  background: var(--xm-bg-elevated, #1A1A1A);
+  background: var(--c-bg-2);
   border-radius: 12px;
   padding: 16px;
   display: flex;
@@ -249,7 +249,7 @@
 .skeleton-stat-value {
   height: 28px;
   width: 50px;
-  background: var(--xm-bg-surface, #222);
+  background: var(--c-bg-3);
   border-radius: 6px;
   animation: pulse 1.5s ease-in-out infinite;
 }
@@ -257,7 +257,7 @@
 .skeleton-stat-label {
   height: 12px;
   width: 60px;
-  background: var(--xm-bg-surface, #222);
+  background: var(--c-bg-3);
   border-radius: 4px;
   animation: pulse 1.5s ease-in-out infinite;
   animation-delay: 0.1s;
@@ -269,7 +269,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 0;
-  border-bottom: 1px solid var(--xm-border, rgba(255, 255, 255, 0.06));
+  border-bottom: 1px solid var(--c-bg-4));
 }
 
 .skeleton-setting-row:last-child {
@@ -286,7 +286,7 @@
 .skeleton-toggle {
   width: 44px;
   height: 24px;
-  background: var(--xm-bg-surface, #222);
+  background: var(--c-bg-3);
   border-radius: 12px;
   animation: pulse 1.5s ease-in-out infinite;
 }
@@ -294,7 +294,7 @@
 .skeleton-slider {
   width: 100%;
   height: 6px;
-  background: var(--xm-bg-surface, #222);
+  background: var(--c-bg-3);
   border-radius: 3px;
   margin-top: 8px;
   animation: pulse 1.5s ease-in-out infinite;
@@ -303,7 +303,7 @@
 /* Line sizes */
 .skeleton-line {
   height: 14px;
-  background: var(--xm-bg-surface, #222);
+  background: var(--c-bg-3);
   border-radius: 6px;
   animation: pulse 1.5s ease-in-out infinite;
 }

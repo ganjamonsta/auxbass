@@ -455,11 +455,11 @@ defineExpose({
   justify-content: center;
   padding: 48px 24px;
   text-align: center;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
 }
 
 .empty-icon {
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   margin-bottom: 16px;
 }
 </style>

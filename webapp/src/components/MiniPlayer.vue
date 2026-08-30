@@ -211,13 +211,13 @@ const formatTime = (seconds) => {
   align-items: center;
   margin: 6px 10px;
   padding: 6px;
-  background: var(--xm-bg-elevated);
-  border-radius: var(--neu-radius-lg);
+  background: var(--c-bg-2);
+  border-radius: var(--r-lg);
   cursor: pointer;
   overflow: visible;
   box-shadow: 
-    6px 6px 12px var(--neu-shadow-dark),
-    -3px -3px 8px var(--neu-shadow-light);
+    6px 6px 12px var(--sh-dark),
+    -3px -3px 8px var(--sh-light);
   border: 1px solid rgba(255, 255, 255, 0.03);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
@@ -225,15 +225,15 @@ const formatTime = (seconds) => {
 .mini-player:active {
   transform: scale(0.98);
   box-shadow: 
-    3px 3px 6px var(--neu-shadow-dark),
-    -2px -2px 4px var(--neu-shadow-light);
+    3px 3px 6px var(--sh-dark),
+    -2px -2px 4px var(--sh-light);
 }
 
 /* ─── LCD Screen - Nokia XpressMusic Style ─── */
 .lcd-screen {
   flex: 1;
   background: var(--lcd-bg);
-  border-radius: var(--neu-radius-md);
+  border-radius: var(--r-md);
   padding: 10px 12px;
   font-family: 'Segoe UI', system-ui, sans-serif;
   border: 1px solid #1a2a40;
@@ -418,8 +418,8 @@ const formatTime = (seconds) => {
 }
 
 .lcd-btn:active svg {
-  color: var(--xm-accent);
-  filter: drop-shadow(0 0 4px var(--xm-accent-glow));
+  color: var(--c-accent);
+  filter: drop-shadow(0 0 4px var(--c-accent-glow));
 }
 
 /* ─── LED Progress Dots ─── */
@@ -441,8 +441,8 @@ const formatTime = (seconds) => {
 }
 
 .lcd-dot.active {
-  background: var(--xm-accent);
-  box-shadow: 0 0 4px var(--xm-accent-glow);
+  background: var(--c-accent);
+  box-shadow: 0 0 4px var(--c-accent-glow);
 }
 
 .lcd-dot.buffered {
@@ -450,14 +450,14 @@ const formatTime = (seconds) => {
 }
 
 .lcd-dot.next {
-  background: var(--xm-accent);
+  background: var(--c-accent);
   opacity: 0.5;
   animation: dot-blink 0.6s ease-in-out infinite;
 }
 
 @keyframes dot-blink {
   0%, 100% { opacity: 0.3; box-shadow: none; }
-  50% { opacity: 1; box-shadow: 0 0 6px var(--xm-accent-glow); }
+  50% { opacity: 1; box-shadow: 0 0 6px var(--c-accent-glow); }
 }
 
 /* ─── Time Display ─── */

@@ -449,7 +449,7 @@ const handleResetState = (event) => {
 h1 {
   font-size: 28px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   margin: 0 0 var(--sp-6) 0;
 }
 
@@ -464,7 +464,7 @@ h1 {
   gap: var(--sp-2);
   font-size: 14px;
   font-weight: 600;
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin: 0 0 var(--sp-4) 0;
@@ -507,7 +507,7 @@ h1 {
 }
 
 .user-name {
-  color: var(--text-primary);
+  color: var(--c-text-1);
   font-weight: 500;
   font-size: 16px;
   overflow: hidden;
@@ -516,7 +516,7 @@ h1 {
 }
 
 .user-id {
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
@@ -525,9 +525,9 @@ h1 {
   width: 100%;
   padding: var(--sp-3);
   background: transparent;
-  border: 1px solid var(--danger);
+  border: 1px solid var(--c-error);
   border-radius: var(--r-md);
-  color: var(--danger);
+  color: var(--c-error);
   font-weight: 500;
   font-size: 14px;
   cursor: pointer;
@@ -546,7 +546,7 @@ h1 {
 }
 
 .stat-item {
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
   border-radius: var(--r-md);
   padding: var(--sp-4);
   text-align: center;
@@ -560,7 +560,7 @@ h1 {
   display: block;
   font-size: 26px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--c-text-1);
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -568,7 +568,7 @@ h1 {
 
 .stat-label {
   display: block;
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   font-size: 13px;
   margin-top: var(--sp-1);
   line-height: 1.3;
@@ -581,7 +581,7 @@ h1 {
   justify-content: space-between;
   align-items: center;
   padding: var(--sp-3) 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--c-bg-4);
   gap: var(--sp-4);
 }
 
@@ -598,13 +598,13 @@ h1 {
 }
 
 .setting-name {
-  color: var(--text-primary);
+  color: var(--c-text-1);
   font-size: 15px;
   line-height: 1.4;
 }
 
 .setting-desc {
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   font-size: 13px;
   line-height: 1.4;
   margin-top: 0;
@@ -631,7 +631,7 @@ h1 {
   position: absolute;
   cursor: pointer;
   inset: 0;
-  background: var(--bg-highlight);
+  background: var(--c-bg-4);
   border-radius: 14px;
   transition: background 0.25s ease;
 }
@@ -649,7 +649,7 @@ h1 {
 }
 
 .toggle input:checked + .toggle-slider {
-  background: var(--accent);
+  background: var(--c-accent);
 }
 
 .toggle input:checked + .toggle-slider::before {
@@ -661,7 +661,7 @@ h1 {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
   border: none;
   font-size: 20px;
   cursor: pointer;
@@ -670,10 +670,10 @@ h1 {
 .clear-cache-btn {
   width: 100%;
   padding: var(--sp-3);
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
   border: none;
   border-radius: var(--r-md);
-  color: var(--text-primary);
+  color: var(--c-text-1);
   font-weight: 500;
   font-size: 14px;
   cursor: pointer;
@@ -681,7 +681,7 @@ h1 {
 }
 
 .clear-cache-btn:hover {
-  background: var(--bg-highlight);
+  background: var(--c-bg-4);
 }
 
 /* ─── About ─── */
@@ -690,12 +690,12 @@ h1 {
 }
 
 .about p {
-  color: var(--text-primary);
+  color: var(--c-text-1);
   margin: var(--sp-2) 0;
 }
 
 .about-desc {
-  color: var(--text-tertiary) !important;
+  color: var(--c-text-3) !important;
   font-size: 14px;
 }
 
@@ -703,7 +703,7 @@ h1 {
    Channel Section
    ═══════════════════════════════════════════════ */
 .channel-section {
-  background: var(--bg-elevated);
+  background: var(--c-bg-3);
   border-radius: var(--r-md);
   padding: var(--sp-4);
 }
@@ -730,7 +730,7 @@ h1 {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--c-accent);
   color: #000;
   display: flex;
   align-items: center;
@@ -746,7 +746,7 @@ h1 {
 }
 
 .channel-title {
-  color: var(--text-primary);
+  color: var(--c-text-1);
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -754,7 +754,7 @@ h1 {
 }
 
 .channel-username {
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-size: 13px;
 }
 
@@ -770,7 +770,7 @@ h1 {
   align-items: center;
   gap: 6px;
   background: rgba(29, 185, 84, 0.15);
-  color: var(--accent);
+  color: var(--c-accent);
   padding: 6px 12px;
   border-radius: var(--r-full);
   font-size: 13px;
@@ -785,7 +785,7 @@ h1 {
 }
 
 .channel-desc {
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   margin: 0;
   line-height: 1.5;
 }
@@ -804,20 +804,20 @@ h1 {
   flex-direction: row;
   align-items: center;
   gap: var(--sp-2);
-  color: var(--text-primary);
+  color: var(--c-text-1);
   font-size: 14px;
   line-height: 1.4;
 }
 
 .setup-steps {
-  background: var(--bg-secondary, var(--bg-elevated));
+  background: var(--c-bg-2));
   border-radius: var(--r-sm);
   padding: var(--sp-3);
   margin-top: var(--sp-2);
 }
 
 .setup-steps h3 {
-  color: var(--text-primary);
+  color: var(--c-text-1);
   font-size: 14px;
   margin: 0 0 var(--sp-2) 0;
 }
@@ -825,21 +825,21 @@ h1 {
 .setup-steps ol {
   padding-left: 20px;
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-size: 13px;
   line-height: 1.6;
 }
 
 .setup-steps strong {
-  color: var(--accent);
+  color: var(--c-accent);
 }
 
 .setup-steps code {
-  background: var(--bg-highlight);
+  background: var(--c-bg-4);
   padding: 2px 6px;
   border-radius: var(--r-xs);
   font-family: monospace;
-  color: var(--text-primary);
+  color: var(--c-text-1);
 }
 
 .refresh-btn {
@@ -882,7 +882,7 @@ h1 {
 .range-slider {
   width: 100%;
   height: 6px;
-  background: var(--bg-tertiary, var(--bg-highlight));
+  background: var(--bg-tertiary, var(--c-bg-4));
   border-radius: 3px;
   outline: none;
   -webkit-appearance: none;
@@ -894,7 +894,7 @@ h1 {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--c-accent);
   cursor: pointer;
   transition: transform 0.15s ease;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
@@ -908,13 +908,13 @@ h1 {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--c-accent);
   cursor: pointer;
   border: none;
 }
 
 .setting-value {
-  color: var(--accent);
+  color: var(--c-accent);
   font-weight: 600;
   font-size: 14px;
   font-variant-numeric: tabular-nums;
@@ -922,7 +922,7 @@ h1 {
 }
 
 .scale-desc {
-  color: var(--text-tertiary);
+  color: var(--c-text-3);
   font-size: 13px;
   margin-top: 0;
   display: block;
