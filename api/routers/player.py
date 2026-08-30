@@ -801,6 +801,10 @@ async def stream_audio(
         "Accept-Ranges": "bytes",
         "Content-Disposition": f'inline; filename="{safe_title}.mp3"',
         "Cache-Control": "private, max-age=3600",  # Cache 1 hour
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": "*",
+        "Access-Control-Expose-Headers": "Content-Range, Content-Length, Accept-Ranges",
     }
     
     # If Telegram returned 206 Partial Content, pass it through

@@ -52,6 +52,12 @@ export function initAudioContext() {
   }
 }
 
+export function resumeAudioContext() {
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {})
+  }
+}
+
 /**
  * Connect (or re-connect) the given HTMLAudioElement to the processing graph.
  * Handles the one-source-per-element restriction via element tagging.
@@ -65,7 +71,7 @@ export function connectAudioSource(audioEl) {
     sourceNode = audioCtx.createMediaElementSource(audioEl)
     sourceNode.connect(bassNode)
 
-    if (audioCtx.state === 'suspended') audioCtx.resume()
+    resumeAudioContext()
     console.log('[Audio Enhancer] Source connected')
   } catch (e) {
     // Element already has a source node (reused element)

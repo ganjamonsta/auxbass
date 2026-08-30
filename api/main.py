@@ -170,16 +170,13 @@ app.add_middleware(CacheControlMiddleware)
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        settings.webapp_url,
-        "https://aux.ganj4craft.ru",
-        "https://telegram.org",
-        "https://*.telegram.org",
-    ],
+    allow_origin_regex=".*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Range", "Content-Length", "Accept-Ranges", "X-Cache-TTL"],
 )
+
 
 # Routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
