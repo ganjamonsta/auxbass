@@ -56,11 +56,11 @@ import { usePwaInstall } from '@/composables/usePwaInstall'
 const {
   showBanner,
   isInstallable,
+  canPromptDirectly,
   isIOS,
   isTelegram,
   promptInstall,
-  dismissBanner,
-  openGuide
+  dismissBanner
 } = usePwaInstall()
 
 const bannerSubtitle = computed(() => {
@@ -70,6 +70,7 @@ const bannerSubtitle = computed(() => {
 })
 
 const installButtonText = computed(() => {
+  if (canPromptDirectly.value) return 'Установить'
   if (isIOS.value) return 'Инструкция'
   return 'Установить'
 })
@@ -79,11 +80,7 @@ const handleInstallClick = () => {
 }
 
 const handleCardClick = () => {
-  if (isIOS.value) {
-    openGuide()
-  } else {
-    promptInstall()
-  }
+  promptInstall()
 }
 </script>
 

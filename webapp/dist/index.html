@@ -4,6 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     
+    <!-- Early PWA beforeinstallprompt capture -->
+    <script>
+      window.__pwaDeferredPrompt = null;
+      window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        window.__pwaDeferredPrompt = e;
+        window.dispatchEvent(new CustomEvent('pwa-prompt-captured'));
+      });
+    </script>
+    
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#1DB954" />
     <meta name="background-color" content="#121212" />
@@ -31,8 +41,8 @@
     
     <!-- Telegram Web App SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script type="module" crossorigin src="/assets/index-BgQ44FwG.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-CdKItmwQ.css">
+    <script type="module" crossorigin src="/assets/index-B_tmhLRs.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-C0FM4RJk.css">
   </head>
   <body>
     <div id="app"></div>

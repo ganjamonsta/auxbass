@@ -6,7 +6,6 @@ const DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 // Shared singleton reactive state
 const deferredPrompt = ref(null)
 const isInstalled = ref(false)
-const canPromptDirectly = ref(false)
 const showBanner = ref(false)
 const showModal = ref(false)
 const isInitialized = ref(false)
@@ -35,17 +34,31 @@ const checkIsSafari = () => {
   return /Safari/i.test(ua) && !/Chrome|CriOS|FxiOS|OPiOS|EdgiOS|Android/i.test(ua)
 }
 
+const checkIsAndroid = () => {
+  if (typeof navigator === 'undefined') return false
+  return /Android/i.test(navigator.userAgent)
+}
+
 const checkIsTelegram = () => {
   if (typeof window === 'undefined') return false
-  return Boolean(
-    window.Telegram?.WebApp?.initData ||
-    window.TelegramWebviewProxy ||
-    window.Telegram?.WebApp?.version
-  )
+  const tg = window.Telegram?.WebApp
+  if (!tg) return false
+  
+  // Must have real initData with actual user/query parameters, or webview proxy
+  const hasRealInitData = typeof tg.initData === 'string' && tg.initData.trim().length > 0
+  const hasProxy = Boolean(window.TelegramWebviewProxy)
+  const isKnownTgPlatform = tg.platform && tg.platform !== 'unknown' && tg.platform !== ''
+
+  return Boolean(hasRealInitData || (isKnownTgPlatform && hasProxy))
 }
 
 // Global initialization
 if (typeof window !== 'undefined') {
+  // Pick up early prompt if already captured in index.html
+  if (window.__pwaDeferredPrompt) {
+    deferredPrompt.value = window.__pwaDeferredPrompt
+  }
+
   // Check initial standalone mode
   if (isStandalone()) {
     isInstalled.value = true
@@ -54,18 +67,28 @@ if (typeof window !== 'undefined') {
   // Listen for beforeinstallprompt
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault()
+    window.__pwaDeferredPrompt = e
     deferredPrompt.value = e
-    canPromptDirectly.value = true
     if (!isInstalled.value) {
       checkAndScheduleBanner()
+    }
+  })
+
+  // Listen for custom event from index.html
+  window.addEventListener('pwa-prompt-captured', () => {
+    if (window.__pwaDeferredPrompt) {
+      deferredPrompt.value = window.__pwaDeferredPrompt
+      if (!isInstalled.value) {
+        checkAndScheduleBanner()
+      }
     }
   })
 
   // Listen for appinstalled
   window.addEventListener('appinstalled', () => {
     isInstalled.value = true
-    canPromptDirectly.value = false
     deferredPrompt.value = null
+    window.__pwaDeferredPrompt = null
     showBanner.value = false
     showModal.value = false
     try {
@@ -106,25 +129,31 @@ function checkAndScheduleBanner() {
     if (!isStandalone() && !isInstalled.value && !isDismissedRecently()) {
       showBanner.value = true
     }
-  }, 3000)
+  }, 2500)
 }
 
 export function usePwaInstall() {
   const isIOS = ref(checkIsIOS())
   const isSafari = ref(checkIsSafari())
+  const isAndroid = ref(checkIsAndroid())
   const isTelegram = ref(checkIsTelegram())
+
+  const canPromptDirectly = computed(() => {
+    if (deferredPrompt.value) return true
+    if (isTelegram.value && typeof window.Telegram?.WebApp?.addToHomeScreen === 'function') return true
+    return false
+  })
 
   const isInstallable = computed(() => {
     if (isInstalled.value || isStandalone()) return false
-    // If can prompt directly (Chrome/Edge/Android) or iOS Safari or Telegram or standard browser
     return true
   })
 
   const platform = computed(() => {
     if (isTelegram.value) return 'telegram'
-    if (isIOS.value) return isSafari.value ? 'ios-safari' : 'ios-other'
-    if (canPromptDirectly.value) return 'chromium'
-    return 'generic'
+    if (isIOS.value) return 'ios'
+    if (isAndroid.value) return 'android'
+    return 'desktop'
   })
 
   const init = () => {
@@ -134,6 +163,11 @@ export function usePwaInstall() {
     if (isStandalone()) {
       isInstalled.value = true
       return
+    }
+
+    // Pick up global prompt if available
+    if (typeof window !== 'undefined' && window.__pwaDeferredPrompt) {
+      deferredPrompt.value = window.__pwaDeferredPrompt
     }
 
     // Check Telegram addToHomeScreen support
@@ -155,26 +189,26 @@ export function usePwaInstall() {
   }
 
   const promptInstall = async () => {
-    // 1. Direct prompt if available
+    // 1. Direct browser prompt if available
     if (deferredPrompt.value) {
       try {
         deferredPrompt.value.prompt()
         const choice = await deferredPrompt.value.userChoice
-        if (choice.outcome === 'accepted') {
+        if (choice?.outcome === 'accepted') {
           isInstalled.value = true
           showBanner.value = false
           showModal.value = false
         }
         deferredPrompt.value = null
-        canPromptDirectly.value = false
+        window.__pwaDeferredPrompt = null
         return
       } catch (err) {
-        console.warn('[PWA] Prompt error:', err)
+        console.warn('[PWA] Direct prompt error:', err)
       }
     }
 
     // 2. Telegram WebApp addToHomeScreen
-    if (isTelegram.value && window.Telegram?.WebApp?.addToHomeScreen) {
+    if (isTelegram.value && typeof window.Telegram?.WebApp?.addToHomeScreen === 'function') {
       try {
         window.Telegram.WebApp.addToHomeScreen()
         showBanner.value = false
@@ -184,7 +218,7 @@ export function usePwaInstall() {
       }
     }
 
-    // 3. Fallback to manual guide modal (iOS Safari or unsupported browsers)
+    // 3. Fallback to platform-specific instruction modal
     showModal.value = true
   }
 
@@ -206,11 +240,13 @@ export function usePwaInstall() {
   }
 
   return {
+    deferredPrompt,
     isInstalled,
     isInstallable,
     canPromptDirectly,
     isIOS,
     isSafari,
+    isAndroid,
     isTelegram,
     platform,
     showBanner,

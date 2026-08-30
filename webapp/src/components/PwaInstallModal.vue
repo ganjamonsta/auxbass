@@ -40,7 +40,7 @@
           <!-- Platform specific instructions -->
           <div class="pwa-steps-container">
             <!-- iOS Safari -->
-            <template v-if="isIOS">
+            <template v-if="platform === 'ios'">
               <div class="step-card">
                 <div class="step-number">1</div>
                 <div class="step-content">
@@ -78,12 +78,12 @@
             </template>
 
             <!-- Telegram WebApp -->
-            <template v-else-if="isTelegram">
+            <template v-else-if="platform === 'telegram'">
               <div class="step-card">
                 <div class="step-number">1</div>
                 <div class="step-content">
                   <div class="step-text">
-                    Нажмите кнопку ниже для добавления ярлыка на рабочий стол
+                    Нажмите кнопку <strong>«Добавить ярлык»</strong> ниже для быстрого доступа
                   </div>
                 </div>
               </div>
@@ -98,32 +98,77 @@
               </div>
             </template>
 
-            <!-- Android / Chromium / Desktop -->
-            <template v-else>
-              <div class="step-card">
-                <div class="step-number">1</div>
-                <div class="step-content">
-                  <div class="step-text">
-                    Нажмите кнопку <strong>«Установить»</strong> ниже или иконку установки в адресной строке браузера
+            <!-- Android -->
+            <template v-else-if="platform === 'android'">
+              <template v-if="canPromptDirectly">
+                <div class="step-card">
+                  <div class="step-number">✓</div>
+                  <div class="step-content">
+                    <div class="step-text">
+                      Нажмите кнопку <strong>«Установить сейчас»</strong> ниже для быстрой установки на ваше устройство
+                    </div>
                   </div>
                 </div>
-              </div>
+              </template>
+              <template v-else>
+                <div class="step-card">
+                  <div class="step-number">1</div>
+                  <div class="step-content">
+                    <div class="step-text">
+                      Нажмите на меню браузера (три точки <strong>⋮</strong> в правом верхнем углу)
+                    </div>
+                  </div>
+                </div>
 
-              <div class="step-card">
-                <div class="step-number">2</div>
-                <div class="step-content">
-                  <div class="step-text">
-                    Либо откройте меню браузера (<strong>⋮</strong>) и выберите <strong>«Установить приложение AuxBass»</strong>
+                <div class="step-card">
+                  <div class="step-number">2</div>
+                  <div class="step-content">
+                    <div class="step-text">
+                      Выберите <strong>«Установить приложение»</strong> или <strong>«Добавить на главный экран»</strong>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </template>
+            </template>
+
+            <!-- Desktop (Chrome / Brave / Edge / Firefox / Opera) -->
+            <template v-else>
+              <template v-if="canPromptDirectly">
+                <div class="step-card">
+                  <div class="step-number">✓</div>
+                  <div class="step-content">
+                    <div class="step-text">
+                      Нажмите кнопку <strong>«Установить сейчас»</strong> ниже для добавления AuxBass на ваш компьютер
+                    </div>
+                  </div>
+                </div>
+              </template>
+              <template v-else>
+                <div class="step-card">
+                  <div class="step-number">1</div>
+                  <div class="step-content">
+                    <div class="step-text">
+                      В адресной строке браузера нажмите иконку <strong>установки приложения</strong> (значок <strong>⊕</strong> или <strong>💻</strong> в правой части адресной строки)
+                    </div>
+                  </div>
+                </div>
+
+                <div class="step-card">
+                  <div class="step-number">2</div>
+                  <div class="step-content">
+                    <div class="step-text">
+                      Либо откройте меню браузера (<strong>⋮</strong>) → выберите <strong>«Установить AuxBass»</strong>
+                    </div>
+                  </div>
+                </div>
+              </template>
             </template>
           </div>
 
           <!-- Modal Actions -->
           <div class="pwa-modal-footer">
             <button 
-              v-if="canPromptDirectly || isTelegram" 
+              v-if="canPromptDirectly" 
               class="pwa-primary-action-btn"
               @click="handleDirectInstall"
             >
@@ -132,7 +177,7 @@
             </button>
             <button 
               class="pwa-secondary-action-btn" 
-              :class="{ 'full-width': !canPromptDirectly && !isTelegram }"
+              :class="{ 'full-width': !canPromptDirectly }"
               @click="closeGuide"
             >
               Понятно
@@ -158,8 +203,7 @@ import { usePwaInstall } from '@/composables/usePwaInstall'
 
 const {
   showModal,
-  isIOS,
-  isTelegram,
+  platform,
   canPromptDirectly,
   promptInstall,
   closeGuide
@@ -189,7 +233,7 @@ const handleDirectInstall = () => {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 20px;
   width: 100%;
-  max-width: 420px;
+  max-width: 440px;
   padding: 24px;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
   animation: modal-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -389,10 +433,11 @@ const handleDirectInstall = () => {
 
 .pwa-secondary-action-btn.full-width {
   flex: 1;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .pwa-secondary-action-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.18);
 }
 
 /* Animations */
