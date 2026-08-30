@@ -1,57 +1,44 @@
 <template>
   <div class="virtual-grid-container" ref="containerRef">
     <!-- Initial loading skeleton (before first fetch) -->
-    <div v-if="loading && !initialized" class="media-grid" :class="`type-${type}`">
+    <div v-if="loading && items.length === 0" class="media-grid" :class="`type-${type}`">
       <GridSkeleton v-for="i in skeletonCount" :key="i" :type="type" />
     </div>
     
-    <!-- Virtual scroll grid -->
-    <template v-else-if="total > 0">
-      <!-- Spacer to create proper scrollbar height -->
-      <div class="virtual-grid-spacer" :style="spacerStyle">
-        <!-- Top padding -->
-        <div :style="{ height: paddingTop + 'px' }" />
-        
-        <!-- Visible rows -->
-        <div class="media-grid" :class="`type-${type}`" :style="gridStyle">
-          <template v-for="(item, idx) in visibleItems" :key="item?.id ?? `skeleton-${startIndex + idx}`">
-            <!-- Skeleton for unloaded items -->
-            <GridSkeleton v-if="!item" :type="type" />
-            
-            <!-- Actual item based on type -->
-            <template v-else>
-              <AlbumGridCard
-                v-if="type === 'album'"
-                :album="item"
-                @click="handleClick(item)"
-                @play="handlePlay(item)"
-                @contextmenu="(e) => handleContextMenu(item, e)"
-              />
-              <ArtistGridCard
-                v-else-if="type === 'artist'"
-                :artist="item"
-                @click="handleClick(item)"
-                @contextmenu="(e) => handleContextMenu(item, e)"
-              />
-              <PlaylistGridCard
-                v-else-if="type === 'playlist'"
-                :playlist="item"
-                @click="handleClick(item)"
-                @play="handlePlay(item)"
-                @contextmenu="(e) => handleContextMenu(item, e)"
-              />
-            </template>
-          </template>
-        </div>
-        
-        <!-- Bottom padding -->
-        <div :style="{ height: paddingBottom + 'px' }" />
+    <!-- Items grid -->
+    <template v-else-if="items.length > 0">
+      <div class="media-grid" :class="`type-${type}`">
+        <template v-for="item in items" :key="getKey(item)">
+          <AlbumGridCard
+            v-if="type === 'album'"
+            :album="item"
+            @click="handleClick(item)"
+            @play="handlePlay(item)"
+            @contextmenu="(e) => handleContextMenu(item, e)"
+          />
+          <ArtistGridCard
+            v-else-if="type === 'artist'"
+            :artist="item"
+            @click="handleClick(item)"
+            @contextmenu="(e) => handleContextMenu(item, e)"
+          />
+          <PlaylistGridCard
+            v-else-if="type === 'playlist'"
+            :playlist="item"
+            @click="handleClick(item)"
+            @play="handlePlay(item)"
+            @contextmenu="(e) => handleContextMenu(item, e)"
+          />
+        </template>
       </div>
-      
-      <!-- Loading more indicator -->
+
+      <!-- Loading more skeleton items -->
       <div v-if="loadingMore" class="media-grid loading-more-grid" :class="`type-${type}`">
-        <GridSkeleton v-for="i in 3" :key="`loading-${i}`" :type="type" />
+        <GridSkeleton v-for="i in Math.min(6, skeletonCount)" :key="`loading-${i}`" :type="type" />
       </div>
+
+      <!-- Scroll Sentinel for IntersectionObserver -->
+      <div ref="sentinelRef" class="scroll-sentinel" />
     </template>
     
     <!-- Empty state -->
@@ -69,7 +56,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import GridSkeleton from '@/components/GridSkeleton.vue'
 import AlbumGridCard from '@/components/AlbumGridCard.vue'
 import ArtistGridCard from '@/components/ArtistGridCard.vue'
@@ -97,171 +84,25 @@ const props = defineProps({
   skeletonCount: {
     type: Number,
     default: 12
-  },
-  // Number of rows to overscan
-  overscanRows: {
-    type: Number,
-    default: 2
   }
 })
 
 const emit = defineEmits(['click', 'play', 'contextmenu'])
 
-// Constants for grid layout
-const ITEM_HEIGHT = 200 // Approximate height of grid card
-const GAP = 14
-const MIN_ITEM_WIDTH = 130
-
-// State
 const containerRef = ref(null)
-const loading = ref(true)
-const loadingMore = ref(false)
-const initialized = ref(false)
+const sentinelRef = ref(null)
+const items = ref([])
 const total = ref(0)
-const scrollTop = ref(0)
-const containerOffset = ref(Infinity) // Start with Infinity so relativeScroll = 0 until calculated
-const viewportHeight = ref(800)
-const containerWidth = ref(0)
-const loadedPages = ref(new Set())
-const pendingFetches = ref(new Set())
-const sparseItems = ref([])
-
-// Scroll container reference
+const loading = ref(false)
+const loadingMore = ref(false)
+let observer = null
 let scrollContainer = null
 
-// Calculate number of columns based on container width
-// Formula matches CSS auto-fill: N = floor((width + gap) / (minWidth + gap))
-const columns = computed(() => {
-  if (containerWidth.value === 0) return 3 // Default
-  return Math.max(3, Math.floor((containerWidth.value + GAP) / (MIN_ITEM_WIDTH + GAP)))
-})
-
-// Calculate row height (item + gap)
-const rowHeight = computed(() => ITEM_HEIGHT + GAP)
-
-// Calculate total rows
-const totalRows = computed(() => Math.ceil(total.value / columns.value))
-
-// Calculate visible row range based on scroll position relative to container
-const startRow = computed(() => {
-  const relativeScroll = Math.max(0, scrollTop.value - containerOffset.value)
-  return Math.max(0, Math.floor(relativeScroll / rowHeight.value) - props.overscanRows)
-})
-
-const endRow = computed(() => {
-  const relativeScroll = Math.max(0, scrollTop.value - containerOffset.value)
-  const visibleRows = Math.ceil(viewportHeight.value / rowHeight.value)
-  return Math.min(totalRows.value, Math.floor(relativeScroll / rowHeight.value) + visibleRows + props.overscanRows)
-})
-
-// Calculate visible item indices
-const startIndex = computed(() => startRow.value * columns.value)
-const endIndex = computed(() => Math.min(total.value, endRow.value * columns.value))
-
-// Visible items (with nulls for unloaded)
-const visibleItems = computed(() => {
-  const result = []
-  for (let i = startIndex.value; i < endIndex.value; i++) {
-    result.push(sparseItems.value[i] || null)
-  }
-  return result
-})
-
-// Padding for virtual scroll
-const paddingTop = computed(() => startRow.value * rowHeight.value)
-const paddingBottom = computed(() => Math.max(0, (totalRows.value - endRow.value) * rowHeight.value))
-
-// Total spacer height
-const spacerStyle = computed(() => ({
-  minHeight: totalRows.value * rowHeight.value + 'px'
-}))
-
-const gridStyle = computed(() => ({
-  // Grid styles are handled by .media-grid CSS
-}))
-
-// Page calculations
-const getPageForIndex = (index) => Math.floor(index / props.pageSize)
-
-// Fetch a page
-const fetchPage = async (pageNum) => {
-  if (loadedPages.value.has(pageNum) || pendingFetches.value.has(pageNum)) {
-    return
-  }
-  
-  pendingFetches.value.add(pageNum)
-  
-  try {
-    const offset = pageNum * props.pageSize
-    const result = await props.fetchFn({
-      offset,
-      limit: props.pageSize
-    })
-    
-    // Update total if changed
-    if (result.total !== total.value) {
-      total.value = result.total
-      // Resize sparse array
-      if (sparseItems.value.length !== result.total) {
-        const newArray = new Array(result.total)
-        for (let i = 0; i < Math.min(sparseItems.value.length, result.total); i++) {
-          if (sparseItems.value[i]) {
-            newArray[i] = sparseItems.value[i]
-          }
-        }
-        sparseItems.value = newArray
-      }
-    }
-    
-    // Insert items
-    const items = result.items || []
-    items.forEach((item, i) => {
-      sparseItems.value[offset + i] = item
-    })
-    
-    loadedPages.value.add(pageNum)
-    
-  } catch (err) {
-    console.error('VirtualGrid fetch error:', err)
-  } finally {
-    pendingFetches.value.delete(pageNum)
-  }
+const getKey = (item) => {
+  return item?.id ?? item?.name ?? JSON.stringify(item)
 }
 
-// Load visible pages
-const loadVisiblePages = async () => {
-  const startPage = getPageForIndex(startIndex.value)
-  const endPage = getPageForIndex(Math.max(0, endIndex.value - 1))
-  
-  const pagesToLoad = []
-  for (let page = startPage; page <= endPage; page++) {
-    if (!loadedPages.value.has(page) && !pendingFetches.value.has(page)) {
-      pagesToLoad.push(page)
-    }
-  }
-  
-  if (pagesToLoad.length > 0) {
-    loadingMore.value = true
-    await Promise.all(pagesToLoad.map(p => fetchPage(p)))
-    loadingMore.value = false
-  }
-}
-
-// Update container offset relative to scroll container
-const updateContainerOffset = () => {
-  if (containerRef.value && scrollContainer) {
-    if (scrollContainer === window) {
-      const rect = containerRef.value.getBoundingClientRect()
-      containerOffset.value = rect.top + window.scrollY
-    } else {
-      const containerRect = containerRef.value.getBoundingClientRect()
-      const scrollRect = scrollContainer.getBoundingClientRect()
-      containerOffset.value = containerRect.top - scrollRect.top + scrollContainer.scrollTop
-    }
-  }
-}
-
-// Find scroll container (parent with overflow)
+// Find scroll container
 const findScrollContainer = (el) => {
   let parent = el?.parentElement
   while (parent) {
@@ -274,69 +115,137 @@ const findScrollContainer = (el) => {
   return window
 }
 
-// Scroll handler
-let ticking = false
-const handleScroll = () => {
-  if (!ticking) {
-    requestAnimationFrame(() => {
-      if (scrollContainer) {
-        if (scrollContainer === window) {
-          scrollTop.value = window.scrollY
-          viewportHeight.value = window.innerHeight
-        } else {
-          scrollTop.value = scrollContainer.scrollTop
-          viewportHeight.value = scrollContainer.clientHeight
-        }
-        updateContainerOffset()
-        loadVisiblePages()
-      }
-      ticking = false
+// Fetch next page
+const loadMore = async () => {
+  if (loading.value || loadingMore.value) return
+  if (items.value.length >= total.value && total.value > 0) return
+
+  loadingMore.value = true
+  try {
+    const offset = items.value.length
+    const result = await props.fetchFn({
+      offset,
+      limit: props.pageSize
     })
-    ticking = true
+
+    if (result) {
+      total.value = result.total ?? (items.value.length + (result.items?.length || 0))
+      const newItems = result.items || []
+      // Deduplicate items
+      const existingIds = new Set(items.value.map(i => getKey(i)))
+      const filtered = newItems.filter(i => !existingIds.has(getKey(i)))
+      items.value.push(...filtered)
+    }
+  } catch (err) {
+    console.error('VirtualGrid loadMore error:', err)
+  } finally {
+    loadingMore.value = false
   }
 }
 
-// Setup resize observer and scroll listener
-let resizeObserver = null
+// Initial load
+const load = async () => {
+  loading.value = true
+  items.value = []
+  total.value = 0
+  try {
+    const result = await props.fetchFn({
+      offset: 0,
+      limit: props.pageSize
+    })
+    if (result) {
+      items.value = result.items || []
+      total.value = result.total ?? items.value.length
+    }
+  } catch (err) {
+    console.error('VirtualGrid initial load error:', err)
+  } finally {
+    loading.value = false
+    nextTick(() => {
+      setupObserver()
+    })
+  }
+}
+
+// Reset and reload
+const reset = async () => {
+  await load()
+}
+
+// Event handlers
+const handleClick = (item) => emit('click', item)
+const handlePlay = (item) => emit('play', item)
+const handleContextMenu = (item, event) => emit('contextmenu', { item, event })
+
+// Scroll handler fallback
+const handleScroll = () => {
+  if (loading.value || loadingMore.value) return
+  if (items.value.length >= total.value && total.value > 0) return
+
+  if (scrollContainer) {
+    let scrollBottom = 0
+    if (scrollContainer === window) {
+      scrollBottom = window.scrollY + window.innerHeight
+      const docHeight = document.documentElement.scrollHeight
+      if (docHeight - scrollBottom < 600) {
+        loadMore()
+      }
+    } else {
+      scrollBottom = scrollContainer.scrollTop + scrollContainer.clientHeight
+      const scrollHeight = scrollContainer.scrollHeight
+      if (scrollHeight - scrollBottom < 600) {
+        loadMore()
+      }
+    }
+  }
+}
+
+// Setup IntersectionObserver on sentinel
+const setupObserver = () => {
+  if (observer) {
+    observer.disconnect()
+    observer = null
+  }
+
+  if (!sentinelRef.value) return
+
+  const root = scrollContainer === window ? null : scrollContainer
+  observer = new IntersectionObserver(
+    (entries) => {
+      const entry = entries[0]
+      if (entry && entry.isIntersecting) {
+        loadMore()
+      }
+    },
+    {
+      root,
+      rootMargin: '400px',
+      threshold: 0
+    }
+  )
+
+  observer.observe(sentinelRef.value)
+}
+
+watch(sentinelRef, () => {
+  setupObserver()
+})
 
 onMounted(() => {
-  if (containerRef.value) {
-    containerWidth.value = containerRef.value.clientWidth
-    
-    // Find scroll container
-    scrollContainer = findScrollContainer(containerRef.value)
-    
-    if (scrollContainer === window) {
-      window.addEventListener('scroll', handleScroll, { passive: true })
-      viewportHeight.value = window.innerHeight
-      scrollTop.value = window.scrollY
-    } else {
-      scrollContainer.addEventListener('scroll', handleScroll, { passive: true })
-      viewportHeight.value = scrollContainer.clientHeight
-      scrollTop.value = scrollContainer.scrollTop
-    }
-    
-    resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        containerWidth.value = entry.contentRect.width
-      }
-    })
-    resizeObserver.observe(containerRef.value)
-    
-    // Calculate initial offset after next tick
-    nextTick(() => {
-      updateContainerOffset()
-      loadVisiblePages()
-    })
-    
-    // Initial load
-    load()
+  scrollContainer = findScrollContainer(containerRef.value)
+
+  if (scrollContainer === window) {
+    window.addEventListener('scroll', handleScroll, { passive: true })
+  } else if (scrollContainer) {
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true })
   }
+
+  load()
 })
 
 onUnmounted(() => {
-  if (resizeObserver) {
-    resizeObserver.disconnect()
+  if (observer) {
+    observer.disconnect()
   }
   if (scrollContainer === window) {
     window.removeEventListener('scroll', handleScroll)
@@ -345,77 +254,18 @@ onUnmounted(() => {
   }
 })
 
-// Initial load
-const load = async () => {
-  loading.value = true
-  try {
-    await fetchPage(0)
-    initialized.value = true
-    nextTick(() => {
-      updateContainerOffset()
-      loadVisiblePages()
-    })
-  } finally {
-    loading.value = false
-  }
-}
-
-// Reset
-const reset = async () => {
-  loading.value = true
-  initialized.value = false
-  loadedPages.value.clear()
-  pendingFetches.value.clear()
-  sparseItems.value = []
-  total.value = 0
-  scrollTop.value = 0
-  
-  if (scrollContainer === window) {
-    window.scrollTo(0, 0)
-  } else if (scrollContainer) {
-    scrollContainer.scrollTop = 0
-  }
-  
-  await load()
-}
-
-// Event handlers
-const handleClick = (item) => {
-  emit('click', item)
-}
-
-const handlePlay = (item) => {
-  emit('play', item)
-}
-
-const handleContextMenu = (item, event) => {
-  emit('contextmenu', { item, event })
-}
-
-// Scroll to top
-const scrollToTop = () => {
-  if (scrollContainer === window) {
-    window.scrollTo(0, 0)
-  } else if (scrollContainer) {
-    scrollContainer.scrollTop = 0
-  }
-}
-
 defineExpose({
   reset,
-  scrollToTop,
+  refresh: reset,
   total,
-  items: sparseItems
+  items
 })
 </script>
 
 <style scoped>
 .virtual-grid-container {
   position: relative;
-}
-
-.virtual-grid-spacer {
-  position: relative;
+  width: 100%;
 }
 
 .media-grid {
@@ -445,7 +295,14 @@ defineExpose({
 }
 
 .loading-more-grid {
-  margin-top: 16px;
+  margin-top: 14px;
+}
+
+.scroll-sentinel {
+  width: 100%;
+  height: 20px;
+  pointer-events: none;
+  opacity: 0;
 }
 
 .empty-state {
