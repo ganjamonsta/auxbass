@@ -648,7 +648,7 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   // ===================== PLAY SHUFFLE ALL =====================
-  const playShuffleAll = async (context, contextId = null, contextName = null) => {
+  const playShuffleAll = async (context, contextId = null, contextName = null, options = {}) => {
     if (shuffleInProgress) return
     shuffleInProgress = true
     loading.value = true
@@ -656,7 +656,12 @@ export const usePlayerStore = defineStore('player', () => {
     try {
       let response
       switch (context) {
-        case 'library':  response = await tracksApi.getAllIds({ sort_by: 'random' }); break
+        case 'library':  
+          response = await tracksApi.getAllIds({ 
+            sort_by: 'random', 
+            search: options?.search || undefined 
+          }); 
+          break
         case 'artist': {
           const name = contextName || contextId
           if (!name) throw new Error('Artist name required')
@@ -673,7 +678,12 @@ export const usePlayerStore = defineStore('player', () => {
 
       lazyShuffleIds.value = ids
       lazyShuffleIndex.value = 0
-      lazyShuffleContext.value = { type: context, id: contextId, name: context === 'artist' ? (contextName || contextId) : contextName }
+      lazyShuffleContext.value = { 
+        type: context, 
+        id: contextId, 
+        name: context === 'artist' ? (contextName || contextId) : contextName,
+        search: options?.search || null
+      }
       shuffle.value = true
       saveSettings({ shuffle: true, volume: volume.value, isMuted: isMuted.value, repeat: repeat.value })
       queue.value = []; queueIndex.value = -1; shuffleOrder.value = []; shuffleIndex.value = -1

@@ -229,12 +229,17 @@ const shuffling = ref(false)
 const tracks = ref([])
 const page = ref(1)
 const searchTotal = ref(0) // Real total from API during search
-const total = computed(() => props.searchQuery ? searchTotal.value : virtualTotal.value)
+const total = computed(() => {
+  if (props.searchQuery) {
+    return searchTotal.value || (friendsTracks.value.length + globalTracks.value.length)
+  }
+  return virtualTotal.value
+})
 const perPage = 50
 const loadTriggerRef = ref(null)
 let observer = null
 
-const hasMore = computed(() => tracks.value.length < total.value)
+const hasMore = computed(() => tracks.value.length < searchTotal.value)
 
 // Unified friends + global search (via composable)
 const {
@@ -457,7 +462,22 @@ const shuffleAll = async () => {
   if (shuffling.value) return
   shuffling.value = true
   try {
-    await playerStore.playShuffleAll('library')
+    const trimmedQuery = props.searchQuery ? props.searchQuery.trim() : ''
+    if (trimmedQuery && !searchTotal.value && (friendsTracks.value.length || globalTracks.value.length)) {
+      const allSearchTracks = [...friendsTracks.value, ...globalTracks.value]
+      if (allSearchTracks.length > 0) {
+        const shuffled = [...allSearchTracks]
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1))
+          ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+        }
+        playerStore.playTrack(shuffled[0], shuffled)
+      }
+    } else {
+      await playerStore.playShuffleAll('library', null, null, {
+        search: trimmedQuery || undefined
+      })
+    }
   } finally {
     shuffling.value = false
   }

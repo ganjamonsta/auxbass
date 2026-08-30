@@ -74,12 +74,12 @@ export function usePlaybackActions(tracksSource) {
    * @param {number|string|null} contextId - ID for playlist/album, name for artist, null for library
    * @returns {Promise<void>}
    */
-  const shufflePlayFull = async (context, contextId = null) => {
+  const shufflePlayFull = async (context, contextId = null, options = {}) => {
     if (isShuffling.value) return
     
     isShuffling.value = true
     try {
-      await playerStore.playShuffleAll(context, contextId)
+      await playerStore.playShuffleAll(context, contextId, null, options)
     } catch (error) {
       console.error(`[ShufflePlayFull] Failed to shuffle ${context}:`, error)
     } finally {

@@ -45,6 +45,7 @@ router = APIRouter(tags=["Tracks"])
 
 @router.get("/ids")
 async def get_track_ids(
+    search: Optional[str] = None,
     sort_by: str = Query("added_at", pattern="^(added_at|title|artist|duration|random)$"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     user: TelegramUser = Depends(get_current_user),
@@ -57,6 +58,7 @@ async def get_track_ids(
     Use this to build a complete shuffle queue, then load tracks on-demand.
     
     Args:
+        search: Optional search query to filter tracks
         sort_by: Sort field. Use 'random' for pre-shuffled order
         sort_order: asc or desc
     
@@ -68,6 +70,16 @@ async def get_track_ids(
         .join(UserLibrary, UserLibrary.track_id == Track.id)
         .where(UserLibrary.user_id == user.id)
     )
+    
+    # Search filter
+    if search:
+        search_term = f"%{search}%"
+        query = query.where(
+            or_(
+                Track.title.ilike(search_term),
+                Track.artist.ilike(search_term),
+            )
+        )
     
     # Sorting
     if sort_by == "random":

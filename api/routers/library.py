@@ -265,6 +265,9 @@ async def get_my_tracks(
 
 @router.get("/ids")
 async def get_all_track_ids(
+    search: Optional[str] = None,
+    artist: Optional[str] = None,
+    album_id: Optional[int] = None,
     source: Optional[str] = None,
     liked_only: bool = False,
     sort_by: str = Query("added_at", pattern="^(added_at|title|artist|duration|random)$"),
@@ -279,6 +282,9 @@ async def get_all_track_ids(
     Use this to build a complete shuffle queue, then load tracks on-demand.
     
     Args:
+        search: Filter by search query
+        artist: Filter by artist name
+        album_id: Filter by album ID
         source: Filter by library source (forwarded, search, etc.)
         liked_only: Only return liked tracks
         sort_by: Sort field. Use 'random' for pre-shuffled order
@@ -292,6 +298,24 @@ async def get_all_track_ids(
         .join(UserLibrary, UserLibrary.track_id == Track.id)
         .where(UserLibrary.user_id == user.id)
     )
+    
+    # Search filter
+    if search:
+        search_term = f"%{search}%"
+        query = query.where(
+            or_(
+                Track.title.ilike(search_term),
+                Track.artist.ilike(search_term),
+            )
+        )
+    
+    # Artist filter
+    if artist:
+        query = query.where(Track.artist.ilike(artist))
+    
+    # Album filter
+    if album_id:
+        query = query.join(AlbumTrack, AlbumTrack.track_id == Track.id).where(AlbumTrack.album_id == album_id)
     
     # Source filter
     if source:
@@ -328,7 +352,7 @@ async def get_all_track_ids(
     result = await db.execute(query)
     track_ids = result.scalars().all()
     
-    return {"ids": track_ids, "total": len(track_ids)}
+    return {"ids": list(track_ids), "total": len(track_ids)}
 
 
 @router.get("/stats", response_model=LibraryStatsResponse)
