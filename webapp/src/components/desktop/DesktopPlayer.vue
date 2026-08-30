@@ -18,6 +18,38 @@
       <span class="vol-label">VOL</span>
     </div>
 
+    <!-- Control buttons -->
+    <div class="player-controls">
+      <button 
+        class="ctrl-btn mode" 
+        :class="{ active: shuffle }" 
+        @click="playerStore.toggleShuffle()" 
+        :title="shuffle ? 'Случайно: включено' : 'Случайно: выключено'"
+      >
+        <span class="btn-icon"><Shuffle :size="14" /></span>
+      </button>
+      <button class="ctrl-btn" @click="playerStore.prev()" title="Предыдущий трек">
+        <span class="btn-icon"><SkipBack :size="14" /></span>
+      </button>
+      <button class="ctrl-btn play-btn" @click="playerStore.togglePlay()" :title="isPlaying ? 'Пауза' : 'Воспроизведение'">
+        <span class="btn-icon"><Pause v-if="isPlaying" :size="16" fill="currentColor" /><Play v-else :size="16" fill="currentColor" /></span>
+      </button>
+      <button class="ctrl-btn" @click="playerStore.next()" title="Следующий трек">
+        <span class="btn-icon"><SkipForward :size="14" /></span>
+      </button>
+      <button 
+        class="ctrl-btn mode" 
+        :class="{ active: repeat !== 'none' }" 
+        @click="playerStore.toggleRepeat()" 
+        :title="repeatTitle"
+      >
+        <span class="btn-icon">
+          <Repeat1 v-if="repeat === 'one'" :size="14" />
+          <Repeat v-else :size="14" />
+        </span>
+      </button>
+    </div>
+
     <!-- Center - LCD Display -->
     <div class="lcd-panel">
       <div class="lcd-frame">
@@ -72,25 +104,6 @@
           </div>
         </div>
       </div>
-
-      <!-- Control buttons -->
-      <div class="lcd-controls">
-        <button class="ctrl-btn mode" :class="{ active: shuffle }" @click="playerStore.toggleShuffle()" title="Shuffle">
-          <span class="btn-label">RND</span>
-        </button>
-        <button class="ctrl-btn" @click="playerStore.prev()" title="Previous">
-          <span class="btn-icon"><SkipBack :size="14" /></span>
-        </button>
-        <button class="ctrl-btn play-btn" @click="playerStore.togglePlay()" :title="isPlaying ? 'Pause' : 'Play'">
-          <span class="btn-icon"><Pause v-if="isPlaying" :size="16" fill="currentColor" /><Play v-else :size="16" fill="currentColor" /></span>
-        </button>
-        <button class="ctrl-btn" @click="playerStore.next()" title="Next">
-          <span class="btn-icon"><SkipForward :size="14" /></span>
-        </button>
-        <button class="ctrl-btn mode" :class="{ active: repeat !== 'none' }" @click="playerStore.toggleRepeat()" title="Repeat">
-          <span class="btn-label">{{ repeat === 'one' ? 'RPT1' : 'RPT' }}</span>
-        </button>
-      </div>
     </div>
 
     <!-- Right side - Cover & controls -->
@@ -136,7 +149,7 @@ import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { getCoverUrl, CoverSize } from '@/utils'
-import { Play, Square, Pause, Volume2, VolumeX, SkipBack, SkipForward } from 'lucide-vue-next'
+import { Play, Square, Pause, Volume2, VolumeX, SkipBack, SkipForward, Shuffle, Repeat, Repeat1 } from 'lucide-vue-next'
 import { useNetworkMonitor } from '@/composables/useNetworkMonitor'
 
 const playerStore = usePlayerStore()
@@ -156,6 +169,12 @@ const volume = computed(() => playerStore.volume)
 const isMuted = computed(() => playerStore.isMuted)
 const shuffle = computed(() => playerStore.shuffle)
 const repeat = computed(() => playerStore.repeat)
+
+const repeatTitle = computed(() => {
+  if (repeat.value === 'one') return 'Повтор одного трека'
+  if (repeat.value === 'all') return 'Повтор всех треков'
+  return 'Повтор выключен'
+})
 
 const isLiked = computed(() => {
   if (!track.value?.id) return false
@@ -644,6 +663,7 @@ onUnmounted(() => {
 }
 
 /* Control Buttons */
+.player-controls,
 .lcd-controls {
   display: flex;
   align-items: center;
@@ -664,6 +684,9 @@ onUnmounted(() => {
   box-shadow: 
     2px 2px 5px rgba(0, 0, 0, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .ctrl-btn:hover {
@@ -683,8 +706,7 @@ onUnmounted(() => {
 }
 
 .ctrl-btn.mode {
-  font-size: 9px;
-  padding: 8px 6px;
+  padding: 8px 10px;
 }
 
 .ctrl-btn.mode.active {
@@ -694,6 +716,12 @@ onUnmounted(() => {
   box-shadow: 
     2px 2px 5px rgba(0, 0, 0, 0.5),
     0 0 10px rgba(77, 195, 255, 0.3);
+}
+
+.btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-label {
