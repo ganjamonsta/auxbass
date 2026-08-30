@@ -90,7 +90,7 @@
         <span class="user-name">{{ userName }}</span>
       </div>
       <button 
-        v-if="!pwaInstall.isInstalled.value" 
+        v-if="!pwaInstall.isInstalled" 
         class="footer-btn install-btn" 
         @click="pwaInstall.promptInstall()" 
         title="Установить приложение"

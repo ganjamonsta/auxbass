@@ -245,7 +245,7 @@
     <section class="section pwa-section">
       <h2><Smartphone :size="20" /> Приложение</h2>
       
-      <div v-if="pwaInstall.isInstalled.value" class="pwa-status-installed">
+      <div v-if="pwaInstall.isInstalled" class="pwa-status-installed">
         <div class="pwa-status-icon"><Check :size="20" /></div>
         <div class="pwa-status-text">
           <span class="pwa-status-title">Приложение установлено</span>
@@ -260,7 +260,7 @@
         </div>
         <button class="pwa-section-install-btn" @click="handleInstallClick">
           <Download :size="16" />
-          <span>{{ pwaInstall.isIOS.value ? 'Как установить' : 'Установить' }}</span>
+          <span>{{ pwaInstall.isIOS ? 'Как установить' : 'Установить' }}</span>
         </button>
       </div>
     </section>
@@ -289,6 +289,8 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { usePlayerStore } from '@/stores/player'
+import api, { authApi } from '@/api/client'
 import { Megaphone, Check, Folder, Heart, ListMusic, Cloud, RefreshCw, Lock, User, Bell, Sliders, Headphones, Smartphone, Download } from 'lucide-vue-next'
 import SettingsSkeleton from '@/components/SettingsSkeleton.vue'
 import { usePwaInstall } from '@/composables/usePwaInstall'
