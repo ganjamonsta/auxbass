@@ -16,21 +16,23 @@ git config --global init.defaultBranch main 2>/dev/null || true
 DEFAULT_REPO="https://github.com/ganjamonsta/auxbass.git"
 REPO_URL="${GIT_ADDRESS:-$DEFAULT_REPO}"
 
+echo "📦 [1/3] Проверка обновлений Git ($REPO_URL)..."
 if [ ! -d ".git" ]; then
-    echo "📦 [1/3] Инициализируем подключение к репозиторию ($REPO_URL)..."
     git init
-    git remote add origin "$REPO_URL" 2>/dev/null || git remote set-url origin "$REPO_URL"
-    echo "⬇️ Скачиваем свежий код из репозитория..."
-    git fetch origin main
-    git reset --hard origin/main
-    git branch -M main
-else
-    echo "📦 [1/3] Проверка обновлений Git..."
-    git fetch origin main 2>/dev/null || git fetch origin master 2>/dev/null || git fetch origin 2>/dev/null || true
-    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
-    echo "⬇️ Обновляем ветку $CURRENT_BRANCH..."
-    git reset --hard "origin/$CURRENT_BRANCH" 2>/dev/null || git pull origin "$CURRENT_BRANCH" 2>/dev/null || true
 fi
+
+git remote add origin "$REPO_URL" 2>/dev/null || git remote set-url origin "$REPO_URL" || true
+echo "⬇️ Подтягиваем свежий код из репозитория..."
+git fetch origin main || git fetch origin master || git fetch origin || true
+
+BRANCH="main"
+if git show-ref --verify --quiet refs/remotes/origin/main; then
+    BRANCH="main"
+elif git show-ref --verify --quiet refs/remotes/origin/master; then
+    BRANCH="master"
+fi
+
+git checkout -B "$BRANCH" "origin/$BRANCH" 2>/dev/null || git reset --hard "origin/$BRANCH" 2>/dev/null || git pull origin "$BRANCH" 2>/dev/null || true
 
 # 2. Update Python dependencies
 if [ -f "requirements.txt" ]; then
