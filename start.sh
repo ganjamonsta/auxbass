@@ -54,12 +54,29 @@ if [ -f "requirements.txt" ]; then
     pip install --no-cache-dir -r requirements.txt || pip install -r requirements.txt || true
 fi
 
-# 3. Build WebApp if Node.js / npm is installed and dist is missing
-if command -v npm &> /dev/null && [ -d "webapp" ]; then
+# 3. Build WebApp if needed
+if [ -d "webapp" ]; then
     echo "🌐 [3/3] Проверка сборки WebApp..."
-    if [ ! -d "webapp/dist" ]; then
-        echo "🔨 Собираем фронтенд WebApp..."
-        (cd webapp && npm install && npm run build) || true
+    
+    # If npm is missing and dist is missing, install portable Node.js
+    if ! command -v npm &> /dev/null && [ ! -d "webapp/dist" ]; then
+        echo "📦 Установка портативного Node.js (v20)..."
+        mkdir -p "$HOME/.local"
+        curl -fsSL https://nodejs.org/dist/v20.18.0/node-v20.18.0-linux-x64.tar.xz | tar -xJ -C "$HOME/.local" 2>/dev/null || true
+        if [ -d "$HOME/.local/node-v20.18.0-linux-x64" ]; then
+            rm -rf "$HOME/.local/node" 2>/dev/null || true
+            mv "$HOME/.local/node-v20.18.0-linux-x64" "$HOME/.local/node"
+        fi
+        if [ -d "$HOME/.local/node/bin" ]; then
+            export PATH="$HOME/.local/node/bin:$PATH"
+        fi
+    fi
+
+    if [ ! -d "webapp/dist" ] || [ ! -f "webapp/dist/index.html" ]; then
+        if command -v npm &> /dev/null; then
+            echo "🔨 Собираем фронтенд WebApp..."
+            (cd webapp && npm install && npm run build) || true
+        fi
     fi
 fi
 
