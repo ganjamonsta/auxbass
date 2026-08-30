@@ -334,14 +334,14 @@ async def get_telegram_file_path(file_id: str) -> Optional[str]:
     try:
         async with session.get(api_url, params={"file_id": file_id}) as resp:
             if resp.status != 200:
-                logger.error(f"Telegram getFile failed: status={resp.status}, file_id={file_id[:20]}...")
+                logger.debug(f"Telegram getFile returned status={resp.status} for file_id={file_id[:20]}... (will refresh from channel)")
                 return None
             
             data = await resp.json()
             
             if not data.get("ok"):
                 error_desc = data.get("description", "Unknown error")
-                logger.error(f"Telegram getFile error: {error_desc}, file_id={file_id[:20]}...")
+                logger.debug(f"Telegram getFile error: {error_desc}, file_id={file_id[:20]}...")
                 return None
             
             file_path = data.get("result", {}).get("file_path")
