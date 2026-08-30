@@ -18,7 +18,7 @@ elif os.path.exists(".env"):
 
 # Set dummy token if not configured (for cleanup script only)
 if not os.getenv("BOT_TOKEN"):
-    os.environ["BOT_TOKEN"] = "1234567890:ABCdefGHIjklmNOpqrsTUVwxyz"
+    os.environ["BOT_TOKEN"] = "dummy_token_for_script"
 
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
