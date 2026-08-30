@@ -1,77 +1,61 @@
 """
-TG Player Bot - Audio Handler v2
+TG Player Bot - Clean Audio & Document Handler
 
-Handles audio file uploads and forwards.
-Uses new modular service architecture.
+Handles:
+- Single audio file upload
+- Batch / Album audio upload with debouncing
+- Audio sent as Document (FLAC, WAV, MP3 etc.)
+- Telegram Desktop JSON export import (result.json)
 """
+import io
+import json
+import logging
+import asyncio
+from typing import Dict, Any, Optional
+from datetime import datetime
+
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, Document, Audio
+from sqlalchemy import select
 
 from shared.config import get_settings
 from shared.database import get_session
-from shared.models import User, Track, LibrarySource, ForwardSourceType, UserChannel
+from shared.models import User, LibrarySource, ForwardSourceType
 from shared.utils import format_duration
 
 from bot.services import track_service, channel_service
-from bot.services.deduplication import (
-    deduplication_service, 
-    get_approx_bitrate, 
-    get_approx_bitrate_raw,
-    is_hd_quality_raw,
-    is_hd_version,
-)
-from bot.services.session import session_manager
-from bot.handlers.keyboards import (
-    get_track_keyboard,
-    get_playlist_mode_keyboard,
-    get_duplicate_keyboard,
-    get_upload_duplicate_keyboard,
-)
-
+from bot.services.importer import channel_importer
+from bot.handlers.menu_keyboards import get_webapp_keyboard, get_track_keyboard
 
 router = Router()
 settings = get_settings()
+logger = logging.getLogger(__name__)
+
+# User batch tracking for debounced multi-file uploads: user_id -> BatchTracker
+_batch_lock = asyncio.Lock()
+_user_batches: Dict[int, dict] = {}
 
 
 def extract_forward_info(message: Message) -> dict:
-    """
-    Extract forward source information from a message.
-    
-    Returns:
-        Dict with source_type, source_id, source_name
-    """
+    """Extract forward source information from a message."""
     info = {
         "source_type": None,
         "source_id": None,
         "source_name": None,
     }
-    
-    # Check for forwarded from user/bot
     if message.forward_from:
-        user = message.forward_from
-        info["source_type"] = ForwardSourceType.BOT if user.is_bot else ForwardSourceType.USER
-        info["source_id"] = user.id
-        info["source_name"] = (
-            f"{user.first_name or ''} {user.last_name or ''}".strip() 
-            or user.username 
-            or str(user.id)
-        )
-    
-    # Check for forwarded from channel/chat
+        u = message.forward_from
+        info["source_type"] = ForwardSourceType.BOT if u.is_bot else ForwardSourceType.USER
+        info["source_id"] = u.id
+        info["source_name"] = (f"{u.first_name or ''} {u.last_name or ''}".strip() or u.username or str(u.id))
     elif message.forward_from_chat:
         chat = message.forward_from_chat
-        if chat.type == "channel":
-            info["source_type"] = ForwardSourceType.CHANNEL
-        else:
-            info["source_type"] = ForwardSourceType.SUPERGROUP
+        info["source_type"] = ForwardSourceType.CHANNEL if chat.type == "channel" else ForwardSourceType.SUPERGROUP
         info["source_id"] = chat.id
         info["source_name"] = chat.title or chat.username or str(chat.id)
-    
-    # Hidden forward (privacy settings)
     elif message.forward_sender_name:
         info["source_type"] = ForwardSourceType.HIDDEN
         info["source_name"] = message.forward_sender_name
-    
     return info
 
 
@@ -82,371 +66,252 @@ def get_library_source(message: Message) -> LibrarySource:
     return LibrarySource.UPLOADED
 
 
-@router.message(F.audio)
-async def handle_audio(message: Message):
-    """
-    Handle incoming audio files.
+# ───────────────────── JSON Export Import ─────────────────────
+
+@router.message(F.document, F.document.file_name.lower().endswith(".json"))
+async def handle_json_document(message: Message):
+    """Handle Telegram Desktop export JSON upload"""
+    doc: Document = message.document
+    if doc.file_size and doc.file_size > 50 * 1024 * 1024:
+        await message.reply("❌ Файл слишком большой (максимум 50 MB).")
+        return
+
+    status_msg = await message.reply("⏳ Загружаю и анализирую файл экспорта...")
     
-    Flow:
-    1. Check if user has connected channel (required for saving)
-    2. Save track using track_service (handles deduplication)
-    3. If new track: schedule enrichment
-    4. If user has channel: forward to channel
-    5. Show result to user
-    """
-    audio = message.audio
-    user = message.from_user
-    user_id = user.id
-    
-    # Determine library source from message
-    forward_info = extract_forward_info(message)
-    library_source = get_library_source(message)
-    
-    # Metadata for processing
-    title = audio.title
-    artist = audio.performer
-    duration = audio.duration
-    file_size = audio.file_size
-    file_name = audio.file_name  # Original filename for fallback display
-    
-    # Check if in playlist creation mode
-    playlist_session = session_manager.get_playlist_session(user_id)
-    
-    async with get_session() as session:
-        # Ensure user exists
-        db_user = await session.get(User, user_id)
-        if not db_user:
-            db_user = User(
-                id=user_id,
-                username=user.username,
-                first_name=user.first_name,
-                last_name=user.last_name,
-            )
-            session.add(db_user)
-            await session.flush()
-    
-    # Check for potential duplicates BEFORE saving (by artist/title, not file_unique_id)
-    potential_duplicates = await deduplication_service.find_potential_duplicates(
-        user_id=user_id,
-        artist=artist,
-        title=title,
-        file_unique_id=audio.file_unique_id,
-    )
-    
-    if potential_duplicates and not playlist_session:
-        # Check quality: if uploading HD and library has only regular - auto save
-        upload_is_hd = is_hd_quality_raw(duration, file_size, audio.mime_type)
-        upload_bitrate = get_approx_bitrate_raw(duration, file_size)
-        
-        # Check if all duplicates are lower quality
-        all_duplicates_lower_quality = False
-        if upload_is_hd:
-            # HD upload - check if all existing are regular quality
-            all_duplicates_lower_quality = all(not is_hd_version(dup) for dup in potential_duplicates)
-        elif upload_bitrate:
-            # Regular upload - check if we're uploading significantly better quality
-            all_duplicates_lower_quality = all(
-                (br := get_approx_bitrate(dup)) is not None and upload_bitrate > br * 1.4
-                for dup in potential_duplicates
-            )
-        
-        if all_duplicates_lower_quality:
-            # Uploading better quality version - save without asking
-            pass  # Continue to normal save flow below
-        else:
-            # Same or lower quality - ask user
-            display_title = title or (file_name.rsplit('.', 1)[0] if file_name else "Без названия")
-            
-            # Show what we're uploading
-            upload_meta = []
-            if duration:
-                m, s = divmod(duration, 60)
-                upload_meta.append(f"{m}:{s:02d}")
-            if file_size:
-                upload_meta.append(f"{file_size / (1024*1024):.1f}MB")
-            if upload_bitrate:
-                upload_meta.append(f"~{int(upload_bitrate)}kbps")
-            upload_meta_str = " • ".join(upload_meta) if upload_meta else ""
-            
-            # Format duplicate info
-            dup_list = []
-            for idx, dup in enumerate(potential_duplicates[:3]):
-                dup_meta = []
-                if dup.duration:
-                    m, s = divmod(dup.duration, 60)
-                    dup_meta.append(f"{m}:{s:02d}")
-                if dup.file_size:
-                    dup_meta.append(f"{dup.file_size / (1024*1024):.1f}MB")
-                bitrate = get_approx_bitrate(dup)
-                if bitrate:
-                    dup_meta.append(f"~{int(bitrate)}kbps")
-                
-                meta_str = " • ".join(dup_meta) if dup_meta else ""
-                dup_list.append(
-                    f"<b>#{idx+1}</b>: {dup.artist or 'Неизвестный'} - {dup.title or 'Без названия'}\n"
-                    f"   └ {meta_str}"
+    try:
+        file_io = io.BytesIO()
+        await message.bot.download(doc.file_id, destination=file_io)
+        file_bytes = file_io.getvalue()
+        json_data = json.loads(file_bytes.decode("utf-8", errors="ignore"))
+    except Exception as e:
+        logger.error(f"Failed to parse JSON export: {e}")
+        await status_msg.edit_text("❌ Не удалось прочитать JSON файл. Убедитесь, что это корректный файл экспорта.")
+        return
+
+    if not isinstance(json_data, dict) or "messages" not in json_data:
+        await status_msg.edit_text(
+            "❌ Файл не похож на экспорт чата Telegram Desktop.\n\n"
+            "Экспортируйте историю канала через Telegram Desktop (меню ⋮ -> Экспорт истории чата -> формат JSON)."
+        )
+        return
+
+    last_update_time = 0
+
+    async def on_progress(current: int, total: int, current_track: str):
+        nonlocal last_update_time
+        now = asyncio.get_event_loop().time()
+        if now - last_update_time >= 1.5 or current == total:
+            last_update_time = now
+            pct = int((current / total) * 100) if total else 0
+            try:
+                await status_msg.edit_text(
+                    f"📥 <b>Импорт музыки из экспорта... ({pct}%)</b>\n\n"
+                    f"Обработано: <b>{current}</b> из <b>{total}</b>\n"
+                    f"🎵 <i>{current_track[:40]}</i>"
                 )
-            
-            dup_text = "\n".join(dup_list)
-            
-            # Store pending upload data in session
-            session_manager.set_pending_upload(user_id, {
-                "file_id": audio.file_id,
-                "file_unique_id": audio.file_unique_id,
-                "title": title,
-                "artist": artist,
-                "duration": duration,
-                "file_size": file_size,
-                "mime_type": audio.mime_type,
-                "file_name": file_name,
-                "library_source": library_source.value if library_source else None,
-                "forward_info": forward_info,
-            })
-            
-            await message.reply(
-                f"⚠️ <b>Возможный дубликат!</b>\n\n"
-                f"🎵 Вы загружаете: <b>{display_title}</b>\n"
-                f"   └ {upload_meta_str}\n"
-                f"👤 {artist or 'Неизвестный исполнитель'}\n\n"
-                f"📚 Похожие треки в библиотеке:\n{dup_text}\n\n"
-                f"<i>Можете прослушать и сравнить перед сохранением</i>",
-                reply_markup=get_upload_duplicate_keyboard(audio.file_unique_id, potential_duplicates),
-                parse_mode="HTML"
-            )
-            return
-    
-    # Save track using service
-    result = await track_service.save_track(
+            except Exception:
+                pass
+
+    res = await channel_importer.import_from_json(
+        user_id=message.from_user.id,
+        json_data=json_data,
+        bot=message.bot,
+        progress_callback=on_progress,
+    )
+
+    if not res.get("success"):
+        await status_msg.edit_text(f"❌ Ошибка импорта:\n{res.get('error', 'Неизвестная ошибка')}")
+        return
+
+    total = res["total"]
+    imported = res["imported"]
+    skipped = res["skipped"]
+
+    await status_msg.edit_text(
+        f"🎉 <b>Импорт успешно завершён!</b>\n\n"
+        f"✅ Добавлено новых треков: <b>{imported}</b>\n"
+        f"⏭ Уже было в библиотеке: <b>{skipped}</b>\n"
+        f"📊 Всего в файле: <b>{total}</b>\n\n"
+        "Обложки и метаданные подтягиваются в фоновом режиме.",
+        reply_markup=get_webapp_keyboard(),
+    )
+
+
+# ───────────────────── Audio Batch Processing ─────────────────────
+
+async def _save_audio_item(
+    user_id: int,
+    audio_obj: Audio | Document,
+    forward_info: dict,
+    library_source: LibrarySource,
+    bot,
+) -> tuple[int, bool, str, str]:
+    """Helper to save a single track and return (track_id, is_new, title, artist)"""
+    title = getattr(audio_obj, "title", None)
+    artist = getattr(audio_obj, "performer", None)
+    duration = getattr(audio_obj, "duration", None)
+    file_size = getattr(audio_obj, "file_size", None)
+    file_name = getattr(audio_obj, "file_name", None)
+    mime_type = getattr(audio_obj, "mime_type", None)
+
+    # Save to library
+    res = await track_service.save_track(
         user_id=user_id,
-        file_id=audio.file_id,
-        file_unique_id=audio.file_unique_id,
+        file_id=audio_obj.file_id,
+        file_unique_id=audio_obj.file_unique_id,
         title=title,
         artist=artist,
         duration=duration,
         file_size=file_size,
-        mime_type=audio.mime_type,
+        mime_type=mime_type,
         file_name=file_name,
         library_source=library_source,
         forward_source_type=forward_info["source_type"],
         forward_source_id=forward_info["source_id"],
         forward_source_name=forward_info["source_name"],
-        enrich=True,  # Auto-schedule enrichment
+        enrich=True,
     )
-    
-    track_id = result.track_id
-    is_new = result.is_new
-    
-    # Check if user has backup channel, queue track for forwarding
-    channel_queued = False
+
+    # Forward to channel in background if configured
     try:
-        channel_queued = await channel_service.forward_track_to_channel(
+        await channel_service.forward_track_to_channel(
             user_id=user_id,
-            track_id=track_id,
-            bot=message.bot,
+            track_id=res.track_id,
+            bot=bot,
         )
-    except Exception as e:
+    except Exception:
         pass
+
+    display_title = title or (file_name.rsplit(".", 1)[0] if file_name else "Без названия")
+    display_artist = artist or "Неизвестный исполнитель"
+    return res.track_id, res.is_new, display_title, display_artist
+
+
+async def _batch_timer_worker(user_id: int, bot):
+    """Wait for debounce timeout and send consolidated batch confirmation"""
+    await asyncio.sleep(1.8)
     
-    # Channel backup note - now shows queued status
-    channel_note = ""
-    if channel_queued:
-        queue_size = channel_service.get_queue_size(user_id)
-        if queue_size > 1:
-            channel_note = f"\n☁️ <i>В очереди на бекап ({queue_size})</i>"
-        else:
-            channel_note = "\n☁️ <i>Сохраняется в ваш канал...</i>"
-    else:
-        channel_note = "\n⚠️ <i>Канал не подключен. Используйте /channel, чтобы не потерять библиотеку в случае блокировки бота.</i>"
-    
-    # Build response
-    duration_str = format_duration(duration) if duration else ""
-    size_mb = (file_size or 0) / (1024 * 1024)
-    
-    # Get display title - prefer title, fallback to filename
-    def get_display_title():
-        if title:
-            return title
-        if file_name:
-            import os
-            return os.path.splitext(file_name)[0].strip() or "Без названия"
-        return "Без названия"
-    
-    display_title = get_display_title()
-    
-    # Source info
-    source_note = ""
-    if forward_info["source_type"] and forward_info["source_type"] != ForwardSourceType.HIDDEN:
-        source_emoji = {
-            ForwardSourceType.BOT: "🤖",
-            ForwardSourceType.USER: "👤",
-            ForwardSourceType.CHANNEL: "📢",
-            ForwardSourceType.SUPERGROUP: "👥",
-        }.get(forward_info["source_type"], "📁")
-        source_note = f"\n{source_emoji} Источник: <b>{forward_info['source_name']}</b>"
-    
-    # Status
-    if not is_new:
-        # Track already existed
-        if playlist_session:
-            await message.reply(
-                f"⚠️ Трек уже в твоей библиотеке!\n\n"
-                f"🎵 <b>{display_title}</b>\n"
-                f"👤 {artist or 'Неизвестный исполнитель'}\n\n"
-                f"Добавить в плейлист «{playlist_session.name}»?",
-                reply_markup=get_duplicate_keyboard(track_id)
-            )
-        else:
-            await message.reply(
-                "⚠️ Этот трек уже есть в твоей библиотеке!\n\n"
-                f"🎵 <b>{display_title}</b>\n"
-                f"👤 {artist or 'Неизвестный исполнитель'}{channel_note}",
-                reply_markup=get_track_keyboard(track_id)
-            )
+    async with _batch_lock:
+        batch = _user_batches.pop(user_id, None)
+
+    if not batch:
         return
-    
-    # New track added
-    if playlist_session:
-        playlist_session.add_track(track_id)
-        await message.reply(
-            f"✅ Трек добавлен в плейлист «{playlist_session.name}»!\n\n"
-            f"🎵 <b>{display_title}</b>\n"
-            f"👤 {artist or 'Неизвестный исполнитель'}\n"
-            f"⏱ {duration_str}{source_note}\n\n"
-            f"📊 Всего в плейлисте: <b>{playlist_session.track_count}</b> треков",
-            reply_markup=get_playlist_mode_keyboard(playlist_session.track_count)
+
+    count = batch["count"]
+    target_msg: Message = batch["target_msg"]
+    first_title = batch.get("first_title", "")
+    first_artist = batch.get("first_artist", "")
+    new_count = batch["new_count"]
+
+    if count == 1:
+        # Single track response
+        dur_str = format_duration(batch.get("duration", 0))
+        size_mb = (batch.get("file_size", 0) or 0) / (1024 * 1024)
+        meta_sub = f"⏱ {dur_str} • {size_mb:.1f} MB" if dur_str else f"{size_mb:.1f} MB"
+
+        await target_msg.reply(
+            f"🎵 <b>{first_artist}</b> — <b>{first_title}</b>\n"
+            f"└ {meta_sub}\n\n"
+            f"✅ Добавлено в медиатеку",
+            reply_markup=get_track_keyboard(batch.get("first_track_id")),
         )
     else:
-        await message.reply(
-            f"✅ <b>Трек добавлен в библиотеку!</b>\n\n"
-            f"🎵 <b>{display_title}</b>\n"
-            f"👤 {artist or 'Неизвестный исполнитель'}\n"
-            f"⏱ {duration_str} • {size_mb:.1f} MB{source_note}{channel_note}\n\n"
-            f"🔄 <i>Метаданные загружаются...</i>",
-            reply_markup=get_track_keyboard(track_id)
+        # Batch response
+        await target_msg.reply(
+            f"✅ <b>Добавлено {count} треков в библиотеку!</b>\n\n"
+            f"🎵 Новых: <b>{new_count}</b> (дубликатов пропущено: <b>{count - new_count}</b>)\n"
+            f"✨ Метаданные и обложки обновляются в фоне.",
+            reply_markup=get_webapp_keyboard(),
         )
 
 
-# ========== Upload Duplicate Callbacks ==========
+# ───────────────────── Audio Handlers ─────────────────────
 
-@router.callback_query(F.data.startswith("upload_dup:"))
-async def handle_upload_dup_callback(callback: CallbackQuery):
-    """Handle upload duplicate confirmation callbacks"""
-    user_id = callback.from_user.id
-    action = callback.data.split(":")[1]
-    
-    if action == "listen":
-        # Listen to existing track for comparison
-        track_id = int(callback.data.split(":")[2])
-        async with get_session() as session:
-            track = await session.get(Track, track_id)
-            if track:
-                await callback.message.reply_audio(
-                    track.file_id,
-                    caption=f"🎧 Существующий трек:\n{track.artist or 'Неизвестный'} - {track.title or 'Без названия'}"
-                )
-        await callback.answer()
-    
-    elif action == "save":
-        # User confirmed - save the track anyway
-        pending = session_manager.get_pending_upload(user_id)
-        
-        # If pending data expired, try to recover from original message
-        if not pending:
-            # Get original audio message (reply_to_message of bot's duplicate warning)
-            original_message = callback.message.reply_to_message
-            if original_message and original_message.audio:
-                audio = original_message.audio
-                # Reconstruct pending data from original message
-                pending = {
-                    "file_id": audio.file_id,
-                    "file_unique_id": audio.file_unique_id,
-                    "title": audio.title,
-                    "artist": audio.performer,
-                    "duration": audio.duration,
-                    "file_size": audio.file_size,
-                    "file_name": audio.file_name,
-                    "library_source": get_library_source(original_message).value,
-                    "forward_info": extract_forward_info(original_message),
-                }
-            else:
-                await callback.answer("Загрузка устарела, отправьте трек ещё раз", show_alert=True)
-                return
-        
-        # Parse library source back from string
-        lib_source = LibrarySource.UPLOADED
-        if pending.get("library_source"):
-            try:
-                lib_source = LibrarySource(pending["library_source"])
-            except ValueError:
-                pass
-        
-        forward_info = pending.get("forward_info", {})
-        
-        # Save the track
-        result = await track_service.save_track(
-            user_id=user_id,
-            file_id=pending["file_id"],
-            file_unique_id=pending["file_unique_id"],
-            title=pending.get("title"),
-            artist=pending.get("artist"),
-            duration=pending.get("duration"),
-            file_size=pending.get("file_size"),
-            mime_type=pending.get("mime_type"),
-            file_name=pending.get("file_name"),
-            library_source=lib_source,
-            forward_source_type=forward_info.get("source_type"),
-            forward_source_id=forward_info.get("source_id"),
-            forward_source_name=forward_info.get("source_name"),
-            enrich=True,
-        )
-        
-        session_manager.clear_pending_upload(user_id)
-        
-        # Queue for channel backup
-        try:
-            await channel_service.forward_track_to_channel(
-                user_id=user_id,
-                track_id=result.track_id,
-                bot=callback.bot,
-            )
-        except Exception:
-            pass
-        
-        display_title = pending.get("title") or "Без названия"
-        
-        await callback.message.edit_text(
-            f"✅ <b>Трек сохранён!</b>\n\n"
-            f"🎵 <b>{display_title}</b>\n"
-            f"👤 {pending.get('artist') or 'Неизвестный исполнитель'}\n\n"
-            f"🔄 <i>Метаданные загружаются...</i>",
-            reply_markup=get_track_keyboard(result.track_id)
-        )
-        await callback.answer("Трек сохранён!")
-    
-    elif action == "cancel":
-        # User cancelled upload
-        session_manager.clear_pending_upload(user_id)
-        await callback.message.edit_text("❌ Загрузка отменена.")
-        await callback.answer()
+@router.message(F.audio)
+async def handle_audio(message: Message):
+    """Handle regular audio messages (single or batches)"""
+    user_id = message.from_user.id
+    audio = message.audio
 
+    forward_info = extract_forward_info(message)
+    lib_source = get_library_source(message)
 
-@router.message(F.voice)
-async def handle_voice(message: Message):
-    """Handle voice messages - inform user"""
-    await message.reply(
-        "🎤 Голосовые сообщения не поддерживаются.\n"
-        "Отправь аудиофайл (MP3, FLAC и др.)"
+    track_id, is_new, display_title, display_artist = await _save_audio_item(
+        user_id=user_id,
+        audio_obj=audio,
+        forward_info=forward_info,
+        library_source=lib_source,
+        bot=message.bot,
     )
+
+    async with _batch_lock:
+        if user_id not in _user_batches:
+            _user_batches[user_id] = {
+                "count": 1,
+                "new_count": 1 if is_new else 0,
+                "target_msg": message,
+                "first_track_id": track_id,
+                "first_title": display_title,
+                "first_artist": display_artist,
+                "duration": audio.duration,
+                "file_size": audio.file_size,
+                "task": asyncio.create_task(_batch_timer_worker(user_id, message.bot)),
+            }
+        else:
+            b = _user_batches[user_id]
+            b["count"] += 1
+            if is_new:
+                b["new_count"] += 1
+            b["target_msg"] = message
+            b["task"].cancel()
+            b["task"] = asyncio.create_task(_batch_timer_worker(user_id, message.bot))
 
 
 @router.message(F.document)
-async def handle_document(message: Message):
-    """Handle documents - check if audio"""
-    doc = message.document
-    
-    if doc.mime_type and doc.mime_type.startswith("audio/"):
-        await message.reply(
-            "💡 Отправь этот файл как <b>аудио</b>, а не как документ.\n\n"
-            "Для этого при отправке выбери 'Отправить как музыку' или "
-            "используй скрепку → Музыка."
-        )
+async def handle_audio_document(message: Message):
+    """Handle audio sent as file/document (e.g. uncompressed FLAC/WAV/MP3)"""
+    doc: Document = message.document
+    fn = (doc.file_name or "").lower()
+    mime = (doc.mime_type or "").lower()
+
+    is_audio_file = (
+        mime.startswith("audio/")
+        or fn.endswith((".mp3", ".flac", ".m4a", ".ogg", ".opus", ".wav", ".aac", ".alac"))
+    )
+
+    if not is_audio_file:
+        return  # Ignore non-audio documents (JSON handled above)
+
+    user_id = message.from_user.id
+    forward_info = extract_forward_info(message)
+    lib_source = get_library_source(message)
+
+    track_id, is_new, display_title, display_artist = await _save_audio_item(
+        user_id=user_id,
+        audio_obj=doc,
+        forward_info=forward_info,
+        library_source=lib_source,
+        bot=message.bot,
+    )
+
+    async with _batch_lock:
+        if user_id not in _user_batches:
+            _user_batches[user_id] = {
+                "count": 1,
+                "new_count": 1 if is_new else 0,
+                "target_msg": message,
+                "first_track_id": track_id,
+                "first_title": display_title,
+                "first_artist": display_artist,
+                "duration": 0,
+                "file_size": doc.file_size,
+                "task": asyncio.create_task(_batch_timer_worker(user_id, message.bot)),
+            }
+        else:
+            b = _user_batches[user_id]
+            b["count"] += 1
+            if is_new:
+                b["new_count"] += 1
+            b["target_msg"] = message
+            b["task"].cancel()
+            b["task"] = asyncio.create_task(_batch_timer_worker(user_id, message.bot))

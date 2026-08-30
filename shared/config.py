@@ -46,8 +46,9 @@ class Settings(BaseSettings):
     scanner_buffer_chat_id: int = 0
     
     class Config:
-        env_file = ".env"
+        env_file = (".env", ".env.local")
         env_file_encoding = "utf-8"
+        extra = "ignore"
 
 
 @lru_cache

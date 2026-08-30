@@ -14,6 +14,7 @@ from .channels import (
 )
 from .albums import album_service, AlbumService
 from .deduplication import deduplication_service, DeduplicationService
+from .importer import channel_importer, ChannelImporter
 
 __all__ = [
     'enrichment_worker',
@@ -28,4 +29,7 @@ __all__ = [
     'AlbumService',
     'deduplication_service',
     'DeduplicationService',
+    'channel_importer',
+    'ChannelImporter',
 ]
+
