@@ -233,10 +233,21 @@ async def health():
 @app.get("/{full_path:path}")
 async def spa_fallback(full_path: str):
     """Serve index.html for all non-API routes (SPA client-side routing)"""
+    from fastapi import HTTPException
+    
     # Don't serve index.html for API routes
     if full_path.startswith("api/"):
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="API endpoint not found")
+    
+    # Immediately reject scanner probes for PHP, CGI, config files, etc.
+    lower_path = full_path.lower()
+    blocked_patterns = (
+        ".php", ".env", ".git", ".asp", ".aspx", ".jsp", ".action",
+        "wp-admin", "wp-login", "wp-content", "xmlrpc", "phpunit",
+        "actuator", "config.json", "setup.cgi"
+    )
+    if any(pattern in lower_path for pattern in blocked_patterns):
+        raise HTTPException(status_code=404, detail="Not found")
     
     index_path = WEBAPP_DIST / "index.html"
     if index_path.exists():
