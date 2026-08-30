@@ -14,9 +14,15 @@ self.addEventListener('install', (event) => {
   console.log('[SW] Installing...');
   event.waitUntil(
     caches.open(STATIC_CACHE)
-      .then((cache) => {
+      .then(async (cache) => {
         console.log('[SW] Caching static assets');
-        return cache.addAll(STATIC_ASSETS);
+        for (const asset of STATIC_ASSETS) {
+          try {
+            await cache.add(asset);
+          } catch (e) {
+            console.warn('[SW] Could not cache asset:', asset, e);
+          }
+        }
       })
       .then(() => self.skipWaiting())
   );

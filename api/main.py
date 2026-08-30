@@ -201,23 +201,46 @@ WEBAPP_DIST = Path(__file__).parent.parent / "webapp" / "dist"
 
 # Serve static assets (js, css, images, etc.)
 if WEBAPP_DIST.exists():
-    app.mount("/assets", StaticFiles(directory=WEBAPP_DIST / "assets"), name="assets")
+    if (WEBAPP_DIST / "assets").exists():
+        app.mount("/assets", StaticFiles(directory=WEBAPP_DIST / "assets"), name="assets")
+    if (WEBAPP_DIST / "icons").exists():
+        app.mount("/icons", StaticFiles(directory=WEBAPP_DIST / "icons"), name="icons")
     
     # Serve other static files from dist root
     @app.get("/manifest.json")
     async def manifest():
-        return FileResponse(WEBAPP_DIST / "manifest.json")
+        manifest_path = WEBAPP_DIST / "manifest.json"
+        if manifest_path.exists():
+            return FileResponse(
+                manifest_path, 
+                media_type="application/manifest+json",
+                headers={"Cache-Control": "no-cache"}
+            )
+        return JSONResponse(status_code=404, content={"error": "not found"})
     
     @app.get("/sw.js")
     async def service_worker():
-        return FileResponse(WEBAPP_DIST / "sw.js", media_type="application/javascript")
+        sw_path = WEBAPP_DIST / "sw.js"
+        if sw_path.exists():
+            return FileResponse(
+                sw_path, 
+                media_type="application/javascript",
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Service-Worker-Allowed": "/"
+                }
+            )
+        return JSONResponse(status_code=404, content={"error": "not found"})
     
     @app.get("/favicon.ico")
     async def favicon():
         favicon_path = WEBAPP_DIST / "favicon.ico"
         if favicon_path.exists():
             return FileResponse(favicon_path)
-        return {"error": "not found"}
+        icon_path = WEBAPP_DIST / "icons" / "icon-96x96.png"
+        if icon_path.exists():
+            return FileResponse(icon_path, media_type="image/png")
+        return JSONResponse(status_code=404, content={"error": "not found"})
 
 
 @app.get("/api/health")
