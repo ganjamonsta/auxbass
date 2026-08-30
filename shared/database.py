@@ -69,10 +69,79 @@ async_session = async_sessionmaker(
 )
 
 
+async def _ensure_sqlite_columns(conn):
+    """Ensure missing columns in SQLite tables are added"""
+    schema_definitions = {
+        "channel_messages": [
+            ("status", "TEXT DEFAULT 'sent'"),
+            ("retry_count", "INTEGER DEFAULT 0"),
+            ("last_error", "TEXT"),
+            ("updated_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+        ],
+        "tracks": [
+            ("file_name", "TEXT"),
+            ("normalized_artist", "TEXT"),
+            ("is_public", "INTEGER DEFAULT 1"),
+            ("is_unavailable", "INTEGER DEFAULT 0"),
+            ("play_count", "INTEGER DEFAULT 0"),
+            ("last_played_at", "TIMESTAMP"),
+            ("forward_source_type", "TEXT"),
+            ("forward_source_id", "INTEGER"),
+            ("forward_source_name", "TEXT"),
+            ("forward_source_username", "TEXT"),
+            ("uploader_id", "INTEGER"),
+        ],
+        "users": [
+            ("hide_from_search", "INTEGER DEFAULT 0"),
+            ("hide_profile", "INTEGER DEFAULT 0"),
+            ("notify_subscription", "INTEGER DEFAULT 1"),
+        ],
+        "user_channels": [
+            ("auto_sync", "INTEGER DEFAULT 1"),
+        ],
+        "playlists": [
+            ("pending_cover_url", "TEXT"),
+            ("pending_cover_expires_at", "TIMESTAMP"),
+        ],
+    }
+    
+    for table_name, columns in schema_definitions.items():
+        res = await conn.exec_driver_sql(
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}';"
+        )
+        if not res.scalar():
+            continue
+        
+        info = await conn.exec_driver_sql(f"PRAGMA table_info({table_name});")
+        existing_cols = {row[1] for row in info.fetchall()}
+        
+        for col_name, col_def in columns:
+            if col_name not in existing_cols:
+                try:
+                    await conn.exec_driver_sql(
+                        f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_def};"
+                    )
+                except Exception:
+                    pass
+
+    # Ensure indexes
+    try:
+        await conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS idx_channel_message_status ON channel_messages(channel_id, status);"
+        )
+        await conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS idx_tracks_normalized_artist ON tracks(normalized_artist);"
+        )
+    except Exception:
+        pass
+
+
 async def init_db():
     """Initialize database tables"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        if is_sqlite:
+            await _ensure_sqlite_columns(conn)
 
 
 async def drop_db():
