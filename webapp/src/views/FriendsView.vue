@@ -127,11 +127,13 @@
 
       <!-- Search Tab -->
       <div v-show="activeTab === 'search'" class="tab-content">
-        <SearchBar
-          v-model="searchQuery"
-          placeholder="Поиск по имени или @username"
-          @input="debouncedSearch"
-        />
+        <div class="search-section">
+          <SearchBar
+            v-model="searchQuery"
+            placeholder="Поиск по имени или @username"
+            @input="debouncedSearch"
+          />
+        </div>
 
         <div v-if="searching" class="loading">
           <div class="spinner"></div>

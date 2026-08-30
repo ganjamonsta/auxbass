@@ -275,9 +275,9 @@ const showNav = computed(() => {
 })
 
 const showHeader = computed(() => {
-  // On desktop, show header only for detail pages (not main navigation pages)
+  // On desktop, show header only for drill-down detail pages (not main navigation pages)
   if (isDesktop.value) {
-    const detailRoutes = ['album-detail', 'artist-detail', 'playlist-detail', 'liked', 'settings']
+    const detailRoutes = ['album-detail', 'artist-detail', 'playlist-detail']
     return authStore.isAuthenticated && detailRoutes.includes(route.name)
   }
   // On mobile, show header for all pages except login
@@ -286,8 +286,9 @@ const showHeader = computed(() => {
 })
 
 const showBackButton = computed(() => {
-  // Only the main library page (home) doesn't need back button
-  return route.name !== 'library'
+  // Main navigation tabs do not need a back button
+  const mainNavRoutes = ['library', 'collections', 'friends', 'liked', 'settings']
+  return !mainNavRoutes.includes(route.name)
 })
 
 const pageTitle = computed(() => {

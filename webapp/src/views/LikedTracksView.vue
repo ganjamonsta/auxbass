@@ -36,6 +36,14 @@
         </div>
       </div>
 
+      <!-- Search bar (when tracks exist) -->
+      <div class="search-section" v-if="tracks.length > 5">
+        <SearchBar
+          v-model="searchQuery"
+          placeholder="Поиск по понравившимся..."
+        />
+      </div>
+
       <!-- Loading -->
       <div v-if="loading" class="loading">
         <div class="spinner"></div>
@@ -79,6 +87,7 @@ import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useTrackActions, usePlaybackActions, useTrackSync } from '@/composables'
 import TrackItem from '@/components/TrackItem.vue'
+import SearchBar from '@/components/ui/SearchBar.vue'
 import { Heart, Play, Shuffle } from 'lucide-vue-next'
 
 // Universal context menu
@@ -99,16 +108,25 @@ const goToChannelSetup = () => {
 
 const tracks = computed(() => libraryStore.likedTracks)
 const loading = ref(true)
+const searchQuery = ref('')
 
 // Sync liked tracks with global track events
 useTrackSync(() => libraryStore.likedTracks)
 
 const sortedTracks = computed(() => {
-  return [...tracks.value].sort((a, b) => {
+  let list = [...tracks.value].sort((a, b) => {
     const dateA = new Date(a.liked_at || 0)
     const dateB = new Date(b.liked_at || 0)
     return dateB - dateA
   })
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.trim().toLowerCase()
+    list = list.filter(t => 
+      t.title?.toLowerCase().includes(q) || 
+      t.artist?.toLowerCase().includes(q)
+    )
+  }
+  return list
 })
 
 // Unified playback actions
@@ -132,6 +150,10 @@ onMounted(async () => {
 <style scoped>
 .liked-tracks-view {
   padding: 16px;
+}
+
+.search-section {
+  margin-bottom: 16px;
 }
 
 .liked-cover {

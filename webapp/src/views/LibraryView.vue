@@ -12,6 +12,19 @@
 
     <!-- Has channel - show library -->
     <template v-else>
+      <!-- Type Switcher (Tabs) - Neumorphic style -->
+      <div class="neu-tab-bar library-tabs">
+        <button 
+          v-for="tab in tabs" 
+          :key="tab.id"
+          class="neu-tab"
+          :class="{ active: currentTabId === tab.id }"
+          @click="currentTabId = tab.id"
+        >
+          <span class="neu-tab-content" :data-text="tab.label">{{ tab.label }}</span>
+        </button>
+      </div>
+
       <!-- Search bar -->
       <div class="search-section">
         <SearchBar 
@@ -22,26 +35,13 @@
         />
       </div>
 
-    <!-- Type Switcher (Tabs) - Neumorphic style -->
-    <div class="neu-tab-bar library-tabs">
-      <button 
-        v-for="tab in tabs" 
-        :key="tab.id"
-        class="neu-tab"
-        :class="{ active: currentTabId === tab.id }"
-        @click="currentTabId = tab.id"
-      >
-        <span class="neu-tab-content" :data-text="tab.label">{{ tab.label }}</span>
-      </button>
-    </div>
-
-    <!-- Dynamic Content Window -->
-    <div class="library-content">
-       <component 
+      <!-- Dynamic Content Window -->
+      <div class="library-content">
+        <component 
           :is="currentTabComponent" 
           :searchQuery="debouncedQuery"
-       />
-    </div>
+        />
+      </div>
     </template>
   </div>
 </template>

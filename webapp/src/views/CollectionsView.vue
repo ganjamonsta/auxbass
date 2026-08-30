@@ -20,11 +20,13 @@
 
     <!-- Albums Tab - using unified component -->
     <div v-show="activeTab === 'albums'" class="tab-content">
-      <SearchBar
-        v-model="albumSearchQuery"
-        placeholder="Поиск альбомов..."
-        @input="debouncedAlbumSearch"
-      />
+      <div class="search-section">
+        <SearchBar
+          v-model="albumSearchQuery"
+          placeholder="Поиск альбомов..."
+          @input="debouncedAlbumSearch"
+        />
+      </div>
 
       <LibraryAlbums
         ref="albumsRef"
@@ -35,11 +37,13 @@
 
     <!-- Playlists Tab - using unified component -->
     <div v-show="activeTab === 'playlists'" class="tab-content">
-      <SearchBar
-        v-model="playlistSearchQuery"
-        placeholder="Поиск плейлистов..."
-        @input="debouncedPlaylistSearch"
-      />
+      <div class="search-section">
+        <SearchBar
+          v-model="playlistSearchQuery"
+          placeholder="Поиск плейлистов..."
+          @input="debouncedPlaylistSearch"
+        />
+      </div>
 
       <LibraryPlaylists
         ref="playlistsRef"
@@ -111,7 +115,11 @@ onUnmounted(() => {
 
 <style scoped>
 .collections-view {
-  padding: 8px 16px 16px 16px;
+  padding: 16px;
+}
+
+.search-section {
+  margin-bottom: 16px;
 }
 
 /* Tabs Styles - use design system */
