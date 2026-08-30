@@ -10,7 +10,9 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-dist/
+/dist/
+!webapp/dist/
+!webapp/dist/**
 downloads/
 eggs/
 .eggs/
@@ -80,7 +82,6 @@ logs/
 
 # Node
 webapp/node_modules/
-webapp/dist/
 webapp/.vite/
 node_modules/
 
