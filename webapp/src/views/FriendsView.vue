@@ -12,303 +12,310 @@
 
     <!-- Has channel - show friends -->
     <template v-else>
-    <!-- Tab switcher -->
-    <div class="tabs-header">
-      <button 
-        class="tab-btn" 
-        :class="{ active: activeTab === 'following' }"
-        @click="activeTab = 'following'"
-      >
-        Подписки
-      </button>
-      <button 
-        class="tab-btn" 
-        :class="{ active: activeTab === 'followers' }"
-        @click="activeTab = 'followers'"
-      >
-        Подписчики
-      </button>
-      <button 
-        v-if="canUseSocial"
-        class="tab-btn" 
-        :class="{ active: activeTab === 'search' }"
-        @click="activeTab = 'search'"
-      >
-        <Search :size="18" />
-      </button>
-    </div>
-
-    <!-- Following Tab -->
-    <div v-show="activeTab === 'following'" class="tab-content">
-      <div v-if="loading" class="loading">
-        <div class="spinner"></div>
-      </div>
-
-      <div v-else-if="following.length === 0" class="empty-state">
-        <span class="empty-icon"><Users :size="48" /></span>
-        <p>Вы пока ни на кого не подписаны</p>
-        <button v-if="canUseSocial" class="action-btn" @click="activeTab = 'search'">
-          Найти друзей
+      <!-- Unified Tab switcher -->
+      <div class="neu-tab-bar friends-tabs">
+        <button 
+          class="neu-tab" 
+          :class="{ active: activeTab === 'following' }"
+          @click="activeTab = 'following'"
+        >
+          <span class="neu-tab-content" data-text="Подписки">Подписки</span>
         </button>
-        <p v-else class="hint">Подключите канал для поиска друзей</p>
-      </div>
-
-      <div v-else class="users-list">
-        <div 
-          v-for="user in following" 
-          :key="user.id"
-          class="user-card"
-          @click="viewUserProfile(user)"
+        <button 
+          class="neu-tab" 
+          :class="{ active: activeTab === 'followers' }"
+          @click="activeTab = 'followers'"
         >
-          <div class="user-avatar">
-            {{ getInitials(user) }}
-          </div>
-          <div class="user-info">
-            <div class="user-name">{{ user.display_name }}</div>
-            <div class="user-meta">
-              {{ user.track_count }} треков • {{ user.playlist_count }} плейлистов
-            </div>
-          </div>
-          <button 
-            class="unfollow-btn" 
-            @click.stop="unfollowUser(user)"
-          >
-            <Check :size="14" /> Подписан
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Followers Tab -->
-    <div v-show="activeTab === 'followers'" class="tab-content">
-      <div v-if="loading" class="loading">
-        <div class="spinner"></div>
-      </div>
-
-      <div v-else-if="followers.length === 0" class="empty-state">
-        <span class="empty-icon"><User :size="48" /></span>
-        <p>Пока никто не подписался на вас</p>
-      </div>
-
-      <div v-else class="users-list">
-        <div 
-          v-for="user in followers" 
-          :key="user.id"
-          class="user-card"
-          @click="viewUserProfile(user)"
+          <span class="neu-tab-content" data-text="Подписчики">Подписчики</span>
+        </button>
+        <button 
+          v-if="canUseSocial"
+          class="neu-tab" 
+          :class="{ active: activeTab === 'search' }"
+          @click="activeTab = 'search'"
         >
-          <div class="user-avatar">
-            {{ getInitials(user) }}
-          </div>
-          <div class="user-info">
-            <div class="user-name">{{ user.display_name }}</div>
-            <div class="user-meta">
-              {{ user.track_count }} треков • {{ user.playlist_count }} плейлистов
+          <Search :size="15" />
+          <span class="neu-tab-content" data-text="Поиск">Поиск</span>
+        </button>
+      </div>
+
+      <!-- Following Tab -->
+      <div v-show="activeTab === 'following'" class="tab-content">
+        <div v-if="loading" class="loading">
+          <div class="spinner"></div>
+        </div>
+
+        <div v-else-if="following.length === 0" class="empty-state">
+          <span class="empty-icon"><Users :size="48" /></span>
+          <p>Вы пока ни на кого не подписаны</p>
+          <button v-if="canUseSocial" class="btn-pill-primary" @click="activeTab = 'search'">
+            Найти друзей
+          </button>
+          <p v-else class="hint">Подключите канал для поиска друзей</p>
+        </div>
+
+        <div v-else class="users-list">
+          <div 
+            v-for="user in following" 
+            :key="user.id"
+            class="user-card"
+            @click="viewUserProfile(user)"
+          >
+            <div class="user-avatar">
+              {{ getInitials(user) }}
             </div>
-          </div>
-          <button 
-            v-if="!user.is_following"
-            class="follow-btn" 
-            @click.stop="followUser(user)"
-          >
-            Подписаться
-          </button>
-          <button 
-            v-else
-            class="unfollow-btn" 
-            @click.stop="unfollowUser(user)"
-          >
-            <Check :size="14" /> Подписан
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Search Tab -->
-    <div v-show="activeTab === 'search'" class="tab-content">
-      <SearchBar
-        v-model="searchQuery"
-        placeholder="Поиск по имени или @username"
-        @input="debouncedSearch"
-      />
-
-      <div v-if="searching" class="loading">
-        <div class="spinner"></div>
-      </div>
-
-      <div v-else-if="searchQuery && searchResults.length === 0" class="empty-state">
-        <span class="empty-icon"><Search :size="48" /></span>
-        <p>Никого не найдено</p>
-      </div>
-
-      <div v-else-if="searchResults.length" class="users-list">
-        <div 
-          v-for="user in searchResults" 
-          :key="user.id"
-          class="user-card"
-          @click="viewUserProfile(user)"
-        >
-          <div class="user-avatar">
-            {{ getInitials(user) }}
-          </div>
-          <div class="user-info">
-            <div class="user-name">{{ user.display_name }}</div>
-            <div class="user-meta">
-              <span v-if="user.username">@{{ user.username }}</span>
-              <span v-else>{{ user.track_count }} треков</span>
-            </div>
-          </div>
-          <button 
-            v-if="!user.is_following"
-            class="follow-btn" 
-            @click.stop="followUser(user)"
-          >
-            Подписаться
-          </button>
-          <button 
-            v-else
-            class="unfollow-btn" 
-            @click.stop="unfollowUser(user)"
-          >
-            <Check :size="14" /> Подписан
-          </button>
-        </div>
-      </div>
-
-      <div v-else-if="!searchQuery" class="search-hint">
-        <span class="hint-icon"><Lightbulb :size="24" /></span>
-        <p>Введите имя или username друга</p>
-      </div>
-    </div>
-
-    <!-- User Profile Modal -->
-    <div v-if="selectedUser" class="modal-overlay" @click.self="closeProfile">
-      <div class="profile-modal">
-        <div class="profile-header">
-          <div class="profile-avatar">
-            {{ getInitials(selectedUser) }}
-          </div>
-          <div class="profile-info">
-            <h2>{{ selectedUser.display_name }}</h2>
-            <p v-if="selectedUser.username">@{{ selectedUser.username }}</p>
-          </div>
-          <button class="close-btn" @click="closeProfile"><X :size="20" /></button>
-        </div>
-
-        <div class="profile-stats">
-          <div class="stat">
-            <span class="stat-value">{{ selectedUser.track_count }}</span>
-            <span class="stat-label">треков</span>
-          </div>
-          <div class="stat">
-            <span class="stat-value">{{ selectedUser.playlist_count }}</span>
-            <span class="stat-label">плейлистов</span>
-          </div>
-          <div class="stat">
-            <span class="stat-value">{{ selectedUser.followers_count }}</span>
-            <span class="stat-label">подписчиков</span>
-          </div>
-        </div>
-
-        <div class="profile-actions">
-          <button 
-            v-if="!selectedUser.is_following"
-            class="action-btn primary"
-            @click="followUser(selectedUser)"
-          >
-            Подписаться
-          </button>
-          <button 
-            v-else
-            class="action-btn secondary"
-            @click="unfollowUser(selectedUser)"
-          >
-            Отписаться
-          </button>
-        </div>
-
-        <div class="profile-content">
-          <!-- Tabs for user content -->
-          <div class="content-tabs">
-            <button 
-              :class="{ active: profileTab === 'library' }"
-              @click="profileTab = 'library'; loadUserLibrary()"
-            >
-              <Music :size="16" /> Библиотека
-            </button>
-            <button 
-              :class="{ active: profileTab === 'playlists' }"
-              @click="profileTab = 'playlists'; loadUserPlaylists()"
-            >
-              <Folder :size="16" /> Плейлисты
-            </button>
-            <button 
-              :class="{ active: profileTab === 'albums' }"
-              @click="profileTab = 'albums'; loadUserAlbums()"
-            >
-              <Disc3 :size="16" /> Альбомы
-            </button>
-          </div>
-
-          <div v-if="loadingUserContent" class="loading">
-            <div class="spinner"></div>
-          </div>
-
-          <!-- Library tracks -->
-          <div v-else-if="profileTab === 'library'" class="tracks-list">
-            <div 
-              v-for="track in userTracks" 
-              :key="track.id"
-              class="track-item"
-              @click="playTrack(track)"
-            >
-              <div class="track-cover">
-                <img v-if="track.cover_url" :src="getCoverUrl(track.cover_url, CoverSize.SMALL)" />
-                <span v-else><Music :size="20" /></span>
-              </div>
-              <div class="track-info">
-                <div class="track-title">{{ getDisplayTitle(track) }}</div>
-                <div class="track-artist">{{ getDisplayArtist(track) }}</div>
+            <div class="user-info">
+              <div class="user-name">{{ user.display_name }}</div>
+              <div class="user-meta">
+                {{ user.track_count }} треков • {{ user.playlist_count }} плейлистов
               </div>
             </div>
-            <p v-if="userTracks.length === 0" class="empty-hint">Нет треков</p>
-          </div>
-
-          <!-- Playlists -->
-          <div v-else-if="profileTab === 'playlists'" class="playlists-list">
-            <div 
-              v-for="playlist in userPlaylists" 
-              :key="playlist.id"
-              class="playlist-item"
-              @click="$router.push(`/playlist/${playlist.id}`); closeProfile()"
+            <button 
+              class="btn-unfollow" 
+              @click.stop="unfollowUser(user)"
             >
-              <div class="playlist-icon"><Folder :size="20" /></div>
-              <div class="playlist-info">
-                <div class="playlist-name">{{ playlist.name }}</div>
-                <div class="playlist-meta">{{ playlist.track_count }} треков</div>
-              </div>
-            </div>
-            <p v-if="userPlaylists.length === 0" class="empty-hint">Нет публичных плейлистов</p>
-          </div>
-
-          <!-- Albums -->
-          <div v-else-if="profileTab === 'albums'" class="albums-grid-small">
-            <div 
-              v-for="album in userAlbums" 
-              :key="album.id"
-              class="album-item"
-              @click="$router.push(`/album/${album.id}`); closeProfile()"
-              @contextmenu.prevent="handleAlbumContextMenu(album, $event)"
-            >
-              <img v-if="album.cover_url" :src="getCoverUrl(album.cover_url, CoverSize.SMALL)" />
-              <div v-else class="album-placeholder"><Disc3 :size="24" /></div>
-              <div class="album-name">{{ album.name }}</div>
-            </div>
-            <p v-if="userAlbums.length === 0" class="empty-hint">Нет альбомов</p>
+              <Check :size="14" /> Подписан
+            </button>
           </div>
         </div>
       </div>
-    </div>
+
+      <!-- Followers Tab -->
+      <div v-show="activeTab === 'followers'" class="tab-content">
+        <div v-if="loading" class="loading">
+          <div class="spinner"></div>
+        </div>
+
+        <div v-else-if="followers.length === 0" class="empty-state">
+          <span class="empty-icon"><User :size="48" /></span>
+          <p>Пока никто не подписался на вас</p>
+        </div>
+
+        <div v-else class="users-list">
+          <div 
+            v-for="user in followers" 
+            :key="user.id"
+            class="user-card"
+            @click="viewUserProfile(user)"
+          >
+            <div class="user-avatar">
+              {{ getInitials(user) }}
+            </div>
+            <div class="user-info">
+              <div class="user-name">{{ user.display_name }}</div>
+              <div class="user-meta">
+                {{ user.track_count }} треков • {{ user.playlist_count }} плейлистов
+              </div>
+            </div>
+            <button 
+              v-if="!user.is_following"
+              class="btn-follow" 
+              @click.stop="followUser(user)"
+            >
+              Подписаться
+            </button>
+            <button 
+              v-else
+              class="btn-unfollow" 
+              @click.stop="unfollowUser(user)"
+            >
+              <Check :size="14" /> Подписан
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search Tab -->
+      <div v-show="activeTab === 'search'" class="tab-content">
+        <SearchBar
+          v-model="searchQuery"
+          placeholder="Поиск по имени или @username"
+          @input="debouncedSearch"
+        />
+
+        <div v-if="searching" class="loading">
+          <div class="spinner"></div>
+        </div>
+
+        <div v-else-if="searchQuery && searchResults.length === 0" class="empty-state">
+          <span class="empty-icon"><Search :size="48" /></span>
+          <p>Никого не найдено</p>
+        </div>
+
+        <div v-else-if="searchResults.length" class="users-list">
+          <div 
+            v-for="user in searchResults" 
+            :key="user.id"
+            class="user-card"
+            @click="viewUserProfile(user)"
+          >
+            <div class="user-avatar">
+              {{ getInitials(user) }}
+            </div>
+            <div class="user-info">
+              <div class="user-name">{{ user.display_name }}</div>
+              <div class="user-meta">
+                <span v-if="user.username">@{{ user.username }}</span>
+                <span v-else>{{ user.track_count }} треков</span>
+              </div>
+            </div>
+            <button 
+              v-if="!user.is_following"
+              class="btn-follow" 
+              @click.stop="followUser(user)"
+            >
+              Подписаться
+            </button>
+            <button 
+              v-else
+              class="btn-unfollow" 
+              @click.stop="unfollowUser(user)"
+            >
+              <Check :size="14" /> Подписан
+            </button>
+          </div>
+        </div>
+
+        <div v-else-if="!searchQuery" class="search-hint">
+          <span class="hint-icon"><Lightbulb :size="24" /></span>
+          <p>Введите имя или username друга</p>
+        </div>
+      </div>
+
+      <!-- User Profile Modal -->
+      <div v-if="selectedUser" class="modal-overlay" @click.self="closeProfile">
+        <div class="profile-modal">
+          <div class="profile-header">
+            <div class="profile-avatar">
+              {{ getInitials(selectedUser) }}
+            </div>
+            <div class="profile-info">
+              <h2>{{ selectedUser.display_name }}</h2>
+              <p v-if="selectedUser.username">@{{ selectedUser.username }}</p>
+            </div>
+            <button class="close-btn" @click="closeProfile"><X :size="20" /></button>
+          </div>
+
+          <div class="profile-stats">
+            <div class="stat">
+              <span class="stat-value">{{ selectedUser.track_count }}</span>
+              <span class="stat-label">треков</span>
+            </div>
+            <div class="stat">
+              <span class="stat-value">{{ selectedUser.playlist_count }}</span>
+              <span class="stat-label">плейлистов</span>
+            </div>
+            <div class="stat">
+              <span class="stat-value">{{ selectedUser.followers_count }}</span>
+              <span class="stat-label">подписчиков</span>
+            </div>
+          </div>
+
+          <div class="profile-actions">
+            <button 
+              v-if="!selectedUser.is_following"
+              class="btn-pill-primary modal-action-btn"
+              @click="followUser(selectedUser)"
+            >
+              Подписаться
+            </button>
+            <button 
+              v-else
+              class="btn-unfollow modal-action-btn"
+              @click="unfollowUser(selectedUser)"
+            >
+              <Check :size="14" /> Подписан
+            </button>
+          </div>
+
+          <div class="profile-content">
+            <!-- Tabs for user content -->
+            <div class="neu-tab-bar modal-tabs">
+              <button 
+                class="neu-tab"
+                :class="{ active: profileTab === 'library' }"
+                @click="profileTab = 'library'; loadUserLibrary()"
+              >
+                <Music :size="14" />
+                <span class="neu-tab-content" data-text="Библиотека">Библиотека</span>
+              </button>
+              <button 
+                class="neu-tab"
+                :class="{ active: profileTab === 'playlists' }"
+                @click="profileTab = 'playlists'; loadUserPlaylists()"
+              >
+                <Folder :size="14" />
+                <span class="neu-tab-content" data-text="Плейлисты">Плейлисты</span>
+              </button>
+              <button 
+                class="neu-tab"
+                :class="{ active: profileTab === 'albums' }"
+                @click="profileTab = 'albums'; loadUserAlbums()"
+              >
+                <Disc3 :size="14" />
+                <span class="neu-tab-content" data-text="Альбомы">Альбомы</span>
+              </button>
+            </div>
+
+            <div v-if="loadingUserContent" class="loading">
+              <div class="spinner"></div>
+            </div>
+
+            <!-- Library tracks -->
+            <div v-else-if="profileTab === 'library'" class="tracks-list">
+              <div 
+                v-for="track in userTracks" 
+                :key="track.id"
+                class="user-track-row"
+                @click="playTrack(track)"
+              >
+                <div class="track-cover-sm">
+                  <img v-if="track.cover_url" :src="getCoverUrl(track.cover_url, CoverSize.SMALL)" />
+                  <span v-else><Music :size="18" /></span>
+                </div>
+                <div class="track-info">
+                  <div class="track-title">{{ getDisplayTitle(track) }}</div>
+                  <div class="track-artist">{{ getDisplayArtist(track) }}</div>
+                </div>
+              </div>
+              <p v-if="userTracks.length === 0" class="empty-hint">Нет треков</p>
+            </div>
+
+            <!-- Playlists -->
+            <div v-else-if="profileTab === 'playlists'" class="playlists-list">
+              <div 
+                v-for="playlist in userPlaylists" 
+                :key="playlist.id"
+                class="playlist-row"
+                @click="$router.push(`/playlist/${playlist.id}`); closeProfile()"
+              >
+                <div class="playlist-icon"><Folder :size="20" /></div>
+                <div class="playlist-info">
+                  <div class="playlist-name">{{ playlist.name }}</div>
+                  <div class="playlist-meta">{{ playlist.track_count }} треков</div>
+                </div>
+              </div>
+              <p v-if="userPlaylists.length === 0" class="empty-hint">Нет публичных плейлистов</p>
+            </div>
+
+            <!-- Albums -->
+            <div v-else-if="profileTab === 'albums'" class="albums-grid-small">
+              <div 
+                v-for="album in userAlbums" 
+                :key="album.id"
+                class="album-item"
+                @click="$router.push(`/album/${album.id}`); closeProfile()"
+                @contextmenu.prevent="handleAlbumContextMenu(album, $event)"
+              >
+                <img v-if="album.cover_url" :src="getCoverUrl(album.cover_url, CoverSize.SMALL)" />
+                <div v-else class="album-placeholder"><Disc3 :size="24" /></div>
+                <div class="album-name">{{ album.name }}</div>
+              </div>
+              <p v-if="userAlbums.length === 0" class="empty-hint">Нет альбомов</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </template>
   </div>
 </template>
@@ -583,47 +590,9 @@ const handleResetState = (event) => {
   padding: 16px;
 }
 
-.tabs-header {
-  display: flex;
-  gap: 4px;
+.friends-tabs {
   margin-bottom: 20px;
-  padding: 4px;
-  background: var(--c-bg-0);
-  border-radius: var(--r-md);
-  box-shadow:
-    inset 2px 2px 4px var(--sh-inset-dark),
-    inset -1px -1px 3px var(--sh-inset-light);
 }
-
-.tab-btn {
-  flex: 1;
-  padding: 10px 14px;
-  background: transparent;
-  border: none;
-  border-radius: calc(var(--r-md) - 2px);
-  color: var(--c-text-2);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-}
-
-.tab-btn:hover {
-  color: var(--c-text-1);
-}
-
-.tab-btn.active {
-  background: var(--c-bg-2);
-  color: var(--c-text-1);
-  font-weight: 600;
-  box-shadow:
-    2px 2px 4px var(--sh-dark),
-    -1px -1px 2px var(--sh-light);
-}
-
-/* Search - neumorphic inset style */
-/* Removed old search-box styles */
 
 .search-hint {
   text-align: center;
@@ -633,43 +602,55 @@ const handleResetState = (event) => {
 
 .hint-icon {
   font-size: 32px;
-  display: block;
+  display: flex;
+  justify-content: center;
   margin-bottom: 12px;
+  color: var(--c-accent);
 }
 
 /* Users list */
 .users-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .user-card {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px;
-  background: var(--c-bg-3);
-  border-radius: 12px;
+  padding: 12px 16px;
+  background: var(--c-bg-2);
+  border-radius: var(--r-lg);
+  box-shadow: 
+    3px 3px 8px var(--sh-dark),
+    -2px -2px 4px var(--sh-light);
+  border: 1px solid rgba(255, 255, 255, 0.02);
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.15s ease;
+}
+
+.user-card:hover {
+  background: var(--c-bg-3);
 }
 
 .user-card:active {
-  background: var(--c-bg-4);
+  transform: scale(0.98);
 }
 
 .user-avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-full);
   background: linear-gradient(135deg, var(--c-accent), #8b5cf6);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   color: #fff;
+  flex-shrink: 0;
+  box-shadow: 2px 2px 6px var(--sh-dark);
 }
 
 .user-info {
@@ -689,25 +670,6 @@ const handleResetState = (event) => {
   margin-top: 2px;
 }
 
-.follow-btn, .unfollow-btn {
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-}
-
-.follow-btn {
-  background: var(--c-accent);
-  color: #000;
-}
-
-.unfollow-btn {
-  background: var(--c-bg-4);
-  color: var(--c-text-2);
-}
-
 /* Empty state */
 .empty-state {
   text-align: center;
@@ -717,19 +679,10 @@ const handleResetState = (event) => {
 
 .empty-icon {
   font-size: 48px;
-  display: block;
+  display: flex;
+  justify-content: center;
   margin-bottom: 16px;
-}
-
-.action-btn {
-  margin-top: 16px;
-  background: var(--c-accent);
-  color: #000;
-  border: none;
-  border-radius: 20px;
-  padding: 12px 24px;
-  font-weight: 600;
-  cursor: pointer;
+  color: var(--c-text-3);
 }
 
 /* Profile Modal */
@@ -748,11 +701,15 @@ const handleResetState = (event) => {
 
 .profile-modal {
   background: var(--c-bg-2);
-  border-radius: 24px 24px 0 0;
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
   width: 100%;
+  max-width: 560px;
   max-height: 85vh;
   overflow-y: auto;
-  animation: slideUp 0.3s ease;
+  box-shadow: 0 -8px 24px var(--sh-dark);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: none;
+  animation: slideUp 0.25s ease;
 }
 
 @keyframes slideUp {
@@ -769,16 +726,18 @@ const handleResetState = (event) => {
 }
 
 .profile-avatar {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  border-radius: var(--r-full);
   background: linear-gradient(135deg, var(--c-accent), #8b5cf6);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 700;
   color: #fff;
+  box-shadow: 4px 4px 10px var(--sh-dark);
+  flex-shrink: 0;
 }
 
 .profile-info {
@@ -798,22 +757,30 @@ const handleResetState = (event) => {
 }
 
 .close-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-full);
   background: var(--c-bg-3);
   border: none;
   color: var(--c-text-2);
-  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.close-btn:hover {
+  background: var(--c-bg-4);
+  color: var(--c-text-1);
 }
 
 .profile-stats {
   display: flex;
   justify-content: space-around;
   padding: 16px 24px;
-  border-top: 1px solid var(--c-bg-4);
-  border-bottom: 1px solid var(--c-bg-4);
+  border-top: 1px solid var(--c-bg-3);
+  border-bottom: 1px solid var(--c-bg-3);
 }
 
 .stat {
@@ -838,74 +805,53 @@ const handleResetState = (event) => {
   gap: 12px;
 }
 
-.action-btn.primary {
+.modal-action-btn {
   flex: 1;
-  background: var(--c-accent);
-  color: #000;
-}
-
-.action-btn.secondary {
-  flex: 1;
-  background: var(--c-bg-3);
-  color: var(--c-text-1);
 }
 
 .profile-content {
   padding: 0 16px 24px;
 }
 
-.content-tabs {
-  display: flex;
-  gap: 8px;
+.modal-tabs {
   margin-bottom: 16px;
-  overflow-x: auto;
 }
 
-.content-tabs button {
-  padding: 8px 16px;
-  background: var(--c-bg-3);
-  border: none;
-  border-radius: 20px;
-  color: var(--c-text-2);
-  font-size: 13px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.content-tabs button.active {
-  background: var(--c-accent);
-  color: #000;
-}
-
-/* Tracks list */
+/* Tracks list in modal */
 .tracks-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
-.track-item {
+.user-track-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px;
+  gap: 10px;
+  padding: 8px 12px;
   background: var(--c-bg-3);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-.track-cover {
-  width: 44px;
-  height: 44px;
-  border-radius: 6px;
+.user-track-row:hover {
+  background: var(--c-bg-4);
+}
+
+.track-cover-sm {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-sm);
   background: var(--c-bg-4);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
-.track-cover img {
+.track-cover-sm img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -918,7 +864,7 @@ const handleResetState = (event) => {
 
 .track-title {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--c-text-1);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -927,28 +873,33 @@ const handleResetState = (event) => {
 
 .track-artist {
   font-size: 12px;
-  color: var(--c-text-2);
+  color: var(--c-text-3);
 }
 
 /* Playlists list */
 .playlists-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
-.playlist-item {
+.playlist-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px;
+  padding: 10px 14px;
   background: var(--c-bg-3);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.playlist-row:hover {
+  background: var(--c-bg-4);
 }
 
 .playlist-icon {
-  font-size: 24px;
+  color: var(--c-accent);
 }
 
 .playlist-info {
@@ -956,13 +907,14 @@ const handleResetState = (event) => {
 }
 
 .playlist-name {
-  font-weight: 500;
+  font-weight: 600;
   color: var(--c-text-1);
+  font-size: 14px;
 }
 
 .playlist-meta {
   font-size: 12px;
-  color: var(--c-text-2);
+  color: var(--c-text-3);
 }
 
 /* Albums grid small */
@@ -980,18 +932,20 @@ const handleResetState = (event) => {
 .album-placeholder {
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   object-fit: cover;
   background: var(--c-bg-3);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 32px;
+  color: var(--c-text-3);
+  box-shadow: 2px 2px 6px var(--sh-dark);
 }
 
 .album-item .album-name {
   margin-top: 6px;
   font-size: 12px;
+  font-weight: 500;
   color: var(--c-text-1);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1005,71 +959,9 @@ const handleResetState = (event) => {
   font-size: 14px;
 }
 
-/* Loading */
 .loading {
   display: flex;
   justify-content: center;
   padding: 24px;
-}
-
-
-/* No channel prompt */
-.no-channel-prompt {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 60vh;
-  text-align: center;
-  padding: 32px 24px;
-}
-
-.no-channel-prompt .prompt-icon {
-  font-size: 64px;
-  margin-bottom: 16px;
-}
-
-.no-channel-prompt h2 {
-  color: var(--c-text-1);
-  font-size: 24px;
-  font-weight: 700;
-  margin: 0 0 12px 0;
-}
-
-.no-channel-prompt p {
-  color: var(--c-text-2);
-  font-size: 15px;
-  line-height: 1.5;
-  margin: 0 0 24px 0;
-  max-width: 300px;
-}
-
-.no-channel-prompt .setup-btn {
-  background: linear-gradient(135deg, var(--c-accent) 0%, #00c853 100%);
-  border: none;
-  border-radius: 24px;
-  color: #000;
-  font-size: 16px;
-  font-weight: 600;
-  padding: 14px 32px;
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.no-channel-prompt .setup-btn:hover {
-  transform: scale(1.02);
-  box-shadow: 0 4px 16px rgba(0, 230, 118, 0.3);
-}
-.spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--c-bg-4);
-  border-top-color: var(--c-accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 </style>

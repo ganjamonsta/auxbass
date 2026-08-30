@@ -193,6 +193,10 @@
       <!-- Network status banner -->
       <NetworkBanner />
       
+      <!-- PWA install banner & guide modal -->
+      <PwaInstallBanner />
+      <PwaInstallModal />
+
       <!-- Global toast notifications -->
       <ToastContainer />
     </template>
@@ -214,8 +218,11 @@ import ToastContainer from '@/components/ToastContainer.vue'
 import ContextMenu from '@/components/ContextMenu.vue'
 import NetworkBanner from '@/components/NetworkBanner.vue'
 import MaintenanceBanner from '@/components/MaintenanceBanner.vue'
+import PwaInstallBanner from '@/components/PwaInstallBanner.vue'
+import PwaInstallModal from '@/components/PwaInstallModal.vue'
 import { useNetworkMonitor } from '@/composables/useNetworkMonitor'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
+import { usePwaInstall } from '@/composables/usePwaInstall'
 import { MobileFooter } from '@/components/layout'
 import { Music, Disc3, User, Folder } from 'lucide-vue-next'
 // Desktop components
@@ -232,6 +239,7 @@ const libraryStore = useLibraryStore()
 const uiStore = useUIStore()
 const telegram = inject('telegram')
 const networkMonitor = useNetworkMonitor()
+const pwaInstall = usePwaInstall()
 
 // Pull-to-refresh — bound to .main-content via scrollRef
 const { scrollRef, pullDistance, isPulling, isRefreshing } = usePullToRefresh(
@@ -448,6 +456,9 @@ onMounted(async () => {
     telegram.ready()
     telegram.expand()
   }
+
+  // Initialize PWA installation check & banner schedule
+  pwaInstall.init()
   
   // Add resize listener for responsive detection
   window.addEventListener('resize', updateDesktopState)

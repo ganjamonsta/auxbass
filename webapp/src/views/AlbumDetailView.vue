@@ -1,18 +1,16 @@
 <template>
   <div class="album-detail-view" v-if="album">
-    <!-- Album header -->
-    <div class="album-header">
-      <div class="album-cover">
+    <!-- Unified Hero Header -->
+    <div class="hero-header">
+      <div class="hero-cover album-cover">
         <img v-if="album.cover_url" :src="getCoverUrl(album.cover_url, CoverSize.LARGE)" :alt="album.name" />
-        <div v-else class="cover-placeholder"><Disc3 :size="32" /></div>
+        <div v-else class="cover-placeholder"><Disc3 :size="48" /></div>
       </div>
-      <div class="album-info">
-        <h1>{{ album.name }}</h1>
+      <div class="hero-info">
+        <h1 class="hero-title">{{ album.name }}</h1>
         <!-- Artists (clickable, split into separate links) -->
         <div v-if="parsedAlbumArtists.length > 0" class="artists-container">
-          <svg class="artists-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-          </svg>
+          <Users :size="16" class="artists-icon" />
           <span class="artists-links">
             <template v-for="(artist, index) in parsedAlbumArtists" :key="artist">
               <button 
@@ -25,7 +23,7 @@
           </span>
         </div>
         <p v-else class="artist" @click="goToArtist">{{ album.artist }}</p>
-        <p class="meta">
+        <p class="hero-meta">
           <span v-if="album.release_date">{{ formatYear(album.release_date) }} • </span>
           <span v-if="album.total_tracks">
             {{ album.track_count }}/{{ album.total_tracks }} треков
@@ -45,18 +43,14 @@
       </div>
     </div>
 
-    <!-- Actions -->
-    <div class="album-actions">
+    <!-- Unified Actions -->
+    <div class="hero-actions">
       <div class="action-buttons">
-        <button class="action-btn play-btn" @click="playAll">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M8 5v14l11-7z"/>
-          </svg>
+        <button class="action-btn play-btn" @click="playAll" title="Слушать все">
+          <Play :size="20" fill="currentColor" />
         </button>
-        <button class="action-btn shuffle-btn" @click="shufflePlay" :disabled="isShuffling">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
-          </svg>
+        <button class="action-btn shuffle-btn" @click="shufflePlay" :disabled="isShuffling" title="Перемешать">
+          <Shuffle :size="18" />
         </button>
       </div>
     </div>
@@ -72,7 +66,8 @@
           :class="{ 
             'missing': !item.track, 
             'has-track': item.track,
-            'not-in-library': item.track && !item.in_library
+            'not-in-library': item.track && !item.in_library,
+            'playing': playerStore.currentTrack?.id === item.track_id
           }"
           @click="handleTracklistItemClick(item)"
           @contextmenu.prevent="item.track && openMenu('track', item.track, 'album', $event)"
@@ -97,7 +92,7 @@
             @click.stop="handleAddToLibraryFromTracklist(item)"
             title="Добавить в библиотеку"
           >
-            +
+            <Plus :size="14" />
           </button>
           <!-- In library indicator -->
           <span v-else-if="item.track && item.in_library" class="in-library-indicator">
@@ -110,7 +105,7 @@
             @click.stop="handleMissingTrack(item)"
             title="Найти трек"
           >
-            +
+            <Plus :size="14" />
           </button>
           <!-- Playing indicator -->
           <span v-if="playerStore.currentTrack?.id === item.track_id" class="playing-indicator">
@@ -196,7 +191,7 @@ import { useTrackActions, usePlaybackActions, useTrackSync } from '@/composables
 import TrackItem from '@/components/TrackItem.vue'
 import TagChips from '@/components/TagChips.vue'
 import api from '@/api/client'
-import { Disc3, Check, Music, X } from 'lucide-vue-next'
+import { Disc3, Check, Music, X, Play, Shuffle, Plus, Users } from 'lucide-vue-next'
 import { splitArtists, getCoverUrl, CoverSize } from '@/utils/formatters'
 
 // Universal context menu
@@ -370,9 +365,6 @@ const handleTagClick = (tag) => {
   console.log('[AlbumDetail] Tag clicked:', tag)
 }
 
-// Track actions (handleLikeTrack, handleAddToLibrary, handleDirectDownload, handleHdNotice) 
-// are provided by useTrackActions composable above
-
 const formatDuration = (seconds) => {
   if (!seconds) return '--:--'
   const mins = Math.floor(seconds / 60)
@@ -403,50 +395,6 @@ watch(
 <style scoped>
 .album-detail-view {
   padding: 16px;
-}
-
-.album-header {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.album-cover {
-  width: 160px;
-  height: 160px;
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--c-bg-3);
-  flex-shrink: 0;
-}
-
-.album-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.cover-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  font-size: 64px;
-}
-
-.album-info {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-}
-
-.album-info h1 {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--c-text-1);
-  margin: 0 0 8px 0;
-  line-height: 1.2;
 }
 
 .artist {
@@ -499,70 +447,11 @@ watch(
   color: var(--c-text-3);
 }
 
-.meta {
-  color: var(--c-text-3);
-  font-size: 13px;
-  margin: 0;
-}
-
 .album-tags {
   margin-top: 8px;
 }
 
-.album-actions {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 24px;
-}
-
-.action-buttons {
-  display: flex;
-  border-radius: 28px;
-  background: var(--c-accent);
-  box-shadow: 
-    6px 6px 12px rgba(0, 0, 0, 0.3),
-    -3px -3px 8px rgba(255, 255, 255, 0.1),
-    inset 0 1px 1px rgba(255, 255, 255, 0.2);
-  overflow: hidden;
-}
-
-.action-btn {
-  width: 48px;
-  height: 48px;
-  border: none;
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #000;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  position: relative;
-}
-
-.action-btn::after {
-  content: '';
-  position: absolute;
-  top: 10px;
-  bottom: 10px;
-  width: 1px;
-  background: rgba(0, 0, 0, 0.15);
-}
-
-.action-btn.play-btn::after {
-  right: 0;
-}
-
-.action-btn.shuffle-btn::after {
-  display: none;
-}
-
-.action-btn:active {
-  background: rgba(0, 0, 0, 0.1);
-  box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.15);
-}
-
-.action-btn.play-btn svg {
+.play-btn svg {
   margin-left: 2px;
 }
 
@@ -572,34 +461,58 @@ watch(
   gap: 2px;
 }
 
-/* Full tracklist item styles */
+/* Full tracklist item styles (matching TrackItem.vue) */
 .tracklist-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 8px;
-  border-radius: 8px;
+  gap: 10px;
+  padding: 8px 12px;
+  margin: 4px 0;
+  border-radius: var(--r-md);
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.15s ease;
+  background: transparent;
 }
 
 .tracklist-item:hover {
   background: var(--c-bg-3);
 }
 
+.tracklist-item:active {
+  transform: scale(0.98);
+}
+
+.tracklist-item.playing {
+  background: var(--c-bg-3);
+  box-shadow: 
+    inset 2px 2px 4px var(--sh-inset-dark),
+    inset -1px -1px 3px var(--sh-inset-light);
+}
+
+.tracklist-item.playing .track-title {
+  color: var(--c-accent);
+}
+
 .tracklist-item.missing {
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .tracklist-item.missing:hover {
-  opacity: 0.9;
+  opacity: 0.8;
 }
 
 .track-number {
-  width: 24px;
+  width: 28px;
   text-align: center;
   color: var(--c-text-3);
   font-size: 14px;
+  font-weight: 500;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.tracklist-item.playing .track-number {
+  color: var(--c-accent);
 }
 
 .track-info {
@@ -611,7 +524,8 @@ watch(
 }
 
 .track-title {
-  font-size: 15px;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--c-text-1);
   white-space: nowrap;
   overflow: hidden;
@@ -619,11 +533,11 @@ watch(
 }
 
 .track-title.missing-title {
-  color: var(--c-text-2);
+  color: var(--c-text-3);
 }
 
 .track-artist {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--c-text-3);
   white-space: nowrap;
   overflow: hidden;
@@ -632,64 +546,52 @@ watch(
 
 .track-duration {
   color: var(--c-text-3);
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 500;
   min-width: 40px;
   text-align: right;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
 }
 
-.add-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--c-accent);
-  color: #000;
-  border: none;
-  font-size: 18px;
-  font-weight: bold;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.add-btn:hover {
-  transform: scale(1.1);
-}
-
+.add-btn,
 .add-library-btn {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  border-radius: var(--r-full);
   background: var(--c-accent);
-  color: #000;
+  color: var(--c-accent-text, #000);
   border: none;
-  font-size: 18px;
-  font-weight: bold;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: transform 0.15s ease;
+  box-shadow: 2px 2px 4px var(--sh-dark);
 }
 
+.add-btn:hover,
 .add-library-btn:hover {
   transform: scale(1.1);
 }
 
 .in-library-indicator {
   color: var(--c-accent);
-  font-size: 14px;
-  font-weight: bold;
   width: 28px;
-  text-align: center;
-}
-
-.tracklist-item.not-in-library {
-  /* Slightly different style for tracks not in user's library but playable */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .playing-indicator {
-  font-size: 16px;
+  color: var(--c-accent);
+  width: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 /* Modal styles */
@@ -708,18 +610,21 @@ watch(
 }
 
 .modal-content {
-  background: var(--c-bg-3);
-  border-radius: 16px;
+  background: var(--c-bg-2);
+  border-radius: var(--r-xl);
   padding: 24px;
   max-width: 400px;
   width: 100%;
   position: relative;
+  box-shadow: 12px 12px 24px var(--sh-dark);
+  border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .modal-content h3 {
   margin: 0 0 16px 0;
   font-size: 18px;
   padding-right: 24px;
+  color: var(--c-text-1);
 }
 
 .modal-loading {
@@ -753,9 +658,9 @@ watch(
 }
 
 .found-track-info {
-  background: var(--bg-base);
+  background: var(--c-bg-0);
   padding: 12px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   margin-bottom: 16px;
   display: flex;
   flex-direction: column;
@@ -775,11 +680,16 @@ watch(
   width: 100%;
   padding: 12px;
   background: var(--c-accent);
-  color: #000;
+  color: var(--c-accent-text, #000);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--r-full);
   font-weight: 600;
   cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.primary-btn:hover {
+  background: var(--c-accent-light);
 }
 
 .primary-btn:disabled {
@@ -790,10 +700,10 @@ watch(
 .secondary-btn {
   width: 100%;
   padding: 12px;
-  background: var(--bg-base);
+  background: var(--c-bg-3);
   color: var(--c-text-1);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--r-full);
   cursor: pointer;
 }
 
@@ -804,11 +714,13 @@ watch(
   background: none;
   border: none;
   color: var(--c-text-3);
-  font-size: 20px;
   cursor: pointer;
 }
 
-/* Loading - uses .spinner from design-system.css */
+.close-btn:hover {
+  color: var(--c-text-1);
+}
+
 .loading {
   display: flex;
   justify-content: center;

@@ -269,7 +269,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 0;
-  border-bottom: 1px solid var(--c-bg-4));
+  border-bottom: 1px solid var(--c-bg-4);
 }
 
 .skeleton-setting-row:last-child {

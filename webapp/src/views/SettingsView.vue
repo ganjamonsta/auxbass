@@ -241,6 +241,30 @@
       </template>
     </section>
 
+    <!-- App section (PWA) -->
+    <section class="section pwa-section">
+      <h2><Smartphone :size="20" /> Приложение</h2>
+      
+      <div v-if="pwaInstall.isInstalled.value" class="pwa-status-installed">
+        <div class="pwa-status-icon"><Check :size="20" /></div>
+        <div class="pwa-status-text">
+          <span class="pwa-status-title">Приложение установлено</span>
+          <span class="pwa-status-desc">AuxBass работает в полноэкранном режиме Web App</span>
+        </div>
+      </div>
+
+      <div v-else class="pwa-install-card">
+        <div class="setting-info">
+          <span class="setting-name">Установить как Web App</span>
+          <span class="setting-desc">Быстрый запуск с главного экрана, поддержка медиаклавиш и воспроизведение без пауз</span>
+        </div>
+        <button class="pwa-section-install-btn" @click="handleInstallClick">
+          <Download :size="16" />
+          <span>{{ pwaInstall.isIOS.value ? 'Как установить' : 'Установить' }}</span>
+        </button>
+      </div>
+    </section>
+
     <!-- Cache section -->
     <section class="section">
       <h2>Кэш</h2>
@@ -265,15 +289,19 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { usePlayerStore } from '@/stores/player'
-import api, { authApi } from '@/api/client'
-import { Megaphone, Check, Folder, Heart, ListMusic, Cloud, RefreshCw, Lock, User, Bell, Sliders, Headphones } from 'lucide-vue-next'
+import { Megaphone, Check, Folder, Heart, ListMusic, Cloud, RefreshCw, Lock, User, Bell, Sliders, Headphones, Smartphone, Download } from 'lucide-vue-next'
 import SettingsSkeleton from '@/components/SettingsSkeleton.vue'
+import { usePwaInstall } from '@/composables/usePwaInstall'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const playerStore = usePlayerStore()
+const pwaInstall = usePwaInstall()
+
+const handleInstallClick = () => {
+  pwaInstall.promptInstall()
+}
 
 const loading = ref(true)
 const stats = ref(null)
@@ -810,7 +838,7 @@ h1 {
 }
 
 .setup-steps {
-  background: var(--c-bg-2));
+  background: var(--c-bg-2);
   border-radius: var(--r-sm);
   padding: var(--sp-3);
   margin-top: var(--sp-2);
@@ -927,6 +955,79 @@ h1 {
   margin-top: 0;
   display: block;
   line-height: 1.4;
+}
+
+/* ═══════════════════════════════════════════════
+   PWA Section
+   ═══════════════════════════════════════════════ */
+.pwa-status-installed {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: rgba(29, 185, 84, 0.1);
+  border: 1px solid rgba(29, 185, 84, 0.25);
+  border-radius: var(--r-sm);
+}
+
+.pwa-status-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--c-accent);
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pwa-status-title {
+  display: block;
+  font-weight: 600;
+  color: var(--c-text-1);
+  font-size: 14px;
+}
+
+.pwa-status-desc {
+  display: block;
+  font-size: 12px;
+  color: var(--c-text-2);
+  margin-top: 2px;
+}
+
+.pwa-install-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.pwa-section-install-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  background: var(--c-accent);
+  color: #000000;
+  border: none;
+  border-radius: var(--r-sm);
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(29, 185, 84, 0.3);
+}
+
+.pwa-section-install-btn:hover {
+  background: var(--c-accent-light);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(29, 185, 84, 0.45);
+}
+
+.pwa-section-install-btn:active {
+  transform: translateY(0);
 }
 
 /* ═══════════════════════════════════════════════

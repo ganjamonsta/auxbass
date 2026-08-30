@@ -35,8 +35,8 @@
   background: var(--c-bg-3);
   flex-shrink: 0;
   box-shadow: 
-    inset 2px 2px 4px var(--sh-inset-dark)),
-    inset -1px -1px 2px var(--sh-inset-light));
+    inset 2px 2px 4px var(--sh-inset-dark),
+    inset -1px -1px 2px var(--sh-inset-light);
   animation: pulse 1.5s ease-in-out infinite;
 }
 

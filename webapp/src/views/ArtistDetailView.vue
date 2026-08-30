@@ -26,32 +26,28 @@
 
   <!-- Actual content -->
   <div class="artist-detail-view" v-else-if="artist">
-    <!-- Artist header -->
-    <div class="artist-header">
-      <div class="artist-image">
+    <!-- Unified Hero Header -->
+    <div class="hero-header">
+      <div class="hero-cover round artist-cover">
         <img v-if="artist.image_url" :src="getCoverUrl(artist.image_url, CoverSize.LARGE)" :alt="artist.name" />
-        <div v-else class="image-placeholder"><User :size="48" /></div>
+        <div v-else class="cover-placeholder"><User :size="48" /></div>
       </div>
-      <div class="artist-info">
-        <h1>{{ artist.name }}</h1>
-        <p class="meta">
+      <div class="hero-info">
+        <h1 class="hero-title">{{ artist.name }}</h1>
+        <p class="hero-meta">
           {{ artist.track_count }} треков • {{ artist.album_count }} альбомов
         </p>
       </div>
     </div>
 
-    <!-- Actions -->
-    <div class="artist-actions">
-      <div class="action-buttons" v-if="artist.track_count > 0">
-        <button class="action-btn play-btn" @click="playAll">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M8 5v14l11-7z"/>
-          </svg>
+    <!-- Unified Actions -->
+    <div class="hero-actions" v-if="artist.track_count > 0">
+      <div class="action-buttons">
+        <button class="action-btn play-btn" @click="playAll" title="Слушать все">
+          <Play :size="20" fill="currentColor" />
         </button>
-        <button class="action-btn shuffle-btn" @click="shufflePlay" :disabled="isShuffling">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
-          </svg>
+        <button class="action-btn shuffle-btn" @click="shufflePlay" :disabled="isShuffling" title="Перемешать">
+          <Shuffle :size="18" />
         </button>
       </div>
     </div>
@@ -136,7 +132,7 @@ import { useContextMenu } from '@/composables/useContextMenu'
 import { useTrackActions, usePlaybackActions } from '@/composables'
 import VirtualTrackList from '@/components/VirtualTrackList.vue'
 import api, { playerApi } from '@/api/client'
-import { User, Disc3, Globe, Music } from 'lucide-vue-next'
+import { User, Disc3, Globe, Music, Play, Shuffle } from 'lucide-vue-next'
 import { getCoverUrl, CoverSize } from '@/utils'
 
 // Universal context menu
@@ -290,6 +286,9 @@ watch(
   font-size: 80px;
   margin-bottom: 16px;
   opacity: 0.5;
+  color: var(--c-text-3);
+  display: flex;
+  justify-content: center;
 }
 
 .not-in-library-content h2 {
@@ -305,126 +304,27 @@ watch(
 }
 
 .not-in-library-content .primary-btn {
-  background: var(--accent-color);
-  color: var(--c-accent-text);
+  background: var(--c-accent);
+  color: var(--c-accent-text, #000);
   border: none;
-  border-radius: 24px;
+  border-radius: var(--r-full);
   padding: 12px 24px;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   transition: transform 0.2s, opacity 0.2s;
+  box-shadow: 4px 4px 8px var(--sh-dark), 0 0 16px var(--c-accent-glow);
 }
 
 .not-in-library-content .primary-btn:hover {
-  opacity: 0.9;
+  opacity: 0.95;
   transform: scale(1.02);
 }
 
-.artist-header {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.artist-image {
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  overflow: hidden;
-  background: var(--c-bg-3);
-  flex-shrink: 0;
-}
-
-.artist-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.artist-image .image-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  font-size: 56px;
-}
-
-.artist-info {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.artist-info h1 {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--c-text-1);
-  margin: 0 0 8px 0;
-  line-height: 1.2;
-}
-
-.meta {
-  color: var(--c-text-2);
-  font-size: 14px;
-  margin: 0;
-}
-
-.artist-actions {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 32px;
-}
-
-.action-buttons {
-  display: flex;
-  border-radius: 28px;
-  background: var(--c-accent);
-  box-shadow: 
-    6px 6px 12px rgba(0, 0, 0, 0.3),
-    -3px -3px 8px rgba(255, 255, 255, 0.1),
-    inset 0 1px 1px rgba(255, 255, 255, 0.2);
-  overflow: hidden;
-}
-
-.action-btn {
-  width: 48px;
-  height: 48px;
-  border: none;
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #000;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  position: relative;
-}
-
-.action-btn::after {
-  content: '';
-  position: absolute;
-  top: 10px;
-  bottom: 10px;
-  width: 1px;
-  background: rgba(0, 0, 0, 0.15);
-}
-
-.action-btn.play-btn::after {
-  right: 0;
-}
-
-.action-btn.shuffle-btn::after {
-  display: none;
-}
-
-.action-btn:active {
-  background: rgba(0, 0, 0, 0.1);
-  box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.15);
-}
-
-.action-btn.play-btn svg {
+.play-btn svg {
   margin-left: 2px;
 }
 

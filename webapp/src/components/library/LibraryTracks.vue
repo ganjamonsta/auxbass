@@ -8,9 +8,7 @@
           <span>Загрузка...</span>
         </template>
         <template v-else>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
-          </svg>
+          <Shuffle :size="16" />
           <span>Перемешать ({{ total }})</span>
         </template>
       </button>
@@ -191,7 +189,7 @@ import TrackItem from '@/components/TrackItem.vue'
 import TrackSkeleton from '@/components/TrackSkeleton.vue'
 import SortChips from '@/components/SortChips.vue'
 import api from '@/api/client'
-import { Users, Music, Globe } from 'lucide-vue-next'
+import { Users, Music, Globe, Shuffle } from 'lucide-vue-next'
 
 // Universal context menu
 const { openMenu } = useContextMenu()
@@ -499,38 +497,6 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 16px;
-}
-
-.shuffle-all-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--c-accent);
-  color: #000;
-  border: none;
-  border-radius: 20px;
-  padding: 8px 16px;
-  font-weight: 600;
-  font-size: 13px;
-  cursor: pointer;
-  white-space: nowrap;
-  box-shadow:
-    3px 3px 6px var(--sh-dark),
-    -2px -2px 4px var(--sh-light),
-    0 0 10px var(--c-accent-glow));
-  transition: all 0.15s ease;
-}
-
-.shuffle-all-btn:active {
-  transform: scale(0.97);
-  box-shadow:
-    inset 2px 2px 4px rgba(0, 0, 0, 0.3),
-    0 0 8px var(--c-accent-glow));
-}
-
-.shuffle-all-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 /* Loading state - uses .spinner from design-system.css */

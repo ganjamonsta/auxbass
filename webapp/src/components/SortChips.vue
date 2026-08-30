@@ -68,39 +68,38 @@ const toggleOrder = () => {
 
 .sort-buttons {
   display: flex;
-  border-radius: 28px;
+  height: 40px;
+  border-radius: var(--r-full);
   background: var(--c-accent);
   box-shadow: 
-    6px 6px 12px rgba(0, 0, 0, 0.3),
-    -3px -3px 8px rgba(255, 255, 255, 0.1),
-    inset 0 1px 1px rgba(255, 255, 255, 0.2);
+    4px 4px 8px var(--sh-dark),
+    -2px -2px 4px var(--sh-light),
+    0 0 12px var(--c-accent-glow);
   overflow: hidden;
 }
 
 .sort-btn {
   height: 40px;
+  width: 40px;
+  padding: 0;
   border: none;
   background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  color: #000;
+  color: var(--c-accent-text, #000);
   cursor: pointer;
   transition: all 0.15s ease;
   position: relative;
-  font-size: 13px;
-  font-weight: 500;
+}
+
+.sort-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
 }
 
 .sort-btn:active {
-  background: rgba(0, 0, 0, 0.1);
-  box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.15);
-}
-
-.mode-btn {
-  width: 40px;
-  padding: 0;
+  background: rgba(0, 0, 0, 0.15);
+  box-shadow: inset 1px 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .mode-btn::after {
@@ -111,11 +110,6 @@ const toggleOrder = () => {
   right: 0;
   width: 1px;
   background: rgba(0, 0, 0, 0.15);
-}
-
-.order-btn {
-  width: 40px;
-  padding: 0;
 }
 
 .chip-icon {

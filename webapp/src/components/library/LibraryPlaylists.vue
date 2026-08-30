@@ -33,10 +33,10 @@
           @next="onNextSort"
           @toggle-order="onToggleOrder"
         />
-        <button v-if="scope === 'global'" class="action-btn" @click="showManageModal = true">
+        <button v-if="scope === 'global'" class="btn-pill-primary" @click="showManageModal = true">
           <Plus :size="16" /> Добавить
         </button>
-        <button v-else class="action-btn" @click="handleCreatePlaylist">
+        <button v-else class="btn-pill-primary" @click="handleCreatePlaylist">
           <Plus :size="16" /> Создать
         </button>
       </div>
@@ -374,32 +374,6 @@ defineExpose({
 .stats {
   color: var(--c-text-2);
   font-size: 14px;
-}
-
-.action-btn {
-  padding: 8px 14px;
-  background: var(--c-accent);
-  border: none;
-  border-radius: 20px;
-  color: #000;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.2s, opacity 0.2s;
-  width: auto !important;
-  max-width: fit-content;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.action-btn:hover {
-  opacity: 0.9;
-}
-
-.action-btn:active {
-  transform: scale(0.97);
 }
 
 /* Liked card (inline, above grid) */

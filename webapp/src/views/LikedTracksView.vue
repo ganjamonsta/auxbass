@@ -3,9 +3,7 @@
     <!-- No channel - show setup prompt -->
     <div v-if="!authStore.hasChannel" class="no-channel-prompt">
       <div class="prompt-icon">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-        </svg>
+        <Heart :size="48" />
       </div>
       <h2>Понравившиеся</h2>
       <p>Подключите Telegram-канал, чтобы сохранять понравившиеся треки</p>
@@ -15,66 +13,58 @@
     </div>
 
     <template v-else>
-      <!-- Header -->
-      <div class="liked-header">
-      <div class="liked-cover">
-        <svg class="liked-icon" width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-        </svg>
+      <!-- Unified Hero Header -->
+      <div class="hero-header">
+        <div class="hero-cover liked-cover">
+          <Heart :size="48" class="liked-icon" />
+        </div>
+        <div class="hero-info">
+          <h1 class="hero-title">Понравившиеся</h1>
+          <p class="hero-meta">{{ tracks.length }} треков</p>
+        </div>
       </div>
-      <div class="liked-info">
-        <h1>Понравившиеся</h1>
-        <p class="meta">{{ tracks.length }} треков</p>
+
+      <!-- Unified Actions -->
+      <div class="hero-actions" v-if="tracks.length">
+        <div class="action-buttons">
+          <button class="action-btn play-btn" @click="playAll" title="Слушать все">
+            <Play :size="20" fill="currentColor" />
+          </button>
+          <button class="action-btn shuffle-btn" @click="shufflePlay" title="Перемешать">
+            <Shuffle :size="18" />
+          </button>
+        </div>
       </div>
-    </div>
 
-    <!-- Actions -->
-    <div class="liked-actions">
-      <div class="action-buttons" v-if="tracks.length">
-        <button class="action-btn play-btn" @click="playAll">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M8 5v14l11-7z"/>
-          </svg>
-        </button>
-        <button class="action-btn shuffle-btn" @click="shufflePlay">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
-          </svg>
-        </button>
+      <!-- Loading -->
+      <div v-if="loading" class="loading">
+        <div class="spinner"></div>
       </div>
-    </div>
 
-    <!-- Loading -->
-    <div v-if="loading" class="loading">
-      <div class="spinner"></div>
-    </div>
-
-    <!-- Track list -->
-    <div class="track-list" v-else-if="tracks.length">
-      <TrackItem
-        v-for="(track, index) in sortedTracks"
-        :key="track.id"
-        :track="track"
-        :isPlaying="playerStore.currentTrack?.id === track.id"
-        :isLiked="true"
-        @click="playTrack(track, index)"
-        @like="unlikeTrack(track)"
-        @menu="(e) => openMenu('track', track, 'liked', e)"
-        @download="handleDirectDownload(track)"
-        @hdNotice="handleHdNotice"
-      />
-    </div>
-
-    <!-- Empty state -->
-    <div v-else class="empty-state">
-      <div class="empty-icon">
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-        </svg>
+      <!-- Track list -->
+      <div class="track-list" v-else-if="tracks.length">
+        <TrackItem
+          v-for="(track, index) in sortedTracks"
+          :key="track.id"
+          :track="track"
+          :isPlaying="playerStore.currentTrack?.id === track.id"
+          :isLiked="true"
+          @click="playTrack(track, index)"
+          @like="unlikeTrack(track)"
+          @menu="(e) => openMenu('track', track, 'liked', e)"
+          @download="handleDirectDownload(track)"
+          @hdNotice="handleHdNotice"
+        />
       </div>
-      <p>Нет понравившихся треков</p>
-      <p class="hint">Нажмите ♡ на треке, чтобы добавить</p>
-    </div>
+
+      <!-- Empty state -->
+      <div v-else class="empty-state">
+        <div class="empty-icon">
+          <Heart :size="48" />
+        </div>
+        <p>Нет понравившихся треков</p>
+        <p class="hint">Нажмите ♡ на треке, чтобы добавить</p>
+      </div>
     </template>
   </div>
 </template>
@@ -89,6 +79,7 @@ import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useTrackActions, usePlaybackActions, useTrackSync } from '@/composables'
 import TrackItem from '@/components/TrackItem.vue'
+import { Heart, Play, Shuffle } from 'lucide-vue-next'
 
 // Universal context menu
 const { openMenu } = useContextMenu()
@@ -131,8 +122,6 @@ const unlikeTrack = async (track) => {
   }
 }
 
-// Track actions (handleDirectDownload, handleHdNotice) provided by useTrackActions above
-
 onMounted(async () => {
   loading.value = true
   await libraryStore.fetchLikedTracks()
@@ -145,121 +134,22 @@ onMounted(async () => {
   padding: 16px;
 }
 
-.liked-header {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
 .liked-cover {
-  width: 120px;
-  height: 120px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #ff4564, #c8325a);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  background: linear-gradient(135deg, #2a151b 0%, #181818 100%);
+  border: 1px solid rgba(255, 69, 100, 0.2);
+  box-shadow: 
+    6px 6px 14px var(--sh-dark),
+    -3px -3px 8px var(--sh-light),
+    0 0 24px rgba(255, 69, 100, 0.15);
 }
 
 .liked-icon {
-  color: white;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+  color: #ff4564;
+  filter: drop-shadow(0 0 10px rgba(255, 69, 100, 0.6));
 }
 
-.liked-info {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-}
-
-.liked-info h1 {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--c-text-1);
-  margin: 0 0 8px 0;
-}
-
-.liked-info .meta {
-  color: var(--c-text-3);
-  font-size: 14px;
-  margin: 0;
-}
-
-.liked-actions {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 24px;
-}
-
-.action-buttons {
-  display: flex;
-  border-radius: 28px;
-  background: linear-gradient(135deg, #ff4564, #c8325a);
-  box-shadow: 
-    6px 6px 12px rgba(0, 0, 0, 0.3),
-    -3px -3px 8px rgba(255, 255, 255, 0.1),
-    inset 0 1px 1px rgba(255, 255, 255, 0.2);
-  overflow: hidden;
-}
-
-.action-btn {
-  width: 48px;
-  height: 48px;
-  border: none;
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  position: relative;
-}
-
-.action-btn::after {
-  content: '';
-  position: absolute;
-  top: 10px;
-  bottom: 10px;
-  width: 1px;
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.action-btn.play-btn::after {
-  right: 0;
-}
-
-.action-btn.shuffle-btn::after {
-  display: none;
-}
-
-.action-btn:active {
-  background: rgba(0, 0, 0, 0.15);
-  box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.action-btn.play-btn svg {
+.play-btn svg {
   margin-left: 2px;
-}
-
-.loading {
-  display: flex;
-  justify-content: center;
-  padding: 48px;
-}
-
-.spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--c-bg-4);
-  border-top-color: #ff4564;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 
 .track-list {
@@ -288,53 +178,5 @@ onMounted(async () => {
 .empty-state .hint {
   font-size: 13px;
   color: var(--c-text-3);
-}
-
-/* No channel prompt */
-.no-channel-prompt {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 60vh;
-  text-align: center;
-  padding: 32px 24px;
-}
-
-.no-channel-prompt .prompt-icon {
-  color: rgba(255, 69, 100, 0.8);
-  margin-bottom: 16px;
-}
-
-.no-channel-prompt h2 {
-  color: var(--c-text-1);
-  font-size: 24px;
-  font-weight: 700;
-  margin: 0 0 12px 0;
-}
-
-.no-channel-prompt p {
-  color: var(--c-text-2);
-  font-size: 15px;
-  line-height: 1.5;
-  margin: 0 0 24px 0;
-  max-width: 300px;
-}
-
-.no-channel-prompt .setup-btn {
-  background: linear-gradient(135deg, #ff4564 0%, #ff6b8a 100%);
-  border: none;
-  border-radius: 24px;
-  color: #fff;
-  font-size: 16px;
-  font-weight: 600;
-  padding: 14px 32px;
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.no-channel-prompt .setup-btn:hover {
-  transform: scale(1.02);
-  box-shadow: 0 4px 16px rgba(255, 69, 100, 0.3);
 }
 </style>
