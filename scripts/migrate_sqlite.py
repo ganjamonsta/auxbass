@@ -14,6 +14,43 @@ def migrate_sqlite_db(db_path: str):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
+    # Set WAL mode and busy timeout for high concurrency
+    cursor.execute("PRAGMA journal_mode=WAL;")
+    cursor.execute("PRAGMA synchronous=NORMAL;")
+    cursor.execute("PRAGMA busy_timeout=60000;")
+
+    # Check if channel_messages has message_id NOT NULL and fix it
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='channel_messages';")
+    if cursor.fetchone():
+        cursor.execute("PRAGMA table_info(channel_messages);")
+        cm_cols = {row[1]: {"notnull": row[3]} for row in cursor.fetchall()}
+        if cm_cols.get("message_id", {}).get("notnull") == 1:
+            print("  [+] Migrating channel_messages to make message_id nullable...")
+            cursor.execute("PRAGMA foreign_keys=OFF;")
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS channel_messages_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    channel_id INTEGER NOT NULL REFERENCES user_channels(id) ON DELETE CASCADE,
+                    track_id INTEGER NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
+                    status TEXT DEFAULT 'pending',
+                    message_id BIGINT,
+                    hashtags TEXT,
+                    retry_count INTEGER DEFAULT 0,
+                    last_error VARCHAR(500),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(channel_id, track_id)
+                );
+            """)
+            cursor.execute("""
+                INSERT OR IGNORE INTO channel_messages_new (id, channel_id, track_id, status, message_id, hashtags, retry_count, last_error, created_at, updated_at)
+                SELECT id, channel_id, track_id, COALESCE(status, 'sent'), message_id, hashtags, COALESCE(retry_count, 0), last_error, created_at, updated_at FROM channel_messages;
+            """)
+            cursor.execute("DROP TABLE channel_messages;")
+            cursor.execute("ALTER TABLE channel_messages_new RENAME TO channel_messages;")
+            cursor.execute("PRAGMA foreign_keys=ON;")
+            print("  [OK] channel_messages table migrated!")
+
     # Define all required columns per table with their SQLite types & defaults
     schema_definitions = {
         "channel_messages": [
@@ -72,6 +109,7 @@ def migrate_sqlite_db(db_path: str):
 
     # Create missing indexes
     indexes = [
+        ("idx_channel_message_track", "CREATE INDEX IF NOT EXISTS idx_channel_message_track ON channel_messages(track_id);"),
         ("idx_channel_message_status", "CREATE INDEX IF NOT EXISTS idx_channel_message_status ON channel_messages(channel_id, status);"),
         ("idx_tracks_normalized_artist", "CREATE INDEX IF NOT EXISTS idx_tracks_normalized_artist ON tracks(normalized_artist);"),
     ]
@@ -83,8 +121,9 @@ def migrate_sqlite_db(db_path: str):
 
     conn.commit()
     conn.close()
-    print("[✓] SQLite migration completed successfully!")
+    print("[OK] SQLite migration completed successfully!")
 
 if __name__ == "__main__":
     db_file = sys.argv[1] if len(sys.argv) > 1 else "tg_player.db"
     migrate_sqlite_db(db_file)
+

@@ -3,6 +3,8 @@ TG Player - Database Session Manager v2
 
 Supports both SQLite and PostgreSQL with proper connection pooling.
 """
+import logging
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.pool import NullPool
 from contextlib import asynccontextmanager
@@ -11,7 +13,7 @@ from typing import AsyncGenerator
 from .config import get_settings
 from .models import Base
 
-
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
@@ -46,8 +48,12 @@ engine_kwargs = {
 }
 
 if is_sqlite:
-    # SQLite: use NullPool, no pool settings
+    # SQLite: use NullPool with 60s timeout for write locks
     engine_kwargs["poolclass"] = NullPool
+    engine_kwargs["connect_args"] = {
+        "timeout": 60,
+        "check_same_thread": False,
+    }
 else:
     # PostgreSQL: use connection pooling for better performance
     engine_kwargs.update({
@@ -61,6 +67,16 @@ else:
 # Create async engine
 engine = create_async_engine(database_url, **engine_kwargs)
 
+if is_sqlite:
+    # Configure SQLite PRAGMAs for high-concurrency (WAL mode + 60s busy timeout)
+    @event.listens_for(engine.sync_engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA busy_timeout=60000")
+        cursor.close()
+
 # Session factory
 async_session = async_sessionmaker(
     engine,
@@ -70,7 +86,41 @@ async_session = async_sessionmaker(
 
 
 async def _ensure_sqlite_columns(conn):
-    """Ensure missing columns in SQLite tables are added"""
+    """Ensure missing columns in SQLite tables are added and constraints fixed"""
+    # 1. Check if channel_messages has message_id NOT NULL and fix it
+    res_cm = await conn.exec_driver_sql(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='channel_messages';"
+    )
+    if res_cm.scalar():
+        cm_info = await conn.exec_driver_sql("PRAGMA table_info(channel_messages);")
+        cm_cols = {row[1]: {"notnull": row[3]} for row in cm_info.fetchall()}
+        if cm_cols.get("message_id", {}).get("notnull") == 1:
+            logger.info("Migrating channel_messages to make message_id nullable...")
+            await conn.exec_driver_sql("PRAGMA foreign_keys=OFF;")
+            await conn.exec_driver_sql("""
+                CREATE TABLE IF NOT EXISTS channel_messages_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    channel_id INTEGER NOT NULL REFERENCES user_channels(id) ON DELETE CASCADE,
+                    track_id INTEGER NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
+                    status TEXT DEFAULT 'pending',
+                    message_id BIGINT,
+                    hashtags TEXT,
+                    retry_count INTEGER DEFAULT 0,
+                    last_error VARCHAR(500),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(channel_id, track_id)
+                );
+            """)
+            await conn.exec_driver_sql("""
+                INSERT OR IGNORE INTO channel_messages_new (id, channel_id, track_id, status, message_id, hashtags, retry_count, last_error, created_at, updated_at)
+                SELECT id, channel_id, track_id, COALESCE(status, 'sent'), message_id, hashtags, COALESCE(retry_count, 0), last_error, created_at, updated_at FROM channel_messages;
+            """)
+            await conn.exec_driver_sql("DROP TABLE channel_messages;")
+            await conn.exec_driver_sql("ALTER TABLE channel_messages_new RENAME TO channel_messages;")
+            await conn.exec_driver_sql("PRAGMA foreign_keys=ON;")
+
+    # 2. Add missing columns
     schema_definitions = {
         "channel_messages": [
             ("status", "TEXT DEFAULT 'sent'"),
@@ -127,6 +177,9 @@ async def _ensure_sqlite_columns(conn):
     # Ensure indexes
     try:
         await conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS idx_channel_message_track ON channel_messages(track_id);"
+        )
+        await conn.exec_driver_sql(
             "CREATE INDEX IF NOT EXISTS idx_channel_message_status ON channel_messages(channel_id, status);"
         )
         await conn.exec_driver_sql(
@@ -139,6 +192,10 @@ async def _ensure_sqlite_columns(conn):
 async def init_db():
     """Initialize database tables"""
     async with engine.begin() as conn:
+        if is_sqlite:
+            await conn.exec_driver_sql("PRAGMA journal_mode=WAL;")
+            await conn.exec_driver_sql("PRAGMA synchronous=NORMAL;")
+            await conn.exec_driver_sql("PRAGMA busy_timeout=60000;")
         await conn.run_sync(Base.metadata.create_all)
         if is_sqlite:
             await _ensure_sqlite_columns(conn)
