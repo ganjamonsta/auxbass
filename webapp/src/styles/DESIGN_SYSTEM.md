@@ -25,20 +25,20 @@ webapp/src/
 ### Цвета
 
 ```css
-/* Акцентные */
---c-accent          /* #E53935 - основной красный */
---c-accent-light    /* #FF6F60 */
---c-accent-dark     /* #AB000D */
---c-accent-glow     /* rgba для свечения */
+/* Акцентные (зелёный — единый источник правды) */
+--c-accent          /* #1db954 - основной зелёный */
+--c-accent-light    /* #1ed760 */
+--c-accent-dark     /* #169c46 */
+--c-accent-glow     /* rgba(29, 185, 84, 0.4) */
 --c-accent-text     /* #000000 - текст на акцентном фоне */
+
+/* Алиасы (указывают на --c-accent) */
+--accent            /* var(--c-accent) */
+--accent-text       /* var(--c-accent-text) */
+--accent-glow       /* var(--c-accent-glow) */
 
 --c-secondary       /* #00BCD4 - циан */
 --c-secondary-glow
-
-/* Динамические алиасы (перезаписываются в App.vue для зелёной темы) */
---accent            /* #1db954 - зелёный в App.vue */
---accent-text       /* #000000 - чёрный текст на зелёном фоне */
---accent-glow       /* rgba(29, 185, 84, 0.4) */
 
 /* Поверхности (от тёмного к светлому) */
 --c-bg-0            /* #0D0D0D - самый тёмный */

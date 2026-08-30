@@ -710,14 +710,14 @@ const save = async () => {
 }
 
 .delete-playlist-btn:hover {
-  border-color: var(--danger, #e53935);
-  color: var(--danger, #e53935);
+  border-color: var(--danger, #1db954);
+  color: var(--danger, #1db954);
 }
 
 .delete-playlist-btn.confirm-state {
-  border-color: var(--danger, #e53935);
+  border-color: var(--danger, #1db954);
   color: #fff;
-  background: var(--danger, #e53935);
+  background: var(--danger, #1db954);
   animation: pulse-danger 0.3s ease;
 }
 

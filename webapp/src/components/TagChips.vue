@@ -153,7 +153,7 @@ const iconSize = computed(() => {
 
 /* ─── Icon Color ─── */
 .tag-chip :deep(svg) {
-  color: var(--c-accent, #E53935);
+  color: var(--c-accent, #1db954);
   opacity: 0.7;
   flex-shrink: 0;
 }

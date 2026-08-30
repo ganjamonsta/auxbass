@@ -25,12 +25,18 @@
    ═══════════════════════════════════════════════════════════ */
 
 :root {
-  /* ─── Accent Colors ─── */
-  --c-accent: #E53935;
-  --c-accent-light: #FF6F60;
-  --c-accent-dark: #AB000D;
-  --c-accent-glow: rgba(229, 57, 53, 0.4);
+  /* ─── Accent Colors (Green — single source of truth) ─── */
+  --c-accent: #1db954;
+  --c-accent-light: #1ed760;
+  --c-accent-dark: #169c46;
+  --c-accent-glow: rgba(29, 185, 84, 0.4);
   --c-accent-text: #000000;        /* Text on accent background */
+  
+  /* Unified aliases — all point to the same accent */
+  --accent: var(--c-accent);
+  --accent-hover: var(--c-accent-light);
+  --accent-text: var(--c-accent-text);
+  --accent-glow: var(--c-accent-glow);
   
   --c-secondary: #00BCD4;
   --c-secondary-glow: rgba(0, 188, 212, 0.3);
@@ -41,7 +47,7 @@
   
   /* ─── Surface Colors ─── */
   --c-bg-0: #0D0D0D;      /* Deepest */
-  --c-bg-1: #141414;      /* Base */
+  --c-bg-1: #121212;      /* Base */
   --c-bg-2: #1A1A1A;      /* Elevated */
   --c-bg-3: #222222;      /* Surface */
   --c-bg-4: #2A2A2A;      /* Hover */
@@ -81,14 +87,14 @@
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'Consolas', 'Monaco', monospace;
   
-  /* ─── LCD Panel (Nokia Style) ─── */
+  /* ─── LCD Panel ─── */
   --lcd-bg: linear-gradient(180deg, #0a1520 0%, #051015 100%);
   --lcd-text: #4DC3FF;
   --lcd-glow: rgba(77, 195, 255, 0.6);
   --lcd-dot-on: #00CCFF;
   --lcd-dot-off: #0a2035;
   
-  /* ─── Rubber Button (Nokia Style) ─── */
+  /* ─── Rubber Button ─── */
   --rubber-bg: linear-gradient(180deg, #3a3a3a 0%, #252525 50%, #1a1a1a 100%);
   --rubber-pressed: linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 50%, #151515 100%);
   --rubber-border: #0a0a0a;
@@ -101,8 +107,14 @@
   --z-modal: 100;
   --z-toast: 200;
   
-  /* ─── Legacy Variable Aliases ─── */
-  /* App.vue uses these names - map to design system tokens */
+  /* ─── Layout ─── */
+  --nav-height: 60px;
+  --player-height: 64px;
+  --desktop-player-height: 100px;
+  --sidebar-width: 280px;
+  --now-playing-width: 320px;
+  
+  /* ─── Legacy Aliases (compatibility) ─── */
   --bg-primary: var(--c-bg-1);
   --bg-secondary: var(--c-bg-2);
   --bg-elevated: var(--c-bg-3);
@@ -113,10 +125,6 @@
   --text-tertiary: var(--c-text-3);
   --danger: var(--c-error);
   --border: var(--c-bg-4);
-  
-  /* Accent glow and text - uses --accent which can be overridden by App.vue */
-  --accent-glow: rgba(29, 185, 84, 0.4);
-  --accent-text: #000000;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1216,7 +1224,7 @@
   width: 32px;
   height: 32px;
   border: 3px solid var(--c-bg-4, rgba(255, 255, 255, 0.1));
-  border-top-color: var(--c-accent, #E53935);
+  border-top-color: var(--c-accent, #1db954);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }

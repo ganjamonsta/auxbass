@@ -516,26 +516,7 @@ onUnmounted(() => {
 </script>
 
 <style>
-:root {
-  --bg-primary: #121212;
-  --bg-secondary: #181818;
-  --bg-elevated: #242424;
-  --bg-highlight: #2a2a2a;
-  --text-primary: #ffffff;
-  --text-secondary: #b3b3b3;
-  --text-tertiary: #6a6a6a;
-  --accent: #1db954;
-  --accent-hover: #1ed760;
-  --accent-text: #000000;
-  --accent-glow: rgba(29, 185, 84, 0.4);
-  --danger: #e91429;
-  --border: #282828;
-  --nav-height: 60px;
-  --player-height: 64px;
-  --desktop-player-height: 100px;
-  --sidebar-width: 280px;
-  --now-playing-width: 320px;
-}
+/* App.vue layout styles — tokens are in design-system.css */
 
 * {
   box-sizing: border-box;
@@ -545,9 +526,9 @@ onUnmounted(() => {
 
 html, body {
   height: 100%;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: var(--c-bg-1);
+  color: var(--c-text-1);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -630,7 +611,7 @@ html, body {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   min-height: 0;
-  position: relative; /* for pull indicator positioning */
+  position: relative;
 }
 
 /* Pull-to-refresh indicator */
@@ -645,7 +626,7 @@ html, body {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   font-size: 12px;
   z-index: 10;
   pointer-events: none;
@@ -656,16 +637,16 @@ html, body {
 .ptr-spinner {
   width: 24px;
   height: 24px;
-  color: var(--text-secondary);
+  color: var(--c-text-2);
   transition: color 0.15s;
 }
 
 .ptr-spinner.ready {
-  color: var(--accent);
+  color: var(--c-accent);
 }
 
 .ptr-spinner.active {
-  color: var(--accent);
+  color: var(--c-accent);
   animation: spin 0.8s linear infinite;
 }
 
@@ -674,17 +655,8 @@ html, body {
   opacity: 0.7;
 }
 
-/* Mobile: no extra padding needed since footer is in flex layout */
-.app.has-player .main-content {
-  /* No extra padding needed */
-}
-
-/* Desktop: no extra padding needed, grid handles it */
+/* Desktop: content padding */
 .app.desktop-layout .main-content {
-  padding-bottom: 20px;
-}
-
-.app.desktop-layout.has-player .main-content {
   padding-bottom: 20px;
 }
 
@@ -698,8 +670,8 @@ html, body {
 .auth-spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid var(--bg-highlight);
-  border-top-color: var(--accent);
+  border: 3px solid var(--c-bg-4);
+  border-top-color: var(--c-accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -714,7 +686,6 @@ html, body {
     padding: 0 24px 20px;
   }
   
-  /* Improve track items on desktop */
   .app.desktop-layout :deep(.track-item) {
     border-radius: 8px;
     margin-bottom: 2px;

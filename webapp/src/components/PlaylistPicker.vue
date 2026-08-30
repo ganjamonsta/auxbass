@@ -176,13 +176,13 @@ const handleSelect = async (playlist) => {
   width: 100%;
   padding: 40px 20px;
   background: var(--xm-bg-surface, #222);
-  border: 2px dashed var(--xm-accent, #E53935);
+  border: 2px dashed var(--xm-accent, #1db954);
   border-radius: var(--neu-radius-lg, 16px);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 14px;
-  color: var(--xm-accent, #E53935);
+  color: var(--xm-accent, #1db954);
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
@@ -220,7 +220,7 @@ const handleSelect = async (playlist) => {
 }
 
 .playlist-option.create {
-  color: var(--xm-accent, #E53935);
+  color: var(--xm-accent, #1db954);
   background: linear-gradient(180deg, var(--xm-bg-surface, #222) 0%, var(--xm-bg-elevated, #1A1A1A) 100%);
 }
 

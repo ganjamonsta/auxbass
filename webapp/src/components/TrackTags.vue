@@ -270,7 +270,7 @@ function handleBlur() {
 /* Voted state */
 .tag-chip.voted {
   background: var(--c-accent-bg, rgba(229, 57, 53, 0.12));
-  color: var(--c-accent, #E53935);
+  color: var(--c-accent, #1db954);
   border-color: var(--c-accent-dim, rgba(229, 57, 53, 0.3));
 }
 
@@ -285,7 +285,7 @@ function handleBlur() {
 
 /* Icon color */
 .tag-chip :deep(svg) {
-  color: var(--c-accent, #E53935);
+  color: var(--c-accent, #1db954);
   opacity: 0.7;
   flex-shrink: 0;
 }
@@ -304,14 +304,14 @@ function handleBlur() {
 }
 
 .tag-chip.voted .tag-votes {
-  color: var(--c-accent, #E53935);
+  color: var(--c-accent, #1db954);
   opacity: 1;
 }
 
 /* Voted checkmark */
 .voted-icon {
   margin-left: 1px;
-  color: var(--c-accent, #E53935) !important;
+  color: var(--c-accent, #1db954) !important;
   opacity: 1 !important;
 }
 
@@ -324,7 +324,7 @@ function handleBlur() {
 
 .add-tag-btn:hover {
   border-color: var(--c-accent-dim, rgba(229, 57, 53, 0.4));
-  color: var(--c-accent, #E53935);
+  color: var(--c-accent, #1db954);
   background: var(--c-accent-bg, rgba(229, 57, 53, 0.06));
 }
 
@@ -382,7 +382,7 @@ function handleBlur() {
   height: 28px;
   border: none;
   border-radius: 50%;
-  background: var(--c-accent, #E53935);
+  background: var(--c-accent, #1db954);
   color: #fff;
   cursor: pointer;
   transition: all 0.15s ease;

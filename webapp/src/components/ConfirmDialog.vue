@@ -157,7 +157,7 @@ const icon = computed(() => {
 }
 
 .btn-confirm {
-  background: linear-gradient(180deg, var(--xm-accent, #E53935) 0%, var(--xm-accent-dark, #C62828) 100%);
+  background: linear-gradient(180deg, var(--xm-accent, #1db954) 0%, var(--xm-accent-dark, #169c46) 100%);
   color: white;
   box-shadow: 
     4px 4px 10px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),

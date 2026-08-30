@@ -663,7 +663,7 @@ const firstTag = computed(() => {
 .track-tag-badge {
   font-size: 10px;
   font-weight: 600;
-  color: var(--c-accent, #E53935);
+  color: var(--c-accent, #1db954);
   opacity: 0.6;
   white-space: nowrap;
   flex-shrink: 0;

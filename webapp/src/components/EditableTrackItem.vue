@@ -56,7 +56,7 @@ defineEmits(['dragstart', 'dragend', 'dragover', 'drop', 'remove'])
 }
 
 .remove-btn:hover { 
-  background: var(--danger, #e53935); 
+  background: var(--danger, #1db954); 
   color: #fff;
   transform: scale(1.1);
 }

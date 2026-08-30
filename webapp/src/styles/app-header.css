@@ -1,17 +1,12 @@
 /* ════════════════════════════════════════════════════════════════════
-   Header & Search Bar Styles
-   
-   NOTE: These styles are consolidated with app.css to avoid duplication.
-   Search-related styles (.search-wrapper, .search-scope-btn, .search-tag, 
-   .search-content, .search-input-inline) are now defined in app.css.
-   This file only contains header-specific styles not duplicated elsewhere.
+   Header Styles (neumorphic)
+   Search-related styles are in app.css
    ════════════════════════════════════════════════════════════════════ */
 
-/* Header title styles - unique to header */
 .oneui-header {
   flex-shrink: 0;
   padding: 8px 12px 10px;
-  background: linear-gradient(180deg, var(--spotify-gray-dark) 0%, var(--spotify-black) 100%);
+  background: linear-gradient(180deg, var(--c-bg-2) 0%, var(--c-bg-1) 100%);
 }
 
 .header-row {
@@ -44,16 +39,7 @@
   text-overflow: ellipsis;
 }
 
-.header-title-main:active {
-  opacity: 0.7;
-}
+.header-title-main:active { opacity: 0.7; }
 
-/* Search toggle button in header */
-.search-toggle {
-  flex-shrink: 0;
-}
-
-.search-icon {
-  flex-shrink: 0;
-  color: var(--spotify-text-muted);
-}
+.search-toggle { flex-shrink: 0; }
+.search-icon { flex-shrink: 0; color: var(--c-text-3); }

@@ -236,7 +236,7 @@ const handleSubmit = async () => {
   box-shadow: 
     inset 4px 4px 8px var(--neu-shadow-inset-dark, rgba(0, 0, 0, 0.4)),
     inset -2px -2px 4px var(--neu-shadow-inset-light, rgba(255, 255, 255, 0.02)),
-    0 0 0 2px var(--xm-accent, #E53935);
+    0 0 0 2px var(--xm-accent, #1db954);
 }
 
 .form-input::placeholder {
@@ -262,7 +262,7 @@ const handleSubmit = async () => {
 }
 
 .btn-primary {
-  background: linear-gradient(180deg, var(--xm-accent, #E53935) 0%, var(--xm-accent-dark, #C62828) 100%);
+  background: linear-gradient(180deg, var(--xm-accent, #1db954) 0%, var(--xm-accent-dark, #169c46) 100%);
   color: white;
   box-shadow: 
     4px 4px 10px var(--neu-shadow-dark, rgba(0, 0, 0, 0.5)),

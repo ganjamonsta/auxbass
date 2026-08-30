@@ -61,5 +61,5 @@ defineEmits(['add', 'remove'])
 
 .action-btn:hover { transform: scale(1.1); }
 .action-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-.action-btn.check:hover { background: var(--danger, #e53935); color: #fff; }
+.action-btn.check:hover { background: var(--danger, #1db954); color: #fff; }
 </style>
