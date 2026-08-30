@@ -9,11 +9,13 @@
         :progress="progress"
         :duration="duration"
         :buffered="buffered"
+        :is-liked="isLiked"
         @expand="$emit('expand-player')"
         @toggle="$emit('toggle-play')"
         @next="$emit('next-track')"
         @toggleShuffle="$emit('toggle-shuffle')"
         @toggleRepeat="$emit('toggle-repeat')"
+        @like="$emit('like')"
       />
     </div>
 
@@ -69,6 +71,10 @@ const props = defineProps({
     type: Number,
     default: 0
   },
+  isLiked: {
+    type: Boolean,
+    default: false
+  },
   // Navigation props
   showNav: {
     type: Boolean,
@@ -90,6 +96,9 @@ const emit = defineEmits([
   'expand-player', 
   'toggle-play', 
   'next-track',
+  'toggle-shuffle',
+  'toggle-repeat',
+  'like',
   'nav-click',
   'reset-view'
 ])
@@ -107,17 +116,43 @@ const isActiveRoute = (path, matchPaths = []) => {
   return matchPaths.some(p => route.path.startsWith(p))
 }
 
+const scrollToTop = () => {
+  // 1. Primary main-content container
+  const mainContent = document.querySelector('.main-content')
+  if (mainContent) {
+    mainContent.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // 2. All possible scroll containers
+  const scrollContainers = document.querySelectorAll(
+    '.main-content, .main-content-wrapper, .library-view, .collections-view, .liked-tracks-view, .friends-view, .settings-view, .virtual-track-list, .virtual-grid, .page-scroll-container, .mobile-page-content'
+  )
+  scrollContainers.forEach((el) => {
+    if (el && el.scrollTop > 0) {
+      el.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  })
+
+  // 3. Global window fallback
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+  if (document.documentElement) {
+    document.documentElement.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
+
 const handleNavClick = (path) => {
-  // If already on this page
-  if (isActiveRoute(path, props.navItems.find(i => i.path === path)?.matchPaths || [path])) {
-    // Check if we're at the top of the page
-    const scrollTop = window.scrollY || document.documentElement.scrollTop
-    
-    if (scrollTop > 100) {
-      // If not at top - scroll to top
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    } else {
-      // If already at top - reset view state
+  const currentNav = props.navItems.find(i => i.path === path)
+  const isCurrentActive = isActiveRoute(path, currentNav?.matchPaths || [path])
+
+  if (isCurrentActive) {
+    const mainContent = document.querySelector('.main-content')
+    const currentScroll = mainContent ? mainContent.scrollTop : (window.scrollY || document.documentElement.scrollTop || 0)
+
+    // Smoothly scroll to top
+    scrollToTop()
+
+    // If already at or near top (or user taps again at top), reset view state / filters
+    if (currentScroll <= 30) {
       emit('reset-view', path)
       window.dispatchEvent(new CustomEvent('reset-view-state', { detail: { route: path } }))
     }

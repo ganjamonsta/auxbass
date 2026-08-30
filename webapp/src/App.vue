@@ -90,11 +90,13 @@
         :progress="playerStore.progress"
         :duration="playerStore.duration"
         :buffered="playerStore.buffered"
+        :isLiked="isCurrentTrackLiked"
         @expand-player="showFullPlayer = true"
         @toggle-play="playerStore.togglePlay()"
         @next-track="playerStore.next()"
         @toggle-shuffle="playerStore.toggleShuffle()"
         @toggle-repeat="playerStore.toggleRepeat()"
+        @like="handleToggleLike"
       />
 
       <!-- Desktop: Now Playing Sidebar -->
@@ -111,7 +113,7 @@
 
       <!-- Full player modal - Desktop version -->
       <FullPlayerDesktop
-        v-if="showFullPlayer && isDesktop"
+        v-if="isDesktop"
         :show="showFullPlayer"
         :track="playerStore.currentTrack"
         :is-playing="playerStore.isPlaying"
@@ -146,40 +148,42 @@
       />
 
       <!-- Full player modal - Mobile version (original) -->
-      <FullPlayer 
-        v-if="showFullPlayer && !isDesktop"
-        :track="playerStore.currentTrack"
-        :is-playing="playerStore.isPlaying"
-        :loading="playerStore.loading"
-        :progress="playerStore.progress"
-        :duration="playerStore.duration"
-        :buffered="playerStore.buffered"
-        :volume="playerStore.volume"
-        :is-muted="playerStore.isMuted"
-        :shuffle="playerStore.shuffle"
-        :repeat="playerStore.repeat"
-        :queue="playerStore.queue"
-        :queue-index="playerStore.queueIndex"
-        :shuffle-order="playerStore.shuffleOrder"
-        :shuffle-index="playerStore.shuffleIndex"
-        :is-liked="isCurrentTrackLiked"
-        :lazy-shuffle-mode="playerStore.isLazyShuffleMode()"
-        :lazy-shuffle-total="playerStore.lazyShuffleIds?.length || 0"
-        :lazy-shuffle-index="playerStore.lazyShuffleIndex"
-        @close="showFullPlayer = false"
-        @toggle="playerStore.togglePlay()"
-        @next="playerStore.next()"
-        @prev="playerStore.prev()"
-        @seek="playerStore.seek($event)"
-        @setVolume="playerStore.setVolume($event)"
-        @toggleMute="playerStore.toggleMute()"
-        @toggleShuffle="playerStore.toggleShuffle()"
-        @toggleRepeat="playerStore.toggleRepeat()"
-        @removeFromQueue="playerStore.removeFromQueue($event)"
-        @moveInQueue="playerStore.moveInQueue($event.from, $event.to)"
-        @playFromQueue="playerStore.playFromQueue($event)"
-        @like="handleToggleLike"
-      />
+      <Transition name="player-slide">
+        <FullPlayer 
+          v-if="showFullPlayer && !isDesktop"
+          :track="playerStore.currentTrack"
+          :is-playing="playerStore.isPlaying"
+          :loading="playerStore.loading"
+          :progress="playerStore.progress"
+          :duration="playerStore.duration"
+          :buffered="playerStore.buffered"
+          :volume="playerStore.volume"
+          :is-muted="playerStore.isMuted"
+          :shuffle="playerStore.shuffle"
+          :repeat="playerStore.repeat"
+          :queue="playerStore.queue"
+          :queue-index="playerStore.queueIndex"
+          :shuffle-order="playerStore.shuffleOrder"
+          :shuffle-index="playerStore.shuffleIndex"
+          :is-liked="isCurrentTrackLiked"
+          :lazy-shuffle-mode="playerStore.isLazyShuffleMode()"
+          :lazy-shuffle-total="playerStore.lazyShuffleIds?.length || 0"
+          :lazy-shuffle-index="playerStore.lazyShuffleIndex"
+          @close="showFullPlayer = false"
+          @toggle="playerStore.togglePlay()"
+          @next="playerStore.next()"
+          @prev="playerStore.prev()"
+          @seek="playerStore.seek($event)"
+          @setVolume="playerStore.setVolume($event)"
+          @toggleMute="playerStore.toggleMute()"
+          @toggleShuffle="playerStore.toggleShuffle()"
+          @toggleRepeat="playerStore.toggleRepeat()"
+          @removeFromQueue="playerStore.removeFromQueue($event)"
+          @moveInQueue="playerStore.moveInQueue($event.from, $event.to)"
+          @playFromQueue="playerStore.playFromQueue($event)"
+          @like="handleToggleLike"
+        />
+      </Transition>
       
       <!-- Channel setup banner -->
       <ChannelBanner />
@@ -706,6 +710,27 @@ html, body {
   .app.desktop-layout :deep(.track-item:hover) {
     background: rgba(255, 255, 255, 0.1);
   }
+}
+
+/* Full player mobile slide transition */
+.player-slide-enter-active {
+  transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease;
+}
+
+.player-slide-leave-active {
+  transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease;
+}
+
+.player-slide-enter-from,
+.player-slide-leave-to {
+  transform: translateY(100%);
+  opacity: 0.6;
+}
+
+.player-slide-enter-to,
+.player-slide-leave-from {
+  transform: translateY(0);
+  opacity: 1;
 }
 
 @media (min-width: 1440px) {

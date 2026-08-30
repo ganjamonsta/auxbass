@@ -39,6 +39,16 @@
             </svg>
           </span>
           <span 
+            class="lcd-indicator like-indicator" 
+            :class="{ active: isLiked }" 
+            :title="isLiked ? 'Удалить из любимых' : 'Добавить в любимое'"
+            @click.stop="$emit('like')"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" :fill="isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+          </span>
+          <span 
             class="lcd-indicator shuffle-indicator" 
             :class="{ active: playerStore.shuffle }" 
             title="Перемешивание"
@@ -135,10 +145,14 @@ const props = defineProps({
   buffered: {
     type: Number,
     default: 0
+  },
+  isLiked: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['expand', 'toggle', 'next', 'toggleShuffle', 'toggleRepeat'])
+const emit = defineEmits(['expand', 'toggle', 'next', 'toggleShuffle', 'toggleRepeat', 'like'])
 
 const progressPercent = computed(() => {
   const dur = props.duration || props.track?.duration
@@ -353,6 +367,20 @@ const formatTime = (seconds) => {
 .lcd-indicator.hd-indicator.active {
   color: #ffd700;
   text-shadow: 0 0 8px rgba(255, 215, 0, 0.8);
+}
+
+.lcd-indicator.like-indicator:hover {
+  opacity: 0.85;
+}
+
+.lcd-indicator.like-indicator.active {
+  opacity: 1;
+  color: #ff4b7b;
+  text-shadow: 0 0 8px rgba(255, 75, 123, 0.7);
+}
+
+.lcd-indicator.like-indicator.active svg {
+  filter: drop-shadow(0 0 4px rgba(255, 75, 123, 0.8));
 }
 
 .lcd-indicator.net-indicator.active {

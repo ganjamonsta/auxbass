@@ -590,7 +590,6 @@ const formatTime = (seconds) => {
   z-index: 100;
   padding: 8px 16px;
   padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
-  transition: transform 0.1s ease-out, opacity 0.1s ease-out;
   touch-action: pan-y;
   overflow: hidden;
 }
