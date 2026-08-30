@@ -11,6 +11,7 @@ from typing import Optional, List
 from datetime import datetime, timezone
 from collections import deque
 from dataclasses import dataclass
+import html
 import json
 import logging
 
@@ -35,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 def build_track_caption(track, hashtags=None, *, enrichment_override=None):
-    """Build a standard caption for a track in a channel message.
+    """Build a standard caption for a track in a channel message (HTML escaped).
     
     Args:
         track: Track model instance
@@ -47,15 +48,15 @@ def build_track_caption(track, hashtags=None, *, enrichment_override=None):
     """
     caption_parts = []
     if hasattr(track, 'has_metadata') and not track.has_metadata:
-        caption_parts.append(f"🎵 {track.display_title}")
+        caption_parts.append(f"🎵 {html.escape(track.display_title or '')}")
     else:
         if track.title:
-            caption_parts.append(f"🎵 {track.title}")
+            caption_parts.append(f"🎵 {html.escape(track.title)}")
         if track.artist:
-            caption_parts.append(f"👤 {track.artist}")
+            caption_parts.append(f"👤 {html.escape(track.artist)}")
         enr = enrichment_override if enrichment_override is not None else getattr(track, 'enrichment', None)
         if enr and enr.album_name:
-            caption_parts.append(f"💿 {enr.album_name}")
+            caption_parts.append(f"💿 {html.escape(enr.album_name)}")
     
     if hashtags:
         caption_parts.append("")
@@ -537,13 +538,35 @@ class ChannelService:
                 
                 caption = build_track_caption(track, hashtags)
                 
-                # Send to Telegram
-                sent_message = await use_bot.send_audio(
-                    chat_id=channel.channel_id,
-                    audio=track.file_id,
-                    caption=caption,
-                    parse_mode="HTML",
-                )
+                # Send to Telegram (with fallback for document audio or formatting errors)
+                sent_message = None
+                try:
+                    sent_message = await use_bot.send_audio(
+                        chat_id=channel.channel_id,
+                        audio=track.file_id,
+                        caption=caption,
+                        parse_mode="HTML",
+                    )
+                except TelegramBadRequest as e:
+                    err_str = str(e).lower()
+                    if "wrong file identifier" in err_str or "can't use file" in err_str:
+                        # File was uploaded as document/file, retry with send_document
+                        sent_message = await use_bot.send_document(
+                            chat_id=channel.channel_id,
+                            document=track.file_id,
+                            caption=caption,
+                            parse_mode="HTML",
+                        )
+                    elif "can't parse entities" in err_str:
+                        # HTML entity issue, retry without parse_mode
+                        sent_message = await use_bot.send_audio(
+                            chat_id=channel.channel_id,
+                            audio=track.file_id,
+                            caption=caption,
+                            parse_mode=None,
+                        )
+                    else:
+                        raise
                 
                 # STEP 3a: Mark as SENT with message_id
                 channel_message.status = ChannelMessageStatus.SENT

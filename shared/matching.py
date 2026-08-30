@@ -4,6 +4,7 @@ TG Player - Text Normalization and Matching Utilities
 Consolidated module for all text normalization and fuzzy matching.
 Used by: enrichment, album assembly, search, deduplication.
 """
+import html
 import re
 import unicodedata
 from typing import Optional, List, Tuple
@@ -742,7 +743,7 @@ def generate_hashtags(
 
 def format_hashtags(tags: List[str]) -> str:
     """Format list of tags as hashtag string."""
-    return ' '.join(f'#{tag}' for tag in tags)
+    return ' '.join(f'#{html.escape(tag)}' for tag in tags)
 
 
 def extract_artists_from_filename(filename: str) -> List[str]:

@@ -347,8 +347,18 @@ class AlbumService:
             if not tracks:
                 return None
             
+            if isinstance(tracks, dict):
+                tracks = tracks.get("track", [])
+                if isinstance(tracks, dict):
+                    tracks = [tracks]
+
+            if not isinstance(tracks, list):
+                return None
+            
             tracklist = []
             for i, t in enumerate(tracks, 1):
+                if not isinstance(t, dict):
+                    continue
                 duration = 0
                 if t.get("duration"):
                     try:
@@ -362,6 +372,9 @@ class AlbumService:
                     "artist": artist_name,
                     "duration": duration,
                 })
+            
+            if not tracklist:
+                return None
             
             logger.info(f"Loaded tracklist from Last.fm: {album_name} - {len(tracklist)} tracks")
             return tracklist
