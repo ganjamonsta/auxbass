@@ -90,7 +90,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
@@ -163,10 +163,13 @@ const coverImages = computed(() => {
 
 // Data loading
 const loadPlaylist = async () => {
+  if (!route.params.id) return
   loading.value = true
   try {
     const response = await api.get(`/playlists/${route.params.id}`)
     playlist.value = response.data
+  } catch (error) {
+    console.error('Failed to load playlist:', error)
   } finally {
     loading.value = false
   }
@@ -239,8 +242,22 @@ const toggleSubscription = async () => {
   }
 }
 
-// Load on mount
-onMounted(loadPlaylist)
+const onPlaylistChanged = (e) => {
+  const changedId = e?.detail?.playlistId
+  if (!changedId || String(changedId) === String(route.params.id) || (playlist.value && String(changedId) === String(playlist.value.id))) {
+    loadPlaylist()
+  }
+}
+
+// Load on mount & listen for global changes
+onMounted(() => {
+  loadPlaylist()
+  window.addEventListener('playlist:changed', onPlaylistChanged)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('playlist:changed', onPlaylistChanged)
+})
 
 // Reload when route params change (for sidebar navigation)
 watch(

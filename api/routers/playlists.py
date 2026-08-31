@@ -91,11 +91,10 @@ async def get_my_playlists(
     db: AsyncSession = Depends(get_db),
 ):
     """Get user's public playlists (owned and subscribed). Supports search, sort and offset/limit pagination."""
-    # Build set of user's visible playlist IDs (owned public + subscribed)
+    # Build set of user's visible playlist IDs (owned all + subscribed public)
     owned_ids_q = (
         select(Playlist.id)
         .where(Playlist.owner_id == user.id)
-        .where(Playlist.is_public == True)
     )
     
     if include_subscribed:
@@ -163,7 +162,7 @@ async def get_my_playlists(
     
     items = []
     for playlist, owner, tc in rows:
-        _, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id)
+        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id)
         
         is_owner = playlist.owner_id == user.id
         is_subscribed = False
@@ -181,7 +180,7 @@ async def get_my_playlists(
             id=playlist.id,
             name=playlist.name,
             description=playlist.description,
-            track_count=tc,
+            track_count=track_count,
             total_duration=total_duration,
             cover_url=cover_url,
             covers=covers,
@@ -332,7 +331,7 @@ async def get_global_playlists(
     
     items = []
     for playlist, owner, tc in rows:
-        _, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id)
+        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id)
         
         is_owner = playlist.owner_id == user.id
         is_subscribed = False
@@ -350,7 +349,7 @@ async def get_global_playlists(
             id=playlist.id,
             name=playlist.name,
             description=playlist.description,
-            track_count=tc,
+            track_count=track_count,
             total_duration=total_duration,
             cover_url=cover_url,
             covers=covers,

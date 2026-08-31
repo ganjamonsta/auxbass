@@ -112,7 +112,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { useAuthStore } from '@/stores/auth'
@@ -216,6 +216,18 @@ const getPlaylistCoverStyle = (playlist) => {
     background: `linear-gradient(135deg, hsl(${hue}, 50%, 40%) 0%, hsl(${(hue + 30) % 360}, 40%, 30%) 100%)`
   }
 }
+
+const onPlaylistChanged = () => {
+  libraryStore.fetchPlaylists()
+}
+
+onMounted(() => {
+  window.addEventListener('playlist:changed', onPlaylistChanged)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('playlist:changed', onPlaylistChanged)
+})
 </script>
 
 <style scoped>

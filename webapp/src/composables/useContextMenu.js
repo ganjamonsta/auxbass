@@ -317,8 +317,7 @@ export function useContextMenu() {
       
       if (confirm(`Удалить плейлист "${playlist.name}"?`)) {
         try {
-          await playlistsApi.delete(playlist.id)
-          await libraryStore.fetchPlaylists()
+          await libraryStore.deletePlaylist(playlist.id)
           uiStore.toast.success('Удалено', `Плейлист "${playlist.name}" удалён`)
         } catch (error) {
           console.error('Failed to delete playlist:', error)
@@ -532,8 +531,7 @@ export function useContextMenu() {
     if (!playlist?.id || !renameValue.value.trim()) return
     
     try {
-      await playlistsApi.update(playlist.id, { name: renameValue.value.trim() })
-      await libraryStore.fetchPlaylists()
+      await libraryStore.updatePlaylist(playlist.id, { name: renameValue.value.trim() })
       uiStore.toast.success('Переименовано', renameValue.value.trim())
       closeRenameModal()
     } catch (error) {
