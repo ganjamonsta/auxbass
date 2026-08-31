@@ -502,6 +502,9 @@ export const useLibraryStore = defineStore('library', () => {
     window.dispatchEvent(new CustomEvent('track:removed', {
       detail: { trackId }
     }))
+    window.dispatchEvent(new CustomEvent('track:removed:library', {
+      detail: { trackId }
+    }))
   }
 
   // Add track to playlist
@@ -554,7 +557,7 @@ export const useLibraryStore = defineStore('library', () => {
     try {
       await tracksApi.delete(id)
       await notifyTrackRemoved(id)
-      total.value--
+      total.value = Math.max(0, (total.value || 0) - 1)
       // Refresh artists list as this track's artist may no longer have tracks
       fetchArtists(artistScope.value)
     } catch (error) {
@@ -776,6 +779,10 @@ export const useLibraryStore = defineStore('library', () => {
   const addToLibrary = async (trackId) => {
     try {
       await tracksApi.addToLibrary(trackId)
+      apiCache.invalidateRelated('track', trackId)
+      apiCache.invalidatePattern('/tracks')
+      apiCache.invalidatePattern('/library')
+      
       await notifyTrackChange(trackId, { in_library: true })
       // Also add to tracks list from a global source if found
       const source = globalTracks.value.find(t => t.id === trackId) ||
@@ -785,7 +792,14 @@ export const useLibraryStore = defineStore('library', () => {
       if (source && !tracks.value.find(t => t.id === trackId)) {
         tracks.value.unshift({ ...source, in_library: true })
         total.value = (total.value || 0) + 1
+      } else {
+        total.value = (total.value || 0) + 1
       }
+      
+      window.dispatchEvent(new CustomEvent('track:added:library', {
+        detail: { trackId }
+      }))
+      
       // Refresh artists list for new artist
       fetchArtists(artistScope.value)
       return true
@@ -805,12 +819,23 @@ export const useLibraryStore = defineStore('library', () => {
   const removeFromLibrary = async (trackId) => {
     try {
       await tracksApi.removeFromLibrary(trackId)
+      apiCache.invalidateRelated('track', trackId)
+      apiCache.invalidatePattern('/tracks')
+      apiCache.invalidatePattern('/library')
+      
       // Remove from library lists
       tracks.value = tracks.value.filter(t => t.id !== trackId)
       likedTracks.value = likedTracks.value.filter(t => t.id !== trackId)
       total.value = Math.max(0, (total.value || 0) - 1)
+      
       // Notify all lists about in_library change
       await notifyTrackChange(trackId, { in_library: false })
+      
+      // Dispatch library-specific removal event
+      window.dispatchEvent(new CustomEvent('track:removed:library', {
+        detail: { trackId }
+      }))
+      
       // Refresh artists list as this track's artist may no longer have tracks in library
       fetchArtists(artistScope.value)
       return true

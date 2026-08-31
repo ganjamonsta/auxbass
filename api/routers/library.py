@@ -126,6 +126,19 @@ def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None,
     if in_library is None:
         in_library = library_entry is not None
     
+    # Combine enrichment tags and user track_tags
+    tags = None
+    if enrichment and enrichment.tags:
+        tags = list(enrichment.tags)
+    
+    track_tags = track.__dict__.get('track_tags')
+    if track_tags:
+        if tags is None:
+            tags = []
+        for tt in track_tags:
+            if tt.tag and tt.tag not in tags:
+                tags.append(tt.tag)
+    
     return TrackResponse(
         id=track.id,
         telegram_file_id=track.file_id,
@@ -143,7 +156,7 @@ def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None,
         album_name=album_info["name"] if album_info else None,
         cover_url=enrichment.cover_url if enrichment else None,
         genre=enrichment.genre if enrichment else None,
-        tags=enrichment.tags if enrichment else None,
+        tags=tags,
         release_date=enrichment.release_date if enrichment else None,
         is_liked=is_liked,
         liked_at=liked_at,
@@ -178,6 +191,7 @@ async def get_my_tracks(
         .where(UserLibrary.user_id == user.id)
         .options(
             selectinload(Track.enrichment),
+            selectinload(Track.track_tags),
             selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
         )
     )

@@ -143,6 +143,7 @@ class ApiCache {
     switch (type) {
       case 'track':
         this.invalidatePattern('/tracks')
+        this.invalidatePattern('/library')
         this.invalidatePattern('/tracks/liked')
         this.invalidatePattern('/tracks/global')
         this.invalidatePattern('/tracks/history')
@@ -159,7 +160,6 @@ class ApiCache {
         
       case 'artist':
         this.invalidatePattern('/artists')
-        this.invalidatePattern('/artists')
         if (id) this.invalidatePattern(`/artists/${id}`)
         break
         
@@ -171,11 +171,13 @@ class ApiCache {
       case 'like':
         this.invalidatePattern('/tracks/liked')
         this.invalidatePattern('/tracks')
+        this.invalidatePattern('/library')
         if (id) this.invalidatePattern(`/tracks/${id}`)
         break
         
       case 'trackRemoved':
         this.invalidatePattern('/tracks')
+        this.invalidatePattern('/library')
         this.invalidatePattern('/tracks/liked')
         this.invalidatePattern('/tracks/global')
         this.invalidatePattern('/tracks/history')

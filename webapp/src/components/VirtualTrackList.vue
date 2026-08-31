@@ -391,6 +391,44 @@ const onTrackChanged = (event) => {
   }
 }
 
+// Listen for track:removed events to remove tracks in-place
+const onTrackRemoved = (event) => {
+  const { trackId } = event.detail || {}
+  if (!trackId) return
+  const idx = sparseItems.value.findIndex(item => item?.id === trackId)
+  if (idx !== -1) {
+    sparseItems.value.splice(idx, 1)
+    total.value = Math.max(0, total.value - 1)
+    emit('update:total', total.value)
+    emit('update:items', sparseItems.value)
+
+    // Clear loaded pages from the removed index onwards so next page items shift correctly
+    const fromPage = getPageForIndex(idx)
+    for (const p of Array.from(loadedPages.value)) {
+      if (p >= fromPage) loadedPages.value.delete(p)
+    }
+    nextTick(() => {
+      loadVisiblePages()
+    })
+  }
+}
+
+// Listen for library-specific track removal
+const onLibraryTrackRemoved = (event) => {
+  const { trackId } = event.detail || {}
+  if (!trackId) return
+  if (props.menuContext === 'library') {
+    onTrackRemoved(event)
+  }
+}
+
+// Listen for track added to library
+const onLibraryTrackAdded = () => {
+  if (props.menuContext === 'library') {
+    reset()
+  }
+}
+
 // Setup
 onMounted(() => {
   scrollContainer = findScrollContainer(containerRef.value)
@@ -413,6 +451,9 @@ onMounted(() => {
   })
   
   window.addEventListener('track:changed', onTrackChanged)
+  window.addEventListener('track:removed', onTrackRemoved)
+  window.addEventListener('track:removed:library', onLibraryTrackRemoved)
+  window.addEventListener('track:added:library', onLibraryTrackAdded)
   load()
 })
 
@@ -423,6 +464,9 @@ onUnmounted(() => {
     scrollContainer.removeEventListener('scroll', handleScroll)
   }
   window.removeEventListener('track:changed', onTrackChanged)
+  window.removeEventListener('track:removed', onTrackRemoved)
+  window.removeEventListener('track:removed:library', onLibraryTrackRemoved)
+  window.removeEventListener('track:added:library', onLibraryTrackAdded)
 })
 
 // Expose methods

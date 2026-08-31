@@ -63,6 +63,10 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { Hash, Plus, Check } from 'lucide-vue-next'
 import { tracksApi } from '@/api/client'
+import { useLibraryStore } from '@/stores/library'
+import apiCache from '@/utils/apiCache'
+
+const libraryStore = useLibraryStore()
 
 const props = defineProps({
   /** Track ID for API calls */
@@ -176,6 +180,8 @@ async function handleTagAction(tag) {
         const { data } = await tracksApi.voteTag(props.trackId, tag.id)
         updateTagInList(tag.id, { vote_count: data.vote_count, voted_by_me: true })
       }
+      const tagList = richTags.value.map(t => t.tag)
+      await libraryStore.notifyTrackChange(props.trackId, { tags: tagList })
     } catch (e) {
       console.warn('[TrackTags] Vote failed:', e)
     }
@@ -205,6 +211,14 @@ async function submitTag() {
     newTag.value = ''
     showInput.value = false
     emit('tagsUpdated', richTags.value)
+
+    // Invalidate API cache so subsequent fetches get fresh tags
+    apiCache.invalidateRelated('track', props.trackId)
+    apiCache.invalidatePattern('/tracks')
+
+    // Notify all app views (VirtualTrackList, TrackItem, etc.) to immediately show the new tag
+    const tagList = richTags.value.map(t => t.tag)
+    await libraryStore.notifyTrackChange(props.trackId, { tags: tagList })
   } catch (e) {
     console.warn('[TrackTags] Add tag failed:', e?.response?.data?.detail || e)
   }

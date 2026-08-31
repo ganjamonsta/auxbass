@@ -1,11 +1,13 @@
 import { onMounted, onUnmounted, isRef } from 'vue'
 
 /**
- * Composable that syncs a local tracks array with global track:changed / track:removed events.
+ * Composable that syncs a local tracks array with global track:changed / track:removed / track:removed:library events.
  * 
  * @param {import('vue').Ref<Array>|Function} tracksRef - A ref or getter returning the tracks array to sync.
+ * @param {Object} [options] - Options
+ * @param {boolean} [options.isLibraryList=false] - Whether this list represents the user's library
  */
-export function useTrackSync(tracksRef) {
+export function useTrackSync(tracksRef, options = {}) {
   const getList = () => {
     if (isRef(tracksRef)) return tracksRef.value
     if (typeof tracksRef === 'function') return tracksRef()
@@ -34,13 +36,21 @@ export function useTrackSync(tracksRef) {
     }
   }
 
+  const onLibraryTrackRemoved = (e) => {
+    if (options.isLibraryList) {
+      onTrackRemoved(e)
+    }
+  }
+
   onMounted(() => {
     window.addEventListener('track:changed', onTrackChanged)
     window.addEventListener('track:removed', onTrackRemoved)
+    window.addEventListener('track:removed:library', onLibraryTrackRemoved)
   })
 
   onUnmounted(() => {
     window.removeEventListener('track:changed', onTrackChanged)
     window.removeEventListener('track:removed', onTrackRemoved)
+    window.removeEventListener('track:removed:library', onLibraryTrackRemoved)
   })
 }

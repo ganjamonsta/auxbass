@@ -181,7 +181,7 @@ import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
-import { useSort, useTrackActions } from '@/composables'
+import { useSort, useTrackActions, useTrackSync } from '@/composables'
 import { useTrackSearch } from '@/composables/useTrackSearch'
 import { useContextMenu } from '@/composables/useContextMenu'
 import VirtualTrackList from '@/components/VirtualTrackList.vue'
@@ -258,6 +258,11 @@ const {
   loadMoreGlobal,
   clearSearch: clearSecondarySearch,
 } = useTrackSearch({ perPage: 50 })
+
+// Sync local track arrays with track changes/removals
+useTrackSync(tracks, { isLibraryList: true })
+useTrackSync(friendsTracks)
+useTrackSync(globalTracks)
 
 // Fetch function for VirtualTrackList (without search)
 const fetchTracks = async ({ offset, limit }) => {

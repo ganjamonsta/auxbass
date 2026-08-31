@@ -1118,6 +1118,7 @@ async def get_all_tracks(
         .where(UserLibrary.user_id == user.id)
         .options(
             selectinload(Track.enrichment),
+            selectinload(Track.track_tags),
             selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
         )
     )
