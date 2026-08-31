@@ -195,9 +195,21 @@
         />
       </div>
       <button 
+        class="lyrics-toggle-btn" 
+        :class="{ active: showLyrics }"
+        @click="showLyrics = !showLyrics; if (showLyrics) showQueue = false"
+        title="Текст песни"
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          <line x1="8" y1="8" x2="16" y2="8"></line>
+          <line x1="8" y1="12" x2="13" y2="12"></line>
+        </svg>
+      </button>
+      <button 
         class="queue-toggle-btn" 
         :class="{ active: showQueue }"
-        @click="showQueue = !showQueue"
+        @click="showQueue = !showQueue; if (showQueue) showLyrics = false"
         title="Очередь"
       >
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
@@ -205,6 +217,19 @@
         </svg>
       </button>
     </div>
+
+    <!-- Full Lyrics overlay -->
+    <Transition name="slide-up-lyrics">
+      <div v-if="showLyrics" class="player-lyrics-container">
+        <LyricsViewer 
+          :track="track" 
+          :currentTime="progress" 
+          :isPlaying="isPlaying" 
+          @seek="$emit('seek', $event)" 
+          @close="showLyrics = false"
+        />
+      </div>
+    </Transition>
 
     <!-- Mini queue -->
     <Transition name="slide-up-queue">
@@ -280,6 +305,7 @@ import { useRouter } from 'vue-router'
 import { getTrackCoverStyle, getTrackInitials, splitArtists, getDisplayTitle, getDisplayArtist, getAllTrackArtists, getCoverUrl, CoverSize } from '@/utils'
 import TagChips from '@/components/TagChips.vue'
 import TrackTags from '@/components/TrackTags.vue'
+import LyricsViewer from '@/components/LyricsViewer.vue'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useContextMenu } from '@/composables/useContextMenu'
@@ -401,6 +427,7 @@ const touchCurrent = ref({ x: 0, y: 0 })
 const isSwiping = ref(false)
 const swipeDirection = ref(null)
 const showQueue = ref(false)
+const showLyrics = ref(false)
 
 // Queue interaction state
 const queueListRef = ref(null)
@@ -1357,6 +1384,80 @@ const formatTime = (seconds) => {
 .lazy-shuffle-meta {
   color: var(--c-text-3);
   font-size: 12px;
+}
+
+.queue-toggle-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-md);
+  border: none;
+  background: var(--c-bg-3);
+  color: var(--c-text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 
+    3px 3px 6px var(--sh-dark),
+    -2px -2px 4px var(--sh-light);
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.lyrics-toggle-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-md);
+  border: none;
+  background: var(--c-bg-3);
+  color: var(--c-text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 
+    3px 3px 6px var(--sh-dark),
+    -2px -2px 4px var(--sh-light);
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.lyrics-toggle-btn:hover,
+.queue-toggle-btn:hover {
+  color: var(--c-text-1);
+}
+
+.lyrics-toggle-btn.active,
+.queue-toggle-btn.active {
+  color: var(--c-accent);
+  box-shadow: 
+    inset 2px 2px 4px var(--sh-inset-dark),
+    inset -1px -1px 3px var(--sh-inset-light);
+}
+
+.player-lyrics-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(14, 14, 18, 0.96);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+
+.slide-up-lyrics-enter-active,
+.slide-up-lyrics-leave-active {
+  transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.2, 1), opacity 0.25s ease;
+}
+
+.slide-up-lyrics-enter-from,
+.slide-up-lyrics-leave-to {
+  transform: translateY(100%);
+  opacity: 0;
 }
 
 /* ─── Queue Animation ─── */

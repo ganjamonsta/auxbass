@@ -36,6 +36,13 @@
         >
           HISTORY
         </button>
+        <button 
+          class="queue-tab" 
+          :class="{ active: activeQueueTab === 'lyrics' }"
+          @click="activeQueueTab = 'lyrics'"
+        >
+          LYRICS
+        </button>
       </div>
 
       <div class="queue-list" ref="queueListRef">
@@ -75,7 +82,7 @@
         </template>
 
         <!-- History -->
-        <template v-else>
+        <template v-else-if="activeQueueTab === 'history'">
           <div 
             v-for="(t, idx) in historyTracks" 
             :key="`h-${t.id}-${idx}`"
@@ -99,6 +106,23 @@
             <span>No history</span>
           </div>
         </template>
+
+        <!-- Lyrics -->
+        <template v-else-if="activeQueueTab === 'lyrics'">
+          <div class="lyrics-panel-container">
+            <LyricsViewer
+              v-if="track"
+              :track="track"
+              :currentTime="progress"
+              :isPlaying="isPlaying"
+              :embedded="true"
+              @seek="$emit('seek', $event)"
+            />
+            <div v-else class="queue-empty">
+              <span>Нет активного трека</span>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
   </div>
@@ -108,10 +132,14 @@
 import { ref, computed } from 'vue'
 import { getTrackCoverStyle, getTrackInitials, getCoverUrl, CoverSize } from '@/utils'
 import { useContextMenu } from '@/composables/useContextMenu'
+import LyricsViewer from '@/components/LyricsViewer.vue'
 
 const { openMenu } = useContextMenu()
 
 const props = defineProps({
+  track: Object,
+  progress: Number,
+  isPlaying: Boolean,
   contextInfo: Object,
   queueLength: Number,
   upcomingQueue: Array,
@@ -124,9 +152,18 @@ const props = defineProps({
   lazyShuffleTotal: Number
 })
 
-defineEmits(['playFromQueue', 'playFromHistory'])
+const emit = defineEmits(['playFromQueue', 'playFromHistory', 'seek'])
 
 const activeQueueTab = ref('upcoming')
+
+function setTab(tab) {
+  activeQueueTab.value = tab
+}
+
+defineExpose({
+  setTab,
+  activeQueueTab,
+})
 
 const contextType = computed(() => {
   if (!props.contextInfo) return ''
@@ -437,5 +474,12 @@ const formatTime = (seconds) => {
   color: #a0aec0;
   font-size: 13px;
   font-family: 'Segoe UI', sans-serif;
+}
+
+.lyrics-panel-container {
+  height: 100%;
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
 }
 </style>

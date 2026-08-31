@@ -161,7 +161,17 @@
 
       <div class="setting-row slider-row">
         <div class="setting-info">
-          <span class="setting-name">Масштаб интерфейса</span>
+          <div class="setting-info-title">
+            <span class="setting-name">Масштаб интерфейса</span>
+            <button 
+              v-if="Math.round(playerStore.uiScale * 100) !== 100"
+              class="scale-reset-btn"
+              @click="playerStore.uiScale = 1.0"
+              title="Сбросить на 100%"
+            >
+              100%
+            </button>
+          </div>
           <span class="setting-value">{{ Math.round(playerStore.uiScale * 100) }}%</span>
         </div>
         <input 
@@ -172,6 +182,17 @@
           v-model.number="playerStore.uiScale"
           class="range-slider"
         />
+        <div class="scale-presets">
+          <button 
+            v-for="preset in [0.8, 0.9, 1.0, 1.1, 1.2, 1.3]" 
+            :key="preset"
+            class="scale-preset-chip"
+            :class="{ active: Math.round(playerStore.uiScale * 100) === Math.round(preset * 100) }"
+            @click="playerStore.uiScale = preset"
+          >
+            {{ Math.round(preset * 100) }}%
+          </button>
+        </div>
         <span class="setting-desc scale-desc">Измените размер интерфейса плеера для удобства использования</span>
       </div>
     </section>
@@ -951,10 +972,66 @@ h1 {
   white-space: nowrap;
 }
 
+.setting-info-title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.scale-reset-btn {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--r-xs, 4px);
+  background: var(--c-bg-3);
+  color: var(--c-text-2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.scale-reset-btn:hover {
+  color: var(--c-accent);
+  background: var(--c-bg-4);
+  border-color: var(--c-accent-glow);
+}
+
+.scale-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.scale-preset-chip {
+  padding: 4px 10px;
+  border-radius: var(--r-sm, 8px);
+  background: var(--c-bg-3);
+  color: var(--c-text-2);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.scale-preset-chip:hover {
+  background: var(--c-bg-4);
+  color: var(--c-text-1);
+}
+
+.scale-preset-chip.active {
+  background: var(--c-accent);
+  color: #000000;
+  font-weight: 600;
+  border-color: var(--c-accent);
+  box-shadow: 0 0 10px var(--c-accent-glow);
+}
+
 .scale-desc {
   color: var(--c-text-3);
   font-size: 13px;
-  margin-top: 0;
+  margin-top: 2px;
   display: block;
   line-height: 1.4;
 }

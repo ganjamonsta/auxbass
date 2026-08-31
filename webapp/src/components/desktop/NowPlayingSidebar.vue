@@ -142,6 +142,32 @@
         </svg>
         <span>{{ isLiked ? 'В любимом' : 'Нравится' }}</span>
       </button>
+
+      <button 
+        class="action-btn" 
+        :class="{ active: showLyrics }"
+        @click="showLyrics = !showLyrics"
+        :title="showLyrics ? 'Скрыть текст' : 'Показать текст песни'"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          <line x1="8" y1="8" x2="16" y2="8"></line>
+          <line x1="8" y1="12" x2="13" y2="12"></line>
+        </svg>
+        <span>{{ showLyrics ? 'Скрыть текст' : 'Текст песни' }}</span>
+      </button>
+    </div>
+
+    <!-- Lyrics Section (if enabled) -->
+    <div v-if="showLyrics" class="sidebar-lyrics-section">
+      <LyricsViewer
+        v-if="track"
+        :track="track"
+        :currentTime="playerStore.progress"
+        :isPlaying="isPlaying"
+        :embedded="true"
+        @seek="playerStore.seek($event)"
+      />
     </div>
 
     <!-- Divider -->
@@ -215,13 +241,14 @@
 </template>
 
 <script setup>
-import { computed, defineEmits } from 'vue'
+import { ref, computed, defineEmits } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { splitArtists, getDisplayTitle, getDisplayArtist, getAllTrackArtists, getCoverUrl, CoverSize } from '@/utils/formatters'
 import { Play } from 'lucide-vue-next'
+import LyricsViewer from '@/components/LyricsViewer.vue'
 
 const emit = defineEmits(['goToUser'])
 
@@ -229,6 +256,8 @@ const router = useRouter()
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
 const { openMenu } = useContextMenu()
+
+const showLyrics = ref(false)
 
 // Computed from stores
 const track = computed(() => playerStore.currentTrack)
@@ -894,9 +923,18 @@ const handleToggleLike = async () => {
 }
 
 .now-playing-sidebar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
-  border: 2px solid transparent;
-  background-clip: padding-box;
+  background: var(--c-text-3);
+}
+
+.sidebar-lyrics-section {
+  background: var(--c-bg-2, #161622);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--r-lg, 16px);
+  margin-top: 12px;
+  overflow: hidden;
+  height: 380px;
+  display: flex;
+  flex-direction: column;
 }
 
 .now-playing-sidebar::-webkit-scrollbar-thumb:active {

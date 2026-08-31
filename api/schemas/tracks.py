@@ -73,3 +73,32 @@ class TrackCreate(BaseModel):
     artist: Optional[str] = None
     duration: Optional[int] = None
     file_size: Optional[int] = None
+
+
+class TrackLyricsResponse(BaseModel):
+    """Track lyrics response"""
+    track_id: int
+    plain_lyrics: Optional[str] = None
+    synced_lyrics: Optional[str] = None
+    is_synced: bool = False
+    is_instrumental: bool = False
+    source: Optional[str] = None
+    offset_ms: int = 0
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class TrackLyricsUpdate(BaseModel):
+    """Track lyrics update request"""
+    plain_lyrics: Optional[str] = None
+    synced_lyrics: Optional[str] = None
+    is_instrumental: Optional[bool] = None
+    offset_ms: Optional[int] = None
+
+
+class TrackLyricsOffsetUpdate(BaseModel):
+    """Track lyrics timing offset update request"""
+    offset_ms: int
+

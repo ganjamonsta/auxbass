@@ -397,9 +397,15 @@ const handleAuthLogout = () => {
   window.location.href = '/login'
 }
 
-// Apply UI scale to body
+// Apply UI scale to documentElement (root)
 const applyUIScale = () => {
-  document.body.style.zoom = playerStore.uiScale
+  const scale = Number(playerStore.uiScale) || 1.0
+  // Clear any residual zoom on body
+  document.body.style.zoom = ''
+  // Apply zoom to documentElement for full-viewport scaling without gaps or overflow clipping
+  document.documentElement.style.zoom = scale
+  document.documentElement.style.setProperty('--ui-scale', String(scale))
+  updateDesktopState()
 }
 
 // Watch for scale changes
@@ -529,7 +535,9 @@ onUnmounted(() => {
   window.removeEventListener('player:network-recovered', handleNetworkRecovered)
   networkMonitor.stopMonitoring()
   // Reset zoom on unmount
-  document.body.style.zoom = '1'
+  document.body.style.zoom = ''
+  document.documentElement.style.zoom = ''
+  document.documentElement.style.removeProperty('--ui-scale')
 })
 </script>
 
@@ -544,20 +552,22 @@ onUnmounted(() => {
 
 html, body {
   height: 100%;
+  width: 100%;
   background: var(--c-bg-1);
   color: var(--c-text-1);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
 }
 
 .app {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  height: 100dvh;
-  max-height: 100vh;
-  max-height: 100dvh;
+  height: 100%;
+  width: 100%;
+  max-height: 100%;
+  min-height: 100%;
   overflow: hidden;
 }
 
@@ -569,9 +579,10 @@ html, body {
   grid-template-areas:
     "sidebar main"
     "player player";
-  min-height: 100vh;
-  height: 100vh;
-  max-height: 100vh;
+  height: 100%;
+  min-height: 100%;
+  max-height: 100%;
+  width: 100%;
   overflow: hidden;
   position: relative;
 }
@@ -682,7 +693,8 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
+  height: 100%;
+  min-height: 100%;
 }
 
 .auth-spinner {

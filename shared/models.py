@@ -204,6 +204,11 @@ class Track(Base):
         uselist=False,
         cascade="all, delete-orphan"
     )
+    lyrics: Mapped[Optional["TrackLyrics"]] = relationship(
+        back_populates="track",
+        uselist=False,
+        cascade="all, delete-orphan"
+    )
     library_entries: Mapped[List["UserLibrary"]] = relationship(
         back_populates="track", 
         cascade="all, delete-orphan"
@@ -332,6 +337,38 @@ class TrackEnrichment(Base):
     __table_args__ = (
         Index("idx_enrichment_deezer_album", "deezer_album_id"),
         Index("idx_enrichment_album_name", "album_name"),
+    )
+
+
+# ============== Track Lyrics ==============
+
+class TrackLyrics(Base):
+    """
+    Lyrics data for a track.
+    Supports synced lyrics (LRC format with timestamps) and plain text lyrics.
+    """
+    __tablename__ = "track_lyrics"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    track_id: Mapped[int] = mapped_column(Integer, ForeignKey("tracks.id", ondelete="CASCADE"), unique=True)
+    
+    plain_lyrics: Mapped[Optional[str]] = mapped_column(Text)
+    synced_lyrics: Mapped[Optional[str]] = mapped_column(Text)  # [mm:ss.xx] LRC formatted
+    is_synced: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_instrumental: Mapped[bool] = mapped_column(Boolean, default=False)
+    
+    source: Mapped[str] = mapped_column(String(50), default="lrclib")  # lrclib, user_custom, id3
+    offset_ms: Mapped[int] = mapped_column(Integer, default=0)  # timing sync offset in ms
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+    
+    # Relationship
+    track: Mapped["Track"] = relationship(back_populates="lyrics")
+    
+    __table_args__ = (
+        Index("idx_track_lyrics_track", "track_id"),
     )
 
 

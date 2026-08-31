@@ -8,8 +8,9 @@
 .app {
   display: flex;
   flex-direction: column;
-  height: var(--tg-viewport-stable-height, 100dvh);
-  max-height: var(--tg-viewport-stable-height, 100dvh);
+  height: 100%;
+  width: 100%;
+  max-height: 100%;
   overflow: hidden;
   background-color: var(--c-bg-1);
   color: var(--c-text-1);
@@ -31,8 +32,9 @@
   grid-template-areas:
     "sidebar main"
     "player player";
-  height: 100vh;
-  max-height: 100vh;
+  height: 100%;
+  width: 100%;
+  max-height: 100%;
 }
 
 .app.desktop-layout.has-now-playing {

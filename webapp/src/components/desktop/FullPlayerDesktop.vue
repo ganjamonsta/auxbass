@@ -53,6 +53,7 @@
                 @like="$emit('like')"
                 @addToPlaylist="handleAddToPlaylist"
                 @downloadHD="handleDownloadHD"
+                @toggleLyrics="handleToggleLyrics"
               />
             </div>
 
@@ -67,6 +68,10 @@
           <!-- Right Panel: Queue & Context -->
           <div class="panel-right">
             <QueuePanel 
+              ref="queuePanelRef"
+              :track="track"
+              :progress="progress"
+              :isPlaying="isPlaying"
               :contextInfo="contextInfo"
               :queueLength="queueLength"
               :upcomingQueue="upcomingQueue"
@@ -74,6 +79,7 @@
               :lazyShuffleMode="lazyShuffleMode"
               :lazyShuffleIndex="lazyShuffleIndex"
               :lazyShuffleTotal="lazyShuffleTotal"
+              @seek="$emit('seek', $event)"
               @playFromQueue="$emit('playFromQueue', $event)"
               @playFromHistory="$emit('playFromHistory', $event)"
             />
@@ -257,6 +263,18 @@ const handleGoToArtist = (artistName) => {
 
 const handleAddToPlaylist = () => {
   openMenu('track', props.track, 'player')
+}
+
+const queuePanelRef = ref(null)
+
+const handleToggleLyrics = () => {
+  if (queuePanelRef.value) {
+    if (queuePanelRef.value.activeQueueTab === 'lyrics') {
+      queuePanelRef.value.setTab('upcoming')
+    } else {
+      queuePanelRef.value.setTab('lyrics')
+    }
+  }
 }
 </script>
 

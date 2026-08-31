@@ -227,6 +227,12 @@ export const tracksApi = {
   voteTag: nonCacheable((trackId, tagId) => api.post(`/tracks/${trackId}/tags/${tagId}/vote`), 'tag'),
   unvoteTag: nonCacheable((trackId, tagId) => api.delete(`/tracks/${trackId}/tags/${tagId}/vote`), 'tag'),
   deleteTag: nonCacheable((trackId, tagId) => api.delete(`/tracks/${trackId}/tags/${tagId}`), 'tag'),
+
+  // Lyrics
+  getLyrics: (trackId, forceRefresh = false) => api.get(`/tracks/${trackId}/lyrics`, { params: { force_refresh: forceRefresh } }),
+  updateLyrics: nonCacheable((trackId, data) => api.put(`/tracks/${trackId}/lyrics`, data), 'track'),
+  updateLyricsOffset: nonCacheable((trackId, offsetMs) => api.post(`/tracks/${trackId}/lyrics/offset`, { offset_ms: offsetMs }), 'track'),
+  searchLyrics: (trackId, query) => api.post(`/tracks/${trackId}/lyrics/search`, null, { params: { query } }),
 }
 
 // Playlists

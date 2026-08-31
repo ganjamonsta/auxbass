@@ -16,7 +16,7 @@ from sqlalchemy.orm import selectinload
 
 from shared.database import get_db
 from shared.models import (
-    Track, TrackEnrichment, Album, AlbumTrack, User, UserLibrary,
+    Track, TrackEnrichment, TrackLyrics, Album, AlbumTrack, User, UserLibrary,
     EnrichmentStatus, LibrarySource, utcnow
 )
 from shared.matching import normalize_artist
@@ -25,6 +25,7 @@ from shared.matching import normalize_artist
 # The API lifespan initializes the bot and channel_service.
 # TODO: Extract channel forwarding logic into shared/ layer.
 from bot.services.channels import get_channel_service
+from bot.services.lyrics import lrclib_client
 
 from api.routers.auth import get_current_user, require_premium, get_optional_user
 from api.routers.library import track_to_response, build_track_search_filter
@@ -32,6 +33,9 @@ from api.schemas.tracks import (
     TrackResponse,
     TracksListResponse,
     TrackUpdate,
+    TrackLyricsResponse,
+    TrackLyricsUpdate,
+    TrackLyricsOffsetUpdate,
 )
 from api.schemas.common import TelegramUser
 
@@ -1148,3 +1152,176 @@ async def get_all_tracks(
         offset=offset,
         limit=limit,
     )
+
+
+# ============== Lyrics Endpoints ==============
+
+@router.get("/{track_id}/lyrics", response_model=TrackLyricsResponse)
+async def get_track_lyrics(
+    track_id: int,
+    force_refresh: bool = Query(False),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get lyrics for a track (on-demand).
+    
+    Checks DB cache first; if not present or force_refresh=True,
+    queries LRCLIB API, saves to DB and returns result.
+    """
+    result = await db.execute(
+        select(Track)
+        .options(
+            selectinload(Track.enrichment),
+            selectinload(Track.lyrics),
+        )
+        .where(Track.id == track_id)
+    )
+    track = result.scalar_one_or_none()
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    
+    # If cached and not forcing refresh, return cached
+    if track.lyrics and not force_refresh:
+        return track.lyrics
+    
+    # Fetch from LRCLIB
+    lyrics_data = await lrclib_client.get_lyrics(
+        title=track.display_title,
+        artist=track.artist,
+        album=track.album,
+        duration=track.duration,
+    )
+    
+    if lyrics_data:
+        if track.lyrics:
+            track.lyrics.plain_lyrics = lyrics_data.get("plain_lyrics")
+            track.lyrics.synced_lyrics = lyrics_data.get("synced_lyrics")
+            track.lyrics.is_synced = lyrics_data.get("is_synced", False)
+            track.lyrics.is_instrumental = lyrics_data.get("is_instrumental", False)
+            track.lyrics.source = lyrics_data.get("source", "lrclib")
+            track.lyrics.updated_at = utcnow()
+        else:
+            track.lyrics = TrackLyrics(
+                track_id=track.id,
+                plain_lyrics=lyrics_data.get("plain_lyrics"),
+                synced_lyrics=lyrics_data.get("synced_lyrics"),
+                is_synced=lyrics_data.get("is_synced", False),
+                is_instrumental=lyrics_data.get("is_instrumental", False),
+                source=lyrics_data.get("source", "lrclib"),
+                offset_ms=0,
+            )
+            db.add(track.lyrics)
+        
+        await db.commit()
+        await db.refresh(track.lyrics)
+        return track.lyrics
+    
+    # If nothing found online, return existing DB record if any, or empty lyrics response
+    if track.lyrics:
+        return track.lyrics
+    
+    return TrackLyricsResponse(
+        track_id=track.id,
+        plain_lyrics=None,
+        synced_lyrics=None,
+        is_synced=False,
+        is_instrumental=False,
+        source=None,
+        offset_ms=0,
+        updated_at=None,
+    )
+
+
+@router.put("/{track_id}/lyrics", response_model=TrackLyricsResponse)
+async def update_track_lyrics(
+    track_id: int,
+    update_data: TrackLyricsUpdate,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Save custom or edited lyrics for a track."""
+    result = await db.execute(
+        select(Track).options(selectinload(Track.lyrics)).where(Track.id == track_id)
+    )
+    track = result.scalar_one_or_none()
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    
+    synced = update_data.synced_lyrics
+    plain = update_data.plain_lyrics
+    is_synced = bool(synced and len(synced.strip()) > 0)
+    is_inst = update_data.is_instrumental if update_data.is_instrumental is not None else False
+    offset = update_data.offset_ms if update_data.offset_ms is not None else 0
+    
+    if track.lyrics:
+        if update_data.plain_lyrics is not None:
+            track.lyrics.plain_lyrics = plain
+        if update_data.synced_lyrics is not None:
+            track.lyrics.synced_lyrics = synced
+            track.lyrics.is_synced = is_synced
+        if update_data.is_instrumental is not None:
+            track.lyrics.is_instrumental = is_inst
+        if update_data.offset_ms is not None:
+            track.lyrics.offset_ms = offset
+        track.lyrics.source = "user_custom"
+        track.lyrics.updated_at = utcnow()
+    else:
+        track.lyrics = TrackLyrics(
+            track_id=track.id,
+            plain_lyrics=plain,
+            synced_lyrics=synced,
+            is_synced=is_synced,
+            is_instrumental=is_inst,
+            source="user_custom",
+            offset_ms=offset,
+        )
+        db.add(track.lyrics)
+    
+    await db.commit()
+    await db.refresh(track.lyrics)
+    return track.lyrics
+
+
+@router.post("/{track_id}/lyrics/offset", response_model=TrackLyricsResponse)
+async def update_lyrics_offset(
+    track_id: int,
+    offset_data: TrackLyricsOffsetUpdate,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update timing offset in ms for synced lyrics."""
+    result = await db.execute(
+        select(Track).options(selectinload(Track.lyrics)).where(Track.id == track_id)
+    )
+    track = result.scalar_one_or_none()
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+    
+    if not track.lyrics:
+        track.lyrics = TrackLyrics(
+            track_id=track.id,
+            offset_ms=offset_data.offset_ms,
+            source="user_custom",
+        )
+        db.add(track.lyrics)
+    else:
+        track.lyrics.offset_ms = offset_data.offset_ms
+        track.lyrics.updated_at = utcnow()
+    
+    await db.commit()
+    await db.refresh(track.lyrics)
+    return track.lyrics
+
+
+@router.post("/{track_id}/lyrics/search")
+async def search_lyrics(
+    track_id: int,
+    query: str = Query(..., min_length=1),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Search LRCLIB for lyrics matching custom query."""
+    results = await lrclib_client.search(query)
+    return results
+
