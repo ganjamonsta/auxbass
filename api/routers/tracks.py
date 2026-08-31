@@ -27,7 +27,7 @@ from shared.matching import normalize_artist
 from bot.services.channels import get_channel_service
 
 from api.routers.auth import get_current_user, require_premium, get_optional_user
-from api.routers.library import track_to_response
+from api.routers.library import track_to_response, build_track_search_filter
 from api.schemas.tracks import (
     TrackResponse,
     TracksListResponse,
@@ -71,15 +71,9 @@ async def get_track_ids(
         .where(UserLibrary.user_id == user.id)
     )
     
-    # Search filter
+    # Search filter (indexes title, artist, file_name, user tags, and enrichment tags)
     if search:
-        search_term = f"%{search}%"
-        query = query.where(
-            or_(
-                Track.title.ilike(search_term),
-                Track.artist.ilike(search_term),
-            )
-        )
+        query = query.where(build_track_search_filter(search))
     
     # Sorting
     if sort_by == "random":
@@ -576,31 +570,22 @@ async def get_global_tracks(
         .where(Track.is_unavailable == False)
         .options(
             selectinload(Track.enrichment),
+            selectinload(Track.track_tags),
             selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
         )
     )
     
     if search:
-        # Use ilike for case-insensitive search (works better with Cyrillic in PostgreSQL)
-        search_term = f"%{search}%"
-        query = query.where(
-            or_(
-                Track.title.ilike(search_term),
-                Track.artist.ilike(search_term),
-            )
-        )
+        search_filter = build_track_search_filter(search)
+        query = query.where(search_filter)
     
     count_query = select(func.count(Track.id)).where(
         Track.is_public == True,
         Track.is_unavailable == False
     )
     if search:
-        count_query = count_query.where(
-            or_(
-                Track.title.ilike(search_term),
-                Track.artist.ilike(search_term),
-            )
-        )
+        search_filter = build_track_search_filter(search)
+        count_query = count_query.where(search_filter)
     
     total = await db.scalar(count_query) or 0
     
@@ -1124,14 +1109,8 @@ async def get_all_tracks(
     )
     
     if search:
-        # Use ilike for case-insensitive search (works better with Cyrillic in PostgreSQL)
-        search_term = f"%{search}%"
-        query = query.where(
-            or_(
-                Track.title.ilike(search_term),
-                Track.artist.ilike(search_term),
-            )
-        )
+        search_filter = build_track_search_filter(search)
+        query = query.where(search_filter)
     
     # Count
     count_query = (
@@ -1139,12 +1118,8 @@ async def get_all_tracks(
         .where(UserLibrary.user_id == user.id)
     )
     if search:
-        count_query = count_query.join(Track, Track.id == UserLibrary.track_id).where(
-            or_(
-                Track.title.ilike(search_term),
-                Track.artist.ilike(search_term),
-            )
-        )
+        search_filter = build_track_search_filter(search)
+        count_query = count_query.join(Track, Track.id == UserLibrary.track_id).where(search_filter)
     
     total = await db.scalar(count_query) or 0
     

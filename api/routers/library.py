@@ -9,13 +9,13 @@ from typing import Optional, List
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func, or_, desc, asc
+from sqlalchemy import select, func, or_, desc, asc, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from shared.database import get_db
 from shared.models import (
-    Track, TrackEnrichment, Album, AlbumTrack, User, UserLibrary,
+    Track, TrackEnrichment, TrackTag, Album, AlbumTrack, User, UserLibrary,
     EnrichmentStatus, LibrarySource, utcnow
 )
 from shared.matching import normalize_artist
@@ -62,18 +62,10 @@ HD_MIME_TYPES = {
 
 
 def is_streamable(mime_type: Optional[str]) -> bool:
-    """Check if track format can be streamed in web player"""
+    """Check if MIME type is supported for direct streaming in web browser."""
     if not mime_type:
-        return True  # Assume streamable if unknown (legacy data)
-    
-    mime_lower = mime_type.lower()
-    
-    # Explicitly HD - not streamable
-    if mime_lower in HD_MIME_TYPES:
-        return False
-    
-    # Known streamable or unknown (assume streamable)
-    return True
+        return True  # Assume streamable if mime_type unknown (legacy tracks)
+    return mime_type.lower() in STREAMABLE_MIME_TYPES
 
 
 def is_hd_format(mime_type: Optional[str]) -> bool:
@@ -166,6 +158,55 @@ def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None,
     )
 
 
+def build_track_search_filter(search: str):
+    """
+    Build SQLAlchemy search filter for tracks.
+    Matches:
+    - Track title
+    - Track artist
+    - Track file_name
+    - Associated custom user tags (TrackTag)
+    - Associated enrichment genre
+    - Associated enrichment tags (Last.fm tags)
+    """
+    if not search:
+        return None
+        
+    search_clean = search.lstrip('#').strip()
+    if not search_clean:
+        search_clean = search.strip()
+    search_term = f"%{search_clean}%"
+    
+    tag_match = (
+        select(TrackTag.id)
+        .where(
+            TrackTag.track_id == Track.id,
+            TrackTag.tag.ilike(search_term)
+        )
+        .exists()
+    )
+    
+    enrichment_match = (
+        select(TrackEnrichment.id)
+        .where(
+            TrackEnrichment.track_id == Track.id,
+            or_(
+                TrackEnrichment.genre.ilike(search_term),
+                func.cast(TrackEnrichment.tags, String).ilike(search_term),
+            )
+        )
+        .exists()
+    )
+    
+    return or_(
+        Track.title.ilike(search_term),
+        Track.artist.ilike(search_term),
+        Track.file_name.ilike(search_term),
+        tag_match,
+        enrichment_match,
+    )
+
+
 @router.get("", response_model=TracksListResponse)
 async def get_my_tracks(
     page: int = Query(1, ge=1),
@@ -201,14 +242,9 @@ async def get_my_tracks(
         .where(UserLibrary.user_id == user.id)
     )
     
-    # Search filter
+    # Search filter (indexes title, artist, file_name, user tags, and enrichment tags)
     if search:
-        # Use ilike for case-insensitive search (works better with Cyrillic in PostgreSQL)
-        search_term = f"%{search}%"
-        search_filter = or_(
-            Track.title.ilike(search_term),
-            Track.artist.ilike(search_term),
-        )
+        search_filter = build_track_search_filter(search)
         query = query.where(search_filter)
         count_query = count_query.where(search_filter)
     

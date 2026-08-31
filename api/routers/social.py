@@ -24,7 +24,7 @@ from shared.models import (
 from api.routers.auth import get_current_user, require_premium
 
 logger = logging.getLogger(__name__)
-from api.routers.library import track_to_response
+from api.routers.library import track_to_response, build_track_search_filter
 from api.schemas.common import TelegramUser, PaginatedResponse
 from api.schemas.tracks import TrackResponse
 
@@ -355,14 +355,8 @@ async def search_friends_libraries(
             "per_page": per_page,
         }
     
-    # Search tracks in friends' libraries
-    # Use ilike for case-insensitive search (works better with Cyrillic in PostgreSQL)
-    search_term = f"%{search}%"
-    
-    search_filter = or_(
-        Track.title.ilike(search_term),
-        Track.artist.ilike(search_term),
-    )
+    # Search tracks in friends' libraries (indexes title, artist, file_name, user tags, and enrichment tags)
+    search_filter = build_track_search_filter(search)
     
     # Count total unique tracks matching search across friends
     # Use a subquery to count distinct track_ids
@@ -384,6 +378,7 @@ async def search_friends_libraries(
         .where(search_filter)
         .options(
             selectinload(Track.enrichment),
+            selectinload(Track.track_tags),
             selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
         )
         .order_by(UserLibrary.added_at.desc())

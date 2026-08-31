@@ -120,10 +120,11 @@ const sortedTracks = computed(() => {
     return dateB - dateA
   })
   if (searchQuery.value.trim()) {
-    const q = searchQuery.value.trim().toLowerCase()
+    const q = searchQuery.value.trim().toLowerCase().replace(/^#/, '')
     list = list.filter(t => 
       t.title?.toLowerCase().includes(q) || 
-      t.artist?.toLowerCase().includes(q)
+      t.artist?.toLowerCase().includes(q) ||
+      (t.tags && t.tags.some(tag => (typeof tag === 'string' ? tag : tag?.tag)?.toLowerCase().includes(q)))
     )
   }
   return list
