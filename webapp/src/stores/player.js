@@ -1088,28 +1088,16 @@ export const usePlayerStore = defineStore('player', () => {
     try {
       loading.value = true
       const source = await resolveAudioSource(currentTrack.value.id, playerApi.getStreamUrl.bind(playerApi))
-
-      if (source.type === 'blob') {
-        audio.value.src = source.src; audio.value.load()
-        if (savedProgress > 0) audio.value.currentTime = savedProgress
-        await audio.value.play()
-      } else if (source.type === 'error') {
-        throw source.error || new Error(source.reason)
-      } else {
-        audio.value.src = source.src; buffered.value = 0
-        await new Promise((resolve, reject) => {
-          const h1 = () => { audio.value.removeEventListener('loadedmetadata', h1); audio.value.removeEventListener('error', h2); resolve() }
-          const h2 = (e) => { audio.value.removeEventListener('loadedmetadata', h1); audio.value.removeEventListener('error', h2); reject(e) }
-          audio.value.addEventListener('loadedmetadata', h1); audio.value.addEventListener('error', h2)
-          audio.value.load()
-        })
-        if (savedProgress > 0 && savedProgress < audio.value.duration - 1) audio.value.currentTime = savedProgress
-        await audio.value.play()
+      await applySource(currentTrack.value, source)
+      if (savedProgress > 0 && audio.value && savedProgress < (audio.value.duration || duration.value) - 1) {
+        audio.value.currentTime = savedProgress
       }
       loading.value = false
+      startStateSaving()
       preloadNextTracks()
     } catch (e) {
-      console.error('Failed to resume playback:', e); loading.value = false
+      console.error('Failed to resume playback:', e)
+      loading.value = false
     }
   }
 

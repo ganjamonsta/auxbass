@@ -126,8 +126,8 @@ async def find_streamable_alternative(track: Track, db: AsyncSession) -> Optiona
         return None
     
     # Normalize for matching
-    norm_title = normalize_title(track.title).lower()
-    norm_artist = normalize_artist(track.artist or "").lower() if track.artist else None
+    norm_title = normalize_title(track.title).lower().strip()
+    norm_artist = normalize_artist(track.artist or "").lower().strip() if track.artist else None
     
     # Get HD track enrichment data for Deezer ID matching
     hd_deezer_id = None
@@ -168,20 +168,25 @@ async def find_streamable_alternative(track: Track, db: AsyncSession) -> Optiona
         if not candidate.title:
             continue
         
-        cand_norm_title = normalize_title(candidate.title).lower()
-        cand_norm_artist = normalize_artist(candidate.artist or "").lower() if candidate.artist else None
+        cand_norm_title = normalize_title(candidate.title).lower().strip()
+        cand_norm_artist = normalize_artist(candidate.artist or "").lower().strip() if candidate.artist else None
         
-        # Match title (exact or substring)
-        title_matched = False
+        # Check Deezer ID match (definitive match)
+        has_deezer_match = False
+        if hd_deezer_id and candidate.enrichment and candidate.enrichment.deezer_track_id == hd_deezer_id:
+            has_deezer_match = True
+        
+        # Match title (must be exact or very close high-ratio substring >= 80%)
         title_score = 0
         if norm_title == cand_norm_title:
-            title_matched = True
-            title_score = 40
-        elif norm_title in cand_norm_title or cand_norm_title in norm_title:
-            title_matched = True
-            title_score = 20
+            title_score = 50
+        elif len(norm_title) >= 5 and len(cand_norm_title) >= 5:
+            min_len = min(len(norm_title), len(cand_norm_title))
+            max_len = max(len(norm_title), len(cand_norm_title))
+            if (cand_norm_title in norm_title or norm_title in cand_norm_title) and (min_len / max_len >= 0.75):
+                title_score = 30
         
-        if not title_matched:
+        if title_score == 0 and not has_deezer_match:
             continue
         
         score = title_score
@@ -189,47 +194,49 @@ async def find_streamable_alternative(track: Track, db: AsyncSession) -> Optiona
         # Match artist
         if norm_artist and cand_norm_artist:
             if norm_artist == cand_norm_artist:
-                score += 30
+                score += 40
             elif norm_artist in cand_norm_artist or cand_norm_artist in norm_artist:
-                score += 15
-            else:
-                # If titles match exactly but artists are completely different, skip unless Deezer match
-                if score < 40 and not (hd_deezer_id and candidate.enrichment and candidate.enrichment.deezer_track_id == hd_deezer_id):
-                    continue
-        elif not norm_artist and not cand_norm_artist:
-            score += 10
+                score += 20
+            elif not has_deezer_match:
+                # Different artist and no Deezer match -> skip false positive
+                continue
+        elif (not norm_artist and not cand_norm_artist) or has_deezer_match:
+            score += 15
+        else:
+            # One has artist, other doesn't -> only allow if title is exact match >= 6 chars
+            if len(norm_title) >= 6 and norm_title == cand_norm_title:
+                score += 10
+            elif not has_deezer_match:
+                continue
         
-        # Check Deezer ID match (highest priority)
-        if hd_deezer_id and candidate.enrichment:
-            if candidate.enrichment.deezer_track_id == hd_deezer_id:
-                score += 100  # Perfect match via Deezer
+        if has_deezer_match:
+            score += 100
         
         # Check duration similarity
         if track.duration and candidate.duration:
             duration_diff = abs(track.duration - candidate.duration)
-            if duration_diff <= 5:
-                score += 50  # Good duration match
-            elif duration_diff <= 15:
-                score += 20  # Acceptable duration match
-            else:
-                continue  # Duration too different, skip
+            if duration_diff <= 3:
+                score += 30
+            elif duration_diff <= 8:
+                score += 15
+            elif not has_deezer_match:
+                # Duration too different -> not the same audio (e.g. extended mix vs radio edit)
+                continue
+        elif track.duration and track.duration > 600 and (not candidate.duration or candidate.duration < 300):
+            # Long track (>10min) should not match short unknown candidate
+            continue
         
-        # Check file size (prefer streamable <= 20MB)
-        if candidate.file_size:
-            if candidate.file_size <= max_size_bytes:
-                score += 10
-            if track.file_size and candidate.file_size < track.file_size:
-                size_ratio = track.file_size / candidate.file_size
-                if size_ratio >= 1.5:
-                    score += 20
+        # File size preference
+        if candidate.file_size and candidate.file_size <= max_size_bytes:
+            score += 10
         
         # Update best match
         if score > best_score:
             best_score = score
             best_match = candidate
     
-    # Require minimum score to avoid false matches
-    if best_match and best_score >= 30:
+    # Require minimum score to avoid false matches (requires title + artist match or Deezer match)
+    if best_match and best_score >= 70:
         return best_match
     
     return None
