@@ -59,7 +59,9 @@ export function useTrackActions() {
   const handleLikeTrack = async (track) => {
     if (!track?.id) return false
     
-    const newLikedState = await libraryStore.toggleLike(track.id)
+    const current = track.is_liked === true
+    track.is_liked = !current
+    const newLikedState = await libraryStore.toggleLike(track.id, current)
     // Update track object if mutable
     if (track && typeof track === 'object') {
       track.is_liked = newLikedState

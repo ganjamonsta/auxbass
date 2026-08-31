@@ -121,3 +121,4 @@ frps.ini
 *.key
 *.crt
 *.cer
+tg_player.db.old

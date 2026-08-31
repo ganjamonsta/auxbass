@@ -255,7 +255,8 @@ const upcomingTracks = computed(() => {
 
 const isLiked = computed(() => {
   if (!track.value?.id) return false
-  return libraryStore.isTrackLiked(track.value.id)
+  if (libraryStore.isTrackLiked(track.value.id)) return true
+  return track.value.is_liked === true
 })
 
 // Cover style
@@ -361,7 +362,8 @@ const removeFromQueueHandler = (index) => {
 // Like handler
 const handleToggleLike = async () => {
   if (track.value?.id) {
-    await libraryStore.toggleLike(track.value.id)
+    const current = isLiked.value
+    await libraryStore.toggleLike(track.value.id, current)
   }
 }
 </script>

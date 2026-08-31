@@ -297,6 +297,8 @@ export const usePlayerStore = defineStore('player', () => {
     },
     onPlaying: () => {
       loading.value = false; clearStallTimer(); resetStallRetry(); resetAudioRetry()
+      isPlaying.value = true
+      updatePlaybackState()
     },
     onWaiting: () => {
       if (audio.value && audio.value.readyState < 3) {
@@ -324,6 +326,18 @@ export const usePlayerStore = defineStore('player', () => {
         }
       }
       clearStallTimer()
+
+      // Self-heal isPlaying if desynced from actual DOM audio state
+      if (!audio.value._obsolete) {
+        if (!audio.value.paused && !isPlaying.value) {
+          isPlaying.value = true
+          updatePlaybackState()
+        } else if (audio.value.paused && isPlaying.value) {
+          isPlaying.value = false
+          updatePlaybackState()
+        }
+      }
+
       const now = Date.now()
       if (now - lastPositionUpdate >= 1000) {
         lastPositionUpdate = now
@@ -496,6 +510,7 @@ export const usePlayerStore = defineStore('player', () => {
         buffered.value = duration.value
         audio.value.load()
         await audio.value.play()
+        isPlaying.value = true
         hdTrackInfo.value = null
         break
       }
@@ -509,12 +524,14 @@ export const usePlayerStore = defineStore('player', () => {
         }
         const oldAudio = audio.value
         audio.value = source.audio
+        audio.value._obsolete = false
         audio.value.volume = volume.value
         audio.value.muted = isMuted.value
         reattachAudioListeners()
         connectEnhancer(audio.value)
         try {
           await audio.value.play()
+          isPlaying.value = true
           recyclePreloadAudio(oldAudio)
           // Re-register handlers + metadata after audio element swap.
           // On Android/Firefox the browser may lose the MediaSession association
@@ -533,6 +550,7 @@ export const usePlayerStore = defineStore('player', () => {
           audio.value.src = fallback.src
           buffered.value = 0
           await audio.value.play()
+          isPlaying.value = true
         }
         break
       }
@@ -541,6 +559,7 @@ export const usePlayerStore = defineStore('player', () => {
         audio.value.src = source.src
         buffered.value = 0
         await audio.value.play()
+        isPlaying.value = true
         if (source.meta?.hdInfo) {
           hdTrackInfo.value = source.meta.hdInfo
         } else if (source.type !== 'cached-url') {
@@ -626,21 +645,21 @@ export const usePlayerStore = defineStore('player', () => {
           try { await tracksApi.markUnavailable(track.id); track.is_unavailable = true } catch (_) {}
         }
         if (onTrackUnavailableCallback) onTrackUnavailableCallback(track, detail, isLargeFile || isHdFormat)
-        setTimeout(() => next(), 1500)
+        setTimeout(() => next(), 250)
       } else if (statusCode === 401) {
         deleteCachedUrl(track.id)
         lastError.value = { type: 'auth_expired', track, message: 'Токен истёк, переключаем трек...' }
         window.dispatchEvent(new CustomEvent('player:error', { detail: lastError.value }))
-        setTimeout(() => next(), 500)
+        setTimeout(() => next(), 300)
       } else if (statusCode === 404) {
         lastError.value = { type: 'not_found', track, message: 'Трек не найден' }
         window.dispatchEvent(new CustomEvent('player:error', { detail: lastError.value }))
         try { await tracksApi.markUnavailable(track.id); track.is_unavailable = true } catch (_) {}
-        setTimeout(() => next(), 1000)
+        setTimeout(() => next(), 300)
       } else {
         lastError.value = { type: 'playback_error', track, message: detail }
         window.dispatchEvent(new CustomEvent('player:error', { detail: lastError.value }))
-        setTimeout(() => next(), 1000)
+        setTimeout(() => next(), 500)
       }
     } finally {
       loading.value = false
@@ -706,7 +725,20 @@ export const usePlayerStore = defineStore('player', () => {
   const toggle = async () => {
     if (currentTrack.value && (!audio.value || !audio.value.src)) { await resumeFromState(); return }
     if (!audio.value) return
-    isPlaying.value ? audio.value.pause() : audio.value.play()
+
+    // Check actual DOM state to prevent desync
+    if (audio.value.paused) {
+      try {
+        await audio.value.play()
+        isPlaying.value = true
+      } catch (err) {
+        console.error('[Player] Failed to play on toggle:', err)
+      }
+    } else {
+      audio.value.pause()
+      isPlaying.value = false
+    }
+    updatePlaybackState()
   }
 
   const seek = (time) => {
@@ -761,23 +793,38 @@ export const usePlayerStore = defineStore('player', () => {
     if (queue.value.length === 0) { isSkipping = false; return }
 
     let nextIndex
-    if (shuffle.value && shuffleOrder.value.length > 0) {
-      shuffleIndex.value++
-      if (shuffleIndex.value >= shuffleOrder.value.length) {
-        if (repeat.value === 'all') generateShuffleOrder()
-        else { isPlaying.value = false; isSkipping = false; return }
+    let attempts = 0
+    const maxAttempts = queue.value.length
+
+    while (attempts < maxAttempts) {
+      if (shuffle.value && shuffleOrder.value.length > 0) {
+        shuffleIndex.value++
+        if (shuffleIndex.value >= shuffleOrder.value.length) {
+          if (repeat.value === 'all') generateShuffleOrder()
+          else { isPlaying.value = false; isSkipping = false; return }
+        }
+        nextIndex = shuffleOrder.value[shuffleIndex.value]
+      } else {
+        nextIndex = queueIndex.value + 1
+        if (nextIndex >= queue.value.length) {
+          if (repeat.value === 'all') nextIndex = 0
+          else { isPlaying.value = false; isSkipping = false; return }
+        }
       }
-      nextIndex = shuffleOrder.value[shuffleIndex.value]
-    } else {
-      nextIndex = queueIndex.value + 1
-      if (nextIndex >= queue.value.length) {
-        if (repeat.value === 'all') nextIndex = 0
-        else { isPlaying.value = false; isSkipping = false; return }
+
+      queueIndex.value = nextIndex
+      const candidateTrack = queue.value[nextIndex]
+      // Skip known unavailable tracks immediately
+      if (candidateTrack && !candidateTrack.is_unavailable) {
+        break
       }
+      attempts++
     }
 
-    queueIndex.value = nextIndex
-    const nextTrack = queue.value[nextIndex]
+    const nextTrack = queue.value[queueIndex.value]
+    if (!nextTrack || nextTrack.is_unavailable) {
+      isPlaying.value = false; isSkipping = false; return
+    }
 
     // Use unified resolveAudioSource instead of 4× duplicated cascade
     initAudio()
@@ -828,10 +875,27 @@ export const usePlayerStore = defineStore('player', () => {
     }
 
     if (queue.value.length === 0) { isSkipping = false; return }
-    let prevIndex = queueIndex.value - 1
-    if (prevIndex < 0) prevIndex = repeat.value === 'all' ? queue.value.length - 1 : 0
-    queueIndex.value = prevIndex
-    const prevTrack = queue.value[prevIndex]
+
+    let prevIndex
+    let attempts = 0
+    const maxAttempts = queue.value.length
+
+    while (attempts < maxAttempts) {
+      prevIndex = queueIndex.value - 1
+      if (prevIndex < 0) prevIndex = repeat.value === 'all' ? queue.value.length - 1 : 0
+      queueIndex.value = prevIndex
+      const candidateTrack = queue.value[prevIndex]
+      if (candidateTrack && !candidateTrack.is_unavailable) {
+        break
+      }
+      attempts++
+      if (prevIndex === 0 && repeat.value !== 'all') break
+    }
+
+    const prevTrack = queue.value[queueIndex.value]
+    if (!prevTrack || prevTrack.is_unavailable) {
+      isPlaying.value = false; isSkipping = false; return
+    }
 
     // Use unified resolveAudioSource (BUG-1 FIX: no more undefined audioCache.delete)
     initAudio()

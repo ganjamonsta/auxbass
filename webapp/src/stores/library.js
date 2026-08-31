@@ -599,24 +599,69 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
+  // Helper to find track across all local store collections
+  const findTrackInStore = (trackId) => {
+    return (
+      tracks.value.find(t => t.id === trackId) ||
+      likedTracks.value.find(t => t.id === trackId) ||
+      globalTracks.value.find(t => t.id === trackId) ||
+      recentUploads.value.find(t => t.id === trackId) ||
+      popularTracks.value.find(t => t.id === trackId) ||
+      selectedUserTracks.value.find(t => t.id === trackId) ||
+      history.value.find(t => t.id === trackId) ||
+      null
+    )
+  }
+
+  // Check if track is liked
+  const isTrackLiked = (trackId) => {
+    if (!trackId) return false
+    // 1. Check likedTracks array (source of truth)
+    if (likedTracks.value.some(t => t.id === trackId)) return true
+    
+    // 2. Check local store collections
+    const track = findTrackInStore(trackId)
+    if (track && typeof track.is_liked === 'boolean') {
+      return track.is_liked
+    }
+    
+    return false
+  }
+
   // Toggle like on track
-  const toggleLike = async (trackId) => {
-    // Find track in tracks list
-    const track = tracks.value.find(t => t.id === trackId)
-    const isLiked = track?.is_liked || likedTracks.value.some(t => t.id === trackId)
+  const toggleLike = async (trackId, currentLikedState = null) => {
+    if (!trackId) return false
+
+    // Determine current liked status:
+    // 1. Explicitly passed parameter
+    // 2. isTrackLiked() check across all known collections
+    let isLiked = currentLikedState
+    if (isLiked === null || isLiked === undefined) {
+      isLiked = isTrackLiked(trackId)
+    }
     
     try {
       if (isLiked) {
         await tracksApi.unlike(trackId)
         await notifyTrackChange(trackId, { is_liked: false, liked_at: null })
         likedTracks.value = likedTracks.value.filter(t => t.id !== trackId)
+        return false
       } else {
         await tracksApi.like(trackId)
-        await notifyTrackChange(trackId, { is_liked: true, liked_at: new Date().toISOString() })
-        // Refetch liked tracks to get proper order
-        await fetchLikedTracks()
+        const nowIso = new Date().toISOString()
+        await notifyTrackChange(trackId, { is_liked: true, liked_at: nowIso })
+        
+        // Add to likedTracks locally or refetch
+        if (!likedTracks.value.some(t => t.id === trackId)) {
+          const track = findTrackInStore(trackId)
+          if (track) {
+            likedTracks.value.unshift({ ...track, is_liked: true, liked_at: nowIso })
+          } else {
+            await fetchLikedTracks()
+          }
+        }
+        return true
       }
-      return !isLiked
     } catch (error) {
       console.error('Failed to toggle like:', error)
       // Handle 403 - show channel banner
@@ -628,15 +673,6 @@ export const useLibraryStore = defineStore('library', () => {
       }
       return isLiked
     }
-  }
-
-  // Check if track is liked
-  const isTrackLiked = (trackId) => {
-    // First check likedTracks array (source of truth)
-    if (likedTracks.value.some(t => t.id === trackId)) return true
-    // Fallback to track's is_liked property
-    const track = tracks.value.find(t => t.id === trackId)
-    return track?.is_liked === true
   }
 
   // Get unavailable tracks count

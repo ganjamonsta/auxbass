@@ -116,10 +116,10 @@ def validate_stream_token(token: str) -> Optional[tuple[int, int, str]]:
 
 async def find_streamable_alternative(track: Track, db: AsyncSession) -> Optional[Track]:
     """
-    Find a streamable (MP3) alternative for an HD track.
+    Find a streamable (MP3/AAC/OGG/M4A) alternative for an HD or large track.
     Matches by normalized title and artist, with additional validation:
-    - Duration difference < 5 seconds
-    - File size smaller than original (MP3 should be smaller than HD)
+    - Duration difference <= 15 seconds (if durations present)
+    - File size <= 20 MB (streamable via standard Telegram Bot API)
     - Deezer track ID match (if available)
     """
     if not track.title:
@@ -134,20 +134,27 @@ async def find_streamable_alternative(track: Track, db: AsyncSession) -> Optiona
     if track.enrichment:
         hd_deezer_id = track.enrichment.deezer_track_id
     
-    # Find MP3 tracks with similar title/artist
-    # Using func.lower() for case-insensitive search in DB
+    # Find non-HD tracks with file size <= 20MB
+    hd_mime_list = list(HD_MIME_TYPES)
+    max_size_bytes = 20 * 1024 * 1024
+    
     query = (
         select(Track)
         .where(Track.id != track.id)
         .where(Track.is_unavailable == False)
         .where(
             or_(
-                Track.mime_type == "audio/mpeg",
-                Track.mime_type == "audio/mp3",
-                Track.mime_type == None,  # Legacy tracks without mime_type are usually MP3
+                Track.mime_type.is_(None),
+                Track.mime_type.notin_(hd_mime_list)
             )
         )
-        .options(selectinload(Track.enrichment))  # Load enrichment for deezer_id check
+        .where(
+            or_(
+                Track.file_size.is_(None),
+                Track.file_size <= max_size_bytes
+            )
+        )
+        .options(selectinload(Track.enrichment))
     )
     
     result = await db.execute(query)
@@ -164,48 +171,57 @@ async def find_streamable_alternative(track: Track, db: AsyncSession) -> Optiona
         cand_norm_title = normalize_title(candidate.title).lower()
         cand_norm_artist = normalize_artist(candidate.artist or "").lower() if candidate.artist else None
         
-        # Match title (must be similar)
-        if norm_title != cand_norm_title:
+        # Match title (exact or substring)
+        title_matched = False
+        title_score = 0
+        if norm_title == cand_norm_title:
+            title_matched = True
+            title_score = 40
+        elif norm_title in cand_norm_title or cand_norm_title in norm_title:
+            title_matched = True
+            title_score = 20
+        
+        if not title_matched:
             continue
         
-        # Match artist if both have artist
-        if norm_artist and cand_norm_artist:
-            if norm_artist != cand_norm_artist:
-                continue
+        score = title_score
         
-        # Calculate match score
-        score = 0
+        # Match artist
+        if norm_artist and cand_norm_artist:
+            if norm_artist == cand_norm_artist:
+                score += 30
+            elif norm_artist in cand_norm_artist or cand_norm_artist in norm_artist:
+                score += 15
+            else:
+                # If titles match exactly but artists are completely different, skip unless Deezer match
+                if score < 40 and not (hd_deezer_id and candidate.enrichment and candidate.enrichment.deezer_track_id == hd_deezer_id):
+                    continue
+        elif not norm_artist and not cand_norm_artist:
+            score += 10
         
         # Check Deezer ID match (highest priority)
         if hd_deezer_id and candidate.enrichment:
             if candidate.enrichment.deezer_track_id == hd_deezer_id:
                 score += 100  # Perfect match via Deezer
         
-        # Check duration similarity (±5 seconds)
+        # Check duration similarity
         if track.duration and candidate.duration:
             duration_diff = abs(track.duration - candidate.duration)
             if duration_diff <= 5:
                 score += 50  # Good duration match
-            elif duration_diff <= 10:
+            elif duration_diff <= 15:
                 score += 20  # Acceptable duration match
             else:
                 continue  # Duration too different, skip
         
-        # Check file size (MP3 should be smaller than HD)
-        if track.file_size and candidate.file_size:
-            if candidate.file_size < track.file_size:
-                # MP3 is smaller than HD - good sign
-                size_ratio = track.file_size / candidate.file_size
-                if 2 <= size_ratio <= 10:  # Typical HD/MP3 ratio
-                    score += 30
-                elif size_ratio > 1.5:  # At least somewhat smaller
-                    score += 10
-        
-        # Prefer smaller files (better for streaming)
+        # Check file size (prefer streamable <= 20MB)
         if candidate.file_size:
-            file_size_mb = candidate.file_size / (1024 * 1024)
-            if file_size_mb < 10:
-                score += 5
+            if candidate.file_size <= max_size_bytes:
+                score += 10
+            if track.file_size and candidate.file_size < track.file_size:
+                size_ratio = track.file_size / candidate.file_size
+                if size_ratio >= 1.5:
+                    score += 20
         
         # Update best match
         if score > best_score:
@@ -213,7 +229,7 @@ async def find_streamable_alternative(track: Track, db: AsyncSession) -> Optiona
             best_match = candidate
     
     # Require minimum score to avoid false matches
-    if best_match and best_score >= 20:  # At least title+artist match + some validation
+    if best_match and best_score >= 30:
         return best_match
     
     return None
@@ -873,20 +889,30 @@ async def get_batch_stream_urls(
     tracks = {t.id: t for t in result.scalars().all()}
     
     # Pre-fetch all file paths in parallel (key optimization!)
-    # Also try to refresh stale file_ids from channel messages
+    # Also try to refresh stale file_ids from channel messages and support HD alternatives
     async def get_file_path_for_track(track):
         try:
+            file_size_mb = (track.file_size or 0) / (1024 * 1024)
+            is_track_hd = not is_streamable(track.mime_type)
+            is_too_large = file_size_mb > 20
+
+            # If HD or >20MB, try to find streamable alternative first
+            if is_track_hd or is_too_large:
+                alt = await find_streamable_alternative(track, db)
+                if alt:
+                    alt_path = await get_telegram_file_path(alt.file_id)
+                    if alt_path:
+                        logger.info(f"[Batch] Using MP3 alternative {alt.id} for HD/large track {track.id}")
+                        return alt_path, None, True  # (file_path, new_file_id, is_hd_or_large)
+                # HD/large with no alternative or path: not streamable, but NOT unavailable!
+                return None, None, True
+
+            # Normal streamable track: try direct get_telegram_file_path
             file_path = await get_telegram_file_path(track.file_id)
             if file_path:
-                return file_path, None  # (file_path, new_file_id)
+                return file_path, None, False  # (file_path, new_file_id, is_hd_or_large)
             
             # File path is None - try to refresh file_id from channel
-            file_size_mb = (track.file_size or 0) / (1024 * 1024)
-            if file_size_mb > 20:
-                # File too large for Bot API
-                logger.debug(f"[Batch] Track {track.id} too large ({file_size_mb:.1f}MB)")
-                return None, None
-            
             logger.info(f"[Batch] Track {track.id} file_id stale, attempting refresh from channel...")
             new_file_id = await refresh_file_id_from_channel(track.id, db)
             
@@ -895,12 +921,12 @@ async def get_batch_stream_urls(
                 file_path = await get_telegram_file_path(new_file_id)
                 if file_path:
                     logger.info(f"[Batch] Track {track.id} file_id refreshed successfully!")
-                    return file_path, new_file_id
+                    return file_path, new_file_id, False
             
-            return None, None
+            return None, None, False
         except Exception as e:
             logger.debug(f"Failed to get file path for track {track.id}: {e}")
-            return None, None
+            return None, None, False
     
     # Fetch all file paths concurrently
     file_path_tasks = []
@@ -924,7 +950,7 @@ async def get_batch_stream_urls(
             file_path_map[track_id] = None
             continue
         
-        file_path, new_file_id = result
+        file_path, new_file_id, is_hd_or_large = result
         file_path_map[track_id] = file_path
         
         if new_file_id and track:
@@ -932,8 +958,8 @@ async def get_batch_stream_urls(
             track.file_id = new_file_id
             track.is_unavailable = False
             tracks_to_update.append(track_id)
-        elif not file_path and track and not track.is_unavailable:
-            # Mark as unavailable
+        elif not file_path and track and not track.is_unavailable and not is_hd_or_large:
+            # Mark as unavailable ONLY for regular files whose telegram path is truly gone
             track.is_unavailable = True
             tracks_to_mark_unavailable.append(track_id)
     

@@ -134,7 +134,7 @@ const { playAll, shufflePlay, playTrack } = usePlaybackActions(sortedTracks)
 
 const unlikeTrack = async (track) => {
   try {
-    await libraryStore.toggleLike(track.id)
+    await libraryStore.toggleLike(track.id, true)
   } catch (error) {
     console.error('Failed to unlike track:', error)
   }

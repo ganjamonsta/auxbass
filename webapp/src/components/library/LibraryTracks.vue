@@ -411,7 +411,11 @@ const onToggleOrder = () => {
 
 // Like track
 const handleLikeTrack = async (track) => {
-  const newLikedState = await libraryStore.toggleLike(track.id)
+  if (!track?.id) return
+  const current = track.is_liked === true
+  track.is_liked = !current
+  const newLikedState = await libraryStore.toggleLike(track.id, current)
+  track.is_liked = newLikedState
   const idx = tracks.value.findIndex(t => t.id === track.id)
   if (idx !== -1) {
     tracks.value[idx].is_liked = newLikedState

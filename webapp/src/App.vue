@@ -266,11 +266,12 @@ const appClasses = computed(() => ({
   'has-now-playing': isDesktop.value && playerStore.currentTrack && authStore.isAuthenticated
 }))
 
-// Computed property for like state based on libraryStore.likedTracks
+// Computed property for like state based on libraryStore.likedTracks + currentTrack
 const isCurrentTrackLiked = computed(() => {
-  const trackId = playerStore.currentTrack?.id
-  if (!trackId) return false
-  return libraryStore.isTrackLiked(trackId)
+  const track = playerStore.currentTrack
+  if (!track?.id) return false
+  if (libraryStore.isTrackLiked(track.id)) return true
+  return track.is_liked === true
 })
 
 // Navigation visibility
@@ -372,7 +373,8 @@ const goBack = () => {
 // Toggle like for current track
 const handleToggleLike = async () => {
   if (playerStore.currentTrack?.id) {
-    await libraryStore.toggleLike(playerStore.currentTrack.id)
+    const current = isCurrentTrackLiked.value
+    await libraryStore.toggleLike(playerStore.currentTrack.id, current)
   }
 }
 
