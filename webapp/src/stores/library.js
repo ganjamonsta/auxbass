@@ -569,10 +569,11 @@ export const useLibraryStore = defineStore('library', () => {
   const fetchHistory = async (limit = 30) => {
     try {
       const response = await tracksApi.getHistory(limit)
-      history.value = response.data
-      return response.data
+      history.value = response.data?.items || (Array.isArray(response.data) ? response.data : [])
+      return history.value
     } catch (error) {
       console.error('Failed to fetch history:', error)
+      history.value = []
       return []
     }
   }
@@ -593,7 +594,7 @@ export const useLibraryStore = defineStore('library', () => {
     try {
       const response = await tracksApi.getLiked()
       // API returns { items: [...], total: N }
-      likedTracks.value = response.data?.items || response.data || []
+      likedTracks.value = response.data?.items || (Array.isArray(response.data) ? response.data : [])
       return likedTracks.value
     } catch (error) {
       console.error('Failed to fetch liked tracks:', error)
@@ -604,14 +605,16 @@ export const useLibraryStore = defineStore('library', () => {
 
   // Helper to find track across all local store collections
   const findTrackInStore = (trackId) => {
+    if (!trackId) return null
+    const searchIn = (list) => (Array.isArray(list) ? list.find(t => t?.id === trackId) : null)
     return (
-      tracks.value.find(t => t.id === trackId) ||
-      likedTracks.value.find(t => t.id === trackId) ||
-      globalTracks.value.find(t => t.id === trackId) ||
-      recentUploads.value.find(t => t.id === trackId) ||
-      popularTracks.value.find(t => t.id === trackId) ||
-      selectedUserTracks.value.find(t => t.id === trackId) ||
-      history.value.find(t => t.id === trackId) ||
+      searchIn(tracks.value) ||
+      searchIn(likedTracks.value) ||
+      searchIn(globalTracks.value) ||
+      searchIn(recentUploads.value) ||
+      searchIn(popularTracks.value) ||
+      searchIn(selectedUserTracks.value) ||
+      searchIn(history.value) ||
       null
     )
   }
@@ -620,7 +623,7 @@ export const useLibraryStore = defineStore('library', () => {
   const isTrackLiked = (trackId) => {
     if (!trackId) return false
     // 1. Check likedTracks array (source of truth)
-    if (likedTracks.value.some(t => t.id === trackId)) return true
+    if (Array.isArray(likedTracks.value) && likedTracks.value.some(t => t?.id === trackId)) return true
     
     // 2. Check local store collections
     const track = findTrackInStore(trackId)
@@ -743,10 +746,11 @@ export const useLibraryStore = defineStore('library', () => {
   const fetchRecentUploads = async (limit = 20) => {
     try {
       const response = await tracksApi.getRecentUploads(limit)
-      recentUploads.value = response.data
-      return response.data
+      recentUploads.value = response.data?.items || (Array.isArray(response.data) ? response.data : [])
+      return recentUploads.value
     } catch (error) {
       console.error('Failed to fetch recent uploads:', error)
+      recentUploads.value = []
       return []
     }
   }
@@ -755,10 +759,11 @@ export const useLibraryStore = defineStore('library', () => {
   const fetchPopularTracks = async (limit = 20) => {
     try {
       const response = await tracksApi.getPopular(limit)
-      popularTracks.value = response.data
-      return response.data
+      popularTracks.value = response.data?.items || (Array.isArray(response.data) ? response.data : [])
+      return popularTracks.value
     } catch (error) {
       console.error('Failed to fetch popular tracks:', error)
+      popularTracks.value = []
       return []
     }
   }
@@ -785,11 +790,12 @@ export const useLibraryStore = defineStore('library', () => {
       
       await notifyTrackChange(trackId, { in_library: true })
       // Also add to tracks list from a global source if found
-      const source = globalTracks.value.find(t => t.id === trackId) ||
-                     recentUploads.value.find(t => t.id === trackId) ||
-                     popularTracks.value.find(t => t.id === trackId) ||
-                     selectedUserTracks.value.find(t => t.id === trackId)
-      if (source && !tracks.value.find(t => t.id === trackId)) {
+      const searchSource = (list) => (Array.isArray(list) ? list.find(t => t?.id === trackId) : null)
+      const source = searchSource(globalTracks.value) ||
+                     searchSource(recentUploads.value) ||
+                     searchSource(popularTracks.value) ||
+                     searchSource(selectedUserTracks.value)
+      if (source && Array.isArray(tracks.value) && !tracks.value.find(t => t?.id === trackId)) {
         tracks.value.unshift({ ...source, in_library: true })
         total.value = (total.value || 0) + 1
       } else {
@@ -824,8 +830,8 @@ export const useLibraryStore = defineStore('library', () => {
       apiCache.invalidatePattern('/library')
       
       // Remove from library lists
-      tracks.value = tracks.value.filter(t => t.id !== trackId)
-      likedTracks.value = likedTracks.value.filter(t => t.id !== trackId)
+      tracks.value = Array.isArray(tracks.value) ? tracks.value.filter(t => t?.id !== trackId) : []
+      likedTracks.value = Array.isArray(likedTracks.value) ? likedTracks.value.filter(t => t?.id !== trackId) : []
       total.value = Math.max(0, (total.value || 0) - 1)
       
       // Notify all lists about in_library change
@@ -853,17 +859,18 @@ export const useLibraryStore = defineStore('library', () => {
   
   // Check if track is in my library
   const isInLibrary = (trackId) => {
-    return tracks.value.some(t => t.id === trackId)
+    return Array.isArray(tracks.value) && tracks.value.some(t => t?.id === trackId)
   }
   
   // Fetch top users
   const fetchTopUsers = async () => {
     try {
       const response = await tracksApi.getTopUsers(20)
-      topUsers.value = response.data
-      return response.data
+      topUsers.value = response.data?.items || (Array.isArray(response.data) ? response.data : [])
+      return topUsers.value
     } catch (error) {
       console.error('Failed to fetch top users:', error)
+      topUsers.value = []
       return []
     }
   }
@@ -871,13 +878,14 @@ export const useLibraryStore = defineStore('library', () => {
   // Fetch tracks by specific user
   const fetchUserTracks = async (userId) => {
     try {
-      const user = topUsers.value.find(u => u.id === userId)
+      const user = Array.isArray(topUsers.value) ? topUsers.value.find(u => u?.id === userId) : null
       selectedUser.value = user || { id: userId }
       const response = await tracksApi.getUserTracks(userId, 50)
-      selectedUserTracks.value = response.data
-      return response.data
+      selectedUserTracks.value = response.data?.items || (Array.isArray(response.data) ? response.data : [])
+      return selectedUserTracks.value
     } catch (error) {
       console.error('Failed to fetch user tracks:', error)
+      selectedUserTracks.value = []
       return []
     }
   }
