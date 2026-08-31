@@ -56,7 +56,7 @@
         <template v-if="tracks.length">
           <div class="section-header">
             <span class="section-title">Моя библиотека</span>
-            <span class="section-count">{{ tracks.length }}</span>
+            <span class="section-count">{{ tracks.length }}<template v-if="searchTotal > tracks.length"> из {{ searchTotal }}</template></span>
           </div>
         </template>
         
@@ -73,6 +73,24 @@
           @download="handleDirectDownload(track)"
           @hdNotice="handleHdNotice"
         />
+
+        <!-- Load more trigger for my library search infinite scroll -->
+        <div v-if="hasMore" ref="loadTriggerRef" class="load-trigger">
+          <div v-if="loadingMore" class="loading-more">
+            <div class="spinner small"></div>
+          </div>
+        </div>
+
+        <!-- Load more my tracks button -->
+        <button v-if="hasMore" class="load-more-btn" :disabled="loadingMore" @click="loadMore">
+          <template v-if="loadingMore">
+            <div class="spinner small"></div>
+            <span>Загрузка...</span>
+          </template>
+          <template v-else>
+            <span>Показать ещё ({{ tracks.length }} из {{ searchTotal }})</span>
+          </template>
+        </button>
         
         <!-- Section: Friends' Libraries results -->
         <template v-if="friendsTracks.length">
@@ -161,13 +179,6 @@
         <div v-if="!tracks.length && !friendsTracks.length && !globalTracks.length && !loading && !friendsLoading && !globalLoading" class="empty-state">
           <span class="empty-icon"><Music :size="48" /></span>
           <h3>Ничего не найдено</h3>
-        </div>
-
-        <!-- Load more trigger for search infinite scroll -->
-        <div v-if="hasMore" ref="loadTriggerRef" class="load-trigger">
-          <div v-if="loadingMore" class="loading-more">
-            <div class="spinner small"></div>
-          </div>
         </div>
       </template>
     </div>
@@ -334,7 +345,6 @@ const loadSearchTracks = async () => {
     // I will check `stores/library.js` if possible, but for now I will assume I need to handle appending if the store doesn't.
     // Actually, I'll stick to the exact logic of `LibraryView.vue` to not break it.
     // Code: `await libraryStore.fetchTracks(...)` then `tracks.value = libraryStore.tracks`.
-    
     tracks.value = libraryStore.tracks
     searchTotal.value = libraryStore.total
   } finally {
@@ -350,22 +360,43 @@ const loadMore = async () => {
   await loadSearchTracks()
 }
 
+const findScrollContainer = (el) => {
+  let parent = el?.parentElement
+  while (parent) {
+    const style = window.getComputedStyle(parent)
+    if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+      return parent
+    }
+    parent = parent.parentElement
+  }
+  return window
+}
+
 // Setup IntersectionObserver for infinite scroll
 const setupObserver = () => {
-  if (observer) observer.disconnect()
+  if (observer) {
+    observer.disconnect()
+    observer = null
+  }
+  
+  if (!loadTriggerRef.value) return
+
+  const container = findScrollContainer(loadTriggerRef.value)
+  const isWindow = container === window
   
   observer = new IntersectionObserver(
     (entries) => {
-      if (entries[0].isIntersecting && hasMore.value && !loading.value && !loadingMore.value) {
+      if (entries[0]?.isIntersecting && hasMore.value && !loading.value && !loadingMore.value) {
         loadMore()
       }
     },
-    { rootMargin: '200px' }
+    {
+      root: isWindow ? null : container,
+      rootMargin: '300px'
+    }
   )
   
-  if (loadTriggerRef.value) {
-    observer.observe(loadTriggerRef.value)
-  }
+  observer.observe(loadTriggerRef.value)
 }
 
 // Watch loadTriggerRef to setup observer when element appears
@@ -394,37 +425,11 @@ watch(() => props.searchQuery, async (newVal) => {
   }
 })
 
-const onNextSort = () => {
-  nextSort()
-  page.value = 1
-  if (props.searchQuery) {
-    loadSearchTracks()
-  } else if (virtualTrackListRef.value) {
-    virtualTrackListRef.value.reset()
-  }
-}
-
-const onToggleOrder = () => {
-  toggleOrder()
-  page.value = 1
-  if (props.searchQuery) {
-    loadSearchTracks()
-  } else if (virtualTrackListRef.value) {
-    virtualTrackListRef.value.reset()
-  }
-}
-
 // Like track
 const handleLikeTrack = async (track) => {
   if (!track?.id) return
   const current = track.is_liked === true
   track.is_liked = !current
-  const newLikedState = await libraryStore.toggleLike(track.id, current)
-  track.is_liked = newLikedState
-  const idx = tracks.value.findIndex(t => t.id === track.id)
-  if (idx !== -1) {
-    tracks.value[idx].is_liked = newLikedState
-  }
 }
 
 const playTrack = (track) => {
@@ -538,14 +543,37 @@ onUnmounted(() => {
   color: var(--c-text-2);
 }
 
-/* Empty state, section headers, spinner, loading-more are in design-system.css */
+/* Section header styling */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 4px 10px;
+  margin-top: 8px;
+  user-select: none;
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-text-1, #fff);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-count {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
+}
 
 /* Section modifiers for search results */
 .section-header.global-section,
 .section-header.friends-section {
   margin-top: 24px;
   padding-top: 16px;
-  border-top: 1px solid var(--c-bg-4));
+  border-top: 1px solid var(--c-bg-4, rgba(255, 255, 255, 0.08));
 }
 
 .global-loading {
@@ -554,7 +582,7 @@ onUnmounted(() => {
   justify-content: center;
   gap: 8px;
   padding: 16px;
-  color: var(--c-text-2);
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
   font-size: 13px;
 }
 
@@ -565,10 +593,11 @@ onUnmounted(() => {
   gap: 8px;
   width: 100%;
   padding: 12px;
-  margin-top: 8px;
-  background: var(--c-bg-3));
-  color: var(--c-accent);
-  border: 1px solid var(--c-bg-4));
+  margin-top: 12px;
+  margin-bottom: 8px;
+  background: var(--c-bg-3, rgba(255, 255, 255, 0.05));
+  color: var(--c-accent, #10b981);
+  border: 1px solid var(--c-bg-4, rgba(255, 255, 255, 0.1));
   border-radius: 10px;
   font-size: 13px;
   font-weight: 500;
@@ -585,5 +614,10 @@ onUnmounted(() => {
   cursor: not-allowed;
 }
 
-/* load-trigger is in design-system.css */
+.load-trigger {
+  min-height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 </style>
