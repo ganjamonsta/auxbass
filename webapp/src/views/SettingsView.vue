@@ -184,7 +184,7 @@
         />
         <div class="scale-presets">
           <button 
-            v-for="preset in [0.8, 0.9, 1.0, 1.1, 1.2, 1.3]" 
+            v-for="preset in [0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3]" 
             :key="preset"
             class="scale-preset-chip"
             :class="{ active: Math.round(playerStore.uiScale * 100) === Math.round(preset * 100) }"
@@ -998,13 +998,16 @@ h1 {
 
 .scale-presets {
   display: flex;
-  flex-wrap: wrap;
+  width: 100%;
   gap: 6px;
   margin-top: 4px;
 }
 
 .scale-preset-chip {
-  padding: 4px 10px;
+  flex: 1;
+  min-width: 0;
+  padding: 6px 2px;
+  text-align: center;
   border-radius: var(--r-sm, 8px);
   background: var(--c-bg-3);
   color: var(--c-text-2);
@@ -1013,6 +1016,7 @@ h1 {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
 .scale-preset-chip:hover {
