@@ -14,7 +14,13 @@
         </svg>
       </button>
       <span class="player-title">Сейчас играет</span>
-      <div class="header-spacer"></div>
+      <button class="menu-btn" @click="openTrackContextMenu($event)" title="Меню трека" aria-label="Меню трека">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <circle cx="12" cy="5" r="2"/>
+          <circle cx="12" cy="12" r="2"/>
+          <circle cx="12" cy="19" r="2"/>
+        </svg>
+      </button>
     </div>
 
     <!-- Cover art with generated gradient - swipe area for track navigation & long-press for menu -->
