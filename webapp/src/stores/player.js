@@ -364,7 +364,6 @@ export const usePlayerStore = defineStore('player', () => {
     onEnded: (e) => {
       if (e.target?._obsolete) return
       clearStallTimer()
-      if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'none'
       handleEnded()
     },
     onPlay: (e) => {
@@ -514,46 +513,6 @@ export const usePlayerStore = defineStore('player', () => {
         hdTrackInfo.value = null
         break
       }
-      case 'preloaded': {
-        if (audio.value) {
-          // Mark obsolete BEFORE pause — so onPause handler skips MediaSession update.
-          // Without this, the brief 'paused' state dismisses the Android notification.
-          audio.value._obsolete = true
-          audio.value.pause()
-          audio.value.src = ''
-        }
-        const oldAudio = audio.value
-        audio.value = source.audio
-        audio.value._obsolete = false
-        audio.value.volume = volume.value
-        audio.value.muted = isMuted.value
-        reattachAudioListeners()
-        connectEnhancer(audio.value)
-        try {
-          await audio.value.play()
-          isPlaying.value = true
-          recyclePreloadAudio(oldAudio)
-          // Re-register handlers + metadata after audio element swap.
-          // On Android/Firefox the browser may lose the MediaSession association
-          // when the playing audio element changes.
-          setupMediaSession(_msActions())
-          updateMediaSession()
-          updatePlaybackState()
-        } catch (e) {
-          console.error('[Play] Preloaded audio failed, falling back:', e)
-          audio.value = oldAudio
-          if (oldAudio) reattachAudioListeners()
-          clearPreloadAudio()
-          // Fall through to cached/fresh URL
-          const fallback = await resolveAudioSource(track.id, playerApi.getStreamUrl.bind(playerApi))
-          if (fallback.type === 'error') throw fallback.error || new Error(fallback.reason)
-          audio.value.src = fallback.src
-          buffered.value = 0
-          await audio.value.play()
-          isPlaying.value = true
-        }
-        break
-      }
       case 'cached-url':
       case 'fresh-url': {
         audio.value.src = source.src
@@ -574,6 +533,7 @@ export const usePlayerStore = defineStore('player', () => {
 
   // ===================== PLAY =====================
   const play = async (track, newQueue = null) => {
+    stateRestored.value = true // Prevent late cache restoration from clobbering active playback
     initAudio()
     markUserInteraction()
     cancelIrrelevantPreloads(_collectRelevantIds())
@@ -711,7 +671,6 @@ export const usePlayerStore = defineStore('player', () => {
       if (!firstTrack) { clearLazyShuffle(); loading.value = false; shuffleInProgress = false; return }
 
       queue.value = [firstTrack]; queueIndex.value = 0
-      if (audio.value) { audio.value._obsolete = true; audio.value.pause(); audio.value.src = '' }
       duration.value = 0; currentTrack.value = null
       await play(firstTrack)
       shuffleInProgress = false
@@ -920,17 +879,18 @@ export const usePlayerStore = defineStore('player', () => {
   // ===================== HANDLE ENDED =====================
   const handleEnded = async () => {
     const track = currentTrack.value
-    const played = audio.value?.currentTime || 0
-    const total = duration.value || 0
-    if (!track || total === 0 || !audio.value?.src) return
-    if (played < 1 && total > 5) return
+    if (!track || !audio.value?.src) return
 
     if (currentTrack.value) {
       try { await playerApi.recordPlay(currentTrack.value.id) } catch (_) {}
     }
 
-    if (repeat.value === 'one') { seek(0); audio.value.play() }
-    else next()
+    if (repeat.value === 'one') {
+      seek(0)
+      try { await audio.value.play() } catch (_) {}
+    } else {
+      await next()
+    }
   }
 
   // ===================== QUEUE MANAGEMENT =====================
@@ -1061,6 +1021,11 @@ export const usePlayerStore = defineStore('player', () => {
   // ===================== STATE RESTORE =====================
   const restoreState = async () => {
     if (stateRestored.value || !savedState) return false
+    // If user has already started playing or loaded a track before cache restore, do not overwrite
+    if (currentTrack.value || isPlaying.value) {
+      stateRestored.value = true
+      return false
+    }
     stateRestored.value = true
     const maxAge = 24 * 60 * 60 * 1000
     if (savedState.savedAt && Date.now() - savedState.savedAt > maxAge) { clearPlayerState(); return false }

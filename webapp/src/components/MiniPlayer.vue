@@ -223,37 +223,39 @@ const formatTime = (seconds) => {
 .mini-player {
   display: flex;
   align-items: center;
-  margin: 6px 10px;
+  margin: 4px 10px 6px;
   padding: 6px;
-  background: var(--c-bg-2);
+  background: rgba(22, 27, 34, 0.75);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
   border-radius: var(--r-lg);
   cursor: pointer;
   overflow: visible;
   box-shadow: 
-    6px 6px 12px var(--sh-dark),
-    -3px -3px 8px var(--sh-light);
-  border: 1px solid rgba(255, 255, 255, 0.03);
+    0 8px 24px rgba(0, 0, 0, 0.4),
+    inset 0 1px 1px rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .mini-player:active {
   transform: scale(0.98);
   box-shadow: 
-    3px 3px 6px var(--sh-dark),
-    -2px -2px 4px var(--sh-light);
+    0 4px 12px rgba(0, 0, 0, 0.5),
+    inset 0 1px 1px rgba(255, 255, 255, 0.1);
 }
 
 /* ─── LCD Screen - Nokia XpressMusic Style ─── */
 .lcd-screen {
   flex: 1;
-  background: var(--lcd-bg);
+  background: linear-gradient(180deg, rgba(8, 16, 24, 0.85) 0%, rgba(4, 10, 16, 0.95) 100%);
   border-radius: var(--r-md);
   padding: 10px 12px;
   font-family: 'Segoe UI', system-ui, sans-serif;
-  border: 1px solid #1a2a40;
+  border: 1px solid rgba(77, 195, 255, 0.15);
   box-shadow: 
-    inset 0 2px 8px rgba(0, 0, 0, 0.8),
-    0 1px 0 rgba(100, 150, 255, 0.1);
+    inset 0 2px 10px rgba(0, 0, 0, 0.8),
+    0 1px 0 rgba(255, 255, 255, 0.05);
   min-width: 0;
   position: relative;
   overflow: visible;

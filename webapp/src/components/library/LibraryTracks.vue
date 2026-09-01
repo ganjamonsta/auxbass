@@ -2,15 +2,14 @@
   <div class="library-tracks">
     <!-- Sort options -->
     <div class="sort-options">
-      <button class="shuffle-all-btn" @click="shuffleAll" :disabled="!total || shuffling">
-        <template v-if="shuffling">
-          <div class="spinner small"></div>
-          <span>Загрузка...</span>
-        </template>
-        <template v-else>
-          <Shuffle :size="16" />
-          <span>Перемешать ({{ total }})</span>
-        </template>
+      <button class="shuffle-all-btn" :class="{ 'is-loading': shuffling }" @click="shuffleAll" :disabled="!total || shuffling">
+        <div v-if="shuffling" class="spinner small"></div>
+        <Shuffle v-else :size="16" class="shuffle-icon" />
+        <span class="shuffle-text">
+          <template v-if="shuffling">Загрузка...</template>
+          <template v-else-if="total > 0">Перемешать ({{ total }})</template>
+          <template v-else>Перемешать</template>
+        </span>
       </button>
       <SortChips
         :currentOption="currentOption"
@@ -229,6 +228,27 @@ const {
   nextSort, 
   toggleOrder 
 } = useSort('library-sort', 'library', { sortBy: 'added_at', sortOrder: 'desc' })
+
+// Sort handlers
+const onNextSort = async () => {
+  nextSort()
+  if (props.searchQuery) {
+    page.value = 1
+    await loadSearchTracks()
+  } else {
+    virtualTrackListRef.value?.reset()
+  }
+}
+
+const onToggleOrder = async () => {
+  toggleOrder()
+  if (props.searchQuery) {
+    page.value = 1
+    await loadSearchTracks()
+  } else {
+    virtualTrackListRef.value?.reset()
+  }
+}
 
 // Virtual track list ref
 const virtualTrackListRef = ref(null)
@@ -529,8 +549,23 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
   margin-bottom: 16px;
+}
+
+.shuffle-all-btn {
+  min-width: 165px;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.shuffle-all-btn .shuffle-text {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.shuffle-icon {
+  flex-shrink: 0;
 }
 
 /* Loading state - uses .spinner from design-system.css */

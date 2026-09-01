@@ -168,26 +168,28 @@ const handleNavClick = (path) => {
 .mobile-footer {
   flex-shrink: 0;
   z-index: var(--z-overlay, 100);
-  background: var(--c-bg-2);
-  border-top: 2px solid var(--c-bg-4);
+  background: rgba(14, 18, 24, 0.85);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   padding-bottom: env(safe-area-inset-bottom);
-  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45);
 }
 
 /* Player section */
 .footer-player {
-  background: var(--c-bg-1);
-  padding: 8px 0;
+  background: transparent;
+  padding: 4px 0 2px 0;
 }
 
 /* Navigation */
 .footer-nav {
-  height: 72px;
+  height: 64px;
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding: 8px 0;
-  background: var(--c-bg-2);
+  padding: 4px 0;
+  background: transparent;
 }
 
 .nav-item {

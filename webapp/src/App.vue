@@ -29,7 +29,7 @@
                 :key="tab.id"
                 class="neu-tab" 
                 :class="{ active: uiStore.libraryTab === tab.id }"
-                @click="uiStore.setLibraryTab(tab.id)"
+                @click="handleLibraryTabClick(tab.id)"
               >
                 <span class="neu-tab-content" :data-text="tab.label">{{ tab.label }}</span>
               </button>
@@ -40,14 +40,14 @@
               <button 
                 class="neu-tab" 
                 :class="{ active: uiStore.collectionsTab === 'albums' }"
-                @click="uiStore.setCollectionsTab('albums')"
+                @click="handleCollectionsTabClick('albums')"
               >
                 <span class="neu-tab-content" data-text="Альбомы">Альбомы</span>
               </button>
               <button 
                 class="neu-tab" 
                 :class="{ active: uiStore.collectionsTab === 'playlists' }"
-                @click="uiStore.setCollectionsTab('playlists')"
+                @click="handleCollectionsTabClick('playlists')"
               >
                 <span class="neu-tab-content" data-text="Плейлисты">Плейлисты</span>
               </button>
@@ -208,7 +208,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, inject, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
@@ -252,6 +252,39 @@ const { scrollRef, pullDistance, isPulling, isRefreshing } = usePullToRefresh(
 )
 
 const { showFullPlayer } = useModals(telegram)
+
+// Scroll to top helper for tab clicks and resets
+const scrollToContentTop = () => {
+  if (scrollRef.value) {
+    scrollRef.value.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+  const scrollContainers = document.querySelectorAll(
+    '.main-content, .main-content-wrapper, .library-view, .collections-view, .layout-content, .virtual-track-list'
+  )
+  scrollContainers.forEach((el) => {
+    if (el && el.scrollTop > 0) {
+      el.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  })
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+  if (document.documentElement) {
+    document.documentElement.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
+
+const handleLibraryTabClick = (tabId) => {
+  uiStore.setLibraryTab(tabId)
+  nextTick(() => {
+    scrollToContentTop()
+  })
+}
+
+const handleCollectionsTabClick = (tabId) => {
+  uiStore.setCollectionsTab(tabId)
+  nextTick(() => {
+    scrollToContentTop()
+  })
+}
 
 // Responsive detection
 const isDesktop = ref(window.innerWidth >= 1024)
@@ -487,7 +520,7 @@ onMounted(async () => {
     await libraryStore.init()
     
     // Restore player state if available (persisted queue, track, position)
-    if (playerStore.hasSavedState()) {
+    if (playerStore.hasSavedState() && !playerStore.currentTrack && !playerStore.isPlaying) {
       await playerStore.restoreState()
     }
   }

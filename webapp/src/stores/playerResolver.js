@@ -36,34 +36,14 @@ export async function resolveAudioSource(trackId, getStreamUrl) {
     return { type: 'blob', src: blobUrl, buffered: true }
   }
 
-  // === PRIORITY 2: Preloaded Audio element ===
+  // === PRIORITY 2: Cached URL token (from prefetch/preload) ===
   const cachedUrl = getCachedUrl(trackId)
-  const preloaded = getPreloadedAudio(trackId)
-
-  if (preloaded &&
-      preloaded.readyState >= 2 &&
-      cachedUrl &&
-      (preloaded.networkState === 1 || preloaded.networkState === 2)) {
-    console.log(`[Play] Using preloaded Audio element (readyState=${preloaded.readyState}, networkState=${preloaded.networkState})`)
-    return { type: 'preloaded', audio: preloaded }
-  }
-
-  // Clear broken / expired preloads
-  if (preloaded && !cachedUrl) {
-    console.log('[Play] Preloaded audio URL expired, clearing')
-    clearPreloadAudio()
-  } else if (preloaded && preloaded.networkState === 3) {
-    console.log('[Play] Preloaded audio bad networkState, clearing')
-    clearPreloadAudio()
-  }
-
-  // === PRIORITY 3: Cached URL token ===
   if (cachedUrl) {
     console.log('[Play] Using cached URL token')
     return { type: 'cached-url', src: cachedUrl }
   }
 
-  // === PRIORITY 4: Fresh URL from API ===
+  // === PRIORITY 3: Fresh URL from API ===
   try {
     console.log('[Play] Fetching new stream URL from API')
     const response = await getStreamUrl(trackId)
