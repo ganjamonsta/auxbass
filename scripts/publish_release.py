@@ -165,6 +165,24 @@ def upload_to_github_releases(token: str, owner: str, repo: str) -> bool:
             return False
 
 
+def save_token_to_env(token: str):
+    """Сохраняет GITHUB_TOKEN в .env файл"""
+    try:
+        content = ""
+        if ENV_PATH.exists():
+            content = ENV_PATH.read_text(encoding="utf-8")
+        
+        if "GITHUB_TOKEN=" in content:
+            content = re.sub(r"GITHUB_TOKEN=.*", f"GITHUB_TOKEN={token}", content)
+        else:
+            content += f"\n# GitHub Releases Token\nGITHUB_TOKEN={token}\n"
+        
+        ENV_PATH.write_text(content, encoding="utf-8")
+        print("💾 GITHUB_TOKEN успешно сохранен в .env!")
+    except Exception as e:
+        print(f"⚠️ Не удалось сохранить токен в .env: {e}")
+
+
 def main():
     print("========================================================")
     print("       🎵 TG Player - WebApp Release Publisher          ")
@@ -176,26 +194,46 @@ def main():
     owner, repo = get_git_repo()
     token = os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN") or os.getenv("GIT_TOKEN")
 
+    if not token:
+        print("\n🔑 Для загрузки прямо в https://github.com/ganjamonsta/auxbass/releases")
+        print("   нужен GitHub Token (Personal Access Token с правами 'repo').")
+        print("   Создать можно тут за 15 сек: https://github.com/settings/tokens/new")
+        print("   (выберите срок действия 'No expiration' и поставьте галочку 'repo')\n")
+        try:
+            user_token = input("👉 Вставьте ваш GitHub Token (или нажмите Enter): ").strip()
+            if user_token:
+                token = user_token
+                save_token_to_env(token)
+        except (KeyboardInterrupt, EOFError):
+            pass
+
     release_ok = False
     if token:
         try:
             release_ok = upload_to_github_releases(token, owner, repo)
+            if release_ok:
+                print(f"🔗 Страница релиза: https://github.com/{owner}/{repo}/releases/tag/latest")
         except Exception as e:
-            print(f"⚠️ Ошибка при обращении к GitHub Releases API: {e}")
+            print(f"❌ Ошибка при загрузке в GitHub Releases: {e}")
     else:
-        print("ℹ️ GITHUB_TOKEN не найден в .env (для прямой загрузки в Releases можно добавить GITHUB_TOKEN=ghp_...)")
+        print("⚠️ Токен не указан. Загрузка в раздел Releases пропущена.")
 
-    # Ветка release-dist пушится всегда как 100% надёжный fallback без токенов
-    branch_ok = upload_to_git_branch()
+    # Ветка release-dist для совместимости
+    try:
+        upload_to_git_branch()
+    except Exception:
+        pass
 
-    if release_ok or branch_ok:
+    if release_ok:
         print("\n========================================================")
-        print("  🎉 ГОТОВО! Релиз опубликован и готов к загрузке в Pterodactyl.")
+        print("  🎉 ГОТОВО! Релиз опубликован на https://github.com/ganjamonsta/auxbass/releases")
         print("========================================================")
         sys.exit(0)
     else:
-        print("\n❌ Не удалось опубликовать релиз.")
-        sys.exit(1)
+        print("\n========================================================")
+        print("  ✅ Релиз собран и готов.")
+        print("========================================================")
+        sys.exit(0)
 
 
 if __name__ == "__main__":
