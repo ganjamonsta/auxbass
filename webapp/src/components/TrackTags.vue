@@ -164,28 +164,8 @@ async function loadTags() {
   }
 }
 
-async function handleTagAction(tag) {
-  if (!props.interactive) {
-    emit('tagClick', tag.tag)
-    return
-  }
-
-  // Toggle vote
-  if (tag.id) {
-    try {
-      if (tag.voted_by_me) {
-        const { data } = await tracksApi.unvoteTag(props.trackId, tag.id)
-        updateTagInList(tag.id, { vote_count: data.vote_count, voted_by_me: false })
-      } else {
-        const { data } = await tracksApi.voteTag(props.trackId, tag.id)
-        updateTagInList(tag.id, { vote_count: data.vote_count, voted_by_me: true })
-      }
-      const tagList = richTags.value.map(t => t.tag)
-      await libraryStore.notifyTrackChange(props.trackId, { tags: tagList })
-    } catch (e) {
-      console.warn('[TrackTags] Vote failed:', e)
-    }
-  }
+function handleTagAction(tag) {
+  emit('tagClick', tag.tag)
 }
 
 function updateTagInList(tagId, updates) {

@@ -306,6 +306,7 @@ import TrackTags from '@/components/TrackTags.vue'
 import LyricsViewer from '@/components/LyricsViewer.vue'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
+import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useAuthStore } from '@/stores/auth'
 
@@ -385,6 +386,7 @@ const emit = defineEmits([
 const router = useRouter()
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
+const uiStore = useUIStore()
 const authStore = useAuthStore()
 const { openMenu } = useContextMenu()
 
@@ -405,11 +407,13 @@ const goToArtist = (artistName) => {
   }
 }
 
-// Navigate to tag (future: tag-based playlist)
+// Navigate to tag search
 const handleTagClick = (tag) => {
-  // TODO: navigate to tag-based generated playlist view
-  // For now just log it — will be used when tag playlists are implemented
-  console.log('[FullPlayer] Tag clicked:', tag)
+  if (!tag) return
+  emit('close')
+  uiStore.setLibraryTab('tracks')
+  router.push({ path: '/', query: { search: tag } })
+  window.dispatchEvent(new CustomEvent('app-search', { detail: { query: tag } }))
 }
 
 // Open track context menu (uses unified context menu)

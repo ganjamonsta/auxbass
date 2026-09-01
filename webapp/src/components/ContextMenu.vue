@@ -33,11 +33,13 @@
 
             <!-- Tags (for tracks with enrichment tags) -->
             <TagChips
-              v-if="menuType === 'track' && data?.tags?.length"
-              :tags="data.tags"
+              v-if="menuType === 'track' && menuData?.tags?.length"
+              :tags="menuData.tags"
               :max="5"
+              :clickable="true"
               size="sm"
               class="menu-tags"
+              @tagClick="handleTagClick"
             />
 
             <!-- Menu Items -->
@@ -284,8 +286,10 @@
 
 <script setup>
 import { computed, watch, nextTick, ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useAuthStore } from '@/stores/auth'
+import { useUIStore } from '@/stores/ui'
 import { usePlayerStore } from '@/stores/player'
 import { getAllTrackArtists } from '@/utils/formatters'
 import PlaylistPicker from '@/components/PlaylistPicker.vue'
@@ -296,6 +300,9 @@ import {
   Download, Trash2, FolderOpen, Shuffle, Music, Mic2, ChevronRight, ChevronDown
 } from 'lucide-vue-next'
 
+const router = useRouter()
+const uiStore = useUIStore()
+
 // State for artist submenu
 const showArtistSubmenu = ref(false)
 
@@ -304,6 +311,14 @@ const renameInput = ref(null)
 const menuSheet = ref(null)
 const isDesktop = ref(false)
 const adjustedPosition = ref({ x: 0, y: 0 })
+
+const handleTagClick = (tag) => {
+  if (!tag) return
+  closeMenu()
+  uiStore.setLibraryTab('tracks')
+  router.push({ path: '/', query: { search: tag } })
+  window.dispatchEvent(new CustomEvent('app-search', { detail: { query: tag } }))
+}
 
 // Detect desktop
 const checkDesktop = () => {

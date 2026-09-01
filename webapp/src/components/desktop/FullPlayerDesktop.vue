@@ -32,6 +32,7 @@
                 :isLiked="isLiked"
                 @goToAlbum="handleGoToAlbum"
                 @goToArtist="handleGoToArtist"
+                @tagClick="handleTagClick"
               />
 
               <PlayerControls 
@@ -113,6 +114,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
+import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
 
 // New sub-components
@@ -160,6 +162,7 @@ defineEmits([
 const router = useRouter()
 const playerStore = usePlayerStore()
 const authStore = useAuthStore()
+const uiStore = useUIStore()
 const { openMenu } = useContextMenu()
 
 // Computed
@@ -274,6 +277,14 @@ const handleToggleLyrics = () => {
       queuePanelRef.value.setTab('lyrics')
     }
   }
+}
+
+const handleTagClick = (tag) => {
+  if (!tag) return
+  emit('close')
+  uiStore.setLibraryTab('tracks')
+  router.push({ path: '/', query: { search: tag } })
+  window.dispatchEvent(new CustomEvent('app-search', { detail: { query: tag } }))
 }
 </script>
 

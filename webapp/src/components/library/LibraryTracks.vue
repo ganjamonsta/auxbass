@@ -443,7 +443,7 @@ watch(() => props.searchQuery, async (newVal) => {
       virtualTrackListRef.value.reset()
     }
   }
-})
+}, { immediate: true })
 
 // Like track
 const handleLikeTrack = async (track) => {

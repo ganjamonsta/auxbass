@@ -31,7 +31,7 @@
           v-model="searchQuery"
           :placeholder="searchPlaceholder"
           @input="debouncedSearch"
-          @clear="clearSearch"
+          @clear="handleClearSearch"
         />
       </div>
 
@@ -47,8 +47,8 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, watch, onMounted, onUnmounted, onActivated } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import { useDebouncedSearch } from '@/composables'
@@ -59,6 +59,7 @@ import LibraryPlaylists from '@/components/library/LibraryPlaylists.vue'
 import SearchBar from '@/components/ui/SearchBar.vue'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const uiStore = useUIStore()
 
@@ -84,24 +85,68 @@ const currentTabComponent = computed(() => currentTab.value.component)
 const searchPlaceholder = computed(() => currentTab.value.placeholder)
 
 // Debounced search using composable
-const { query: searchQuery, debouncedQuery, search: debouncedSearch, clear: clearSearch } = useDebouncedSearch()
+const { query: searchQuery, debouncedQuery, search: debouncedSearch, clear: clearSearch, setQuery } = useDebouncedSearch()
+
+// Sync search query from route or external trigger
+const applyRouteSearch = (queryOverride) => {
+  const queryParam = queryOverride || route.query.search || route.query.q
+  if (queryParam && typeof queryParam === 'string') {
+    uiStore.setLibraryTab('tracks')
+    setQuery(queryParam, true)
+  }
+}
+
+const handleAppSearch = (event) => {
+  const query = event.detail?.query
+  if (query) {
+    uiStore.setLibraryTab('tracks')
+    setQuery(query, true)
+  }
+}
+
+const handleClearSearch = () => {
+  clearSearch()
+  if (route.query.search || route.query.q) {
+    router.replace({ path: '/', query: {} })
+  }
+}
+
+// Watch route search query param changes
+watch(
+  () => route.query.search || route.query.q,
+  (newVal) => {
+    if (newVal && typeof newVal === 'string') {
+      if (searchQuery.value !== newVal) {
+        uiStore.setLibraryTab('tracks')
+        setQuery(newVal, true)
+      }
+    }
+  }
+)
 
 // Слушаем событие сброса состояния
 const handleResetState = (event) => {
   if (event.detail.route === '/') {
     // Сбрасываем поиск
-    clearSearch()
+    handleClearSearch()
     // Сбрасываем на первую вкладку (Треки)
     currentTabId.value = 'tracks'
   }
 }
 
 onMounted(() => {
+  applyRouteSearch()
   window.addEventListener('reset-view-state', handleResetState)
+  window.addEventListener('app-search', handleAppSearch)
+})
+
+onActivated(() => {
+  applyRouteSearch()
 })
 
 onUnmounted(() => {
   window.removeEventListener('reset-view-state', handleResetState)
+  window.removeEventListener('app-search', handleAppSearch)
 })
 
 </script>
