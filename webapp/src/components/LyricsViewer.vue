@@ -3,42 +3,42 @@
     <!-- Header Controls -->
     <div class="lyrics-header" v-if="!embedded || showHeaderInEmbedded">
       <div class="lyrics-header-left">
-        <span class="lyrics-badge" :class="badgeClass">
-          <span v-if="lyricsData?.is_instrumental">🎵 Инструментал</span>
-          <span v-else-if="parsedLines.length > 0">⚡ Синхронизировано</span>
-          <span v-else-if="lyricsData?.plain_lyrics">📝 Обычный текст</span>
-          <span v-else>Текст песни</span>
+        <span 
+          v-if="parsedLines.length > 0" 
+          class="lyrics-badge badge-synced" 
+          title="Синхронизированный текст (Караоке)"
+        >
+          <svg class="badge-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
         </span>
-
-        <!-- View Switcher (Synced / Plain) if both or synced available -->
-        <div v-if="parsedLines.length > 0 && lyricsData?.plain_lyrics" class="mode-switch">
-          <button 
-            class="switch-btn" 
-            :class="{ active: viewMode === 'synced' }"
-            @click="viewMode = 'synced'"
-            title="Караоке (синхронизированный текст)"
-          >
-            Караоке
-          </button>
-          <button 
-            class="switch-btn" 
-            :class="{ active: viewMode === 'plain' }"
-            @click="viewMode = 'plain'"
-            title="Текст целиком"
-          >
-            Текст
-          </button>
-        </div>
+        <span 
+          v-else-if="lyricsData?.is_instrumental" 
+          class="lyrics-badge badge-instrumental" 
+          title="Инструментальная композиция"
+        >
+          <svg class="badge-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18V5l12-2v13"></path>
+            <circle cx="6" cy="18" r="3"></circle>
+            <circle cx="18" cy="16" r="3"></circle>
+          </svg>
+        </span>
+        <span 
+          v-else-if="lyricsData?.plain_lyrics" 
+          class="lyrics-badge badge-plain" 
+          title="Текст песни"
+        >
+          <svg class="badge-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+        </span>
       </div>
 
       <div class="lyrics-header-right">
-        <!-- Offset adjustment controls for synced mode -->
-        <div v-if="isSyncedView && parsedLines.length > 0" class="offset-controls" title="Подстройка синхронизации">
-          <button class="offset-btn" @click="adjustOffset(-500)" title="Сдвинуть текст раньше на 0.5с">-0.5s</button>
-          <span class="offset-val" v-if="userOffset !== 0">{{ formatOffset(userOffset) }}</span>
-          <button class="offset-btn" @click="adjustOffset(500)" title="Сдвинуть текст позже на 0.5с">+0.5s</button>
-        </div>
-
         <!-- Action dropdown / buttons -->
         <button class="action-icon-btn" @click="fetchLyrics(true)" :disabled="loading" title="Обновить текст из сети">
           <svg class="icon" :class="{ 'spin': loading }" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -260,7 +260,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { parseLrc, getActiveLineIndex } from '@/utils/lrcParser'
 import { tracksApi } from '@/api/client'
 import { useUIStore } from '@/stores/ui'
@@ -296,7 +296,6 @@ const uiStore = useUIStore()
 const loading = ref(false)
 const lyricsData = ref(null)
 const userOffset = ref(0)
-const viewMode = ref('synced') // 'synced' | 'plain'
 const containerRef = ref(null)
 const lineRefs = ref([])
 
@@ -317,9 +316,6 @@ const searching = ref(false)
 const searched = ref(false)
 const saving = ref(false)
 
-// Offset debounce
-let offsetDebounceTimer = null
-
 // Parsed LRC Lines
 const parsedLrcData = computed(() => {
   if (!lyricsData.value?.synced_lyrics) {
@@ -331,20 +327,13 @@ const parsedLrcData = computed(() => {
 const parsedLines = computed(() => parsedLrcData.value.lines)
 
 const isSyncedView = computed(() => {
-  return viewMode.value === 'synced' && parsedLines.value.length > 0 && !lyricsData.value?.is_instrumental
+  return parsedLines.value.length > 0 && !lyricsData.value?.is_instrumental
 })
 
 // Active Line Index Calculation
 const activeLineIndex = computed(() => {
   if (!isSyncedView.value || parsedLines.value.length === 0) return -1
   return getActiveLineIndex(parsedLines.value, props.currentTime, userOffset.value)
-})
-
-const badgeClass = computed(() => {
-  if (lyricsData.value?.is_instrumental) return 'badge-instrumental'
-  if (parsedLines.value.length > 0) return 'badge-synced'
-  if (lyricsData.value?.plain_lyrics) return 'badge-plain'
-  return 'badge-none'
 })
 
 function setLineRef(el, idx) {
@@ -361,13 +350,6 @@ async function fetchLyrics(forceRefresh = false) {
     const res = await tracksApi.getLyrics(props.track.id, forceRefresh)
     lyricsData.value = res.data
     userOffset.value = res.data?.offset_ms || 0
-    
-    // Choose initial viewMode
-    if (res.data?.synced_lyrics) {
-      viewMode.value = 'synced'
-    } else {
-      viewMode.value = 'plain'
-    }
   } catch (err) {
     console.error('Failed to fetch lyrics:', err)
   } finally {
@@ -436,25 +418,6 @@ function handleTouchStart() {
   if (isSyncedView.value) {
     isUserScrolledAway.value = true
   }
-}
-
-// Offset adjustment
-function adjustOffset(deltaMs) {
-  userOffset.value += deltaMs
-  if (offsetDebounceTimer) clearTimeout(offsetDebounceTimer)
-  offsetDebounceTimer = setTimeout(async () => {
-    if (!props.track?.id) return
-    try {
-      await tracksApi.updateLyricsOffset(props.track.id, userOffset.value)
-    } catch (e) {
-      console.warn('Failed to save lyrics offset:', e)
-    }
-  }, 800)
-}
-
-function formatOffset(ms) {
-  const s = (ms / 1000).toFixed(1)
-  return ms > 0 ? `+${s}s` : `${s}s`
 }
 
 // Edit Modal
@@ -544,7 +507,6 @@ async function applySearchResult(result) {
 
 onUnmounted(() => {
   if (userScrollTimeout) clearTimeout(userScrollTimeout)
-  if (offsetDebounceTimer) clearTimeout(offsetDebounceTimer)
 })
 </script>
 
@@ -582,23 +544,30 @@ onUnmounted(() => {
 }
 
 .lyrics-badge {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.badge-icon {
+  display: block;
 }
 
 .badge-synced {
-  background: rgba(99, 102, 241, 0.25);
+  background: rgba(99, 102, 241, 0.2);
   color: #818cf8;
-  border: 1px solid rgba(99, 102, 241, 0.4);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.25);
 }
 
 .badge-plain {
-  background: rgba(255, 255, 255, 0.1);
-  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .badge-instrumental {
@@ -607,71 +576,10 @@ onUnmounted(() => {
   border: 1px solid rgba(236, 72, 153, 0.3);
 }
 
-.badge-none {
-  background: rgba(255, 255, 255, 0.06);
-  color: #94a3b8;
-}
-
-.mode-switch {
-  display: flex;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  padding: 2px;
-}
-
-.switch-btn {
-  background: transparent;
-  border: none;
-  color: #94a3b8;
-  font-size: 11px;
-  padding: 3px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.switch-btn.active {
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
-  font-weight: 600;
-}
-
 .lyrics-header-right {
   display: flex;
   align-items: center;
   gap: 6px;
-}
-
-.offset-controls {
-  display: flex;
-  align-items: center;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  padding: 2px 4px;
-  gap: 4px;
-}
-
-.offset-btn {
-  background: transparent;
-  border: none;
-  color: #cbd5e1;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 5px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.offset-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  color: #fff;
-}
-
-.offset-val {
-  font-size: 11px;
-  color: #38bdf8;
-  font-weight: 600;
 }
 
 .action-icon-btn {
