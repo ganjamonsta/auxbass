@@ -775,11 +775,11 @@ defineExpose({ expand, collapse, isExpanded, expandProgress })
 .sheet-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(0, 0, 0, 0.92);
   opacity: calc(var(--expand) * 1);
   pointer-events: none;
   transition: opacity 0.35s cubic-bezier(0.32, 0.72, 0, 1);
-  z-index: -1;
+  z-index: 89;
 }
 
 .sheet--expanded .sheet-backdrop,
@@ -803,6 +803,7 @@ defineExpose({ expand, collapse, isExpanded, expandProgress })
   display: flex;
   flex-direction: column;
   transition: top 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  z-index: 91;
 }
 
 .sheet--expanded .sheet-container {
@@ -1110,7 +1111,7 @@ defineExpose({ expand, collapse, isExpanded, expandProgress })
   flex-direction: column;
   gap: 16px;
   position: relative;
-  background: radial-gradient(circle at 50% 25%, rgba(35, 45, 60, 0.5) 0%, rgba(10, 12, 16, 0.98) 80%);
+  background: #0a0c10;
   min-height: 0;
 }
 
