@@ -199,6 +199,7 @@ import TrackItem from '@/components/TrackItem.vue'
 import TrackSkeleton from '@/components/TrackSkeleton.vue'
 import SortChips from '@/components/SortChips.vue'
 import api from '@/api/client'
+import { getAllCachedTracks } from '@/utils/audioCacheDb'
 import { Users, Music, Globe, Shuffle } from 'lucide-vue-next'
 
 // Universal context menu
@@ -297,15 +298,30 @@ useTrackSync(globalTracks)
 
 // Fetch function for VirtualTrackList (without search)
 const fetchTracks = async ({ offset, limit }) => {
-  const response = await api.get('/tracks', {
-    params: {
-      offset,
-      limit,
-      sort_by: sortBy.value,
-      sort_order: sortOrder.value
+  try {
+    const response = await api.get('/tracks', {
+      params: {
+        offset,
+        limit,
+        sort_by: sortBy.value,
+        sort_order: sortOrder.value
+      }
+    })
+    return response.data
+  } catch (err) {
+    // If offline / network error, fallback to cached tracks in IndexedDB
+    try {
+      const cached = await getAllCachedTracks()
+      return {
+        items: cached.slice(offset, offset + limit),
+        total: cached.length,
+        offset,
+        limit
+      }
+    } catch (_) {
+      return { items: [], total: 0, offset, limit }
     }
-  })
-  return response.data
+  }
 }
 
 // Handle click from VirtualTrackList
@@ -328,45 +344,21 @@ const loadSearchTracks = async () => {
       sort_by: sortBy.value,
       sort_order: sortOrder.value,
     })
-    
-    // If we're on page 1, replace. If not, append.
-    // Actually current logic in LibraryView was replace on search/sort, append on loadMore.
-    // libraryStore.tracks contains the result of fetchTracks (which might be just page)
-    // Wait, let's check existing implementation.
-    // Existing: tracks.value = libraryStore.tracks
-    // But loadMore does: page++ -> loadTracks.
-    // If store replaces content, then we lose previous pages if we don't append locally.
-    // Let's check LibraryStore.
-    // Assuming LibraryStore stores current response.
-    // The current implementation in LibraryView does:
-    // tracks.value = libraryStore.tracks
-    // This implies libraryStore.tracks is *accumulated* or I missed something.
-    // In loadMore: page.value++ -> loadTracks().
-    // If libraryStore.fetchTracks replaces the state, then `tracks.value = libraryStore.tracks` would only show the new page.
-    // BUT, usually fetchTracks appends if page > 1 or it returns just the new items.
-    // Checking `tracks.value < total.value` implies we rely on local `tracks`.
-    // Let's double check `LibraryView.vue` logic.
-    // It relies on `libraryStore.tracks`.
-    // If `libraryStore` accumulates, then we are fine.
-    
-    // But `loadMore` calls `loadTracks`.
-    // I will assume libraryStore.tracks returns the fetched list.
-    // IF page > 1, we should probably APPEND.
-    // BUT `LibraryView.vue` says `tracks.value = libraryStore.tracks`.
-    // This looks like pagination where `tracks` is just the *current* list? 
-    // Wait, `hasMore` checks `tracks.value.length < total.value`.
-    // If `tracks` is only 50 items (page 2), asking if 50 < 1000 is true.
-    // If I show only 50 items, but I want infinite scroll...
-    // Infinite scroll usually appends.
-    // If `LibraryStore` doesn't append, then `LibraryView.vue` logic `tracks.value = libraryStore.tracks` would replace the list.
-    // This means the current implementation IS paginated but using "Load More" button?
-    // If so, clicking "Load More" replaces the content with the next page? That's weird for a list that says "Load More".
-    // "Load More" usually implies "Add to bottom".
-    // I will check `stores/library.js` if possible, but for now I will assume I need to handle appending if the store doesn't.
-    // Actually, I'll stick to the exact logic of `LibraryView.vue` to not break it.
-    // Code: `await libraryStore.fetchTracks(...)` then `tracks.value = libraryStore.tracks`.
     tracks.value = libraryStore.tracks
     searchTotal.value = libraryStore.total
+  } catch (error) {
+    console.error('Failed to load search tracks:', error)
+    // Offline search fallback
+    try {
+      const cached = await getAllCachedTracks()
+      const q = (props.searchQuery || '').toLowerCase()
+      const filtered = cached.filter(t => 
+        (t.title && t.title.toLowerCase().includes(q)) || 
+        (t.artist && t.artist.toLowerCase().includes(q))
+      )
+      tracks.value = filtered
+      searchTotal.value = filtered.length
+    } catch (_) {}
   } finally {
     loading.value = false
     loadingMore.value = false

@@ -2,6 +2,16 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import api, { authStorage, authApi } from '@/api/client'
 
+const CHANNEL_STATUS_KEY = 'tg_player_channel_status'
+
+const loadCachedChannelStatus = () => {
+  try {
+    const raw = localStorage.getItem(CHANNEL_STATUS_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch (_) {}
+  return { hasChannel: false, canSave: false, channelInfo: null }
+}
+
 export const useAuthStore = defineStore('auth', () => {
   // State
   const user = ref(authStorage.getUser())
@@ -10,9 +20,10 @@ export const useAuthStore = defineStore('auth', () => {
   const error = ref(null)
   
   // Channel/Premium status
-  const hasChannel = ref(false)
-  const canSave = ref(false)
-  const channelInfo = ref(null)
+  const cachedStatus = loadCachedChannelStatus()
+  const hasChannel = ref(cachedStatus.hasChannel)
+  const canSave = ref(cachedStatus.canSave)
+  const channelInfo = ref(cachedStatus.channelInfo)
   const showChannelBanner = ref(false)  // Show banner when user tries premium action
   
   // App config
@@ -51,6 +62,7 @@ export const useAuthStore = defineStore('auth', () => {
       } else {
         // Auth explicitly failed (401/403) - clear storage
         authStorage.clear()
+        localStorage.removeItem(CHANNEL_STATUS_KEY)
         user.value = null
         error.value = 'Authentication failed'
         initialized.value = true
@@ -66,9 +78,16 @@ export const useAuthStore = defineStore('auth', () => {
       hasChannel.value = response.data.has_channel || false
       canSave.value = response.data.can_save || false
       channelInfo.value = response.data.channel_info || null
+      try {
+        localStorage.setItem(CHANNEL_STATUS_KEY, JSON.stringify({
+          hasChannel: hasChannel.value,
+          canSave: canSave.value,
+          channelInfo: channelInfo.value
+        }))
+      } catch (_) {}
     } catch (err) {
       console.error('Failed to fetch status:', err)
-      // Don't fail initialization for status fetch
+      // Don't fail initialization for status fetch, keep cached status
     }
   }
   
