@@ -1,10 +1,5 @@
 <template>
   <div class="settings-view">
-    <!-- Skeleton while loading -->
-    <SettingsSkeleton v-if="loading" />
-
-    <!-- Actual content -->
-    <template v-else>
     <h1>Настройки</h1>
 
     <!-- Channel section (Premium) -->
@@ -96,6 +91,12 @@
         <div class="stat-item">
           <span class="stat-value">{{ formatDuration(stats.total_duration_seconds) }}</span>
           <span class="stat-label">общее время</span>
+        </div>
+      </div>
+      <div class="stats-grid" v-else>
+        <div class="stat-item stat-skeleton" v-for="i in 4" :key="i">
+          <div class="skeleton-stat-value"></div>
+          <div class="skeleton-stat-label"></div>
         </div>
       </div>
     </section>
@@ -365,7 +366,6 @@
         Музыкальный плеер с хранением в Telegram
       </p>
     </section>
-    </template>
   </div>
 </template>
 
@@ -376,9 +376,8 @@ import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
 import api, { authApi } from '@/api/client'
 import { Megaphone, Check, Folder, Heart, ListMusic, Cloud, RefreshCw, Lock, User, Bell, Sliders, Headphones, Smartphone, Download, HardDrive, Trash2 } from 'lucide-vue-next'
-import SettingsSkeleton from '@/components/SettingsSkeleton.vue'
 import { usePwaInstall } from '@/composables/usePwaInstall'
-import { getCacheStats } from '@/utils/audioCacheDb'
+import { getCacheStats, getCachedAudioStats } from '@/utils/audioCacheDb'
 import { clearAudioCache } from '@/stores/playerCache'
 
 const router = useRouter()
@@ -391,8 +390,18 @@ const handleInstallClick = () => {
   pwaInstall.promptInstall()
 }
 
-const loading = ref(true)
-const stats = ref(null)
+const STATS_STORAGE_KEY = 'tg_player_library_stats'
+
+const getCachedStats = () => {
+  try {
+    const raw = localStorage.getItem(STATS_STORAGE_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch (_) {}
+  return null
+}
+
+const stats = ref(getCachedStats())
+const statsLoading = ref(!stats.value)
 const darkMode = ref(true)
 const botUsername = ref('tg_player_bot')  // Default, will be updated from config
 const privacySettings = ref({
@@ -429,11 +438,17 @@ const repeatModeIcon = computed(() => {
 })
 
 const loadStats = async () => {
+  statsLoading.value = true
   try {
     const response = await api.get('/library/stats')
     stats.value = response.data
+    try {
+      localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(response.data))
+    } catch (_) {}
   } catch (error) {
     console.error('Failed to load stats:', error)
+  } finally {
+    statsLoading.value = false
   }
 }
 
@@ -495,7 +510,13 @@ const logout = async () => {
   window.location.href = '/login'
 }
 
-const cacheStats = ref({ totalBytes: 0, trackCount: 0, quotaBytes: 0, usageBytes: 0 })
+const cachedAudioStats = getCachedAudioStats()
+const cacheStats = ref({
+  totalBytes: cachedAudioStats?.totalBytes || 0,
+  trackCount: cachedAudioStats?.trackCount || 0,
+  quotaBytes: 0,
+  usageBytes: 0
+})
 const clearingCache = ref(false)
 
 const cacheLimits = [
@@ -558,20 +579,12 @@ watch(darkMode, (isDark) => {
   localStorage.setItem('theme', isDark ? 'dark' : 'light')
 })
 
-onMounted(async () => {
-  loading.value = true
-  
-  try {
-    // Load all data in parallel
-    await Promise.all([
-      loadStats(),
-      loadBotConfig(),
-      loadPrivacySettings(),
-      refreshCacheStats()
-    ])
-  } finally {
-    loading.value = false
-  }
+onMounted(() => {
+  // Load data in parallel without blocking page rendering
+  loadStats()
+  loadBotConfig()
+  loadPrivacySettings()
+  refreshCacheStats()
   
   // Load saved theme preference
   const savedTheme = localStorage.getItem('theme')
@@ -742,6 +755,38 @@ h1 {
   font-size: 13px;
   margin-top: var(--sp-1);
   line-height: 1.3;
+}
+
+/* ─── Stat Skeleton ─── */
+.stat-item.stat-skeleton {
+  min-height: 86px;
+}
+
+.skeleton-stat-value {
+  height: 28px;
+  width: 64px;
+  background: var(--c-bg-4);
+  border-radius: var(--r-sm);
+  animation: pulse-stat-skeleton 1.5s ease-in-out infinite;
+}
+
+.skeleton-stat-label {
+  height: 12px;
+  width: 50px;
+  background: var(--c-bg-4);
+  border-radius: var(--r-xs);
+  margin-top: var(--sp-2);
+  animation: pulse-stat-skeleton 1.5s ease-in-out infinite;
+  animation-delay: 0.1s;
+}
+
+@keyframes pulse-stat-skeleton {
+  0%, 100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.75;
+  }
 }
 
 /* ─── Setting Rows (toggle + description) ─── */

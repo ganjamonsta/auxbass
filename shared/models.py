@@ -501,6 +501,7 @@ class AlbumTrack(Base):
     
     __table_args__ = (
         UniqueConstraint("album_id", "track_id", name="uq_album_track"),
+        Index("idx_album_tracks_track_id", "track_id"),
     )
 
 

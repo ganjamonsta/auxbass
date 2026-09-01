@@ -411,47 +411,59 @@ async def get_library_stats(
     db: AsyncSession = Depends(get_db),
 ):
     """Get user's library statistics"""
-    # Total tracks in user's library
-    total_tracks = await db.scalar(
-        select(func.count(UserLibrary.id))
+    # 1. Combined main stats: total tracks, total duration, and artist count in one single query
+    main_stats_query = (
+        select(
+            func.count(UserLibrary.id).label("total_tracks"),
+            func.coalesce(func.sum(Track.duration), 0).label("total_duration"),
+            func.count(
+                func.distinct(
+                    func.nullif(
+                        func.coalesce(Track.normalized_artist, func.lower(func.trim(Track.artist))),
+                        ''
+                    )
+                )
+            ).label("artist_count"),
+        )
+        .select_from(UserLibrary)
+        .join(Track, UserLibrary.track_id == Track.id)
+        .where(UserLibrary.user_id == user.id)
+    )
+    main_result = await db.execute(main_stats_query)
+    main_row = main_result.one()
+
+    total_tracks = main_row.total_tracks or 0
+    total_duration = main_row.total_duration or 0
+    artist_count = main_row.artist_count or 0
+
+    if total_tracks == 0:
+        return LibraryStatsResponse(
+            total_tracks=0,
+            total_duration_seconds=0,
+            album_count=0,
+            artist_count=0,
+            by_source={},
+        )
+
+    # 2. Album count (albums that have tracks in user's library) - direct 2-table join
+    album_count = await db.scalar(
+        select(func.count(func.distinct(AlbumTrack.album_id)))
+        .select_from(UserLibrary)
+        .join(AlbumTrack, AlbumTrack.track_id == UserLibrary.track_id)
         .where(UserLibrary.user_id == user.id)
     ) or 0
-    
-    # Total duration
-    total_duration = await db.scalar(
-        select(func.sum(Track.duration))
-        .join(UserLibrary, UserLibrary.track_id == Track.id)
-        .where(UserLibrary.user_id == user.id)
-    ) or 0
-    
-    # By source
+
+    # 3. By source
     source_result = await db.execute(
         select(UserLibrary.source, func.count(UserLibrary.id))
         .where(UserLibrary.user_id == user.id)
         .group_by(UserLibrary.source)
     )
     by_source = {
-        source.value if source else "unknown": count
+        source.value if hasattr(source, "value") and source else (source or "unknown"): count
         for source, count in source_result.all()
     }
-    
-    # Album count (albums that have tracks in user's library)
-    album_count = await db.scalar(
-        select(func.count(func.distinct(AlbumTrack.album_id)))
-        .join(Track, AlbumTrack.track_id == Track.id)
-        .join(UserLibrary, UserLibrary.track_id == Track.id)
-        .where(UserLibrary.user_id == user.id)
-    ) or 0
-    
-    # Artist count - using normalized artist names
-    artist_count = await db.scalar(
-        select(func.count(func.distinct(func.lower(func.trim(Track.artist)))))
-        .join(UserLibrary, UserLibrary.track_id == Track.id)
-        .where(UserLibrary.user_id == user.id)
-        .where(Track.artist.isnot(None))
-        .where(Track.artist != '')
-    ) or 0
-    
+
     return LibraryStatsResponse(
         total_tracks=total_tracks,
         total_duration_seconds=total_duration,

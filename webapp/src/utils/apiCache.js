@@ -123,10 +123,10 @@ class ApiCache {
   /**
    * Invalidate cache by pattern
    */
-  invalidatePattern(pattern) {
+  invalidatePattern(pattern, excludePattern = null) {
     let count = 0
     for (const key of this.cache.keys()) {
-      if (key.includes(pattern)) {
+      if (key.includes(pattern) && (!excludePattern || !key.includes(excludePattern))) {
         this.cache.delete(key)
         count++
       }
@@ -143,7 +143,7 @@ class ApiCache {
     switch (type) {
       case 'track':
         this.invalidatePattern('/tracks')
-        this.invalidatePattern('/library')
+        this.invalidatePattern('/library', '/library/stats')
         this.invalidatePattern('/tracks/liked')
         this.invalidatePattern('/tracks/global')
         this.invalidatePattern('/tracks/history')
@@ -171,7 +171,7 @@ class ApiCache {
       case 'like':
         this.invalidatePattern('/tracks/liked')
         this.invalidatePattern('/tracks')
-        this.invalidatePattern('/library')
+        this.invalidatePattern('/library', '/library/stats')
         if (id) this.invalidatePattern(`/tracks/${id}`)
         break
         

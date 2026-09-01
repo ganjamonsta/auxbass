@@ -271,38 +271,33 @@ export async function clearAllCache() {
   }
 }
 
+const CACHE_STATS_KEY = 'tg_player_audio_cache_stats'
+
+export function getCachedAudioStats() {
+  try {
+    const raw = localStorage.getItem(CACHE_STATS_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch (_) {}
+  return null
+}
+
+export function setCachedAudioStats(stats) {
+  try {
+    if (stats) {
+      localStorage.setItem(CACHE_STATS_KEY, JSON.stringify({
+        totalBytes: stats.totalBytes || 0,
+        trackCount: stats.trackCount || 0,
+        updatedAt: Date.now()
+      }))
+    }
+  } catch (_) {}
+}
+
 /**
  * Get cache statistics (total size, track count, browser quota)
  * @returns {Promise<{ totalBytes: number, trackCount: number, quotaBytes: number, usageBytes: number }>}
  */
 export async function getCacheStats() {
-  let totalBytes = 0
-  let trackCount = 0
-
-  try {
-    const db = await openCacheDb()
-    await new Promise((resolve) => {
-      const tx = db.transaction(STORE_NAME, 'readonly')
-      const store = tx.objectStore(STORE_NAME)
-      const cursorReq = store.openCursor()
-
-      cursorReq.onsuccess = (e) => {
-        const cursor = e.target.result
-        if (cursor) {
-          trackCount++
-          totalBytes += cursor.value.size || (cursor.value.blob ? cursor.value.blob.size : 0)
-          cursor.continue()
-        } else {
-          resolve()
-        }
-      }
-
-      cursorReq.onerror = () => resolve()
-    })
-  } catch (e) {
-    console.warn('[AudioCache] Error calculating cache stats:', e)
-  }
-
   let quotaBytes = 0
   let usageBytes = 0
   if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.estimate) {
@@ -311,6 +306,58 @@ export async function getCacheStats() {
       quotaBytes = estimate.quota || 0
       usageBytes = estimate.usage || 0
     } catch (_) {}
+  }
+
+  // Fast check: if usageBytes is 0 or navigator has no storage, 0 cached
+  let totalBytes = 0
+  let trackCount = 0
+
+  try {
+    const db = await openCacheDb()
+    await new Promise((resolve) => {
+      const tx = db.transaction(STORE_NAME, 'readonly')
+      const store = tx.objectStore(STORE_NAME)
+
+      // Fast check count first (O(1) in IndexedDB)
+      const countReq = store.count()
+      countReq.onsuccess = () => {
+        if (countReq.result === 0) {
+          trackCount = 0
+          totalBytes = 0
+          setCachedAudioStats({ totalBytes: 0, trackCount: 0 })
+          resolve()
+          return
+        }
+
+        trackCount = countReq.result
+        // Calculate size via cursor
+        const cursorReq = store.openCursor()
+        let sumBytes = 0
+        cursorReq.onsuccess = (e) => {
+          const cursor = e.target.result
+          if (cursor) {
+            sumBytes += cursor.value.size || (cursor.value.blob ? cursor.value.blob.size : 0)
+            cursor.continue()
+          } else {
+            totalBytes = sumBytes
+            setCachedAudioStats({ totalBytes, trackCount })
+            resolve()
+          }
+        }
+        cursorReq.onerror = () => {
+          totalBytes = sumBytes
+          resolve()
+        }
+      }
+      countReq.onerror = () => resolve()
+    })
+  } catch (e) {
+    console.warn('[AudioCache] Error calculating cache stats:', e)
+    const cached = getCachedAudioStats()
+    if (cached) {
+      totalBytes = cached.totalBytes || 0
+      trackCount = cached.trackCount || 0
+    }
   }
 
   return {
