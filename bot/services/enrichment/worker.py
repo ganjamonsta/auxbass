@@ -23,6 +23,7 @@ class EnrichmentWorker:
     def __init__(self):
         self.running = False
         self._task: Optional[asyncio.Task] = None
+        self._notify_event: Optional[asyncio.Event] = None
         self._stats = {
             "processed": 0,
             "success": 0,
@@ -31,6 +32,16 @@ class EnrichmentWorker:
         
         # Callbacks
         self._on_enrichment_complete = None
+
+    def _get_event(self) -> asyncio.Event:
+        if self._notify_event is None:
+            self._notify_event = asyncio.Event()
+        return self._notify_event
+
+    def notify_new_track(self):
+        """Signal worker that new pending tracks are available for instant processing"""
+        if self._notify_event:
+            self._notify_event.set()
     
     def set_on_enrichment_complete(self, callback):
         """
@@ -39,26 +50,29 @@ class EnrichmentWorker:
         """
         self._on_enrichment_complete = callback
     
-    async def start(self, idle_interval: int = 60, busy_interval: int = 5):
+    async def start(self, idle_interval: int = 300, busy_interval: int = 2):
         """
         Start background enrichment loop.
         
         Args:
-            idle_interval: Seconds to wait when no pending tracks
-            busy_interval: Seconds to wait when processing tracks
+            idle_interval: Seconds between fallback sanity checks when idle (default 300s)
+            busy_interval: Seconds to wait between batches when processing active queue (default 2s)
         """
         if self.running:
             return
         
         self.running = True
+        self._notify_event = asyncio.Event()
         self._task = asyncio.create_task(
             self._worker_loop(idle_interval, busy_interval)
         )
-        logger.info("Enrichment worker started")
+        logger.info("Enrichment worker started (event-driven)")
     
     async def stop(self):
         """Stop background enrichment"""
         self.running = False
+        if self._notify_event:
+            self._notify_event.set()
         if self._task:
             self._task.cancel()
             try:
@@ -70,18 +84,28 @@ class EnrichmentWorker:
         logger.info("Enrichment worker stopped")
     
     async def _worker_loop(self, idle_interval: int, busy_interval: int):
-        """Main worker loop"""
+        """Main worker loop with event-driven wakeup and zero idle I/O"""
+        event = self._get_event()
         while self.running:
             try:
                 had_work = await self._process_batch()
                 
-                # Adaptive interval
-                interval = busy_interval if had_work else idle_interval
-                await asyncio.sleep(interval)
+                if had_work:
+                    # Continue quickly while there is work in the batch
+                    await asyncio.sleep(busy_interval)
+                else:
+                    # No pending tracks: sleep until notified or periodic health-check
+                    event.clear()
+                    try:
+                        await asyncio.wait_for(event.wait(), timeout=idle_interval)
+                    except asyncio.TimeoutError:
+                        pass
                 
+            except asyncio.CancelledError:
+                break
             except Exception as e:
                 logger.error(f"Enrichment worker error: {e}")
-                await asyncio.sleep(idle_interval)
+                await asyncio.sleep(min(idle_interval, 30))
     
     async def _process_batch(self, batch_size: int = 10) -> bool:
         """
@@ -246,6 +270,8 @@ class EnrichmentWorker:
             
             count = len(tracks)
             logger.info(f"Reset {count} failed tracks to pending")
+            if count > 0:
+                self.notify_new_track()
             return count
     
     async def enrich_single(self, track_id: int) -> bool:

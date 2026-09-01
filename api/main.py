@@ -42,12 +42,24 @@ api_bot: Bot = None
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    """Simple in-memory rate limiter"""
+    """Memory-safe in-memory rate limiter with periodic cleanup"""
     
-    def __init__(self, app, requests_per_minute: int = 60):
+    def __init__(self, app, requests_per_minute: int = 600):
         super().__init__(app)
         self.requests_per_minute = requests_per_minute
-        self.requests: dict[str, list[float]] = defaultdict(list)
+        self.requests: dict[str, list[float]] = {}
+        self._last_cleanup = time.time()
+    
+    def _cleanup_stale_ips(self, now: float):
+        """Purge empty and expired IP entries to keep memory footprint bounded"""
+        minute_ago = now - 60
+        stale_keys = [
+            ip for ip, timestamps in self.requests.items()
+            if not timestamps or timestamps[-1] <= minute_ago
+        ]
+        for ip in stale_keys:
+            del self.requests[ip]
+        self._last_cleanup = now
     
     async def dispatch(self, request: Request, call_next):
         # Skip rate limiting for audio streaming
@@ -63,17 +75,23 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         now = time.time()
         minute_ago = now - 60
         
-        self.requests[client_ip] = [
-            t for t in self.requests[client_ip] if t > minute_ago
+        # Periodic cleanup every 60s or if map exceeds 2000 entries
+        if now - self._last_cleanup > 60 or len(self.requests) > 2000:
+            self._cleanup_stale_ips(now)
+        
+        # Filter current IP's timestamps
+        client_timestamps = [
+            t for t in self.requests.get(client_ip, []) if t > minute_ago
         ]
         
-        if len(self.requests[client_ip]) >= self.requests_per_minute:
+        if len(client_timestamps) >= self.requests_per_minute:
             return JSONResponse(
                 status_code=429,
                 content={"detail": "Too many requests. Please slow down."}
             )
         
-        self.requests[client_ip].append(now)
+        client_timestamps.append(now)
+        self.requests[client_ip] = client_timestamps
         
         return await call_next(request)
 

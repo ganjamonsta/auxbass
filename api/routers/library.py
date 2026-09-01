@@ -557,6 +557,13 @@ async def update_track(
     
     await db.commit()
     
+    if changed:
+        try:
+            from bot.services.enrichment import enrichment_worker
+            enrichment_worker.notify_new_track()
+        except Exception:
+            pass
+    
     # Reload with relationships to return fresh data
     result = await db.execute(
         select(Track, UserLibrary)
@@ -639,6 +646,11 @@ async def trigger_enrichment(
     if track:
         track.enrichment_status = EnrichmentStatus.PENDING
         await db.commit()
+        try:
+            from bot.services.enrichment import enrichment_worker
+            enrichment_worker.notify_new_track()
+        except Exception:
+            pass
     
     return {"status": "scheduled", "track_id": track_id}
 

@@ -219,6 +219,9 @@ class TrackService:
             
             logger.info(f"Added track {track_id} to user {user_id}'s library")
         
+        if is_new and enrich:
+            enrichment_worker.notify_new_track()
+        
         return SaveTrackResult(
             track_id=track_id,
             is_new=is_new,

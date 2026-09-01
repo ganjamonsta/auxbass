@@ -828,6 +828,13 @@ async def update_track(
         track.enrichment_status = EnrichmentStatus.PENDING
     
     await db.commit()
+    
+    if changed:
+        try:
+            from bot.services.enrichment import enrichment_worker
+            enrichment_worker.notify_new_track()
+        except Exception:
+            pass
 
     # Re-fetch track with all relations to return fresh data
     result = await db.execute(

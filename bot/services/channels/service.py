@@ -86,25 +86,73 @@ class ChannelService:
         
         # Forward queue for rate-limited sending
         self._forward_queue: deque[ForwardQueueItem] = deque()
+        self._queue_notify_event: Optional[asyncio.Event] = None
         self._queue_worker_task: Optional[asyncio.Task] = None
         self._queue_running = False
+
+    def _get_queue_event(self) -> asyncio.Event:
+        if self._queue_notify_event is None:
+            self._queue_notify_event = asyncio.Event()
+        return self._queue_notify_event
     
     def set_bot(self, bot: Bot):
         """Set bot instance for sending messages"""
         self.bot = bot
     
+    async def _restore_pending_from_db(self):
+        """Restore pending channel forwards from database after server restart."""
+        try:
+            async with get_session() as session:
+                result = await session.execute(
+                    select(ChannelMessage.track_id, UserChannel.user_id, ChannelMessage.created_at)
+                    .join(UserChannel, ChannelMessage.channel_id == UserChannel.id)
+                    .where(
+                        ChannelMessage.status == ChannelMessageStatus.PENDING,
+                        UserChannel.is_active == True,
+                        UserChannel.auto_forward == True,
+                    )
+                    .order_by(ChannelMessage.id.asc())
+                )
+                existing_track_ids = {item.track_id for item in self._forward_queue}
+                restored_count = 0
+                for track_id, user_id, created_at in result.all():
+                    if track_id not in existing_track_ids:
+                        self._forward_queue.append(
+                            ForwardQueueItem(
+                                user_id=user_id,
+                                track_id=track_id,
+                                added_at=created_at or utcnow(),
+                            )
+                        )
+                        existing_track_ids.add(track_id)
+                        restored_count += 1
+                
+                if restored_count > 0:
+                    logger.info(f"Restored {restored_count} pending channel forward tasks from database")
+                    if self._queue_notify_event:
+                        self._queue_notify_event.set()
+        except Exception as e:
+            logger.error(f"Failed to restore pending channel forwards from DB: {e}")
+
     async def start_queue_worker(self):
         """Start background queue worker for rate-limited forwarding"""
         if self._queue_running:
             return
         
         self._queue_running = True
+        self._queue_notify_event = asyncio.Event()
+        
+        # Restore any pending tasks that were in DB before restart
+        await self._restore_pending_from_db()
+        
         self._queue_worker_task = asyncio.create_task(self._queue_worker_loop())
         logger.info("Channel forward queue worker started")
     
     async def stop_queue_worker(self):
         """Stop background queue worker"""
         self._queue_running = False
+        if self._queue_notify_event:
+            self._queue_notify_event.set()
         if self._queue_worker_task:
             self._queue_worker_task.cancel()
             try:
@@ -114,7 +162,8 @@ class ChannelService:
         logger.info("Channel forward queue worker stopped")
     
     async def _queue_worker_loop(self):
-        """Main loop for processing forward queue with rate limiting"""
+        """Main loop for processing forward queue with rate limiting and event-driven wait"""
+        event = self._get_queue_event()
         while self._queue_running:
             try:
                 if self._forward_queue:
@@ -126,8 +175,12 @@ class ChannelService:
                     # Delay to avoid rate limiting
                     await asyncio.sleep(self.FORWARD_DELAY)
                 else:
-                    # No items in queue, sleep briefly
-                    await asyncio.sleep(0.5)
+                    # No items in queue: sleep until notified or periodic check
+                    event.clear()
+                    try:
+                        await asyncio.wait_for(event.wait(), timeout=30.0)
+                    except asyncio.TimeoutError:
+                        pass
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -145,6 +198,8 @@ class ChannelService:
             added_at=datetime.now(timezone.utc),
         )
         self._forward_queue.append(item)
+        if self._queue_notify_event:
+            self._queue_notify_event.set()
         logger.debug(f"Track {track_id} queued for forward (queue size: {len(self._forward_queue)})")
     
     def get_queue_size(self, user_id: Optional[int] = None) -> int:
