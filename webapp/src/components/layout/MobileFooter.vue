@@ -19,14 +19,19 @@
         </div>
         <!-- Player control layer (fades in when expanded) -->
         <div class="control-layer">
-          <component
+          <div
             v-if="controlItems[idx]"
-            :is="controlItems[idx].iconComponent"
-            class="control-icon"
-            :size="controlItems[idx].size || 24"
-            :stroke-width="2"
-          />
-          <span class="control-label">{{ controlItems[idx]?.label || '' }}</span>
+            class="control-icon-wrap"
+            :class="{ 'play-wrap': controlItems[idx].isPlayBtn }"
+          >
+            <component
+              :is="controlItems[idx].iconComponent"
+              class="control-icon"
+              :size="controlItems[idx].size || 24"
+              :stroke-width="2"
+            />
+          </div>
+          <span v-if="!controlItems[idx]?.isPlayBtn" class="control-label">{{ controlItems[idx]?.label || '' }}</span>
         </div>
       </button>
     </nav>
@@ -237,7 +242,19 @@ const handleItemClick = (idx, navItem) => {
 }
 
 /* ─── Layer Crossfade ─── */
-.nav-layer,
+.nav-layer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  /* Nav layer is in normal flow — provides height */
+  position: relative;
+  opacity: calc(1 - var(--expand, 0));
+  transform: translateY(calc(var(--expand, 0) * -6px));
+}
+
 .control-layer {
   display: flex;
   flex-direction: column;
@@ -245,28 +262,22 @@ const handleItemClick = (idx, navItem) => {
   justify-content: center;
   gap: 4px;
   transition: opacity 0.3s ease, transform 0.3s ease;
+  /* Control layer overlays on top */
   position: absolute;
   inset: 0;
-  padding: 8px 0;
-}
-
-.nav-layer {
-  opacity: calc(1 - var(--expand, 0));
-  transform: translateY(calc(var(--expand, 0) * -8px));
-  pointer-events: auto;
-}
-
-.control-layer {
   opacity: calc(var(--expand, 0));
-  transform: translateY(calc((1 - var(--expand, 0)) * 8px));
-  pointer-events: auto;
+  transform: translateY(calc((1 - var(--expand, 0)) * 6px));
 }
 
 .footer--player-expanded .nav-layer {
   pointer-events: none;
 }
 
-:not(.footer--player-expanded) .control-layer {
+.footer--player-expanded .control-layer {
+  pointer-events: auto;
+}
+
+:not(.footer--player-expanded) > .footer-nav > .nav-item > .control-layer {
   pointer-events: none;
 }
 
@@ -284,34 +295,39 @@ const handleItemClick = (idx, navItem) => {
   letter-spacing: 0.02em;
   font-size: 10px;
 }
+/* ─── Control icon wrap ─── */
+.control-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
 /* ─── Play button highlight (center position) ─── */
 .footer--player-expanded .nav-item:nth-child(3) {
   color: var(--c-text-1);
 }
 
-.footer--player-expanded .nav-item:nth-child(3) .control-icon {
+.play-wrap {
   width: 48px;
   height: 48px;
   background: linear-gradient(145deg, #22e066 0%, #159b43 100%);
   color: #000;
   border-radius: var(--r-full);
-  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   box-shadow:
     0 4px 16px rgba(29, 185, 84, 0.4),
     inset 0 1px 1px rgba(255, 255, 255, 0.4);
-  transform: translateY(-4px);
+  transform: translateY(-6px);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.footer--player-expanded .nav-item:nth-child(3):active .control-icon {
-  transform: translateY(-4px) scale(0.92);
+.nav-item:active .play-wrap {
+  transform: translateY(-6px) scale(0.92);
   box-shadow:
     inset 3px 3px 6px rgba(0, 0, 0, 0.5),
     0 0 12px var(--c-accent-glow);
-}
-
-.footer--player-expanded .nav-item:nth-child(3) .control-label {
-  display: none;
 }
 
 /* Desktop: hide mobile footer */

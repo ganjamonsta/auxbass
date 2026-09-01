@@ -12,7 +12,7 @@
     />
 
     <!-- Sheet container (holds header + body) -->
-    <div class="sheet-container">
+    <div class="sheet-container" :style="containerStyle">
       <!-- Header: Mini-player that transforms into compact bar -->
       <div
         class="sheet-header"
@@ -436,6 +436,19 @@ const sheetStyle = computed(() => ({
   '--header-h-expanded': HEADER_EXPANDED_H + 'px',
 }))
 
+// Container style: controls the top position dynamically during drag
+const containerStyle = computed(() => {
+  if (isDragging.value) {
+    // During drag: interpolate top from (screenH - navH - headerH) to 0
+    const screenH = window.innerHeight
+    const bottomOffset = NAV_H // safe area handled by CSS bottom
+    const collapsedTop = screenH - bottomOffset - HEADER_COLLAPSED_H
+    const top = collapsedTop * (1 - expandProgress.value)
+    return { top: top + 'px' }
+  }
+  return {}
+})
+
 // ─── Expand/Collapse ───
 const expand = () => {
   isAnimating.value = true
@@ -783,13 +796,17 @@ defineExpose({ expand, collapse, isExpanded, expandProgress })
   position: fixed;
   left: 0;
   right: 0;
-  /* Bottom: sits above the nav bar (64px + safe area) */
+  /* Always anchored above nav bar */
   bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  /* When collapsed: height = header only. When expanded: stretch to top */
+  top: auto;
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - env(safe-area-inset-bottom, 0px));
-  max-height: calc(100dvh - env(safe-area-inset-bottom, 0px));
-  transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: top 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.sheet--expanded .sheet-container {
+  top: 0;
 }
 
 .sheet--dragging .sheet-container {
@@ -1089,25 +1106,22 @@ defineExpose({ expand, collapse, isExpanded, expandProgress })
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   padding: 0 20px 20px;
-  display: flex;
+  display: none;
   flex-direction: column;
   gap: 16px;
   position: relative;
-  /* Hidden when collapsed */
-  opacity: var(--expand);
-  transform: translateY(calc((1 - var(--expand)) * 40px));
-  pointer-events: none;
-  transition: opacity 0.3s ease, transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
   background: radial-gradient(circle at 50% 25%, rgba(35, 45, 60, 0.5) 0%, rgba(10, 12, 16, 0.98) 80%);
   min-height: 0;
 }
 
 .sheet--expanded .sheet-body {
-  pointer-events: auto;
+  display: flex;
+  opacity: 1;
 }
 
 .sheet--dragging .sheet-body {
-  transition: none;
+  display: flex;
+  opacity: var(--expand);
 }
 
 /* ─── Background behind header when collapsed ─── */
