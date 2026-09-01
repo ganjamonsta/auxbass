@@ -22,21 +22,24 @@
 .track-skeleton {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
+  gap: 10px;
+  padding: 8px 6px 8px 12px;
+  margin: 4px 0 4px 8px;
   border-radius: var(--r-md);
-  background: var(--c-bg-2);
+  background: transparent;
+  height: 64px;
+  box-sizing: border-box;
 }
 
 .skeleton-cover {
-  width: 52px;
-  height: 52px;
-  border-radius: var(--r-sm);
+  width: 48px;
+  height: 48px;
+  border-radius: var(--r-md);
   background: var(--c-bg-3);
   flex-shrink: 0;
   box-shadow: 
-    inset 2px 2px 4px var(--sh-inset-dark),
-    inset -1px -1px 2px var(--sh-inset-light);
+    4px 4px 8px var(--sh-dark),
+    -2px -2px 4px var(--sh-light);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -45,14 +48,14 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .skeleton-title {
   height: 14px;
   background: var(--c-bg-3);
-  border-radius: var(--r-sm);
-  width: 75%;
+  border-radius: 4px;
+  width: 65%;
   animation: pulse 1.5s ease-in-out infinite;
   animation-delay: 0.1s;
 }
@@ -60,27 +63,29 @@
 .skeleton-subtitle {
   height: 12px;
   background: var(--c-bg-3);
-  border-radius: var(--r-sm);
-  width: 50%;
+  border-radius: 4px;
+  width: 40%;
   animation: pulse 1.5s ease-in-out infinite;
   animation-delay: 0.2s;
 }
 
 .skeleton-duration {
-  width: 32px;
+  width: 36px;
   height: 12px;
   background: var(--c-bg-3);
-  border-radius: var(--r-sm);
+  border-radius: 4px;
+  margin-right: 8px;
+  flex-shrink: 0;
   animation: pulse 1.5s ease-in-out infinite;
   animation-delay: 0.3s;
 }
 
 @keyframes pulse {
   0%, 100% {
-    opacity: 0.4;
+    opacity: 0.35;
   }
   50% {
-    opacity: 0.8;
+    opacity: 0.75;
   }
 }
 </style>

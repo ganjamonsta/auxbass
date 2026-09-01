@@ -1,46 +1,56 @@
 <template>
   <div class="virtual-grid-container" ref="containerRef">
     <!-- Initial loading skeleton (before first fetch) -->
-    <div v-if="loading && items.length === 0" class="media-grid" :class="`type-${type}`">
-      <GridSkeleton v-for="i in skeletonCount" :key="i" :type="type" />
+    <div
+      v-if="loading && total === 0"
+      class="media-grid initial-loading"
+      :class="`type-${type}`"
+    >
+      <GridSkeleton v-for="i in skeletonCount" :key="`init-skel-${i}`" :type="type" />
     </div>
-    
-    <!-- Items grid -->
-    <template v-else-if="items.length > 0">
-      <div class="media-grid" :class="`type-${type}`">
-        <template v-for="item in items" :key="getKey(item)">
-          <AlbumGridCard
-            v-if="type === 'album'"
-            :album="item"
-            @click="handleClick(item)"
-            @play="handlePlay(item)"
-            @contextmenu="(e) => handleContextMenu(item, e)"
-          />
-          <ArtistGridCard
-            v-else-if="type === 'artist'"
-            :artist="item"
-            @click="handleClick(item)"
-            @contextmenu="(e) => handleContextMenu(item, e)"
-          />
-          <PlaylistGridCard
-            v-else-if="type === 'playlist'"
-            :playlist="item"
-            @click="handleClick(item)"
-            @play="handlePlay(item)"
-            @contextmenu="(e) => handleContextMenu(item, e)"
-          />
+
+    <!-- Virtual Grid Canvas with Windowed Rows -->
+    <div
+      v-else-if="total > 0"
+      class="virtual-grid-canvas"
+      :style="{ height: `${totalHeight}px` }"
+    >
+      <div
+        class="virtual-grid-window media-grid"
+        :class="`type-${type}`"
+        :style="{
+          transform: `translateY(${topOffset}px)`,
+          gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))`
+        }"
+      >
+        <template v-for="vItem in visibleItems" :key="vItem.index">
+          <template v-if="!vItem.isPlaceholder && vItem.data">
+            <AlbumGridCard
+              v-if="type === 'album'"
+              :album="vItem.data"
+              @click="handleClick(vItem.data)"
+              @play="handlePlay(vItem.data)"
+              @contextmenu="(e) => handleContextMenu(vItem.data, e)"
+            />
+            <ArtistGridCard
+              v-else-if="type === 'artist'"
+              :artist="vItem.data"
+              @click="handleClick(vItem.data)"
+              @contextmenu="(e) => handleContextMenu(vItem.data, e)"
+            />
+            <PlaylistGridCard
+              v-else-if="type === 'playlist'"
+              :playlist="vItem.data"
+              @click="handleClick(vItem.data)"
+              @play="handlePlay(vItem.data)"
+              @contextmenu="(e) => handleContextMenu(vItem.data, e)"
+            />
+          </template>
+          <GridSkeleton v-else :type="type" />
         </template>
       </div>
+    </div>
 
-      <!-- Loading more skeleton items -->
-      <div v-if="loadingMore" class="media-grid loading-more-grid" :class="`type-${type}`">
-        <GridSkeleton v-for="i in Math.min(6, skeletonCount)" :key="`loading-${i}`" :type="type" />
-      </div>
-
-      <!-- Scroll Sentinel for IntersectionObserver -->
-      <div ref="sentinelRef" class="scroll-sentinel" />
-    </template>
-    
     <!-- Empty state -->
     <div v-else-if="!loading && total === 0" class="empty-state">
       <slot name="empty">
@@ -56,7 +66,8 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { computed, watch } from 'vue'
+import { useVirtualScroll } from '@/composables/useVirtualScroll'
 import GridSkeleton from '@/components/GridSkeleton.vue'
 import AlbumGridCard from '@/components/AlbumGridCard.vue'
 import ArtistGridCard from '@/components/ArtistGridCard.vue'
@@ -84,181 +95,90 @@ const props = defineProps({
   skeletonCount: {
     type: Number,
     default: 12
+  },
+  // Grid gap in px
+  gap: {
+    type: Number,
+    default: 14
   }
 })
 
-const emit = defineEmits(['click', 'play', 'contextmenu'])
+const emit = defineEmits(['click', 'play', 'contextmenu', 'update:total', 'update:items'])
 
-const containerRef = ref(null)
-const sentinelRef = ref(null)
-const items = ref([])
-const total = ref(0)
-const loading = ref(false)
-const loadingMore = ref(false)
-let observer = null
-let scrollContainer = null
-
-const getKey = (item) => {
-  return item?.id ?? item?.name ?? JSON.stringify(item)
-}
-
-// Find scroll container
-const findScrollContainer = (el) => {
-  let parent = el?.parentElement
-  while (parent) {
-    const style = getComputedStyle(parent)
-    if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
-      return parent
-    }
-    parent = parent.parentElement
+// Helpers for responsive grid columns and row heights
+const getMinColWidth = (width, type) => {
+  if (type === 'artist') {
+    if (width >= 700) return 140
+    if (width >= 500) return 130
+    return 110
   }
-  return window
+  return 130
 }
 
-// Fetch next page
-const loadMore = async () => {
-  if (loading.value || loadingMore.value) return
-  if (items.value.length >= total.value && total.value > 0) return
+const calcColumns = (width, type) => {
+  const w = width || 360
+  const minW = getMinColWidth(w, type)
+  const gap = props.gap
+  return Math.max(1, Math.floor((w + gap) / (minW + gap)))
+}
 
-  loadingMore.value = true
-  try {
-    const offset = items.value.length
-    const result = await props.fetchFn({
-      offset,
-      limit: props.pageSize
-    })
-
-    if (result) {
-      total.value = result.total ?? (items.value.length + (result.items?.length || 0))
-      const newItems = result.items || []
-      // Deduplicate items
-      const existingIds = new Set(items.value.map(i => getKey(i)))
-      const filtered = newItems.filter(i => !existingIds.has(getKey(i)))
-      items.value.push(...filtered)
-    }
-  } catch (err) {
-    console.error('VirtualGrid loadMore error:', err)
-  } finally {
-    loadingMore.value = false
+const calcRowHeight = (width, type) => {
+  const w = width || 360
+  const cols = calcColumns(w, type)
+  const gap = props.gap
+  const colWidth = Math.max(80, (w - (cols - 1) * gap) / cols)
+  if (type === 'artist') {
+    return colWidth + 38 // Round avatar + name
   }
+  return colWidth + 62 // Square cover + margin + name + artist/meta
 }
 
-// Initial load
-const load = async () => {
-  loading.value = true
-  items.value = []
-  total.value = 0
-  try {
-    const result = await props.fetchFn({
-      offset: 0,
-      limit: props.pageSize
-    })
-    if (result) {
-      items.value = result.items || []
-      total.value = result.total ?? items.value.length
-    }
-  } catch (err) {
-    console.error('VirtualGrid initial load error:', err)
-  } finally {
-    loading.value = false
-    nextTick(() => {
-      setupObserver()
-    })
-  }
-}
+// Initialize virtual scroll engine
+const {
+  containerRef,
+  containerWidth,
+  total,
+  loading,
+  loadingMore,
+  error,
+  totalHeight,
+  topOffset,
+  visibleItems,
+  getLoadedItems,
+  reset,
+  refresh,
+  updateScroll
+} = useVirtualScroll({
+  fetchFn: props.fetchFn,
+  pageSize: props.pageSize,
+  columns: (w) => calcColumns(w, props.type),
+  itemHeight: (w) => calcRowHeight(w, props.type),
+  gap: props.gap,
+  overscan: 2, // 2 rows above and below
+  immediate: true
+})
 
-// Reset and reload
-const reset = async () => {
-  await load()
-}
+// Current column count for styling grid-template-columns
+const colCount = computed(() => {
+  return calcColumns(containerWidth.value, props.type)
+})
+
+watch(total, (newTotal) => {
+  emit('update:total', newTotal)
+  emit('update:items', getLoadedItems())
+})
 
 // Event handlers
 const handleClick = (item) => emit('click', item)
 const handlePlay = (item) => emit('play', item)
 const handleContextMenu = (item, event) => emit('contextmenu', { item, event })
 
-// Scroll handler fallback
-const handleScroll = () => {
-  if (loading.value || loadingMore.value) return
-  if (items.value.length >= total.value && total.value > 0) return
-
-  if (scrollContainer) {
-    let scrollBottom = 0
-    if (scrollContainer === window) {
-      scrollBottom = window.scrollY + window.innerHeight
-      const docHeight = document.documentElement.scrollHeight
-      if (docHeight - scrollBottom < 600) {
-        loadMore()
-      }
-    } else {
-      scrollBottom = scrollContainer.scrollTop + scrollContainer.clientHeight
-      const scrollHeight = scrollContainer.scrollHeight
-      if (scrollHeight - scrollBottom < 600) {
-        loadMore()
-      }
-    }
-  }
-}
-
-// Setup IntersectionObserver on sentinel
-const setupObserver = () => {
-  if (observer) {
-    observer.disconnect()
-    observer = null
-  }
-
-  if (!sentinelRef.value) return
-
-  const root = scrollContainer === window ? null : scrollContainer
-  observer = new IntersectionObserver(
-    (entries) => {
-      const entry = entries[0]
-      if (entry && entry.isIntersecting) {
-        loadMore()
-      }
-    },
-    {
-      root,
-      rootMargin: '400px',
-      threshold: 0
-    }
-  )
-
-  observer.observe(sentinelRef.value)
-}
-
-watch(sentinelRef, () => {
-  setupObserver()
-})
-
-onMounted(() => {
-  scrollContainer = findScrollContainer(containerRef.value)
-
-  if (scrollContainer === window) {
-    window.addEventListener('scroll', handleScroll, { passive: true })
-  } else if (scrollContainer) {
-    scrollContainer.addEventListener('scroll', handleScroll, { passive: true })
-  }
-
-  load()
-})
-
-onUnmounted(() => {
-  if (observer) {
-    observer.disconnect()
-  }
-  if (scrollContainer === window) {
-    window.removeEventListener('scroll', handleScroll)
-  } else if (scrollContainer) {
-    scrollContainer.removeEventListener('scroll', handleScroll)
-  }
-})
-
 defineExpose({
   reset,
-  refresh: reset,
+  refresh,
   total,
-  items
+  items: computed(() => getLoadedItems()),
+  updateScroll
 })
 </script>
 
@@ -266,6 +186,21 @@ defineExpose({
 .virtual-grid-container {
   position: relative;
   width: 100%;
+}
+
+.virtual-grid-canvas {
+  position: relative;
+  width: 100%;
+  contain: layout paint;
+}
+
+.virtual-grid-window {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  will-change: transform;
 }
 
 .media-grid {
@@ -292,17 +227,6 @@ defineExpose({
   .media-grid.type-artist {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   }
-}
-
-.loading-more-grid {
-  margin-top: 14px;
-}
-
-.scroll-sentinel {
-  width: 100%;
-  height: 20px;
-  pointer-events: none;
-  opacity: 0;
 }
 
 .empty-state {

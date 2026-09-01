@@ -31,8 +31,8 @@ defineProps({
   border-radius: var(--r-md);
   background: var(--c-bg-3);
   box-shadow: 
-    inset 2px 2px 4px var(--sh-inset-dark)),
-    inset -1px -1px 2px var(--sh-inset-light));
+    4px 4px 8px var(--sh-dark),
+    -2px -2px 4px var(--sh-light);
   animation: pulse 1.5s ease-in-out infinite;
 }
 

@@ -1,305 +1,402 @@
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, shallowRef, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 
 /**
- * Universal Virtual Scroll Composable
+ * Universal Windowed Virtual Scroll Composable
  * 
- * Provides infinite scroll with memory optimization:
- * - Loads items as user scrolls down
- * - Optionally unloads items outside viewport (virtual scrolling)
- * - Shows skeletons to maintain layout
- * - Works with both list and grid layouts
+ * Implements high-performance DOM windowing with sparse paged data fetching:
+ * - Accurate total virtual height known from `total` (scrollbar immediately reflects full size)
+ * - Windowed DOM mounting: only mounts visible items + overscan buffer (~20-30 items)
+ * - Automatically unmounts items scrolled out of view to keep memory & DOM size constant
+ * - Sparse data loading: placeholders/skeletons rendered for un-fetched chunks
+ * - Reliable relative-top scroll tracking inside nested scroll containers or window
  * 
  * @param {Object} options - Configuration options
- * @param {Function} options.fetchFn - Async function that fetches data
- *                                     Receives { offset, limit }
- *                                     Must return { items: Array, total: number }
- * @param {number} [options.limit=30] - Number of items per page
- * @param {boolean} [options.immediate=true] - Whether to load immediately on mount
- * @param {boolean} [options.virtualize=false] - Enable virtual scrolling (unload items outside viewport)
- * @param {number} [options.bufferSize=2] - Number of pages to keep in buffer (for virtualize mode)
- * @param {string} [options.rootMargin='200px'] - IntersectionObserver margin for triggering loads
+ * @param {Function} options.fetchFn - Async function ({ offset, limit, ...params }) => Promise<{ items, total }>
+ * @param {number} [options.pageSize=50] - Number of items per fetched page
+ * @param {number|Function} [options.itemHeight=64] - Item/row height in px
+ * @param {number} [options.gap=2] - Gap between items/rows in px
+ * @param {number} [options.overscan=10] - Number of items/rows to pre-render outside viewport
+ * @param {number|Function|Ref} [options.columns=1] - Number of columns (1 for lists, dynamic for grids)
+ * @param {boolean} [options.immediate=true] - Whether to load first page immediately on mount
  * @param {Ref<HTMLElement>} [options.scrollContainer=null] - Custom scroll container ref
- * @param {number} [options.skeletonCount=6] - Number of skeleton placeholders to show when loading more
- * 
- * @example
- * const { 
- *   items, loading, hasMore, total,
- *   loadTriggerRef, reset, refresh
- * } = useVirtualScroll({
- *   fetchFn: async ({ offset, limit }) => api.get('/items', { params: { offset, limit } }),
- *   limit: 30
- * })
  */
-export function useVirtualScroll(options) {
+export function useVirtualScroll(options = {}) {
   const {
     fetchFn,
-    limit = 30,
+    pageSize = options.limit || 50,
+    itemHeight = 64,
+    gap = 2,
+    overscan = 10,
+    columns = 1,
     immediate = true,
-    virtualize = false,
-    bufferSize = 2,
-    rootMargin = '200px',
-    scrollContainer = null,
-    // New option: number of skeleton placeholders to show when loading more
-    skeletonCount = 6
+    scrollContainer = null
   } = options
 
   // State
-  const items = ref([])
   const total = ref(0)
-  const offset = ref(0)
   const loading = ref(false)
   const loadingMore = ref(false)
   const error = ref(null)
   const initialized = ref(false)
-  
-  // For virtual scrolling
-  const visibleStartIndex = ref(0)
-  const visibleEndIndex = ref(0)
-  const itemHeight = ref(0) // Estimated item height for virtual scrolling
-  
-  // Extra params for filtering/searching/sorting
-  const extraParams = ref({})
-  
-  // Refs for DOM elements
   const loadTriggerRef = ref(null)
+
+  // Map of loaded items: index -> item
+  const itemsMap = shallowRef(new Map())
+  const loadedPages = new Set()
+  const pendingPages = new Set()
+
+  // Scroll tracking state
   const containerRef = ref(null)
-  
-  // Observer reference
-  let intersectionObserver = null
+  const scrollTop = ref(0)
+  const viewportHeight = ref(800)
+  const containerWidth = ref(0)
 
-  // Computed properties
-  const hasMore = computed(() => items.value.length < total.value)
-  const currentPage = computed(() => Math.ceil(offset.value / limit))
-  const totalPages = computed(() => Math.ceil(total.value / limit))
-  const isEmpty = computed(() => !loading.value && items.value.length === 0)
-  
-  // Items to render (for virtual scrolling, only visible items; otherwise all)
-  const visibleItems = computed(() => {
-    if (!virtualize) return items.value
-    return items.value.slice(visibleStartIndex.value, visibleEndIndex.value)
-  })
-  
-  // Skeleton count to show before content
-  const topSkeletonCount = computed(() => {
-    if (!virtualize) return 0
-    return visibleStartIndex.value
-  })
-  
-  // Skeleton count to show after content
-  const bottomSkeletonCount = computed(() => {
-    if (!virtualize) return 0
-    return Math.max(0, total.value - visibleEndIndex.value)
-  })
+  // Extra parameters for filtering/searching/sorting
+  const extraParams = ref({})
 
-  // Skeleton count to show when loading more items (for infinite scroll)
-  const loadingSkeletonCount = computed(() => {
-    if (!loadingMore.value) return 0
-    // Show skeletons equal to remaining items or skeletonCount, whichever is smaller
-    const remaining = total.value - items.value.length
-    return Math.min(Math.max(remaining, 0), skeletonCount)
-  })
+  let detectedScrollContainer = null
+  let ticking = false
+  let resizeObserver = null
 
-  /**
-   * Fetch items from server
-   * @param {boolean} append - Append to existing items or replace
-   */
-  const fetchItems = async (append = false) => {
-    if (loading.value && !append) return
-    if (loadingMore.value && append) return
-    
-    if (append) {
-      loadingMore.value = true
-    } else {
-      loading.value = true
+  // Helpers
+  const findScrollContainer = (el) => {
+    if (scrollContainer?.value) return scrollContainer.value
+    if (scrollContainer && typeof scrollContainer === 'object' && 'nodeType' in scrollContainer) return scrollContainer
+    let parent = el?.parentElement
+    while (parent) {
+      const style = window.getComputedStyle(parent)
+      if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+        return parent
+      }
+      parent = parent.parentElement
     }
-    error.value = null
-    
+    return window
+  }
+
+  // Column count (reactive or prop/option)
+  const colCount = computed(() => {
+    if (typeof columns === 'function') return Math.max(1, columns(containerWidth.value))
+    if (typeof columns === 'object' && 'value' in columns) return Math.max(1, columns.value)
+    return Math.max(1, Number(columns) || 1)
+  })
+
+  // Height calculations
+  const effectiveItemHeight = computed(() => {
+    const h = typeof itemHeight === 'function' ? itemHeight(containerWidth.value) : itemHeight
+    return Number(h) || 64
+  })
+
+  const effectiveRowHeight = computed(() => effectiveItemHeight.value + gap)
+
+  const totalRows = computed(() => Math.ceil(total.value / colCount.value))
+
+  const totalHeight = computed(() => {
+    if (total.value <= 0) return 0
+    return Math.max(0, totalRows.value * effectiveRowHeight.value - gap)
+  })
+
+  // Windowed indices calculation
+  const startRow = computed(() => {
+    return Math.max(0, Math.floor(scrollTop.value / effectiveRowHeight.value) - overscan)
+  })
+
+  const endRow = computed(() => {
+    return Math.min(totalRows.value, Math.ceil((scrollTop.value + viewportHeight.value) / effectiveRowHeight.value) + overscan)
+  })
+
+  const startIndex = computed(() => startRow.value * colCount.value)
+  const endIndex = computed(() => Math.min(total.value, endRow.value * colCount.value))
+
+  const topOffset = computed(() => startRow.value * effectiveRowHeight.value)
+
+  // Visible items slice
+  const visibleItems = computed(() => {
+    const list = []
+    const start = startIndex.value
+    const end = endIndex.value
+    const map = itemsMap.value
+
+    for (let i = start; i < end; i++) {
+      const hasItem = map.has(i)
+      list.push({
+        index: i,
+        data: hasItem ? map.get(i) : null,
+        isPlaceholder: !hasItem
+      })
+    }
+    return list
+  })
+
+  const hasMore = computed(() => itemsMap.value.size < total.value)
+  const isEmpty = computed(() => initialized.value && !loading.value && total.value === 0)
+
+  // Fetch a specific page/chunk by offset
+  const fetchPage = async (pageOffset) => {
+    if (loadedPages.has(pageOffset) || pendingPages.has(pageOffset)) return
+    if (!fetchFn) return
+
+    pendingPages.add(pageOffset)
+
+    if (pageOffset === 0 && !initialized.value) {
+      loading.value = true
+    } else {
+      loadingMore.value = true
+    }
+
     try {
-      const currentOffset = append ? offset.value : 0
-      
       const result = await fetchFn({
-        offset: currentOffset,
-        limit,
+        offset: pageOffset,
+        limit: pageSize,
         ...extraParams.value
       })
-      
-      const newItems = result.items || []
-      
-      if (append) {
-        items.value = [...items.value, ...newItems]
-      } else {
-        items.value = newItems
-        offset.value = 0
+
+      if (result) {
+        total.value = result.total ?? (pageOffset + (result.items?.length || 0))
+        const newItems = result.items || []
+
+        // Update itemsMap
+        const updated = new Map(itemsMap.value)
+        for (let i = 0; i < newItems.length; i++) {
+          updated.set(pageOffset + i, newItems[i])
+        }
+        itemsMap.value = updated
+        loadedPages.add(pageOffset)
       }
-      
-      total.value = result.total || 0
-      offset.value = append ? offset.value + newItems.length : newItems.length
-      initialized.value = true
-      
-      return result
     } catch (err) {
       error.value = err
-      console.error('Virtual scroll fetch error:', err)
-      throw err
+      console.error(`[useVirtualScroll] Error fetching offset ${pageOffset}:`, err)
     } finally {
+      pendingPages.delete(pageOffset)
       loading.value = false
-      loadingMore.value = false
+      loadingMore.value = pendingPages.size > 0
+      initialized.value = true
     }
   }
 
-  /**
-   * Load more items (for infinite scroll)
-   */
-  const loadMore = async () => {
-    if (!hasMore.value || loading.value || loadingMore.value) return
-    return fetchItems(true)
+  // Check which pages are needed for the current visible window
+  const checkNeededPages = () => {
+    if (total.value <= 0) return
+    const start = startIndex.value
+    const end = endIndex.value
+
+    for (let i = start; i < end; i++) {
+      if (!itemsMap.value.has(i)) {
+        const pageOffset = Math.floor(i / pageSize) * pageSize
+        if (!loadedPages.has(pageOffset) && !pendingPages.has(pageOffset)) {
+          fetchPage(pageOffset)
+        }
+      }
+    }
   }
 
-  /**
-   * Reset and reload with optional new params
-   * @param {Object} params - New extra params
-   */
+  // Update scroll metrics
+  const updateScroll = () => {
+    if (!containerRef.value) return
+    const sc = detectedScrollContainer || findScrollContainer(containerRef.value)
+    detectedScrollContainer = sc
+
+    const containerRect = containerRef.value.getBoundingClientRect()
+    containerWidth.value = containerRef.value.clientWidth
+
+    if (sc === window) {
+      viewportHeight.value = window.innerHeight
+      const listTop = containerRect.top
+      scrollTop.value = Math.max(0, -listTop)
+    } else if (sc) {
+      viewportHeight.value = sc.clientHeight
+      const scRect = sc.getBoundingClientRect()
+      const relativeTop = containerRect.top - scRect.top
+      scrollTop.value = Math.max(0, -relativeTop)
+    }
+
+    checkNeededPages()
+    ticking = false
+  }
+
+  const handleScroll = () => {
+    if (!ticking) {
+      window.requestAnimationFrame(updateScroll)
+      ticking = true
+    }
+  }
+
+  // Reset data and reload from offset 0
   const reset = async (params = null) => {
     if (params !== null) {
       extraParams.value = params
     }
-    offset.value = 0
-    items.value = []
-    return fetchItems(false)
+    loadedPages.clear()
+    pendingPages.clear()
+    itemsMap.value = new Map()
+    total.value = 0
+    scrollTop.value = 0
+    await fetchPage(0)
+    await nextTick()
+    updateScroll()
   }
 
-  /**
-   * Update params and reload
-   * @param {Object} params - Params to merge
-   */
+  const refresh = async () => {
+    loadedPages.clear()
+    pendingPages.clear()
+    itemsMap.value = new Map()
+    await fetchPage(0)
+    await nextTick()
+    updateScroll()
+  }
+
   const setParams = async (params) => {
     extraParams.value = { ...extraParams.value, ...params }
-    offset.value = 0
-    items.value = []
-    return fetchItems(false)
+    return reset()
   }
 
-  /**
-   * Refresh current data (keep params)
-   */
-  const refresh = async () => {
-    offset.value = 0
-    return fetchItems(false)
-  }
-
-  /**
-   * Clear all data
-   */
   const clear = () => {
-    items.value = []
+    loadedPages.clear()
+    pendingPages.clear()
+    itemsMap.value = new Map()
     total.value = 0
-    offset.value = 0
-    error.value = null
     initialized.value = false
   }
 
-  /**
-   * Setup IntersectionObserver for infinite scroll
-   */
-  const setupObserver = () => {
-    if (intersectionObserver) {
-      intersectionObserver.disconnect()
-    }
-    
-    const root = scrollContainer?.value || null
-    
-    intersectionObserver = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0]
-        if (entry?.isIntersecting && hasMore.value && !loading.value && !loadingMore.value) {
-          loadMore()
-        }
-      },
-      { 
-        root,
-        rootMargin,
-        threshold: 0 
+  // Array of all loaded items in order (for player queue, etc.)
+  const getLoadedItems = () => {
+    const result = []
+    for (let i = 0; i < total.value; i++) {
+      if (itemsMap.value.has(i)) {
+        result.push(itemsMap.value.get(i))
       }
-    )
-    
-    // Observe load trigger if exists
-    if (loadTriggerRef.value) {
-      intersectionObserver.observe(loadTriggerRef.value)
+    }
+    return result
+  }
+
+  // Patch item by id or predicate
+  const patchItem = (predicateOrId, data) => {
+    const isFn = typeof predicateOrId === 'function'
+    const updated = new Map(itemsMap.value)
+    let modified = false
+
+    for (const [index, item] of updated.entries()) {
+      if (item && (isFn ? predicateOrId(item) : item.id === predicateOrId)) {
+        updated.set(index, { ...item, ...data })
+        modified = true
+      }
+    }
+    if (modified) {
+      itemsMap.value = updated
     }
   }
 
-  /**
-   * Watch for load trigger changes
-   */
-  watch(loadTriggerRef, (el) => {
-    if (el && intersectionObserver) {
-      intersectionObserver.observe(el)
+  // Remove item by id or predicate
+  const removeItem = (predicateOrId) => {
+    const isFn = typeof predicateOrId === 'function'
+    const current = itemsMap.value
+    let targetIndex = -1
+
+    for (const [index, item] of current.entries()) {
+      if (item && (isFn ? predicateOrId(item) : item.id === predicateOrId)) {
+        targetIndex = index
+        break
+      }
     }
+
+    if (targetIndex !== -1) {
+      const updated = new Map()
+      for (const [index, item] of current.entries()) {
+        if (index < targetIndex) {
+          updated.set(index, item)
+        } else if (index > targetIndex) {
+          updated.set(index - 1, item)
+        }
+      }
+      itemsMap.value = updated
+      total.value = Math.max(0, total.value - 1)
+      loadedPages.clear() // Invalidate page boundary cache after shift
+    }
+  }
+
+  // Watch startIndex / endIndex to fetch missing chunks
+  watch([startIndex, endIndex, total], () => {
+    checkNeededPages()
   })
 
-  /**
-   * Watch hasMore to stop observing when no more items
-   */
-  watch(hasMore, (value) => {
-    if (!value && loadTriggerRef.value && intersectionObserver) {
-      intersectionObserver.unobserve(loadTriggerRef.value)
-    } else if (value && loadTriggerRef.value && intersectionObserver) {
-      intersectionObserver.observe(loadTriggerRef.value)
+  onMounted(async () => {
+    await nextTick()
+    detectedScrollContainer = findScrollContainer(containerRef.value)
+    
+    if (detectedScrollContainer === window) {
+      window.addEventListener('scroll', handleScroll, { passive: true })
+      window.addEventListener('resize', handleScroll, { passive: true })
+    } else if (detectedScrollContainer) {
+      detectedScrollContainer.addEventListener('scroll', handleScroll, { passive: true })
+      window.addEventListener('resize', handleScroll, { passive: true })
     }
-  })
 
-  // Lifecycle
-  onMounted(() => {
-    setupObserver()
+    if (containerRef.value) {
+      containerWidth.value = containerRef.value.clientWidth
+      resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          containerWidth.value = entry.contentRect.width
+          updateScroll()
+        }
+      })
+      resizeObserver.observe(containerRef.value)
+    }
+
     if (immediate) {
-      fetchItems(false)
+      await fetchPage(0)
+      await nextTick()
+      updateScroll()
     }
   })
 
   onUnmounted(() => {
-    if (intersectionObserver) {
-      intersectionObserver.disconnect()
-      intersectionObserver = null
+    if (detectedScrollContainer === window) {
+      window.removeEventListener('scroll', handleScroll)
+      window.removeEventListener('resize', handleScroll)
+    } else if (detectedScrollContainer) {
+      detectedScrollContainer.removeEventListener('scroll', handleScroll)
+      window.removeEventListener('resize', handleScroll)
+    }
+    if (resizeObserver) {
+      resizeObserver.disconnect()
+      resizeObserver = null
     }
   })
 
   return {
     // State
-    items,
-    visibleItems,
+    containerRef,
+    loadTriggerRef,
     total,
     loading,
     loadingMore,
+    loadingSkeletonCount: computed(() => (loadingMore.value ? 4 : 0)),
     error,
+    initialized,
     hasMore,
     isEmpty,
-    initialized,
-    currentPage,
-    totalPages,
+    itemsMap,
+    items: computed(() => getLoadedItems()),
     
-    // Skeleton counts for virtual scrolling
-    topSkeletonCount,
-    bottomSkeletonCount,
-    
-    // Skeleton count for loading more (infinite scroll)
-    loadingSkeletonCount,
-    
-    // Refs for DOM elements
-    loadTriggerRef,
-    containerRef,
-    
-    // Extra params (reactive)
-    extraParams,
+    // Windowing metrics
+    scrollTop,
+    viewportHeight,
+    containerWidth,
+    totalHeight,
+    topOffset,
+    startIndex,
+    endIndex,
+    visibleItems,
     
     // Methods
-    loadMore,
+    fetchPage,
     reset,
-    setParams,
     refresh,
+    setParams,
     clear,
-    
-    // Manual fetch (for advanced usage)
-    fetchItems
+    updateScroll,
+    getLoadedItems,
+    patchItem,
+    removeItem
   }
 }
 
