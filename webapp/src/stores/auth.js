@@ -41,10 +41,20 @@ export const useAuthStore = defineStore('auth', () => {
       // Fetch channel status and config after auth
       await Promise.all([fetchStatus(), fetchConfig()])
     } catch (err) {
-      // Auth failed - clear storage
-      authStorage.clear()
-      user.value = null
-      error.value = 'Authentication failed'
+      // If network is offline or request failed due to connection error, keep existing session!
+      const isOfflineError = (typeof navigator !== 'undefined' && !navigator.onLine) || !err.response || err.code === 'ERR_NETWORK' || err.code === 'ECONNABORTED'
+      const savedUser = authStorage.getUser()
+      if (isOfflineError && savedUser) {
+        console.log('[Auth] Network offline, preserving existing session for offline use')
+        user.value = savedUser
+        initialized.value = true
+      } else {
+        // Auth explicitly failed (401/403) - clear storage
+        authStorage.clear()
+        user.value = null
+        error.value = 'Authentication failed'
+        initialized.value = true
+      }
     } finally {
       loading.value = false
     }

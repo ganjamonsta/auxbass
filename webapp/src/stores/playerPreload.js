@@ -195,6 +195,9 @@ export async function executeBatchPreload({ trackIds, getBatchUrls, nextTrack, o
   }
 }
 
+// Active background auto-caching controllers
+const _cachingTracks = new Map()
+
 /**
  * Cache a track in background using its active/prefetched stream URL.
  * Does not block audio playback.
@@ -204,17 +207,17 @@ export async function executeBatchPreload({ trackIds, getBatchUrls, nextTrack, o
  * @param {number} [maxCacheBytes] - max allowed cache size for LRU eviction
  */
 export async function cacheTrackInBackground(track, streamUrl, maxCacheBytes = 1073741824) {
-  if (!track || !track.id || !streamUrl || _preloadingTracks.has(track.id)) return
+  if (!track || !track.id || !streamUrl || _cachingTracks.has(track.id)) return
 
   // Check if already in IndexedDB
   const isCached = await hasCachedTrack(track.id)
   if (isCached) return
 
   const controller = new AbortController()
-  _preloadingTracks.set(track.id, controller)
+  _cachingTracks.set(track.id, controller)
 
   try {
-    console.log(`[AutoCache] Background caching started for "${track.title}"`)
+    console.log(`[AutoCache] Background caching started for "${track.title}" (track ${track.id})`)
     const response = await fetch(streamUrl, { signal: controller.signal })
     if (!response.ok) return
 
@@ -230,8 +233,8 @@ export async function cacheTrackInBackground(track, streamUrl, maxCacheBytes = 1
       console.warn(`[AutoCache] Failed to cache track "${track.title}":`, e.message)
     }
   } finally {
-    if (_preloadingTracks.get(track.id) === controller) {
-      _preloadingTracks.delete(track.id)
+    if (_cachingTracks.get(track.id) === controller) {
+      _cachingTracks.delete(track.id)
     }
   }
 }

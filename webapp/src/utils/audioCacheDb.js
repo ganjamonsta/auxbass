@@ -45,6 +45,15 @@ export function openCacheDb() {
 }
 
 /**
+ * Emit event to notify UI components (SettingsView, etc.) about cache state change
+ */
+export function notifyCacheUpdated() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('cache-updated'))
+  }
+}
+
+/**
  * Request persistent storage to protect cache from browser auto-eviction (iOS/Safari/Android)
  */
 export async function requestStoragePersistence() {
@@ -133,6 +142,39 @@ export async function getCachedTrack(trackId) {
 }
 
 /**
+ * Get all cached tracks metadata for offline browsing
+ * @returns {Promise<Array<Object>>}
+ */
+export async function getAllCachedTracks() {
+  try {
+    const db = await openCacheDb()
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_NAME, 'readonly')
+      const store = tx.objectStore(STORE_NAME)
+      const req = store.getAll()
+      req.onsuccess = () => {
+        const items = (req.result || []).map(r => ({
+          id: r.track_id,
+          title: r.title,
+          artist: r.artist,
+          album: r.album,
+          duration: r.duration,
+          cover_url: r.cover_url,
+          is_cached: true,
+          cached_at: r.cached_at,
+          file_size: r.size,
+          mime_type: r.mime_type
+        }))
+        resolve(items)
+      }
+      req.onerror = () => resolve([])
+    })
+  } catch (e) {
+    return []
+  }
+}
+
+/**
  * Save audio blob and track metadata to IndexedDB
  * @param {Object} track - track metadata
  * @param {Blob} blob - audio binary blob
@@ -166,6 +208,7 @@ export async function saveTrackToCache(track, blob, mimeType = 'audio/mpeg') {
 
       putReq.onsuccess = () => {
         console.log(`[AudioCache] Saved track ${track.id} ("${track.title}") to cache (${(blob.size / 1024 / 1024).toFixed(1)} MB)`)
+        notifyCacheUpdated()
         resolve(true)
       }
 
@@ -193,7 +236,10 @@ export async function deleteCachedTrack(trackId) {
       const tx = db.transaction(STORE_NAME, 'readwrite')
       const store = tx.objectStore(STORE_NAME)
       const delReq = store.delete(trackId)
-      delReq.onsuccess = () => resolve(true)
+      delReq.onsuccess = () => {
+        notifyCacheUpdated()
+        resolve(true)
+      }
       delReq.onerror = () => resolve(false)
     })
   } catch (e) {
@@ -214,6 +260,7 @@ export async function clearAllCache() {
       const clearReq = store.clear()
       clearReq.onsuccess = () => {
         console.log('[AudioCache] All cached audio cleared')
+        notifyCacheUpdated()
         resolve(true)
       }
       clearReq.onerror = () => resolve(false)
@@ -331,6 +378,7 @@ export async function evictOldTracksIfNeeded(maxBytes) {
         }
         tx.oncomplete = () => {
           console.log(`[AudioCache] Evicted ${toDelete.length} oldest tracks, freed ${(freedBytes / 1024 / 1024).toFixed(1)} MB`)
+          notifyCacheUpdated()
           resolve()
         }
         tx.onerror = () => resolve()

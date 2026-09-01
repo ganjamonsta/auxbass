@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { tracksApi, playlistsApi, playerApi, artistsApi } from '../api/client'
 import apiCache from '../utils/apiCache'
+import { getAllCachedTracks } from '../utils/audioCacheDb'
 
 export const useLibraryStore = defineStore('library', () => {
   // State - My Library
@@ -158,6 +159,18 @@ export const useLibraryStore = defineStore('library', () => {
       hasMore.value = tracks.value.length < data.total
     } catch (error) {
       console.error('Failed to fetch tracks:', error)
+      // If offline and tracks are empty, fallback to cached tracks from IndexedDB
+      if (tracks.value.length === 0) {
+        try {
+          const cached = await getAllCachedTracks()
+          if (cached.length > 0) {
+            tracks.value = cached
+            total.value = cached.length
+            hasMore.value = false
+            console.log(`[Library] Loaded ${cached.length} cached tracks in offline mode`)
+          }
+        } catch (_) {}
+      }
     } finally {
       loading.value = false
     }

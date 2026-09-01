@@ -584,11 +584,14 @@ onMounted(async () => {
     }, 100)
   }
   
+  window.addEventListener('cache-updated', refreshCacheStats)
+  
   // Слушаем событие сброса состояния
   window.addEventListener('reset-view-state', handleResetState)
 })
 
 onUnmounted(() => {
+  window.removeEventListener('cache-updated', refreshCacheStats)
   window.removeEventListener('reset-view-state', handleResetState)
 })
 
