@@ -626,18 +626,18 @@ const formatTime = (seconds) => {
 .full-player {
   position: fixed;
   inset: 0;
-  background: radial-gradient(circle at 50% 25%, rgba(35, 45, 60, 0.7) 0%, rgba(10, 12, 16, 0.96) 80%);
+  background: radial-gradient(circle at 50% 15%, #182232 0%, #0c0e14 75%, #080a0e 100%);
   backdrop-filter: blur(40px) saturate(190%);
   -webkit-backdrop-filter: blur(40px) saturate(190%);
   display: flex;
   flex-direction: column;
-  z-index: 100;
+  z-index: 1000;
   padding: 10px 20px;
   padding-bottom: max(20px, env(safe-area-inset-bottom, 20px));
   touch-action: pan-y;
   overflow: hidden;
-  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.7);
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.85);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 /* ─── Swipe Indicator ─── */

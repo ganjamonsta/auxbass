@@ -1,57 +1,85 @@
 <template>
-  <div class="mobile-footer" :class="footerClasses" :style="footerStyle">
-    <!-- Bottom Navigation / Player Controls hybrid -->
-    <nav class="footer-nav">
-      <button
-        v-for="(item, idx) in navItems"
+  <div class="mobile-footer" :class="footerClasses">
+    <!-- Mini Player (when track is playing) -->
+    <div v-if="showPlayer && currentTrack" class="footer-player">
+      <MiniPlayer
+        :track="currentTrack"
+        :is-playing="isPlaying"
+        :loading="loading"
+        :progress="progress"
+        :duration="duration"
+        :buffered="buffered"
+        :is-liked="isLiked"
+        @expand="$emit('expand-player')"
+        @toggle="$emit('toggle-play')"
+        @next="$emit('next-track')"
+        @toggleShuffle="$emit('toggle-shuffle')"
+        @toggleRepeat="$emit('toggle-repeat')"
+        @like="$emit('like')"
+      />
+    </div>
+
+    <!-- Bottom Navigation -->
+    <nav v-if="showNav" class="footer-nav">
+      <button 
+        v-for="item in navItems" 
         :key="item.path"
-        class="nav-item"
-        :class="{
-          active: !playerExpanded && isActiveRoute(item.path, item.matchPaths),
-          'control-active': playerExpanded && controlItems[idx]?.isActive,
-        }"
-        @click="handleItemClick(idx, item)"
+        class="nav-item" 
+        :class="{ active: isActiveRoute(item.path, item.matchPaths) }"
+        @click="handleNavClick(item.path)"
       >
-        <!-- Nav icon layer (fades out when expanded) -->
-        <div class="nav-layer">
-          <component :is="item.icon" class="nav-icon" :size="22" :stroke-width="2" />
-          <span class="nav-label">{{ item.label }}</span>
-        </div>
-        <!-- Player control layer (fades in when expanded) -->
-        <div class="control-layer">
-          <div
-            v-if="controlItems[idx]"
-            class="control-icon-wrap"
-            :class="{ 'play-wrap': controlItems[idx].isPlayBtn }"
-          >
-            <component
-              :is="controlItems[idx].iconComponent"
-              class="control-icon"
-              :size="controlItems[idx].size || 24"
-              :stroke-width="2"
-            />
-          </div>
-          <span v-if="!controlItems[idx]?.isPlayBtn" class="control-label">{{ controlItems[idx]?.label || '' }}</span>
-        </div>
+        <component :is="item.icon" class="nav-icon" :size="22" :stroke-width="2" />
+        <span class="nav-label">{{ item.label }}</span>
       </button>
     </nav>
   </div>
 </template>
 
 <script setup>
-import { computed, h, defineComponent } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ListMusic, Disc3, Users, Heart, Settings, SkipBack, Shuffle, Play, Pause, Repeat, Repeat1, SkipForward } from 'lucide-vue-next'
+import MiniPlayer from '@/components/MiniPlayer.vue'
+import { ListMusic, Disc3, Users, Heart, Settings } from 'lucide-vue-next'
 
 const props = defineProps({
-  showPlayer: { type: Boolean, default: false },
-  currentTrack: { type: Object, default: null },
-  isPlaying: { type: Boolean, default: false },
-  loading: { type: Boolean, default: false },
-  playerExpanded: { type: Boolean, default: false },
-  expandProgress: { type: Number, default: 0 },
-  shuffle: { type: Boolean, default: false },
-  repeat: { type: String, default: 'none' },
+  // Player props
+  showPlayer: {
+    type: Boolean,
+    default: false
+  },
+  currentTrack: {
+    type: Object,
+    default: null
+  },
+  isPlaying: {
+    type: Boolean,
+    default: false
+  },
+  loading: {
+    type: Boolean,
+    default: false
+  },
+  progress: {
+    type: Number,
+    default: 0
+  },
+  duration: {
+    type: Number,
+    default: 0
+  },
+  buffered: {
+    type: Number,
+    default: 0
+  },
+  isLiked: {
+    type: Boolean,
+    default: false
+  },
+  // Navigation props
+  showNav: {
+    type: Boolean,
+    default: true
+  },
   navItems: {
     type: Array,
     default: () => [
@@ -65,53 +93,23 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
-  'toggle-play',
+  'expand-player', 
+  'toggle-play', 
   'next-track',
-  'prev-track',
   'toggle-shuffle',
   'toggle-repeat',
+  'like',
   'nav-click',
-  'reset-view',
+  'reset-view'
 ])
 
 const route = useRoute()
 const router = useRouter()
 
 const footerClasses = computed(() => ({
-  'footer--player-expanded': props.playerExpanded,
+  'footer--has-player': props.showPlayer && props.currentTrack,
+  'footer--nav-only': props.showNav && (!props.showPlayer || !props.currentTrack)
 }))
-
-const footerStyle = computed(() => ({
-  '--expand': props.expandProgress,
-}))
-
-// Loading spinner as component
-const SpinnerIcon = defineComponent({
-  props: { size: { type: Number, default: 24 }, strokeWidth: { type: Number, default: 2 } },
-  setup(props) {
-    return () => h('svg', {
-      class: 'spin',
-      width: props.size, height: props.size,
-      viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
-      'stroke-width': props.strokeWidth,
-    }, [
-      h('path', { d: 'M12 2a10 10 0 0 1 10 10' })
-    ])
-  }
-})
-
-// Map nav positions to player controls
-const controlItems = computed(() => {
-  const playIcon = props.loading ? SpinnerIcon : (props.isPlaying ? Pause : Play)
-
-  return [
-    { iconComponent: SkipBack, label: 'Назад', action: 'prev', size: 22, isActive: false },
-    { iconComponent: Shuffle, label: 'Шафл', action: 'shuffle', size: 20, isActive: props.shuffle },
-    { iconComponent: playIcon, label: props.isPlaying ? 'Пауза' : 'Играть', action: 'toggle', size: 28, isActive: props.isPlaying, isPlayBtn: true },
-    { iconComponent: props.repeat === 'one' ? Repeat1 : Repeat, label: 'Повтор', action: 'repeat', size: 20, isActive: props.repeat !== 'none' },
-    { iconComponent: SkipForward, label: 'Далее', action: 'next', size: 22, isActive: false },
-  ]
-})
 
 const isActiveRoute = (path, matchPaths = []) => {
   if (path === '/') return route.path === '/'
@@ -119,47 +117,49 @@ const isActiveRoute = (path, matchPaths = []) => {
 }
 
 const scrollToTop = () => {
+  // 1. Primary main-content container
   const mainContent = document.querySelector('.main-content')
-  if (mainContent) mainContent.scrollTo({ top: 0, behavior: 'smooth' })
+  if (mainContent) {
+    mainContent.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // 2. All possible scroll containers
   const scrollContainers = document.querySelectorAll(
     '.main-content, .main-content-wrapper, .library-view, .collections-view, .liked-tracks-view, .friends-view, .settings-view, .virtual-track-list, .virtual-grid, .page-scroll-container, .mobile-page-content'
   )
   scrollContainers.forEach((el) => {
-    if (el && el.scrollTop > 0) el.scrollTo({ top: 0, behavior: 'smooth' })
+    if (el && el.scrollTop > 0) {
+      el.scrollTo({ top: 0, behavior: 'smooth' })
+    }
   })
+
+  // 3. Global window fallback
   window.scrollTo({ top: 0, behavior: 'smooth' })
+  if (document.documentElement) {
+    document.documentElement.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 }
 
-const handleItemClick = (idx, navItem) => {
-  if (props.playerExpanded) {
-    // Player controls mode
-    const control = controlItems.value[idx]
-    if (!control) return
-    switch (control.action) {
-      case 'prev': emit('prev-track'); break
-      case 'shuffle': emit('toggle-shuffle'); break
-      case 'toggle': emit('toggle-play'); break
-      case 'repeat': emit('toggle-repeat'); break
-      case 'next': emit('next-track'); break
-    }
-    return
-  }
-
-  // Navigation mode
-  const currentNav = props.navItems.find(i => i.path === navItem.path)
-  const isCurrentActive = isActiveRoute(navItem.path, currentNav?.matchPaths || [navItem.path])
+const handleNavClick = (path) => {
+  const currentNav = props.navItems.find(i => i.path === path)
+  const isCurrentActive = isActiveRoute(path, currentNav?.matchPaths || [path])
 
   if (isCurrentActive) {
     const mainContent = document.querySelector('.main-content')
-    const currentScroll = mainContent ? mainContent.scrollTop : 0
+    const currentScroll = mainContent ? mainContent.scrollTop : (window.scrollY || document.documentElement.scrollTop || 0)
+
+    // Smoothly scroll to top
     scrollToTop()
+
+    // If already at or near top (or user taps again at top), reset view state / filters
     if (currentScroll <= 30) {
-      emit('reset-view', navItem.path)
-      window.dispatchEvent(new CustomEvent('reset-view-state', { detail: { route: navItem.path } }))
+      emit('reset-view', path)
+      window.dispatchEvent(new CustomEvent('reset-view-state', { detail: { route: path } }))
     }
   } else {
-    emit('nav-click', navItem.path)
-    router.push(navItem.path)
+    // Navigate to new page
+    emit('nav-click', path)
+    router.push(path)
   }
 }
 </script>
@@ -168,18 +168,18 @@ const handleItemClick = (idx, navItem) => {
 .mobile-footer {
   flex-shrink: 0;
   z-index: var(--z-overlay, 100);
-  background: rgba(14, 18, 24, 0.85);
+  background: rgba(14, 18, 24, 0.92);
   backdrop-filter: blur(28px) saturate(180%);
   -webkit-backdrop-filter: blur(28px) saturate(180%);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding-bottom: env(safe-area-inset-bottom);
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.55);
 }
 
-/* When player is expanded, style differently */
-.footer--player-expanded {
-  background: rgba(10, 12, 16, 0.95);
-  border-top-color: rgba(255, 255, 255, 0.06);
+/* Player section */
+.footer-player {
+  background: transparent;
+  padding: 4px 0 2px 0;
 }
 
 /* Navigation */
@@ -197,6 +197,7 @@ const handleItemClick = (idx, navItem) => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   text-decoration: none;
   color: var(--c-text-3);
   font-size: 11px;
@@ -210,11 +211,8 @@ const handleItemClick = (idx, navItem) => {
   border-radius: 12px;
   position: relative;
   min-width: 64px;
-  /* Stack nav and control layers */
-  overflow: hidden;
 }
 
-/* Active route indicator (nav mode only) */
 .nav-item.active {
   color: var(--c-accent);
 }
@@ -231,57 +229,12 @@ const handleItemClick = (idx, navItem) => {
   border-radius: 0 0 3px 3px;
 }
 
-/* Active control indicator (player mode) */
-.nav-item.control-active {
-  color: var(--c-accent);
-}
-
 .nav-item:active {
   transform: scale(0.95);
   opacity: 0.7;
 }
 
-/* ─── Layer Crossfade ─── */
-.nav-layer {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  transition: opacity 0.3s ease, transform 0.3s ease;
-  /* Nav layer is in normal flow — provides height */
-  position: relative;
-  opacity: calc(1 - var(--expand, 0));
-  transform: translateY(calc(var(--expand, 0) * -6px));
-}
-
-.control-layer {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  transition: opacity 0.3s ease, transform 0.3s ease;
-  /* Control layer overlays on top */
-  position: absolute;
-  inset: 0;
-  opacity: calc(var(--expand, 0));
-  transform: translateY(calc((1 - var(--expand, 0)) * 6px));
-}
-
-.footer--player-expanded .nav-layer {
-  pointer-events: none;
-}
-
-.footer--player-expanded .control-layer {
-  pointer-events: auto;
-}
-
-:not(.footer--player-expanded) > .footer-nav > .nav-item > .control-layer {
-  pointer-events: none;
-}
-
-.nav-icon, .control-icon {
+.nav-icon {
   flex-shrink: 0;
   transition: all 0.2s ease;
 }
@@ -290,44 +243,9 @@ const handleItemClick = (idx, navItem) => {
   transform: translateY(-2px);
 }
 
-.nav-label, .control-label {
+.nav-label {
   font-weight: 500;
   letter-spacing: 0.02em;
-  font-size: 10px;
-}
-/* ─── Control icon wrap ─── */
-.control-icon-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* ─── Play button highlight (center position) ─── */
-.footer--player-expanded .nav-item:nth-child(3) {
-  color: var(--c-text-1);
-}
-
-.play-wrap {
-  width: 48px;
-  height: 48px;
-  background: linear-gradient(145deg, #22e066 0%, #159b43 100%);
-  color: #000;
-  border-radius: var(--r-full);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow:
-    0 4px 16px rgba(29, 185, 84, 0.4),
-    inset 0 1px 1px rgba(255, 255, 255, 0.4);
-  transform: translateY(-6px);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.nav-item:active .play-wrap {
-  transform: translateY(-6px) scale(0.92);
-  box-shadow:
-    inset 3px 3px 6px rgba(0, 0, 0, 0.5),
-    0 0 12px var(--c-accent-glow);
 }
 
 /* Desktop: hide mobile footer */
@@ -336,8 +254,4 @@ const handleItemClick = (idx, navItem) => {
     display: none;
   }
 }
-
-/* Spinner */
-.spin { animation: spin 1s linear infinite; }
-@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 </style>
