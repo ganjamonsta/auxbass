@@ -1,20 +1,19 @@
 @echo off
-chcp 65001 > nul
 setlocal
 
 echo ========================================================
-echo        🚀 TG Player - WebApp Release Publisher
+echo        TG Player - WebApp Release Publisher
 echo ========================================================
 echo.
 
 cd /d "%~dp0"
 
-echo [1/3] 🔨 Сборка WebApp (Vite)...
+echo [1/3] Building WebApp (npm run build)...
 cd webapp
 call npm run build
 if %errorlevel% neq 0 (
     echo.
-    echo ❌ Ошибка при сборке WebApp!
+    echo [ERROR] WebApp build failed!
     cd ..
     pause
     exit /b %errorlevel%
@@ -22,22 +21,22 @@ if %errorlevel% neq 0 (
 cd ..
 
 echo.
-echo [2/3] 📦 Упаковка и публикация релиза на GitHub...
+echo [2/3] Packaging and publishing release to GitHub...
 python scripts\publish_release.py
 if %errorlevel% neq 0 (
     echo.
-    echo ⚠️ Публикация завершилась с ошибкой.
+    echo [ERROR] Publishing failed!
     pause
     exit /b %errorlevel%
 )
 
 echo.
-echo [3/3] 💾 Очистка временных архивов...
+echo [3/3] Cleaning up temporary files...
 if exist webapp-dist.tar.gz del webapp-dist.tar.gz
 
 echo.
 echo ========================================================
-echo   ✅ Всё готово! Теперь перезапустите бота в Pterodactyl.
+echo   Done! Restart your bot server in Pterodactyl.
 echo ========================================================
 echo.
 pause
