@@ -1,9 +1,7 @@
 """
 TG Player - WebApp Release Publisher
-Скрипт для сборки и публикации WebApp релиза на GitHub.
-Поддерживает два режима доставки архива:
-1. Загрузка в GitHub Releases (если в .env указан GITHUB_TOKEN)
-2. Публикация архива в Git-ветку release-dist (через стандартный git push, без токенов)
+Скрипт для сборки и загрузки WebApp релиза напрямую в GitHub Releases:
+https://github.com/ganjamonsta/auxbass/releases
 """
 import os
 import re
@@ -12,6 +10,7 @@ import subprocess
 import tarfile
 from pathlib import Path
 import httpx
+
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 if hasattr(sys.stderr, "reconfigure"):
@@ -34,7 +33,6 @@ def get_git_repo() -> tuple[str, str]:
             ["git", "config", "--get", "remote.origin.url"],
             cwd=ROOT_DIR
         ).decode().strip()
-        # https://github.com/owner/repo.git or git@github.com:owner/repo.git
         match = re.search(r"github\.com[:/]([^/]+)/([^/\.]+)", url)
         if match:
             return match.group(1), match.group(2)
@@ -58,59 +56,16 @@ def ensure_archive() -> bool:
     return True
 
 
-def upload_to_git_branch() -> bool:
-    """Публикует webapp-dist.tar.gz в ветку release-dist через Git plumbing (без токенов)"""
-    print("\n🚀 Публикация архива в Git-ветку 'release-dist'...")
-    try:
-        # 1. Хешируем архив в git object store
-        blob_id = subprocess.check_output(
-            ["git", "hash-object", "-w", str(ARCHIVE_PATH)],
-            cwd=ROOT_DIR
-        ).decode().strip()
-
-        # 2. Создаем дерево с одним файлом webapp-dist.tar.gz
-        tree_input = f"100644 blob {blob_id}\twebapp-dist.tar.gz\n".encode("utf-8")
-        tree_proc = subprocess.Popen(
-            ["git", "mktree"],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            cwd=ROOT_DIR
-        )
-        tree_id, err = tree_proc.communicate(input=tree_input)
-        if tree_proc.returncode != 0:
-            print(f"⚠️ Ошибка mktree: {err.decode()}")
-            return False
-        tree_id = tree_id.decode().strip()
-
-        # 3. Создаем коммит дерева
-        commit_id = subprocess.check_output(
-            ["git", "commit-tree", tree_id, "-m", "release: update webapp prebuilt bundle"],
-            cwd=ROOT_DIR
-        ).decode().strip()
-
-        # 4. Пушим в origin/release-dist
-        subprocess.check_call(
-            ["git", "push", "origin", f"{commit_id}:refs/heads/release-dist", "-f"],
-            cwd=ROOT_DIR
-        )
-        print("✅ Успешно запушено в ветку 'release-dist' на GitHub!")
-        return True
-    except subprocess.CalledProcessError as e:
-        print(f"⚠️ Не удалось запушить в release-dist через git: {e}")
-        return False
-
-
 def upload_to_github_releases(token: str, owner: str, repo: str) -> bool:
     """Загружает webapp-dist.tar.gz в GitHub Releases 'latest' через REST API"""
-    print(f"\n🚀 Загрузка в GitHub Releases ({owner}/{repo})...")
+    print(f"\n🚀 Загрузка в GitHub Releases (https://github.com/{owner}/{repo}/releases)...")
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/vnd.github.v3+json",
         "X-GitHub-Api-Version": "2022-11-28",
     }
     
-    with httpx.Client(headers=headers, timeout=30.0) as client:
+    with httpx.Client(headers=headers, timeout=60.0) as client:
         # 1. Проверяем или создаем release latest
         rel_resp = client.get(f"https://api.github.com/repos/{owner}/{repo}/releases/tags/latest")
         if rel_resp.status_code == 200:
@@ -123,8 +78,8 @@ def upload_to_github_releases(token: str, owner: str, repo: str) -> bool:
                     "tag_name": "latest",
                     "name": "Latest WebApp Build",
                     "body": "Production build of TG Player WebApp.",
-                    "draft": false,
-                    "prerelease": false,
+                    "draft": False,
+                    "prerelease": False,
                 }
             )
             if create_resp.status_code not in (200, 201):
@@ -145,7 +100,7 @@ def upload_to_github_releases(token: str, owner: str, repo: str) -> bool:
 
         # 3. Загружаем новый ассет
         upload_url = f"https://uploads.github.com/repos/{owner}/{repo}/releases/{release_id}/assets?name=webapp-dist.tar.gz"
-        print("⬆️ Загрузка файла webapp-dist.tar.gz...")
+        print("⬆️ Загрузка файла webapp-dist.tar.gz на GitHub...")
         
         with open(ARCHIVE_PATH, "rb") as f:
             file_data = f.read()
@@ -178,7 +133,7 @@ def save_token_to_env(token: str):
             content += f"\n# GitHub Releases Token\nGITHUB_TOKEN={token}\n"
         
         ENV_PATH.write_text(content, encoding="utf-8")
-        print("💾 GITHUB_TOKEN успешно сохранен в .env!")
+        print("💾 GITHUB_TOKEN сохранен в .env (больше вводить не потребуется)!")
     except Exception as e:
         print(f"⚠️ Не удалось сохранить токен в .env: {e}")
 
@@ -195,45 +150,36 @@ def main():
     token = os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN") or os.getenv("GIT_TOKEN")
 
     if not token:
-        print("\n🔑 Для загрузки прямо в https://github.com/ganjamonsta/auxbass/releases")
-        print("   нужен GitHub Token (Personal Access Token с правами 'repo').")
-        print("   Создать можно тут за 15 сек: https://github.com/settings/tokens/new")
-        print("   (выберите срок действия 'No expiration' и поставьте галочку 'repo')\n")
+        print(f"\n🔑 Для загрузки в https://github.com/{owner}/{repo}/releases")
+        print("   нужен GitHub Personal Access Token (с правами 'repo').")
+        print("   Создать можно тут (15 сек): https://github.com/settings/tokens/new")
+        print("   (срок: 'No expiration', галочка: 'repo')\n")
         try:
-            user_token = input("👉 Вставьте ваш GitHub Token (или нажмите Enter): ").strip()
+            user_token = input("👉 Вставьте ваш токен (ghp_...): ").strip()
             if user_token:
                 token = user_token
                 save_token_to_env(token)
+            else:
+                print("❌ Токен не введен. Отмена.")
+                sys.exit(1)
         except (KeyboardInterrupt, EOFError):
-            pass
+            print("\n❌ Отменено.")
+            sys.exit(1)
 
-    release_ok = False
-    if token:
-        try:
-            release_ok = upload_to_github_releases(token, owner, repo)
-            if release_ok:
-                print(f"🔗 Страница релиза: https://github.com/{owner}/{repo}/releases/tag/latest")
-        except Exception as e:
-            print(f"❌ Ошибка при загрузке в GitHub Releases: {e}")
-    else:
-        print("⚠️ Токен не указан. Загрузка в раздел Releases пропущена.")
-
-    # Ветка release-dist для совместимости
     try:
-        upload_to_git_branch()
-    except Exception:
-        pass
-
-    if release_ok:
-        print("\n========================================================")
-        print("  🎉 ГОТОВО! Релиз опубликован на https://github.com/ganjamonsta/auxbass/releases")
-        print("========================================================")
-        sys.exit(0)
-    else:
-        print("\n========================================================")
-        print("  ✅ Релиз собран и готов.")
-        print("========================================================")
-        sys.exit(0)
+        ok = upload_to_github_releases(token, owner, repo)
+        if ok:
+            print("\n========================================================")
+            print(f"  🎉 УСПЕШНО ЗАЛИТО В РЕЛИЗЫ:")
+            print(f"  🔗 https://github.com/{owner}/{repo}/releases/tag/latest")
+            print("========================================================")
+            sys.exit(0)
+        else:
+            print("\n❌ Не удалось загрузить в Releases.")
+            sys.exit(1)
+    except Exception as e:
+        print(f"❌ Ошибка: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
