@@ -39,6 +39,15 @@
             <span v-if="latencyText" class="banner-detail">{{ latencyText }}</span>
           </div>
         </div>
+
+        <!-- Go to downloaded tracks when offline -->
+        <button 
+          v-if="isOffline && route.name !== 'downloaded'" 
+          class="banner-action-btn"
+          @click.stop="router.push('/downloaded')"
+        >
+          Скачанные
+        </button>
         
         <!-- Dismiss button (only for slow) -->
         <button v-if="isSlow && canDismiss" class="banner-dismiss" @click.stop="dismiss">
@@ -53,7 +62,11 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useNetworkMonitor } from '@/composables/useNetworkMonitor'
+
+const router = useRouter()
+const route = useRoute()
 
 const { 
   connectionState,
@@ -167,6 +180,25 @@ watch(connectionState, (newState, oldState) => {
 .banner-detail {
   font-size: 11px;
   opacity: 0.8;
+}
+
+.banner-action-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  color: #fff;
+  border-radius: var(--r-full);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  cursor: pointer;
+  margin-left: auto;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.banner-action-btn:hover {
+  background: rgba(255, 255, 255, 0.35);
+  transform: translateY(-1px);
 }
 
 .banner-dismiss {

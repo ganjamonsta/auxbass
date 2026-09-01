@@ -349,6 +349,15 @@
       </div>
 
       <button 
+        v-if="cacheStats.trackCount > 0"
+        class="view-downloaded-btn"
+        @click="router.push('/downloaded')"
+      >
+        <HardDrive :size="16" />
+        <span>Открыть скачанные треки ({{ cacheStats.trackCount }})</span>
+      </button>
+
+      <button 
         class="clear-cache-btn" 
         :disabled="clearingCache || cacheStats.trackCount === 0"
         @click="handleClearCache"
@@ -1337,6 +1346,30 @@ h1 {
   background: linear-gradient(90deg, var(--c-accent) 0%, #00e676 100%);
   border-radius: 3px;
   transition: width 0.3s ease;
+}
+
+.view-downloaded-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: 12px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: var(--r-sm);
+  color: #10b981;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: var(--sp-2);
+  transition: all 0.2s ease;
+}
+
+.view-downloaded-btn:hover {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: #10b981;
+  transform: translateY(-1px);
 }
 
 .clear-cache-btn {

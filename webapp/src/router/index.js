@@ -7,6 +7,7 @@ const FriendsView = () => import('@/views/FriendsView.vue')
 const AlbumDetailView = () => import('@/views/AlbumDetailView.vue')
 const ArtistDetailView = () => import('@/views/ArtistDetailView.vue')
 const PlaylistDetailView = () => import('@/views/PlaylistDetailView.vue')
+const DownloadedTracksView = () => import('@/views/DownloadedTracksView.vue')
 const LikedTracksView = () => import('@/views/LikedTracksView.vue')
 const SettingsView = () => import('@/views/SettingsView.vue')
 const LoginView = () => import('@/views/LoginView.vue')
@@ -18,6 +19,12 @@ const routes = [
     path: '/',
     name: 'library',
     component: LibraryView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/downloaded',
+    name: 'downloaded',
+    component: DownloadedTracksView,
     meta: { requiresAuth: true }
   },
   {
@@ -68,6 +75,7 @@ const routes = [
     component: LoginView
   },
   // Legacy redirects
+  { path: '/offline', redirect: '/downloaded' },
   { path: '/favorites', redirect: '/liked' },
   { path: '/albums', redirect: '/collections' },
   { path: '/playlists', redirect: '/collections' },
@@ -99,6 +107,13 @@ router.beforeEach(async (to, from, next) => {
   
   if (to.name === 'login' && authStore.isAuthenticated) {
     next({ name: 'library' })
+    return
+  }
+  
+  // If user is offline and navigating to online-only root tabs, auto-redirect to downloaded
+  const isOffline = typeof navigator !== 'undefined' && !navigator.onLine
+  if (isOffline && authStore.isAuthenticated && (to.name === 'library' || to.name === 'collections' || to.name === 'friends')) {
+    next({ name: 'downloaded' })
     return
   }
   
