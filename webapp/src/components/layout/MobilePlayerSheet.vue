@@ -1,416 +1,408 @@
 <template>
+  <!-- Root Fixed Container -->
   <div 
-    class="mobile-player-sheet" 
-    :class="sheetClasses"
-    :style="sheetStyle"
-    ref="sheetRootRef"
+    class="mobile-player-system"
+    :class="systemClasses"
+    ref="systemRootRef"
   >
-    <!-- Background Backdrop Overlay (Fades in on drag/expand) -->
+    <!-- ─── 1. FIXED BOTTOM NAVIGATION BAR ─── -->
+    <!-- Always pinned at bottom of viewport, visible when player is collapsed -->
+    <nav 
+      v-if="showNav"
+      class="fixed-bottom-nav"
+      :style="{ opacity: Math.max(0, 1 - expandProgress * 2.5) }"
+    >
+      <button 
+        v-for="item in navItems" 
+        :key="item.path"
+        class="nav-btn" 
+        :class="{ active: isActiveRoute(item.path, item.matchPaths) }"
+        @click="handleNavClick(item.path)"
+      >
+        <component :is="item.icon" class="nav-icon" :size="22" :stroke-width="2" />
+        <span class="nav-label">{{ item.label }}</span>
+      </button>
+    </nav>
+
+    <!-- ─── 2. BACKDROP OVERLAY (Fades in when dragging/expanded) ─── -->
     <div 
-      class="player-backdrop"
+      class="sheet-backdrop"
       :style="{ opacity: expandProgress * 0.96 }"
       @click="handleBackdropClick"
     ></div>
 
-    <!-- Ambient Dynamic Light Aura based on cover artwork -->
-    <div 
-      class="ambient-aura"
-      :style="{ opacity: expandProgress * 0.85 }"
-    >
-      <div class="aura-glow primary" :style="ambientCoverStyle"></div>
-      <div class="aura-glow secondary"></div>
-    </div>
-
-    <!-- ═══════════════════════════════════════════════════════════
-         1. MORPHING TOP HEADER (PHYSICALLY TRAVELS BOTTOM ➔ TOP)
-         ═══════════════════════════════════════════════════════════ -->
+    <!-- ─── 3. THE UNIFIED MORPHING PLAYER SHEET ─── -->
+    <!-- Translates smoothly from bottom (above nav) all the way to top of viewport -->
     <div 
       v-if="hasTrack"
-      class="morph-header-unit"
-      :style="headerTransformStyle"
-      @touchstart="onHeaderTouchStart"
-      @touchmove="onHeaderTouchMove"
-      @touchend="onHeaderTouchEnd"
-      @touchcancel="onHeaderTouchEnd"
-      @click="handleHeaderClick"
+      class="player-motion-sheet"
+      :style="sheetMotionStyle"
+      ref="motionSheetRef"
     >
-      <!-- Top Drag Bar Pill Indicator -->
-      <div class="drag-indicator-bar">
-        <div class="drag-pill" :class="{ expanded: expandProgress > 0.5 }"></div>
+      <!-- Ambient Dynamic Glow inside sheet -->
+      <div 
+        class="ambient-halo"
+        :style="{ opacity: expandProgress * 0.85 }"
+      >
+        <div class="halo-glow primary" :style="ambientCoverStyle"></div>
+        <div class="halo-glow secondary"></div>
       </div>
 
-      <!-- [STATE A: Collapsed] Nokia / Cyber LCD Mini Player -->
+      <!-- ═══════════════════════════════════════════════════════════
+           HEADER UNIT (Mini Player when Collapsed / Cyber HUD when Expanded)
+           ═══════════════════════════════════════════════════════════ -->
       <div 
-        class="mini-lcd-view"
-        :style="{ 
-          opacity: Math.max(0, 1 - expandProgress * 2.2),
-          pointerEvents: expandProgress > 0.3 ? 'none' : 'auto',
-          transform: `scale(${1 - expandProgress * 0.08})`
-        }"
-        @contextmenu.prevent="openTrackContextMenu($event)"
+        class="sheet-header-unit"
+        @touchstart="onTouchStart"
+        @touchmove="onTouchMove"
+        @touchend="onTouchEnd"
+        @touchcancel="onTouchEnd"
+        @click="handleHeaderClick"
       >
-        <div class="lcd-housing">
-          <!-- Row 1: Title Marquee + Live Spectrum + Indicators -->
-          <div class="lcd-row row-top">
-            <div class="lcd-live-spectrum" v-if="isPlaying">
-              <span class="bar bar-1"></span>
-              <span class="bar bar-2"></span>
-              <span class="bar bar-3"></span>
-            </div>
-            
-            <div class="lcd-title-marquee-wrap">
-              <div class="lcd-marquee-track" :class="{ 'marquee': shouldMarquee }">
-                <span class="lcd-title-text">{{ displayText }}</span>
-                <span v-if="shouldMarquee" class="lcd-title-text lcd-title-clone">{{ displayText }}</span>
+        <!-- Pull Handle -->
+        <div class="drag-handle-wrap">
+          <div class="drag-pill-bar" :class="{ active: isDragging || expandProgress > 0.5 }"></div>
+        </div>
+
+        <!-- [VIEW A: COLLAPSED] Nokia / Cyber LCD Mini Player -->
+        <div 
+          class="mini-lcd-box"
+          :style="{ 
+            opacity: Math.max(0, 1 - expandProgress * 2.2),
+            pointerEvents: expandProgress > 0.25 ? 'none' : 'auto'
+          }"
+          @contextmenu.prevent="openTrackContextMenu($event)"
+        >
+          <div class="lcd-inner-screen">
+            <!-- Row 1: Title Marquee + Live Spectrum + Indicators -->
+            <div class="lcd-line line-top">
+              <div class="lcd-spectrum-bars" v-if="isPlaying">
+                <span class="bar b1"></span>
+                <span class="bar b2"></span>
+                <span class="bar b3"></span>
+              </div>
+              
+              <div class="lcd-marquee-mask">
+                <div class="lcd-marquee-strip" :class="{ 'scrolling': shouldMarquee }">
+                  <span class="lcd-txt">{{ displayText }}</span>
+                  <span v-if="shouldMarquee" class="lcd-txt clone">&nbsp;&nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;&nbsp;{{ displayText }}</span>
+                </div>
+              </div>
+
+              <div class="lcd-badges-cluster">
+                <!-- Network issue -->
+                <span 
+                  v-if="networkMonitor.hasIssues.value" 
+                  class="lcd-ico net-ico active" 
+                  :class="{ pulse: networkMonitor.connectionState.value === 'reconnecting' }"
+                  :title="networkMonitor.connectionState.value === 'offline' ? 'Нет сети' : 'Восстановление...'"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                    <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+                    <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+                  </svg>
+                </span>
+
+                <!-- HD Badge -->
+                <span v-if="playerStore.hdTrackInfo" class="lcd-ico hd-ico active" title="HD качество">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-8 12H9.5v-2h-2v2H6V9h1.5v2.5h2V9H11v6zm2-6h4c.55 0 1 .45 1 1v4c0 .55-.45 1-1 1h-4V9zm1.5 4.5h2v-3h-2v3z"/>
+                  </svg>
+                </span>
+
+                <!-- Like Heart -->
+                <span 
+                  class="lcd-ico like-ico" 
+                  :class="{ active: isLiked }" 
+                  @click.stop="$emit('like')"
+                  title="Лайк"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" :fill="isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                  </svg>
+                </span>
+
+                <!-- Shuffle -->
+                <span 
+                  class="lcd-ico" 
+                  :class="{ active: shuffle }" 
+                  @click.stop="$emit('toggle-shuffle')"
+                  title="Перемешивание"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
+                  </svg>
+                </span>
+
+                <!-- Repeat -->
+                <span 
+                  class="lcd-ico" 
+                  :class="{ active: repeat !== 'none' }" 
+                  @click.stop="$emit('toggle-repeat')"
+                  :title="repeatTitle"
+                >
+                  <svg v-if="repeat === 'one'" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z"/>
+                  </svg>
+                  <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
+                  </svg>
+                </span>
               </div>
             </div>
 
-            <div class="lcd-indicators-group">
-              <!-- Network issue -->
-              <span 
-                v-if="networkMonitor.hasIssues.value" 
-                class="lcd-icon net-icon active" 
-                :class="{ pulse: networkMonitor.connectionState.value === 'reconnecting' }"
-                :title="networkMonitor.connectionState.value === 'offline' ? 'Нет сети' : 'Восстановление...'"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="1" y1="1" x2="23" y2="23"/>
-                  <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
-                  <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
-                  <line x1="12" y1="20" x2="12.01" y2="20"/>
-                </svg>
-              </span>
+            <!-- Row 2: 20-Dot LED Progress + Time + Action Buttons -->
+            <div class="lcd-line line-bottom">
+              <div class="lcd-dot-array">
+                <span 
+                  class="dot-cell" 
+                  v-for="i in 20" 
+                  :key="i" 
+                  :class="getDotClass(i, 20)"
+                ></span>
+              </div>
 
-              <!-- HD Badge -->
-              <span v-if="playerStore.hdTrackInfo" class="lcd-icon hd-icon active" title="HD версия">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-8 12H9.5v-2h-2v2H6V9h1.5v2.5h2V9H11v6zm2-6h4c.55 0 1 .45 1 1v4c0 .55-.45 1-1 1h-4V9zm1.5 4.5h2v-3h-2v3z"/>
-                </svg>
-              </span>
+              <span class="lcd-timer">{{ formatTime(progress) }}/{{ formatTime(duration || currentTrack?.duration) }}</span>
 
-              <!-- Like Button -->
-              <span 
-                class="lcd-icon like-icon" 
-                :class="{ active: isLiked }" 
-                @click.stop="$emit('like')"
-                title="Лайк"
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" :fill="isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
-                  <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                </svg>
-              </span>
-
-              <!-- Shuffle -->
-              <span 
-                class="lcd-icon" 
-                :class="{ active: shuffle }" 
-                @click.stop="$emit('toggle-shuffle')"
-                title="Перемешать"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
-                </svg>
-              </span>
-
-              <!-- Repeat -->
-              <span 
-                class="lcd-icon" 
-                :class="{ active: repeat !== 'none' }" 
-                @click.stop="$emit('toggle-repeat')"
-                :title="repeatTitle"
-              >
-                <svg v-if="repeat === 'one'" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z"/>
-                </svg>
-                <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
-                </svg>
-              </span>
+              <div class="lcd-btns-group">
+                <button class="lcd-btn" @click.stop="$emit('toggle-play')" title="Play/Pause">
+                  <svg v-if="loading" class="spin" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                    <path d="M12 2a10 10 0 0 1 10 10"/>
+                  </svg>
+                  <svg v-else-if="isPlaying" width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                  </svg>
+                  <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8 5v14l11-7z"/>
+                  </svg>
+                </button>
+                <button class="lcd-btn" @click.stop="$emit('next-track')" title="Next">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
+        </div>
 
-          <!-- Row 2: 20 LED Dots Progress + Time + Mini Play Controls -->
-          <div class="lcd-row row-bottom">
-            <div class="lcd-led-progress">
-              <span 
-                class="lcd-led-dot" 
-                v-for="i in 20" 
-                :key="i" 
-                :class="getDotClass(i, 20)"
-              ></span>
+        <!-- [VIEW B: EXPANDED] Top Cyber HUD Island Header -->
+        <div 
+          class="cyber-top-hud-island"
+          :style="{ 
+            opacity: Math.max(0, (expandProgress - 0.3) * 1.45),
+            pointerEvents: expandProgress < 0.6 ? 'none' : 'auto'
+          }"
+        >
+          <button class="hud-circle-btn collapse-btn" @click.stop="collapsePlayer" title="Свернуть">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+
+          <!-- Center Cyber Display -->
+          <div class="hud-center-pod">
+            <div class="hud-label-row">
+              <span class="hud-equalizer-bars" v-if="isPlaying">
+                <span class="eq-b b1"></span>
+                <span class="eq-b b2"></span>
+                <span class="eq-b b3"></span>
+                <span class="eq-b b4"></span>
+              </span>
+              <span class="hud-title-tag">СЕЙЧАС ИГРАЕТ</span>
+              <span v-if="playerStore.hdTrackInfo" class="hud-hd-badge">HD</span>
             </div>
+            <span class="hud-track-name">{{ getDisplayTitle(currentTrack) }}</span>
+          </div>
 
-            <span class="lcd-time-display">{{ formatTime(progress) }}/{{ formatTime(duration || currentTrack?.duration) }}</span>
-
-            <div class="lcd-quick-btns">
-              <button class="lcd-action-btn" @click.stop="$emit('toggle-play')" title="Play/Pause">
-                <svg v-if="loading" class="spin" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                  <path d="M12 2a10 10 0 0 1 10 10"/>
-                </svg>
-                <svg v-else-if="isPlaying" width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-                </svg>
-                <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8 5v14l11-7z"/>
-                </svg>
-              </button>
-              <button class="lcd-action-btn" @click.stop="$emit('next-track')" title="Next">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
-                </svg>
-              </button>
-            </div>
+          <div class="hud-actions-cluster">
+            <button 
+              class="hud-circle-btn like-btn" 
+              :class="{ active: isLiked }"
+              @click.stop="$emit('like')"
+              title="Лайк"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" :fill="isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+              </svg>
+            </button>
+            <button 
+              class="hud-circle-btn options-btn"
+              @click.stop="openTrackContextMenu($event)"
+              title="Опции"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="12" cy="5" r="2"/>
+                <circle cx="12" cy="12" r="2"/>
+                <circle cx="12" cy="19" r="2"/>
+              </svg>
+            </button>
           </div>
         </div>
       </div>
 
-      <!-- [STATE B: Expanded] Top Cyber HUD Island Header -->
+      <!-- ═══════════════════════════════════════════════════════════
+           MIDDLE CANVAS (Full Player Controls, 3D Cover, Tags, Scrubber)
+           ═══════════════════════════════════════════════════════════ -->
       <div 
-        class="cyber-top-island"
+        class="sheet-middle-canvas"
         :style="{ 
-          opacity: Math.max(0, (expandProgress - 0.3) * 1.45),
-          pointerEvents: expandProgress < 0.5 ? 'none' : 'auto'
+          opacity: Math.max(0, (expandProgress - 0.15) * 1.18),
+          transform: `translateY(${(1 - expandProgress) * 45}px) scale(${0.92 + expandProgress * 0.08})`,
+          pointerEvents: expandProgress < 0.6 ? 'none' : 'auto'
         }"
       >
-        <button class="hud-circle-btn collapse-trigger" @click.stop="collapsePlayer" title="Свернуть">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="6 9 12 15 18 9"></polyline>
-          </svg>
-        </button>
+        <!-- 3D Album Cover with Swipe Gestures -->
+        <div 
+          class="album-cover-stage"
+          :class="{ swiping: isCoverSwiping }"
+          @touchstart="onCoverTouchStart"
+          @touchmove="onCoverTouchMove"
+          @touchend="onCoverTouchEnd"
+          @touchcancel="onCoverTouchEnd"
+          @contextmenu.prevent="openTrackContextMenu($event)"
+        >
+          <div class="cover-neon-backlight"></div>
+          <div class="cover-tactile-card" :style="coverStyle">
+            <span v-if="!currentTrack?.cover_url" class="cover-fallback-initials">{{ coverInitials }}</span>
+            <img 
+              v-else 
+              :src="getCoverUrl(currentTrack.cover_url, CoverSize.XL)" 
+              alt="Cover" 
+              class="cover-photo" 
+              draggable="false"
+            />
 
-        <!-- Center Cyber HUD Display -->
-        <div class="hud-center-capsule">
-          <div class="hud-now-playing-row">
-            <span class="hud-equalizer-bars" v-if="isPlaying">
-              <span class="hud-eq-bar b1"></span>
-              <span class="hud-eq-bar b2"></span>
-              <span class="hud-eq-bar b3"></span>
-              <span class="hud-eq-bar b4"></span>
-            </span>
-            <span class="hud-tag-title">СЕЙЧАС ИГРАЕТ</span>
-            <span v-if="playerStore.hdTrackInfo" class="hud-hd-chip">HD</span>
+            <!-- Loading Spinner Overlay -->
+            <div v-if="loading" class="cover-spinner-overlay">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="spin">
+                <circle cx="12" cy="12" r="10" stroke-width="3" stroke-opacity="0.25"/>
+                <path d="M12 2a10 10 0 0 1 10 10" stroke-width="3" stroke-linecap="round"/>
+              </svg>
+            </div>
           </div>
-          <span class="hud-track-marquee">{{ getDisplayTitle(currentTrack) }}</span>
+
+          <!-- Swipe Hints Overlay -->
+          <div v-if="isCoverSwiping" class="cover-swipe-notices">
+            <div v-if="coverSwipeDirection === 'left'" class="swipe-badge right-side">
+              <span>Дальше</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+              </svg>
+            </div>
+            <div v-if="coverSwipeDirection === 'right'" class="swipe-badge left-side">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
+              </svg>
+              <span>Назад</span>
+            </div>
+          </div>
         </div>
 
-        <div class="hud-actions-right">
+        <!-- Track Title & Artists -->
+        <div class="track-headers-group" @contextmenu.prevent="openTrackContextMenu($event)">
+          <h2 class="hero-track-title">{{ getDisplayTitle(currentTrack) }}</h2>
+          
+          <p class="hero-track-artists">
+            <template v-if="parsedArtists.length > 0">
+              <template v-for="(artist, index) in parsedArtists" :key="artist">
+                <span class="artist-pill-link" @click.stop="goToArtist(artist)">{{ artist }}</span>
+                <span v-if="index < parsedArtists.length - 1" class="artist-pill-sep">, </span>
+              </template>
+            </template>
+            <span v-else>{{ getDisplayArtist(currentTrack) }}</span>
+          </p>
+
+          <!-- Interactive Tags -->
+          <TrackTags
+            v-if="currentTrack?.id"
+            :trackId="currentTrack.id"
+            :tags="currentTrack.tags || []"
+            :interactive="true"
+            :max="5"
+            class="tags-inline-bar"
+          />
+        </div>
+
+        <!-- Progress Scrubber Slider -->
+        <div class="scrubber-control-group">
+          <div class="scrubber-bar-rail">
+            <div class="scrubber-buffered-fill" :style="{ width: `${bufferedPercent}%` }"></div>
+            <div class="scrubber-played-fill" :style="{ width: `${progressPercent}%` }"></div>
+            <input 
+              type="range"
+              class="scrubber-slider-touch"
+              :value="progress"
+              min="0"
+              :max="duration || currentTrack?.duration || 100"
+              @input="$emit('seek', Number($event.target.value))"
+            />
+          </div>
+          <div class="scrubber-time-legend">
+            <span class="time-num cur">{{ formatTime(progress) }}</span>
+            <span class="time-num tot">{{ formatTime(duration || currentTrack?.duration) }}</span>
+          </div>
+        </div>
+
+        <!-- Aux Controls (Volume + Lyrics + Queue) -->
+        <div class="aux-accessories-bar">
+          <!-- Volume Slider -->
+          <div class="volume-slider-box">
+            <button class="aux-icon-btn mute-btn" @click.stop="$emit('toggle-mute')">
+              <svg v-if="isMuted || volume === 0" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+              </svg>
+              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+              </svg>
+            </button>
+            <input 
+              type="range"
+              class="volume-range-ctl"
+              :value="isMuted ? 0 : volume * 100"
+              min="0"
+              max="100"
+              @input="$emit('set-volume', Number($event.target.value) / 100)"
+            />
+          </div>
+
+          <!-- Lyrics Button -->
           <button 
-            class="hud-circle-btn like-btn" 
-            :class="{ active: isLiked }"
-            @click.stop="$emit('like')"
-            title="Лайк"
+            class="aux-pill-btn lyrics-pill" 
+            :class="{ active: showLyrics }"
+            @click.stop="toggleLyrics"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" :fill="isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
-              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+              <line x1="8" y1="8" x2="16" y2="8"></line>
+              <line x1="8" y1="12" x2="13" y2="12"></line>
             </svg>
+            <span>Текст</span>
           </button>
+
+          <!-- Queue Button -->
           <button 
-            class="hud-circle-btn menu-btn"
-            @click.stop="openTrackContextMenu($event)"
-            title="Опции"
+            class="aux-pill-btn queue-pill" 
+            :class="{ active: showQueue }"
+            @click.stop="toggleQueue"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <circle cx="12" cy="5" r="2"/>
-              <circle cx="12" cy="12" r="2"/>
-              <circle cx="12" cy="19" r="2"/>
+              <path d="M4 10h12v2H4zm0-4h12v2H4zm0 8h8v2H4zm10 0v6l5-3z"/>
             </svg>
+            <span>Очередь</span>
+            <span v-if="upcomingQueue.length" class="queue-counter-tag">{{ upcomingQueue.length }}</span>
           </button>
         </div>
       </div>
-    </div>
 
-    <!-- ═══════════════════════════════════════════════════════════
-         2. FULLSCREEN PLAYER CANVAS (PULLED UP WITH THE SHEET)
-         ═══════════════════════════════════════════════════════════ -->
-    <div 
-      class="fullscreen-canvas-body"
-      :style="{ 
-        opacity: Math.max(0, (expandProgress - 0.15) * 1.18),
-        transform: `translateY(${(1 - expandProgress) * 50}px) scale(${0.9 + expandProgress * 0.1})`,
-        pointerEvents: expandProgress < 0.6 ? 'none' : 'auto'
-      }"
-    >
-      <!-- 3D Neumorphic Album Cover with Horizontal Gestures -->
-      <div 
-        class="cover-art-viewport"
-        :class="{ swiping: isCoverSwiping }"
-        @touchstart="onCoverTouchStart"
-        @touchmove="onCoverTouchMove"
-        @touchend="onCoverTouchEnd"
-        @touchcancel="onCoverTouchEnd"
-        @contextmenu.prevent="openTrackContextMenu($event)"
-      >
-        <div class="cover-neon-halo"></div>
-        <div class="cover-vinyl-frame" :style="coverStyle">
-          <span v-if="!currentTrack?.cover_url" class="cover-initials-txt">{{ coverInitials }}</span>
-          <img 
-            v-else 
-            :src="getCoverUrl(currentTrack.cover_url, CoverSize.XL)" 
-            alt="Cover" 
-            class="cover-art-img" 
-            draggable="false"
-          />
-
-          <!-- Loading Spinner Overlay -->
-          <div v-if="loading" class="cover-spin-overlay">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="spin">
-              <circle cx="12" cy="12" r="10" stroke-width="3" stroke-opacity="0.25"/>
-              <path d="M12 2a10 10 0 0 1 10 10" stroke-width="3" stroke-linecap="round"/>
-            </svg>
-          </div>
-        </div>
-
-        <!-- Directional Swipe Feedback Badges -->
-        <div v-if="isCoverSwiping" class="cover-swipe-hints">
-          <div v-if="coverSwipeDirection === 'left'" class="swipe-badge next-badge">
-            <span>Дальше</span>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
-            </svg>
-          </div>
-          <div v-if="coverSwipeDirection === 'right'" class="swipe-badge prev-badge">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
-            </svg>
-            <span>Назад</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Track Information & Clickable Artists -->
-      <div class="track-meta-section" @contextmenu.prevent="openTrackContextMenu($event)">
-        <h2 class="track-main-title">{{ getDisplayTitle(currentTrack) }}</h2>
-        
-        <p class="track-artists-row">
-          <template v-if="parsedArtists.length > 0">
-            <template v-for="(artist, index) in parsedArtists" :key="artist">
-              <span class="artist-badge-link" @click.stop="goToArtist(artist)">{{ artist }}</span>
-              <span v-if="index < parsedArtists.length - 1" class="artist-dot-sep">, </span>
-            </template>
-          </template>
-          <span v-else>{{ getDisplayArtist(currentTrack) }}</span>
-        </p>
-
-        <!-- Interactive Tag Pills -->
-        <TrackTags
-          v-if="currentTrack?.id"
-          :trackId="currentTrack.id"
-          :tags="currentTrack.tags || []"
-          :interactive="true"
-          :max="5"
-          class="track-tags-container"
-        />
-      </div>
-
-      <!-- Cyber Scrubber Progress Slider -->
-      <div class="scrubber-section">
-        <div class="scrubber-track-rail">
-          <div class="scrubber-buffered-fill" :style="{ width: `${bufferedPercent}%` }"></div>
-          <div class="scrubber-played-fill" :style="{ width: `${progressPercent}%` }"></div>
-          <input 
-            type="range"
-            class="scrubber-range-input"
-            :value="progress"
-            min="0"
-            :max="duration || currentTrack?.duration || 100"
-            @input="$emit('seek', Number($event.target.value))"
-          />
-        </div>
-        <div class="scrubber-timestamp-row">
-          <span class="ts current">{{ formatTime(progress) }}</span>
-          <span class="ts total">{{ formatTime(duration || currentTrack?.duration) }}</span>
-        </div>
-      </div>
-
-      <!-- Auxiliary Bar: Volume + Lyrics + Queue -->
-      <div class="aux-tools-row">
-        <!-- Compact Volume Slider -->
-        <div class="aux-volume-wrap">
-          <button class="aux-tool-btn mute-btn" @click.stop="$emit('toggle-mute')">
-            <svg v-if="isMuted || volume === 0" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
-            </svg>
-            <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-            </svg>
-          </button>
-          <input 
-            type="range"
-            class="aux-volume-range"
-            :value="isMuted ? 0 : volume * 100"
-            min="0"
-            max="100"
-            @input="$emit('set-volume', Number($event.target.value) / 100)"
-          />
-        </div>
-
-        <!-- Lyrics Pill Button -->
+      <!-- ═══════════════════════════════════════════════════════════
+           BOTTOM CONTROLS BAR (5 Tactile Neumorphic Buttons)
+           ═══════════════════════════════════════════════════════════ -->
+      <div class="sheet-bottom-controls-bar">
+        <!-- 1. Shuffle (Morphs from 'Библиотека') -->
         <button 
-          class="aux-tool-btn pill-btn lyrics-pill" 
-          :class="{ active: showLyrics }"
-          @click.stop="toggleLyrics"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-            <line x1="8" y1="8" x2="16" y2="8"></line>
-            <line x1="8" y1="12" x2="13" y2="12"></line>
-          </svg>
-          <span>Текст</span>
-        </button>
-
-        <!-- Queue Pill Button -->
-        <button 
-          class="aux-tool-btn pill-btn queue-pill" 
-          :class="{ active: showQueue }"
-          @click.stop="toggleQueue"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M4 10h12v2H4zm0-4h12v2H4zm0 8h8v2H4zm10 0v6l5-3z"/>
-          </svg>
-          <span>Очередь</span>
-          <span v-if="upcomingQueue.length" class="queue-num-chip">{{ upcomingQueue.length }}</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- ═══════════════════════════════════════════════════════════
-         3. BOTTOM DOCK (MORPHS NAVIGATION ➔ 5 PLAYBACK CONTROLS)
-         ═══════════════════════════════════════════════════════════ -->
-    <div class="bottom-morph-dock">
-      <!-- Layer A: Navigation Tabs (Active in Collapsed State) -->
-      <nav 
-        v-if="showNav"
-        class="dock-layer navigation-layer"
-        :style="{ 
-          opacity: Math.max(0, 1 - expandProgress * 2.2),
-          pointerEvents: expandProgress > 0.3 ? 'none' : 'auto',
-          transform: `translateY(${expandProgress * 16}px)`
-        }"
-      >
-        <button 
-          v-for="item in navItems" 
-          :key="item.path"
-          class="nav-tab-btn" 
-          :class="{ active: isActiveRoute(item.path, item.matchPaths) }"
-          @click="handleNavClick(item.path)"
-        >
-          <component :is="item.icon" class="nav-tab-icon" :size="22" :stroke-width="2" />
-          <span class="nav-tab-title">{{ item.label }}</span>
-        </button>
-      </nav>
-
-      <!-- Layer B: Playback Controls Deck (Active in Expanded State) -->
-      <div 
-        class="dock-layer controls-layer"
-        :style="{ 
-          opacity: Math.max(0, (expandProgress - 0.35) * 1.55),
-          pointerEvents: expandProgress < 0.6 ? 'none' : 'auto',
-          transform: `translateY(${(1 - expandProgress) * 20}px)`
-        }"
-      >
-        <!-- Slot 1: Shuffle (Morphs from 'Библиотека') -->
-        <button 
-          class="dock-ctl-btn secondary-btn"
+          class="playback-ctl-btn secondary-btn"
           :class="{ active: shuffle }"
           @click.stop="$emit('toggle-shuffle')"
           title="Перемешать"
@@ -420,9 +412,9 @@
           </svg>
         </button>
 
-        <!-- Slot 2: Previous Track (Morphs from 'Любимое') -->
+        <!-- 2. Prev Track (Morphs from 'Любимое') -->
         <button 
-          class="dock-ctl-btn"
+          class="playback-ctl-btn"
           @click.stop="$emit('prev-track')"
           title="Предыдущий трек"
         >
@@ -431,13 +423,13 @@
           </svg>
         </button>
 
-        <!-- Slot 3: Master Hero Play/Pause Button (Center: Morphs from 'Коллекции') -->
+        <!-- 3. Master Hero Play/Pause Button (Morphs from 'Коллекции') -->
         <button 
-          class="dock-hero-play-btn"
+          class="playback-hero-play-btn"
           @click.stop="$emit('toggle-play')"
           title="Play / Pause"
         >
-          <div class="hero-neon-ring"></div>
+          <div class="hero-halo-pulse"></div>
           <svg v-if="loading" class="spin" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/>
             <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
@@ -450,9 +442,9 @@
           </svg>
         </button>
 
-        <!-- Slot 4: Next Track (Morphs from 'Кенты') -->
+        <!-- 4. Next Track (Morphs from 'Кенты') -->
         <button 
-          class="dock-ctl-btn"
+          class="playback-ctl-btn"
           @click.stop="$emit('next-track')"
           title="Следующий трек"
         >
@@ -461,9 +453,9 @@
           </svg>
         </button>
 
-        <!-- Slot 5: Repeat Mode (Morphs from 'Настройки') -->
+        <!-- 5. Repeat Mode (Morphs from 'Настройки') -->
         <button 
-          class="dock-ctl-btn secondary-btn"
+          class="playback-ctl-btn secondary-btn"
           :class="{ active: repeat !== 'none' }"
           @click.stop="$emit('toggle-repeat')"
           :title="repeatTitle"
@@ -478,12 +470,10 @@
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════════════════════
-         4. SLIDE-UP MODAL SHEETS (LYRICS & QUEUE)
-         ═══════════════════════════════════════════════════════════ -->
+    <!-- ─── 4. INNER MODAL SHEETS (LYRICS & QUEUE) ─── -->
     <!-- Lyrics Modal -->
     <Transition name="sheet-slide-up">
-      <div v-if="showLyrics" class="inner-modal-sheet lyrics-modal">
+      <div v-if="showLyrics" class="modal-sheet-panel lyrics-panel">
         <LyricsViewer
           :track="currentTrack"
           :currentTime="progress"
@@ -494,16 +484,16 @@
       </div>
     </Transition>
 
-    <!-- Queue Modal Drawer -->
+    <!-- Queue Drawer -->
     <Transition name="sheet-slide-up">
-      <div v-if="showQueue" class="inner-modal-sheet queue-modal">
-        <div class="queue-drawer-container">
-          <div class="queue-drawer-header">
-            <div class="queue-hdr-text">
-              <span class="queue-main-title">Очередь воспроизведения</span>
-              <span class="queue-swipe-hint">Свайп влево для удаления</span>
+      <div v-if="showQueue" class="modal-sheet-panel queue-panel">
+        <div class="queue-inner-box">
+          <div class="queue-hdr-bar">
+            <div class="queue-hdr-meta">
+              <span class="queue-hdr-title">Очередь воспроизведения</span>
+              <span class="queue-hdr-hint">Свайп влево для удаления</span>
             </div>
-            <button class="queue-close-circle" @click="showQueue = false">
+            <button class="queue-close-circle-btn" @click="showQueue = false">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <line x1="18" y1="6" x2="6" y2="18"/>
                 <line x1="6" y1="6" x2="18" y2="18"/>
@@ -511,11 +501,11 @@
             </button>
           </div>
 
-          <div class="queue-items-scroll">
+          <div class="queue-track-list">
             <div 
               v-for="(t, idx) in upcomingQueue" 
               :key="`q-${t.id}-${idx}`"
-              class="queue-row-card"
+              class="queue-item-card"
               :class="{ 
                 swiping: swipingQueueIndex === idx,
                 'swipe-delete': queueSwipeProgress > 0.5 && swipingQueueIndex === idx,
@@ -527,28 +517,28 @@
               @click="$emit('play-from-queue', idx)"
               @contextmenu.prevent="openTrackContextMenuForQueue(t, $event)"
             >
-              <span class="q-row-num">{{ idx + 1 }}</span>
-              <div class="q-row-cover" :style="getQueueCoverStyle(t)"></div>
-              <div class="q-row-details">
-                <span class="q-row-title">{{ getDisplayTitle(t) }}</span>
-                <span class="q-row-artist">{{ getDisplayArtist(t) }}</span>
+              <span class="q-idx-number">{{ idx + 1 }}</span>
+              <div class="q-thumb-photo" :style="getQueueCoverStyle(t)"></div>
+              <div class="q-item-info">
+                <span class="q-item-title">{{ getDisplayTitle(t) }}</span>
+                <span class="q-item-artist">{{ getDisplayArtist(t) }}</span>
               </div>
-              <div class="q-del-icon">
+              <div class="q-del-badge">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
                 </svg>
               </div>
             </div>
 
-            <div v-if="lazyShuffleMode" class="queue-shuffle-banner">
-              <div class="shuffle-badge-icon">🔀</div>
-              <div class="shuffle-badge-info">
-                <span class="banner-title">Режим бесконечного перемешивания</span>
-                <span class="banner-meta">{{ lazyShuffleIndex + 1 }} из {{ lazyShuffleTotal }} треков</span>
+            <div v-if="lazyShuffleMode" class="queue-infinite-card">
+              <div class="inf-icon">🔀</div>
+              <div class="inf-meta">
+                <span class="inf-title">Режим бесконечного перемешивания</span>
+                <span class="inf-sub">{{ lazyShuffleIndex + 1 }} из {{ lazyShuffleTotal }} треков</span>
               </div>
             </div>
 
-            <div v-else-if="!upcomingQueue.length" class="queue-empty-msg">
+            <div v-else-if="!upcomingQueue.length" class="queue-empty-note">
               <span>Нет предстоящих треков в очереди</span>
             </div>
           </div>
@@ -698,9 +688,10 @@ const networkMonitor = useNetworkMonitor()
 const telegram = inject('telegram', null)
 
 // ═════════════════════════════════════════════════════════════
-// 🌟 60FPS GESTURE & MORPH ENGINE
+// 🌟 60FPS SHEET MOTION ENGINE
 // ═════════════════════════════════════════════════════════════
-const sheetRootRef = ref(null)
+const systemRootRef = ref(null)
+const motionSheetRef = ref(null)
 
 const expandProgress = ref(props.isExpanded ? 1.0 : 0.0)
 const isDragging = ref(false)
@@ -739,34 +730,21 @@ watch(() => props.isExpanded, (val) => {
 
 const hasTrack = computed(() => !!props.currentTrack)
 
-const sheetClasses = computed(() => ({
+const systemClasses = computed(() => ({
   'is-expanded': expandProgress.value > 0.95,
   'is-collapsed': expandProgress.value < 0.05,
   'is-in-motion': isDragging.value,
   'has-track': hasTrack.value
 }))
 
-const sheetStyle = computed(() => {
-  if (expandProgress.value > 0.01) {
-    return {
-      top: '0px',
-      height: '100%'
-    }
-  }
-  return {
-    top: 'auto',
-    height: 'auto'
-  }
-})
-
-// Header travel calculation
-const headerTransformStyle = computed(() => {
-  // When collapsed (progress 0): sits at bottom right above bottom nav bar (translateY = calc(100vh - 66px - headerHeight))
-  // When expanded (progress 1): sits at top (translateY = 0)
+// Continuous GPU translation for the entire player sheet:
+// At progress = 0: translates down so only its header (68px) is visible above bottom nav (64px + safeArea)
+// At progress = 1: translates to 0 (pinned at top of screen)
+const sheetMotionStyle = computed(() => {
   const p = expandProgress.value
   return {
-    transform: `translateY(calc( (1 - ${p}) * (100vh - 68px - 66px - env(safe-area-inset-top, 0px)) ))`,
-    transition: isDragging.value ? 'none' : 'transform 0.35s cubic-bezier(0.2, 0.9, 0.2, 1)'
+    transform: `translateY(calc( (1 - ${p}) * (100% - 66px - 64px - env(safe-area-inset-bottom, 0px)) ))`,
+    transition: isDragging.value ? 'none' : 'transform 0.38s cubic-bezier(0.22, 1, 0.36, 1)'
   }
 })
 
@@ -776,7 +754,7 @@ const displayText = computed(() => {
   return `${artist} — ${title}`
 })
 
-const shouldMarquee = computed(() => displayText.value.length > 28)
+const shouldMarquee = computed(() => displayText.value.length > 26)
 
 const parsedArtists = computed(() => {
   const t = props.currentTrack
@@ -842,7 +820,7 @@ const upcomingQueue = computed(() => {
 // ═════════════════════════════════════════════════════════════
 const getScreenHeight = () => window.innerHeight || 800
 
-const onHeaderTouchStart = (e) => {
+const onTouchStart = (e) => {
   const touch = e.touches[0]
   isDragging.value = true
   dragStartY.value = touch.clientY
@@ -852,7 +830,7 @@ const onHeaderTouchStart = (e) => {
   dragVelocityY.value = 0
 }
 
-const onHeaderTouchMove = (e) => {
+const onTouchMove = (e) => {
   if (!isDragging.value) return
   const touch = e.touches[0]
   const currentY = touch.clientY
@@ -866,13 +844,13 @@ const onHeaderTouchMove = (e) => {
     dragLastTime.value = now
   }
 
-  const travelDistance = getScreenHeight() * 0.72
+  const travelDistance = getScreenHeight() * 0.7
   const progressChange = -deltaY / travelDistance
   const newProgress = Math.max(0, Math.min(1, dragStartProgress.value + progressChange))
   expandProgress.value = newProgress
 }
 
-const onHeaderTouchEnd = () => {
+const onTouchEnd = () => {
   if (!isDragging.value) return
   isDragging.value = false
 
@@ -880,13 +858,13 @@ const onHeaderTouchEnd = () => {
   let target = 0
 
   if (dragStartProgress.value < 0.5) {
-    if (v < -0.3 || expandProgress.value > 0.22) {
+    if (v < -0.3 || expandProgress.value > 0.2) {
       target = 1
     } else {
       target = 0
     }
   } else {
-    if (v > 0.3 || expandProgress.value < 0.78) {
+    if (v > 0.3 || expandProgress.value < 0.8) {
       target = 0
     } else {
       target = 1
@@ -980,7 +958,7 @@ const onCoverTouchEnd = (e) => {
   }
 
   if (isDragging.value) {
-    onHeaderTouchEnd()
+    onTouchEnd()
   }
 
   isCoverSwiping.value = false
@@ -1111,54 +1089,125 @@ const formatTime = (seconds) => {
 
 <style scoped>
 /* ═════════════════════════════════════════════════════════════
-   🎵 MOBILE PLAYER SHEET - Unified Morphing Neumorphic Glass
+   🎵 MOBILE PLAYER SYSTEM - Unified Seamless Motion Sheet
    ═════════════════════════════════════════════════════════════ */
 
-.mobile-player-sheet {
+.mobile-player-system {
   position: fixed;
+  inset: 0;
+  z-index: 120;
+  pointer-events: none;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ─── 1. Fixed Bottom Navigation ─── */
+.fixed-bottom-nav {
+  position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 120;
+  height: 64px;
+  background: rgba(14, 18, 24, 0.88);
+  backdrop-filter: blur(32px) saturate(180%);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  pointer-events: auto;
+  z-index: 10;
+  transition: opacity 0.2s ease;
+}
+
+.nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--c-text-3);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 12px;
+  position: relative;
+  min-width: 60px;
+  transition: color 0.15s ease, transform 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nav-btn.active {
+  color: var(--c-accent);
+}
+
+.nav-btn.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 3px;
+  background: var(--c-accent);
+  border-radius: 0 0 3px 3px;
+}
+
+.nav-btn:active {
+  transform: scale(0.93);
+}
+
+/* ─── 2. Backdrop Overlay ─── */
+.sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 25%, rgba(20, 26, 36, 0.97) 0%, rgba(6, 8, 12, 0.99) 100%);
+  backdrop-filter: blur(44px) saturate(200%);
+  -webkit-backdrop-filter: blur(44px) saturate(200%);
+  z-index: 20;
+  pointer-events: none;
+  transition: opacity 0.2s linear;
+}
+
+.mobile-player-system.is-expanded .sheet-backdrop {
+  pointer-events: auto;
+}
+
+/* ─── 3. The Motion Sheet ─── */
+.player-motion-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 30;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   pointer-events: auto;
-  user-select: none;
-  -webkit-user-select: none;
-  font-family: var(--font-sans);
-  overflow: hidden;
+  will-change: transform;
 }
 
-/* ─── Backdrop Blur Overlay ─── */
-.player-backdrop {
-  position: fixed;
-  inset: 0;
-  background: radial-gradient(circle at 50% 25%, rgba(20, 26, 36, 0.96) 0%, rgba(6, 8, 12, 0.99) 100%);
-  backdrop-filter: blur(44px) saturate(200%);
-  -webkit-backdrop-filter: blur(44px) saturate(200%);
-  pointer-events: none;
-  z-index: 0;
-  transition: opacity 0.2s linear;
-}
-
-.mobile-player-sheet.is-expanded .player-backdrop {
-  pointer-events: auto;
-}
-
-/* ─── Ambient Dynamic Glow Aura ─── */
-.ambient-aura {
+/* Ambient Halo */
+.ambient-halo {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 1;
+  z-index: -1;
   overflow: hidden;
   transition: opacity 0.25s ease;
 }
 
-.aura-glow.primary {
+.halo-glow.primary {
   position: absolute;
-  top: 12%;
+  top: 14%;
   left: 50%;
   transform: translateX(-50%);
   width: 320px;
@@ -1168,7 +1217,7 @@ const formatTime = (seconds) => {
   opacity: 0.35;
 }
 
-.aura-glow.secondary {
+.halo-glow.secondary {
   position: absolute;
   bottom: 20%;
   right: 15%;
@@ -1181,20 +1230,19 @@ const formatTime = (seconds) => {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   1. MORPHING TOP HEADER UNIT
+   HEADER UNIT (MINI LCD / TOP CYBER HUD)
    ═══════════════════════════════════════════════════════════ */
 
-.morph-header-unit {
+.sheet-header-unit {
   position: relative;
   z-index: 10;
   width: 100%;
   padding-top: max(4px, env(safe-area-inset-top, 4px));
   touch-action: pan-x pan-y;
   cursor: pointer;
-  will-change: transform;
 }
 
-.drag-indicator-bar {
+.drag-handle-wrap {
   width: 100%;
   display: flex;
   justify-content: center;
@@ -1202,7 +1250,7 @@ const formatTime = (seconds) => {
   pointer-events: none;
 }
 
-.drag-pill {
+.drag-pill-bar {
   width: 38px;
   height: 4px;
   background: rgba(255, 255, 255, 0.3);
@@ -1211,16 +1259,16 @@ const formatTime = (seconds) => {
   transition: width 0.2s ease, background 0.2s ease;
 }
 
-.drag-pill.expanded {
+.drag-pill-bar.active {
   width: 44px;
   background: rgba(255, 255, 255, 0.45);
 }
 
-/* ─── State A: Mini LCD Player View ─── */
-.mini-lcd-view {
+/* ─── State A: Mini LCD Box ─── */
+.mini-lcd-box {
   margin: 2px 8px 4px;
   padding: 3px;
-  background: rgba(18, 24, 32, 0.85);
+  background: rgba(18, 24, 32, 0.88);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   border-radius: var(--r-lg);
@@ -1231,11 +1279,11 @@ const formatTime = (seconds) => {
   transition: transform 0.15s ease;
 }
 
-.mini-lcd-view:active {
+.mini-lcd-box:active {
   transform: scale(0.985);
 }
 
-.lcd-housing {
+.lcd-inner-screen {
   background: linear-gradient(180deg, rgba(8, 16, 24, 0.94) 0%, rgba(3, 8, 14, 0.98) 100%);
   border-radius: var(--r-md);
   padding: 7px 10px;
@@ -1250,21 +1298,7 @@ const formatTime = (seconds) => {
   overflow: hidden;
 }
 
-.lcd-housing::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0, 0, 0, 0.04) 2px,
-    rgba(0, 0, 0, 0.04) 4px
-  );
-  pointer-events: none;
-}
-
-.lcd-row {
+.lcd-line {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1272,11 +1306,11 @@ const formatTime = (seconds) => {
   z-index: 1;
 }
 
-.row-top {
+.line-top {
   justify-content: space-between;
 }
 
-.lcd-live-spectrum {
+.lcd-spectrum-bars {
   display: flex;
   align-items: flex-end;
   gap: 2px;
@@ -1284,41 +1318,43 @@ const formatTime = (seconds) => {
   flex-shrink: 0;
 }
 
-.lcd-live-spectrum .bar {
+.lcd-spectrum-bars .bar {
   width: 2px;
   background: var(--c-accent, #1db954);
   border-radius: 1px;
   box-shadow: 0 0 4px var(--c-accent-glow);
-  animation: spectrum-jump 0.8s infinite ease-in-out alternate;
+  animation: spectrum-live 0.8s infinite ease-in-out alternate;
 }
 
-.lcd-live-spectrum .bar-1 { height: 60%; animation-delay: 0.1s; }
-.lcd-live-spectrum .bar-2 { height: 100%; animation-delay: 0.3s; }
-.lcd-live-spectrum .bar-3 { height: 40%; animation-delay: 0.2s; }
+.lcd-spectrum-bars .b1 { height: 60%; animation-delay: 0.1s; }
+.lcd-spectrum-bars .b2 { height: 100%; animation-delay: 0.3s; }
+.lcd-spectrum-bars .b3 { height: 40%; animation-delay: 0.2s; }
 
-@keyframes spectrum-jump {
+@keyframes spectrum-live {
   0% { height: 25%; }
   100% { height: 100%; }
 }
 
-.lcd-title-marquee-wrap {
+.lcd-marquee-mask {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  mask-image: linear-gradient(90deg, black 90%, transparent 100%);
-  -webkit-mask-image: linear-gradient(90deg, black 90%, transparent 100%);
+  position: relative;
+  mask-image: linear-gradient(90deg, transparent 0%, black 6px, black calc(100% - 10px), transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 6px, black calc(100% - 10px), transparent 100%);
 }
 
-.lcd-marquee-track {
+.lcd-marquee-strip {
   display: inline-flex;
+  align-items: center;
   white-space: nowrap;
 }
 
-.lcd-marquee-track.marquee {
-  animation: marquee-scroll 12s linear infinite;
+.lcd-marquee-strip.scrolling {
+  animation: marquee-scroll-loop 14s linear infinite;
 }
 
-.lcd-title-text {
+.lcd-txt {
   color: var(--lcd-text, #4DC3FF);
   font-size: 13px;
   font-weight: 600;
@@ -1326,23 +1362,25 @@ const formatTime = (seconds) => {
   text-shadow: 0 0 8px var(--lcd-glow, rgba(77, 195, 255, 0.6));
 }
 
-.lcd-title-clone {
-  margin-left: 50px;
+.lcd-txt.clone {
+  opacity: 0.9;
 }
 
-@keyframes marquee-scroll {
-  0%, 5% { transform: translateX(0); }
-  95%, 100% { transform: translateX(calc(-50% - 25px)); }
+@keyframes marquee-scroll-loop {
+  0% { transform: translateX(0); }
+  8% { transform: translateX(0); }
+  92% { transform: translateX(-50%); }
+  100% { transform: translateX(-50%); }
 }
 
-.lcd-indicators-group {
+.lcd-badges-cluster {
   display: flex;
   align-items: center;
   gap: 3px;
   flex-shrink: 0;
 }
 
-.lcd-icon {
+.lcd-ico {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1354,30 +1392,30 @@ const formatTime = (seconds) => {
   transition: all 0.15s ease;
 }
 
-.lcd-icon.active {
+.lcd-ico.active {
   color: var(--lcd-text, #4DC3FF);
   text-shadow: 0 0 6px var(--lcd-glow, rgba(77, 195, 255, 0.6));
 }
 
-.lcd-icon.like-icon.active {
+.lcd-ico.like-ico.active {
   color: #ff4b7b;
   text-shadow: 0 0 8px rgba(255, 75, 123, 0.8);
 }
 
-.lcd-icon.hd-icon.active {
+.lcd-ico.hd-ico.active {
   color: #ffd700;
   text-shadow: 0 0 8px rgba(255, 215, 0, 0.8);
 }
 
-.lcd-icon.net-icon.active {
+.lcd-ico.net-ico.active {
   color: #ff6b6b;
 }
 
-.row-bottom {
+.line-bottom {
   gap: 8px;
 }
 
-.lcd-led-progress {
+.lcd-dot-array {
   flex: 1;
   display: flex;
   align-items: center;
@@ -1385,7 +1423,7 @@ const formatTime = (seconds) => {
   min-width: 0;
 }
 
-.lcd-led-dot {
+.dot-cell {
   flex: 1;
   height: 4px;
   min-width: 2px;
@@ -1394,16 +1432,16 @@ const formatTime = (seconds) => {
   transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 
-.lcd-led-dot.active {
+.dot-cell.active {
   background: var(--c-accent);
   box-shadow: 0 0 5px var(--c-accent-glow);
 }
 
-.lcd-led-dot.buffered {
+.dot-cell.buffered {
   background: rgba(0, 188, 212, 0.35);
 }
 
-.lcd-led-dot.next {
+.dot-cell.next {
   background: var(--c-accent);
   animation: dot-blink 0.6s infinite ease-in-out;
 }
@@ -1413,7 +1451,7 @@ const formatTime = (seconds) => {
   50% { opacity: 1; box-shadow: 0 0 6px var(--c-accent-glow); }
 }
 
-.lcd-time-display {
+.lcd-timer {
   font-size: 10px;
   font-weight: 600;
   color: var(--lcd-text, #4DC3FF);
@@ -1422,7 +1460,7 @@ const formatTime = (seconds) => {
   text-align: right;
 }
 
-.lcd-quick-btns {
+.lcd-btns-group {
   display: flex;
   border-radius: 6px;
   overflow: hidden;
@@ -1430,7 +1468,7 @@ const formatTime = (seconds) => {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.lcd-action-btn {
+.lcd-btn {
   width: 28px;
   height: 22px;
   border: none;
@@ -1443,16 +1481,16 @@ const formatTime = (seconds) => {
   transition: all 0.15s ease;
 }
 
-.lcd-action-btn:first-child {
+.lcd-btn:first-child {
   border-right: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.lcd-action-btn:active {
+.lcd-btn:active {
   background: rgba(255, 255, 255, 0.12);
 }
 
 /* ─── State B: Expanded Top Cyber HUD Island ─── */
-.cyber-top-island {
+.cyber-top-hud-island {
   position: absolute;
   inset: 0;
   display: flex;
@@ -1484,7 +1522,7 @@ const formatTime = (seconds) => {
   background: rgba(0, 0, 0, 0.35);
 }
 
-.hud-center-capsule {
+.hud-center-pod {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -1493,7 +1531,7 @@ const formatTime = (seconds) => {
   min-width: 0;
 }
 
-.hud-now-playing-row {
+.hud-label-row {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -1507,24 +1545,24 @@ const formatTime = (seconds) => {
   height: 10px;
 }
 
-.hud-eq-bar {
+.eq-b {
   width: 2px;
   background: var(--c-accent, #1db954);
   border-radius: 1px;
-  animation: eq-bounce 0.6s infinite ease-in-out alternate;
+  animation: eq-bounce-anim 0.6s infinite ease-in-out alternate;
 }
 
-.hud-eq-bar.b1 { height: 80%; animation-delay: 0.1s; }
-.hud-eq-bar.b2 { height: 100%; animation-delay: 0.3s; }
-.hud-eq-bar.b3 { height: 50%; animation-delay: 0.2s; }
-.hud-eq-bar.b4 { height: 90%; animation-delay: 0.4s; }
+.eq-b.b1 { height: 80%; animation-delay: 0.1s; }
+.eq-b.b2 { height: 100%; animation-delay: 0.3s; }
+.eq-b.b3 { height: 50%; animation-delay: 0.2s; }
+.eq-b.b4 { height: 90%; animation-delay: 0.4s; }
 
-@keyframes eq-bounce {
+@keyframes eq-bounce-anim {
   0% { height: 20%; }
   100% { height: 100%; }
 }
 
-.hud-tag-title {
+.hud-title-tag {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 1.5px;
@@ -1532,7 +1570,7 @@ const formatTime = (seconds) => {
   text-shadow: 0 0 6px var(--c-accent-glow);
 }
 
-.hud-hd-chip {
+.hud-hd-badge {
   padding: 1px 5px;
   font-size: 9px;
   font-weight: 800;
@@ -1542,7 +1580,7 @@ const formatTime = (seconds) => {
   box-shadow: 0 0 6px rgba(255, 215, 0, 0.6);
 }
 
-.hud-track-marquee {
+.hud-track-name {
   font-size: 13px;
   font-weight: 600;
   color: var(--c-text-1);
@@ -1552,7 +1590,7 @@ const formatTime = (seconds) => {
   max-width: 100%;
 }
 
-.hud-actions-right {
+.hud-actions-cluster {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1565,23 +1603,23 @@ const formatTime = (seconds) => {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   2. FULLSCREEN CANVAS BODY (EXPANDS IN MIDDLE)
+   MIDDLE CANVAS (FULLSCREEN HERO BODY)
    ═══════════════════════════════════════════════════════════ */
 
-.fullscreen-canvas-body {
+.sheet-middle-canvas {
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 6px 20px 10px;
+  padding: 4px 20px 8px;
   min-height: 0;
   overflow: hidden;
   z-index: 5;
-  transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.2, 1), opacity 0.25s ease;
+  transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease;
 }
 
-/* ─── Cover Art Viewport ─── */
-.cover-art-viewport {
+/* Cover Art */
+.album-cover-stage {
   flex: 1;
   display: flex;
   align-items: center;
@@ -1589,10 +1627,10 @@ const formatTime = (seconds) => {
   position: relative;
   min-height: 180px;
   max-height: 38vh;
-  margin: 4px 0 10px;
+  margin: 2px 0 8px;
 }
 
-.cover-neon-halo {
+.cover-neon-backlight {
   position: absolute;
   width: min(270px, 32vh);
   aspect-ratio: 1;
@@ -1603,7 +1641,7 @@ const formatTime = (seconds) => {
   pointer-events: none;
 }
 
-.cover-vinyl-frame {
+.cover-tactile-card {
   width: 100%;
   max-width: min(280px, 34vh);
   aspect-ratio: 1;
@@ -1621,23 +1659,23 @@ const formatTime = (seconds) => {
   transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.cover-art-viewport.swiping .cover-vinyl-frame {
+.album-cover-stage.swiping .cover-tactile-card {
   transform: scale(0.94);
 }
 
-.cover-art-img {
+.cover-photo {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.cover-initials-txt {
+.cover-fallback-initials {
   font-size: 64px;
   font-weight: 800;
   color: rgba(255, 255, 255, 0.75);
 }
 
-.cover-spin-overlay {
+.cover-spinner-overlay {
   position: absolute;
   inset: 0;
   background: rgba(0, 0, 0, 0.55);
@@ -1648,7 +1686,7 @@ const formatTime = (seconds) => {
   color: var(--c-accent);
 }
 
-.cover-swipe-hints {
+.cover-swipe-notices {
   position: absolute;
   inset: 0;
   display: flex;
@@ -1672,14 +1710,14 @@ const formatTime = (seconds) => {
   box-shadow: 0 0 16px var(--c-accent-glow);
 }
 
-/* ─── Track Meta Section ─── */
-.track-meta-section {
+/* Track Headers */
+.track-headers-group {
   text-align: center;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   flex-shrink: 0;
 }
 
-.track-main-title {
+.hero-track-title {
   font-size: 20px;
   font-weight: 800;
   color: var(--c-text-1);
@@ -1688,37 +1726,37 @@ const formatTime = (seconds) => {
   overflow: hidden;
   text-overflow: ellipsis;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
-.track-artists-row {
+.hero-track-artists {
   font-size: 14px;
   color: var(--c-text-2);
   font-weight: 500;
 }
 
-.artist-badge-link {
+.artist-pill-link {
   cursor: pointer;
   transition: color 0.15s ease;
 }
 
-.artist-badge-link:hover {
+.artist-pill-link:hover {
   color: var(--c-accent);
   text-decoration: underline;
 }
 
-.track-tags-container {
+.tags-inline-bar {
   justify-content: center;
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
-/* ─── Scrubber Progress Section ─── */
-.scrubber-section {
-  margin-bottom: 6px;
+/* Scrubber */
+.scrubber-control-group {
+  margin-bottom: 4px;
   flex-shrink: 0;
 }
 
-.scrubber-track-rail {
+.scrubber-bar-rail {
   position: relative;
   width: 100%;
   height: 6px;
@@ -1749,7 +1787,7 @@ const formatTime = (seconds) => {
   pointer-events: none;
 }
 
-.scrubber-range-input {
+.scrubber-slider-touch {
   position: absolute;
   left: 0;
   top: -8px;
@@ -1764,7 +1802,7 @@ const formatTime = (seconds) => {
   margin: 0;
 }
 
-.scrubber-range-input::-webkit-slider-thumb {
+.scrubber-slider-touch::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 16px;
   height: 16px;
@@ -1776,22 +1814,22 @@ const formatTime = (seconds) => {
   transition: transform 0.15s ease;
 }
 
-.scrubber-range-input:active::-webkit-slider-thumb {
+.scrubber-slider-touch:active::-webkit-slider-thumb {
   transform: scale(1.3);
 }
 
-.scrubber-timestamp-row {
+.scrubber-time-legend {
   display: flex;
   justify-content: space-between;
-  margin-top: 6px;
+  margin-top: 5px;
   font-size: 11px;
   font-weight: 600;
   color: var(--c-text-3);
   font-variant-numeric: tabular-nums;
 }
 
-/* ─── Auxiliary Tools Row (Volume, Lyrics, Queue) ─── */
-.aux-tools-row {
+/* Aux Bar */
+.aux-accessories-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1800,15 +1838,15 @@ const formatTime = (seconds) => {
   flex-shrink: 0;
 }
 
-.aux-volume-wrap {
+.volume-slider-box {
   display: flex;
   align-items: center;
   gap: 6px;
   flex: 1;
-  max-width: 140px;
+  max-width: 135px;
 }
 
-.aux-volume-range {
+.volume-range-ctl {
   width: 100%;
   height: 4px;
   -webkit-appearance: none;
@@ -1819,7 +1857,7 @@ const formatTime = (seconds) => {
   cursor: pointer;
 }
 
-.aux-volume-range::-webkit-slider-thumb {
+.volume-range-ctl::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 12px;
   height: 12px;
@@ -1829,7 +1867,7 @@ const formatTime = (seconds) => {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
 }
 
-.aux-tool-btn {
+.aux-icon-btn {
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
   color: var(--c-text-2);
@@ -1840,36 +1878,43 @@ const formatTime = (seconds) => {
   transition: all 0.15s ease;
 }
 
-.aux-tool-btn.mute-btn {
+.aux-icon-btn.mute-btn {
   width: 28px;
   height: 28px;
   border-radius: var(--r-full);
 }
 
-.aux-tool-btn.pill-btn {
-  padding: 6px 12px;
+.aux-pill-btn {
+  padding: 5px 11px;
   gap: 5px;
   border-radius: var(--r-full);
   font-size: 11px;
   font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
+  color: var(--c-text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
   box-shadow: 
     2px 2px 5px rgba(0, 0, 0, 0.35),
     inset 0 1px 1px rgba(255, 255, 255, 0.15);
 }
 
-.aux-tool-btn.pill-btn:active {
+.aux-pill-btn:active {
   transform: scale(0.94);
   background: rgba(0, 0, 0, 0.3);
 }
 
-.aux-tool-btn.pill-btn.active {
+.aux-pill-btn.active {
   color: var(--c-accent);
   border-color: rgba(29, 185, 84, 0.4);
   background: linear-gradient(145deg, rgba(29, 185, 84, 0.15) 0%, rgba(0, 0, 0, 0.25) 100%);
   box-shadow: 0 0 12px var(--c-accent-glow);
 }
 
-.queue-num-chip {
+.queue-counter-tag {
   background: var(--c-accent);
   color: #000;
   font-size: 9px;
@@ -1879,89 +1924,29 @@ const formatTime = (seconds) => {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   3. BOTTOM MORPH DOCK (NAV ➔ CONTROLS)
+   BOTTOM CONTROLS BAR (IN THE EXPANDED SHEET)
    ═══════════════════════════════════════════════════════════ */
 
-.bottom-morph-dock {
+.sheet-bottom-controls-bar {
   position: relative;
   width: 100%;
   height: 64px;
-  background: rgba(14, 18, 24, 0.88);
+  background: rgba(14, 18, 24, 0.92);
   backdrop-filter: blur(32px) saturate(180%);
   -webkit-backdrop-filter: blur(32px) saturate(180%);
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   padding-bottom: env(safe-area-inset-bottom);
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+  padding-left: 16px;
+  padding-right: 16px;
   flex-shrink: 0;
   z-index: 10;
 }
 
-/* ─── Layer A: Navigation Tabs ─── */
-.dock-layer.navigation-layer {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  padding-bottom: env(safe-area-inset-bottom);
-  will-change: transform, opacity;
-  transition: transform 0.25s ease, opacity 0.2s ease;
-}
-
-.nav-tab-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  background: none;
-  border: none;
-  color: var(--c-text-3);
-  font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
-  padding: 6px 10px;
-  border-radius: 12px;
-  position: relative;
-  min-width: 60px;
-  transition: color 0.15s ease, transform 0.15s ease;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.nav-tab-btn.active {
-  color: var(--c-accent);
-}
-
-.nav-tab-btn.active::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 28px;
-  height: 3px;
-  background: var(--c-accent);
-  border-radius: 0 0 3px 3px;
-}
-
-.nav-tab-btn:active {
-  transform: scale(0.93);
-}
-
-/* ─── Layer B: Playback Controls Deck ─── */
-.dock-layer.controls-layer {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-evenly;
-  padding: 0 16px;
-  padding-bottom: env(safe-area-inset-bottom);
-  will-change: transform, opacity;
-  transition: transform 0.25s ease, opacity 0.2s ease;
-}
-
-.dock-ctl-btn {
+.playback-ctl-btn {
   width: 44px;
   height: 44px;
   border-radius: var(--r-full);
@@ -1979,26 +1964,26 @@ const formatTime = (seconds) => {
   transition: all 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.dock-ctl-btn:active {
+.playback-ctl-btn:active {
   transform: scale(0.92);
   background: rgba(0, 0, 0, 0.4);
   box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.7);
 }
 
-.dock-ctl-btn.secondary-btn {
+.playback-ctl-btn.secondary-btn {
   width: 40px;
   height: 40px;
   color: var(--c-text-3);
 }
 
-.dock-ctl-btn.secondary-btn.active {
+.playback-ctl-btn.secondary-btn.active {
   color: var(--c-accent);
   border-color: rgba(29, 185, 84, 0.4);
   box-shadow: 0 0 14px var(--c-accent-glow);
 }
 
-/* Center Master Hero Play Button */
-.dock-hero-play-btn {
+/* Master Hero Play Button */
+.playback-hero-play-btn {
   width: 58px;
   height: 58px;
   border-radius: var(--r-full);
@@ -2017,17 +2002,17 @@ const formatTime = (seconds) => {
   transition: all 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.dock-hero-play-btn:active {
+.playback-hero-play-btn:active {
   transform: scale(0.92);
   background: linear-gradient(145deg, #18b850 0%, #128038 100%);
   box-shadow: 0 0 14px var(--c-accent-glow);
 }
 
 /* ═══════════════════════════════════════════════════════════
-   4. MODAL SHEETS (LYRICS & QUEUE)
+   MODAL PANELS (LYRICS & QUEUE)
    ═══════════════════════════════════════════════════════════ */
 
-.inner-modal-sheet {
+.modal-sheet-panel {
   position: absolute;
   inset: 0;
   background: rgba(12, 16, 22, 0.97);
@@ -2038,7 +2023,7 @@ const formatTime = (seconds) => {
   flex-direction: column;
 }
 
-.queue-modal {
+.queue-panel {
   top: auto;
   bottom: 0;
   height: 65%;
@@ -2047,21 +2032,21 @@ const formatTime = (seconds) => {
   box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.8);
 }
 
-.queue-drawer-container {
+.queue-inner-box {
   display: flex;
   flex-direction: column;
   height: 100%;
   padding: 16px 16px max(16px, env(safe-area-inset-bottom));
 }
 
-.queue-drawer-header {
+.queue-hdr-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
 }
 
-.queue-hdr-text {
+.queue-hdr-meta {
   display: flex;
   flex-direction: column;
 }
@@ -2072,12 +2057,12 @@ const formatTime = (seconds) => {
   color: var(--c-text-1);
 }
 
-.queue-swipe-hint {
+.queue-hdr-hint {
   font-size: 10px;
   color: var(--c-text-3);
 }
 
-.queue-close-circle {
+.queue-close-circle-btn {
   width: 32px;
   height: 32px;
   border-radius: var(--r-full);
@@ -2090,13 +2075,13 @@ const formatTime = (seconds) => {
   cursor: pointer;
 }
 
-.queue-items-scroll {
+.queue-track-list {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-.queue-row-card {
+.queue-item-card {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -2111,11 +2096,11 @@ const formatTime = (seconds) => {
   transition: background 0.15s ease;
 }
 
-.queue-row-card:active {
+.queue-item-card:active {
   background: rgba(255, 255, 255, 0.08);
 }
 
-.q-row-num {
+.q-idx-number {
   font-size: 12px;
   font-weight: 700;
   color: var(--c-accent);
@@ -2123,7 +2108,7 @@ const formatTime = (seconds) => {
   text-align: center;
 }
 
-.q-row-cover {
+.q-thumb-photo {
   width: 36px;
   height: 36px;
   border-radius: 8px;
@@ -2131,12 +2116,12 @@ const formatTime = (seconds) => {
   flex-shrink: 0;
 }
 
-.q-row-details {
+.q-item-info {
   flex: 1;
   min-width: 0;
 }
 
-.q-row-title {
+.q-item-title {
   display: block;
   font-size: 13px;
   font-weight: 600;
@@ -2146,7 +2131,7 @@ const formatTime = (seconds) => {
   text-overflow: ellipsis;
 }
 
-.q-row-artist {
+.q-item-artist {
   display: block;
   font-size: 11px;
   color: var(--c-text-3);
@@ -2155,7 +2140,7 @@ const formatTime = (seconds) => {
   text-overflow: ellipsis;
 }
 
-.q-del-icon {
+.q-del-badge {
   position: absolute;
   right: -36px;
   top: 50%;
@@ -2165,17 +2150,17 @@ const formatTime = (seconds) => {
   transition: all 0.2s ease;
 }
 
-.queue-row-card.swiping .q-del-icon {
+.queue-item-card.swiping .q-del-badge {
   opacity: 1;
   right: 12px;
 }
 
-.queue-row-card.swipe-delete {
+.queue-item-card.swipe-delete {
   background: rgba(229, 57, 53, 0.25);
   border-color: rgba(229, 57, 53, 0.4);
 }
 
-.queue-shuffle-banner {
+.queue-infinite-card {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -2186,27 +2171,27 @@ const formatTime = (seconds) => {
   margin-top: 8px;
 }
 
-.shuffle-badge-icon {
+.inf-icon {
   font-size: 20px;
 }
 
-.shuffle-badge-info {
+.inf-meta {
   display: flex;
   flex-direction: column;
 }
 
-.banner-title {
+.inf-title {
   font-size: 13px;
   font-weight: 600;
   color: var(--c-text-1);
 }
 
-.banner-meta {
+.inf-sub {
   font-size: 11px;
   color: var(--c-text-3);
 }
 
-.queue-empty-msg {
+.queue-empty-note {
   text-align: center;
   padding: 32px 16px;
   color: var(--c-text-3);
@@ -2236,7 +2221,7 @@ const formatTime = (seconds) => {
 }
 
 @media (min-width: 1024px) {
-  .mobile-player-sheet {
+  .mobile-player-system {
     display: none;
   }
 }
