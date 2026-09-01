@@ -186,12 +186,12 @@ defineExpose({
 .virtual-grid-container {
   position: relative;
   width: 100%;
+  padding-bottom: 32px;
 }
 
 .virtual-grid-canvas {
   position: relative;
   width: 100%;
-  contain: layout paint;
 }
 
 .virtual-grid-window {

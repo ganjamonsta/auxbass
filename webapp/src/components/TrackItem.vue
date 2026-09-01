@@ -276,12 +276,14 @@ const firstTag = computed(() => {
   display: flex;
   align-items: center;
   gap: 10px;
+  height: 64px;
   padding: 8px 6px 8px 12px; /* Less right padding, scrollbar is there */
-  margin: 4px 0 4px 8px; /* No right margin - scrollbar takes that space */
+  margin: 0 0 0 8px; /* No vertical margin, spacing handled by gap */
   border-radius: var(--r-md);
   cursor: pointer;
   transition: all 0.15s ease;
   background: transparent;
+  box-sizing: border-box;
 }
 
 .track-item:active {

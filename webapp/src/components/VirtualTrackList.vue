@@ -80,7 +80,7 @@ const props = defineProps({
   // Gap between track items
   gap: {
     type: Number,
-    default: 2
+    default: 4
   },
   // Number of items to render above and below viewport
   overscan: {
@@ -241,12 +241,12 @@ defineExpose({
 .virtual-track-list {
   position: relative;
   width: 100%;
+  padding-bottom: 32px;
 }
 
 .virtual-track-list-canvas {
   position: relative;
   width: 100%;
-  contain: layout paint;
 }
 
 .virtual-track-list-window {
@@ -261,7 +261,7 @@ defineExpose({
 .track-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .initial-loading {

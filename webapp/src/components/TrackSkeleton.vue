@@ -24,7 +24,7 @@
   align-items: center;
   gap: 10px;
   padding: 8px 6px 8px 12px;
-  margin: 4px 0 4px 8px;
+  margin: 0 0 0 8px;
   border-radius: var(--r-md);
   background: transparent;
   height: 64px;
