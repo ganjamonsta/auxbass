@@ -19,21 +19,24 @@
 
     <!-- Hero Actions -->
     <div class="hero-actions" v-if="tracks.length">
-      <div class="action-buttons">
-        <button class="action-btn play-btn" @click="playAll" title="Слушать все">
-          <Play :size="20" fill="currentColor" />
+      <div class="controls-group">
+        <!-- Primary Play All Button -->
+        <button class="ctrl-btn ctrl-play-btn" @click="playAll" title="Слушать все">
+          <Play :size="22" fill="currentColor" />
         </button>
-        <button class="action-btn shuffle-btn" @click="shufflePlay" title="Перемешать">
-          <Shuffle :size="18" />
+        <!-- Shuffle Play Button -->
+        <button class="ctrl-btn ctrl-shuffle-btn" @click="shufflePlay" title="Перемешать">
+          <Shuffle :size="20" />
         </button>
       </div>
+
+      <!-- Minimalist Clear Cache Icon Button -->
       <button 
-        class="clear-all-btn" 
+        class="ctrl-btn ctrl-clear-btn" 
         @click="handleClearAll"
-        title="Очистить скачанные треки"
+        title="Очистить все скачанные треки"
       >
-        <Trash2 :size="16" />
-        <span class="clear-btn-text">Очистить</span>
+        <Trash2 :size="18" />
       </button>
     </div>
 
@@ -257,67 +260,89 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: var(--sp-4);
+  padding: 0 2px;
 }
 
-.action-buttons {
+.controls-group {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
 }
 
-.action-btn {
-  display: flex;
+.ctrl-btn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   border: none;
-  border-radius: 50%;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-tap-highlight-color: transparent;
 }
 
-.play-btn {
+/* Primary round Play All button */
+.ctrl-play-btn {
   width: 48px;
   height: 48px;
-  background: var(--c-accent);
+  border-radius: 50%;
+  background: var(--c-accent, #1db954);
   color: #000000;
   box-shadow: 0 4px 16px rgba(29, 185, 84, 0.4);
 }
 
-.play-btn:hover {
-  transform: scale(1.06);
-  background: var(--c-accent-light);
+.ctrl-play-btn svg {
+  margin-left: 2px;
 }
 
-.shuffle-btn {
+.ctrl-play-btn:hover {
+  transform: scale(1.06);
+  background: var(--c-accent-light, #1ed760);
+  box-shadow: 0 6px 20px rgba(29, 185, 84, 0.55);
+}
+
+.ctrl-play-btn:active {
+  transform: scale(0.95);
+}
+
+/* Round Shuffle button */
+.ctrl-shuffle-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--c-bg-3, #242424);
+  color: var(--c-text-2, #b3b3b3);
+  border: 1px solid var(--c-border, rgba(255, 255, 255, 0.08));
+}
+
+.ctrl-shuffle-btn:hover {
+  color: var(--c-accent, #1db954);
+  border-color: rgba(29, 185, 84, 0.35);
+  background: var(--c-bg-4, #2a2a2a);
+  transform: scale(1.05);
+}
+
+.ctrl-shuffle-btn:active {
+  transform: scale(0.95);
+}
+
+/* Minimalist round clear button */
+.ctrl-clear-btn {
   width: 40px;
   height: 40px;
-  background: var(--c-bg-3);
-  color: var(--c-text-2);
-  border: 1px solid var(--c-border);
+  border-radius: 50%;
+  background: var(--c-bg-3, #242424);
+  color: var(--c-text-3, #888);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.shuffle-btn:hover {
-  color: var(--c-text-1);
-  background: var(--c-bg-4);
+.ctrl-clear-btn:hover {
+  color: #ff5252;
+  background: rgba(255, 82, 82, 0.12);
+  border-color: rgba(255, 82, 82, 0.3);
+  transform: scale(1.05);
 }
 
-.clear-all-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: transparent;
-  border: 1px solid rgba(244, 67, 54, 0.3);
-  border-radius: var(--r-sm);
-  color: var(--c-error);
-  font-size: 13px;
-  padding: 8px 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.clear-all-btn:hover {
-  background: rgba(244, 67, 54, 0.1);
-  border-color: var(--c-error);
+.ctrl-clear-btn:active {
+  transform: scale(0.95);
 }
 
 /* ─── Search ─── */
