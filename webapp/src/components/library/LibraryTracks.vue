@@ -2,7 +2,7 @@
   <div class="library-tracks">
     <!-- Sort options -->
     <div class="sort-options">
-      <button class="shuffle-all-btn" :class="{ 'is-loading': shuffling }" @click="shuffleAll" :disabled="!total || shuffling">
+      <button class="shuffle-all-btn" @click="shuffleAll" :disabled="!total || shuffling">
         <div v-if="shuffling" class="spinner small"></div>
         <Shuffle v-else :size="16" class="shuffle-icon" />
         <span class="shuffle-text">
@@ -562,6 +562,15 @@ onUnmounted(() => {
 .shuffle-all-btn .shuffle-text {
   display: inline-block;
   white-space: nowrap;
+}
+
+.shuffle-all-btn .spinner {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+  border-color: rgba(0, 0, 0, 0.2);
+  border-top-color: var(--c-accent-text, #000);
+  flex-shrink: 0;
 }
 
 .shuffle-icon {

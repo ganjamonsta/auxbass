@@ -1,0 +1,56 @@
+name: Build & Release WebApp
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'webapp/**'
+      - '.github/workflows/build-webapp.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build WebApp Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: webapp/package.json
+
+      - name: Install dependencies
+        run: |
+          cd webapp
+          npm install
+
+      - name: Build WebApp (Vite)
+        run: |
+          cd webapp
+          npm run build
+
+      - name: Archive dist directory
+        run: |
+          tar -czf webapp-dist.tar.gz webapp/dist
+
+      - name: Publish/Update Release Asset
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          tag_name: latest
+          name: "Latest WebApp Build"
+          body: "Automated production build of TG Player WebApp from branch `main`."
+          draft: false
+          prerelease: false
+          files: webapp-dist.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
