@@ -743,6 +743,7 @@ const systemClasses = computed(() => ({
 const sheetMotionStyle = computed(() => {
   const p = expandProgress.value
   return {
+    '--p': p,
     transform: `translateY(calc( (1 - ${p}) * (100% - 66px - 64px - env(safe-area-inset-bottom, 0px)) ))`,
     transition: isDragging.value ? 'none' : 'transform 0.38s cubic-bezier(0.22, 1, 0.36, 1)'
   }
@@ -1237,7 +1238,7 @@ const formatTime = (seconds) => {
   position: relative;
   z-index: 10;
   width: 100%;
-  padding-top: max(4px, env(safe-area-inset-top, 4px));
+  padding-top: calc(var(--p, 0) * env(safe-area-inset-top, 0px) + 2px);
   touch-action: pan-x pan-y;
   cursor: pointer;
 }

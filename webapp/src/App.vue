@@ -652,6 +652,7 @@ html, body {
   -webkit-overflow-scrolling: touch;
   min-height: 0;
   position: relative;
+  padding-bottom: calc(138px + env(safe-area-inset-bottom, 0px));
 }
 
 /* Pull-to-refresh indicator */
