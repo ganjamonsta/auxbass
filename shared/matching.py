@@ -15,8 +15,8 @@ from functools import lru_cache
 
 # Threshold for fuzzy matching (0.0 to 1.0)
 ARTIST_MATCH_THRESHOLD = 0.75
-TITLE_MATCH_THRESHOLD = 0.6
-ALBUM_MATCH_THRESHOLD = 0.7
+TITLE_MATCH_THRESHOLD = 0.70
+ALBUM_MATCH_THRESHOLD = 0.70
 
 # Common genre mappings
 GENRE_MAPPINGS = {
@@ -464,11 +464,13 @@ def jaccard_similarity(set1: set, set2: set) -> float:
 def fuzzy_match_title(title1: str, title2: str) -> float:
     """
     Calculate similarity between two titles (0.0 to 1.0).
-    Uses normalized comparison and word-based matching.
+    Uses normalized comparison, sequence distance and word-based matching.
     
     Returns:
         Similarity score (0.0 to 1.0)
     """
+    from difflib import SequenceMatcher
+    
     norm1 = normalize_title(title1)
     norm2 = normalize_title(title2)
     
@@ -486,36 +488,44 @@ def fuzzy_match_title(title1: str, title2: str) -> float:
     if compact1 == compact2:
         return 1.0
     
-    # One contains the other
-    if norm1 in norm2 or norm2 in norm1:
-        return 0.9
-    
-    if compact1 in compact2 or compact2 in compact1:
-        return 0.85
-    
-    # Word-based Jaccard similarity
+    # Word sets
     words1 = set(norm1.split())
     words2 = set(norm2.split())
+    if words1 == words2:
+        return 1.0
     
-    base_similarity = jaccard_similarity(words1, words2)
+    # Character-level SequenceMatcher (handles typos, slight spelling differences)
+    seq_ratio = SequenceMatcher(None, norm1, norm2).ratio()
+    compact_seq = SequenceMatcher(None, compact1, compact2).ratio()
+    best_seq = max(seq_ratio, compact_seq)
     
-    # Bonus for matching significant words (longer than 3 chars)
-    significant1 = {w for w in words1 if len(w) > 3}
-    significant2 = {w for w in words2 if len(w) > 3}
+    # Word-based Jaccard similarity
+    jaccard = jaccard_similarity(words1, words2)
     
-    if significant1 and significant2:
-        sig_similarity = jaccard_similarity(significant1, significant2)
-        # Weight significant words more heavily
-        return max(base_similarity, sig_similarity * 0.95)
+    # Word count ratio (penalizes when one title has extra words like 'Empty Promises' vs 'Promises')
+    word_count_ratio = min(len(words1), len(words2)) / max(len(words1), len(words2))
     
-    return base_similarity
+    # Character length ratio
+    len_ratio = min(len(norm1), len(norm2)) / max(len(norm1), len(norm2))
+    
+    # Weighted composite score
+    score = (best_seq * 0.4) + (jaccard * 0.4) + (word_count_ratio * 0.2)
+    
+    # Only boost substring if length ratio is very close (e.g. >= 0.88, minor spelling/prefix difference)
+    if (norm1 in norm2 or norm2 in norm1) and len_ratio >= 0.88:
+        score = max(score, 0.80 + (0.15 * len_ratio))
+    
+    return min(1.0, score)
 
 
 def fuzzy_match_artist(artist1: str, artist2: str) -> float:
     """
     Calculate similarity between two artist names (0.0 to 1.0).
-    More strict than title matching.
+    Strict matching: does NOT match unrelated artists that happen to share a substring
+    (e.g., 'Nero' vs 'Nero Isekai', 'Air' vs 'Airbourne').
     """
+    from difflib import SequenceMatcher
+    
     norm1 = normalize_artist(artist1)
     norm2 = normalize_artist(artist2)
     
@@ -533,16 +543,28 @@ def fuzzy_match_artist(artist1: str, artist2: str) -> float:
     if compact1 == compact2:
         return 1.0
     
-    # One contains the other (common for artist name variations)
-    if norm1 in norm2 or norm2 in norm1:
-        len_ratio = min(len(norm1), len(norm2)) / max(len(norm1), len(norm2))
-        return 0.8 + (0.15 * len_ratio)
-    
-    # Word-based matching
+    # Word sets
     words1 = set(norm1.split())
     words2 = set(norm2.split())
+    if words1 == words2:
+        return 1.0
     
-    return jaccard_similarity(words1, words2)
+    # Character-level SequenceMatcher
+    seq_ratio = SequenceMatcher(None, norm1, norm2).ratio()
+    compact_seq = SequenceMatcher(None, compact1, compact2).ratio()
+    best_seq = max(seq_ratio, compact_seq)
+    
+    # Token Jaccard
+    jaccard = jaccard_similarity(words1, words2)
+    
+    len_ratio = min(len(norm1), len(norm2)) / max(len(norm1), len(norm2))
+    
+    # Only boost substring if length ratio is very high (>= 0.85) e.g. "The Artist" vs "Artist"
+    if (norm1 in norm2 or norm2 in norm1) and len_ratio >= 0.85:
+        return max(best_seq, 0.75 + (0.15 * len_ratio))
+    
+    # Blend sequence similarity and token Jaccard
+    return (best_seq * 0.7) + (jaccard * 0.3)
 
 
 def fuzzy_match_album(album1: str, album2: str) -> float:
@@ -570,22 +592,24 @@ def fuzzy_match_album(album1: str, album2: str) -> float:
     if compact1 == compact2:
         return 1.0
     
-    # One contains the other (e.g. "Album" vs "Album Deluxe")
-    if compact1 in compact2 or compact2 in compact1:
-        len_ratio = min(len(compact1), len(compact2)) / max(len(compact1), len(compact2))
-        return 0.75 + (0.15 * len_ratio)
-    
-    # Word-based Jaccard similarity
     words1 = set(norm1.split())
     words2 = set(norm2.split())
+    if words1 == words2:
+        return 1.0
+    
+    seq_ratio = SequenceMatcher(None, norm1, norm2).ratio()
+    compact_seq = SequenceMatcher(None, compact1, compact2).ratio()
+    best_seq = max(seq_ratio, compact_seq)
+    
     jaccard = jaccard_similarity(words1, words2)
     
-    # SequenceMatcher for character-level similarity
-    # Better for short names and slight misspellings (e.g. "D&G" vs "DG")
-    seq_ratio = SequenceMatcher(None, compact1, compact2).ratio()
+    len_ratio = min(len(compact1), len(compact2)) / max(len(compact1), len(compact2))
     
-    # Take the best of the two approaches
-    return max(jaccard, seq_ratio)
+    # One contains the other with high length ratio (e.g. "Album" vs "Album Deluxe")
+    if (compact1 in compact2 or compact2 in compact1) and len_ratio >= 0.65:
+        return max(best_seq, 0.70 + (0.20 * len_ratio))
+    
+    return (best_seq * 0.6) + (jaccard * 0.4)
 
 
 def albums_match(album1: str, album2: str, threshold: float = ALBUM_MATCH_THRESHOLD) -> bool:

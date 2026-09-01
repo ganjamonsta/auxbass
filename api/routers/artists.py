@@ -541,14 +541,19 @@ async def get_artist_info(
         )
         album_track_counts = {row[0]: row[1] for row in album_tracks_result.all()}
     
-    # Get albums for this artist
+    # Get albums for this artist (only albums by this artist or where artist is collaborator)
     if album_track_counts:
         albums_result = await db.execute(
             select(Album)
             .where(Album.id.in_(album_track_counts.keys()))
             .order_by(Album.release_date.desc().nullslast())
         )
-        albums = albums_result.scalars().all()
+        all_candidate_albums = albums_result.scalars().all()
+        albums = [
+            album for album in all_candidate_albums
+            if (album.normalized_artist == normalized_search or 
+                (album.artist and artist_matches_track(album.artist, normalized_search)))
+        ]
     else:
         # Fallback: get albums by normalized_artist (if Album has it)
         albums_result = await db.execute(

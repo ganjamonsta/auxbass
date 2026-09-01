@@ -80,23 +80,60 @@
 
       </div>
 
-      <!-- Mobile Footer (Player + Navigation) -->
+      <!-- Mobile Player Sheet (swipe-up fullscreen) -->
+      <MobilePlayerSheet
+        v-if="!isDesktop"
+        ref="mobilePlayerSheetRef"
+        :track="playerStore.currentTrack"
+        :is-playing="playerStore.isPlaying"
+        :loading="playerStore.loading"
+        :progress="playerStore.progress"
+        :duration="playerStore.duration"
+        :buffered="playerStore.buffered"
+        :volume="playerStore.volume"
+        :is-muted="playerStore.isMuted"
+        :shuffle="playerStore.shuffle"
+        :repeat="playerStore.repeat"
+        :is-liked="isCurrentTrackLiked"
+        :queue="playerStore.queue"
+        :queue-index="playerStore.queueIndex"
+        :shuffle-order="playerStore.shuffleOrder"
+        :shuffle-index="playerStore.shuffleIndex"
+        :lazy-shuffle-mode="playerStore.isLazyShuffleMode()"
+        :lazy-shuffle-total="playerStore.lazyShuffleIds?.length || 0"
+        :lazy-shuffle-index="playerStore.lazyShuffleIndex"
+        @toggle="playerStore.togglePlay()"
+        @next="playerStore.next()"
+        @prev="playerStore.prev()"
+        @seek="playerStore.seek($event)"
+        @setVolume="playerStore.setVolume($event)"
+        @toggleMute="playerStore.toggleMute()"
+        @toggleShuffle="playerStore.toggleShuffle()"
+        @toggleRepeat="playerStore.toggleRepeat()"
+        @removeFromQueue="playerStore.removeFromQueue($event)"
+        @moveInQueue="playerStore.moveInQueue($event.from, $event.to)"
+        @playFromQueue="playerStore.playFromQueue($event)"
+        @like="handleToggleLike"
+        @update:expanded="mobilePlayerExpanded = $event"
+        @update:expandProgress="mobileExpandProgress = $event"
+      />
+
+      <!-- Mobile Footer (Navigation / Player Controls) -->
       <MobileFooter
         v-if="showNav && !isDesktop"
         :showPlayer="!!playerStore.currentTrack"
         :currentTrack="playerStore.currentTrack"
         :isPlaying="playerStore.isPlaying"
         :loading="playerStore.loading"
-        :progress="playerStore.progress"
-        :duration="playerStore.duration"
-        :buffered="playerStore.buffered"
-        :isLiked="isCurrentTrackLiked"
-        @expand-player="showFullPlayer = true"
+        :playerExpanded="mobilePlayerExpanded"
+        :expandProgress="mobileExpandProgress"
+        :shuffle="playerStore.shuffle"
+        :repeat="playerStore.repeat"
         @toggle-play="playerStore.togglePlay()"
         @next-track="playerStore.next()"
+        @prev-track="playerStore.prev()"
         @toggle-shuffle="playerStore.toggleShuffle()"
         @toggle-repeat="playerStore.toggleRepeat()"
-        @like="handleToggleLike"
       />
 
       <!-- Desktop: Now Playing Sidebar -->
@@ -147,43 +184,7 @@
         @like="handleToggleLike"
       />
 
-      <!-- Full player modal - Mobile version (original) -->
-      <Transition name="player-slide">
-        <FullPlayer 
-          v-if="showFullPlayer && !isDesktop"
-          :track="playerStore.currentTrack"
-          :is-playing="playerStore.isPlaying"
-          :loading="playerStore.loading"
-          :progress="playerStore.progress"
-          :duration="playerStore.duration"
-          :buffered="playerStore.buffered"
-          :volume="playerStore.volume"
-          :is-muted="playerStore.isMuted"
-          :shuffle="playerStore.shuffle"
-          :repeat="playerStore.repeat"
-          :queue="playerStore.queue"
-          :queue-index="playerStore.queueIndex"
-          :shuffle-order="playerStore.shuffleOrder"
-          :shuffle-index="playerStore.shuffleIndex"
-          :is-liked="isCurrentTrackLiked"
-          :lazy-shuffle-mode="playerStore.isLazyShuffleMode()"
-          :lazy-shuffle-total="playerStore.lazyShuffleIds?.length || 0"
-          :lazy-shuffle-index="playerStore.lazyShuffleIndex"
-          @close="showFullPlayer = false"
-          @toggle="playerStore.togglePlay()"
-          @next="playerStore.next()"
-          @prev="playerStore.prev()"
-          @seek="playerStore.seek($event)"
-          @setVolume="playerStore.setVolume($event)"
-          @toggleMute="playerStore.toggleMute()"
-          @toggleShuffle="playerStore.toggleShuffle()"
-          @toggleRepeat="playerStore.toggleRepeat()"
-          @removeFromQueue="playerStore.removeFromQueue($event)"
-          @moveInQueue="playerStore.moveInQueue($event.from, $event.to)"
-          @playFromQueue="playerStore.playFromQueue($event)"
-          @like="handleToggleLike"
-        />
-      </Transition>
+      <!-- Mobile full player is now handled by MobilePlayerSheet above -->
       
       <!-- Channel setup banner -->
       <ChannelBanner />
@@ -227,7 +228,7 @@ import PwaInstallModal from '@/components/PwaInstallModal.vue'
 import { useNetworkMonitor } from '@/composables/useNetworkMonitor'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
 import { usePwaInstall } from '@/composables/usePwaInstall'
-import { MobileFooter } from '@/components/layout'
+import { MobileFooter, MobilePlayerSheet } from '@/components/layout'
 import { Music, Disc3, User, Folder } from 'lucide-vue-next'
 // Desktop components
 import Sidebar from '@/components/desktop/Sidebar.vue'
@@ -252,6 +253,11 @@ const { scrollRef, pullDistance, isPulling, isRefreshing } = usePullToRefresh(
 )
 
 const { showFullPlayer } = useModals(telegram)
+
+// Mobile player sheet expand state
+const mobilePlayerExpanded = ref(false)
+const mobileExpandProgress = ref(0)
+const mobilePlayerSheetRef = ref(null)
 
 // Scroll to top helper for tab clicks and resets
 const scrollToContentTop = () => {

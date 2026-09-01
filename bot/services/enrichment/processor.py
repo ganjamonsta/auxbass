@@ -61,6 +61,7 @@ class EnrichmentProcessor:
         self,
         title: str,
         artist: str,
+        duration: Optional[int] = None,
     ) -> EnrichmentResult:
         """
         Enrich a track with metadata from external APIs.
@@ -68,6 +69,7 @@ class EnrichmentProcessor:
         Args:
             title: Track title
             artist: Artist name
+            duration: Optional track duration in seconds
         
         Returns:
             EnrichmentResult with all found metadata
@@ -108,27 +110,21 @@ class EnrichmentProcessor:
                     result.lastfm_url = lastfm_data["lastfm_url"]
         
         # 2. Enhance with Deezer (covers, track numbers, IDs)
-        deezer_data = await self._enrich_from_deezer(title, artist)
+        deezer_data = await self._enrich_from_deezer(title, artist, duration=duration)
         
         if deezer_data:
             if not result.success:
                 result.success = True
                 result.source = "deezer"
-                result.confidence = 60
+                result.confidence = 65
             else:
                 result.source = "lastfm+deezer"
                 result.confidence = min(100, result.confidence + 20)
             
-            # Deezer provides covers and track numbers
-            if deezer_data.get("cover_url"):
-                result.cover_url = deezer_data["cover_url"]
-            
+            # Deezer track number and IDs
             if deezer_data.get("track_number"):
                 result.track_number = deezer_data["track_number"]
             
-            # --- Album cross-validation ---
-            # Deezer is more structured (has album IDs, tracklists), so prefer it
-            # for album name. Only keep Last.fm album if Deezer has no data.
             deezer_album = deezer_data.get("album")
             
             if result.album_name and deezer_album:
@@ -136,34 +132,42 @@ class EnrichmentProcessor:
                 album_similarity = fuzzy_match_album(result.album_name, deezer_album)
                 
                 if album_similarity >= ALBUM_MATCH_THRESHOLD:
-                    # Albums agree — prefer Deezer name (canonical) and keep IDs
+                    # Albums agree — prefer Deezer canonical name and store verified album ID + cover
                     result.album_name = deezer_album
                     result.deezer_album_id = deezer_data.get("deezer_album_id")
+                    if deezer_data.get("cover_url"):
+                        result.cover_url = deezer_data["cover_url"]
                     result.confidence = min(100, result.confidence + 10)
                     logger.debug(
                         f"Album cross-validated: '{deezer_album}' "
                         f"(similarity={album_similarity:.2f})"
                     )
                 else:
-                    # Albums disagree — Last.fm may have returned a compilation/wrong album
-                    # Prefer Deezer (has structured album ID + tracklist)
+                    # Albums disagree! NEVER mix Last.fm album name with Deezer's mismatched album ID / cover
                     logger.info(
                         f"Album mismatch for '{title}': "
                         f"Last.fm='{result.album_name}' vs Deezer='{deezer_album}' "
-                        f"(similarity={album_similarity:.2f}). Using Deezer."
+                        f"(similarity={album_similarity:.2f})."
                     )
-                    result.album_name = deezer_album
-                    result.deezer_album_id = deezer_data.get("deezer_album_id")
-                    # Lower confidence due to disagreement
-                    result.confidence = max(50, result.confidence - 10)
+                    # If Deezer had high confidence, use Deezer's album and Deezer's ID together
+                    if deezer_data.get("confidence", 0) >= 75:
+                        result.album_name = deezer_album
+                        result.deezer_album_id = deezer_data.get("deezer_album_id")
+                        if deezer_data.get("cover_url"):
+                            result.cover_url = deezer_data["cover_url"]
+                    else:
+                        # Keep Last.fm album name, but DROP Deezer album ID & cover
+                        result.deezer_album_id = None
+                        result.confidence = max(50, result.confidence - 10)
             elif deezer_album:
-                # Only Deezer has album — use it
+                # Only Deezer has album — use it with its ID and cover
                 result.album_name = deezer_album
                 result.deezer_album_id = deezer_data.get("deezer_album_id")
+                if deezer_data.get("cover_url"):
+                    result.cover_url = deezer_data["cover_url"]
             else:
-                # Only Last.fm has album (or neither) — NO deezer_album_id
-                # This prevents storing a mismatched deezer_album_id
-                pass
+                # Only Last.fm has album (or neither) — clear deezer_album_id
+                result.deezer_album_id = None
             
             # Always take Deezer track ID
             result.deezer_track_id = deezer_data.get("deezer_track_id")
@@ -220,17 +224,18 @@ class EnrichmentProcessor:
         self,
         title: str,
         artist: str,
+        duration: Optional[int] = None,
     ) -> Optional[Dict[str, Any]]:
         """Get enrichment data from Deezer"""
         try:
-            track = await deezer_client.search_track(title, artist)
+            track = await deezer_client.search_track(title, artist, duration=duration)
             
             if not track:
                 return None
             
             result = {
                 "deezer_track_id": track.get("id"),
-                "confidence": 70,
+                "confidence": 75,
             }
             
             # Get album info

@@ -112,16 +112,16 @@ class EnrichmentWorker:
         
         # Process each track (outside of main session to avoid long locks)
         for track in tracks:
-            await self._enrich_track(track.id, track.title, track.artist)
+            await self._enrich_track(track.id, track.title, track.artist, track.duration)
         
         self._stats["processed"] += len(tracks)
         return True
     
-    async def _enrich_track(self, track_id: int, title: str, artist: str):
+    async def _enrich_track(self, track_id: int, title: str, artist: str, duration: Optional[int] = None):
         """Enrich a single track"""
         try:
             # Get enrichment data
-            result = await enrichment_processor.enrich_track(title, artist or "")
+            result = await enrichment_processor.enrich_track(title, artist or "", duration=duration)
             
             async with get_session() as session:
                 track = await session.get(Track, track_id)
@@ -262,9 +262,10 @@ class EnrichmentWorker:
             
             title = track.title
             artist = track.artist
+            duration = track.duration
             track.enrichment_status = EnrichmentStatus.PROCESSING
         
-        await self._enrich_track(track_id, title, artist)
+        await self._enrich_track(track_id, title, artist, duration=duration)
         
         async with get_session() as session:
             track = await session.get(Track, track_id)

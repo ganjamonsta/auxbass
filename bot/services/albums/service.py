@@ -259,7 +259,10 @@ class AlbumService:
             
             # Fallback to Deezer if Last.fm unavailable
             if not full_tracklist and enrichment.deezer_album_id:
-                full_tracklist = await self._fetch_album_tracklist(enrichment.deezer_album_id)
+                full_tracklist = await self._fetch_album_tracklist(
+                    enrichment.deezer_album_id,
+                    expected_artist=track.artist,
+                )
             
             if full_tracklist:
                 total_tracks = len(full_tracklist)
@@ -284,9 +287,14 @@ class AlbumService:
             
             return album_id
     
-    async def _fetch_album_tracklist(self, deezer_album_id: int) -> Optional[List[dict]]:
+    async def _fetch_album_tracklist(
+        self,
+        deezer_album_id: int,
+        expected_artist: Optional[str] = None
+    ) -> Optional[List[dict]]:
         """
         Fetch full album tracklist from Deezer.
+        Validates that album artist matches expected_artist.
         
         Returns list of track info dicts with:
         - track_number: position in album
@@ -297,6 +305,19 @@ class AlbumService:
         """
         try:
             from bot.services.enrichment.deezer import deezer_client
+            from shared.matching import fuzzy_match_artist, ARTIST_MATCH_THRESHOLD
+            
+            # Validate album artist if expected_artist is specified
+            if expected_artist:
+                full_album = await deezer_client.get_album(deezer_album_id)
+                if full_album:
+                    deezer_artist = full_album.get("artist", {}).get("name", "")
+                    if deezer_artist and fuzzy_match_artist(expected_artist, deezer_artist) < ARTIST_MATCH_THRESHOLD:
+                        logger.warning(
+                            f"Deezer album {deezer_album_id} artist '{deezer_artist}' does not match "
+                            f"expected artist '{expected_artist}'. Rejecting Deezer tracklist."
+                        )
+                        return None
             
             tracks = await deezer_client.get_album_tracks(deezer_album_id)
             if not tracks:

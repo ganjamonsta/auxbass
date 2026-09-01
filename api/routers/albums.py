@@ -316,10 +316,12 @@ async def get_album(
                     if norm_item_title in tracks_by_title:
                         matched_track = tracks_by_title[norm_item_title]
                     else:
+                        best_match_score = 0.0
                         for norm_title, track in tracks_by_title.items():
-                            if fuzzy_match_title(item_title, track.title or ""):
+                            score = fuzzy_match_title(item_title, track.title or "")
+                            if score >= 0.85 and score > best_match_score:
+                                best_match_score = score
                                 matched_track = track
-                                break
                     
                     tracklist_item = AlbumTracklistItem(
                         track_number=item.get("track_number", 0),
@@ -394,10 +396,12 @@ async def get_album(
                     if norm_item_title in all_tracks_by_title:
                         matched_track = all_tracks_by_title[norm_item_title]
                     else:
+                        best_match_score = 0.0
                         for norm_title, track in all_tracks_by_title.items():
-                            if fuzzy_match_title(item_title, track.title or ""):
+                            score = fuzzy_match_title(item_title, track.title or "")
+                            if score >= 0.85 and score > best_match_score:
+                                best_match_score = score
                                 matched_track = track
-                                break
                     
                     # Check if matched track is in user's library
                     in_library = matched_track.id in user_lib_entries if matched_track else False

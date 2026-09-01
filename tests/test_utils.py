@@ -8,7 +8,9 @@ from shared.utils import (
     normalize_title,
     clean_for_search,
     fuzzy_match_artist,
+    fuzzy_match_title,
     artists_match,
+    titles_match,
     format_duration,
     split_artists,
 )
@@ -113,7 +115,7 @@ class TestSplitArtists:
 
 
 class TestFuzzyMatch:
-    """Tests for fuzzy_match_artist function"""
+    """Tests for fuzzy_match_artist and fuzzy_match_title functions"""
     
     def test_exact_match(self):
         assert fuzzy_match_artist("test", "test") >= 0.9
@@ -126,6 +128,24 @@ class TestFuzzyMatch:
     
     def test_no_match(self):
         assert fuzzy_match_artist("abc", "xyz") < 0.5
+    
+    def test_unrelated_artist_substring_rejected(self):
+        """Should NOT match unrelated artists that share a substring"""
+        score = fuzzy_match_artist("Nero", "Nero Isekai")
+        assert score < 0.60
+        assert artists_match("Nero", "Nero Isekai") is False
+    
+    def test_title_substring_different_song_rejected(self):
+        """Should NOT match different songs sharing a substring like Promises vs Empty Promises"""
+        score = fuzzy_match_title("Promises", "Empty Promises")
+        assert score < 0.65
+        from shared.utils import titles_match
+        assert titles_match("Promises", "Empty Promises") is False
+    
+    def test_title_with_remix_matches_base(self):
+        """Should match base title with its remix version"""
+        score = fuzzy_match_title("Promises", "Promises (Skrillex & Nero Remix)")
+        assert score >= 0.95
 
 
 class TestArtistsMatch:
@@ -142,6 +162,9 @@ class TestArtistsMatch:
     
     def test_no_match(self):
         assert artists_match("Artist1", "Artist2") == False
+    
+    def test_no_substring_false_positive(self):
+        assert artists_match("Nero", "Nero Isekai") == False
 
 
 class TestExtractFeaturedArtists:

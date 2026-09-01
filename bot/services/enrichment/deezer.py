@@ -89,6 +89,7 @@ class DeezerClient:
         self,
         title: str,
         artist: str,
+        duration: Optional[int] = None,
         limit: int = 10
     ) -> Optional[Dict[str, Any]]:
         """
@@ -97,6 +98,7 @@ class DeezerClient:
         Args:
             title: Track title
             artist: Artist name
+            duration: Optional track duration in seconds for validation
             limit: Max results to fetch
         
         Returns:
@@ -109,13 +111,21 @@ class DeezerClient:
         if not clean_title:
             return None
         
-        # Build search query
-        if clean_artist:
-            query = f'track:"{clean_title}" artist:"{clean_artist}"'
-        else:
-            query = f'track:"{clean_title}"'
+        data = None
         
-        data = await self._request("search", {"q": query, "limit": limit})
+        # If title has remix / version info, try searching for the full remix string first
+        if "(" in title or "[" in title:
+            # e.g., "Promises (Skrillex & Nero Remix)" -> query with remix terms
+            raw_query = f"{clean_artist} {title}".strip()
+            data = await self._request("search", {"q": raw_query, "limit": limit})
+        
+        # Build standard search query if remix search had no results
+        if not data or not data.get("data"):
+            if clean_artist:
+                query = f'track:"{clean_title}" artist:"{clean_artist}"'
+            else:
+                query = f'track:"{clean_title}"'
+            data = await self._request("search", {"q": query, "limit": limit})
         
         if not data or not data.get("data"):
             # Try simpler search
@@ -132,32 +142,45 @@ class DeezerClient:
         for track in data["data"]:
             deezer_title = track.get("title", "")
             deezer_artist = track.get("artist", {}).get("name", "")
+            deezer_duration = track.get("duration", 0)
             
             # Calculate match scores
-            title_score = fuzzy_match_title(title, deezer_title)
             artist_score = fuzzy_match_artist(artist, deezer_artist) if artist else 0.5
             
-            # Skip if title match is too low — prevents accepting random tracks
-            # by the same artist (e.g. searching "Ivy" and getting "HUMBLE.")
+            # STRICT: Skip if artist match is below threshold (prevents matching 'Nero' to 'Nero Isekai')
+            if artist and artist_score < ARTIST_MATCH_THRESHOLD:
+                continue
+                
+            title_score = fuzzy_match_title(title, deezer_title)
+            
+            # Skip if title match is too low
             if title_score < TITLE_MATCH_THRESHOLD:
                 continue
             
             # Combined score (weighted)
             combined = (title_score * 0.6) + (artist_score * 0.4)
             
-            # Prefer tracks from albums over singles (album type "single")
-            # Deezer returns album.type: "album", "single", "compile"
+            # Duration validation if duration is available
+            if duration and duration > 0 and deezer_duration > 0:
+                dur_diff = abs(duration - deezer_duration)
+                if dur_diff > 45:
+                    # Very large duration discrepancy (> 45s) — skip candidate
+                    continue
+                elif dur_diff > 25:
+                    # Moderate discrepancy — penalize score
+                    combined -= 0.15
+            
+            # Prefer tracks from studio albums over singles/compilations
             album_type = track.get("album", {}).get("type", "")
-            if album_type == "album" and combined > 0.6:
-                # Small bonus for album tracks (more reliable album info)
+            if album_type == "album" and combined >= 0.7:
                 combined += 0.05
             
             if combined > best_score:
                 best_score = combined
                 best_match = track
         
-        # Verify match quality (raised from 0.5 to 0.65)
-        if best_match and best_score >= 0.65:
+        # Verify match quality (threshold 0.70)
+        if best_match and best_score >= 0.70:
             return best_match
         
         return None
