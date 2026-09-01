@@ -8,26 +8,24 @@
 
     <!-- Header -->
     <div class="player-header">
-      <button class="close-btn" @click="$emit('close')">
+      <button class="close-btn" @click="$emit('close')" title="Свернуть">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
           <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
         </svg>
       </button>
       <span class="player-title">Сейчас играет</span>
-      <button class="menu-btn" @click="openTrackContextMenu" title="Меню трека">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
-        </svg>
-      </button>
+      <div class="header-spacer"></div>
     </div>
 
-    <!-- Cover art with generated gradient - swipe area for track navigation -->
+    <!-- Cover art with generated gradient - swipe area for track navigation & long-press for menu -->
     <div 
       class="player-cover" 
       :class="{ swiping: isSwiping }"
       @touchstart="onTouchStart"
       @touchmove="onTouchMove"
       @touchend="onTouchEnd"
+      @touchcancel="onTouchEnd"
+      @contextmenu.prevent="openTrackContextMenu"
     >
       <div class="cover-image" :style="coverStyle">
         <span v-if="!track?.cover_url" class="cover-text">{{ coverInitials }}</span>
@@ -56,7 +54,7 @@
     </div>
 
     <!-- Track info -->
-    <div class="player-info">
+    <div class="player-info" @contextmenu.prevent="openTrackContextMenu">
       <div class="track-info-row">
         <h2 class="track-title">{{ getDisplayTitle(track) }}</h2>
         <!-- HD indicator badge -->
@@ -441,12 +439,24 @@ const dragOverIndex = ref(-1)
 const SWIPE_THRESHOLD = 80
 const QUEUE_SWIPE_DELETE_THRESHOLD = 100
 
+let coverLongPressTimer = null
+let coverTouchMoved = false
+
 const onTouchStart = (e) => {
   const touch = e.touches[0]
   touchStart.value = { x: touch.clientX, y: touch.clientY }
   touchCurrent.value = { x: touch.clientX, y: touch.clientY }
   isSwiping.value = false
   swipeDirection.value = null
+  coverTouchMoved = false
+
+  clearTimeout(coverLongPressTimer)
+  coverLongPressTimer = setTimeout(() => {
+    if (!coverTouchMoved) {
+      telegram?.HapticFeedback?.impactOccurred?.('heavy')
+      openTrackContextMenu()
+    }
+  }, 500)
 }
 
 const onTouchMove = (e) => {
@@ -456,6 +466,11 @@ const onTouchMove = (e) => {
   const deltaX = touchCurrent.value.x - touchStart.value.x
   const deltaY = touchCurrent.value.y - touchStart.value.y
   
+  if (Math.abs(deltaX) > 12 || Math.abs(deltaY) > 12) {
+    coverTouchMoved = true
+    clearTimeout(coverLongPressTimer)
+  }
+  
   // Only handle horizontal swipes for track navigation
   if (Math.abs(deltaX) > 20 && Math.abs(deltaX) > Math.abs(deltaY)) {
     isSwiping.value = true
@@ -464,6 +479,7 @@ const onTouchMove = (e) => {
 }
 
 const onTouchEnd = () => {
+  clearTimeout(coverLongPressTimer)
   const deltaX = touchCurrent.value.x - touchStart.value.x
   const deltaY = touchCurrent.value.y - touchStart.value.y
   
@@ -654,7 +670,7 @@ const formatTime = (seconds) => {
   flex-shrink: 0;
 }
 
-.close-btn, .menu-btn {
+.close-btn {
   width: 42px;
   height: 42px;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -672,13 +688,19 @@ const formatTime = (seconds) => {
     inset 0 1px 1px rgba(255, 255, 255, 0.2);
 }
 
-.close-btn:active, .menu-btn:active {
+.close-btn:active {
   transform: scale(0.92);
   background: rgba(0, 0, 0, 0.3);
   border-color: rgba(255, 255, 255, 0.05);
   box-shadow: 
     inset 2px 2px 5px rgba(0, 0, 0, 0.6),
     inset -1px -1px 2px rgba(255, 255, 255, 0.05);
+}
+
+.header-spacer {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
 }
 
 .player-title {

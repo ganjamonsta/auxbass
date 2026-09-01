@@ -16,18 +16,12 @@
       <h1 class="cockpit-title">PLAYBACK CONTROL SYSTEM</h1>
     </div>
     
-    <div class="header-right">
-      <button class="hud-btn" @click="$emit('openTrackMenu')" title="Меню трека">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
-        </svg>
-      </button>
-    </div>
+    <div class="header-right"></div>
   </div>
 </template>
 
 <script setup>
-defineEmits(['close', 'openTrackMenu'])
+defineEmits(['close'])
 </script>
 
 <style scoped>

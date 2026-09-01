@@ -5,11 +5,10 @@
         
         <PlayerHeader 
           @close="$emit('close')" 
-          @openTrackMenu="openTrackContextMenu" 
         />
 
         <!-- Main Content Grid -->
-        <div class="cockpit-grid">
+        <div class="cockpit-grid" @contextmenu.prevent="openTrackContextMenu">
           <!-- Left Panel: Cover Art & Visualizer -->
           <div class="panel-left">
             <CoverSection 

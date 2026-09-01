@@ -4,6 +4,10 @@
     :class="{ playing: isPlaying, compact: compact, unavailable: track.is_unavailable }" 
     @click="handleClick"
     @contextmenu.prevent="$emit('menu', $event)"
+    @touchstart="handleTouchStart"
+    @touchmove="handleTouchMove"
+    @touchend="handleTouchEnd"
+    @touchcancel="handleTouchEnd"
   >
     <!-- Track number (for album view) -->
     <span v-if="trackNumber" class="track-number">{{ trackNumber }}</span>
@@ -106,12 +110,6 @@
     <span v-else-if="showAddToLibrary && inLibrary" class="in-library-badge" title="В библиотеке">
       <Check :size="16" />
     </span>
-    
-    <button v-if="!compact" class="track-menu" @click.stop="$emit('menu')">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
-      </svg>
-    </button>
   </div>
 </template>
 
@@ -165,17 +163,56 @@ const props = defineProps({
 
 const emit = defineEmits(['click', 'menu', 'like', 'addToLibrary', 'download', 'hdNotice'])
 
-const handleClick = () => {
-  if (props.track.is_unavailable) {
-    // Don't play unavailable tracks, just emit for potential action
-    emit('menu')
+// Long-press handling for mobile touch
+let longPressTimer = null
+let touchMoved = false
+let touchStartX = 0
+let touchStartY = 0
+let isLongPressTriggered = false
+
+const handleTouchStart = (e) => {
+  touchMoved = false
+  isLongPressTriggered = false
+  if (e.touches.length === 1) {
+    touchStartX = e.touches[0].clientX
+    touchStartY = e.touches[0].clientY
+    longPressTimer = setTimeout(() => {
+      if (!touchMoved) {
+        isLongPressTriggered = true
+        emit('menu', e)
+      }
+    }, 450)
+  }
+}
+
+const handleTouchMove = (e) => {
+  if (e.touches.length === 1) {
+    const dx = Math.abs(e.touches[0].clientX - touchStartX)
+    const dy = Math.abs(e.touches[0].clientY - touchStartY)
+    if (dx > 10 || dy > 10) {
+      touchMoved = true
+      clearTimeout(longPressTimer)
+    }
+  }
+}
+
+const handleTouchEnd = () => {
+  clearTimeout(longPressTimer)
+}
+
+const handleClick = (e) => {
+  if (isLongPressTriggered) {
+    isLongPressTriggered = false
+    e?.preventDefault?.()
+    e?.stopPropagation?.()
     return
   }
   
-  // HD/Large files - let the player try to find MP3 alternative via API
-  // The API /stream/{track_id} has find_streamable_alternative() that can auto-substitute
-  // If API finds no alternative, it will return 503 and App.vue callback will show notification
-  // Note: streamable_id is NOT pre-populated by API, so we can't check it here
+  if (props.track.is_unavailable) {
+    // Don't play unavailable tracks, just emit for potential action
+    emit('menu', e)
+    return
+  }
   
   emit('click')
 }
@@ -540,28 +577,6 @@ const firstTag = computed(() => {
   font-size: 16px;
   font-weight: bold;
   flex-shrink: 0;
-}
-
-/* ─── Menu Button ─── */
-.track-menu {
-  width: 28px;
-  height: 32px;
-  background: none;
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--c-text-3);
-  cursor: pointer;
-  opacity: 0.6;
-  transition: all 0.2s ease;
-  border-radius: var(--r-full);
-  margin-right: -4px; /* Pull closer to edge, let scrollbar use that space */
-}
-
-.track-menu:active {
-  opacity: 1;
-  background: var(--c-bg-3);
 }
 
 /* ─── Unavailable Track Styles ─── */

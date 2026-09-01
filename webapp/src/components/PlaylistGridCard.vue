@@ -1,8 +1,12 @@
 <template>
   <div
     class="playlist-card"
-    @click="$emit('click', playlist)"
+    @click="handleClick"
     @contextmenu.prevent="$emit('contextmenu', $event)"
+    @touchstart="handleTouchStart"
+    @touchmove="handleTouchMove"
+    @touchend="handleTouchEnd"
+    @touchcancel="handleTouchEnd"
   >
     <div class="playlist-cover">
       <div class="cover-grid" :class="{ 'single-cover': playlist.covers?.length === 1 }" v-if="playlist.covers?.length">
@@ -44,14 +48,60 @@
 import { Music, Globe, Crown, UserPlus, Play } from 'lucide-vue-next'
 import { getCoverUrl, CoverSize } from '@/utils'
 
-defineProps({
+const props = defineProps({
   playlist: {
     type: Object,
     required: true
   }
 })
 
-defineEmits(['click', 'play', 'contextmenu'])
+const emit = defineEmits(['click', 'play', 'contextmenu'])
+
+let longPressTimer = null
+let touchMoved = false
+let touchStartX = 0
+let touchStartY = 0
+let isLongPressTriggered = false
+
+const handleTouchStart = (e) => {
+  touchMoved = false
+  isLongPressTriggered = false
+  if (e.touches.length === 1) {
+    touchStartX = e.touches[0].clientX
+    touchStartY = e.touches[0].clientY
+    longPressTimer = setTimeout(() => {
+      if (!touchMoved) {
+        isLongPressTriggered = true
+        emit('contextmenu', e)
+      }
+    }, 450)
+  }
+}
+
+const handleTouchMove = (e) => {
+  if (e.touches.length === 1) {
+    const dx = Math.abs(e.touches[0].clientX - touchStartX)
+    const dy = Math.abs(e.touches[0].clientY - touchStartY)
+    if (dx > 10 || dy > 10) {
+      touchMoved = true
+      clearTimeout(longPressTimer)
+    }
+  }
+}
+
+const handleTouchEnd = () => {
+  clearTimeout(longPressTimer)
+}
+
+const handleClick = (e) => {
+  if (isLongPressTriggered) {
+    isLongPressTriggered = false
+    e?.preventDefault?.()
+    e?.stopPropagation?.()
+    return
+  }
+  emit('click', props.playlist)
+}
 </script>
 
 <style scoped>

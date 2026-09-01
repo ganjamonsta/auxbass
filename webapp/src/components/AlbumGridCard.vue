@@ -1,5 +1,13 @@
 <template>
-  <div class="album-card" @click="$emit('click', album)" @contextmenu.prevent="$emit('contextmenu', $event)">
+  <div 
+    class="album-card" 
+    @click="handleClick" 
+    @contextmenu.prevent="$emit('contextmenu', $event)"
+    @touchstart="handleTouchStart"
+    @touchmove="handleTouchMove"
+    @touchend="handleTouchEnd"
+    @touchcancel="handleTouchEnd"
+  >
     <div class="album-cover">
       <img v-if="album.cover_url" :src="getCoverUrl(album.cover_url, CoverSize.MEDIUM)" :alt="album.name" loading="lazy" />
       <div v-else class="cover-placeholder"><Disc3 :size="32" /></div>
@@ -28,14 +36,60 @@
 import { Disc3, Play } from 'lucide-vue-next'
 import { getCoverUrl, CoverSize } from '@/utils'
 
-defineProps({
+const props = defineProps({
   album: {
     type: Object,
     required: true
   }
 })
 
-defineEmits(['click', 'play', 'contextmenu'])
+const emit = defineEmits(['click', 'play', 'contextmenu'])
+
+let longPressTimer = null
+let touchMoved = false
+let touchStartX = 0
+let touchStartY = 0
+let isLongPressTriggered = false
+
+const handleTouchStart = (e) => {
+  touchMoved = false
+  isLongPressTriggered = false
+  if (e.touches.length === 1) {
+    touchStartX = e.touches[0].clientX
+    touchStartY = e.touches[0].clientY
+    longPressTimer = setTimeout(() => {
+      if (!touchMoved) {
+        isLongPressTriggered = true
+        emit('contextmenu', e)
+      }
+    }, 450)
+  }
+}
+
+const handleTouchMove = (e) => {
+  if (e.touches.length === 1) {
+    const dx = Math.abs(e.touches[0].clientX - touchStartX)
+    const dy = Math.abs(e.touches[0].clientY - touchStartY)
+    if (dx > 10 || dy > 10) {
+      touchMoved = true
+      clearTimeout(longPressTimer)
+    }
+  }
+}
+
+const handleTouchEnd = () => {
+  clearTimeout(longPressTimer)
+}
+
+const handleClick = (e) => {
+  if (isLongPressTriggered) {
+    isLongPressTriggered = false
+    e?.preventDefault?.()
+    e?.stopPropagation?.()
+    return
+  }
+  emit('click', props.album)
+}
 </script>
 
 <style scoped>
