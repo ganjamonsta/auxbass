@@ -55,19 +55,25 @@ fi
 
 # 3. Update WebApp Static Bundle
 echo "🌐 [3/3] Проверка и обновление WebApp..."
-TAR_URL="https://github.com/ganjamonsta/auxbass/releases/latest/download/webapp-dist.tar.gz"
+TAR_URL_RELEASE="https://github.com/ganjamonsta/auxbass/releases/latest/download/webapp-dist.tar.gz"
+TAR_URL_RAW="https://raw.githubusercontent.com/ganjamonsta/auxbass/release-dist/webapp-dist.tar.gz"
 TEMP_TAR="/tmp/webapp-dist.tar.gz"
 
 DOWNLOADED=0
-# Try downloading prebuilt release asset from GitHub
-if curl -fsSL -L "$TAR_URL" -o "$TEMP_TAR" 2>/dev/null; then
-    if [ -s "$TEMP_TAR" ]; then
-        echo "📦 Распаковка актуальной сборки WebApp из GitHub Releases..."
-        tar -xzf "$TEMP_TAR" -C . 2>/dev/null || true
-        rm -f "$TEMP_TAR"
-        DOWNLOADED=1
-        echo "✅ WebApp успешно обновлен!"
-    fi
+# 1. Try downloading prebuilt release asset from GitHub Releases
+if curl -fsSL -L "$TAR_URL_RELEASE" -o "$TEMP_TAR" 2>/dev/null && [ -s "$TEMP_TAR" ]; then
+    echo "📦 Распаковка актуальной сборки WebApp из GitHub Releases..."
+    tar -xzf "$TEMP_TAR" -C . 2>/dev/null || true
+    rm -f "$TEMP_TAR"
+    DOWNLOADED=1
+    echo "✅ WebApp успешно обновлен из GitHub Releases!"
+# 2. Fallback: Try downloading from release-dist branch
+elif curl -fsSL -L "$TAR_URL_RAW" -o "$TEMP_TAR" 2>/dev/null && [ -s "$TEMP_TAR" ]; then
+    echo "📦 Распаковка актуальной сборки WebApp из ветки release-dist..."
+    tar -xzf "$TEMP_TAR" -C . 2>/dev/null || true
+    rm -f "$TEMP_TAR"
+    DOWNLOADED=1
+    echo "✅ WebApp успешно обновлен из release-dist!"
 fi
 
 # Fallback: if no release tarball and dist is missing, build locally if node exists
