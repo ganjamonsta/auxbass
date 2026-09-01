@@ -66,49 +66,68 @@ export const deleteCachedUrl = (trackId) => {
 }
 
 
-// ============== Audio Blob Cache ==============
-// Stores blob URLs for already loaded tracks
-const audioCache = new Map()
-const MAX_CACHE_SIZE = 50
+import {
+  getCachedTrack,
+  saveTrackToCache,
+  deleteCachedTrack,
+  clearAllCache,
+  hasCachedTrack
+} from '../utils/audioCacheDb'
+
+// ============== Audio Blob Cache (IndexedDB-backed) ==============
+// Tracks active Blob URLs to revoke on cleanup/replacement
+const _activeBlobUrls = new Map()
 
 /**
- * Get cached audio blob URL
+ * Get cached audio blob URL from persistent IndexedDB
+ * @param {number} trackId
+ * @returns {Promise<string|null>}
  */
-export const getCachedAudio = (trackId) => {
-  return audioCache.get(trackId)
-}
+export const getCachedAudio = async (trackId) => {
+  if (!trackId) return null
+  const cached = await getCachedTrack(trackId)
+  if (!cached || !cached.blobUrl) return null
 
-/**
- * Cache audio blob URL with LRU eviction
- */
-export const setCachedAudio = (trackId, blobUrl) => {
-  // Limit cache size - use LRU-like eviction (remove oldest)
-  if (audioCache.size >= MAX_CACHE_SIZE) {
-    const firstKey = audioCache.keys().next().value
-    const oldUrl = audioCache.get(firstKey)
+  // Revoke previous blob URL if exists for this track
+  const oldUrl = _activeBlobUrls.get(trackId)
+  if (oldUrl && oldUrl !== cached.blobUrl) {
     URL.revokeObjectURL(oldUrl)
-    audioCache.delete(firstKey)
   }
-  audioCache.set(trackId, blobUrl)
+  _activeBlobUrls.set(trackId, cached.blobUrl)
+  return cached.blobUrl
 }
 
 /**
- * Delete a single audio blob from cache
+ * Cache audio blob in IndexedDB
+ * @param {Object} track
+ * @param {Blob} blob
+ * @param {string} [mimeType]
  */
-export const deleteCachedAudio = (trackId) => {
-  const url = audioCache.get(trackId)
+export const setCachedAudio = async (track, blob, mimeType) => {
+  if (!track || !blob) return false
+  return await saveTrackToCache(track, blob, mimeType)
+}
+
+/**
+ * Delete a single audio blob from persistent cache
+ * @param {number} trackId
+ */
+export const deleteCachedAudio = async (trackId) => {
+  const url = _activeBlobUrls.get(trackId)
   if (url) {
     URL.revokeObjectURL(url)
-    audioCache.delete(trackId)
+    _activeBlobUrls.delete(trackId)
   }
+  return await deleteCachedTrack(trackId)
 }
 
 /**
- * Clear audio cache
+ * Clear all cached audio files
  */
-export const clearAudioCache = () => {
-  audioCache.forEach((url) => URL.revokeObjectURL(url))
-  audioCache.clear()
+export const clearAudioCache = async () => {
+  _activeBlobUrls.forEach((url) => URL.revokeObjectURL(url))
+  _activeBlobUrls.clear()
+  return await clearAllCache()
 }
 
 

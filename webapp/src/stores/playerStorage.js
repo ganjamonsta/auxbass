@@ -14,12 +14,20 @@ export const loadSettings = () => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {
-      return JSON.parse(saved)
+      const parsed = JSON.parse(saved)
+      return {
+        autoCacheEnabled: true,
+        cacheMaxBytes: 1073741824, // 1 GB default
+        ...parsed
+      }
     }
   } catch (e) {
     console.error('Failed to load player settings:', e)
   }
-  return {}
+  return {
+    autoCacheEnabled: true,
+    cacheMaxBytes: 1073741824
+  }
 }
 
 /**

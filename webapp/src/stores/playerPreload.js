@@ -1,18 +1,17 @@
-/**
- * Player Preload Module
- * Batch-fetches stream URLs and manages Audio-element preloading for next tracks.
- * Extracted from player.js to reduce god-object.
- */
 import {
   getCachedUrl,
   setCachedUrl,
-  getCachedAudio,
   preloadTrackWithAudio,
   getPreloadTrackId,
 } from './playerCache'
 
+import {
+  hasCachedTrack,
+  saveTrackToCache,
+  evictOldTracksIfNeeded,
+} from '../utils/audioCacheDb'
+
 // ============== Adaptive Preload System ==============
-let _lastDownloadSpeed = 0
 let _userInteractionTime = 0
 const USER_INTERACTION_COOLDOWN = 1000
 
@@ -108,7 +107,7 @@ export function collectTracksToPreload({
         } else continue
       }
       const tid = lazyShuffleIds[idx]
-      if (!getCachedUrl(tid) && !getCachedAudio(tid)) idsToFetch.push(tid)
+      if (!getCachedUrl(tid)) idsToFetch.push(tid)
     }
     return { trackIds: idsToFetch, nextTrack: null, isLazy: true }
   }
@@ -124,7 +123,7 @@ export function collectTracksToPreload({
       }
       const qi = shuffleOrder[si]
       const t = queue[qi]
-      if (t && !getCachedUrl(t.id) && !getCachedAudio(t.id)) tracksToPreload.push(t)
+      if (t && !getCachedUrl(t.id)) tracksToPreload.push(t)
     }
   } else {
     for (let off = 1; off <= N; off++) {
@@ -134,7 +133,7 @@ export function collectTracksToPreload({
         else break
       }
       const t = queue[idx]
-      if (t && !getCachedUrl(t.id) && !getCachedAudio(t.id)) tracksToPreload.push(t)
+      if (t && !getCachedUrl(t.id)) tracksToPreload.push(t)
     }
   }
 
@@ -197,34 +196,42 @@ export async function executeBatchPreload({ trackIds, getBatchUrls, nextTrack, o
 }
 
 /**
- * Preload a single track fully (blob download + cache).
+ * Cache a track in background using its active/prefetched stream URL.
+ * Does not block audio playback.
+ *
+ * @param {Object} track - track metadata
+ * @param {string} streamUrl - audio stream URL
+ * @param {number} [maxCacheBytes] - max allowed cache size for LRU eviction
  */
-export async function preloadSingleTrack(track, getStreamUrl, setCachedAudioFn) {
-  if (getCachedAudio(track.id) || _preloadingTracks.has(track.id)) return
+export async function cacheTrackInBackground(track, streamUrl, maxCacheBytes = 1073741824) {
+  if (!track || !track.id || !streamUrl || _preloadingTracks.has(track.id)) return
+
+  // Check if already in IndexedDB
+  const isCached = await hasCachedTrack(track.id)
+  if (isCached) return
 
   const controller = new AbortController()
   _preloadingTracks.set(track.id, controller)
 
-  const startTime = Date.now()
   try {
-    const response = await getStreamUrl(track.id)
-    const streamUrl = response.data.url
-    const audioResponse = await fetch(streamUrl, { signal: controller.signal })
-    if (!audioResponse.ok) return
+    console.log(`[AutoCache] Background caching started for "${track.title}"`)
+    const response = await fetch(streamUrl, { signal: controller.signal })
+    if (!response.ok) return
 
-    const blob = await audioResponse.blob()
-    const blobUrl = URL.createObjectURL(blob)
-
-    const downloadTime = (Date.now() - startTime) / 1000
-    if (downloadTime > 0) {
-      _lastDownloadSpeed = blob.size / downloadTime
+    const blob = await response.blob()
+    if (blob.size > 0) {
+      await saveTrackToCache(track, blob, blob.type || 'audio/mpeg')
+      if (maxCacheBytes > 0) {
+        await evictOldTracksIfNeeded(maxCacheBytes)
+      }
     }
-
-    setCachedAudioFn(track.id, blobUrl)
-    console.log(`[Preload] Cached: ${track.title} (${(blob.size / 1024 / 1024).toFixed(1)}MB in ${downloadTime.toFixed(1)}s)`)
   } catch (e) {
-    if (e.name !== 'AbortError') console.error('Failed to preload track:', track.title, e)
+    if (e.name !== 'AbortError') {
+      console.warn(`[AutoCache] Failed to cache track "${track.title}":`, e.message)
+    }
   } finally {
-    if (_preloadingTracks.get(track.id) === controller) _preloadingTracks.delete(track.id)
+    if (_preloadingTracks.get(track.id) === controller) {
+      _preloadingTracks.delete(track.id)
+    }
   }
 }

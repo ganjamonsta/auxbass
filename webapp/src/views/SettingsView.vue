@@ -286,11 +286,74 @@
       </div>
     </section>
 
-    <!-- Cache section -->
-    <section class="section">
-      <h2>Кэш</h2>
-      <button class="clear-cache-btn" @click="clearCache">
-        Очистить кэш
+    <!-- Cache & Offline section -->
+    <section class="section cache-section">
+      <h2><HardDrive :size="20" /> Кэш и память</h2>
+
+      <!-- Auto-cache toggle -->
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-name">Автокэширование треков</span>
+          <span class="setting-desc">Автоматически сохранять воспроизводимые треки на устройство для мгновенного старта и офлайн-прослушивания</span>
+        </div>
+        <label class="toggle">
+          <input 
+            type="checkbox" 
+            v-model="playerStore.autoCacheEnabled" 
+          />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <!-- Max Cache Size -->
+      <div v-if="playerStore.autoCacheEnabled" class="setting-row slider-row">
+        <div class="setting-info">
+          <span class="setting-name">Лимит размера кэша</span>
+          <span class="setting-value">{{ formatCacheLimit(playerStore.cacheMaxBytes) }}</span>
+        </div>
+        <div class="scale-presets">
+          <button 
+            v-for="limit in cacheLimits" 
+            :key="limit.value"
+            class="scale-preset-chip"
+            :class="{ active: playerStore.cacheMaxBytes === limit.value }"
+            @click="playerStore.cacheMaxBytes = limit.value"
+          >
+            {{ limit.label }}
+          </button>
+        </div>
+        <span class="setting-desc">При заполнении кэша старые треки удаляются автоматически (LRU)</span>
+      </div>
+
+      <!-- Cache stats card -->
+      <div class="cache-stats-card">
+        <div class="cache-stats-header">
+          <div class="cache-stat-item">
+            <span class="cache-stat-label">Занято кэшем</span>
+            <span class="cache-stat-val">{{ formatBytes(cacheStats.totalBytes) }} <span class="cache-stat-count">({{ cacheStats.trackCount }} треков)</span></span>
+          </div>
+          <div v-if="cacheStats.quotaBytes > 0" class="cache-stat-item align-right">
+            <span class="cache-stat-label">Доступно</span>
+            <span class="cache-stat-val">{{ formatBytes(cacheStats.quotaBytes - cacheStats.usageBytes) }}</span>
+          </div>
+        </div>
+
+        <!-- Progress bar -->
+        <div class="cache-progress-bar">
+          <div 
+            class="cache-progress-fill" 
+            :style="{ width: `${cacheFillPercent}%` }"
+          ></div>
+        </div>
+      </div>
+
+      <button 
+        class="clear-cache-btn" 
+        :disabled="clearingCache || cacheStats.trackCount === 0"
+        @click="handleClearCache"
+      >
+        <Trash2 :size="16" />
+        <span>{{ clearingCache ? 'Очистка...' : 'Очистить кэш треков' }}</span>
       </button>
     </section>
 
@@ -312,9 +375,11 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
 import api, { authApi } from '@/api/client'
-import { Megaphone, Check, Folder, Heart, ListMusic, Cloud, RefreshCw, Lock, User, Bell, Sliders, Headphones, Smartphone, Download } from 'lucide-vue-next'
+import { Megaphone, Check, Folder, Heart, ListMusic, Cloud, RefreshCw, Lock, User, Bell, Sliders, Headphones, Smartphone, Download, HardDrive, Trash2 } from 'lucide-vue-next'
 import SettingsSkeleton from '@/components/SettingsSkeleton.vue'
 import { usePwaInstall } from '@/composables/usePwaInstall'
+import { getCacheStats } from '@/utils/audioCacheDb'
+import { clearAudioCache } from '@/stores/playerCache'
 
 const router = useRouter()
 const route = useRoute()
@@ -430,11 +495,61 @@ const logout = async () => {
   window.location.href = '/login'
 }
 
-const clearCache = () => {
-  // Clear any cached data
-  localStorage.removeItem('tracks_cache')
-  localStorage.removeItem('albums_cache')
-  alert('Кэш очищен')
+const cacheStats = ref({ totalBytes: 0, trackCount: 0, quotaBytes: 0, usageBytes: 0 })
+const clearingCache = ref(false)
+
+const cacheLimits = [
+  { label: '500 МБ', value: 500 * 1024 * 1024 },
+  { label: '1 ГБ', value: 1024 * 1024 * 1024 },
+  { label: '2 ГБ', value: 2048 * 1024 * 1024 },
+  { label: '5 ГБ', value: 5120 * 1024 * 1024 },
+  { label: 'Без лимита', value: 0 },
+]
+
+const formatCacheLimit = (bytes) => {
+  if (!bytes || bytes === 0) return 'Без ограничений'
+  const gb = bytes / (1024 * 1024 * 1024)
+  if (gb >= 1) return `${gb.toFixed(0)} ГБ`
+  return `${(bytes / (1024 * 1024)).toFixed(0)} МБ`
+}
+
+const formatBytes = (bytes) => {
+  if (!bytes || bytes === 0) return '0 МБ'
+  const mb = bytes / (1024 * 1024)
+  if (mb < 1024) return `${mb.toFixed(1)} МБ`
+  return `${(mb / 1024).toFixed(1)} ГБ`
+}
+
+const cacheFillPercent = computed(() => {
+  if (!playerStore.cacheMaxBytes || playerStore.cacheMaxBytes === 0) {
+    if (!cacheStats.value.quotaBytes) return 0
+    return Math.min(100, Math.max(2, (cacheStats.value.totalBytes / cacheStats.value.quotaBytes) * 100))
+  }
+  if (cacheStats.value.totalBytes === 0) return 0
+  return Math.min(100, Math.max(2, (cacheStats.value.totalBytes / playerStore.cacheMaxBytes) * 100))
+})
+
+const refreshCacheStats = async () => {
+  try {
+    cacheStats.value = await getCacheStats()
+  } catch (e) {
+    console.warn('Failed to get cache stats:', e)
+  }
+}
+
+const handleClearCache = async () => {
+  if (!confirm('Очистить весь локальный кэш треков?')) return
+  clearingCache.value = true
+  try {
+    await clearAudioCache()
+    localStorage.removeItem('tracks_cache')
+    localStorage.removeItem('albums_cache')
+    await refreshCacheStats()
+  } catch (e) {
+    console.error('Error clearing cache:', e)
+  } finally {
+    clearingCache.value = false
+  }
 }
 
 // Watch dark mode toggle
@@ -451,7 +566,8 @@ onMounted(async () => {
     await Promise.all([
       loadStats(),
       loadBotConfig(),
-      loadPrivacySettings()
+      loadPrivacySettings(),
+      refreshCacheStats()
     ])
   } finally {
     loading.value = false
@@ -1111,6 +1227,95 @@ h1 {
 
 .pwa-section-install-btn:active {
   transform: translateY(0);
+}
+
+.cache-stats-card {
+  background: var(--c-bg-3);
+  border-radius: var(--r-md);
+  padding: var(--sp-4);
+  margin: var(--sp-3) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.cache-stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--sp-3);
+}
+
+.cache-stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cache-stat-item.align-right {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.cache-stat-label {
+  font-size: 12px;
+  color: var(--c-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cache-stat-val {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--c-text-1);
+}
+
+.cache-stat-count {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--c-text-2);
+}
+
+.cache-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--c-bg-4);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.cache-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--c-accent) 0%, #00e676 100%);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.clear-cache-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: 12px;
+  background: transparent;
+  border: 1px solid rgba(244, 67, 54, 0.4);
+  border-radius: var(--r-sm);
+  color: var(--c-error);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clear-cache-btn:hover:not(:disabled) {
+  background: rgba(244, 67, 54, 0.1);
+  border-color: var(--c-error);
+}
+
+.clear-cache-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ═══════════════════════════════════════════════

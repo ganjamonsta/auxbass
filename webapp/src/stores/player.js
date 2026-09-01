@@ -43,7 +43,9 @@ import {
   collectRelevantIds,
   collectTracksToPreload,
   executeBatchPreload,
+  cacheTrackInBackground,
 } from './playerPreload'
+import { requestStoragePersistence } from '../utils/audioCacheDb'
 
 import {
   updateMediaSession as _updateMS,
@@ -111,6 +113,10 @@ export const usePlayerStore = defineStore('player', () => {
   const trebleGain = ref(savedSettings.trebleGain ?? 0)
   const autoGain = ref(savedSettings.autoGain ?? false)
 
+  // Auto-Cache Settings
+  const autoCacheEnabled = ref(savedSettings.autoCacheEnabled ?? true)
+  const cacheMaxBytes = ref(savedSettings.cacheMaxBytes ?? 1073741824) // 1 GB default
+
   const loading = ref(false)
   const buffered = ref(0)
   const nextTrackPreloaded = ref(null)
@@ -157,6 +163,7 @@ export const usePlayerStore = defineStore('player', () => {
     persistSettings()
   })
   watch(uiScale, () => persistSettings())
+  watch([autoCacheEnabled, cacheMaxBytes], () => persistSettings())
 
   // ===================== HELPERS =====================
   const isLazyShuffleMode = () => lazyShuffleIds.value.length > 0 && lazyShuffleIndex.value >= 0
@@ -224,6 +231,8 @@ export const usePlayerStore = defineStore('player', () => {
       enhancerEnabled: enhancerEnabled.value,
       bassGain: bassGain.value, trebleGain: trebleGain.value,
       autoGain: autoGain.value,
+      autoCacheEnabled: autoCacheEnabled.value,
+      cacheMaxBytes: cacheMaxBytes.value,
     })
   }
 
@@ -582,6 +591,13 @@ export const usePlayerStore = defineStore('player', () => {
       persistState()
       startStateSaving()
       preloadNextTracks()
+
+      // Background auto-caching if enabled and playing from network
+      if (autoCacheEnabled.value && source.src && source.type !== 'blob') {
+        cacheTrackInBackground(track, source.src, cacheMaxBytes.value)
+      }
+      // Request persistent storage on playback
+      requestStoragePersistence()
     } catch (error) {
       if (error.name === 'AbortError') { loading.value = false; return }
       if (generation !== _playGeneration) return
@@ -722,23 +738,6 @@ export const usePlayerStore = defineStore('player', () => {
         else { isPlaying.value = false; isSkipping = false; clearLazyShuffle(); return }
       }
       const nextTrackId = lazyShuffleIds.value[lazyShuffleIndex.value]
-
-      // Try blob cache first
-      const blobUrl = getCachedAudio(nextTrackId)
-      if (blobUrl) {
-        const t = await loadTrackById(nextTrackId)
-        if (t) {
-          queue.value = [t]; queueIndex.value = 0
-          initAudio(); loading.value = true; currentTrack.value = t; updateMediaSession()
-          try {
-            audio.value.pause(); audio.value.currentTime = 0
-            audio.value.src = blobUrl; buffered.value = duration.value
-            audio.value.load(); await audio.value.play()
-            loading.value = false; isSkipping = false; persistState(); preloadNextTracks()
-            return
-          } catch (_) { /* fall through */ }
-        }
-      }
 
       loading.value = true
       const t = await loadTrackById(nextTrackId)
@@ -1091,6 +1090,10 @@ export const usePlayerStore = defineStore('player', () => {
     bassGain,
     trebleGain,
     autoGain,
+    
+    // Auto-Cache
+    autoCacheEnabled,
+    cacheMaxBytes,
     
     loading,
     buffered,

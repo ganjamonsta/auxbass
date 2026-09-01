@@ -29,11 +29,11 @@ import {
  *   { type: 'error',      reason: string }
  */
 export async function resolveAudioSource(trackId, getStreamUrl) {
-  // === PRIORITY 1: Blob cache (fully downloaded) ===
-  const blobUrl = getCachedAudio(trackId)
+  // === PRIORITY 1: Persistent IndexedDB Blob cache (instant offline playback) ===
+  const blobUrl = await getCachedAudio(trackId)
   if (blobUrl) {
-    console.log('[Play] Using blob cache - instant start')
-    return { type: 'blob', src: blobUrl, buffered: true }
+    console.log(`[Play] Using persistent blob cache for track ${trackId} - instant start`)
+    return { type: 'blob', src: blobUrl, buffered: true, isCached: true }
   }
 
   // === PRIORITY 2: Cached URL token (from prefetch/preload) ===
