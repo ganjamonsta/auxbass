@@ -330,6 +330,9 @@ const showHeader = computed(() => {
 })
 
 const showBackButton = computed(() => {
+  if (route.name === 'library' && uiStore.libraryTab !== 'overview') {
+    return true
+  }
   // Main navigation tabs do not need a back button
   const mainNavRoutes = ['home', 'library', 'search', 'collections', 'friends', 'liked', 'settings']
   return !mainNavRoutes.includes(route.name)
@@ -419,6 +422,10 @@ const historyTracks = computed(() => {
 })
 
 const goBack = () => {
+  if (route.name === 'library' && uiStore.libraryTab !== 'overview') {
+    uiStore.setLibraryTab('overview')
+    return
+  }
   if (window.history.length > 1) {
     router.back()
   } else {

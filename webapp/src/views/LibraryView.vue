@@ -22,106 +22,8 @@
         />
       </div>
 
-      <!-- Filter Pills (Spotify style) -->
-      <div class="library-filter-pills">
-        <button 
-          v-for="tab in tabs" 
-          :key="tab.id"
-          class="filter-pill"
-          :class="{ active: currentTabId === tab.id }"
-          @click="setTab(tab.id)"
-        >
-          {{ tab.label }}
-        </button>
-      </div>
-
-      <!-- Overview Dashboard View ("Все" without search) -->
+      <!-- Overview Dashboard View without search -->
       <div v-if="currentTabId === 'overview' && !debouncedQuery" class="overview-dashboard">
-        <!-- Top Quick-Access Grid (Spotify 2x3 / 3x2) -->
-        <section v-if="loadingQuickAccess" class="quick-access-grid">
-          <div v-for="i in 4" :key="i" class="quick-card quick-skeleton">
-            <div class="skeleton-thumb"></div>
-            <div class="skeleton-info">
-              <div class="skeleton-line-title"></div>
-              <div class="skeleton-line-sub"></div>
-            </div>
-          </div>
-        </section>
-
-        <section v-else class="quick-access-grid">
-          <!-- Liked Songs Tile (Always First) -->
-          <div 
-            class="quick-card liked-card" 
-            @click="goTo('/liked')"
-            @contextmenu.prevent="openMenu('liked', { name: 'Понравившиеся', track_count: likedCount }, 'library', $event)"
-            v-longpress="(e) => openMenu('liked', { name: 'Понравившиеся', track_count: likedCount }, 'library', e)"
-          >
-            <div class="quick-card-cover liked-cover-gradient">
-              <Heart :size="24" fill="currentColor" />
-            </div>
-            <div class="quick-card-info">
-              <span class="quick-card-title">Понравившиеся</span>
-              <span class="quick-card-meta">{{ likedCount }} треков</span>
-            </div>
-            <button 
-              v-if="likedCount > 0" 
-              class="quick-play-btn" 
-              @click.stop="handlePlayLiked"
-              title="Слушать любимые"
-            >
-              <Play :size="18" fill="currentColor" />
-            </button>
-          </div>
-
-          <!-- User Top Playlists -->
-          <div 
-            v-for="playlist in topPlaylists" 
-            :key="playlist.id"
-            class="quick-card"
-            @click="goTo(`/playlist/${playlist.id}`)"
-            @contextmenu.prevent="openMenu('playlist', playlist, 'library', $event)"
-            v-longpress="(e) => openMenu('playlist', playlist, 'library', e)"
-          >
-            <div class="quick-card-cover" :style="getPlaylistCoverStyle(playlist)">
-              <img 
-                v-if="playlist.covers?.length" 
-                :src="getCoverUrl(playlist.covers[0], CoverSize.SMALL)" 
-                alt="" 
-                loading="lazy"
-              />
-              <Music v-else :size="22" />
-            </div>
-            <div class="quick-card-info">
-              <span class="quick-card-title">{{ playlist.name }}</span>
-              <span class="quick-card-meta">{{ playlist.track_count }} треков</span>
-            </div>
-            <button 
-              v-if="playlist.track_count > 0" 
-              class="quick-play-btn" 
-              @click.stop="handlePlayPlaylist(playlist)"
-              title="Слушать плейлист"
-            >
-              <Play :size="18" fill="currentColor" />
-            </button>
-          </div>
-
-          <!-- Quick Add Playlist Tile if fewer than 5 playlists -->
-          <div 
-            v-if="topPlaylists.length < 5" 
-            class="quick-card create-card" 
-            @click="handleCreatePlaylist"
-            @contextmenu.prevent="handleCreatePlaylist"
-            v-longpress="handleCreatePlaylist"
-          >
-            <div class="quick-card-cover create-cover">
-              <Plus :size="24" />
-            </div>
-            <div class="quick-card-info">
-              <span class="quick-card-title">Создать плейлист</span>
-              <span class="quick-card-meta">Новая подборка</span>
-            </div>
-          </div>
-        </section>
 
         <!-- Section: Плейлисты (Horizontal Scroll) -->
         <section v-if="loadingPlaylists" class="library-section">
@@ -338,6 +240,12 @@
 
       <!-- Specific Tab or Search Active View -->
       <div v-else class="library-content">
+        <div v-if="currentTabId !== 'overview' && !debouncedQuery" class="subtab-header">
+          <button class="subtab-back-btn" @click="setTab('overview')">
+            <ChevronLeft :size="18" />
+            <span>Все разделы</span>
+          </button>
+        </div>
         <component 
           :is="currentTabComponent" 
           :searchQuery="debouncedQuery"
@@ -365,14 +273,13 @@ import LibraryPlaylists from '@/components/library/LibraryPlaylists.vue'
 import TrackItem from '@/components/TrackItem.vue'
 import SearchBar from '@/components/ui/SearchBar.vue'
 import { 
-  Heart, 
   Play, 
-  Plus, 
   Music, 
   Folder, 
   Disc3, 
   Shuffle, 
-  ChevronRight 
+  ChevronRight,
+  ChevronLeft 
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -425,7 +332,6 @@ const searchPlaceholder = computed(() => currentTab.value.placeholder)
 const { query: searchQuery, debouncedQuery, search: debouncedSearch, clear: clearSearch, setQuery } = useDebouncedSearch()
 
 // Overview Data State
-const loadingQuickAccess = ref(false)
 const loadingPlaylists = ref(false)
 const loadingAlbums = ref(false)
 const loadingArtists = ref(false)
@@ -435,9 +341,7 @@ const shuffling = ref(false)
 const overviewAlbums = ref([])
 const albumsTotal = ref(0)
 
-const likedCount = computed(() => libraryStore.likedTracks?.length || 0)
 const allPlaylists = computed(() => libraryStore.playlists || [])
-const topPlaylists = computed(() => allPlaylists.value.slice(0, 5))
 const overviewArtists = computed(() => libraryStore.artists || [])
 const overviewTracks = computed(() => libraryStore.tracks || [])
 const totalTracksCount = computed(() => libraryStore.total || overviewTracks.value.length)
@@ -445,13 +349,6 @@ const totalTracksCount = computed(() => libraryStore.total || overviewTracks.val
 // Navigation helpers
 const goTo = (path) => {
   router.push(path)
-}
-
-// Playback handlers
-const handlePlayLiked = () => {
-  if (libraryStore.likedTracks?.length > 0) {
-    playerStore.playTrack(libraryStore.likedTracks[0], libraryStore.likedTracks, 0)
-  }
 }
 
 const handlePlayPlaylist = async (playlist) => {
@@ -566,10 +463,7 @@ const loadOverviewData = async () => {
 
   // 2. Liked
   if (!libraryStore.likedTracks?.length) {
-    loadingQuickAccess.value = true
-    libraryStore.fetchLikedTracks().finally(() => {
-      loadingQuickAccess.value = false
-    })
+    libraryStore.fetchLikedTracks()
   }
 
   // 3. Tracks
@@ -675,176 +569,34 @@ onUnmounted(() => {
   margin-bottom: 12px;
 }
 
-/* ─── Spotify Filter Pills ─── */
-.library-filter-pills {
-  display: flex;
+/* ─── Subtab Navigation ─── */
+.subtab-header {
+  margin-bottom: 16px;
+}
+
+.subtab-back-btn {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding: 4px 0 16px;
-  margin-bottom: 8px;
-}
-
-.library-filter-pills::-webkit-scrollbar {
-  display: none;
-}
-
-.filter-pill {
-  padding: 7px 15px;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 20px;
+  padding: 6px 14px 6px 10px;
+  color: var(--c-text-2, rgba(255, 255, 255, 0.75));
   font-size: 13px;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--c-text-2, rgba(255, 255, 255, 0.75));
-  border: 1px solid rgba(255, 255, 255, 0.06);
   cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
-  flex-shrink: 0;
-  user-select: none;
+  transition: all 0.2s ease;
 }
 
-.filter-pill:hover {
+.subtab-back-btn:hover {
   background: rgba(255, 255, 255, 0.14);
   color: var(--c-text-1, #fff);
   transform: translateY(-1px);
 }
 
-.filter-pill:active {
+.subtab-back-btn:active {
   transform: scale(0.96);
-}
-
-.filter-pill.active {
-  background: var(--c-accent, #1db954);
-  color: #000;
-  border-color: var(--c-accent, #1db954);
-  font-weight: 700;
-  box-shadow: 0 2px 12px rgba(29, 185, 84, 0.35);
-}
-
-/* ─── Quick Access Grid ─── */
-.quick-access-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  margin-bottom: 28px;
-}
-
-@media (min-width: 768px) {
-  .quick-access-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-  }
-}
-
-.quick-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
-  overflow: hidden;
-  height: 56px;
-  cursor: pointer;
-  position: relative;
-  transition: all 0.2s ease;
-  user-select: none;
-  backdrop-filter: blur(8px);
-}
-
-.quick-card:hover {
-  background: rgba(255, 255, 255, 0.13);
-  transform: translateY(-1px);
-}
-
-.quick-card:active {
-  transform: scale(0.98);
-}
-
-.quick-card-cover {
-  width: 56px;
-  height: 56px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--c-bg-3, #222);
-  color: rgba(255, 255, 255, 0.7);
-  overflow: hidden;
-}
-
-.quick-card-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.liked-cover-gradient {
-  background: linear-gradient(135deg, #450af5 0%, #c4efd9 100%);
-  color: #fff;
-}
-
-.create-cover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
-}
-
-.quick-card-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding-right: 8px;
-}
-
-.quick-card-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--c-text-1, #fff);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.2;
-}
-
-.quick-card-meta {
-  font-size: 11px;
-  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
-  margin-top: 2px;
-}
-
-.quick-play-btn {
-  position: absolute;
-  right: 10px;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--c-accent, #1db954);
-  color: #000;
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
-  opacity: 0;
-  transform: scale(0.8);
-  transition: all 0.2s ease;
-  cursor: pointer;
-}
-
-.quick-card:hover .quick-play-btn {
-  opacity: 1;
-  transform: scale(1);
-}
-
-@media (max-width: 767px) {
-  .quick-play-btn {
-    opacity: 0.9;
-    transform: scale(0.9);
-  }
 }
 
 /* ─── Sections ─── */
@@ -1094,24 +846,11 @@ onUnmounted(() => {
 }
 
 /* ─── Skeletons ─── */
-.quick-skeleton {
-  background: rgba(255, 255, 255, 0.04) !important;
-  pointer-events: none;
-}
-
 .skeleton-thumb {
   width: 56px;
   height: 56px;
   background: rgba(255, 255, 255, 0.08);
   animation: pulse-shimmer 1.5s infinite;
-}
-
-.skeleton-info {
-  flex: 1;
-  padding: 0 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
 }
 
 .skeleton-line-title {
