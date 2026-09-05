@@ -554,12 +554,14 @@ onMounted(() => {
   flex-shrink: 0;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   opacity: 0;
+  pointer-events: none;
   transform: scale(0.85);
   transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .quick-card:hover .quick-play-btn {
   opacity: 1;
+  pointer-events: auto;
   transform: scale(1);
 }
 
@@ -568,11 +570,8 @@ onMounted(() => {
   background: #1ed760;
 }
 
-/* Show play buttons always on mobile for accessibility */
 @media (max-width: 768px) {
   .quick-play-btn {
-    opacity: 0.9;
-    transform: scale(0.85);
     width: 32px;
     height: 32px;
     margin-right: 8px;
@@ -675,6 +674,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   opacity: 0;
+  pointer-events: none;
   transform: translateY(6px);
   transition: all 0.2s ease;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
@@ -682,6 +682,7 @@ onMounted(() => {
 
 .feed-card:hover .play-overlay {
   opacity: 1;
+  pointer-events: auto;
   transform: translateY(0);
 }
 

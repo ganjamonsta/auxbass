@@ -27,81 +27,123 @@
 
     <!-- Normal Profile View -->
     <template v-else>
-      <!-- Hero Header -->
-      <div class="hero-header user-hero">
-        <div class="hero-avatar neu-avatar">
-          <span>{{ getInitials(user) }}</span>
-        </div>
-        <div class="hero-info">
-          <h1 class="hero-title">
-            {{ user.display_name }}
-            <span v-if="isSelf" class="self-badge">Вы</span>
-          </h1>
-          <p v-if="user.username" class="user-handle">@{{ user.username }}</p>
-          
-          <!-- Stats bar -->
-          <div class="profile-stats-bar">
-            <div class="stat-badge" @click="activeTab = 'tracks'">
-              <span class="stat-num">{{ user.track_count }}</span>
-              <span class="stat-desc">треков</span>
+      <!-- Compact Spotify-style Profile Hero -->
+      <div class="profile-hero-card">
+        <div class="hero-ambient-glow" :style="ambientGlowStyle"></div>
+
+        <div class="hero-content">
+          <!-- Avatar -->
+          <div class="hero-avatar" :style="avatarGradientStyle">
+            <span>{{ getInitials(user) }}</span>
+          </div>
+
+          <!-- Meta Info -->
+          <div class="hero-meta">
+            <div class="hero-title-row">
+              <h1 class="hero-name">{{ user.display_name }}</h1>
+              <span v-if="isSelf" class="self-badge">Вы</span>
             </div>
-            <div class="stat-badge" @click="activeTab = 'playlists'">
-              <span class="stat-num">{{ user.playlist_count }}</span>
-              <span class="stat-desc">плейлистов</span>
-            </div>
-            <div class="stat-badge">
-              <span class="stat-num">{{ user.followers_count }}</span>
-              <span class="stat-desc">подписчиков</span>
-            </div>
-            <div class="stat-badge">
-              <span class="stat-num">{{ user.following_count }}</span>
-              <span class="stat-desc">подписок</span>
+            <div v-if="user.username" class="hero-handle">@{{ user.username }}</div>
+
+            <!-- Stats Bar -->
+            <div class="hero-stats-row">
+              <button class="hero-stat-pill" @click="activeTab = 'tracks'" title="Смотреть треки">
+                <span class="stat-num">{{ user.track_count }}</span>
+                <span class="stat-label">{{ getTracksWord(user.track_count) }}</span>
+              </button>
+              <span class="stat-separator">•</span>
+              <button class="hero-stat-pill" @click="activeTab = 'playlists'" title="Смотреть плейлисты">
+                <span class="stat-num">{{ user.playlist_count }}</span>
+                <span class="stat-label">{{ getPlaylistsWord(user.playlist_count) }}</span>
+              </button>
+              <span class="stat-separator">•</span>
+              <div 
+                class="hero-stat-pill"
+                :class="{ 'clickable-stat': isSelf }"
+                @click="isSelf && router.push('/friends')"
+                :title="isSelf ? 'Перейти к кентам' : ''"
+              >
+                <span class="stat-num">{{ user.followers_count }}</span>
+                <span class="stat-label">подписчиков</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Action buttons -->
-      <div class="profile-actions-bar">
-        <!-- Self profile actions -->
-        <button
-          v-if="isSelf"
-          class="btn-action settings-profile-btn"
-          @click="router.push('/settings')"
-          title="Настройки аккаунта"
-        >
-          <Settings :size="16" />
-          <span>Настройки</span>
-        </button>
+        <!-- Action Buttons Bar -->
+        <div class="hero-actions-bar">
+          <!-- Play library button -->
+          <button 
+            v-if="user.track_count > 0"
+            class="hero-play-btn" 
+            @click="handlePlayUserLibrary"
+            title="Слушать медиатеку"
+          >
+            <Play :size="16" fill="currentColor" />
+            <span>Слушать</span>
+          </button>
 
-        <!-- Other user profile actions -->
-        <button
-          v-else
-          class="btn-action follow-btn"
-          :class="{ 'is-following': isFollowing }"
-          :disabled="followLoading"
-          @click="toggleFollow"
-        >
-          <Check v-if="isFollowing" :size="16" />
-          <UserPlus v-else :size="16" />
-          <span>{{ isFollowing ? 'Подписан' : 'Подписаться' }}</span>
-        </button>
+          <!-- Shuffle button -->
+          <button 
+            v-if="user.track_count > 1"
+            class="hero-icon-btn" 
+            @click="handleShuffleUserLibrary"
+            title="Перемешать медиатеку"
+          >
+            <Shuffle :size="16" />
+          </button>
 
-        <button class="btn-action share-btn" @click="handleShare" title="Поделиться профилем">
-          <Share2 :size="16" />
-          <span>{{ isSelf ? 'Поделиться своим профилем' : 'Поделиться' }}</span>
-        </button>
+          <!-- Follow button -->
+          <button
+            v-if="!isSelf"
+            class="hero-pill-btn follow-btn"
+            :class="{ 'is-following': isFollowing }"
+            :disabled="followLoading"
+            @click="toggleFollow"
+          >
+            <Check v-if="isFollowing" :size="16" />
+            <UserPlus v-else :size="16" />
+            <span>{{ isFollowing ? 'Подписан' : 'Подписаться' }}</span>
+          </button>
+
+          <!-- Settings (if self) -->
+          <button
+            v-if="isSelf"
+            class="hero-pill-btn"
+            @click="router.push('/settings')"
+            title="Настройки аккаунта"
+          >
+            <Settings :size="16" />
+            <span>Настройки</span>
+          </button>
+
+          <!-- Share button -->
+          <button class="hero-pill-btn share-btn" @click="handleShare" title="Поделиться профилем">
+            <Share2 :size="16" />
+            <span>Поделиться</span>
+          </button>
+        </div>
       </div>
 
       <!-- Tabs -->
       <div class="neu-tab-bar user-tabs">
         <button
           class="neu-tab"
+          :class="{ active: activeTab === 'overview' }"
+          @click="activeTab = 'overview'"
+        >
+          <Sparkles :size="15" />
+          <span class="neu-tab-content" data-text="Обзор">Обзор</span>
+        </button>
+        <button
+          class="neu-tab"
           :class="{ active: activeTab === 'tracks' }"
           @click="activeTab = 'tracks'"
         >
           <Music :size="15" />
-          <span class="neu-tab-content" data-text="Треки">Треки</span>
+          <span class="neu-tab-content" :data-text="`Треки (${user.track_count})`">
+            Треки <span class="tab-count">{{ user.track_count }}</span>
+          </span>
         </button>
         <button
           class="neu-tab"
@@ -109,9 +151,12 @@
           @click="activeTab = 'playlists'"
         >
           <Folder :size="15" />
-          <span class="neu-tab-content" data-text="Плейлисты">Плейлисты</span>
+          <span class="neu-tab-content" :data-text="`Плейлисты (${user.playlist_count})`">
+            Плейлисты <span class="tab-count">{{ user.playlist_count }}</span>
+          </span>
         </button>
         <button
+          v-if="overviewAlbums.length > 0 || activeTab === 'albums'"
           class="neu-tab"
           :class="{ active: activeTab === 'albums' }"
           @click="activeTab = 'albums'"
@@ -119,6 +164,140 @@
           <Disc3 :size="15" />
           <span class="neu-tab-content" data-text="Альбомы">Альбомы</span>
         </button>
+      </div>
+
+      <!-- Overview Tab Content (Home-like strips for Playlists, Albums, and Top Tracks) -->
+      <div v-show="activeTab === 'overview'" class="tab-pane overview-pane">
+        <!-- Loading overview skeletons -->
+        <div v-if="loadingOverview" class="overview-loading">
+          <section class="profile-section">
+            <div class="section-header">
+              <div class="skeleton-section-title"></div>
+            </div>
+            <div class="horizontal-scroll">
+              <div v-for="i in 4" :key="i" class="feed-card-skeleton">
+                <div class="skeleton-feed-cover"></div>
+                <div class="skeleton-feed-title"></div>
+                <div class="skeleton-feed-sub"></div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <template v-else>
+          <!-- Strip 1: Playlists -->
+          <section v-if="overviewPlaylists.length > 0" class="profile-section">
+            <div class="section-header">
+              <h2 class="section-title">Плейлисты</h2>
+              <button class="section-link" @click="activeTab = 'playlists'">Все {{ user.playlist_count || overviewPlaylists.length }}</button>
+            </div>
+            <div class="horizontal-scroll">
+              <div 
+                v-for="pl in overviewPlaylists.slice(0, 10)" 
+                :key="pl.id" 
+                class="feed-card"
+                @click="goToPlaylist(pl)"
+                @contextmenu.prevent="handlePlaylistContextMenu(pl, $event)"
+                v-longpress="(e) => handlePlaylistContextMenu(pl, e)"
+              >
+                <div class="feed-card-cover" :style="getPlaylistCoverStyle(pl)">
+                  <img 
+                    v-if="pl.covers?.length" 
+                    :src="getCoverUrl(pl.covers[0], CoverSize.SMALL)" 
+                    alt=""
+                    loading="lazy"
+                  />
+                  <Folder v-else :size="32" />
+                  <button 
+                    v-if="pl.track_count > 0" 
+                    class="play-overlay" 
+                    @click.stop="shufflePlaylist(pl)"
+                    title="Слушать"
+                  >
+                    <Play :size="18" fill="currentColor" />
+                  </button>
+                </div>
+                <div class="feed-card-title">{{ pl.name }}</div>
+                <div class="feed-card-subtitle">{{ pl.track_count }} {{ getTracksWord(pl.track_count) }}</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Strip 2: Albums -->
+          <section v-if="overviewAlbums.length > 0" class="profile-section">
+            <div class="section-header">
+              <h2 class="section-title">Альбомы</h2>
+              <button class="section-link" @click="activeTab = 'albums'">Все {{ overviewAlbums.length }}</button>
+            </div>
+            <div class="horizontal-scroll">
+              <div 
+                v-for="album in overviewAlbums.slice(0, 10)" 
+                :key="album.id" 
+                class="feed-card"
+                @click="goToAlbum(album)"
+                @contextmenu.prevent="handleAlbumContextMenu(album, $event)"
+                v-longpress="(e) => handleAlbumContextMenu(album, e)"
+              >
+                <div class="feed-card-cover">
+                  <img 
+                    v-if="album.cover_url" 
+                    :src="getCoverUrl(album.cover_url, CoverSize.SMALL)" 
+                    alt=""
+                    loading="lazy"
+                  />
+                  <Disc3 v-else :size="32" />
+                  <button 
+                    class="play-overlay" 
+                    @click.stop="shuffleAlbum(album)"
+                    title="Слушать"
+                  >
+                    <Play :size="18" fill="currentColor" />
+                  </button>
+                </div>
+                <div class="feed-card-title">{{ album.name || album.title }}</div>
+                <div class="feed-card-subtitle">{{ album.artist || 'Альбом' }}</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 3: Popular / Top Tracks -->
+          <section v-if="overviewTracks.length > 0" class="profile-section">
+            <div class="section-header">
+              <h2 class="section-title">Треки</h2>
+              <button class="section-link" @click="activeTab = 'tracks'">Все {{ user.track_count || overviewTracks.length }}</button>
+            </div>
+            <div class="profile-tracks-list">
+              <TrackItem
+                v-for="(track, index) in overviewTracks.slice(0, 5)"
+                :key="track.id"
+                :track="track"
+                :trackNumber="index + 1"
+                :isPlaying="playerStore.currentTrack?.id === track.id"
+                :isLiked="libraryStore.isTrackLiked(track.id)"
+                @click="handleTrackClick(track, index)"
+                @like="handleLikeTrack(track)"
+                @menu="(e) => handleTrackMenu(track, index, e)"
+                @download="handleDirectDownload(track)"
+                @addToLibrary="handleAddToLibrary(track)"
+              />
+            </div>
+            <button 
+              v-if="(user.track_count || overviewTracks.length) > 5" 
+              class="profile-view-more-btn"
+              @click="activeTab = 'tracks'"
+            >
+              <span>Показать все {{ user.track_count }} треков</span>
+              <ChevronRight :size="16" />
+            </button>
+          </section>
+
+          <!-- Empty State if user has no public content -->
+          <div v-if="overviewPlaylists.length === 0 && overviewTracks.length === 0 && overviewAlbums.length === 0" class="empty-state">
+            <div class="empty-icon"><Music :size="48" /></div>
+            <h2>Медиатека пуста</h2>
+            <p>У пользователя пока нет публичных треков или плейлистов</p>
+          </div>
+        </template>
       </div>
 
       <!-- Tracks Tab Content -->
@@ -190,9 +369,13 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
+import { useLibraryStore } from '@/stores/library'
+import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useTrackActions, usePlaybackActions, useShare } from '@/composables'
 import { socialApi, playlistsApi } from '@/api/client'
+import { getCoverUrl, CoverSize } from '@/utils'
+import TrackItem from '@/components/TrackItem.vue'
 import VirtualTrackList from '@/components/VirtualTrackList.vue'
 import VirtualGrid from '@/components/VirtualGrid.vue'
 import {
@@ -205,12 +388,18 @@ import {
   Folder,
   Disc3,
   Settings,
+  Play,
+  Shuffle,
+  ChevronRight,
+  Sparkles,
 } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const playerStore = usePlayerStore()
+const libraryStore = useLibraryStore()
+const uiStore = useUIStore()
 const { openMenu } = useContextMenu()
 const { share } = useShare()
 
@@ -235,7 +424,13 @@ const error = ref(null)
 const isForbidden = ref(false)
 const isFollowing = ref(false)
 const followLoading = ref(false)
-const activeTab = ref('tracks')
+const activeTab = ref('overview')
+
+// Overview data
+const overviewTracks = ref([])
+const overviewPlaylists = ref([])
+const overviewAlbums = ref([])
+const loadingOverview = ref(false)
 
 // Refs
 const virtualTrackListRef = ref(null)
@@ -248,6 +443,92 @@ const getInitials = (u) => {
   if (u.display_name) return u.display_name.charAt(0).toUpperCase()
   if (u.username) return u.username.charAt(0).toUpperCase()
   return '?'
+}
+
+const getTracksWord = (count) => {
+  const c = count || 0
+  const mod10 = c % 10
+  const mod100 = c % 100
+  if (mod100 >= 11 && mod100 <= 14) return 'треков'
+  if (mod10 === 1) return 'трек'
+  if (mod10 >= 2 && mod10 <= 4) return 'трека'
+  return 'треков'
+}
+
+const getPlaylistsWord = (count) => {
+  const c = count || 0
+  const mod10 = c % 10
+  const mod100 = c % 100
+  if (mod100 >= 11 && mod100 <= 14) return 'плейлистов'
+  if (mod10 === 1) return 'плейлист'
+  if (mod10 >= 2 && mod10 <= 4) return 'плейлиста'
+  return 'плейлистов'
+}
+
+const avatarGradientStyle = computed(() => {
+  const str = user.value?.display_name || user.value?.username || 'User'
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const h1 = Math.abs(hash % 360)
+  const h2 = (h1 + 60) % 360
+  return {
+    background: `linear-gradient(135deg, hsl(${h1}, 70%, 45%) 0%, hsl(${h2}, 75%, 55%) 100%)`
+  }
+})
+
+const ambientGlowStyle = computed(() => {
+  const str = user.value?.display_name || user.value?.username || 'User'
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const h1 = Math.abs(hash % 360)
+  return {
+    background: `radial-gradient(ellipse at 30% 0%, hsla(${h1}, 75%, 50%, 0.18) 0%, rgba(14, 18, 24, 0) 75%)`
+  }
+})
+
+const getPlaylistCoverStyle = (playlist) => {
+  if (playlist?.covers?.length) return {}
+  const str = playlist?.name || 'Playlist'
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const h1 = Math.abs(hash % 360)
+  const h2 = (h1 + 40) % 360
+  return {
+    background: `linear-gradient(135deg, hsl(${h1}, 65%, 28%) 0%, hsl(${h2}, 60%, 18%) 100%)`
+  }
+}
+
+// Load Overview Strips
+const loadOverviewData = async (id) => {
+  if (!id) return
+  loadingOverview.value = true
+  try {
+    const [tracksRes, playlistsRes, albumsRes] = await Promise.allSettled([
+      socialApi.getUserLibrary(id, { page: 1, per_page: 8 }),
+      playlistsApi.getUserPlaylists(id),
+      socialApi.getUserAlbums(id, { page: 1, per_page: 10 })
+    ])
+
+    if (tracksRes.status === 'fulfilled') {
+      overviewTracks.value = tracksRes.value.data?.items || (Array.isArray(tracksRes.value.data) ? tracksRes.value.data : [])
+    }
+    if (playlistsRes.status === 'fulfilled') {
+      overviewPlaylists.value = playlistsRes.value.data?.items || (Array.isArray(playlistsRes.value.data) ? playlistsRes.value.data : [])
+    }
+    if (albumsRes.status === 'fulfilled') {
+      overviewAlbums.value = albumsRes.value.data?.items || (Array.isArray(albumsRes.value.data) ? albumsRes.value.data : [])
+    }
+  } catch (err) {
+    console.error('Failed to load overview data:', err)
+  } finally {
+    loadingOverview.value = false
+  }
 }
 
 // Fetch user profile
@@ -267,6 +548,7 @@ const loadUserProfile = async () => {
     const res = await socialApi.getUser(id)
     user.value = res.data
     isFollowing.value = !!res.data.is_following
+    loadOverviewData(id)
   } catch (err) {
     if (err.response?.status === 403) {
       isForbidden.value = true
@@ -322,6 +604,42 @@ const handleShare = () => {
 }
 
 // Track actions
+const handlePlayUserLibrary = async () => {
+  if (overviewTracks.value?.length > 0) {
+    playQueue(overviewTracks.value, 0)
+    uiStore.toast.success('Воспроизведение', `Играет медиатека ${user.value.display_name}`)
+  } else {
+    try {
+      const res = await socialApi.getUserLibrary(userId.value, { page: 1, per_page: 50 })
+      const tracks = res.data?.items || []
+      if (tracks.length > 0) {
+        playQueue(tracks, 0)
+        uiStore.toast.success('Воспроизведение', `Играет медиатека ${user.value.display_name}`)
+      } else {
+        uiStore.toast.info('Пусто', 'У пользователя нет доступных треков')
+      }
+    } catch (e) {
+      console.error('Failed to play user library:', e)
+    }
+  }
+}
+
+const handleShuffleUserLibrary = async () => {
+  try {
+    const res = await socialApi.getUserLibrary(userId.value, { page: 1, per_page: 100 })
+    const tracks = res.data?.items || []
+    if (tracks.length > 0) {
+      const shuffled = [...tracks].sort(() => Math.random() - 0.5)
+      playQueue(shuffled, 0)
+      uiStore.toast.success('Перемешивание', `Играет медиатека ${user.value.display_name}`)
+    } else {
+      uiStore.toast.info('Пусто', 'У пользователя нет доступных треков')
+    }
+  } catch (e) {
+    console.error('Failed to shuffle user library:', e)
+  }
+}
+
 const fetchUserTracks = async ({ offset, limit }) => {
   const page = Math.floor(offset / limit) + 1
   try {
@@ -337,10 +655,12 @@ const fetchUserTracks = async ({ offset, limit }) => {
 }
 
 const handleTrackClick = (track, index) => {
-  if (virtualTrackListRef.value?.allItems) {
+  if (activeTab.value === 'tracks' && virtualTrackListRef.value?.allItems) {
     const items = virtualTrackListRef.value.allItems.filter(Boolean)
     const validIndex = items.findIndex((t) => t.id === track.id)
     playQueue(items, validIndex >= 0 ? validIndex : index)
+  } else if (overviewTracks.value?.length) {
+    playQueue(overviewTracks.value, index)
   } else {
     playTrack(track)
   }
@@ -469,167 +789,433 @@ onMounted(() => {
   max-width: 320px;
 }
 
-/* User Hero Header */
-.user-hero {
+/* Profile Hero Card */
+.profile-hero-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--c-bg-2, #181818);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.hero-ambient-glow {
+  position: absolute;
+  top: -60px;
+  left: -40px;
+  right: -40px;
+  height: 200px;
+  pointer-events: none;
+  opacity: 0.9;
+  filter: blur(20px);
+}
+
+.hero-content {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 20px;
-  margin-bottom: 20px;
-  padding: 20px;
-  background: var(--c-bg-2);
-  border-radius: var(--r-xl);
-  box-shadow: 
-    4px 4px 12px var(--sh-dark),
-    -2px -2px 6px var(--sh-light);
-  border: 1px solid rgba(255, 255, 255, 0.03);
+  gap: 16px;
+  margin-bottom: 16px;
+  z-index: 1;
 }
 
 .hero-avatar {
-  width: 80px;
-  height: 80px;
-  min-width: 80px;
+  width: 68px;
+  height: 68px;
+  min-width: 68px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--c-accent), #8b5cf6);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 32px;
+  font-size: 26px;
   font-weight: 700;
   color: #fff;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  border: 2px solid rgba(255, 255, 255, 0.15);
 }
 
-.hero-info {
+.hero-meta {
   flex: 1;
   min-width: 0;
 }
 
-.hero-title {
-  font-size: 22px;
+.hero-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hero-name {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--c-text-1, #fff);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+}
+
+.hero-handle {
+  font-size: 13px;
+  color: var(--c-accent, #1db954);
+  font-weight: 500;
+  margin: 2px 0 6px;
+}
+
+.hero-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.hero-stat-pill {
+  background: none;
+  border: none;
+  padding: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.hero-stat-pill:hover:not(.no-click) {
+  color: var(--c-accent, #1db954);
+}
+
+.hero-stat-pill.no-click {
+  cursor: default;
+}
+
+.hero-stat-pill.clickable-stat {
+  cursor: pointer;
+}
+
+.stat-num {
   font-weight: 700;
-  color: var(--c-text-1);
-  margin: 0 0 4px 0;
+  color: var(--c-text-1, #fff);
+  font-size: 13px;
+}
+
+.stat-separator {
+  color: rgba(255, 255, 255, 0.2);
+  font-size: 10px;
+}
+
+.self-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--r-full, 9999px);
+  background: var(--c-accent, #1db954);
+  color: #000;
+}
+
+.hero-actions-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  z-index: 1;
+}
+
+.hero-play-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 9999px;
+  background: var(--c-accent, #1db954);
+  color: #000;
+  font-weight: 700;
+  font-size: 13px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(29, 185, 84, 0.4);
+}
+
+.hero-play-btn:hover {
+  transform: scale(1.03);
+  background: #1ed760;
+}
+
+.hero-icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--c-text-1, #fff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.hero-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  transform: scale(1.05);
+}
+
+.hero-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--c-text-1, #fff);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.hero-pill-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.hero-pill-btn.follow-btn.is-following {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+}
+
+.user-tabs {
+  margin-bottom: 20px;
+}
+
+.tab-count {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-left: 2px;
+}
+
+/* Profile Sections (Overview mode) */
+.profile-section {
+  margin-bottom: 28px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--c-text-1, #fff);
+  letter-spacing: -0.01em;
+}
+
+.section-link {
+  background: none;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.section-link:hover {
+  color: var(--c-accent, #1db954);
+}
+
+/* Horizontal Scroll */
+.horizontal-scroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+}
+
+.horizontal-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Feed Cards */
+.feed-card {
+  width: 128px;
+  flex-shrink: 0;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+}
+
+.feed-card-cover {
+  width: 128px;
+  height: 128px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  position: relative;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.feed-card-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.feed-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--c-text-1, #fff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.feed-card-subtitle {
+  font-size: 12px;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.user-handle {
-  font-size: 14px;
-  color: var(--c-accent);
-  margin: 0 0 12px 0;
-  font-weight: 500;
-}
-
-.profile-stats-bar {
+.play-overlay {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--c-accent, #1db954);
+  color: #000;
+  border: none;
   display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: all 0.2s ease;
 }
 
-.stat-badge {
+.feed-card:hover .play-overlay {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+  .play-overlay {
+    opacity: 0.9;
+    transform: translateY(0);
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* Skeletons */
+.feed-card-skeleton {
+  width: 128px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  cursor: pointer;
-  user-select: none;
-  transition: transform 0.15s ease;
 }
 
-.stat-badge:hover {
-  transform: translateY(-1px);
+.skeleton-feed-cover {
+  width: 128px;
+  height: 128px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  margin-bottom: 8px;
+  animation: pulse 1.5s ease-in-out infinite;
 }
 
-.stat-num {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--c-text-1);
+.skeleton-feed-title {
+  height: 14px;
+  width: 80%;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  margin-bottom: 6px;
+  animation: pulse 1.5s ease-in-out infinite;
 }
 
-.stat-desc {
-  font-size: 12px;
-  color: var(--c-text-2);
+.skeleton-feed-sub {
+  height: 12px;
+  width: 50%;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  animation: pulse 1.5s ease-in-out infinite;
 }
 
-/* Actions Bar */
-.profile-actions-bar {
+.skeleton-section-title {
+  height: 20px;
+  width: 120px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 0.3; }
+}
+
+/* Profile Tracks List */
+.profile-tracks-list {
   display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.btn-action {
-  display: inline-flex;
+.profile-view-more-btn {
+  width: 100%;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
-  border-radius: var(--r-full);
-  font-size: 14px;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
-  border: none;
+  transition: all 0.2s;
+  margin-top: 8px;
 }
 
-.follow-btn {
-  background: var(--c-accent);
-  color: #fff;
+.profile-view-more-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--c-text-1, #fff);
 }
 
-.follow-btn.is-following {
-  background: var(--c-bg-3);
-  color: var(--c-text-1);
-  box-shadow: 
-    2px 2px 5px var(--sh-dark),
-    -1px -1px 3px var(--sh-light);
-}
-
-.follow-btn:hover:not(:disabled) {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-.share-btn {
-  background: var(--c-bg-2);
-  color: var(--c-text-1);
-  box-shadow: 
-    3px 3px 8px var(--sh-dark),
-    -2px -2px 4px var(--sh-light);
-  border: 1px solid rgba(255, 255, 255, 0.02);
-}
-
-.share-btn:hover {
-  background: var(--c-bg-3);
-}
-
-.self-badge {
-  display: inline-block;
-  vertical-align: middle;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: var(--r-full);
-  background: var(--c-accent);
-  color: #fff;
-  margin-left: 8px;
-}
-
-.settings-profile-btn {
-  background: var(--c-bg-3);
-  color: var(--c-text-1);
-  box-shadow: 
-    2px 2px 5px var(--sh-dark),
-    -1px -1px 3px var(--sh-light);
-}
-
-.settings-profile-btn:hover {
-  background: var(--c-bg-2);
+.tab-pane {
+  min-height: 200px;
 }
 
 .btn-pill-secondary {
   padding: 10px 24px;
-  border-radius: var(--r-full);
-  background: var(--c-bg-3);
-  color: var(--c-text-1);
+  border-radius: var(--r-full, 9999px);
+  background: var(--c-bg-3, #222);
+  color: var(--c-text-1, #fff);
   border: none;
   font-size: 14px;
   font-weight: 600;
@@ -637,32 +1223,29 @@ onMounted(() => {
   margin-top: 8px;
 }
 
-.user-tabs {
-  margin-bottom: 16px;
-}
-
-.tab-pane {
-  min-height: 200px;
-}
-
 @media (max-width: 600px) {
-  .user-hero {
-    flex-direction: column;
-    text-align: center;
-    gap: 14px;
-    padding: 16px;
+  .profile-hero-card {
+    padding: 14px 16px;
   }
   .hero-avatar {
-    width: 72px;
-    height: 72px;
-    font-size: 28px;
+    width: 56px;
+    height: 56px;
+    min-width: 56px;
+    font-size: 22px;
   }
-  .profile-stats-bar {
-    justify-content: center;
-    gap: 12px;
+  .hero-name {
+    font-size: 18px;
   }
-  .profile-actions-bar {
-    justify-content: center;
+  .hero-actions-bar {
+    gap: 8px;
+  }
+  .hero-play-btn {
+    padding: 7px 14px;
+    font-size: 12px;
+  }
+  .hero-pill-btn {
+    padding: 7px 12px;
+    font-size: 12px;
   }
 }
 </style>
