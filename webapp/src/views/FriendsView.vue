@@ -12,6 +12,26 @@
 
     <!-- Has channel - show friends -->
     <template v-else>
+      <!-- My Profile banner -->
+      <div v-if="authStore.user" class="my-profile-banner" @click="router.push(`/user/${authStore.user.id}`)">
+        <div class="user-avatar my-avatar">
+          {{ getInitials(authStore.user) }}
+        </div>
+        <div class="user-info">
+          <div class="user-name">
+            {{ authStore.user.first_name }} {{ authStore.user.last_name || '' }}
+            <span class="self-badge">Вы</span>
+          </div>
+          <div class="user-meta">
+            <span v-if="authStore.user.username">@{{ authStore.user.username }} • </span>
+            <span>Мой публичный профиль</span>
+          </div>
+        </div>
+        <div class="my-profile-arrow">
+          <ChevronRight :size="20" />
+        </div>
+      </div>
+
       <!-- Unified Tab switcher -->
       <div class="neu-tab-bar friends-tabs">
         <button 
@@ -332,7 +352,7 @@ import { getDisplayTitle, getDisplayArtist, getCoverUrl, CoverSize } from '@/uti
 import api, { socialApi } from '@/api/client'
 import { useTrackSync } from '@/composables/useTrackSync'
 import SearchBar from '@/components/ui/SearchBar.vue'
-import { Users, User, Search, Check, X, Music, Folder, Disc3, Lightbulb } from 'lucide-vue-next'
+import { Users, User, Search, Check, X, Music, Folder, Disc3, Lightbulb, ChevronRight } from 'lucide-vue-next'
 
 const router = useRouter()
 const route = useRoute()
@@ -586,6 +606,51 @@ const handleResetState = (event) => {
 <style scoped>
 .friends-view {
   padding: 16px;
+}
+
+/* My profile banner */
+.my-profile-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  background: var(--c-bg-2);
+  border-radius: var(--r-xl);
+  box-shadow: 
+    3px 3px 10px var(--sh-dark),
+    -2px -2px 5px var(--sh-light);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  margin-bottom: 20px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.my-profile-banner:hover {
+  background: var(--c-bg-3);
+  transform: translateY(-1px);
+}
+
+.my-profile-banner:active {
+  transform: scale(0.99);
+}
+
+.my-profile-arrow {
+  margin-left: auto;
+  color: var(--c-text-2);
+  display: flex;
+  align-items: center;
+}
+
+.self-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: var(--r-full);
+  background: var(--c-accent);
+  color: #fff;
+  margin-left: 6px;
+  vertical-align: middle;
 }
 
 .friends-tabs {

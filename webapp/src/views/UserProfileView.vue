@@ -33,7 +33,10 @@
           <span>{{ getInitials(user) }}</span>
         </div>
         <div class="hero-info">
-          <h1 class="hero-title">{{ user.display_name }}</h1>
+          <h1 class="hero-title">
+            {{ user.display_name }}
+            <span v-if="isSelf" class="self-badge">Вы</span>
+          </h1>
           <p v-if="user.username" class="user-handle">@{{ user.username }}</p>
           
           <!-- Stats bar -->
@@ -60,8 +63,20 @@
 
       <!-- Action buttons -->
       <div class="profile-actions-bar">
+        <!-- Self profile actions -->
         <button
-          v-if="!isSelf"
+          v-if="isSelf"
+          class="btn-action settings-profile-btn"
+          @click="router.push('/settings')"
+          title="Настройки аккаунта"
+        >
+          <Settings :size="16" />
+          <span>Настройки</span>
+        </button>
+
+        <!-- Other user profile actions -->
+        <button
+          v-else
           class="btn-action follow-btn"
           :class="{ 'is-following': isFollowing }"
           :disabled="followLoading"
@@ -74,7 +89,7 @@
 
         <button class="btn-action share-btn" @click="handleShare" title="Поделиться профилем">
           <Share2 :size="16" />
-          <span>Поделиться</span>
+          <span>{{ isSelf ? 'Поделиться своим профилем' : 'Поделиться' }}</span>
         </button>
       </div>
 
@@ -189,6 +204,7 @@ import {
   Music,
   Folder,
   Disc3,
+  Settings,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -561,6 +577,30 @@ onMounted(() => {
 
 .share-btn:hover {
   background: var(--c-bg-3);
+}
+
+.self-badge {
+  display: inline-block;
+  vertical-align: middle;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  background: var(--c-accent);
+  color: #fff;
+  margin-left: 8px;
+}
+
+.settings-profile-btn {
+  background: var(--c-bg-3);
+  color: var(--c-text-1);
+  box-shadow: 
+    2px 2px 5px var(--sh-dark),
+    -1px -1px 3px var(--sh-light);
+}
+
+.settings-profile-btn:hover {
+  background: var(--c-bg-2);
 }
 
 .btn-pill-secondary {

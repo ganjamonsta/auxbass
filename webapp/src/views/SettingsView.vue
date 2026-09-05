@@ -55,17 +55,21 @@
     <!-- User section -->
     <section class="section">
       <h2>Аккаунт</h2>
-      <div class="user-info" v-if="authStore.user">
+      <div class="user-info user-profile-card" v-if="authStore.user" @click="goToMyProfile" title="Открыть свой профиль">
         <div class="avatar" :style="avatarGradient">
           <User v-if="!authStore.user.first_name" :size="24" />
           <span v-else class="avatar-letter">{{ authStore.user.first_name.charAt(0) }}</span>
         </div>
         <div class="user-details">
           <span class="user-name">
-            {{ authStore.user.first_name }} {{ authStore.user.last_name }}
+            {{ authStore.user.first_name }} {{ authStore.user.last_name || '' }}
           </span>
-          <span class="user-id">ID: {{ authStore.user.id }}</span>
+          <span class="user-id">@{{ authStore.user.username || ('ID: ' + authStore.user.id) }}</span>
         </div>
+        <button class="view-profile-btn" @click.stop="goToMyProfile">
+          <span>Профиль</span>
+          <ChevronRight :size="16" />
+        </button>
       </div>
       <button class="logout-btn" @click="logout">
         Выйти
@@ -384,7 +388,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
 import api, { authApi } from '@/api/client'
-import { Megaphone, Check, Folder, Heart, ListMusic, Cloud, RefreshCw, Lock, User, Bell, Sliders, Headphones, Smartphone, Download, HardDrive, Trash2 } from 'lucide-vue-next'
+import { Megaphone, Check, Folder, Heart, ListMusic, Cloud, RefreshCw, Lock, User, Bell, Sliders, Headphones, Smartphone, Download, HardDrive, Trash2, ChevronRight } from 'lucide-vue-next'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import { getCacheStats, getCachedAudioStats } from '@/utils/audioCacheDb'
 import { clearAudioCache } from '@/stores/playerCache'
@@ -394,6 +398,12 @@ const route = useRoute()
 const authStore = useAuthStore()
 const playerStore = usePlayerStore()
 const pwaInstall = usePwaInstall()
+
+const goToMyProfile = () => {
+  if (authStore.user?.id) {
+    router.push(`/user/${authStore.user.id}`)
+  }
+}
 
 const handleInstallClick = () => {
   pwaInstall.promptInstall()
@@ -670,6 +680,43 @@ h1 {
   align-items: center;
   gap: var(--sp-4);
   margin-bottom: var(--sp-4);
+}
+
+.user-profile-card {
+  cursor: pointer;
+  padding: 12px 16px;
+  background: var(--c-bg-2);
+  border-radius: var(--r-lg);
+  box-shadow: 
+    3px 3px 8px var(--sh-dark),
+    -2px -2px 4px var(--sh-light);
+  border: 1px solid rgba(255, 255, 255, 0.02);
+  transition: all 0.15s ease;
+}
+
+.user-profile-card:hover {
+  background: var(--c-bg-3);
+  transform: translateY(-1px);
+}
+
+.view-profile-btn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  background: var(--c-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--r-full);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.view-profile-btn:hover {
+  opacity: 0.9;
 }
 
 .avatar {

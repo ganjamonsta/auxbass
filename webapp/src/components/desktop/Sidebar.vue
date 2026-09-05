@@ -83,7 +83,7 @@
 
     <!-- User Section (bottom) -->
     <div class="sidebar-footer">
-      <div class="user-info">
+      <div class="user-info clickable" @click="goToMyProfile" title="Мой профиль">
         <div class="user-avatar">
           {{ userInitials }}
         </div>
@@ -199,6 +199,12 @@ const logout = async () => {
     authStore.logout()
     // Force full page reload to clear all store states
     window.location.href = '/login'
+  }
+}
+
+const goToMyProfile = () => {
+  if (authStore.user?.id) {
+    router.push(`/user/${authStore.user.id}`)
   }
 }
 
@@ -531,6 +537,17 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.user-info.clickable {
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--r-md);
+  transition: background 0.15s ease;
+}
+
+.user-info.clickable:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .footer-btn {

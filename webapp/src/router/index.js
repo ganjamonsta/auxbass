@@ -81,6 +81,18 @@ const routes = [
     name: 'login',
     component: LoginView
   },
+  {
+    path: '/profile',
+    name: 'my-profile',
+    redirect: () => {
+      const authStore = useAuthStore()
+      if (authStore.user?.id) {
+        return `/user/${authStore.user.id}`
+      }
+      return '/settings'
+    }
+  },
+  { path: '/me', redirect: '/profile' },
   // Legacy redirects
   { path: '/offline', redirect: '/downloaded' },
   { path: '/favorites', redirect: '/liked' },

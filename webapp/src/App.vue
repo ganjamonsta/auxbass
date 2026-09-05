@@ -53,6 +53,18 @@
               </button>
             </div>
           </template>
+          <template #actions>
+            <button
+              v-if="authStore.user && !(route.name === 'user-profile' && String(route.params.id) === String(authStore.user.id))"
+              class="header-profile-btn"
+              @click="router.push(`/user/${authStore.user.id}`)"
+              title="Мой профиль"
+            >
+              <div class="header-avatar-badge">
+                {{ userInitials }}
+              </div>
+            </button>
+          </template>
         </PageHeader>
 
         <!-- Router view -->
@@ -365,6 +377,14 @@ const libraryIcon = computed(() => {
     playlists: Folder
   }
   return icons[uiStore.libraryTab] || Music
+})
+
+const userInitials = computed(() => {
+  const u = authStore.user
+  if (!u) return '?'
+  if (u.first_name) return u.first_name.charAt(0).toUpperCase()
+  if (u.username) return u.username.charAt(0).toUpperCase()
+  return '?'
 })
 
 // Queue computeds for desktop player
@@ -837,5 +857,34 @@ html, body {
     padding: 0 40px 20px;
     max-width: 1600px;
   }
+}
+
+.header-profile-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-avatar-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--c-accent), #8b5cf6);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease;
+}
+
+.header-profile-btn:hover .header-avatar-badge {
+  transform: scale(1.06);
 }
 </style>
