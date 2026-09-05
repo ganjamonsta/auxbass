@@ -58,6 +58,8 @@
               v-if="authStore.user"
               class="header-profile-btn"
               @click="showProfileMenu = true"
+              @contextmenu.prevent="showProfileMenu = true"
+              v-longpress="() => { showProfileMenu = true }"
               title="Меню профиля"
             >
               <div class="header-avatar-badge">

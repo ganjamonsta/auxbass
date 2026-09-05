@@ -177,6 +177,26 @@
                 </template>
               </template>
 
+              <!-- ═══ LIKED / FAVORITES MENU ═══ -->
+              <template v-else-if="menuType === 'liked'">
+                <button class="menu-item" @click="exec('open')">
+                  <FolderOpen :size="18" />
+                  <span>Открыть</span>
+                </button>
+                <button class="menu-item" @click="exec('playAll')">
+                  <Play :size="18" fill="currentColor" />
+                  <span>Воспроизвести все</span>
+                </button>
+                <button class="menu-item" @click="exec('shuffle')">
+                  <Shuffle :size="18" />
+                  <span>Перемешать</span>
+                </button>
+                <button class="menu-item" @click="exec('addToQueue')">
+                  <ListMusic :size="18" />
+                  <span>Добавить в очередь</span>
+                </button>
+              </template>
+
               <!-- ═══ ALBUM MENU ═══ -->
               <template v-else-if="menuType === 'album'">
                 <button class="menu-item" @click="exec('open')">
@@ -306,7 +326,7 @@ import TagChips from '@/components/TagChips.vue'
 import { 
   X, User, Disc3, Play, ListMusic, Plus, Minus, Pencil, 
   Download, Trash2, FolderOpen, Shuffle, Music, Mic2, ChevronRight, ChevronDown,
-  ThumbsDown
+  ThumbsDown, Heart
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -463,6 +483,15 @@ const coverStyle = computed(() => {
       backgroundPosition: 'center'
     }
   }
+  if (menuType.value === 'liked') {
+    return {
+      background: 'linear-gradient(135deg, #450af5 0%, #8b5cf6 50%, #c084fc 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: '#ffffff'
+    }
+  }
   return {}
 })
 
@@ -472,6 +501,7 @@ const coverIcon = computed(() => {
     case 'playlist': return ListMusic
     case 'album': return Disc3
     case 'artist': return Mic2
+    case 'liked': return Heart
     default: return Music
   }
 })
@@ -485,6 +515,7 @@ const title = computed(() => {
     case 'playlist': return data.name || 'Плейлист'
     case 'album': return data.name || data.album_name || 'Альбом'
     case 'artist': return typeof data === 'string' ? data : data.name || 'Артист'
+    case 'liked': return data.name || 'Понравившиеся'
     default: return ''
   }
 })
@@ -498,6 +529,7 @@ const subtitle = computed(() => {
     case 'playlist': return `${data.track_count || 0} ${getTracksWord(data.track_count || 0)}`
     case 'album': return data.album_artist || data.artist || ''
     case 'artist': return `${data.track_count || ''} ${data.track_count ? getTracksWord(data.track_count) : ''}`
+    case 'liked': return `${data.track_count || 0} ${getTracksWord(data.track_count || 0)}`
     default: return ''
   }
 })

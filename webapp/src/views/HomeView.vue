@@ -23,7 +23,12 @@
     <!-- Real Quick-Access Cards -->
     <section v-else class="quick-access-grid">
       <!-- Liked Songs Tile (Always First) -->
-      <div class="quick-card liked-card" @click="goTo('/liked')">
+      <div 
+        class="quick-card liked-card" 
+        @click="goTo('/liked')"
+        @contextmenu.prevent="openMenu('liked', { name: 'Понравившиеся', track_count: likedCount }, 'home', $event)"
+        v-longpress="(e) => openMenu('liked', { name: 'Понравившиеся', track_count: likedCount }, 'home', e)"
+      >
         <div class="quick-card-cover liked-cover-gradient">
           <Heart :size="24" fill="currentColor" />
         </div>
@@ -47,6 +52,8 @@
         :key="playlist.id"
         class="quick-card"
         @click="goTo(`/playlist/${playlist.id}`)"
+        @contextmenu.prevent="openMenu('playlist', playlist, 'home', $event)"
+        v-longpress="(e) => openMenu('playlist', playlist, 'home', e)"
       >
         <div class="quick-card-cover" :style="getPlaylistCoverStyle(playlist)">
           <img 
@@ -76,6 +83,8 @@
         v-if="topPlaylists.length < 5" 
         class="quick-card create-card" 
         @click="handleCreatePlaylist"
+        @contextmenu.prevent="handleCreatePlaylist"
+        v-longpress="handleCreatePlaylist"
       >
         <div class="quick-card-cover create-cover">
           <Plus :size="24" />
@@ -114,6 +123,7 @@
           class="feed-card"
           @click="handlePlayTrack(track, recentHistoryTracks)"
           @contextmenu.prevent="openMenu('track', track, 'history', $event)"
+          v-longpress="(e) => openMenu('track', track, 'history', e)"
         >
           <div class="feed-card-cover">
             <img 
@@ -163,6 +173,7 @@
           class="feed-card"
           @click="goTo(`/playlist/${pl.id}`)"
           @contextmenu.prevent="openMenu('playlist', pl, 'home', $event)"
+          v-longpress="(e) => openMenu('playlist', pl, 'home', e)"
         >
           <div class="feed-card-cover" :style="getPlaylistCoverStyle(pl)">
             <img 
@@ -214,6 +225,7 @@
           class="feed-card"
           @click="handlePlayTrack(track, recentUploads)"
           @contextmenu.prevent="openMenu('track', track, 'recent_uploads', $event)"
+          v-longpress="(e) => openMenu('track', track, 'recent_uploads', e)"
         >
           <div class="feed-card-cover">
             <img 

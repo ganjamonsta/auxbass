@@ -27,6 +27,8 @@
         class="nav-item" 
         :class="{ active: isActiveRoute(item.path, item.matchPaths) }"
         @click="handleNavClick(item.path)"
+        @contextmenu.prevent="handleItemContextMenu(item, $event)"
+        v-longpress="(e) => handleItemContextMenu(item, e)"
       >
         <component :is="item.icon" class="nav-icon" :size="22" :stroke-width="2" />
         <span class="nav-label">{{ item.label }}</span>
@@ -40,6 +42,8 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MiniPlayer from '@/components/MiniPlayer.vue'
 import { Home, Search, Library, Heart } from 'lucide-vue-next'
+import { useContextMenu } from '@/composables/useContextMenu'
+import { useLibraryStore } from '@/stores/library'
 
 const props = defineProps({
   // Player props
@@ -159,6 +163,15 @@ const handleNavClick = (path) => {
     // Navigate to new page
     emit('nav-click', path)
     router.push(path)
+  }
+}
+
+const { openMenu } = useContextMenu()
+const libraryStore = useLibraryStore()
+
+const handleItemContextMenu = (item, event) => {
+  if (item.path === '/liked') {
+    openMenu('liked', { name: 'Понравившиеся', track_count: libraryStore.likedTracks?.length || 0 }, 'footer', event)
   }
 }
 </script>

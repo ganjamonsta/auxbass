@@ -65,9 +65,11 @@ export function useContextMenu() {
     menuData.value = data
     menuContext.value = context
     
-    // Capture mouse position for desktop
-    if (event && event.clientX !== undefined) {
-      menuPosition.value = { x: event.clientX, y: event.clientY }
+    // Capture mouse or touch position
+    const clientX = event?.clientX ?? event?.touches?.[0]?.clientX ?? event?.changedTouches?.[0]?.clientX
+    const clientY = event?.clientY ?? event?.touches?.[0]?.clientY ?? event?.changedTouches?.[0]?.clientY
+    if (clientX !== undefined && clientY !== undefined) {
+      menuPosition.value = { x: clientX, y: clientY }
     } else {
       menuPosition.value = { x: 0, y: 0 }
     }
@@ -481,6 +483,66 @@ export function useContextMenu() {
   }
 
   // ═══════════════════════════════════════════════════════════
+  // LIKED / FAVORITES ACTIONS
+  // ═══════════════════════════════════════════════════════════
+
+  const likedActions = {
+    open: () => {
+      closeMenu()
+      router.push('/liked')
+    },
+
+    playAll: async () => {
+      closeMenu()
+      try {
+        let tracks = libraryStore.likedTracks
+        if (!tracks?.length) {
+          tracks = await libraryStore.fetchLikedTracks()
+        }
+        if (tracks?.length) {
+          playerStore.playTrack(tracks[0], tracks, 0)
+          uiStore.toast.success('Воспроизведение', 'Включены любимые треки')
+        } else {
+          uiStore.toast.info('Любимое', 'У вас пока нет сохранённых треков')
+        }
+      } catch (error) {
+        console.error('Failed to play liked tracks:', error)
+        uiStore.toast.error('Ошибка', 'Не удалось воспроизвести')
+      }
+    },
+
+    shuffle: async () => {
+      closeMenu()
+      try {
+        await playerStore.playShuffleAll('library')
+        uiStore.toast.success('Перемешивание', 'Любимые треки перемешаны')
+      } catch (error) {
+        console.error('Failed to shuffle liked tracks:', error)
+        uiStore.toast.error('Ошибка', 'Не удалось воспроизвести')
+      }
+    },
+
+    addToQueue: async () => {
+      closeMenu()
+      try {
+        let tracks = libraryStore.likedTracks
+        if (!tracks?.length) {
+          tracks = await libraryStore.fetchLikedTracks()
+        }
+        if (tracks?.length) {
+          tracks.forEach(track => playerStore.addToQueue(track))
+          uiStore.toast.success('Добавлено', `${tracks.length} треков в очереди`)
+        } else {
+          uiStore.toast.info('Пусто', 'В любимых пока нет треков')
+        }
+      } catch (error) {
+        console.error('Failed to add liked tracks to queue:', error)
+        uiStore.toast.error('Ошибка', 'Не удалось добавить в очередь')
+      }
+    },
+  }
+
+  // ═══════════════════════════════════════════════════════════
   // MODAL HANDLERS
   // ═══════════════════════════════════════════════════════════
 
@@ -606,6 +668,11 @@ export function useContextMenu() {
           artistActions[action](data, extra)
         }
         break
+      case 'liked':
+        if (likedActions[action]) {
+          likedActions[action](data, extra)
+        }
+        break
       default:
         console.warn(`Unknown menu type: ${type}`)
         closeMenu()
@@ -630,6 +697,7 @@ export function useContextMenu() {
     playlistActions,
     albumActions,
     artistActions,
+    likedActions,
 
     // Modal states
     showPlaylistPicker,
