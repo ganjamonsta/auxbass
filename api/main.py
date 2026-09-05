@@ -205,7 +205,8 @@ app.include_router(artists_router, prefix="/api/artists", tags=["Artists"])
 app.include_router(playlists_router, prefix="/api/playlists", tags=["Playlists"])
 app.include_router(images_router, prefix="/api", tags=["Images"])
 app.include_router(player_router, prefix="/api/player", tags=["Player"])
-app.include_router(social_router, prefix="/api", tags=["Social"])
+app.include_router(social_router, prefix="/api/social", tags=["Social"])
+app.include_router(social_router, prefix="/api", tags=["Social-Legacy"])
 app.include_router(tags_router, prefix="/api/tracks", tags=["Tags"])
 
 

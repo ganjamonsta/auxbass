@@ -218,8 +218,15 @@ const { share } = useShare()
 const { handleDirectDownload, handleLikeTrack, handleAddToLibrary } = useTrackActions()
 const { playTrack, playQueue } = usePlaybackActions()
 
-const userId = computed(() => Number(route.params.id))
-const isSelf = computed(() => authStore.user && authStore.user.id === userId.value)
+const userId = computed(() => {
+  const raw = route.params.id
+  if (raw === 'me' || !raw) {
+    return authStore.user?.id || 0
+  }
+  const parsed = Number(raw)
+  return isNaN(parsed) ? (authStore.user?.id || 0) : parsed
+})
+const isSelf = computed(() => !!(authStore.user && authStore.user.id === userId.value))
 
 // State
 const user = ref(null)
@@ -245,13 +252,19 @@ const getInitials = (u) => {
 
 // Fetch user profile
 const loadUserProfile = async () => {
-  if (!userId.value) return
+  const id = userId.value
+  if (!id) {
+    if (authStore.loading || !authStore.initialized) return
+    error.value = 'Пользователь не найден'
+    loading.value = false
+    return
+  }
   loading.value = true
   error.value = null
   isForbidden.value = false
 
   try {
-    const res = await socialApi.getUser(userId.value)
+    const res = await socialApi.getUser(id)
     user.value = res.data
     isFollowing.value = !!res.data.is_following
   } catch (err) {
@@ -395,6 +408,15 @@ watch(
   () => route.params.id,
   (newId) => {
     if (newId && route.name === 'user-profile') {
+      loadUserProfile()
+    }
+  }
+)
+
+watch(
+  () => authStore.user,
+  (newUser) => {
+    if (newUser && (!user.value || isSelf.value)) {
       loadUserProfile()
     }
   }
