@@ -188,7 +188,12 @@ app.add_middleware(CacheControlMiddleware)
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=".*",
+    allow_origins=[
+        settings.webapp_url,         # Production webapp URL
+        settings.api_url,            # Same-origin API requests
+        "http://localhost:5173",     # Vite dev server
+        "http://localhost:8000",     # Local API dev
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -305,7 +310,7 @@ async def spa_fallback(full_path: str):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
-        "main_v2:app",
+        "api.main:app",
         host=settings.api_host,
         port=settings.api_port,
         reload=True

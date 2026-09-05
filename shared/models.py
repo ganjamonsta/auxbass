@@ -26,7 +26,7 @@ def utcnow() -> datetime:
 from sqlalchemy import (
     BigInteger, Integer, String, Text, Boolean, 
     DateTime, ForeignKey, UniqueConstraint, Index,
-    Enum as SQLEnum, String as SQLString, JSON
+    Enum as SQLEnum, JSON
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 

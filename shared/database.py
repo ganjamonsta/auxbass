@@ -151,8 +151,6 @@ async def _ensure_sqlite_columns(conn):
         ],
         "playlists": [
             ("custom_cover_url", "TEXT"),
-            ("pending_cover_url", "TEXT"),
-            ("pending_cover_expires_at", "TIMESTAMP"),
         ],
         "user_library": [
             ("is_disliked", "INTEGER DEFAULT 0"),

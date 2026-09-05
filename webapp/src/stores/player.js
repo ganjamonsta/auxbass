@@ -297,8 +297,6 @@ export const usePlayerStore = defineStore('player', () => {
     })
   }
 
-  const preloadNextTrack = preloadNextTracks  // legacy alias
-
   // ===================== AUDIO EVENT HANDLERS =====================
   const buildAudioHandlers = () => ({
     onCanPlay: () => {
