@@ -9,7 +9,19 @@
     </header>
 
     <!-- Top Quick-Access Grid (Spotify 2x3 / 3x2) -->
-    <section class="quick-access-grid">
+    <!-- Skeletons while loading quick access -->
+    <section v-if="loadingQuickAccess" class="quick-access-grid">
+      <div v-for="i in 6" :key="i" class="quick-card quick-skeleton">
+        <div class="skeleton-thumb"></div>
+        <div class="skeleton-info">
+          <div class="skeleton-line-title"></div>
+          <div class="skeleton-line-sub"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Real Quick-Access Cards -->
+    <section v-else class="quick-access-grid">
       <!-- Liked Songs Tile (Always First) -->
       <div class="quick-card liked-card" @click="goTo('/liked')">
         <div class="quick-card-cover liked-cover-gradient">
@@ -76,7 +88,22 @@
     </section>
 
     <!-- Section: Недавно прослушано (History) -->
-    <section v-if="recentHistoryTracks.length > 0" class="home-section">
+    <!-- Skeleton when history is loading -->
+    <section v-if="loadingHistory" class="home-section">
+      <div class="section-header">
+        <div class="skeleton-section-title"></div>
+      </div>
+      <div class="horizontal-scroll">
+        <div v-for="i in 6" :key="i" class="feed-card-skeleton">
+          <div class="skeleton-feed-cover"></div>
+          <div class="skeleton-feed-title"></div>
+          <div class="skeleton-feed-sub"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Real History Section -->
+    <section v-else-if="recentHistoryTracks.length > 0" class="home-section">
       <div class="section-header">
         <h2 class="section-title">Недавно прослушано</h2>
       </div>
@@ -109,7 +136,22 @@
     </section>
 
     <!-- Section: Ваши плейлисты -->
-    <section v-if="allPlaylists.length > 0" class="home-section">
+    <!-- Skeleton when playlists are loading -->
+    <section v-if="loadingPlaylists" class="home-section">
+      <div class="section-header">
+        <div class="skeleton-section-title"></div>
+      </div>
+      <div class="horizontal-scroll">
+        <div v-for="i in 5" :key="i" class="feed-card-skeleton">
+          <div class="skeleton-feed-cover"></div>
+          <div class="skeleton-feed-title"></div>
+          <div class="skeleton-feed-sub"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Real Playlists Section -->
+    <section v-else-if="allPlaylists.length > 0" class="home-section">
       <div class="section-header">
         <h2 class="section-title">Ваши плейлисты</h2>
         <button class="section-link" @click="goToLibraryPlaylists">Все</button>
@@ -146,7 +188,22 @@
     </section>
 
     <!-- Section: Свежее в сообществе (Recent Uploads) -->
-    <section v-if="recentUploads.length > 0" class="home-section">
+    <!-- Skeleton when uploads are loading -->
+    <section v-if="loadingUploads" class="home-section">
+      <div class="section-header">
+        <div class="skeleton-section-title"></div>
+      </div>
+      <div class="horizontal-scroll">
+        <div v-for="i in 6" :key="i" class="feed-card-skeleton">
+          <div class="skeleton-feed-cover"></div>
+          <div class="skeleton-feed-title"></div>
+          <div class="skeleton-feed-sub"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Real Recent Uploads Section -->
+    <section v-else-if="recentUploads.length > 0" class="home-section">
       <div class="section-header">
         <h2 class="section-title">Новинки сообщества</h2>
       </div>
@@ -199,7 +256,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useLibraryStore } from '@/stores/library'
@@ -222,6 +279,12 @@ const libraryStore = useLibraryStore()
 const playerStore = usePlayerStore()
 const uiStore = useUIStore()
 const { openMenu } = useContextMenu()
+
+// Independent async loading flags per section
+const loadingQuickAccess = ref(!libraryStore.playlists?.length && !libraryStore.likedTracks?.length)
+const loadingHistory = ref(!libraryStore.history?.length)
+const loadingPlaylists = ref(!libraryStore.playlists?.length)
+const loadingUploads = ref(!libraryStore.recentUploads?.length)
 
 // Greeting by time of day
 const greetingText = computed(() => {
@@ -306,19 +369,41 @@ const getPlaylistCoverStyle = (playlist) => {
   }
 }
 
-onMounted(async () => {
-  // Ensure background data is loaded for home page
+onMounted(() => {
+  // 1. Playlists (Quick access + Your Playlists)
   if (!libraryStore.playlists?.length) {
-    libraryStore.fetchPlaylists()
+    libraryStore.fetchPlaylists().finally(() => {
+      loadingPlaylists.value = false
+      loadingQuickAccess.value = false
+    })
+  } else {
+    loadingPlaylists.value = false
+    loadingQuickAccess.value = false
   }
+
+  // 2. Liked tracks
   if (!libraryStore.likedTracks?.length) {
-    libraryStore.fetchLikedTracks()
+    libraryStore.fetchLikedTracks().finally(() => {
+      loadingQuickAccess.value = false
+    })
   }
+
+  // 3. History
   if (!libraryStore.history?.length) {
-    libraryStore.fetchHistory(20)
+    libraryStore.fetchHistory(20).finally(() => {
+      loadingHistory.value = false
+    })
+  } else {
+    loadingHistory.value = false
   }
+
+  // 4. Recent Uploads
   if (!libraryStore.recentUploads?.length) {
-    libraryStore.fetchRecentUploads(15)
+    libraryStore.fetchRecentUploads(15).finally(() => {
+      loadingUploads.value = false
+    })
+  } else {
+    loadingUploads.value = false
   }
 })
 </script>
@@ -664,5 +749,94 @@ onMounted(async () => {
 
 .discovery-btn:active {
   transform: scale(0.97);
+}
+
+/* =========================================
+   Skeletons (Neumorphic Async Loaders)
+   ========================================= */
+.quick-skeleton {
+  cursor: default;
+  pointer-events: none;
+}
+
+.skeleton-thumb {
+  width: 56px;
+  height: 56px;
+  background: rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-info {
+  flex: 1;
+  padding: 0 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.skeleton-line-title {
+  height: 13px;
+  width: 75%;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  animation: pulse 1.5s ease-in-out infinite;
+  animation-delay: 0.1s;
+}
+
+.skeleton-line-sub {
+  height: 10px;
+  width: 45%;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  animation: pulse 1.5s ease-in-out infinite;
+  animation-delay: 0.2s;
+}
+
+.skeleton-section-title {
+  height: 18px;
+  width: 140px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.feed-card-skeleton {
+  width: 128px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.skeleton-feed-cover {
+  width: 128px;
+  height: 128px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-feed-title {
+  height: 13px;
+  width: 80%;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  animation: pulse 1.5s ease-in-out infinite;
+  animation-delay: 0.1s;
+}
+
+.skeleton-feed-sub {
+  height: 10px;
+  width: 50%;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  animation: pulse 1.5s ease-in-out infinite;
+  animation-delay: 0.2s;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.8; }
 }
 </style>

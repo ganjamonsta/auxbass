@@ -25,9 +25,9 @@
 
     <!-- Search Results Mode -->
     <div v-if="searchQuery.trim()" class="search-results-container">
-      <!-- Loading indicator -->
-      <div v-if="loading" class="search-loading">
-        <div class="spinner"></div>
+      <!-- Loading search results skeleton -->
+      <div v-if="loading" class="search-skeleton-list">
+        <TrackSkeleton v-for="n in 6" :key="n" />
       </div>
 
       <template v-else>
@@ -149,7 +149,10 @@
 
       <!-- Loading tags skeleton -->
       <div v-if="loadingTags && tags.length === 0" class="tags-loading-grid">
-        <div v-for="n in 8" :key="n" class="tag-tile-skeleton"></div>
+        <div v-for="n in 8" :key="n" class="tag-tile-skeleton">
+          <div class="skeleton-tag-title"></div>
+          <div class="skeleton-tag-count"></div>
+        </div>
       </div>
 
       <!-- Tags Grid -->
@@ -198,6 +201,7 @@ import { useDebouncedSearch } from '@/composables'
 import { tracksApi } from '@/api/client'
 import SearchBar from '@/components/ui/SearchBar.vue'
 import TrackItem from '@/components/TrackItem.vue'
+import TrackSkeleton from '@/components/TrackSkeleton.vue'
 import { getCoverUrl, CoverSize } from '@/utils'
 import { 
   Music, 
@@ -645,16 +649,43 @@ onMounted(async () => {
   transform: scale(1.1) !important;
 }
 
-/* Loading skeleton */
+/* Loading skeletons */
+.search-skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .tag-tile-skeleton {
   height: 96px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.06);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
+}
+
+.skeleton-tag-title {
+  height: 16px;
+  width: 60%;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
+.skeleton-tag-count {
+  height: 10px;
+  width: 35%;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  animation: pulse 1.5s ease-in-out infinite;
+  animation-delay: 0.15s;
+}
+
 @keyframes pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.8; }
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.75; }
 }
 </style>
