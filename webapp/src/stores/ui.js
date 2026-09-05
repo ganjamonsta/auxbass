@@ -9,8 +9,8 @@ export const useUIStore = defineStore('ui', () => {
     collectionsTab.value = tab
   }
 
-  // Library tab state: 'tracks', 'albums', 'artists', or 'playlists'
-  const libraryTab = ref(localStorage.getItem('library_active_tab') || 'tracks')
+  // Library tab state: 'overview', 'tracks', 'albums', 'artists', or 'playlists'
+  const libraryTab = ref(localStorage.getItem('library_active_tab') || 'overview')
 
   const setLibraryTab = (tab) => {
     libraryTab.value = tab

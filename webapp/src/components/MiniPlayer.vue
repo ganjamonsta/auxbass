@@ -33,44 +33,6 @@
               <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-8 12H9.5v-2h-2v2H6V9h1.5v2.5h2V9H11v6zm2-6h4c.55 0 1 .45 1 1v4c0 .55-.45 1-1 1h-4V9zm1.5 4.5h2v-3h-2v3z"/>
             </svg>
           </span>
-          <span v-else class="lcd-indicator hd-indicator" title="HD недоступен">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-8 12H9.5v-2h-2v2H6V9h1.5v2.5h2V9H11v6zm2-6h4c.55 0 1 .45 1 1v4c0 .55-.45 1-1 1h-4V9zm1.5 4.5h2v-3h-2v3z"/>
-            </svg>
-          </span>
-          <span 
-            class="lcd-indicator like-indicator" 
-            :class="{ active: isLiked }" 
-            :title="isLiked ? 'Удалить из любимых' : 'Добавить в любимое'"
-            @click.stop="$emit('like')"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" :fill="isLiked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
-              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-            </svg>
-          </span>
-          <span 
-            class="lcd-indicator shuffle-indicator" 
-            :class="{ active: playerStore.shuffle }" 
-            title="Перемешивание"
-            @click.stop="$emit('toggleShuffle')"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
-            </svg>
-          </span>
-          <span 
-            class="lcd-indicator repeat-indicator" 
-            :class="{ active: playerStore.repeat !== 'none' }" 
-            :title="repeatTitle"
-            @click.stop="$emit('toggleRepeat')"
-          >
-            <svg v-if="playerStore.repeat === 'one'" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z"/>
-            </svg>
-            <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
-            </svg>
-          </span>
         </div>
       </div>
       
@@ -199,13 +161,6 @@ const shouldMarquee = computed(() => {
   return displayText.value.length > 30
 })
 
-const repeatTitle = computed(() => {
-  switch (playerStore.repeat) {
-    case 'one': return 'Повтор трека'
-    case 'all': return 'Повтор всего'
-    default: return 'Повтор выключен'
-  }
-})
 
 const formatTime = (seconds) => {
   if (!seconds) return '0:00'

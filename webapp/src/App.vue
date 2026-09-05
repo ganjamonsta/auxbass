@@ -22,19 +22,6 @@
           <template v-if="route.name === 'library'" #icon>
             <component :is="libraryIcon" :size="20" />
           </template>
-          <template v-if="route.name === 'library'" #toggle>
-            <div class="neu-tab-bar header-tabs">
-              <button 
-                v-for="tab in [{ id: 'tracks', label: 'Треки' }, { id: 'albums', label: 'Альбомы' }, { id: 'artists', label: 'Артисты' }, { id: 'playlists', label: 'Плейлисты' }]"
-                :key="tab.id"
-                class="neu-tab" 
-                :class="{ active: uiStore.libraryTab === tab.id }"
-                @click="handleLibraryTabClick(tab.id)"
-              >
-                <span class="neu-tab-content" :data-text="tab.label">{{ tab.label }}</span>
-              </button>
-            </div>
-          </template>
           <template v-if="route.name === 'collections'" #toggle>
             <div class="neu-tab-bar header-tabs">
               <button 
@@ -245,7 +232,7 @@ import { useNetworkMonitor } from '@/composables/useNetworkMonitor'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import { MobileFooter, ProfileMenu } from '@/components/layout'
-import { Music, Disc3, User, Folder } from 'lucide-vue-next'
+import { Music, Disc3, User, Folder, Library } from 'lucide-vue-next'
 // Desktop components
 import Sidebar from '@/components/desktop/Sidebar.vue'
 import DesktopPlayer from '@/components/desktop/DesktopPlayer.vue'
@@ -358,6 +345,7 @@ const pageTitle = computed(() => {
   // Для страницы библиотеки показываем название текущего раздела
   if (route.name === 'library') {
     const libraryTitles = {
+      overview: 'Медиатека',
       tracks: 'Треки',
       albums: 'Альбомы',
       artists: 'Артисты',
@@ -383,12 +371,13 @@ const pageTitle = computed(() => {
 
 const libraryIcon = computed(() => {
   const icons = {
+    overview: Library,
     tracks: Music,
     albums: Disc3,
     artists: User,
     playlists: Folder
   }
-  return icons[uiStore.libraryTab] || Music
+  return icons[uiStore.libraryTab] || Library
 })
 
 const userInitials = computed(() => {
