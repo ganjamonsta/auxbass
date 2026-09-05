@@ -17,12 +17,13 @@
                 class="artist-link-inline"
                 @click="goToArtistByName(artist)"
                 @contextmenu.prevent="openMenu('artist', { name: artist }, 'album-header', $event)"
+                v-longpress="(e) => openMenu('artist', { name: artist }, 'album-header', e)"
               >{{ artist }}</button>
               <span v-if="index < parsedAlbumArtists.length - 1" class="artist-separator">, </span>
             </template>
           </span>
         </div>
-        <p v-else class="artist" @click="goToArtist">{{ album.artist }}</p>
+        <p v-else class="artist" @click="goToArtist" v-longpress="(e) => openMenu('artist', { name: album.artist }, 'album-header', e)" @contextmenu.prevent="openMenu('artist', { name: album.artist }, 'album-header', $event)">{{ album.artist }}</p>
         <p class="hero-meta">
           <span v-if="album.release_date">{{ formatYear(album.release_date) }} • </span>
           <span v-if="album.total_tracks">
@@ -71,6 +72,7 @@
           }"
           @click="handleTracklistItemClick(item)"
           @contextmenu.prevent="item.track && openMenu('track', item.track, 'album', $event)"
+          v-longpress="(e) => item.track && openMenu('track', item.track, 'album', e)"
         >
           <span class="track-number">{{ item.track_number }}</span>
           

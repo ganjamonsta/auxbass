@@ -19,6 +19,7 @@ class PlaylistUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     is_public: Optional[bool] = None
+    custom_cover_url: Optional[str] = None
 
 
 class PlaylistResponse(BaseModel):
@@ -28,6 +29,7 @@ class PlaylistResponse(BaseModel):
     track_count: int = 0
     total_duration: int = 0
     cover_url: Optional[str] = None
+    custom_cover_url: Optional[str] = None
     covers: List[str] = []  # Array of cover URLs for collage display
     tags: Optional[List[str]] = None  # Tags aggregated from playlist tracks
     is_public: bool = False

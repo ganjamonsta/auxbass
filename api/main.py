@@ -214,7 +214,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
 
-# Path to webapp dist
+# Path to covers and webapp dist
+COVERS_DIR = Path(__file__).parent.parent / "data" / "covers"
+COVERS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/api/covers", StaticFiles(directory=COVERS_DIR), name="covers")
+
 WEBAPP_DIST = Path(__file__).parent.parent / "webapp" / "dist"
 
 # Serve static assets (js, css, images, etc.)

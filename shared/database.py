@@ -150,8 +150,13 @@ async def _ensure_sqlite_columns(conn):
             ("auto_sync", "INTEGER DEFAULT 1"),
         ],
         "playlists": [
+            ("custom_cover_url", "TEXT"),
             ("pending_cover_url", "TEXT"),
             ("pending_cover_expires_at", "TIMESTAMP"),
+        ],
+        "user_library": [
+            ("is_disliked", "INTEGER DEFAULT 0"),
+            ("disliked_at", "TIMESTAMP"),
         ],
     }
     
@@ -187,6 +192,9 @@ async def _ensure_sqlite_columns(conn):
         )
         await conn.exec_driver_sql(
             "CREATE INDEX IF NOT EXISTS idx_album_tracks_track_id ON album_tracks(track_id);"
+        )
+        await conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS idx_user_library_disliked ON user_library(user_id, is_disliked);"
         )
     except Exception:
         pass

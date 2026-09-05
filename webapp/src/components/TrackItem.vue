@@ -1,7 +1,7 @@
 <template>
   <div 
     class="track-item" 
-    :class="{ playing: isPlaying, compact: compact, unavailable: track.is_unavailable }" 
+    :class="{ playing: isPlaying, compact: compact, unavailable: track.is_unavailable, disliked: track.is_disliked }" 
     @click="handleClick"
     @contextmenu.prevent="$emit('menu', $event)"
     @touchstart="handleTouchStart"
@@ -50,6 +50,7 @@
     <div class="track-info">
       <div class="track-title">{{ getDisplayTitle(track) }}</div>
       <div class="track-meta">
+        <span v-if="track.is_disliked" class="disliked-badge" title="Не нравится"><ThumbsDown :size="12" /> Не нравится</span>
         <span v-if="!hideArtist" class="track-artist">{{ getDisplayArtist(track) }}</span>
         <span v-if="showAlbum && albumName" class="track-album">{{ albumName }}</span>
         <span v-else-if="track.play_count && !hideArtist" class="play-count">• {{ track.play_count }} прослушиваний</span>
@@ -116,7 +117,7 @@
 <script setup>
 import { computed } from 'vue'
 import { formatDuration, getTrackCoverStyle, getTrackInitials, getDisplayTitle, getDisplayArtist, getCoverUrl, CoverSize } from '@/utils'
-import { X, Check } from 'lucide-vue-next'
+import { X, Check, ThumbsDown } from 'lucide-vue-next'
 
 const props = defineProps({
   track: {
@@ -560,6 +561,27 @@ const firstTag = computed(() => {
     3px 3px 6px var(--sh-dark),
     -2px -2px 4px var(--sh-light),
     0 0 12px var(--c-accent-glow));
+}
+
+.track-item:active {
+  transform: scale(0.99);
+}
+
+.track-item.disliked {
+  opacity: 0.52;
+}
+
+.track-item.disliked:hover {
+  opacity: 0.85;
+}
+
+.disliked-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #ff5555;
+  font-size: 11px;
+  font-weight: 500;
 }
 
 .track-add-library:active {

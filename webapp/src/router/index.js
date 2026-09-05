@@ -11,6 +11,7 @@ const DownloadedTracksView = () => import('@/views/DownloadedTracksView.vue')
 const LikedTracksView = () => import('@/views/LikedTracksView.vue')
 const SettingsView = () => import('@/views/SettingsView.vue')
 const LoginView = () => import('@/views/LoginView.vue')
+const UserProfileView = () => import('@/views/UserProfileView.vue')
 
 import { useAuthStore } from '@/stores/auth'
 
@@ -55,6 +56,12 @@ const routes = [
     path: '/friends',
     name: 'friends',
     component: FriendsView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/user/:id',
+    name: 'user-profile',
+    component: UserProfileView,
     meta: { requiresAuth: true }
   },
   {

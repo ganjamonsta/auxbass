@@ -29,7 +29,7 @@ from api.schemas.common import TelegramUser, PaginatedResponse
 from api.schemas.tracks import TrackResponse
 
 
-router = APIRouter(prefix="/social", tags=["Social"])
+router = APIRouter(tags=["Social"])
 
 
 # ============== Schemas ==============

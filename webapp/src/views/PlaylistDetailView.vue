@@ -17,7 +17,7 @@
         <p class="hero-meta">
           <span>{{ playlist.track_count }} треков</span>
           <span v-if="playlist.is_public" class="public-badge"><Globe :size="14" /> Публичный</span>
-          <span v-if="playlist.owner_name && !isOwner" class="owner-info">от {{ playlist.owner_name }}</span>
+          <span v-if="playlist.owner_name && !isOwner" class="owner-info" :class="{ 'clickable': !!playlist.owner_id }" @click="goToOwner">от {{ playlist.owner_name }}</span>
         </p>
       </div>
     </div>
@@ -35,6 +35,10 @@
         <button v-if="isOwner" class="action-btn edit-btn" @click="openEditModal" title="Редактировать">
           <Edit3 :size="18" />
         </button>
+        <!-- Add tracks button for owner -->
+        <button v-if="isOwner" class="action-btn add-btn" @click="openEditModal" title="Добавить треки">
+          <Plus :size="18" />
+        </button>
         <!-- Subscribe/Unsubscribe button for non-owner public playlists -->
         <button 
           v-else-if="playlist.is_public" 
@@ -46,6 +50,10 @@
         >
           <Check v-if="playlist.is_subscribed" :size="18" />
           <Plus v-else :size="18" />
+        </button>
+        <!-- Share button -->
+        <button class="action-btn share-btn" @click="handleSharePlaylist" title="Поделиться">
+          <Share2 :size="18" />
         </button>
       </div>
     </div>
@@ -70,7 +78,11 @@
     <div v-else class="empty-state">
       <span class="empty-icon"><Music :size="48" /></span>
       <p>Плейлист пуст</p>
-      <p class="hint">Нажмите «Добавить» чтобы добавить треки</p>
+      <button v-if="isOwner" class="empty-add-btn" @click="openEditModal">
+        <Plus :size="18" />
+        <span>Добавить треки</span>
+      </button>
+      <p v-else class="hint">В этом плейлисте пока нет треков</p>
     </div>
 
     <!-- Edit modal -->
@@ -97,11 +109,11 @@ import { useAuthStore } from '@/stores/auth'
 import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
-import { useTrackActions, usePlaybackActions, useTrackSync } from '@/composables'
+import { useTrackActions, usePlaybackActions, useTrackSync, useShare } from '@/composables'
 import TrackItem from '@/components/TrackItem.vue'
 import EditPlaylistModal from '@/components/EditPlaylistModal.vue'
 import api from '@/api/client'
-import { Music, Check, Plus, Globe, Play, Shuffle, Edit3 } from 'lucide-vue-next'
+import { Music, Check, Plus, Globe, Play, Shuffle, Edit3, Share2 } from 'lucide-vue-next'
 import { getCoverUrl, CoverSize } from '@/utils'
 
 // Universal context menu
@@ -116,6 +128,23 @@ const uiStore = useUIStore()
 
 // Unified track actions
 const { handleDirectDownload, handleHdNotice, handleLikeTrack } = useTrackActions()
+const { share } = useShare()
+
+const handleSharePlaylist = () => {
+  if (!playlist.value) return
+  share({
+    type: 'playlist',
+    id: playlist.value.id,
+    title: playlist.value.name,
+    text: `Послушай плейлист «${playlist.value.name}» в TG Player!`,
+  })
+}
+
+const goToOwner = () => {
+  if (playlist.value?.owner_id) {
+    router.push(`/user/${playlist.value.owner_id}`)
+  }
+}
 
 // State
 const playlist = ref(null)
@@ -150,6 +179,9 @@ const isOwner = computed(() => {
 })
 
 const coverImages = computed(() => {
+  if (playlist.value?.custom_cover_url) {
+    return [getCoverUrl(playlist.value.custom_cover_url, CoverSize.LARGE)]
+  }
   // Use covers array from API (track covers collage, up to 4)
   if (playlist.value?.covers?.length) {
     // Use large size for single cover, small for multi-cover grid
@@ -316,6 +348,30 @@ watch(
   margin-bottom: 16px;
 }
 
+.empty-add-btn {
+  margin-top: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 20px;
+  background: var(--c-accent);
+  color: #fff;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.empty-add-btn:active {
+  transform: scale(0.97);
+}
+
+.empty-add-btn:hover {
+  opacity: 0.9;
+}
+
 .hint {
   color: var(--c-text-3);
   font-size: 14px;
@@ -334,5 +390,22 @@ watch(
 .owner-info {
   font-size: 13px;
   color: var(--c-text-3);
+}
+.owner-info.clickable {
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.owner-info.clickable:hover {
+  color: var(--c-accent);
+}
+
+.share-btn {
+  background: var(--c-bg-2);
+}
+
+.share-btn:hover {
+  background: var(--c-bg-3);
 }
 </style>

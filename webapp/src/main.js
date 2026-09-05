@@ -64,9 +64,12 @@ if (tg) {
   })
 }
 
+import longpress from './directives/longpress'
+
 const app = createApp(App)
 app.use(createPinia())
 app.use(router)
+app.directive('longpress', longpress)
 
 // Provide Telegram WebApp globally
 app.provide('telegram', tg)

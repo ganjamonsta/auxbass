@@ -119,6 +119,14 @@
                   <span>Убрать из плейлиста</span>
                 </button>
 
+                <!-- Dislike action -->
+                <button class="menu-item" :class="{ 'disliked-active': isDisliked }" @click="exec('toggleDislike')">
+                  <ThumbsDown :size="18" :fill="isDisliked ? 'currentColor' : 'none'" />
+                  <span>{{ isDisliked ? 'Убрать дизлайк' : 'Не нравится' }}</span>
+                </button>
+
+                <div class="menu-divider" />
+
                 <!-- Owner can delete -->
                 <button v-if="isTrackOwner" class="menu-item danger" @click="exec('delete')">
                   <Trash2 :size="18" />
@@ -297,7 +305,8 @@ import EditTrackModal from '@/components/EditTrackModal.vue'
 import TagChips from '@/components/TagChips.vue'
 import { 
   X, User, Disc3, Play, ListMusic, Plus, Minus, Pencil, 
-  Download, Trash2, FolderOpen, Shuffle, Music, Mic2, ChevronRight, ChevronDown
+  Download, Trash2, FolderOpen, Shuffle, Music, Mic2, ChevronRight, ChevronDown,
+  ThumbsDown
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -305,6 +314,8 @@ const uiStore = useUIStore()
 
 // State for artist submenu
 const showArtistSubmenu = ref(false)
+
+const isDisliked = computed(() => menuType.value === 'track' && !!menuData.value?.is_disliked)
 
 const authStore = useAuthStore()
 const renameInput = ref(null)

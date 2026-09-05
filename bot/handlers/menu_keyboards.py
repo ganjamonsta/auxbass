@@ -54,6 +54,22 @@ def get_track_keyboard(track_id: Optional[int] = None) -> InlineKeyboardMarkup:
     ])
 
 
+def get_deep_link_keyboard(param: str, label: str = "🎵 Открыть в плеере") -> InlineKeyboardMarkup:
+    """Keyboard with deep link param into WebApp"""
+    sep = "&" if "?" in settings.webapp_url else "?"
+    url = f"{settings.webapp_url}{sep}startapp={param}"
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text=label,
+            web_app=WebAppInfo(url=url),
+        )],
+        [InlineKeyboardButton(
+            text="🏠 Главное меню",
+            callback_data="menu:main",
+        )]
+    ])
+
+
 # ──────────────────────── Channel ────────────────────────
 
 def get_channel_not_connected_keyboard() -> InlineKeyboardMarkup:

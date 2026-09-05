@@ -7,19 +7,49 @@
         <button class="close-modal-btn" @click="$emit('close')"><X :size="20" /></button>
       </div>
       
-      <!-- Playlist name and settings -->
+      <!-- Playlist cover, name and settings -->
       <div class="edit-settings">
-        <input
-          v-model="name"
-          type="text"
-          placeholder="Название плейлиста"
-          class="edit-name-input"
-        />
-        <div class="edit-options">
-          <label class="checkbox-label compact">
-            <input type="checkbox" v-model="isPublic" />
-            <span>Публичный</span>
-          </label>
+        <div class="cover-uploader">
+          <div class="cover-preview-box">
+            <img v-if="currentCoverUrl" :src="currentCoverUrl" alt="Cover" class="cover-preview-img" />
+            <div v-else class="cover-placeholder-box">
+              <ImageIcon :size="22" />
+            </div>
+            <div v-if="coverLoading" class="cover-spinner-overlay">
+              <div class="search-spinner-inline"></div>
+            </div>
+          </div>
+          <div class="cover-action-buttons">
+            <button type="button" class="cover-btn upload" @click="triggerFileInput" :disabled="coverLoading" title="Загрузить обложку">
+              <Upload :size="13" />
+              <span>{{ customCoverUrl ? 'Заменить' : 'Обложка' }}</span>
+            </button>
+            <button v-if="customCoverUrl" type="button" class="cover-btn remove" @click="removeCover" :disabled="coverLoading" title="Сбросить на коллаж">
+              <Trash2 :size="13" />
+            </button>
+            <input
+              ref="fileInputRef"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              class="hidden-cover-input"
+              @change="handleCoverFileChange"
+            />
+          </div>
+        </div>
+
+        <div class="edit-details">
+          <input
+            v-model="name"
+            type="text"
+            placeholder="Название плейлиста"
+            class="edit-name-input"
+          />
+          <div class="edit-options">
+            <label class="checkbox-label compact">
+              <input type="checkbox" v-model="isPublic" />
+              <span>Публичный</span>
+            </label>
+          </div>
         </div>
       </div>
       
@@ -118,12 +148,15 @@
               :key="'edit-' + track.id"
               :track="track"
               :index="index"
+              :isLast="index === tracks.length - 1"
               :isDragging="dragIndex === index"
               :isDragOver="dragOverIndex === index"
               @dragstart="handleDragStart($event, index)"
               @dragend="handleDragEnd"
               @dragover="handleDragOver($event, index)"
               @drop="onDrop($event, index)"
+              @moveUp="onMoveUp(index)"
+              @moveDown="onMoveDown(index)"
               @remove="removeTrackFromList(track, index)"
             />
             <!-- Infinite scroll trigger -->
@@ -177,7 +210,8 @@ import TrackSearchItem from './TrackSearchItem.vue'
 import EditableTrackItem from './EditableTrackItem.vue'
 import TrackSkeleton from './TrackSkeleton.vue'
 import SearchBar from './ui/SearchBar.vue'
-import { X, Music, Users, Globe } from 'lucide-vue-next'
+import { X, Music, Users, Globe, Upload, Trash2, Image as ImageIcon } from 'lucide-vue-next'
+import { getCoverUrl, CoverSize } from '@/utils'
 import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 
@@ -307,22 +341,35 @@ const clearSearch = () => {
 const addingTrackId = ref(null)
 const removingTrackId = ref(null)
 
-// Drag & drop
+// Reorder & Touch handlers
 const onTracksReorder = async (reordered) => {
   tracks.value = reordered
   emit('update:tracks', reordered)
   nextTick(() => resetVirtualScroll())
   try {
-    await api.put(`/playlists/${props.playlist.id}/reorder`, {
-      track_ids: reordered.map(t => t.id)
-    })
+    await playlistsApi.reorder(props.playlist.id, reordered.map(t => t.id))
     await libraryStore.notifyPlaylistChange(props.playlist.id)
   } catch (error) {
     console.error('Failed to reorder tracks:', error)
+    uiStore.toast.error('Ошибка', 'Не удалось сохранить порядок треков')
   }
 }
 
-const { dragIndex, dragOverIndex, handleDragStart, handleDragEnd, handleDragOver, handleDrop } = useDragReorder()
+const { dragIndex, dragOverIndex, handleDragStart, handleDragEnd, handleDragOver, handleDrop, moveUp, moveDown } = useDragReorder()
+
+const onMoveUp = async (index) => {
+  const reordered = moveUp(tracks.value, index)
+  if (reordered) {
+    await onTracksReorder(reordered)
+  }
+}
+
+const onMoveDown = async (index) => {
+  const reordered = moveDown(tracks.value, index)
+  if (reordered) {
+    await onTracksReorder(reordered)
+  }
+}
 
 const onDrop = async (event, toIndex) => {
   const reordered = await handleDrop(event, toIndex, tracks.value)
@@ -331,11 +378,74 @@ const onDrop = async (event, toIndex) => {
   }
 }
 
+// Cover management
+const customCoverUrl = ref(null)
+const coverLoading = ref(false)
+const fileInputRef = ref(null)
+
+const currentCoverUrl = computed(() => {
+  if (customCoverUrl.value) {
+    return getCoverUrl(customCoverUrl.value, CoverSize.MEDIUM)
+  }
+  if (props.playlist?.custom_cover_url) {
+    return getCoverUrl(props.playlist.custom_cover_url, CoverSize.MEDIUM)
+  }
+  if (props.playlist?.cover_url) {
+    return getCoverUrl(props.playlist.cover_url, CoverSize.MEDIUM)
+  }
+  if (props.playlist?.covers?.length) {
+    return getCoverUrl(props.playlist.covers[0], CoverSize.MEDIUM)
+  }
+  return null
+})
+
+const triggerFileInput = () => {
+  fileInputRef.value?.click()
+}
+
+const handleCoverFileChange = async (e) => {
+  const file = e.target.files?.[0]
+  if (!file) return
+  if (!file.type.startsWith('image/')) {
+    uiStore.toast.error('Ошибка', 'Выберите файл изображения (JPG, PNG, WebP)')
+    return
+  }
+  coverLoading.value = true
+  try {
+    const res = await playlistsApi.uploadCover(props.playlist.id, file)
+    customCoverUrl.value = res.data.custom_cover_url
+    await libraryStore.notifyPlaylistChange(props.playlist.id)
+    uiStore.toast.success('Успешно', 'Обложка плейлиста обновлена')
+  } catch (error) {
+    console.error('Failed to upload cover:', error)
+    uiStore.toast.error('Ошибка', 'Не удалось загрузить обложку')
+  } finally {
+    coverLoading.value = false
+    if (fileInputRef.value) fileInputRef.value.value = ''
+  }
+}
+
+const removeCover = async () => {
+  coverLoading.value = true
+  try {
+    await playlistsApi.deleteCover(props.playlist.id)
+    customCoverUrl.value = null
+    await libraryStore.notifyPlaylistChange(props.playlist.id)
+    uiStore.toast.success('Успешно', 'Обложка сброшена на коллаж треков')
+  } catch (error) {
+    console.error('Failed to delete cover:', error)
+    uiStore.toast.error('Ошибка', 'Не удалось удалить обложку')
+  } finally {
+    coverLoading.value = false
+  }
+}
+
 // Watch for playlist changes
 watch(() => props.playlist, (pl) => {
   if (pl) {
     name.value = pl.name || ''
     isPublic.value = pl.is_public || false
+    customCoverUrl.value = pl.custom_cover_url || null
     tracks.value = [...(pl.tracks || [])]
     if (props.show) {
       nextTick(() => resetVirtualScroll())
@@ -368,8 +478,11 @@ const addTrack = async (track) => {
     emit('update:tracks', tracks.value)
     nextTick(() => resetVirtualScroll())
     await libraryStore.notifyPlaylistChange(props.playlist.id)
+    uiStore.toast.success('Добавлено', `Трек "${track.title || 'Без названия'}" добавлен`)
   } catch (error) {
     console.error('Failed to add track:', error)
+    const msg = error.response?.data?.detail || 'Не удалось добавить трек'
+    uiStore.toast.error('Ошибка', msg)
   } finally {
     addingTrackId.value = null
   }
@@ -384,8 +497,10 @@ const removeTrack = async (track) => {
     emit('update:tracks', tracks.value)
     nextTick(() => resetVirtualScroll())
     await libraryStore.notifyPlaylistChange(props.playlist.id)
+    uiStore.toast.success('Удалено', 'Трек убран из плейлиста')
   } catch (error) {
     console.error('Failed to remove track:', error)
+    uiStore.toast.error('Ошибка', 'Не удалось удалить трек')
   } finally {
     removingTrackId.value = null
   }
@@ -399,8 +514,10 @@ const removeTrackFromList = async (track, index) => {
     emit('update:tracks', tracks.value)
     nextTick(() => resetVirtualScroll())
     await libraryStore.notifyPlaylistChange(props.playlist.id)
+    uiStore.toast.success('Удалено', 'Трек убран из плейлиста')
   } catch (error) {
     console.error('Failed to remove track:', error)
+    uiStore.toast.error('Ошибка', 'Не удалось удалить трек')
   }
 }
 
@@ -417,10 +534,12 @@ const save = async () => {
     emit('save', { 
       name: name.value.trim(), 
       isPublic: isPublic.value, 
-      covers: response?.covers || []
+      covers: response?.covers || [],
+      customCoverUrl: customCoverUrl.value
     })
   } catch (error) {
     console.error('Failed to save:', error)
+    uiStore.toast.error('Ошибка', 'Не удалось сохранить плейлист')
   } finally {
     saving.value = false
   }
@@ -502,7 +621,7 @@ const save = async () => {
   align-items: center;
   justify-content: space-between;
   padding: 20px 20px 16px;
-  border-bottom: 1px solid var(--c-bg-4));
+  border-bottom: 1px solid var(--c-bg-4);
 }
 
 .edit-header h2 {
@@ -526,23 +645,104 @@ const save = async () => {
 }
 
 .edit-settings {
-  padding: 20px;
+  padding: 16px 20px;
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 12px;
-  background: var(--c-bg-1);
-  border: 1px solid var(--c-bg-4));
+  gap: 16px;
+  background: var(--c-bg-2);
+  border-bottom: 1px solid var(--c-bg-4);
+}
+
+.cover-uploader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.cover-preview-box {
+  width: 64px;
+  height: 64px;
   border-radius: 8px;
+  overflow: hidden;
+  background: var(--c-bg-3);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--c-bg-4);
+}
+
+.cover-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cover-placeholder-box {
+  color: var(--c-text-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cover-spinner-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cover-action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cover-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid var(--c-bg-4);
+  background: var(--c-bg-3);
   color: var(--c-text-1);
-  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.cover-btn:hover:not(:disabled) {
+  background: var(--c-bg-4);
+}
+
+.cover-btn.remove {
+  color: #ff5555;
+  padding: 4px 6px;
+}
+
+.hidden-cover-input {
+  display: none;
+}
+
+.edit-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .edit-name-input {
-  flex: 1;
+  width: 100%;
   padding: 10px 14px;
   background: var(--c-bg-1);
-  border: 1px solid var(--c-bg-4));
+  border: 1px solid var(--c-bg-4);
   border-radius: 8px;
   color: var(--c-text-1);
   font-size: 15px;

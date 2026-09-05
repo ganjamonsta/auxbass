@@ -741,7 +741,7 @@ export const usePlayerStore = defineStore('player', () => {
 
       loading.value = true
       const t = await loadTrackById(nextTrackId)
-      if (!t) { isSkipping = false; loading.value = false; await next(); return }
+      if (!t || t.is_disliked) { isSkipping = false; loading.value = false; await next(); return }
       queue.value = [t]; queueIndex.value = 0; shuffleOrder.value = []; shuffleIndex.value = -1
       isSkipping = false; await play(t)
       return
@@ -772,15 +772,15 @@ export const usePlayerStore = defineStore('player', () => {
 
       queueIndex.value = nextIndex
       const candidateTrack = queue.value[nextIndex]
-      // Skip known unavailable tracks immediately
-      if (candidateTrack && !candidateTrack.is_unavailable) {
+      // Skip known unavailable tracks and disliked tracks immediately
+      if (candidateTrack && !candidateTrack.is_unavailable && !candidateTrack.is_disliked) {
         break
       }
       attempts++
     }
 
     const nextTrack = queue.value[queueIndex.value]
-    if (!nextTrack || nextTrack.is_unavailable) {
+    if (!nextTrack || nextTrack.is_unavailable || nextTrack.is_disliked) {
       isPlaying.value = false; isSkipping = false; return
     }
 

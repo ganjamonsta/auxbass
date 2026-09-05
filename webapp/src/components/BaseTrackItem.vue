@@ -5,7 +5,7 @@
       'is-dragging': isDragging, 
       'drag-over': isDragOver, 
       'is-playing': isCurrentTrack,
-      'dimmed': dimmed
+      'dimmed': dimmed || track.is_disliked
     }"
     :draggable="draggable && !isSeeking"
     @dragstart="handleDragStart"
@@ -114,10 +114,10 @@ const displayTime = computed(() => {
 
 const togglePlay = () => {
   if (isCurrentTrack.value) {
-    playerStore.togglePlay()
+    playerStore.toggle()
   } else {
     const queue = props.allTracks.length ? props.allTracks : [props.track]
-    playerStore.playTrack(props.track, queue)
+    playerStore.play(props.track, queue)
   }
 }
 

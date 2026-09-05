@@ -524,6 +524,8 @@ class UserLibrary(Base):
     # User's personal data for this track
     is_liked: Mapped[bool] = mapped_column(Boolean, default=False)
     liked_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    is_disliked: Mapped[bool] = mapped_column(Boolean, default=False)
+    disliked_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     play_count: Mapped[int] = mapped_column(Integer, default=0)
     last_played_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     
@@ -538,6 +540,7 @@ class UserLibrary(Base):
         UniqueConstraint("user_id", "track_id", name="uq_user_library_track"),
         Index("idx_user_library_user", "user_id"),
         Index("idx_user_library_liked", "user_id", "is_liked"),
+        Index("idx_user_library_disliked", "user_id", "is_disliked"),
     )
 
 
@@ -558,6 +561,7 @@ class Playlist(Base):
     
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
     share_code: Mapped[Optional[str]] = mapped_column(String(50), unique=True)
+    custom_cover_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

@@ -245,6 +245,22 @@ export function useContextMenu() {
       }
       closeMenu()
     },
+
+    toggleDislike: async (track) => {
+      if (!track?.id) return closeMenu()
+      try {
+        const isDisliked = await libraryStore.toggleDislike(track.id, track.is_disliked)
+        if (isDisliked) {
+          uiStore.toast.success('Не нравится', 'Трек исключён из автовоспроизведения')
+        } else {
+          uiStore.toast.success('Дизлайк снят', 'Трек возвращён в очередь')
+        }
+      } catch (error) {
+        console.error('Failed to toggle dislike:', error)
+        uiStore.toast.error('Ошибка', 'Не удалось изменить статус трека')
+      }
+      closeMenu()
+    },
   }
 
   // ═══════════════════════════════════════════════════════════

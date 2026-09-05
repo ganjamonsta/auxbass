@@ -1,6 +1,6 @@
 /**
- * Drag & Drop reorder composable
- * Handles drag and drop reordering of lists
+ * Drag & Drop and Touch Reorder Composable
+ * Handles drag and drop, touch, and button-based reordering of lists
  */
 import { ref } from 'vue'
 
@@ -10,8 +10,10 @@ export function useDragReorder(onReorder) {
 
   const handleDragStart = (event, index) => {
     dragIndex.value = index
-    event.dataTransfer.effectAllowed = 'move'
-    event.dataTransfer.setData('text/plain', index.toString())
+    if (event?.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move'
+      event.dataTransfer.setData('text/plain', index.toString())
+    }
   }
 
   const handleDragEnd = () => {
@@ -20,31 +22,53 @@ export function useDragReorder(onReorder) {
   }
 
   const handleDragOver = (event, index) => {
-    event.preventDefault()
+    if (event) event.preventDefault()
     dragOverIndex.value = index
   }
 
   const handleDrop = async (event, toIndex, items) => {
-    event.preventDefault()
+    if (event) event.preventDefault()
     const fromIndex = dragIndex.value
 
-    if (fromIndex === null || fromIndex === toIndex) {
+    if (fromIndex === null || fromIndex === toIndex || !items) {
       handleDragEnd()
       return null
     }
 
-    // Reorder items
     const reordered = [...items]
     const [movedItem] = reordered.splice(fromIndex, 1)
     reordered.splice(toIndex, 0, movedItem)
 
     handleDragEnd()
 
-    // Call callback if provided
     if (onReorder) {
       await onReorder(reordered, fromIndex, toIndex)
     }
 
+    return reordered
+  }
+
+  const moveUp = async (items, index) => {
+    if (index <= 0 || !items || index >= items.length) return null
+    const reordered = [...items]
+    const [item] = reordered.splice(index, 1)
+    reordered.splice(index - 1, 0, item)
+
+    if (onReorder) {
+      await onReorder(reordered, index, index - 1)
+    }
+    return reordered
+  }
+
+  const moveDown = async (items, index) => {
+    if (!items || index < 0 || index >= items.length - 1) return null
+    const reordered = [...items]
+    const [item] = reordered.splice(index, 1)
+    reordered.splice(index + 1, 0, item)
+
+    if (onReorder) {
+      await onReorder(reordered, index, index + 1)
+    }
     return reordered
   }
 
@@ -54,6 +78,10 @@ export function useDragReorder(onReorder) {
     handleDragStart,
     handleDragEnd,
     handleDragOver,
-    handleDrop
+    handleDrop,
+    moveUp,
+    moveDown
   }
 }
+
+export default useDragReorder

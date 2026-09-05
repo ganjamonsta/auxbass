@@ -868,3 +868,86 @@ def get_all_track_artists(
             unique.append(a)
     
     return unique
+
+
+# Patterns to strip out promo channels, websites, bitrates, and rip tags
+METADATA_JUNK_PATTERNS = [
+    # Telegram channels and usernames: @something, t.me/something
+    r'(?:https?://)?(?:www\.)?t\.me/[\w_+/-]+',
+    r'(?:https?://)?(?:www\.)?vk\.com/[\w_+/-]+',
+    r'(?:https?://)?(?:www\.)?[\w-]+\.(?:com|ru|net|org|pro|me|club|cc|io|fm|ai)/[\w_+-]*',
+    r'@[\w_]{3,}',
+    
+    # Audio quality and rip stamps
+    r'[\(\[]\s*(?:320\s*kbps|128\s*kbps|256\s*kbps|320k|128k|256k|flac|mp3|lossless|hq|hd|web|rip|cbr|vbr)\s*[\)\]]',
+    r'\b(?:320|128|256)\s*kbps\b',
+    r'\b(?:320|128|256)k\b',
+    
+    # Common rip/promo phrases
+    r'[\(\[]\s*(?:official\s+audio|official\s+video|official\s+music\s+video|official|audio|lyric\s+video|lyrics|клип|премьера)\s*[\)\]]',
+    r'[\(\[]\s*(?:zaycev\.net|promodj\.com|pesni\.fm|sefon|mp3party|muzmo|drivemusic)\s*[\)\]]',
+]
+
+
+def clean_track_metadata(
+    raw_title: Optional[str],
+    raw_artist: Optional[str],
+    file_name: Optional[str] = None,
+) -> Tuple[str, str]:
+    """
+    Clean promotional junk, channel handles, bitrates, and extract clean artist & title.
+    
+    Returns:
+        (cleaned_title, cleaned_artist)
+    """
+    title = (raw_title or "").strip()
+    artist = (raw_artist or "").strip()
+
+    # If title is empty but file_name exists, try to extract from file_name
+    if not title and file_name:
+        base = re.sub(r'\.[a-zA-Z0-9]{2,5}$', '', file_name).strip()
+        title = base
+
+    # Filter out placeholder artists or channel links as artists
+    junk_artists = {'unknown', 'telegram', 'audio', 'music', 'sound', 'track', 'channel', 'неизвестен', 'неизвестный'}
+    if artist.lower() in junk_artists or re.match(r'^@[\w_]+$', artist) or 't.me/' in artist:
+        artist = ""
+
+    # Check if title has "Artist - Title" format
+    if " - " in title:
+        parts = title.split(" - ", 1)
+        left = parts[0].strip()
+        right = parts[1].strip()
+        if not artist or artist.lower() in left.lower() or left.lower() in artist.lower():
+            artist = left
+            title = right
+    elif " — " in title:
+        parts = title.split(" — ", 1)
+        left = parts[0].strip()
+        right = parts[1].strip()
+        if not artist or artist.lower() in left.lower() or left.lower() in artist.lower():
+            artist = left
+            title = right
+
+    # Clean junk patterns from both title and artist
+    for pat in METADATA_JUNK_PATTERNS:
+        title = re.sub(pat, '', title, flags=re.IGNORECASE)
+        artist = re.sub(pat, '', artist, flags=re.IGNORECASE)
+
+    # Clean double spaces, dangling brackets, trailing punctuation
+    def clean_punct(s: str) -> str:
+        s = re.sub(r'\s+', ' ', s)
+        s = re.sub(r'[\(\[]\s*[\)\]]', '', s)
+        s = s.strip(" \t\n\r-_~|/\\")
+        return s.strip()
+
+    title = clean_punct(title)
+    artist = clean_punct(artist)
+
+    # Fallbacks if everything got stripped
+    if not title:
+        title = raw_title or "Unknown Track"
+    if not artist:
+        artist = raw_artist or "Unknown Artist"
+
+    return title, artist

@@ -73,6 +73,7 @@ async def get_track_ids(
         select(Track.id)
         .join(UserLibrary, UserLibrary.track_id == Track.id)
         .where(UserLibrary.user_id == user.id)
+        .where(UserLibrary.is_disliked == False)
     )
     
     # Search filter (indexes title, artist, file_name, user tags, and enrichment tags)
@@ -923,6 +924,8 @@ async def like_track(
             source=LibrarySource.ADDED,
             is_liked=True,
             liked_at=utcnow(),
+            is_disliked=False,
+            disliked_at=None,
         )
         db.add(entry)
         added_to_library = True
@@ -940,6 +943,8 @@ async def like_track(
     else:
         entry.is_liked = True
         entry.liked_at = utcnow()
+        entry.is_disliked = False
+        entry.disliked_at = None
         await db.commit()
     
     # Pin track message in user's channel
@@ -982,6 +987,128 @@ async def unlike_track(
         logger.warning(f"Failed to unpin track {track_id} in channel: {e}")
     
     return {"status": "unliked", "track_id": track_id}
+
+
+@router.post("/{track_id}/dislike")
+async def dislike_track(
+    track_id: int,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Dislike a track.
+    
+    Disliked tracks are excluded from personal library, shuffle, recommendations,
+    and automatic queue advance. If the track was liked, like is removed.
+    """
+    result = await db.execute(
+        select(UserLibrary)
+        .where(UserLibrary.track_id == track_id)
+        .where(UserLibrary.user_id == user.id)
+    )
+    entry = result.scalar_one_or_none()
+    
+    if not entry:
+        track = await db.get(Track, track_id)
+        if not track:
+            raise HTTPException(status_code=404, detail="Track not found")
+        
+        entry = UserLibrary(
+            user_id=user.id,
+            track_id=track_id,
+            source=LibrarySource.ADDED,
+            is_liked=False,
+            liked_at=None,
+            is_disliked=True,
+            disliked_at=utcnow(),
+        )
+        db.add(entry)
+    else:
+        entry.is_disliked = True
+        entry.disliked_at = utcnow()
+        entry.is_liked = False
+        entry.liked_at = None
+    
+    await db.commit()
+    
+    return {
+        "status": "disliked",
+        "track_id": track_id,
+        "is_disliked": True,
+        "is_liked": False,
+    }
+
+
+@router.delete("/{track_id}/dislike")
+async def undislike_track(
+    track_id: int,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Remove dislike from a track."""
+    result = await db.execute(
+        select(UserLibrary)
+        .where(UserLibrary.track_id == track_id)
+        .where(UserLibrary.user_id == user.id)
+    )
+    entry = result.scalar_one_or_none()
+    
+    if not entry:
+        raise HTTPException(status_code=404, detail="Track not found in your library")
+    
+    entry.is_disliked = False
+    entry.disliked_at = None
+    await db.commit()
+    
+    return {
+        "status": "undisliked",
+        "track_id": track_id,
+        "is_disliked": False,
+    }
+
+
+@router.post("/{track_id}/normalize-metadata", response_model=TrackResponse)
+async def normalize_track_metadata(
+    track_id: int,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Normalize track metadata by stripping promotional ads, bitrates, channel tags,
+    and verifying against Deezer / Last.fm for canonical title and artist.
+    """
+    track = await db.get(Track, track_id)
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+        
+    from shared.matching import clean_track_metadata, normalize_artist
+    from bot.services.enrichment.processor import enrichment_processor
+    
+    # 1. Clean using regex heuristics
+    clean_title, clean_artist = clean_track_metadata(track.title, track.artist, track.file_name)
+    track.title = clean_title
+    track.artist = clean_artist
+    track.normalized_artist = normalize_artist(clean_artist)
+    
+    # 2. Try enrichment to find canonical titles
+    try:
+        res = await enrichment_processor.enrich_track(clean_title, clean_artist, track.duration)
+        if res.success and res.confidence >= 65:
+            if res.canonical_title:
+                track.title = res.canonical_title
+            if res.canonical_artist and clean_artist in ("Unknown Artist", "", "неизвестен"):
+                track.artist = res.canonical_artist
+                track.normalized_artist = normalize_artist(res.canonical_artist)
+    except Exception as e:
+        logger.warning(f"Enrichment normalization failed for track {track_id}: {e}")
+        
+    await db.commit()
+    
+    # Return updated track response
+    lib_entry = await db.scalar(
+        select(UserLibrary).where(UserLibrary.track_id == track_id, UserLibrary.user_id == user.id)
+    )
+    return track_to_response(track, lib_entry)
 
 
 @router.post("/{track_id}/mark-unavailable")

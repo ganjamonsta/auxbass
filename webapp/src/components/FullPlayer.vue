@@ -269,6 +269,7 @@
             @touchend="onQueueTouchEnd($event, idx)"
             @click="$emit('playFromQueue', idx)"
             @contextmenu.prevent="openMenu('track', t, 'queue', $event)"
+            v-longpress="(e) => openMenu('track', t, 'queue', e)"
           >
             <div class="drag-handle">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">

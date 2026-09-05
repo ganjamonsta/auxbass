@@ -205,7 +205,10 @@ export const tracksApi = {
   getLiked: cacheable(() => api.get('/tracks/liked')),
   like: nonCacheable((id) => api.post(`/tracks/${id}/like`), 'like'),
   unlike: nonCacheable((id) => api.delete(`/tracks/${id}/like`), 'like'),
+  dislike: nonCacheable((id) => api.post(`/tracks/${id}/dislike`), 'like'),
+  undislike: nonCacheable((id) => api.delete(`/tracks/${id}/dislike`), 'like'),
   markUnavailable: nonCacheable((id) => api.post(`/tracks/${id}/mark-unavailable`), 'track'),
+  normalizeMetadata: nonCacheable((id) => api.post(`/tracks/${id}/normalize-metadata`), 'track'),
   getUnavailable: cacheable(() => api.get('/tracks/unavailable/list')),
   deleteAllUnavailable: nonCacheable(() => api.delete('/tracks/unavailable/all'), 'track'),
   
@@ -254,6 +257,16 @@ export const playlistsApi = {
   delete: nonCacheable((id) => api.delete(`/playlists/${id}`), 'playlist'),
   addTrack: nonCacheable((playlistId, trackId) => api.post(`/playlists/${playlistId}/tracks`, { track_id: trackId }), 'playlist'),
   removeTrack: nonCacheable((playlistId, trackId) => api.delete(`/playlists/${playlistId}/tracks/${trackId}`), 'playlist'),
+  reorder: nonCacheable((id, trackIds) => api.put(`/playlists/${id}/reorder`, { track_ids: trackIds }), 'playlist'),
+  uploadCover: nonCacheable((id, file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post(`/playlists/${id}/cover`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  }, 'playlist'),
+  deleteCover: nonCacheable((id) => api.delete(`/playlists/${id}/cover`), 'playlist'),
+  getUserPlaylists: cacheable((userId) => api.get(`/playlists/user/${userId}`)),
 }
 
 // Artists

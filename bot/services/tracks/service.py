@@ -19,7 +19,7 @@ from shared.models import (
     Track, TrackEnrichment, Album, AlbumTrack, User, UserLibrary,
     EnrichmentStatus, LibrarySource, ForwardSourceType, utcnow
 )
-from shared.matching import normalize_artist
+from shared.matching import normalize_artist, clean_track_metadata
 
 from ..enrichment import enrichment_worker, enrichment_processor
 from ..albums import album_service
@@ -167,6 +167,11 @@ class TrackService:
                     user = User(id=user_id)
                     session.add(user)
                     await session.flush()
+                
+                # Clean promotional junk and format from title & artist
+                clean_title, clean_artist = clean_track_metadata(title, artist, file_name)
+                title = clean_title
+                artist = clean_artist
                 
                 # Sanitize artist name to prevent URL issues
                 sanitized_artist = sanitize_artist(artist)

@@ -668,13 +668,13 @@ export const useLibraryStore = defineStore('library', () => {
       } else {
         await tracksApi.like(trackId)
         const nowIso = new Date().toISOString()
-        await notifyTrackChange(trackId, { is_liked: true, liked_at: nowIso })
+        await notifyTrackChange(trackId, { is_liked: true, liked_at: nowIso, is_disliked: false, disliked_at: null })
         
         // Add to likedTracks locally or refetch
         if (!likedTracks.value.some(t => t.id === trackId)) {
           const track = findTrackInStore(trackId)
           if (track) {
-            likedTracks.value.unshift({ ...track, is_liked: true, liked_at: nowIso })
+            likedTracks.value.unshift({ ...track, is_liked: true, liked_at: nowIso, is_disliked: false, disliked_at: null })
           } else {
             await fetchLikedTracks()
           }
@@ -691,6 +691,34 @@ export const useLibraryStore = defineStore('library', () => {
         authStore.promptChannelSetup()
       }
       return isLiked
+    }
+  }
+
+  // Toggle dislike on track
+  const toggleDislike = async (trackId, currentDislikedState = null) => {
+    if (!trackId) return false
+
+    let isDisliked = currentDislikedState
+    if (isDisliked === null || isDisliked === undefined) {
+      const track = findTrackInStore(trackId)
+      isDisliked = track?.is_disliked || false
+    }
+
+    try {
+      if (isDisliked) {
+        await tracksApi.undislike(trackId)
+        await notifyTrackChange(trackId, { is_disliked: false, disliked_at: null })
+        return false
+      } else {
+        await tracksApi.dislike(trackId)
+        const nowIso = new Date().toISOString()
+        await notifyTrackChange(trackId, { is_disliked: true, disliked_at: nowIso, is_liked: false, liked_at: null })
+        likedTracks.value = likedTracks.value.filter(t => t.id !== trackId)
+        return true
+      }
+    } catch (error) {
+      console.error('Failed to toggle dislike:', error)
+      return isDisliked
     }
   }
 
@@ -985,6 +1013,7 @@ export const useLibraryStore = defineStore('library', () => {
     updateTrack,
     deleteTrack,
     toggleLike,
+    toggleDislike,
     isTrackLiked,
     unavailableCount,
     deleteUnavailableTracks,

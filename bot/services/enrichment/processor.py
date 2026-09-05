@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from .deezer import deezer_client
 from .lastfm import lastfm_client
 from .tracklist_matcher import album_tracklist_matcher
-from shared.matching import normalize_genre, GENRE_MAPPINGS, fuzzy_match_album, ALBUM_MATCH_THRESHOLD
+from shared.matching import normalize_genre, GENRE_MAPPINGS, fuzzy_match_album, ALBUM_MATCH_THRESHOLD, clean_track_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,8 @@ class EnrichmentResult:
     confidence: int  # 0-100
     
     # Enriched metadata
+    canonical_title: Optional[str] = None
+    canonical_artist: Optional[str] = None
     album_name: Optional[str] = None
     genre: Optional[str] = None  # Deezer genre (broad category)
     tags: List[str] = field(default_factory=list)  # Last.fm tags (detailed)
@@ -81,16 +83,21 @@ class EnrichmentProcessor:
         if title == "Без названия" or title.lower() in ["untitled", "unknown", "без названия"]:
             return EnrichmentResult(success=False, confidence=0)
         
+        # Clean title & artist from promotional junk before searching external APIs
+        cleaned_title, cleaned_artist = clean_track_metadata(title, artist)
+        search_title = cleaned_title or title
+        search_artist = cleaned_artist if cleaned_artist not in ("Unknown Artist", "") else (artist or "")
+        
         # Detect placeholder artist — enrichment can still find tags/genre,
         # but album assignment must be blocked (title-only Deezer matches
         # are unreliable and produce garbage albums)
-        artist_is_placeholder = not artist or artist.strip().lower() in PLACEHOLDER_ARTISTS
+        artist_is_placeholder = not search_artist or search_artist.strip().lower() in PLACEHOLDER_ARTISTS
         
         result = EnrichmentResult(success=False, confidence=0, source="none")
         
         # 1. Try Last.fm first (richer database, priority source)
         if lastfm_client.is_configured:
-            lastfm_data = await self._enrich_from_lastfm(title, artist)
+            lastfm_data = await self._enrich_from_lastfm(search_title, search_artist)
             
             if lastfm_data:
                 result.success = True
@@ -109,8 +116,8 @@ class EnrichmentProcessor:
                 if lastfm_data.get("lastfm_url"):
                     result.lastfm_url = lastfm_data["lastfm_url"]
         
-        # 2. Enhance with Deezer (covers, track numbers, IDs)
-        deezer_data = await self._enrich_from_deezer(title, artist, duration=duration)
+        # 2. Enhance with Deezer (covers, track numbers, IDs, canonical metadata)
+        deezer_data = await self._enrich_from_deezer(search_title, search_artist, duration=duration)
         
         if deezer_data:
             if not result.success:
@@ -120,6 +127,12 @@ class EnrichmentProcessor:
             else:
                 result.source = "lastfm+deezer"
                 result.confidence = min(100, result.confidence + 20)
+            
+            # Canonical names
+            if deezer_data.get("canonical_title"):
+                result.canonical_title = deezer_data["canonical_title"]
+            if deezer_data.get("canonical_artist"):
+                result.canonical_artist = deezer_data["canonical_artist"]
             
             # Deezer track number and IDs
             if deezer_data.get("track_number"):
@@ -236,7 +249,11 @@ class EnrichmentProcessor:
             result = {
                 "deezer_track_id": track.get("id"),
                 "confidence": 75,
+                "canonical_title": track.get("title"),
             }
+            artist_obj = track.get("artist")
+            if isinstance(artist_obj, dict) and artist_obj.get("name"):
+                result["canonical_artist"] = artist_obj["name"]
             
             # Get album info
             album = track.get("album", {})

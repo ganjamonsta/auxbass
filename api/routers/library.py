@@ -104,12 +104,16 @@ def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None,
     added_at = track.created_at
     is_liked = False
     liked_at = None
+    is_disliked = False
+    disliked_at = None
     play_count = 0
     if library_entry:
         source = library_entry.source.value if library_entry.source else None
         added_at = library_entry.added_at
         is_liked = library_entry.is_liked or False
         liked_at = library_entry.liked_at
+        is_disliked = getattr(library_entry, 'is_disliked', False) or False
+        disliked_at = getattr(library_entry, 'disliked_at', None)
         play_count = library_entry.play_count or 0
     
     track_is_streamable = is_streamable(track.mime_type)
@@ -152,6 +156,8 @@ def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None,
         release_date=enrichment.release_date if enrichment else None,
         is_liked=is_liked,
         liked_at=liked_at,
+        is_disliked=is_disliked,
+        disliked_at=disliked_at,
         play_count=play_count,
         added_at=added_at,
         in_library=in_library,
@@ -215,6 +221,7 @@ async def get_my_tracks(
     artist: Optional[str] = None,
     album_id: Optional[int] = None,
     source: Optional[str] = None,
+    include_disliked: bool = Query(False, description="Include disliked tracks"),
     sort_by: str = Query("added_at", pattern="^(added_at|title|artist|duration)$"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     user: TelegramUser = Depends(get_current_user),
@@ -226,10 +233,14 @@ async def get_my_tracks(
     Supports filtering by search, artist, album, and source.
     """
     # Base query - join through UserLibrary to get user's tracks
+    base_conds = [UserLibrary.user_id == user.id]
+    if not include_disliked:
+        base_conds.append(UserLibrary.is_disliked == False)
+    
     query = (
         select(Track, UserLibrary)
         .join(UserLibrary, UserLibrary.track_id == Track.id)
-        .where(UserLibrary.user_id == user.id)
+        .where(*base_conds)
         .options(
             selectinload(Track.enrichment),
             selectinload(Track.track_tags),
@@ -239,7 +250,7 @@ async def get_my_tracks(
     count_query = (
         select(func.count(Track.id))
         .join(UserLibrary, UserLibrary.track_id == Track.id)
-        .where(UserLibrary.user_id == user.id)
+        .where(*base_conds)
     )
     
     # Search filter (indexes title, artist, file_name, user tags, and enrichment tags)
@@ -347,6 +358,7 @@ async def get_all_track_ids(
         select(Track.id)
         .join(UserLibrary, UserLibrary.track_id == Track.id)
         .where(UserLibrary.user_id == user.id)
+        .where(UserLibrary.is_disliked == False)
     )
     
     # Search filter

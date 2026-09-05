@@ -17,7 +17,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
 )
-from aiogram.filters import CommandStart, Command
+from aiogram.filters import CommandStart, Command, CommandObject
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from sqlalchemy import select, func
@@ -44,6 +44,7 @@ from bot.handlers.menu_keyboards import (
     get_channel_operation_keyboard,
     get_channel_back_keyboard,
     get_stats_menu_keyboard,
+    get_deep_link_keyboard,
 )
 
 router = Router()
@@ -143,7 +144,7 @@ async def _get_stats_text(user_id: int) -> str:
 # ═══════════════════════════════════════════════════════════
 
 @router.message(CommandStart())
-async def cmd_start(message: Message, state: FSMContext):
+async def cmd_start(message: Message, state: FSMContext, command: CommandObject = None):
     """Welcome message + register user + main menu"""
     user = message.from_user
     async with get_session() as session:
@@ -163,6 +164,34 @@ async def cmd_start(message: Message, state: FSMContext):
         await session.commit()
 
     await state.clear()
+
+    if command and command.args:
+        args = command.args.strip()
+        if args.startswith("user_"):
+            await message.answer(
+                f"👋 Привет, <b>{user.first_name}</b>!\n\n"
+                "👤 Вам отправили профиль пользователя в <b>TG Player</b>.\n\n"
+                "Нажмите кнопку ниже, чтобы открыть его медиатеку:",
+                reply_markup=get_deep_link_keyboard(args, "👤 Открыть профиль"),
+            )
+            return
+        elif args.startswith("playlist_"):
+            await message.answer(
+                f"👋 Привет, <b>{user.first_name}</b>!\n\n"
+                "🎧 Вам отправили плейлист в <b>TG Player</b>.\n\n"
+                "Нажмите кнопку ниже, чтобы послушать его в плеере:",
+                reply_markup=get_deep_link_keyboard(args, "🎧 Открыть плейлист"),
+            )
+            return
+        elif args.startswith("track_"):
+            await message.answer(
+                f"👋 Привет, <b>{user.first_name}</b>!\n\n"
+                "🎵 Вам отправили трек в <b>TG Player</b>.\n\n"
+                "Нажмите кнопку ниже, чтобы включить его в плеере:",
+                reply_markup=get_deep_link_keyboard(args, "🎵 Слушать трек"),
+            )
+            return
+
     await message.answer(
         f"👋 Привет, <b>{user.first_name}</b>!\n\n"
         "🎵 <b>TG Player</b> — твоя персональная музыкальная библиотека.\n\n"

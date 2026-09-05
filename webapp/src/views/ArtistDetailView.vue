@@ -62,6 +62,7 @@
           class="album-card"
           @click="goToAlbum(album)"
           @contextmenu.prevent="openMenu('album', album, 'artist', $event)"
+          v-longpress="(e) => openMenu('album', album, 'artist', e)"
         >
           <div class="album-cover">
             <img v-if="album.cover_url" :src="getCoverUrl(album.cover_url, CoverSize.MEDIUM)" :alt="album.name" />

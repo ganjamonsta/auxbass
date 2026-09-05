@@ -234,6 +234,7 @@ import Sidebar from '@/components/desktop/Sidebar.vue'
 import DesktopPlayer from '@/components/desktop/DesktopPlayer.vue'
 import NowPlayingSidebar from '@/components/desktop/NowPlayingSidebar.vue'
 import FullPlayerDesktop from '@/components/desktop/FullPlayerDesktop.vue'
+import { tracksApi } from '@/api/client'
 
 const route = useRoute()
 const router = useRouter()
@@ -350,6 +351,7 @@ const pageTitle = computed(() => {
     playlists: 'Плейлисты',
     'playlist-detail': 'Плейлист',
     friends: 'Кенты',
+    'user-profile': 'Профиль',
     settings: 'Настройки',
   }
   return titles[route.name] || ''
@@ -496,6 +498,53 @@ const handleNetworkRecovered = () => {
 onMounted(async () => {
   // Apply initial scale
   applyUIScale()
+
+  // Deep linking helper
+  const handleStartParams = async () => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search)
+      const startParam = 
+        telegram?.initDataUnsafe?.start_param || 
+        window.Telegram?.WebApp?.initDataUnsafe?.start_param || 
+        urlParams.get('startapp') || 
+        urlParams.get('tgWebAppStartParam')
+      
+      if (!startParam) return
+
+      console.log('[DeepLink] Processing start_param:', startParam)
+
+      if (startParam.startsWith('user_')) {
+        const uid = startParam.replace('user_', '')
+        if (uid) {
+          router.push(`/user/${uid}`)
+        }
+      } else if (startParam.startsWith('playlist_')) {
+        const pid = startParam.replace('playlist_', '')
+        if (pid) {
+          router.push(`/playlist/${pid}`)
+        }
+      } else if (startParam.startsWith('album_')) {
+        const aid = startParam.replace('album_', '')
+        if (aid) {
+          router.push(`/album/${aid}`)
+        }
+      } else if (startParam.startsWith('track_')) {
+        const tid = Number(startParam.replace('track_', ''))
+        if (tid) {
+          try {
+            const resp = await tracksApi.getOne(tid)
+            if (resp.data) {
+              await playerStore.play(resp.data)
+            }
+          } catch (e) {
+            console.error('[DeepLink] Failed to load track:', e)
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[DeepLink] Error handling start parameter:', err)
+    }
+  }
   
   // Initialize Telegram WebApp
   if (telegram) {
@@ -524,6 +573,9 @@ onMounted(async () => {
       await playerStore.restoreState()
     }
   }
+
+  // Handle deep link / start_param navigation
+  await handleStartParams()
   
   // === Start network monitoring ===
   networkMonitor.startMonitoring()

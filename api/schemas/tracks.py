@@ -44,6 +44,8 @@ class TrackResponse(BaseModel):
     # User library state
     is_liked: bool = False
     liked_at: Optional[datetime] = None
+    is_disliked: bool = False
+    disliked_at: Optional[datetime] = None
     play_count: int = 0
     in_library: Optional[bool] = None  # For global tracks: indicates if user has this track
     

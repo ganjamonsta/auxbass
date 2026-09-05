@@ -476,10 +476,8 @@ const unfollowUser = async (user) => {
   }
 }
 
-const viewUserProfile = async (user) => {
-  selectedUser.value = user
-  profileTab.value = 'library'
-  loadUserLibrary()
+const viewUserProfile = (user) => {
+  router.push(`/user/${user.id}`)
 }
 
 const closeProfile = () => {
@@ -560,9 +558,7 @@ onMounted(() => {
   
   // Check if we need to open a user profile from query params
   if (route.query.viewUser) {
-    loadUserById(route.query.viewUser)
-    // Clear the query param
-    router.replace({ name: 'friends' })
+    router.replace(`/user/${route.query.viewUser}`)
   }
   
   // Слушаем событие сброса состояния

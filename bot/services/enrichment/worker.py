@@ -12,6 +12,7 @@ from sqlalchemy import select, func
 
 from shared.database import get_session
 from shared.models import Track, TrackEnrichment, TrackTag, TagSource, EnrichmentStatus, utcnow
+from shared.matching import clean_track_metadata, normalize_artist
 from .processor import enrichment_processor, EnrichmentResult
 
 logger = logging.getLogger(__name__)
@@ -201,6 +202,17 @@ class EnrichmentWorker:
                     
                     enrichment.confidence = result.confidence
                     enrichment.enriched_at = utcnow()
+                    
+                    # Propagate canonical title and artist on high confidence
+                    if result.confidence >= 65:
+                        if result.canonical_title:
+                            c_title, _ = clean_track_metadata(track.title, track.artist, track.file_name)
+                            if c_title != track.title or not track.title or track.title in ("Без названия", "Unknown Track", "untitled"):
+                                track.title = result.canonical_title
+                        if result.canonical_artist:
+                            if not track.artist or track.artist.strip().lower() in ("unknown", "unknown artist", "неизвестен", "неизвестный исполнитель") or "@" in track.artist or "t.me/" in track.artist:
+                                track.artist = result.canonical_artist
+                                track.normalized_artist = normalize_artist(result.canonical_artist)
                     
                     track.enrichment_status = EnrichmentStatus.COMPLETED
                     self._stats["success"] += 1

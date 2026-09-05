@@ -14,60 +14,97 @@
     @drop="$emit('drop', $event)"
   >
     <template #action>
-      <button class="remove-btn" @click="$emit('remove')" title="Удалить">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-        </svg>
-      </button>
+      <div class="edit-item-actions">
+        <!-- Reorder buttons for reliable touch / mobile reordering -->
+        <button
+          type="button"
+          class="reorder-btn"
+          :disabled="index === 0"
+          @click.stop="$emit('moveUp', index)"
+          title="Переместить выше"
+        >
+          <ChevronUp :size="16" />
+        </button>
+        <button
+          type="button"
+          class="reorder-btn"
+          :disabled="isLast"
+          @click.stop="$emit('moveDown', index)"
+          title="Переместить ниже"
+        >
+          <ChevronDown :size="16" />
+        </button>
+        <button
+          type="button"
+          class="remove-btn"
+          @click.stop="$emit('remove')"
+          title="Убрать из плейлиста"
+        >
+          <X :size="16" />
+        </button>
+      </div>
     </template>
   </BaseTrackItem>
 </template>
 
 <script setup>
 import BaseTrackItem from './BaseTrackItem.vue'
+import { ChevronUp, ChevronDown, X } from 'lucide-vue-next'
 
 defineProps({
   track: { type: Object, required: true },
   index: { type: Number, required: true },
   isDragging: Boolean,
   isDragOver: Boolean,
+  isLast: Boolean,
   allTracks: { type: Array, default: () => [] }
 })
 
-defineEmits(['dragstart', 'dragend', 'dragover', 'drop', 'remove'])
+defineEmits(['dragstart', 'dragend', 'dragover', 'drop', 'remove', 'moveUp', 'moveDown'])
 </script>
 
 <style scoped>
+.edit-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.reorder-btn,
 .remove-btn {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: var(--c-accent);
   border: none;
-  color: #000;
-  font-size: 18px;
-  font-weight: 600;
-  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  transition: all 0.15s;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background: var(--c-bg-2, rgba(255, 255, 255, 0.08));
+  color: var(--c-text-2, #aaa);
 }
 
-.remove-btn:hover { 
-  background: var(--c-error); 
-  color: #fff;
-  transform: scale(1.1);
+.reorder-btn:hover:not(:disabled) {
+  background: var(--c-accent, #6366f1);
+  color: #000;
+  transform: scale(1.05);
 }
 
-.remove-btn:active {
-  transform: scale(0.95);
-}
-
-.remove-btn:disabled {
-  opacity: 0.5;
+.reorder-btn:disabled {
+  opacity: 0.25;
   cursor: not-allowed;
-  transform: none;
+}
+
+.remove-btn:hover {
+  background: var(--c-error, #ef4444);
+  color: #fff;
+  transform: scale(1.05);
+}
+
+.remove-btn:active,
+.reorder-btn:active:not(:disabled) {
+  transform: scale(0.95);
 }
 </style>

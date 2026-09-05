@@ -3,17 +3,30 @@ TG Player API v2 - Playlists Router
 
 User playlist management.
 """
+import logging
 from typing import Optional, List
 from datetime import datetime
+import uuid
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy import select, func, delete, update, union_all, asc, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from aiogram.types import BufferedInputFile
 
 from shared.database import get_db
-from shared.models import Playlist, PlaylistTrack, Track, UserLibrary, AlbumTrack, User, PlaylistSubscription, TrackEnrichment
+from shared.models import (
+    Playlist, PlaylistTrack, Track, UserLibrary, AlbumTrack, User,
+    PlaylistSubscription, TrackEnrichment, UserChannel
+)
 from shared.config import get_settings
+from api.routers.images import _get_bot
+
+logger = logging.getLogger(__name__)
+
+COVERS_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "covers"
+
 
 from api.routers.auth import get_current_user, require_premium
 from api.routers.library import track_to_response
@@ -35,12 +48,14 @@ router = APIRouter(tags=["Playlists"])
 
 async def get_playlist_info(
     db: AsyncSession, 
-    playlist_id: int
+    playlist_id: int,
+    custom_cover_url: Optional[str] = None,
 ) -> tuple[int, int, Optional[str], List[str]]:
     """
     Get track count, duration, cover, and covers array for a playlist.
     Returns: (track_count, total_duration, cover_url, covers)
-    Cover is built from track covers (collage of up to 4 track covers).
+    If custom_cover_url is set, it overrides the track collage.
+    Otherwise, cover is built from track covers (collage of up to 4 track covers).
     """
     # Count and duration
     result = await db.execute(
@@ -54,6 +69,15 @@ async def get_playlist_info(
     row = result.one()
     track_count = row[0] or 0
     total_duration = row[1] or 0
+    
+    if custom_cover_url:
+        return track_count, total_duration, custom_cover_url, [custom_cover_url]
+    
+    p_cover = await db.scalar(
+        select(Playlist.custom_cover_url).where(Playlist.id == playlist_id)
+    )
+    if p_cover:
+        return track_count, total_duration, p_cover, [p_cover]
     
     # Get track covers for collage (up to 4)
     covers_result = await db.execute(
@@ -162,7 +186,7 @@ async def get_my_playlists(
     
     items = []
     for playlist, owner, tc in rows:
-        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id)
+        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.custom_cover_url)
         
         is_owner = playlist.owner_id == user.id
         is_subscribed = False
@@ -183,6 +207,7 @@ async def get_my_playlists(
             track_count=track_count,
             total_duration=total_duration,
             cover_url=cover_url,
+            custom_cover_url=playlist.custom_cover_url,
             covers=covers,
             is_public=playlist.is_public,
             owner_id=owner.id,
@@ -228,7 +253,7 @@ async def get_all_my_playlists(
     
     items = []
     for playlist, owner in rows:
-        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id)
+        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.custom_cover_url)
         items.append(PlaylistResponse(
             id=playlist.id,
             name=playlist.name,
@@ -236,6 +261,7 @@ async def get_all_my_playlists(
             track_count=track_count,
             total_duration=total_duration,
             cover_url=cover_url,
+            custom_cover_url=playlist.custom_cover_url,
             covers=covers,
             is_public=playlist.is_public,
             owner_id=owner.id,
@@ -331,7 +357,7 @@ async def get_global_playlists(
     
     items = []
     for playlist, owner, tc in rows:
-        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id)
+        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.custom_cover_url)
         
         is_owner = playlist.owner_id == user.id
         is_subscribed = False
@@ -352,6 +378,7 @@ async def get_global_playlists(
             track_count=track_count,
             total_duration=total_duration,
             cover_url=cover_url,
+            custom_cover_url=playlist.custom_cover_url,
             covers=covers,
             is_public=playlist.is_public,
             owner_id=owner.id,
@@ -396,6 +423,7 @@ async def create_playlist(
         track_count=0,
         total_duration=0,
         cover_url=None,
+        custom_cover_url=None,
         covers=[],
         is_public=playlist.is_public,
         owner_id=owner.id,
@@ -448,13 +476,17 @@ async def get_playlist(
     track_count = len(tracks_response)
     total_duration = sum(t.duration or 0 for t in [row[0] for row in rows])
     
-    # Build covers array from track covers (up to 4 for collage)
-    track_covers = []
-    for track, _ in rows:
-        if track.enrichment and track.enrichment.cover_url and len(track_covers) < 4:
-            track_covers.append(track.enrichment.cover_url)
-    cover_url = track_covers[0] if track_covers else None
-    covers = track_covers
+    # Build covers array from custom cover or track covers (up to 4 for collage)
+    if playlist.custom_cover_url:
+        cover_url = playlist.custom_cover_url
+        covers = [playlist.custom_cover_url]
+    else:
+        track_covers = []
+        for track, _ in rows:
+            if track.enrichment and track.enrichment.cover_url and len(track_covers) < 4:
+                track_covers.append(track.enrichment.cover_url)
+        cover_url = track_covers[0] if track_covers else None
+        covers = track_covers
     
     # Check if user is subscribed to this playlist
     is_subscribed = False
@@ -496,6 +528,7 @@ async def get_playlist(
         track_count=track_count,
         total_duration=total_duration,
         cover_url=cover_url,
+        custom_cover_url=playlist.custom_cover_url,
         covers=covers,
         tags=playlist_tags,
         is_public=playlist.is_public,
@@ -554,7 +587,7 @@ async def update_playlist(
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update playlist name, description, and visibility."""
+    """Update playlist name, description, visibility, and custom cover."""
     playlist = await db.get(Playlist, playlist_id)
     
     if not playlist or playlist.owner_id != user.id:
@@ -566,10 +599,12 @@ async def update_playlist(
         playlist.description = data.description
     if data.is_public is not None:
         playlist.is_public = data.is_public
+    if data.custom_cover_url is not None:
+        playlist.custom_cover_url = data.custom_cover_url.strip() if data.custom_cover_url.strip() else None
     
     await db.commit()
     
-    track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id)
+    track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.custom_cover_url)
     
     return PlaylistResponse(
         id=playlist.id,
@@ -578,10 +613,122 @@ async def update_playlist(
         track_count=track_count,
         total_duration=total_duration,
         cover_url=cover_url,
+        custom_cover_url=playlist.custom_cover_url,
         covers=covers,
         is_public=playlist.is_public,
         created_at=playlist.created_at,
     )
+
+
+@router.post("/{playlist_id}/cover")
+async def upload_playlist_cover(
+    playlist_id: int,
+    file: UploadFile = File(...),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Upload custom cover image for a playlist directly to Telegram storage (channel or PM)."""
+    playlist = await db.get(Playlist, playlist_id)
+    if not playlist or playlist.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    
+    content_type = file.content_type or ""
+    if not content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only image files are allowed")
+    
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:  # 10MB limit
+        raise HTTPException(status_code=400, detail="Image size exceeds 10MB limit")
+    
+    bot = _get_bot()
+    caption = f"🖼 <b>Обложка плейлиста</b>: {playlist.name}\n\n#playlist_{playlist.id} #cover"
+    
+    # Target user channel if available, else user PM
+    user_channel = await db.scalar(
+        select(UserChannel).where(UserChannel.user_id == user.id, UserChannel.is_active == True)
+    )
+    target_chat_id = user_channel.channel_id if user_channel else user.id
+
+    try:
+        sent_msg = await bot.send_photo(
+            chat_id=target_chat_id,
+            photo=BufferedInputFile(file=content, filename=file.filename or "cover.jpg"),
+            caption=caption,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to upload cover to target {target_chat_id}: {e}")
+        # Fallback to user PM if channel post failed
+        if user_channel and target_chat_id != user.id:
+            try:
+                sent_msg = await bot.send_photo(
+                    chat_id=user.id,
+                    photo=BufferedInputFile(file=content, filename=file.filename or "cover.jpg"),
+                    caption=caption,
+                )
+            except Exception as err:
+                logger.error(f"Failed to upload cover to Telegram PM fallback: {err}")
+                raise HTTPException(status_code=502, detail="Не удалось загрузить обложку в Telegram")
+        else:
+            raise HTTPException(status_code=502, detail="Не удалось загрузить обложку в Telegram")
+
+    photos = sent_msg.photo or []
+    if not photos:
+        raise HTTPException(status_code=502, detail="Telegram не вернул файл обложки")
+
+    file_id = photos[-1].file_id
+
+    # Clean up old local custom cover file if one existed
+    if playlist.custom_cover_url and playlist.custom_cover_url.startswith("/api/covers/"):
+        old_filename = playlist.custom_cover_url.replace("/api/covers/", "")
+        old_path = COVERS_DIR / old_filename
+        if old_path.exists() and old_path.is_file():
+            try:
+                old_path.unlink()
+            except OSError:
+                pass
+
+    playlist.custom_cover_url = f"/api/images/{file_id}"
+    await db.commit()
+
+    track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist_id, playlist.custom_cover_url)
+    return {
+        "status": "success",
+        "custom_cover_url": playlist.custom_cover_url,
+        "cover_url": cover_url,
+        "covers": covers,
+    }
+
+
+@router.delete("/{playlist_id}/cover")
+async def delete_playlist_cover(
+    playlist_id: int,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete custom cover and revert to track collage."""
+    playlist = await db.get(Playlist, playlist_id)
+    if not playlist or playlist.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+        
+    if playlist.custom_cover_url and playlist.custom_cover_url.startswith("/api/covers/"):
+        old_filename = playlist.custom_cover_url.replace("/api/covers/", "")
+        old_path = COVERS_DIR / old_filename
+        if old_path.exists() and old_path.is_file():
+            try:
+                old_path.unlink()
+            except OSError:
+                pass
+                
+    playlist.custom_cover_url = None
+    await db.commit()
+    
+    track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist_id)
+    return {
+        "status": "deleted",
+        "custom_cover_url": None,
+        "cover_url": cover_url,
+        "covers": covers,
+    }
 
 
 
@@ -743,7 +890,7 @@ async def get_public_playlists(
     
     items = []
     for playlist, owner in rows:
-        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id)
+        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.custom_cover_url)
         
         # Check if current user is subscribed or is owner
         is_owner = playlist.owner_id == user.id
@@ -765,6 +912,7 @@ async def get_public_playlists(
             track_count=track_count,
             total_duration=total_duration,
             cover_url=cover_url,
+            custom_cover_url=playlist.custom_cover_url,
             covers=covers,
             is_public=playlist.is_public,
             owner_id=owner.id,
@@ -821,7 +969,7 @@ async def get_user_public_playlists(
     
     items = []
     for playlist in playlists:
-        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id)
+        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.custom_cover_url)
         # Check if current user is subscribed
         is_subscribed = False
         if not is_own:
@@ -841,6 +989,7 @@ async def get_user_public_playlists(
             track_count=track_count,
             total_duration=total_duration,
             cover_url=cover_url,
+            custom_cover_url=playlist.custom_cover_url,
             covers=covers,
             is_public=playlist.is_public,
             owner_id=owner.id,
