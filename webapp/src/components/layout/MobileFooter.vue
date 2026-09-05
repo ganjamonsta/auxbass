@@ -39,7 +39,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MiniPlayer from '@/components/MiniPlayer.vue'
-import { ListMusic, Disc3, Users, Heart, Settings } from 'lucide-vue-next'
+import { Home, Search, Library, Heart } from 'lucide-vue-next'
 
 const props = defineProps({
   // Player props
@@ -83,11 +83,10 @@ const props = defineProps({
   navItems: {
     type: Array,
     default: () => [
-      { path: '/', icon: ListMusic, label: 'Библиотека', matchPaths: ['/'] },
+      { path: '/', icon: Home, label: 'Главная', matchPaths: ['/'] },
+      { path: '/search', icon: Search, label: 'Поиск', matchPaths: ['/search'] },
+      { path: '/library', icon: Library, label: 'Медиатека', matchPaths: ['/library', '/collections', '/albums', '/playlists', '/artists'] },
       { path: '/liked', icon: Heart, label: 'Любимое', matchPaths: ['/liked'] },
-      { path: '/collections', icon: Disc3, label: 'Коллекции', matchPaths: ['/collections', '/albums', '/playlists'] },
-      { path: '/friends', icon: Users, label: 'Кенты', matchPaths: ['/friends'] },
-      { path: '/settings', icon: Settings, label: 'Настройки', matchPaths: ['/settings'] },
     ]
   }
 })
@@ -113,7 +112,7 @@ const footerClasses = computed(() => ({
 
 const isActiveRoute = (path, matchPaths = []) => {
   if (path === '/') return route.path === '/'
-  return matchPaths.some(p => route.path.startsWith(p))
+  return matchPaths.some(p => route.path === p || route.path.startsWith(p + '/'))
 }
 
 const scrollToTop = () => {

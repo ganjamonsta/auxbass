@@ -55,10 +55,10 @@
           </template>
           <template #actions>
             <button
-              v-if="authStore.user && !(route.name === 'user-profile' && String(route.params.id) === String(authStore.user.id))"
+              v-if="authStore.user"
               class="header-profile-btn"
-              @click="router.push(`/user/${authStore.user.id}`)"
-              title="Мой профиль"
+              @click="showProfileMenu = true"
+              title="Меню профиля"
             >
               <div class="header-avatar-badge">
                 {{ userInitials }}
@@ -84,7 +84,7 @@
           </div>
 
           <router-view v-slot="{ Component }">
-            <keep-alive :include="['LibraryView', 'CollectionsView', 'LikedTracksView', 'FriendsView']">
+            <keep-alive :include="['HomeView', 'LibraryView', 'CollectionsView', 'LikedTracksView', 'FriendsView', 'SearchView']">
               <component :is="Component" />
             </keep-alive>
           </router-view>
@@ -215,6 +215,9 @@
 
       <!-- Global toast notifications -->
       <ToastContainer />
+
+      <!-- Profile Context Menu -->
+      <ProfileMenu v-model="showProfileMenu" />
     </template>
   </div>
 </template>
@@ -239,7 +242,7 @@ import PwaInstallModal from '@/components/PwaInstallModal.vue'
 import { useNetworkMonitor } from '@/composables/useNetworkMonitor'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
 import { usePwaInstall } from '@/composables/usePwaInstall'
-import { MobileFooter } from '@/components/layout'
+import { MobileFooter, ProfileMenu } from '@/components/layout'
 import { Music, Disc3, User, Folder } from 'lucide-vue-next'
 // Desktop components
 import Sidebar from '@/components/desktop/Sidebar.vue'
@@ -257,6 +260,7 @@ const uiStore = useUIStore()
 const telegram = inject('telegram')
 const networkMonitor = useNetworkMonitor()
 const pwaInstall = usePwaInstall()
+const showProfileMenu = ref(false)
 
 // Pull-to-refresh — bound to .main-content via scrollRef
 const { scrollRef, pullDistance, isPulling, isRefreshing } = usePullToRefresh(
@@ -338,12 +342,18 @@ const showHeader = computed(() => {
 
 const showBackButton = computed(() => {
   // Main navigation tabs do not need a back button
-  const mainNavRoutes = ['library', 'collections', 'friends', 'liked', 'settings']
+  const mainNavRoutes = ['home', 'library', 'search', 'collections', 'friends', 'liked', 'settings']
   return !mainNavRoutes.includes(route.name)
 })
 
 const pageTitle = computed(() => {
-  // Для главной страницы библиотеки показываем название текущего раздела
+  if (route.name === 'home') {
+    return 'Главная'
+  }
+  if (route.name === 'search') {
+    return 'Поиск'
+  }
+  // Для страницы библиотеки показываем название текущего раздела
   if (route.name === 'library') {
     const libraryTitles = {
       tracks: 'Треки',
@@ -351,7 +361,7 @@ const pageTitle = computed(() => {
       artists: 'Артисты',
       playlists: 'Плейлисты'
     }
-    return libraryTitles[uiStore.libraryTab] || 'Библиотека'
+    return libraryTitles[uiStore.libraryTab] || 'Медиатека'
   }
   
   const titles = {

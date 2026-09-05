@@ -19,19 +19,27 @@
         <span>Главная</span>
       </router-link>
 
+      <router-link to="/search" class="nav-item" :class="{ active: isActive('/search') }">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <span>Поиск</span>
+      </router-link>
+
+      <router-link to="/library" class="nav-item" :class="{ active: isActive('/library') || isActive('/collections') }">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="m16 6 4 14M12 6v14M8 8v12M4 4v16"></path>
+        </svg>
+        <span>Медиатека</span>
+      </router-link>
+
       <router-link to="/liked" class="nav-item" :class="{ active: isActive('/liked') }">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
         </svg>
         <span>Любимое</span>
         <span v-if="likedCount" class="nav-count">{{ formatCount(likedCount) }}</span>
-      </router-link>
-
-      <router-link to="/collections" class="nav-item" :class="{ active: isActive('/collections') }">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
-        </svg>
-        <span>Коллекции</span>
       </router-link>
 
       <router-link to="/friends" class="nav-item" :class="{ active: isActive('/friends') }">
@@ -83,7 +91,7 @@
 
     <!-- User Section (bottom) -->
     <div class="sidebar-footer">
-      <div class="user-info clickable" @click="goToMyProfile" title="Мой профиль">
+      <div class="user-info clickable" @click="showProfileMenu = true" title="Меню профиля">
         <div class="user-avatar">
           {{ userInitials }}
         </div>
@@ -108,11 +116,14 @@
         </svg>
       </button>
     </div>
+
+    <!-- Context Menu for Profile -->
+    <ProfileMenu v-model="showProfileMenu" />
   </aside>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { useAuthStore } from '@/stores/auth'
@@ -121,6 +132,7 @@ import { useContextMenu } from '@/composables/useContextMenu'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import { getCoverUrl, CoverSize } from '@/utils'
 import { Download } from 'lucide-vue-next'
+import ProfileMenu from '@/components/layout/ProfileMenu.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -128,6 +140,7 @@ const libraryStore = useLibraryStore()
 const authStore = useAuthStore()
 const uiStore = useUIStore()
 const pwaInstall = usePwaInstall()
+const showProfileMenu = ref(false)
 
 // Universal context menu
 const { openMenu } = useContextMenu()
@@ -151,7 +164,7 @@ const hasMorePlaylists = computed(() => {
 // Navigation
 const goToPersonalPlaylists = () => {
   uiStore.setLibraryTab('playlists')
-  router.push('/')
+  router.push('/library')
 }
 
 // Format large numbers
