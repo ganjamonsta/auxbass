@@ -95,6 +95,7 @@
         @expand-player="showFullPlayer = true"
         @toggle-play="playerStore.togglePlay()"
         @next-track="playerStore.next()"
+        @prev-track="playerStore.prev()"
         @toggle-shuffle="playerStore.toggleShuffle()"
         @toggle-repeat="playerStore.toggleRepeat()"
         @like="handleToggleLike"

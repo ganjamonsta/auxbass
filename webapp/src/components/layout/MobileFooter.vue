@@ -13,6 +13,7 @@
         @expand="$emit('expand-player')"
         @toggle="$emit('toggle-play')"
         @next="$emit('next-track')"
+        @prev="$emit('prev-track')"
         @toggleShuffle="$emit('toggle-shuffle')"
         @toggleRepeat="$emit('toggle-repeat')"
         @like="$emit('like')"
@@ -99,6 +100,7 @@ const emit = defineEmits([
   'expand-player', 
   'toggle-play', 
   'next-track',
+  'prev-track',
   'toggle-shuffle',
   'toggle-repeat',
   'like',
