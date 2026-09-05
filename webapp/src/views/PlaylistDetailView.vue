@@ -35,10 +35,6 @@
         <button v-if="isOwner" class="action-btn edit-btn" @click="openEditModal" title="Редактировать">
           <Edit3 :size="18" />
         </button>
-        <!-- Add tracks button for owner -->
-        <button v-if="isOwner" class="action-btn add-btn" @click="openEditModal" title="Добавить треки">
-          <Plus :size="18" />
-        </button>
         <!-- Subscribe/Unsubscribe button for non-owner public playlists -->
         <button 
           v-else-if="playlist.is_public" 
