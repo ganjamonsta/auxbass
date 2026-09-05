@@ -4,13 +4,13 @@
     <div class="search-bar-wrapper">
       <SearchBar
         v-model="searchQuery"
-        placeholder="Треки, артисты, плейлисты..."
+        placeholder="Поиск по трекам, тегам #, артистам..."
         @input="debouncedSearch"
         @clear="handleClear"
       />
     </div>
 
-    <!-- Filter chips (when query or genre active) -->
+    <!-- Filter chips (when query is active) -->
     <div v-if="searchQuery.trim()" class="search-type-chips">
       <button 
         v-for="chip in filterChips" 
@@ -39,7 +39,7 @@
           </div>
           <div class="track-results-list">
             <TrackItem
-              v-for="(track, index) in filteredTracks.slice(0, activeFilter === 'tracks' ? 50 : 6)"
+              v-for="(track, index) in filteredTracks.slice(0, activeFilter === 'tracks' ? 50 : 8)"
               :key="track.id"
               :track="track"
               :isPlaying="playerStore.currentTrack?.id === track.id"
@@ -113,26 +113,75 @@
         <!-- Empty Results -->
         <div v-if="noResults" class="no-results-box">
           <p class="no-results-text">Ничего не найдено по запросу «{{ searchQuery }}»</p>
-          <p class="no-results-hint">Попробуйте ввести имя артиста или другое название трека</p>
+          <p class="no-results-hint">Попробуйте ввести другой тег, название трека или артиста</p>
         </div>
       </template>
     </div>
 
-    <!-- Empty/Explore Mode: Genres & Quick Browse -->
+    <!-- Empty/Explore Mode: Dynamic Tags Grid -->
     <div v-else class="search-explore-container">
-      <h2 class="explore-heading">Обзор жанров</h2>
-      <div class="genres-grid">
-        <div 
-          v-for="genre in genreTiles" 
-          :key="genre.name"
-          class="genre-tile"
-          :style="{ background: genre.bg }"
-          @click="handleGenreClick(genre.name)"
-        >
-          <span class="genre-name">{{ genre.name }}</span>
-          <div class="genre-card-icon">
-            <component :is="genre.icon" :size="32" />
+      <div class="explore-header">
+        <div class="explore-title-row">
+          <div class="title-with-icon">
+            <Hash :size="20" class="explore-icon" />
+            <h2 class="explore-heading">Обзор по тегам</h2>
           </div>
+          <!-- Scope switcher -->
+          <div class="tag-scope-tabs">
+            <button 
+              class="scope-tab" 
+              :class="{ active: tagScope === 'library' }"
+              @click="switchScope('library')"
+            >
+              Мои теги
+            </button>
+            <button 
+              class="scope-tab" 
+              :class="{ active: tagScope === 'global' }"
+              @click="switchScope('global')"
+            >
+              Все теги
+            </button>
+          </div>
+        </div>
+        <p class="explore-subheading">Нажмите на любой тег, чтобы открыть подборку музыки</p>
+      </div>
+
+      <!-- Loading tags skeleton -->
+      <div v-if="loadingTags && tags.length === 0" class="tags-loading-grid">
+        <div v-for="n in 8" :key="n" class="tag-tile-skeleton"></div>
+      </div>
+
+      <!-- Tags Grid -->
+      <div v-else class="tags-grid">
+        <div 
+          v-for="tag in displayTags" 
+          :key="tag.name"
+          class="tag-tile"
+          :style="{ background: getTagGradient(tag.name) }"
+          @click="handleTagClick(tag.name)"
+        >
+          <div class="tag-info">
+            <span class="tag-name">#{{ tag.name }}</span>
+            <span v-if="tag.track_count > 0" class="tag-count">
+              {{ tag.track_count }} {{ formatTrackCount(tag.track_count) }}
+            </span>
+          </div>
+
+          <!-- Decorative Hash watermark -->
+          <div class="tag-watermark">
+            <Hash :size="48" stroke-width="2.5" />
+          </div>
+
+          <!-- Quick play mix button -->
+          <button 
+            v-if="tag.track_count > 0"
+            class="tag-play-btn"
+            @click.stop="handlePlayTagMix(tag.name)"
+            title="Слушать микс по тегу"
+          >
+            <Play :size="16" fill="currentColor" />
+          </button>
         </div>
       </div>
     </div>
@@ -146,18 +195,14 @@ import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useDebouncedSearch } from '@/composables'
+import { tracksApi } from '@/api/client'
 import SearchBar from '@/components/ui/SearchBar.vue'
 import TrackItem from '@/components/TrackItem.vue'
 import { getCoverUrl, CoverSize } from '@/utils'
 import { 
   Music, 
-  Disc3, 
-  Radio, 
-  Headphones, 
-  Flame, 
-  Sparkles, 
-  Zap, 
-  Volume2 
+  Hash, 
+  Play 
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -169,6 +214,11 @@ const { query: searchQuery, debouncedQuery, search: debouncedSearch, clear: hand
 const activeFilter = ref('all')
 const loading = ref(false)
 
+// Dynamic Tags state
+const tags = ref([])
+const loadingTags = ref(false)
+const tagScope = ref('library')
+
 const filterChips = [
   { id: 'all', label: 'Все' },
   { id: 'tracks', label: 'Треки' },
@@ -176,16 +226,72 @@ const filterChips = [
   { id: 'playlists', label: 'Плейлисты' },
 ]
 
-const genreTiles = [
-  { name: 'Поп', bg: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)', icon: Sparkles },
-  { name: 'Хип-хоп', bg: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)', icon: Flame },
-  { name: 'Рок', bg: 'linear-gradient(135deg, #ef4444 0%, #991b1b 100%)', icon: Zap },
-  { name: 'Электроника', bg: 'linear-gradient(135deg, #06b6d4 0%, #0e7490 100%)', icon: Headphones },
-  { name: 'Инди', bg: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', icon: Disc3 },
-  { name: 'Lo-Fi', bg: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', icon: Radio },
-  { name: 'Джаз', bg: 'linear-gradient(135deg, #64748b 0%, #334155 100%)', icon: Music },
-  { name: 'Фонк', bg: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)', icon: Volume2 },
+// Fallback popular tags if none exist yet
+const fallbackPresets = [
+  { name: 'phonk', track_count: 0 },
+  { name: 'dnb', track_count: 0 },
+  { name: 'lo-fi', track_count: 0 },
+  { name: 'rock', track_count: 0 },
+  { name: 'ambient', track_count: 0 },
+  { name: 'hiphop', track_count: 0 },
+  { name: 'synthwave', track_count: 0 },
+  { name: 'chill', track_count: 0 },
+  { name: 'nightdrive', track_count: 0 },
+  { name: 'indie', track_count: 0 },
+  { name: 'electronic', track_count: 0 },
+  { name: 'workout', track_count: 0 },
 ]
+
+const displayTags = computed(() => {
+  if (tags.value.length > 0) return tags.value
+  return fallbackPresets
+})
+
+// Deterministic vibrant HSL gradient generator for tags
+const getTagGradient = (name) => {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const h1 = Math.abs(hash % 360)
+  const h2 = (h1 + 38) % 360
+  return `linear-gradient(135deg, hsl(${h1}, 75%, 40%) 0%, hsl(${h2}, 80%, 25%) 100%)`
+}
+
+const formatTrackCount = (count) => {
+  const mod10 = count % 10
+  const mod100 = count % 100
+  if (mod100 >= 11 && mod100 <= 19) return 'треков'
+  if (mod10 === 1) return 'трек'
+  if (mod10 >= 2 && mod10 <= 4) return 'трека'
+  return 'треков'
+}
+
+const loadTags = async () => {
+  loadingTags.value = true
+  try {
+    const resp = await tracksApi.getTags(tagScope.value, 40)
+    const list = resp.data || []
+    if (list.length > 0) {
+      tags.value = list
+    } else if (tagScope.value === 'library') {
+      // If library has no tags yet, fall back to global tags
+      const globalResp = await tracksApi.getTags('global', 40)
+      tags.value = globalResp.data || []
+    }
+  } catch (e) {
+    console.error('Failed to load tags:', e)
+  } finally {
+    loadingTags.value = false
+  }
+}
+
+const switchScope = async (scope) => {
+  if (tagScope.value === scope) return
+  tagScope.value = scope
+  tags.value = []
+  await loadTags()
+}
 
 const normalizedQuery = computed(() => {
   return debouncedQuery.value.trim().toLowerCase()
@@ -194,16 +300,22 @@ const normalizedQuery = computed(() => {
 const filteredTracks = computed(() => {
   const q = normalizedQuery.value
   if (!q) return []
+  const cleanQ = q.replace(/^#/, '').trim()
   const all = libraryStore.tracks || []
-  return all.filter(t => 
-    t.title?.toLowerCase().includes(q) || 
-    t.artist?.toLowerCase().includes(q) ||
-    t.album?.toLowerCase().includes(q)
-  )
+  return all.filter(t => {
+    const titleMatch = t.title?.toLowerCase().includes(cleanQ)
+    const artistMatch = t.artist?.toLowerCase().includes(cleanQ)
+    const albumMatch = t.album?.toLowerCase().includes(cleanQ)
+    const tagMatch = t.tags && t.tags.some(tag => {
+      const tagName = (typeof tag === 'string' ? tag : tag?.tag || tag?.name || '').toLowerCase().replace(/^#/, '')
+      return tagName.includes(cleanQ)
+    })
+    return titleMatch || artistMatch || albumMatch || tagMatch
+  })
 })
 
 const filteredArtists = computed(() => {
-  const q = normalizedQuery.value
+  const q = normalizedQuery.value.replace(/^#/, '').trim()
   if (!q) return []
   const all = libraryStore.artists || []
   return all.filter(a => {
@@ -213,7 +325,7 @@ const filteredArtists = computed(() => {
 })
 
 const filteredPlaylists = computed(() => {
-  const q = normalizedQuery.value
+  const q = normalizedQuery.value.replace(/^#/, '').trim()
   if (!q) return []
   const all = libraryStore.playlists || []
   return all.filter(p => p.name?.toLowerCase().includes(q))
@@ -237,16 +349,23 @@ const goToPlaylist = (id) => {
   router.push(`/playlist/${id}`)
 }
 
-const handleGenreClick = async (genreName) => {
-  try {
-    searchQuery.value = genreName
-    debouncedSearch()
-  } catch (e) {
-    console.error('Failed to search genre:', e)
-  }
+const handleTagClick = (tagName) => {
+  searchQuery.value = `#${tagName}`
+  debouncedSearch()
+}
+
+const handlePlayTagMix = (tagName) => {
+  searchQuery.value = `#${tagName}`
+  debouncedSearch()
+  setTimeout(() => {
+    if (filteredTracks.value.length > 0) {
+      playerStore.playTrack(filteredTracks.value[0], filteredTracks.value, 0)
+    }
+  }, 150)
 }
 
 onMounted(async () => {
+  loadTags()
   if (!libraryStore.tracks?.length) {
     libraryStore.fetchTracks()
   }
@@ -349,33 +468,92 @@ onMounted(async () => {
   color: var(--c-text-3, rgba(255, 255, 255, 0.4));
 }
 
-/* Explore: Genres */
-.explore-heading {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--c-text-1, #fff);
-  margin-bottom: 14px;
+/* Explore: Tags Header */
+.explore-header {
+  margin-bottom: 16px;
 }
 
-.genres-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+.explore-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
+.title-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.explore-icon {
+  color: var(--c-accent, #1db954);
+}
+
+.explore-heading {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--c-text-1, #fff);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.explore-subheading {
+  font-size: 13px;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
+  margin-top: 4px;
+}
+
+/* Scope tabs */
+.tag-scope-tabs {
+  display: flex;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 3px;
+  border-radius: 12px;
+  gap: 2px;
+}
+
+.scope-tab {
+  background: transparent;
+  border: none;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.6));
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.scope-tab.active {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+/* Tags Grid */
+.tags-grid, .tags-loading-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
 @media (min-width: 640px) {
-  .genres-grid {
+  .tags-grid, .tags-loading-grid {
     grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
   }
 }
 
 @media (min-width: 1024px) {
-  .genres-grid {
+  .tags-grid, .tags-loading-grid {
     grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
   }
 }
 
-.genre-tile {
+.tag-tile {
   height: 96px;
   border-radius: 12px;
   padding: 14px;
@@ -383,35 +561,100 @@ onMounted(async () => {
   position: relative;
   overflow: hidden;
   display: flex;
+  flex-direction: column;
   justify-content: space-between;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   user-select: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.genre-tile:hover {
+.tag-tile:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
 }
 
-.genre-tile:active {
+.tag-tile:active {
   transform: scale(0.97);
 }
 
-.genre-name {
+.tag-info {
+  display: flex;
+  flex-direction: column;
+  z-index: 1;
+}
+
+.tag-name {
   font-size: 16px;
   font-weight: 800;
   color: #fff;
-  z-index: 1;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }
 
-.genre-card-icon {
+.tag-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+  margin-top: 3px;
+}
+
+.tag-watermark {
   position: absolute;
-  right: -6px;
-  bottom: -6px;
-  opacity: 0.35;
-  transform: rotate(20deg);
+  right: -8px;
+  bottom: -8px;
+  opacity: 0.18;
+  transform: rotate(-15deg);
   color: #fff;
+  pointer-events: none;
+}
+
+.tag-play-btn {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.85);
+  transition: all 0.2s ease;
+  z-index: 2;
+  backdrop-filter: blur(4px);
+}
+
+.tag-tile:hover .tag-play-btn {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.tag-play-btn:hover {
+  background: var(--c-accent, #1db954);
+  color: #000;
+  border-color: transparent;
+  transform: scale(1.1) !important;
+}
+
+/* Loading skeleton */
+.tag-tile-skeleton {
+  height: 96px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
 }
 </style>
