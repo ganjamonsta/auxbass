@@ -180,13 +180,13 @@ const coverImages = computed(() => {
   }
   // Use covers array from API (track covers collage, up to 4)
   if (playlist.value?.covers?.length) {
-    // Use large size for single cover, small for multi-cover grid
-    const size = playlist.value.covers.length === 1 ? CoverSize.LARGE : CoverSize.SMALL
+    // Use large size for single cover, medium for multi-cover grid
+    const size = playlist.value.covers.length === 1 ? CoverSize.LARGE : CoverSize.MEDIUM
     return playlist.value.covers.map(url => getCoverUrl(url, size))
   }
-  // Fallback to track covers for collage (use small size for grid)
+  // Fallback to track covers for collage (use medium size for grid)
   if (!playlist.value?.tracks) return []
-  return playlist.value.tracks.filter(t => t.cover_url).slice(0, 4).map(t => getCoverUrl(t.cover_url, CoverSize.SMALL))
+  return playlist.value.tracks.filter(t => t.cover_url).slice(0, 4).map(t => getCoverUrl(t.cover_url, CoverSize.MEDIUM))
 })
 
 // Data loading

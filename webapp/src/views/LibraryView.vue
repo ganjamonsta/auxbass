@@ -56,7 +56,7 @@
               <div class="feed-card-cover" :style="getPlaylistCoverStyle(pl)">
                 <img 
                   v-if="pl.covers?.length" 
-                  :src="getCoverUrl(pl.covers[0], CoverSize.SMALL)" 
+                  :src="getCoverUrl(pl.covers[0], CoverSize.MEDIUM)" 
                   alt="" 
                   loading="lazy"
                 />
@@ -107,7 +107,7 @@
               <div class="feed-card-cover">
                 <img 
                   v-if="album.cover_url" 
-                  :src="getCoverUrl(album.cover_url, CoverSize.SMALL)" 
+                  :src="getCoverUrl(album.cover_url, CoverSize.MEDIUM)" 
                   alt="" 
                   loading="lazy"
                 />
@@ -156,7 +156,7 @@
               <div class="feed-card-cover artist-cover" :style="getArtistCoverStyle(artist)">
                 <img 
                   v-if="artist.image_url" 
-                  :src="getCoverUrl(artist.image_url, CoverSize.SMALL)" 
+                  :src="getCoverUrl(artist.image_url, CoverSize.MEDIUM)" 
                   alt="" 
                   loading="lazy"
                 />

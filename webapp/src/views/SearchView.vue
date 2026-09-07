@@ -98,7 +98,7 @@
               <div class="feed-card-cover">
                 <img 
                   v-if="pl.covers?.length" 
-                  :src="getCoverUrl(pl.covers[0], CoverSize.SMALL)" 
+                  :src="getCoverUrl(pl.covers[0], CoverSize.MEDIUM)" 
                   alt=""
                   loading="lazy"
                 />

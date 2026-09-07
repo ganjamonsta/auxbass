@@ -58,7 +58,7 @@
         <div class="quick-card-cover" :style="getPlaylistCoverStyle(playlist)">
           <img 
             v-if="playlist.covers?.length" 
-            :src="getCoverUrl(playlist.covers[0], CoverSize.SMALL)" 
+            :src="getCoverUrl(playlist.covers[0], CoverSize.MEDIUM)" 
             alt="" 
             loading="lazy"
           />
@@ -128,7 +128,7 @@
           <div class="feed-card-cover">
             <img 
               v-if="track.cover_url" 
-              :src="getCoverUrl(track.cover_url, CoverSize.SMALL)" 
+              :src="getCoverUrl(track.cover_url, CoverSize.MEDIUM)" 
               alt=""
               loading="lazy"
             />
@@ -178,7 +178,7 @@
           <div class="feed-card-cover" :style="getPlaylistCoverStyle(pl)">
             <img 
               v-if="pl.covers?.length" 
-              :src="getCoverUrl(pl.covers[0], CoverSize.SMALL)" 
+              :src="getCoverUrl(pl.covers[0], CoverSize.MEDIUM)" 
               alt=""
               loading="lazy"
             />
@@ -230,7 +230,7 @@
           <div class="feed-card-cover">
             <img 
               v-if="track.cover_url" 
-              :src="getCoverUrl(track.cover_url, CoverSize.SMALL)" 
+              :src="getCoverUrl(track.cover_url, CoverSize.MEDIUM)" 
               alt=""
               loading="lazy"
             />

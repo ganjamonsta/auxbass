@@ -329,7 +329,7 @@
                 @click="$router.push(`/album/${album.id}`); closeProfile()"
                 @contextmenu.prevent="handleAlbumContextMenu(album, $event)"
               >
-                <img v-if="album.cover_url" :src="getCoverUrl(album.cover_url, CoverSize.SMALL)" />
+                <img v-if="album.cover_url" :src="getCoverUrl(album.cover_url, CoverSize.MEDIUM)" />
                 <div v-else class="album-placeholder"><Disc3 :size="24" /></div>
                 <div class="album-name">{{ album.name }}</div>
               </div>
