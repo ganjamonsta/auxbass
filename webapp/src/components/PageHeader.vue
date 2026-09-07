@@ -66,6 +66,7 @@ defineEmits(['goBack'])
 
 .page-title {
   flex: 1;
+  min-width: 0;
   font-size: 20px;
   font-weight: 600;
   color: var(--c-text-1);
@@ -93,13 +94,7 @@ defineEmits(['goBack'])
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* Скрываем текст на мобильных устройствах, оставляя только иконку */
-@media (max-width: 768px) {
-  .page-title.with-icon .title-text {
-    display: none;
-  }
+  min-width: 0;
 }
 
 .header-actions {

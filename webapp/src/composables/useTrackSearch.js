@@ -22,7 +22,10 @@ export function useTrackSearch({ perPage = 50, debounceDelay = 300 } = {}) {
   const isGlobalLoading = ref(false)
   let searchTimeout = null
 
-  // Pagination state for friends/global
+  // Pagination state for library/friends/global
+  const libraryPage = ref(1)
+  const libraryTotal = ref(0)
+  const isLibraryLoadingMore = ref(false)
   const friendsPage = ref(1)
   const friendsTotal = ref(0)
   const globalPage = ref(1)
@@ -34,6 +37,7 @@ export function useTrackSearch({ perPage = 50, debounceDelay = 300 } = {}) {
   let _currentQuery = ''
   let _libraryIds = new Set()
 
+  const hasMoreLibrary = computed(() => libraryResults.value.length < libraryTotal.value)
   const hasMoreFriends = computed(() => friendsResults.value.length < friendsTotal.value)
   const hasMoreGlobal = computed(() => globalResults.value.length < globalTotal.value)
 
@@ -69,15 +73,18 @@ export function useTrackSearch({ perPage = 50, debounceDelay = 300 } = {}) {
     _currentQuery = query
 
     // 1) User's library
+    libraryPage.value = 1
     isSearching.value = true
     try {
       const libraryRes = await api.get('/library', {
-        params: { search: query, per_page: perPage }
+        params: { search: query, per_page: perPage, page: 1 }
       })
       libraryResults.value = libraryRes.data.items || []
+      libraryTotal.value = libraryRes.data.total != null ? libraryRes.data.total : libraryResults.value.length
     } catch (error) {
       console.error('Failed to search library:', error)
       libraryResults.value = []
+      libraryTotal.value = 0
     } finally {
       isSearching.value = false
     }
@@ -121,6 +128,29 @@ export function useTrackSearch({ perPage = 50, debounceDelay = 300 } = {}) {
       globalTotal.value = 0
     } finally {
       isGlobalLoading.value = false
+    }
+  }
+
+  /** Load more user library results */
+  const loadMoreLibrary = async () => {
+    if (!hasMoreLibrary.value || isLibraryLoadingMore.value || !_currentQuery) return
+    isLibraryLoadingMore.value = true
+    try {
+      libraryPage.value++
+      const libraryRes = await api.get('/library', {
+        params: { search: _currentQuery, per_page: perPage, page: libraryPage.value }
+      })
+      const newItems = libraryRes.data.items || []
+      libraryResults.value = [...libraryResults.value, ...newItems]
+      libraryTotal.value = libraryRes.data.total != null ? libraryRes.data.total : libraryTotal.value
+      for (const t of newItems) {
+        _libraryIds.add(t.id)
+      }
+    } catch (error) {
+      console.error('Failed to load more library tracks:', error)
+      libraryPage.value--
+    } finally {
+      isLibraryLoadingMore.value = false
     }
   }
 
@@ -173,10 +203,13 @@ export function useTrackSearch({ perPage = 50, debounceDelay = 300 } = {}) {
     libraryResults.value = []
     friendsResults.value = []
     globalResults.value = []
+    libraryTotal.value = 0
     friendsTotal.value = 0
     globalTotal.value = 0
+    libraryPage.value = 1
     friendsPage.value = 1
     globalPage.value = 1
+    isLibraryLoadingMore.value = false
     _currentQuery = ''
     _libraryIds = new Set()
   }
@@ -247,8 +280,10 @@ export function useTrackSearch({ perPage = 50, debounceDelay = 300 } = {}) {
     isSearching,
     isFriendsLoading,
     isGlobalLoading,
-    isFriendsLoadingMore,
-    isGlobalLoadingMore,
+    libraryPage,
+    libraryTotal,
+    hasMoreLibrary,
+    isLibraryLoadingMore,
     hasMoreFriends,
     hasMoreGlobal,
     friendsTotal,
@@ -258,6 +293,7 @@ export function useTrackSearch({ perPage = 50, debounceDelay = 300 } = {}) {
     debouncedSearch,
     search,
     searchFriendsAndGlobal,
+    loadMoreLibrary,
     loadMoreFriends,
     loadMoreGlobal,
     clearSearch,

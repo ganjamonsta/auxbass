@@ -368,6 +368,9 @@ const pageTitle = computed(() => {
     friends: 'Кенты',
     'user-profile': 'Профиль',
     settings: 'Настройки',
+    liked: 'Любимое',
+    downloaded: 'Скачанное',
+    'my-profile': 'Профиль',
   }
   return titles[route.name] || ''
 })
