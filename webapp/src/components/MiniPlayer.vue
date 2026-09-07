@@ -222,6 +222,9 @@ const formatTime = (seconds) => {
    ═══════════════════════════════════════════════════════════ */
 
 .mini-player {
+  --lcd-dot-inactive: rgba(77, 195, 255, 0.16);
+  --lcd-text: #4DC3FF;
+  --lcd-text-glow: rgba(77, 195, 255, 0.6);
   display: flex;
   align-items: center;
   margin: 4px 10px 6px;
@@ -347,8 +350,8 @@ const formatTime = (seconds) => {
   width: 24px;
   height: 24px;
   border-radius: 4px;
-  color: var(--lcd-dot-inactive);
-  opacity: 0.4;
+  color: var(--lcd-text);
+  opacity: 0.35;
   transition: all 0.2s ease;
   cursor: pointer;
 }
@@ -460,29 +463,36 @@ const formatTime = (seconds) => {
   align-items: center;
   gap: 2px;
   min-width: 0;
+  padding: 3px 4px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 4px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .lcd-dot {
   flex: 1;
   height: 4px;
   min-width: 2px;
-  background: var(--lcd-dot-inactive);
+  background: var(--lcd-dot-inactive, rgba(77, 195, 255, 0.16));
   border-radius: 2px;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.3);
   transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .lcd-dot.active {
   background: var(--c-accent);
-  box-shadow: 0 0 4px var(--c-accent-glow);
+  box-shadow: 0 0 5px var(--c-accent-glow);
 }
 
 .lcd-dot.buffered {
-  background: rgba(0, 188, 212, 0.3);
+  background: rgba(0, 188, 212, 0.35);
+  box-shadow: 0 0 2px rgba(0, 188, 212, 0.2);
 }
 
 .lcd-dot.next {
   background: var(--c-accent);
-  opacity: 0.5;
+  opacity: 0.7;
   animation: dot-blink 0.6s ease-in-out infinite;
 }
 

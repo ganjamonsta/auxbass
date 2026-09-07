@@ -656,7 +656,7 @@ const getTracksWord = (count) => {
   inset: 0;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
-  z-index: 1000;
+  z-index: var(--z-contextmenu, 1100);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -848,7 +848,7 @@ const getTracksWord = (count) => {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.7);
-  z-index: 1100;
+  z-index: var(--z-modal, 1200);
   display: flex;
   align-items: center;
   justify-content: center;

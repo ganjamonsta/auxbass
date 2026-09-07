@@ -642,7 +642,7 @@ const formatTime = (seconds) => {
   -webkit-backdrop-filter: blur(40px) saturate(190%);
   display: flex;
   flex-direction: column;
-  z-index: 1000;
+  z-index: var(--z-player, 1000);
   padding: 10px 20px;
   padding-bottom: max(20px, env(safe-area-inset-bottom, 20px));
   touch-action: pan-y;

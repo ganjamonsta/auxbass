@@ -92,7 +92,7 @@ const handleSelect = async (playlist) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 200;
+  z-index: var(--z-modal, 1200);
   padding: 20px;
 }
 
@@ -106,8 +106,8 @@ const handleSelect = async (playlist) => {
   flex-direction: column;
   overflow: hidden;
   box-shadow: 
-    12px 12px 24px var(--sh-dark)),
-    -6px -6px 12px var(--sh-light)),
+    12px 12px 24px var(--sh-dark),
+    -6px -6px 12px var(--sh-light),
     0 0 40px rgba(0, 0, 0, 0.5);
 }
 
@@ -138,15 +138,15 @@ const handleSelect = async (playlist) => {
   justify-content: center;
   color: var(--c-text-3);
   box-shadow: 
-    4px 4px 8px var(--sh-dark)),
-    -2px -2px 4px var(--sh-light));
+    4px 4px 8px var(--sh-dark),
+    -2px -2px 4px var(--sh-light);
   transition: all 0.15s ease;
 }
 
 .modal-close:active {
   box-shadow: 
-    inset 2px 2px 4px var(--sh-inset-dark)),
-    inset -1px -1px 2px var(--sh-inset-light));
+    inset 2px 2px 4px var(--sh-inset-dark),
+    inset -1px -1px 2px var(--sh-inset-light);
 }
 
 .playlist-list {
@@ -168,7 +168,7 @@ const handleSelect = async (playlist) => {
 }
 
 .playlist-list::-webkit-scrollbar-thumb {
-  background: var(--c-accent-glow));
+  background: var(--c-accent-glow);
   border-radius: 3px;
 }
 
@@ -187,8 +187,8 @@ const handleSelect = async (playlist) => {
   font-weight: 600;
   cursor: pointer;
   box-shadow: 
-    inset 4px 4px 8px var(--sh-inset-dark)),
-    inset -2px -2px 4px var(--sh-inset-light));
+    inset 4px 4px 8px var(--sh-inset-dark),
+    inset -2px -2px 4px var(--sh-inset-light);
 }
 
 .create-icon {
@@ -209,14 +209,14 @@ const handleSelect = async (playlist) => {
   transition: all 0.15s ease;
   margin-bottom: 10px;
   box-shadow: 
-    4px 4px 8px var(--sh-dark)),
-    -2px -2px 4px var(--sh-light));
+    4px 4px 8px var(--sh-dark),
+    -2px -2px 4px var(--sh-light);
 }
 
 .playlist-option:active {
   box-shadow: 
-    inset 2px 2px 4px var(--sh-inset-dark)),
-    inset -1px -1px 2px var(--sh-inset-light));
+    inset 2px 2px 4px var(--sh-inset-dark),
+    inset -1px -1px 2px var(--sh-inset-light);
 }
 
 .playlist-option.create {

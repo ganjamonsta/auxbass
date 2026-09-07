@@ -521,7 +521,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding-right: 8px;
+  padding-right: 12px;
 }
 
 .quick-card-title {
@@ -540,6 +540,9 @@ onMounted(() => {
 }
 
 .quick-play-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
   width: 38px;
   height: 38px;
   border-radius: 50%;
@@ -550,23 +553,22 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  margin-right: 10px;
-  flex-shrink: 0;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   opacity: 0;
   pointer-events: none;
-  transform: scale(0.85);
+  transform: translateY(-50%) scale(0.85);
   transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  z-index: 2;
 }
 
 .quick-card:hover .quick-play-btn {
   opacity: 1;
   pointer-events: auto;
-  transform: scale(1);
+  transform: translateY(-50%) scale(1);
 }
 
 .quick-play-btn:hover {
-  transform: scale(1.08) !important;
+  transform: translateY(-50%) scale(1.08) !important;
   background: #1ed760;
 }
 
@@ -574,7 +576,7 @@ onMounted(() => {
   .quick-play-btn {
     width: 32px;
     height: 32px;
-    margin-right: 8px;
+    right: 8px;
   }
 }
 

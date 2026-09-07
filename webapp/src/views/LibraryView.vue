@@ -677,7 +677,8 @@ onUnmounted(() => {
 
 .feed-card-cover {
   width: 100%;
-  aspect-ratio: 1;
+  height: auto;
+  aspect-ratio: 1 / 1;
   border-radius: 8px;
   overflow: hidden;
   position: relative;
@@ -688,6 +689,8 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   color: rgba(255, 255, 255, 0.4);
+  padding: 0;
+  border: none;
 }
 
 .feed-card-cover img {
@@ -891,7 +894,8 @@ onUnmounted(() => {
 
 .skeleton-feed-cover {
   width: 100%;
-  aspect-ratio: 1;
+  height: auto;
+  aspect-ratio: 1 / 1;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.08);
   margin-bottom: 8px;

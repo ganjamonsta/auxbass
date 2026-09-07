@@ -128,7 +128,7 @@ const handleSubmit = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 200;
+  z-index: var(--z-modal, 1200);
   padding: 20px;
 }
 
@@ -142,8 +142,8 @@ const handleSubmit = async () => {
   overflow-x: hidden;
   scrollbar-gutter: auto;
   box-shadow: 
-    12px 12px 24px var(--sh-dark)),
-    -6px -6px 12px var(--sh-light)),
+    12px 12px 24px var(--sh-dark),
+    -6px -6px 12px var(--sh-light),
     0 0 40px rgba(0, 0, 0, 0.5);
 }
 
@@ -157,7 +157,7 @@ const handleSubmit = async () => {
 }
 
 .modal::-webkit-scrollbar-thumb {
-  background: var(--c-accent-glow));
+  background: var(--c-accent-glow);
   border-radius: 3px;
 }
 
@@ -188,15 +188,15 @@ const handleSubmit = async () => {
   justify-content: center;
   color: var(--c-text-3);
   box-shadow: 
-    4px 4px 8px var(--sh-dark)),
-    -2px -2px 4px var(--sh-light));
+    4px 4px 8px var(--sh-dark),
+    -2px -2px 4px var(--sh-light);
   transition: all 0.15s ease;
 }
 
 .modal-close:active {
   box-shadow: 
-    inset 2px 2px 4px var(--sh-inset-dark)),
-    inset -1px -1px 2px var(--sh-inset-light));
+    inset 2px 2px 4px var(--sh-inset-dark),
+    inset -1px -1px 2px var(--sh-inset-light);
 }
 
 .modal-form {
@@ -228,14 +228,14 @@ const handleSubmit = async () => {
   outline: none;
   transition: all 0.2s ease;
   box-shadow: 
-    inset 4px 4px 8px var(--sh-inset-dark)),
-    inset -2px -2px 4px var(--sh-inset-light));
+    inset 4px 4px 8px var(--sh-inset-dark),
+    inset -2px -2px 4px var(--sh-inset-light);
 }
 
 .form-input:focus {
   box-shadow: 
-    inset 4px 4px 8px var(--sh-inset-dark)),
-    inset -2px -2px 4px var(--sh-inset-light)),
+    inset 4px 4px 8px var(--sh-inset-dark),
+    inset -2px -2px 4px var(--sh-inset-light),
     0 0 0 2px var(--c-accent);
 }
 
@@ -265,9 +265,9 @@ const handleSubmit = async () => {
   background: linear-gradient(180deg, var(--c-accent) 0%, var(--c-accent-dark) 100%);
   color: white;
   box-shadow: 
-    4px 4px 10px var(--sh-dark)),
-    -2px -2px 6px var(--sh-light)),
-    0 4px 15px var(--c-accent-glow));
+    4px 4px 10px var(--sh-dark),
+    -2px -2px 6px var(--sh-light),
+    0 4px 15px var(--c-accent-glow);
 }
 
 .btn-primary:active {
@@ -286,14 +286,14 @@ const handleSubmit = async () => {
   background: var(--c-bg-3);
   color: var(--c-text-2);
   box-shadow: 
-    4px 4px 10px var(--sh-dark)),
-    -2px -2px 6px var(--sh-light));
+    4px 4px 10px var(--sh-dark),
+    -2px -2px 6px var(--sh-light);
 }
 
 .btn-secondary:active {
   box-shadow: 
-    inset 2px 2px 4px var(--sh-inset-dark)),
-    inset -1px -1px 2px var(--sh-inset-light));
+    inset 2px 2px 4px var(--sh-inset-dark),
+    inset -1px -1px 2px var(--sh-inset-light);
 }
 
 /* Animation */

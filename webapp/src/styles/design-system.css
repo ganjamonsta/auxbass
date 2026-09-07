@@ -91,8 +91,10 @@
   --lcd-bg: linear-gradient(180deg, #0a1520 0%, #051015 100%);
   --lcd-text: #4DC3FF;
   --lcd-glow: rgba(77, 195, 255, 0.6);
+  --lcd-text-glow: rgba(77, 195, 255, 0.6);
   --lcd-dot-on: #00CCFF;
   --lcd-dot-off: #0a2035;
+  --lcd-dot-inactive: rgba(77, 195, 255, 0.16);
   
   /* ─── Rubber Button ─── */
   --rubber-bg: linear-gradient(180deg, #3a3a3a 0%, #252525 50%, #1a1a1a 100%);
@@ -103,9 +105,14 @@
   --z-base: 0;
   --z-dropdown: 10;
   --z-sticky: 20;
-  --z-overlay: 50;
-  --z-modal: 100;
-  --z-toast: 200;
+  --z-header: 50;
+  --z-player-bar: 100;
+  --z-overlay: 100;
+  --z-player: 1000;
+  --z-contextmenu: 1100;
+  --z-modal: 1200;
+  --z-toast: 10000;
+  --z-banner: 10001;
   
   /* ─── Layout ─── */
   --nav-height: 60px;

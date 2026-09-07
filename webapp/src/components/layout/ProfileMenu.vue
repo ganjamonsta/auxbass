@@ -204,7 +204,7 @@ onUnmounted(() => {
 .profile-menu-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: var(--z-contextmenu, 1100);
   background: rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);

@@ -759,7 +759,7 @@ const handleResetState = (event) => {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--z-modal, 1200);
 }
 
 .profile-modal {

@@ -297,7 +297,7 @@ const handleTagClick = (tag) => {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 10000;
+  z-index: var(--z-player, 1000);
   background: linear-gradient(135deg, #0f0f1a 0%, #08080f 100%);
   display: flex;
   align-items: center;

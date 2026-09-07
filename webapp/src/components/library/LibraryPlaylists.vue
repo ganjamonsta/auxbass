@@ -450,12 +450,12 @@ defineExpose({
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: var(--z-modal, 1200);
   padding: 16px;
 }
 
 .modal {
-  background: var(--c-bg-3));
+  background: var(--c-bg-3);
   border-radius: 16px;
   padding: 24px;
   width: 100%;
@@ -463,16 +463,17 @@ defineExpose({
 }
 
 .modal h2 {
-  margin: 0 0 20px 0;
   font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 20px;
   color: var(--c-text-1);
 }
 
 .modal input {
   width: 100%;
   padding: 14px 16px;
-  background: var(--c-bg-1));
-  border: 1px solid var(--c-bg-4));
+  background: var(--c-bg-1);
+  border: 1px solid var(--c-bg-4);
   border-radius: 10px;
   color: var(--c-text-1);
   font-size: 16px;
@@ -499,7 +500,7 @@ defineExpose({
   border-radius: 10px;
   font-weight: 500;
   cursor: pointer;
-  border: 1px solid var(--c-bg-4));
+  border: 1px solid var(--c-bg-4);
   background: transparent;
   color: var(--c-text-1);
 }
