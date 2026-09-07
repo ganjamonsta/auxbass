@@ -900,8 +900,10 @@ export const useLibraryStore = defineStore('library', () => {
   
   // Check if track is in my library
   const isInLibrary = (trackId) => {
+    if (!trackId) return false
     return Array.isArray(tracks.value) && tracks.value.some(t => t?.id === trackId)
   }
+  const isTrackInLibrary = isInLibrary
   
   // Fetch top users
   const fetchTopUsers = async () => {
@@ -1030,6 +1032,7 @@ export const useLibraryStore = defineStore('library', () => {
     addToLibrary,
     removeFromLibrary,
     isInLibrary,
+    isTrackInLibrary,
     
     // Search
     search,

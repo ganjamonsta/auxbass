@@ -10,7 +10,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
-from sqlalchemy import select, func, delete, update, union_all, asc, desc
+from sqlalchemy import select, func, delete, update, union_all, asc, desc, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from aiogram.types import BufferedInputFile
@@ -321,9 +321,16 @@ async def get_global_playlists(
     # Apply search
     if search:
         search_term = f"%{search}%"
-        search_filter = (
-            Playlist.name.ilike(search_term) |
-            User.display_name.ilike(search_term)
+        user_name_match = or_(
+            User.username.ilike(search_term),
+            User.first_name.ilike(search_term),
+            User.last_name.ilike(search_term),
+            func.concat(func.coalesce(User.first_name, ''), ' ', func.coalesce(User.last_name, '')).ilike(search_term),
+        )
+        search_filter = or_(
+            Playlist.name.ilike(search_term),
+            Playlist.description.ilike(search_term),
+            user_name_match,
         )
         query = query.where(search_filter)
         count_query = (

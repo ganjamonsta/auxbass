@@ -59,8 +59,8 @@
                 :track="track"
                 :isPlaying="playerStore.currentTrack?.id === track.id"
                 :isLiked="libraryStore.isTrackLiked(track.id)"
-                :showAddToLibrary="!track.in_library && !libraryStore.isTrackInLibrary(track.id)"
-                :inLibrary="track.in_library || libraryStore.isTrackInLibrary(track.id)"
+                :showAddToLibrary="!track.in_library && !libraryStore.isInLibrary(track.id)"
+                :inLibrary="Boolean(track.in_library || libraryStore.isInLibrary(track.id))"
                 @click="handlePlayTrack(track, topTracks, index)"
                 @like="handleLikeTrack(track)"
                 @menu="(e) => openMenu('track', track, 'search', e)"
@@ -158,130 +158,143 @@
 
         <!-- ==================== TAB: TRACKS ==================== -->
         <div v-else-if="activeFilter === 'tracks'" class="tracks-results-mode">
-          <!-- 1. My Library Tracks -->
-          <section v-if="libraryResults.length > 0" class="result-section">
-            <div class="section-header">
-              <span class="section-title">
-                <Music :size="16" /> Моя библиотека
-              </span>
-              <span class="section-count">
-                {{ libraryResults.length }}<template v-if="libraryTotal > libraryResults.length"> из {{ libraryTotal }}</template>
-              </span>
-            </div>
-            <div class="track-results-list">
-              <TrackItem
-                v-for="(track, index) in libraryResults"
-                :key="track.id"
-                :track="track"
-                :isPlaying="playerStore.currentTrack?.id === track.id"
-                :isLiked="libraryStore.isTrackLiked(track.id)"
-                :showAddToLibrary="false"
-                :inLibrary="true"
-                @click="handlePlayTrack(track, libraryResults, index)"
-                @like="handleLikeTrack(track)"
-                @menu="(e) => openMenu('track', track, 'search', e)"
-                @download="handleDirectDownload(track)"
-                @hdNotice="handleHdNotice"
-              />
-            </div>
-            <button 
-              v-if="hasMoreLibrary" 
-              class="load-more-btn" 
-              :disabled="isLibraryLoadingMore" 
-              @click="loadMoreLibrary"
-            >
-              <div v-if="isLibraryLoadingMore" class="spinner small"></div>
-              <span>{{ isLibraryLoadingMore ? 'Загрузка...' : `Показать ещё (${libraryResults.length} из ${libraryTotal})` }}</span>
-            </button>
-          </section>
-
-          <!-- 2. Friends' Tracks -->
-          <section v-if="friendsResults.length > 0" class="result-section">
-            <div class="section-header friends-section">
-              <span class="section-title">
-                <Users :size="16" /> У друзей
-              </span>
-              <span class="section-count">
-                {{ friendsResults.length }}<template v-if="friendsTotal > friendsResults.length"> из {{ friendsTotal }}</template>
-              </span>
-            </div>
-            <div class="track-results-list">
-              <TrackItem
-                v-for="(track, index) in friendsResults"
-                :key="'friends-' + track.id"
-                :track="track"
-                :isPlaying="playerStore.currentTrack?.id === track.id"
-                :isLiked="libraryStore.isTrackLiked(track.id)"
-                :showAddToLibrary="!track.in_library && !libraryStore.isTrackInLibrary(track.id)"
-                :inLibrary="track.in_library || libraryStore.isTrackInLibrary(track.id)"
-                @click="handlePlayTrack(track, allTracksList, index)"
-                @like="handleLikeTrack(track)"
-                @menu="(e) => openMenu('track', track, 'search', e)"
-                @download="handleDirectDownload(track)"
-                @hdNotice="handleHdNotice"
-                @addToLibrary="handleAddToLibrary(track)"
-              />
-            </div>
-            <button 
-              v-if="hasMoreFriends" 
-              class="load-more-btn" 
-              :disabled="isFriendsLoadingMore" 
-              @click="loadMoreFriends"
-            >
-              <div v-if="isFriendsLoadingMore" class="spinner small"></div>
-              <span>{{ isFriendsLoadingMore ? 'Загрузка...' : 'Показать ещё у друзей' }}</span>
-            </button>
-          </section>
-
-          <!-- Loading friends -->
-          <div v-if="isFriendsLoading" class="section-loading-indicator">
-            <div class="spinner small"></div>
-            <span>Поиск у друзей...</span>
+          <!-- Initial loading skeleton when searching tracks -->
+          <div v-if="isTracksSearching && allTracksList.length === 0" class="search-skeleton-list">
+            <TrackSkeleton v-for="n in 8" :key="n" />
           </div>
 
-          <!-- 3. Global Network Tracks -->
-          <section v-if="globalResults.length > 0" class="result-section">
-            <div class="section-header global-section">
-              <span class="section-title">
-                <Globe :size="16" /> Общая сеть
-              </span>
-              <span class="section-count">
-                {{ globalResults.length }}<template v-if="globalTotal > globalResults.length"> из {{ globalTotal }}</template>
-              </span>
-            </div>
-            <div class="track-results-list">
-              <TrackItem
-                v-for="(track, index) in globalResults"
-                :key="'global-' + track.id"
-                :track="track"
-                :isPlaying="playerStore.currentTrack?.id === track.id"
-                :isLiked="libraryStore.isTrackLiked(track.id)"
-                :showAddToLibrary="!track.in_library && !libraryStore.isTrackInLibrary(track.id)"
-                :inLibrary="track.in_library || libraryStore.isTrackInLibrary(track.id)"
-                @click="handlePlayTrack(track, allTracksList, index)"
-                @like="handleLikeTrack(track)"
-                @menu="(e) => openMenu('track', track, 'search', e)"
-                @download="handleDirectDownload(track)"
-                @hdNotice="handleHdNotice"
-                @addToLibrary="handleAddToLibrary(track)"
-              />
-            </div>
-            <button 
-              v-if="hasMoreGlobal" 
-              class="load-more-btn" 
-              :disabled="isGlobalLoadingMore" 
-              @click="loadMoreGlobal"
-            >
-              <div v-if="isGlobalLoadingMore" class="spinner small"></div>
-              <span>{{ isGlobalLoadingMore ? 'Загрузка...' : 'Показать ещё в общей сети' }}</span>
-            </button>
-          </section>
-
-          <!-- Loading global -->
-          <div v-if="isGlobalLoading" class="section-loading-indicator">
-            <div class="spinner small"></div>
-            <span>Поиск в общей сети...</span>
+          <!-- Empty state when all track sources are exhausted -->
+          <div v-else-if="!isTracksSearching && !isFriendsLoading && !isGlobalLoading && allTracksList.length === 0" class="no-results-box">
+            <p class="no-results-text">Треки не найдены</p>
+            <p class="no-results-hint">Попробуйте изменить поисковый запрос или выбрать другой тег</p>
           </div>
+
+          <template v-else>
+            <!-- 1. My Library Tracks -->
+            <section v-if="libraryResults.length > 0" class="result-section">
+              <div class="section-header">
+                <span class="section-title">
+                  <Music :size="16" /> Моя библиотека
+                </span>
+                <span class="section-count">
+                  {{ libraryResults.length }}<template v-if="libraryTotal > libraryResults.length"> из {{ libraryTotal }}</template>
+                </span>
+              </div>
+              <div class="track-results-list">
+                <TrackItem
+                  v-for="(track, index) in libraryResults"
+                  :key="track.id"
+                  :track="track"
+                  :isPlaying="playerStore.currentTrack?.id === track.id"
+                  :isLiked="libraryStore.isTrackLiked(track.id)"
+                  :showAddToLibrary="false"
+                  :inLibrary="true"
+                  @click="handlePlayTrack(track, libraryResults, index)"
+                  @like="handleLikeTrack(track)"
+                  @menu="(e) => openMenu('track', track, 'search', e)"
+                  @download="handleDirectDownload(track)"
+                  @hdNotice="handleHdNotice"
+                />
+              </div>
+              <button 
+                v-if="hasMoreLibrary" 
+                class="load-more-btn" 
+                :disabled="isLibraryLoadingMore" 
+                @click="loadMoreLibrary"
+              >
+                <div v-if="isLibraryLoadingMore" class="spinner small"></div>
+                <span>{{ isLibraryLoadingMore ? 'Загрузка...' : `Показать ещё (${libraryResults.length} из ${libraryTotal})` }}</span>
+              </button>
+            </section>
+
+            <!-- 2. Friends' Tracks -->
+            <section v-if="friendsResults.length > 0" class="result-section">
+              <div class="section-header friends-section">
+                <span class="section-title">
+                  <Users :size="16" /> У друзей
+                </span>
+                <span class="section-count">
+                  {{ friendsResults.length }}<template v-if="friendsTotal > friendsResults.length"> из {{ friendsTotal }}</template>
+                </span>
+              </div>
+              <div class="track-results-list">
+                <TrackItem
+                  v-for="(track, index) in friendsResults"
+                  :key="'friends-' + track.id"
+                  :track="track"
+                  :isPlaying="playerStore.currentTrack?.id === track.id"
+                  :isLiked="libraryStore.isTrackLiked(track.id)"
+                  :showAddToLibrary="true"
+                  :inLibrary="Boolean(track.in_library || libraryStore.isInLibrary(track.id))"
+                  @click="handlePlayTrack(track, allTracksList, index)"
+                  @like="handleLikeTrack(track)"
+                  @menu="(e) => openMenu('track', track, 'search', e)"
+                  @download="handleDirectDownload(track)"
+                  @hdNotice="handleHdNotice"
+                  @addToLibrary="handleAddToLibrary(track)"
+                />
+              </div>
+              <button 
+                v-if="hasMoreFriends" 
+                class="load-more-btn" 
+                :disabled="isFriendsLoadingMore" 
+                @click="loadMoreFriends"
+              >
+                <div v-if="isFriendsLoadingMore" class="spinner small"></div>
+                <span>{{ isFriendsLoadingMore ? 'Загрузка...' : 'Показать ещё у друзей' }}</span>
+              </button>
+            </section>
+
+            <!-- Loading friends -->
+            <div v-if="isFriendsLoading" class="section-loading-indicator">
+              <div class="spinner small"></div>
+              <span>Поиск у друзей...</span>
+            </div>
+
+            <!-- 3. Global Network Tracks -->
+            <section v-if="globalResults.length > 0" class="result-section">
+              <div class="section-header global-section">
+                <span class="section-title">
+                  <Globe :size="16" /> Общая сеть
+                </span>
+                <span class="section-count">
+                  {{ globalResults.length }}<template v-if="globalTotal > globalResults.length"> из {{ globalTotal }}</template>
+                </span>
+              </div>
+              <div class="track-results-list">
+                <TrackItem
+                  v-for="(track, index) in globalResults"
+                  :key="'global-' + track.id"
+                  :track="track"
+                  :isPlaying="playerStore.currentTrack?.id === track.id"
+                  :isLiked="libraryStore.isTrackLiked(track.id)"
+                  :showAddToLibrary="true"
+                  :inLibrary="Boolean(track.in_library || libraryStore.isInLibrary(track.id))"
+                  @click="handlePlayTrack(track, allTracksList, index)"
+                  @like="handleLikeTrack(track)"
+                  @menu="(e) => openMenu('track', track, 'search', e)"
+                  @download="handleDirectDownload(track)"
+                  @hdNotice="handleHdNotice"
+                  @addToLibrary="handleAddToLibrary(track)"
+                />
+              </div>
+              <button 
+                v-if="hasMoreGlobal" 
+                class="load-more-btn" 
+                :disabled="isGlobalLoadingMore" 
+                @click="loadMoreGlobal"
+              >
+                <div v-if="isGlobalLoadingMore" class="spinner small"></div>
+                <span>{{ isGlobalLoadingMore ? 'Загрузка...' : 'Показать ещё в общей сети' }}</span>
+              </button>
+            </section>
+
+            <!-- Loading global -->
+            <div v-if="isGlobalLoading" class="section-loading-indicator">
+              <div class="spinner small"></div>
+              <span>Поиск в общей сети...</span>
+            </div>
+          </template>
         </div>
 
         <!-- ==================== TAB: ARTISTS ==================== -->
