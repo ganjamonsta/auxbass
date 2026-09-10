@@ -346,9 +346,8 @@ const adjustedPosition = ref({ x: 0, y: 0 })
 const handleTagClick = (tag) => {
   if (!tag) return
   closeMenu()
-  uiStore.setLibraryTab('tracks')
-  router.push({ path: '/', query: { search: tag } })
-  window.dispatchEvent(new CustomEvent('app-search', { detail: { query: tag } }))
+  const cleanTag = tag.replace(/^#/, '')
+  router.push({ path: '/search', query: { tag: cleanTag } })
 }
 
 // Detect desktop

@@ -89,7 +89,7 @@ const props = defineProps({
     default: () => [
       { path: '/', icon: Home, label: 'Главная', matchPaths: ['/'] },
       { path: '/search', icon: Search, label: 'Поиск', matchPaths: ['/search'] },
-      { path: '/library', icon: Library, label: 'Медиатека', matchPaths: ['/library', '/collections', '/albums', '/playlists', '/artists'] },
+      { path: '/library', icon: Library, label: 'Медиатека', matchPaths: ['/library', '/albums', '/playlists', '/artists', '/tracks'] },
       { path: '/liked', icon: Heart, label: 'Любимое', matchPaths: ['/liked'] },
     ]
   }

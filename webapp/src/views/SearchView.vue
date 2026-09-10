@@ -869,6 +869,14 @@ onMounted(() => {
   window.addEventListener('reset-view-state', handleResetState)
 })
 
+// Watch route query params for reactive updates (e.g. from tag clicks, browser navigation)
+watch(
+  () => [route.query.tag, route.query.q, route.query.search],
+  () => {
+    applyRouteQuery()
+  }
+)
+
 onActivated(() => {
   applyRouteQuery()
 })

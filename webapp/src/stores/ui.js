@@ -2,13 +2,6 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export const useUIStore = defineStore('ui', () => {
-  // Collections tab state: 'albums' or 'playlists'
-  const collectionsTab = ref('albums')
-
-  const setCollectionsTab = (tab) => {
-    collectionsTab.value = tab
-  }
-
   // Library tab state: 'overview', 'tracks', 'albums', 'artists', or 'playlists'
   const libraryTab = ref(localStorage.getItem('library_active_tab') || 'overview')
 
@@ -63,8 +56,6 @@ export const useUIStore = defineStore('ui', () => {
   }
 
   return {
-    collectionsTab,
-    setCollectionsTab,
     libraryTab,
     setLibraryTab,
     // Toast

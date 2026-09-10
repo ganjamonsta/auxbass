@@ -91,7 +91,14 @@
             <span v-if="index < parsedArtists.length - 1" class="artist-sep">, </span>
           </template>
         </template>
-        <span v-else>{{ getDisplayArtist(track) }}</span>
+        <span v-else-if="getDisplayArtist(track)" class="artist-link" @click="goToArtist(getDisplayArtist(track))">
+          {{ getDisplayArtist(track) }}
+        </span>
+      </p>
+      <!-- Clickable Album link if track belongs to an album -->
+      <p v-if="trackAlbum" class="track-album-subtitle" @click="goToAlbum">
+        <Disc3 :size="13" class="album-icon" />
+        <span class="album-link">{{ trackAlbum.name }}</span>
       </p>
       <!-- Interactive tags with voting -->
       <TrackTags
@@ -307,6 +314,7 @@
 <script setup>
 import { ref, computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
+import { Disc3 } from 'lucide-vue-next'
 import { getTrackCoverStyle, getTrackInitials, splitArtists, getDisplayTitle, getDisplayArtist, getAllTrackArtists, getCoverUrl, CoverSize } from '@/utils'
 import TagChips from '@/components/TagChips.vue'
 import TrackTags from '@/components/TrackTags.vue'
@@ -414,13 +422,36 @@ const goToArtist = (artistName) => {
   }
 }
 
+// Parse track album info if available
+const trackAlbum = computed(() => {
+  const t = props.track
+  if (!t) return null
+  if (t.album && typeof t.album === 'object' && t.album.id) {
+    return t.album
+  }
+  if (t.album_id && (t.album_name || t.album_title)) {
+    return {
+      id: t.album_id,
+      name: t.album_name || t.album_title
+    }
+  }
+  return null
+})
+
+// Navigate to album page
+const goToAlbum = () => {
+  if (trackAlbum.value?.id) {
+    router.push(`/album/${trackAlbum.value.id}`)
+    emit('close')
+  }
+}
+
 // Navigate to tag search
 const handleTagClick = (tag) => {
   if (!tag) return
   emit('close')
-  uiStore.setLibraryTab('tracks')
-  router.push({ path: '/', query: { search: tag } })
-  window.dispatchEvent(new CustomEvent('app-search', { detail: { query: tag } }))
+  const cleanTag = tag.replace(/^#/, '')
+  router.push({ path: '/search', query: { tag: cleanTag } })
 }
 
 // Open track context menu (uses unified context menu)
@@ -907,6 +938,25 @@ const formatTime = (seconds) => {
 .track-artist .artist-sep {
   color: var(--c-text-2);
   opacity: 0.6;
+}
+
+.track-album-subtitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--c-text-3);
+  margin-top: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.track-album-subtitle:hover {
+  color: var(--c-accent);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* ─── Tags ─── */

@@ -282,9 +282,8 @@ const handleToggleLyrics = () => {
 const handleTagClick = (tag) => {
   if (!tag) return
   emit('close')
-  uiStore.setLibraryTab('tracks')
-  router.push({ path: '/', query: { search: tag } })
-  window.dispatchEvent(new CustomEvent('app-search', { detail: { query: tag } }))
+  const cleanTag = tag.replace(/^#/, '')
+  router.push({ path: '/search', query: { tag: cleanTag } })
 }
 </script>
 

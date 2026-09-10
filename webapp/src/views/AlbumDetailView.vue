@@ -80,7 +80,12 @@
             <span class="track-title" :class="{ 'missing-title': !item.track }">
               {{ item.title }}
             </span>
-            <span v-if="item.artist && item.artist !== album.artist" class="track-artist">
+            <span 
+              v-if="item.artist && item.artist !== album.artist" 
+              class="track-artist clickable"
+              @click.stop="goToArtistByName(item.artist)"
+              title="Перейти к исполнителю"
+            >
               {{ item.artist }}
             </span>
           </div>
@@ -180,6 +185,17 @@
   <div v-else-if="loading" class="loading">
     <div class="spinner"></div>
   </div>
+
+  <div v-else class="album-not-found">
+    <div class="not-found-content">
+      <Disc3 :size="48" class="not-found-icon" />
+      <h2>Альбом не найден</h2>
+      <p>Возможно, альбом был удалён или ссылка устарела</p>
+      <button class="primary-btn" @click="router.push('/library?tab=albums')">
+        Перейти в медиатеку
+      </button>
+    </div>
+  </div>
 </template>
 
 <script setup>
@@ -222,7 +238,14 @@ useTrackSync(() => {
 
 // Scope from query
 const scope = computed(() => route.query.scope || 'library')
-const isGlobal = computed(() => scope.value === 'global')
+const notFound = ref(false)
+const activeScope = ref(scope.value)
+const isGlobal = computed(() => activeScope.value === 'global')
+
+// Sync activeScope with route query scope
+watch(scope, (newScope) => {
+  activeScope.value = newScope
+})
 
 // Parse album artists into separate names
 const parsedAlbumArtists = computed(() => {
@@ -251,10 +274,33 @@ const playableTracks = computed(() => {
 
 const loadAlbum = async () => {
   loading.value = true
+  notFound.value = false
   try {
-    const params = { scope: scope.value }
-    const response = await api.get(`/albums/${route.params.id}`, { params })
+    let currentScope = activeScope.value
+    let response
+    try {
+      response = await api.get(`/albums/${route.params.id}`, { params: { scope: currentScope } })
+      // If album returned with 0 tracks in library scope, attempt global to load full tracklist
+      if (currentScope === 'library' && (!response.data?.tracks?.length && !response.data?.full_tracklist)) {
+        const globalRes = await api.get(`/albums/${route.params.id}`, { params: { scope: 'global' } }).catch(() => null)
+        if (globalRes?.data?.tracks?.length || globalRes?.data?.full_tracklist) {
+          response = globalRes
+          activeScope.value = 'global'
+        }
+      }
+    } catch (err) {
+      if (err.response?.status === 404 && currentScope === 'library') {
+        response = await api.get(`/albums/${route.params.id}`, { params: { scope: 'global' } })
+        activeScope.value = 'global'
+      } else {
+        throw err
+      }
+    }
     album.value = response.data
+  } catch (err) {
+    console.error('Failed to load album:', err)
+    notFound.value = true
+    album.value = null
   } finally {
     loading.value = false
   }
@@ -362,9 +408,11 @@ const goToArtistByName = (artistName) => {
   }
 }
 
-// Handle tag click (future: navigate to tag-based playlist)
+// Handle tag click: navigate to search
 const handleTagClick = (tag) => {
-  console.log('[AlbumDetail] Tag clicked:', tag)
+  if (!tag) return
+  const cleanTag = tag.replace(/^#/, '')
+  router.push({ path: '/search', query: { tag: cleanTag } })
 }
 
 const formatDuration = (seconds) => {
@@ -544,6 +592,74 @@ watch(
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.track-artist.clickable {
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.track-artist.clickable:hover {
+  color: var(--c-accent);
+  text-decoration: underline;
+}
+
+.album-not-found {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 24px;
+  text-align: center;
+}
+
+.not-found-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 360px;
+}
+
+.not-found-icon {
+  color: var(--c-text-3);
+  opacity: 0.6;
+}
+
+.not-found-content h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--c-text-1);
+}
+
+.not-found-content p {
+  font-size: 14px;
+  color: var(--c-text-3);
+  margin-bottom: 8px;
+}
+
+.primary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--c-accent);
+  color: #000;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 20px;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.primary-btn:hover {
+  transform: translateY(-1px);
+  opacity: 0.95;
+}
+
+.primary-btn:active {
+  transform: scale(0.97);
 }
 
 .track-duration {

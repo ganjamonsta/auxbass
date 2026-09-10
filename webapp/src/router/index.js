@@ -4,7 +4,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 const HomeView = () => import('@/views/HomeView.vue')
 const LibraryView = () => import('@/views/LibraryView.vue')
 const SearchView = () => import('@/views/SearchView.vue')
-const CollectionsView = () => import('@/views/CollectionsView.vue')
 const FriendsView = () => import('@/views/FriendsView.vue')
 const AlbumDetailView = () => import('@/views/AlbumDetailView.vue')
 const ArtistDetailView = () => import('@/views/ArtistDetailView.vue')
@@ -44,9 +43,7 @@ const routes = [
   },
   {
     path: '/collections',
-    name: 'collections',
-    component: CollectionsView,
-    meta: { requiresAuth: true }
+    redirect: '/library?tab=albums'
   },
   {
     path: '/album/:id',
@@ -107,13 +104,13 @@ const routes = [
     }
   },
   { path: '/me', redirect: '/profile' },
-  // Legacy redirects
-  { path: '/tracks', redirect: '/library' },
+  // Section shortcuts & legacy redirects
+  { path: '/albums', redirect: '/library?tab=albums' },
+  { path: '/playlists', redirect: '/library?tab=playlists' },
+  { path: '/artists', redirect: '/library?tab=artists' },
+  { path: '/tracks', redirect: '/library?tab=tracks' },
   { path: '/offline', redirect: '/downloaded' },
-  { path: '/favorites', redirect: '/liked' },
-  { path: '/albums', redirect: '/collections' },
-  { path: '/playlists', redirect: '/collections' },
-  { path: '/artists', redirect: '/library' }
+  { path: '/favorites', redirect: '/liked' }
 ]
 
 const router = createRouter({
@@ -146,7 +143,7 @@ router.beforeEach(async (to, from, next) => {
   
   // If user is offline and navigating to online-only root tabs, auto-redirect to downloaded
   const isOffline = typeof navigator !== 'undefined' && !navigator.onLine
-  if (isOffline && authStore.isAuthenticated && (to.name === 'home' || to.name === 'library' || to.name === 'search' || to.name === 'collections' || to.name === 'friends')) {
+  if (isOffline && authStore.isAuthenticated && (to.name === 'home' || to.name === 'library' || to.name === 'search' || to.name === 'friends')) {
     next({ name: 'downloaded' })
     return
   }

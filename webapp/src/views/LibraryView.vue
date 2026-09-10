@@ -311,6 +311,20 @@ const currentTabId = computed({
 
 const setTab = (tabId) => {
   currentTabId.value = tabId
+  const query = { ...route.query }
+  if (tabId === 'overview') {
+    delete query.tab
+  } else {
+    query.tab = tabId
+  }
+  router.replace({ path: '/library', query })
+}
+
+const applyRouteTab = () => {
+  const tab = route.query.tab
+  if (tab && typeof tab === 'string' && tabs.some(t => t.id === tab)) {
+    uiStore.setLibraryTab(tab)
+  }
 }
 
 const currentTab = computed(() => tabs.find(t => t.id === currentTabId.value) || tabs[0])
@@ -532,6 +546,20 @@ watch(
   }
 )
 
+// Watch route query tab param changes
+watch(
+  () => route.query.tab,
+  (newTab) => {
+    if (newTab && typeof newTab === 'string' && tabs.some(t => t.id === newTab)) {
+      if (currentTabId.value !== newTab) {
+        currentTabId.value = newTab
+      }
+    } else if (!newTab && currentTabId.value !== 'overview') {
+      currentTabId.value = 'overview'
+    }
+  }
+)
+
 // Handle reset state
 const handleResetState = (event) => {
   if (event.detail.route === '/library' || event.detail.route === '/') {
@@ -541,6 +569,7 @@ const handleResetState = (event) => {
 }
 
 onMounted(() => {
+  applyRouteTab()
   applyRouteSearch()
   loadOverviewData()
   window.addEventListener('reset-view-state', handleResetState)
@@ -548,6 +577,7 @@ onMounted(() => {
 })
 
 onActivated(() => {
+  applyRouteTab()
   applyRouteSearch()
   loadOverviewData()
 })

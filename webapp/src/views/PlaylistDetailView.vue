@@ -235,7 +235,7 @@ const deletePlaylist = async () => {
   try {
     await libraryStore.deletePlaylist(playlist.value.id)
     uiStore.toast.success('Удалено', 'Плейлист удален')
-    router.push('/playlists')
+    router.push('/library?tab=playlists')
   } catch (error) {
     console.error('Failed to delete playlist:', error)
     uiStore.toast.error('Ошибка', 'Не удалось удалить плейлист')

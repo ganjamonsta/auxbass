@@ -27,7 +27,7 @@
         <span>Поиск</span>
       </router-link>
 
-      <router-link to="/library" class="nav-item" :class="{ active: isActive('/library') || isActive('/collections') }">
+      <router-link to="/library" class="nav-item" :class="{ active: isActive('/library') }">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="m16 6 4 14M12 6v14M8 8v12M4 4v16"></path>
         </svg>

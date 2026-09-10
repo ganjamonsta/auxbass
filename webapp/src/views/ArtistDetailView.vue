@@ -37,6 +37,7 @@
         <p class="hero-meta">
           {{ artist.track_count }} треков • {{ artist.album_count }} альбомов
         </p>
+        <span v-if="isGlobal" class="global-artist-badge"><Globe :size="12" /> Вся коллекция</span>
       </div>
     </div>
 
@@ -110,14 +111,14 @@
     </section>
   </div>
 
-  <!-- Not in library - offer to view global -->
-  <div v-else-if="notInLibrary" class="not-in-library">
+  <!-- Not found at all -->
+  <div v-else class="not-in-library">
     <div class="not-in-library-content">
       <div class="icon"><User :size="48" /></div>
       <h2>{{ decodeURIComponent(route.params.name) }}</h2>
-      <p>Артист не найден в вашей библиотеке</p>
-      <button class="primary-btn" @click="goToGlobal">
-        <Globe :size="16" /> Посмотреть всю музыку артиста
+      <p>Исполнитель не найден</p>
+      <button class="primary-btn" @click="router.push('/library?tab=artists')">
+        Вернуться к артистам
       </button>
     </div>
   </div>
@@ -156,7 +157,12 @@ const virtualTrackListRef = ref(null)
 
 // Get scope from query param
 const scope = computed(() => route.query.scope || 'library')
-const isGlobal = computed(() => scope.value === 'global')
+const activeScope = ref(scope.value)
+const isGlobal = computed(() => activeScope.value === 'global')
+
+watch(scope, (newScope) => {
+  activeScope.value = newScope
+})
 
 // Tracks pagination with virtual scroll
 const artistName = computed(() => route.params.name ? decodeURIComponent(route.params.name) : null)
@@ -165,7 +171,7 @@ const fetchArtistTracks = async ({ offset, limit }) => {
   if (!artistName.value) return { items: [], total: 0 }
   
   const response = await api.get(`/artists/${encodeURIComponent(artistName.value)}/tracks`, {
-    params: { offset, limit, scope: scope.value }
+    params: { offset, limit, scope: activeScope.value }
   })
   return response.data
 }
@@ -175,22 +181,29 @@ const loadArtist = async () => {
   notInLibrary.value = false
   try {
     const name = decodeURIComponent(route.params.name)
-    const params = { scope: scope.value }
-    // Use the lightweight /info endpoint (no tracks loaded here)
-    const response = await api.get(`/artists/${encodeURIComponent(name)}/info`, { params })
+    let currentScope = activeScope.value
+    let response
+
+    try {
+      response = await api.get(`/artists/${encodeURIComponent(name)}/info`, { params: { scope: currentScope } })
+    } catch (err) {
+      // If artist not found in library (404), seamlessly fallback to global scope!
+      if (err.response?.status === 404 && currentScope === 'library') {
+        response = await api.get(`/artists/${encodeURIComponent(name)}/info`, { params: { scope: 'global' } })
+        activeScope.value = 'global'
+      } else {
+        throw err
+      }
+    }
+
     artist.value = response.data
     // Reset virtual track list
     if (virtualTrackListRef.value) {
       virtualTrackListRef.value.reset()
     }
   } catch (error) {
-    // If artist not found in library, show option to view global
-    if (error.response?.status === 404 && !isGlobal.value) {
-      notInLibrary.value = true
-      artist.value = null
-    } else {
-      console.error('Failed to load artist:', error)
-    }
+    console.error('Failed to load artist:', error)
+    artist.value = null
   } finally {
     loading.value = false
   }
@@ -277,6 +290,21 @@ watch(
   justify-content: center;
   min-height: 60vh;
   padding: 16px;
+}
+
+.global-artist-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: rgba(29, 185, 84, 0.12);
+  color: var(--c-accent);
+  border: 1px solid rgba(29, 185, 84, 0.25);
+  margin-top: 6px;
+  width: fit-content;
 }
 
 .not-in-library-content {

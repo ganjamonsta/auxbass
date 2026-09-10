@@ -54,7 +54,7 @@
         <span v-if="!hideArtist" class="track-artist">{{ getDisplayArtist(track) }}</span>
         <span v-if="showAlbum && albumName" class="track-album">{{ albumName }}</span>
         <span v-else-if="track.play_count && !hideArtist" class="play-count">• {{ track.play_count }} прослушиваний</span>
-        <span v-if="firstTag && !compact" class="track-tag-badge">#{{ firstTag }}</span>
+        <span v-if="firstTag && !compact" class="track-tag-badge" @click.stop="handleTagClick(firstTag)">#{{ firstTag }}</span>
       </div>
     </div>
     
@@ -116,8 +116,11 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { formatDuration, getTrackCoverStyle, getTrackInitials, getDisplayTitle, getDisplayArtist, getCoverUrl, CoverSize } from '@/utils'
 import { X, Check, ThumbsDown } from 'lucide-vue-next'
+
+const router = useRouter()
 
 const props = defineProps({
   track: {
@@ -265,6 +268,12 @@ const albumName = computed(() => {
 const firstTag = computed(() => {
   return props.track?.tags?.[0] || null
 })
+
+const handleTagClick = (tag) => {
+  if (!tag) return
+  const cleanTag = tag.replace(/^#/, '')
+  router.push({ path: '/search', query: { tag: cleanTag } })
+}
 </script>
 
 <style scoped>
@@ -439,6 +448,27 @@ const firstTag = computed(() => {
   font-size: 10px;
   color: var(--c-text-3);
   white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.track-tag-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--c-accent);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.track-tag-badge:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: scale(1.05);
 }
 
 /* ─── Duration ─── */

@@ -22,24 +22,6 @@
           <template v-if="route.name === 'library'" #icon>
             <component :is="libraryIcon" :size="20" />
           </template>
-          <template v-if="route.name === 'collections'" #toggle>
-            <div class="neu-tab-bar header-tabs">
-              <button 
-                class="neu-tab" 
-                :class="{ active: uiStore.collectionsTab === 'albums' }"
-                @click="handleCollectionsTabClick('albums')"
-              >
-                <span class="neu-tab-content" data-text="Альбомы">Альбомы</span>
-              </button>
-              <button 
-                class="neu-tab" 
-                :class="{ active: uiStore.collectionsTab === 'playlists' }"
-                @click="handleCollectionsTabClick('playlists')"
-              >
-                <span class="neu-tab-content" data-text="Плейлисты">Плейлисты</span>
-              </button>
-            </div>
-          </template>
           <template #actions>
             <button
               v-if="authStore.user"
@@ -73,7 +55,7 @@
           </div>
 
           <router-view v-slot="{ Component }">
-            <keep-alive :include="['HomeView', 'LibraryView', 'CollectionsView', 'LikedTracksView', 'FriendsView', 'SearchView']">
+            <keep-alive :include="['HomeView', 'LibraryView', 'LikedTracksView', 'FriendsView', 'SearchView']">
               <component :is="Component" />
             </keep-alive>
           </router-view>
@@ -285,13 +267,6 @@ const handleLibraryTabClick = (tabId) => {
   })
 }
 
-const handleCollectionsTabClick = (tabId) => {
-  uiStore.setCollectionsTab(tabId)
-  nextTick(() => {
-    scrollToContentTop()
-  })
-}
-
 // Responsive detection
 const isDesktop = ref(window.innerWidth >= 1024)
 const updateDesktopState = () => {
@@ -334,7 +309,7 @@ const showBackButton = computed(() => {
     return true
   }
   // Main navigation tabs do not need a back button
-  const mainNavRoutes = ['home', 'library', 'search', 'collections', 'friends', 'liked', 'settings']
+  const mainNavRoutes = ['home', 'library', 'search', 'friends', 'liked', 'settings']
   return !mainNavRoutes.includes(route.name)
 })
 
@@ -427,6 +402,7 @@ const historyTracks = computed(() => {
 const goBack = () => {
   if (route.name === 'library' && uiStore.libraryTab !== 'overview') {
     uiStore.setLibraryTab('overview')
+    router.replace({ path: '/library', query: {} })
     return
   }
   if (window.history.length > 1) {
