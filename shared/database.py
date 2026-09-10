@@ -4,6 +4,7 @@ TG Player - Database Session Manager v2
 Supports both SQLite and PostgreSQL with proper connection pooling.
 """
 import logging
+from pathlib import Path
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.pool import NullPool
@@ -16,14 +17,18 @@ from .models import Base
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
 
 def get_database_url() -> str:
     """
     Get database URL, converting to async driver if needed.
+    Also ensures relative SQLite paths are anchored to project root.
     
     Supports:
     - sqlite:// -> sqlite+aiosqlite://
     - postgresql:// -> postgresql+asyncpg://
+    - postgres:// -> postgresql+asyncpg://
     """
     url = settings.database_url
     
@@ -34,6 +39,15 @@ def get_database_url() -> str:
         url = url.replace("postgresql://", "postgresql+asyncpg://")
     elif url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql+asyncpg://")
+
+    # Anchor relative SQLite paths to project root so current working directory doesn't matter
+    if "sqlite" in url:
+        for prefix in ("sqlite+aiosqlite:///./", "sqlite+aiosqlite:////./", "sqlite:///./"):
+            if url.startswith(prefix):
+                rel_path = url[len(prefix):]
+                abs_db_path = (PROJECT_ROOT / rel_path).resolve()
+                url = f"sqlite+aiosqlite:///{abs_db_path.as_posix()}"
+                break
     
     return url
 
