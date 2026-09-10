@@ -93,3 +93,30 @@ async def test_job_manager_flow():
     # Cancellation
     mgr.cancel_job(job.id)
     assert job.status == JobStatus.CANCELLED
+
+
+@pytest.mark.asyncio
+async def test_soundcloud_search_mock(monkeypatch):
+    sc = SoundCloudProvider()
+    
+    async def mock_to_thread(func):
+        return {
+            "entries": [
+                {
+                    "title": "Test Artist - Cool Song",
+                    "uploader": "Test Artist",
+                    "webpage_url": "https://soundcloud.com/test/cool-song",
+                    "duration": 180,
+                    "thumbnail": "https://i1.sndcdn.com/artworks-0001-large.jpg",
+                    "id": "112233",
+                }
+            ]
+        }
+    
+    monkeypatch.setattr(asyncio, "to_thread", mock_to_thread)
+    results = await sc.search("Cool Song", limit=1)
+    assert len(results) == 1
+    assert results[0].artist == "Test Artist"
+    assert results[0].title == "Cool Song"
+    assert results[0].duration == 180
+    assert "t500x500" in results[0].cover_url
