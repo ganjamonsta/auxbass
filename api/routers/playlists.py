@@ -29,7 +29,7 @@ COVERS_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "covers"
 
 
 from api.routers.auth import get_current_user, require_premium
-from api.routers.library import track_to_response
+from api.routers.library import track_to_response, streamable_track_filter
 from api.schemas.common import TelegramUser, PaginatedResponse
 from api.schemas.tracks import TrackResponse
 from api.schemas.playlists import (
@@ -574,6 +574,7 @@ async def get_playlist_track_ids(
         select(Track.id)
         .join(PlaylistTrack, PlaylistTrack.track_id == Track.id)
         .where(PlaylistTrack.playlist_id == playlist_id)
+        .where(streamable_track_filter())
     )
     
     if shuffle:

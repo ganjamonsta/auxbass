@@ -4,6 +4,8 @@
  * Extracted from player.js to fix BUG-3 (event listener leak) and reduce god-object.
  */
 
+import { isCachedUnstreamable } from './playerCache'
+
 // WeakMap to track listeners per audio element — prevents accumulation on swap
 const _listenerMap = new WeakMap()
 
@@ -86,6 +88,9 @@ const MAX_STREAMABLE_SIZE = 20 * 1024 * 1024
 
 export const isTrackNotStreamable = (track) => {
   if (!track) return false
+  if (track.is_unavailable === true) return true
+  if (isCachedUnstreamable(track.id)) return true
+  if (track.streamable_id) return false
   if (track.mime_type && HD_MIME_TYPES.includes(track.mime_type.toLowerCase())) return true
   if (track.file_size && track.file_size > MAX_STREAMABLE_SIZE) return true
   if (track.is_streamable === false) return true

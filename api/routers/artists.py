@@ -28,7 +28,7 @@ from bot.services.enrichment.lastfm import lastfm_client
 from bot.services.enrichment.deezer import deezer_client
 
 from api.routers.auth import get_current_user
-from api.routers.library import track_to_response
+from api.routers.library import track_to_response, streamable_track_filter
 from api.schemas.artists import (
     ArtistResponse,
     ArtistDetailResponse,
@@ -881,19 +881,16 @@ async def get_artist_track_ids(
     if not all_track_ids:
         return {"ids": [], "total": 0}
     
-    # Apply ordering
+    # Apply ordering and filter only streamable tracks
+    query = (
+        select(Track.id)
+        .where(Track.id.in_(all_track_ids))
+        .where(streamable_track_filter())
+    )
     if shuffle:
-        query = (
-            select(Track.id)
-            .where(Track.id.in_(all_track_ids))
-            .order_by(func.random())
-        )
+        query = query.order_by(func.random())
     else:
-        query = (
-            select(Track.id)
-            .where(Track.id.in_(all_track_ids))
-            .order_by(Track.title.asc())
-        )
+        query = query.order_by(Track.title.asc())
     
     result = await db.execute(query)
     matching_ids = list(result.scalars().all())

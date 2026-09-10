@@ -28,7 +28,7 @@ from bot.services.channels import get_channel_service
 from bot.services.lyrics import lrclib_client
 
 from api.routers.auth import get_current_user, require_premium, get_optional_user
-from api.routers.library import track_to_response, build_track_search_filter
+from api.routers.library import track_to_response, build_track_search_filter, streamable_track_filter
 from api.schemas.tracks import (
     TrackResponse,
     TracksListResponse,
@@ -74,6 +74,7 @@ async def get_track_ids(
         .join(UserLibrary, UserLibrary.track_id == Track.id)
         .where(UserLibrary.user_id == user.id)
         .where(UserLibrary.is_disliked == False)
+        .where(streamable_track_filter())
     )
     
     # Search filter (indexes title, artist, file_name, user tags, and enrichment tags)
@@ -316,7 +317,9 @@ async def get_artist_track_ids(
         select(Track.id, Track.artist, UserLibrary.added_at)
         .join(UserLibrary, UserLibrary.track_id == Track.id)
         .where(UserLibrary.user_id == user.id)
+        .where(UserLibrary.is_disliked == False)
         .where(Track.artist.isnot(None))
+        .where(streamable_track_filter())
     )
     
     result = await db.execute(query)

@@ -3,6 +3,7 @@ import {
   setCachedUrl,
   preloadTrackWithAudio,
   getPreloadTrackId,
+  markTrackUnstreamable,
 } from './playerCache'
 
 import {
@@ -177,6 +178,7 @@ export async function executeBatchPreload({ trackIds, getBatchUrls, nextTrack, o
         setCachedUrl(item.track_id, item.url, item.expires_at)
       } else if (item.error) {
         console.warn(`[Preload] Track ${item.track_id} error: ${item.error}`)
+        markTrackUnstreamable(item.track_id)
       }
     }
 

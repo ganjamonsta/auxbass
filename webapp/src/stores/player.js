@@ -558,6 +558,16 @@ export const usePlayerStore = defineStore('player', () => {
     // Same track → toggle
     if (currentTrack.value?.id === track.id) { toggle(); return }
 
+    // Known unavailable check
+    if (track.is_unavailable) {
+      console.warn(`[Play] Track "${track.title}" is marked unavailable`)
+      if (!isSkipping && onTrackUnavailableCallback) {
+        onTrackUnavailableCallback(track, 'Трек недоступен в Telegram', false)
+      }
+      setTimeout(() => next(), 50)
+      return
+    }
+
     // HD check with streamable substitution
     if (isTrackNotStreamable(track)) {
       console.log(`[Play] Track "${track.title}" is HD/large (mime: ${track.mime_type}, size: ${track.file_size})`)
@@ -618,8 +628,10 @@ export const usePlayerStore = defineStore('player', () => {
         if (!isLargeFile && !isHdFormat) {
           try { await tracksApi.markUnavailable(track.id); track.is_unavailable = true } catch (_) {}
         }
-        if (onTrackUnavailableCallback) onTrackUnavailableCallback(track, detail, isLargeFile || isHdFormat)
-        setTimeout(() => next(), 250)
+        if (onTrackUnavailableCallback && !isSkipping) {
+          onTrackUnavailableCallback(track, detail, isLargeFile || isHdFormat)
+        }
+        setTimeout(() => next(), 50)
       } else if (statusCode === 401) {
         deleteCachedUrl(track.id)
         lastError.value = { type: 'auth_expired', track, message: 'Токен истёк, переключаем трек...' }
@@ -739,9 +751,13 @@ export const usePlayerStore = defineStore('player', () => {
 
       loading.value = true
       const t = await loadTrackById(nextTrackId)
-      if (!t || t.is_disliked) { isSkipping = false; loading.value = false; await next(); return }
+      if (!t || t.is_disliked || t.is_unavailable || isTrackNotStreamable(t)) {
+        loading.value = false
+        await next()
+        return
+      }
       queue.value = [t]; queueIndex.value = 0; shuffleOrder.value = []; shuffleIndex.value = -1
-      isSkipping = false; await play(t)
+      await play(t)
       return
     }
 
@@ -770,15 +786,15 @@ export const usePlayerStore = defineStore('player', () => {
 
       queueIndex.value = nextIndex
       const candidateTrack = queue.value[nextIndex]
-      // Skip known unavailable tracks and disliked tracks immediately
-      if (candidateTrack && !candidateTrack.is_unavailable && !candidateTrack.is_disliked) {
+      // Skip known unavailable tracks, disliked tracks, and unstreamable tracks immediately
+      if (candidateTrack && !candidateTrack.is_unavailable && !candidateTrack.is_disliked && !isTrackNotStreamable(candidateTrack)) {
         break
       }
       attempts++
     }
 
     const nextTrack = queue.value[queueIndex.value]
-    if (!nextTrack || nextTrack.is_unavailable || nextTrack.is_disliked) {
+    if (!nextTrack || nextTrack.is_unavailable || nextTrack.is_disliked || isTrackNotStreamable(nextTrack)) {
       isPlaying.value = false; isSkipping = false; return
     }
 
@@ -800,8 +816,10 @@ export const usePlayerStore = defineStore('player', () => {
     } catch (e) {
       if (e.name === 'AbortError') return
       console.error('[Next] Failed:', e)
-      isSkipping = false
-      await play(nextTrack)
+      if (nextTrack) {
+        nextTrack.is_unavailable = true
+      }
+      await next()
     }
   }
 
@@ -824,9 +842,13 @@ export const usePlayerStore = defineStore('player', () => {
       const prevTrackId = lazyShuffleIds.value[lazyShuffleIndex.value]
       loading.value = true
       const t = await loadTrackById(prevTrackId)
-      if (!t) { isSkipping = false; loading.value = false; return }
+      if (!t || t.is_disliked || t.is_unavailable || isTrackNotStreamable(t)) {
+        loading.value = false
+        await prev()
+        return
+      }
       queue.value = [t]; queueIndex.value = 0; shuffleOrder.value = []; shuffleIndex.value = -1
-      isSkipping = false; await play(t)
+      await play(t)
       return
     }
 
@@ -841,7 +863,7 @@ export const usePlayerStore = defineStore('player', () => {
       if (prevIndex < 0) prevIndex = repeat.value === 'all' ? queue.value.length - 1 : 0
       queueIndex.value = prevIndex
       const candidateTrack = queue.value[prevIndex]
-      if (candidateTrack && !candidateTrack.is_unavailable) {
+      if (candidateTrack && !candidateTrack.is_unavailable && !candidateTrack.is_disliked && !isTrackNotStreamable(candidateTrack)) {
         break
       }
       attempts++
@@ -849,7 +871,7 @@ export const usePlayerStore = defineStore('player', () => {
     }
 
     const prevTrack = queue.value[queueIndex.value]
-    if (!prevTrack || prevTrack.is_unavailable) {
+    if (!prevTrack || prevTrack.is_unavailable || prevTrack.is_disliked || isTrackNotStreamable(prevTrack)) {
       isPlaying.value = false; isSkipping = false; return
     }
 
@@ -867,9 +889,12 @@ export const usePlayerStore = defineStore('player', () => {
       persistState()
       preloadNextTracks()
     } catch (e) {
-      loading.value = false
-      isSkipping = false
-      await play(prevTrack)
+      if (e.name === 'AbortError') return
+      console.error('[Prev] Failed:', e)
+      if (prevTrack) {
+        prevTrack.is_unavailable = true
+      }
+      await prev()
     }
   }
 

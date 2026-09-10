@@ -29,7 +29,8 @@ class TrackResponse(BaseModel):
     library_source: Optional[str] = None
     
     # Streaming compatibility
-    is_streamable: bool = True  # False for HD formats (FLAC, WAV, etc.)
+    is_streamable: bool = True  # False for HD formats (FLAC, WAV, etc.) or files > 20MB without alt
+    is_unavailable: bool = False  # True if file deleted/invalid in Telegram
     streamable_id: Optional[int] = None  # MP3 alternative if this is HD
     hd_id: Optional[int] = None  # HD alternative if this is MP3
     

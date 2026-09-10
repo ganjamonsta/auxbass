@@ -61,8 +61,13 @@ HD_MIME_TYPES = {
 }
 
 
-def is_streamable(mime_type: Optional[str]) -> bool:
-    """Check if MIME type is supported for direct streaming in web browser."""
+MAX_STREAMABLE_SIZE_BYTES = 20 * 1024 * 1024
+
+
+def is_streamable(mime_type: Optional[str], file_size: Optional[int] = None) -> bool:
+    """Check if MIME type and file size are supported for direct streaming in web browser."""
+    if file_size is not None and file_size > MAX_STREAMABLE_SIZE_BYTES:
+        return False
     if not mime_type:
         return True  # Assume streamable if mime_type unknown (legacy tracks)
     return mime_type.lower() in STREAMABLE_MIME_TYPES
@@ -73,6 +78,23 @@ def is_hd_format(mime_type: Optional[str]) -> bool:
     if not mime_type:
         return False
     return mime_type.lower() in HD_MIME_TYPES
+
+
+def streamable_track_filter():
+    """SQLAlchemy filter expression for tracks that are directly streamable via Telegram Bot API."""
+    from sqlalchemy import and_, or_
+    hd_list = list(HD_MIME_TYPES)
+    return and_(
+        Track.is_unavailable == False,
+        or_(
+            Track.file_size.is_(None),
+            Track.file_size <= MAX_STREAMABLE_SIZE_BYTES,
+        ),
+        or_(
+            Track.mime_type.is_(None),
+            Track.mime_type.notin_(hd_list),
+        ),
+    )
 
 
 def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None, *, in_library: Optional[bool] = None) -> TrackResponse:
@@ -116,7 +138,7 @@ def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None,
         disliked_at = getattr(library_entry, 'disliked_at', None)
         play_count = library_entry.play_count or 0
     
-    track_is_streamable = is_streamable(track.mime_type)
+    track_is_streamable = is_streamable(track.mime_type, track.file_size) and not (track.is_unavailable or False)
     
     # Auto-detect in_library from library_entry if not explicitly set
     if in_library is None:
@@ -146,6 +168,7 @@ def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None,
         mime_type=track.mime_type,
         library_source=source,
         is_streamable=track_is_streamable,
+        is_unavailable=track.is_unavailable or False,
         streamable_id=None,
         hd_id=None,
         album=album_info,
@@ -359,6 +382,7 @@ async def get_all_track_ids(
         .join(UserLibrary, UserLibrary.track_id == Track.id)
         .where(UserLibrary.user_id == user.id)
         .where(UserLibrary.is_disliked == False)
+        .where(streamable_track_filter())
     )
     
     # Search filter

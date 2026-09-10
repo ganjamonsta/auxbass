@@ -65,6 +65,17 @@ export const deleteCachedUrl = (trackId) => {
   urlCache.delete(trackId)
 }
 
+// Unstreamable tracks cache (e.g. file too large or invalid in Telegram)
+const unstreamableTracks = new Set()
+
+export const markTrackUnstreamable = (trackId) => {
+  if (trackId) unstreamableTracks.add(Number(trackId))
+}
+
+export const isCachedUnstreamable = (trackId) => {
+  return trackId ? unstreamableTracks.has(Number(trackId)) : false
+}
+
 
 import {
   getCachedTrack,

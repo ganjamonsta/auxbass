@@ -19,6 +19,7 @@ from shared.models import (
 from shared.matching import normalize_artist, normalize_title, fuzzy_match_title
 
 from api.routers.auth import get_current_user
+from api.routers.library import streamable_track_filter
 from api.schemas.albums import (
     AlbumResponse,
     AlbumDetailResponse,
@@ -521,8 +522,10 @@ async def get_album_track_ids(
         .join(UserLibrary, UserLibrary.track_id == Track.id)
         .where(
             AlbumTrack.album_id == album_id,
-            UserLibrary.user_id == user.id
+            UserLibrary.user_id == user.id,
+            UserLibrary.is_disliked == False,
         )
+        .where(streamable_track_filter())
     )
     
     if shuffle:
