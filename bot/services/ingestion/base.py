@@ -80,3 +80,7 @@ class BaseMusicProvider(ABC):
     async def download_track(self, track_meta: TrackMetadata, temp_dir: str) -> DownloadedAudio:
         """Download track audio and artwork into the specified directory."""
         pass
+
+    async def search(self, query: str, limit: int = 15) -> List[TrackMetadata]:
+        """Search tracks by keyword on the external provider (if supported)."""
+        return []

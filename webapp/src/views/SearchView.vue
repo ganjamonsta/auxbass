@@ -71,6 +71,60 @@
             </div>
           </section>
 
+          <!-- Matching SoundCloud Global Search Overview -->
+          <section v-if="soundcloudResults.length > 0" class="result-section soundcloud-section">
+            <div class="result-header">
+              <div class="header-left">
+                <span class="sc-badge">SC</span>
+                <h3 class="result-title">SoundCloud (Найдено в мире)</h3>
+                <span class="result-count">{{ soundcloudResults.length }}</span>
+              </div>
+              <button 
+                v-if="soundcloudResults.length > 5" 
+                class="section-view-all" 
+                @click="activeFilter = 'soundcloud'"
+              >
+                <span>Все {{ soundcloudResults.length }}</span>
+                <ArrowRight :size="14" />
+              </button>
+            </div>
+            
+            <div class="sc-results-list">
+              <div
+                v-for="item in soundcloudResults.slice(0, 5)"
+                :key="item.url"
+                class="sc-track-item"
+                @click="handleQuickPlaySoundCloud(item)"
+              >
+                <div class="sc-track-cover">
+                  <img v-if="item.cover_url" :src="item.cover_url" alt="" loading="lazy" />
+                  <Music v-else :size="20" />
+                  <div v-if="importingTrackUrl === item.url" class="sc-track-loading">
+                    <div class="spinner small"></div>
+                  </div>
+                  <div v-else class="sc-track-play">
+                    <Play :size="14" fill="currentColor" />
+                  </div>
+                </div>
+                <div class="sc-track-info">
+                  <div class="sc-track-title" :title="item.title">{{ item.title }}</div>
+                  <div class="sc-track-artist">{{ item.artist }}</div>
+                </div>
+                <div class="sc-track-actions">
+                  <span v-if="item.duration" class="sc-track-duration">{{ formatDuration(item.duration) }}</span>
+                  <button 
+                    class="sc-add-btn" 
+                    :disabled="importingTrackUrl === item.url"
+                    @click.stop="handleQuickAddSoundCloud(item)"
+                    title="Добавить в медиатеку"
+                  >
+                    <Plus :size="16" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <!-- Matching Artists Overview -->
           <section v-if="artistsResults.length > 0" class="result-section">
             <div class="result-header">
@@ -336,6 +390,60 @@
           </div>
         </div>
 
+        <!-- ==================== TAB: SOUNDCLOUD ==================== -->
+        <div v-else-if="activeFilter === 'soundcloud'" class="soundcloud-results-mode">
+          <div class="section-header">
+            <span class="section-title">
+              <span class="sc-badge">SC</span> SoundCloud (Глобальный поиск)
+            </span>
+            <span class="section-count">{{ soundcloudResults.length }}</span>
+          </div>
+
+          <div v-if="isSoundCloudSearching" class="section-loading-indicator">
+            <div class="spinner small"></div>
+            <span>Поиск на SoundCloud...</span>
+          </div>
+
+          <div v-else-if="soundcloudResults.length > 0" class="sc-results-list full-list">
+            <div
+              v-for="item in soundcloudResults"
+              :key="item.url"
+              class="sc-track-item"
+              @click="handleQuickPlaySoundCloud(item)"
+            >
+              <div class="sc-track-cover">
+                <img v-if="item.cover_url" :src="item.cover_url" alt="" loading="lazy" />
+                <Music v-else :size="20" />
+                <div v-if="importingTrackUrl === item.url" class="sc-track-loading">
+                  <div class="spinner small"></div>
+                </div>
+                <div v-else class="sc-track-play">
+                  <Play :size="14" fill="currentColor" />
+                </div>
+              </div>
+              <div class="sc-track-info">
+                <div class="sc-track-title" :title="item.title">{{ item.title }}</div>
+                <div class="sc-track-artist">{{ item.artist }}</div>
+              </div>
+              <div class="sc-track-actions">
+                <span v-if="item.duration" class="sc-track-duration">{{ formatDuration(item.duration) }}</span>
+                <button 
+                  class="sc-add-btn" 
+                  :disabled="importingTrackUrl === item.url"
+                  @click.stop="handleQuickAddSoundCloud(item)"
+                  title="Добавить в медиатеку"
+                >
+                  <Plus :size="16" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div v-else-if="!isSoundCloudSearching" class="no-results-box">
+            <p class="no-results-text">На SoundCloud ничего не найдено</p>
+          </div>
+        </div>
+
         <!-- ==================== TAB: PLAYLISTS ==================== -->
         <div v-else-if="activeFilter === 'playlists'" class="playlists-results-mode">
           <div class="section-header">
@@ -465,11 +573,11 @@ import {
   useTrackActions, 
   useTrackSync 
 } from '@/composables'
-import api, { tracksApi, artistsApi, playlistsApi } from '@/api/client'
+import api, { tracksApi, artistsApi, playlistsApi, ingestionApi } from '@/api/client'
 import SearchBar from '@/components/ui/SearchBar.vue'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackSkeleton from '@/components/TrackSkeleton.vue'
-import { getCoverUrl, CoverSize } from '@/utils'
+import { getCoverUrl, CoverSize, formatDuration } from '@/utils'
 import { 
   Music, 
   Hash, 
@@ -477,7 +585,8 @@ import {
   Users, 
   Globe, 
   Folder, 
-  ArrowRight 
+  ArrowRight,
+  Plus 
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -537,16 +646,94 @@ const playlistsResults = ref([])
 const isArtistsSearching = ref(false)
 const isPlaylistsSearching = ref(false)
 
+// ─── SoundCloud External Search State ───
+const soundcloudResults = ref([])
+const isSoundCloudSearching = ref(false)
+const importingTrackUrl = ref(null)
+
+const searchSoundCloud = async (query) => {
+  const cleanQ = query.replace(/^#/, '').trim()
+  if (!cleanQ || cleanQ.length < 2) {
+    soundcloudResults.value = []
+    return
+  }
+
+  isSoundCloudSearching.value = true
+  try {
+    const res = await ingestionApi.search(cleanQ, 'soundcloud', 15)
+    soundcloudResults.value = res.data || []
+  } catch (e) {
+    console.error('Failed to search SoundCloud:', e)
+    soundcloudResults.value = []
+  } finally {
+    isSoundCloudSearching.value = false
+  }
+}
+
+const handleQuickPlaySoundCloud = async (scTrack) => {
+  if (importingTrackUrl.value) return
+  importingTrackUrl.value = scTrack.url
+
+  try {
+    const res = await ingestionApi.quickImport({
+      url: scTrack.url,
+      title: scTrack.title,
+      artist: scTrack.artist,
+      duration: scTrack.duration,
+      cover_url: scTrack.cover_url,
+    })
+
+    const track = res.data?.track
+    if (track) {
+      playerStore.playTrack(track, [track], 0)
+      libraryStore.fetchTracks({ refresh: true })
+      uiStore.toast?.success('В эфире!', `${track.artist} — ${track.title}`)
+    }
+  } catch (e) {
+    console.error('Failed to quick import track:', e)
+    uiStore.toast?.error('Ошибка импорта', e.response?.data?.detail || 'Не удалось загрузить трек')
+  } finally {
+    importingTrackUrl.value = null
+  }
+}
+
+const handleQuickAddSoundCloud = async (scTrack) => {
+  if (importingTrackUrl.value) return
+  importingTrackUrl.value = scTrack.url
+
+  try {
+    const res = await ingestionApi.quickImport({
+      url: scTrack.url,
+      title: scTrack.title,
+      artist: scTrack.artist,
+      duration: scTrack.duration,
+      cover_url: scTrack.cover_url,
+    })
+
+    const track = res.data?.track
+    if (track) {
+      libraryStore.fetchTracks({ refresh: true })
+      uiStore.toast?.success('В медиатеке', `${track.artist} — ${track.title}`)
+    }
+  } catch (e) {
+    console.error('Failed to quick import track:', e)
+    uiStore.toast?.error('Ошибка импорта', e.response?.data?.detail || 'Не удалось загрузить трек')
+  } finally {
+    importingTrackUrl.value = null
+  }
+}
+
 // Combined search loading state
 const isLoading = computed(() => {
-  return isTracksSearching.value || isArtistsSearching.value || isPlaylistsSearching.value
+  return isTracksSearching.value || isArtistsSearching.value || isPlaylistsSearching.value || isSoundCloudSearching.value
 })
 
 const isInitialLoading = computed(() => {
   return isLoading.value && 
          allTracksList.value.length === 0 && 
          artistsResults.value.length === 0 && 
-         playlistsResults.value.length === 0
+         playlistsResults.value.length === 0 &&
+         soundcloudResults.value.length === 0
 })
 
 // Dynamic Tags state
@@ -557,6 +744,7 @@ const tagScope = ref('library')
 const filterChips = [
   { id: 'all', label: 'Все' },
   { id: 'tracks', label: 'Треки' },
+  { id: 'soundcloud', label: 'SoundCloud' },
   { id: 'artists', label: 'Артисты' },
   { id: 'playlists', label: 'Плейлисты' },
 ]
@@ -569,6 +757,9 @@ const totalTracksCount = computed(() => {
 const getChipBadge = (chipId) => {
   if (chipId === 'tracks') {
     return totalTracksCount.value > 0 ? totalTracksCount.value : null
+  }
+  if (chipId === 'soundcloud') {
+    return soundcloudResults.value.length > 0 ? soundcloudResults.value.length : null
   }
   if (chipId === 'artists') {
     return artistsResults.value.length > 0 ? artistsResults.value.length : null
@@ -598,10 +789,13 @@ const topTracks = computed(() => {
 const noResults = computed(() => {
   if (isLoading.value || isFriendsLoading.value || isGlobalLoading.value) return false
   if (activeFilter.value === 'all') {
-    return topTracks.value.length === 0 && artistsResults.value.length === 0 && playlistsResults.value.length === 0
+    return topTracks.value.length === 0 && artistsResults.value.length === 0 && playlistsResults.value.length === 0 && soundcloudResults.value.length === 0
   }
   if (activeFilter.value === 'tracks') {
     return allTracksList.value.length === 0
+  }
+  if (activeFilter.value === 'soundcloud') {
+    return soundcloudResults.value.length === 0
   }
   if (activeFilter.value === 'artists') {
     return artistsResults.value.length === 0
@@ -765,10 +959,12 @@ const performSearch = (q) => {
     trackSearchQuery.value = query
     executeTrackSearch()
     searchArtistsAndPlaylists(query)
+    searchSoundCloud(query)
   } else {
     clearTrackSearch()
     artistsResults.value = []
     playlistsResults.value = []
+    soundcloudResults.value = []
   }
 }
 
@@ -782,6 +978,7 @@ const handleClear = () => {
   clearTrackSearch()
   artistsResults.value = []
   playlistsResults.value = []
+  soundcloudResults.value = []
   if (route.query.q || route.query.search || route.query.tag) {
     router.replace({ path: '/search', query: {} })
   }
@@ -1414,5 +1611,149 @@ onUnmounted(() => {
 @keyframes pulse {
   0%, 100% { opacity: 0.35; }
   50% { opacity: 0.75; }
+}
+
+/* SoundCloud Search Styles */
+.sc-badge {
+  background: #ff5500;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.sc-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sc-results-list.full-list {
+  margin-top: 12px;
+}
+
+.sc-track-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.sc-track-item:hover {
+  background: rgba(255, 85, 0, 0.08);
+  border-color: rgba(255, 85, 0, 0.25);
+  transform: translateX(2px);
+}
+
+.sc-track-cover {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #18181c;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.sc-track-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sc-track-play {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  color: #ff5500;
+}
+
+.sc-track-item:hover .sc-track-play {
+  opacity: 1;
+}
+
+.sc-track-loading {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sc-track-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.sc-track-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sc-track-artist {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sc-track-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.sc-track-duration {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.sc-add-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sc-add-btn:hover:not(:disabled) {
+  background: #ff5500;
+  border-color: #ff5500;
+  transform: scale(1.05);
+}
+
+.sc-add-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

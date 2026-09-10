@@ -242,3 +242,53 @@ class SoundCloudProvider(BaseMusicProvider):
             file_size=file_size,
             mime_type="audio/mpeg",
         )
+
+    async def search(self, query: str, limit: int = 15) -> List[TrackMetadata]:
+        """Search SoundCloud for tracks matching query."""
+        clean_query = query.strip()
+        if not clean_query:
+            return []
+
+        def _search():
+            ydl_opts = {
+                "quiet": True,
+                "no_warnings": True,
+                "extract_flat": True,
+                "skip_download": True,
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                return ydl.extract_info(f"scsearch{limit}:{clean_query}", download=False)
+
+        try:
+            info = await asyncio.to_thread(_search)
+            entries = info.get("entries") or []
+        except Exception as e:
+            logger.warning(f"SoundCloud search failed for query '{clean_query}': {e}")
+            return []
+
+        results: List[TrackMetadata] = []
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            raw_title = entry.get("title") or "SoundCloud Track"
+            uploader = entry.get("uploader") or entry.get("channel") or "SoundCloud"
+            artist, title = _parse_artist_and_title(raw_title, uploader)
+            track_url = entry.get("webpage_url") or entry.get("url") or ""
+            if not track_url:
+                continue
+            duration = int(entry.get("duration") or 0) or None
+            cover = _improve_sc_thumbnail(entry.get("thumbnail"))
+
+            results.append(
+                TrackMetadata(
+                    provider_name=self.name,
+                    url=track_url,
+                    title=title,
+                    artist=artist,
+                    duration=duration,
+                    cover_url=cover,
+                    external_id=str(entry.get("id") or ""),
+                    extra={"uploader": uploader},
+                )
+            )
+        return results

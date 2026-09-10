@@ -324,4 +324,6 @@ export const ingestionApi = {
   getJob: (jobId) => api.get(`/ingestion/jobs/${jobId}`),
   cancelJob: (jobId) => api.post(`/ingestion/jobs/${jobId}/cancel`),
   getRecent: () => api.get('/ingestion/recent'),
+  search: (q, provider = 'soundcloud', limit = 15) => api.get('/ingestion/search', { params: { q, provider, limit } }),
+  quickImport: (data) => api.post('/ingestion/quick-import', data),
 }
