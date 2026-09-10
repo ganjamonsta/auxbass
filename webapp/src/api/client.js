@@ -316,3 +316,12 @@ export const socialApi = {
   getUserAlbums: (userId, params = {}) => api.get(`/social/user/${userId}/albums`, { params }),
   getUser: (userId) => api.get(`/social/user/${userId}`),
 }
+
+// Ingestion (External imports from SoundCloud, Spotify, etc.)
+export const ingestionApi = {
+  preview: (url) => api.post('/ingestion/preview', { url }),
+  start: (url) => api.post('/ingestion/start', { url }),
+  getJob: (jobId) => api.get(`/ingestion/jobs/${jobId}`),
+  cancelJob: (jobId) => api.post(`/ingestion/jobs/${jobId}/cancel`),
+  getRecent: () => api.get('/ingestion/recent'),
+}

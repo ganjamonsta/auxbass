@@ -192,6 +192,15 @@
                 <template v-else>Перемешать</template>
               </span>
             </button>
+
+            <button 
+              class="import-btn" 
+              @click="showImportModal = true"
+              title="Импорт музыки из SoundCloud / Spotify"
+            >
+              <CloudDownload :size="16" class="import-icon" />
+              <span class="import-text">Импорт</span>
+            </button>
           </div>
 
           <!-- Recent Tracks List -->
@@ -252,6 +261,13 @@
         />
       </div>
     </template>
+
+    <!-- Import External Music Modal -->
+    <ImportModal
+      :show="showImportModal"
+      @close="showImportModal = false"
+      @imported="handleImportFinished"
+    />
   </div>
 </template>
 
@@ -272,6 +288,7 @@ import LibraryArtists from '@/components/library/LibraryArtists.vue'
 import LibraryPlaylists from '@/components/library/LibraryPlaylists.vue'
 import TrackItem from '@/components/TrackItem.vue'
 import SearchBar from '@/components/ui/SearchBar.vue'
+import ImportModal from '@/components/ImportModal.vue'
 import { 
   Play, 
   Music, 
@@ -279,7 +296,8 @@ import {
   Disc3, 
   Shuffle, 
   ChevronRight,
-  ChevronLeft 
+  ChevronLeft,
+  CloudDownload 
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -289,6 +307,16 @@ const uiStore = useUIStore()
 const libraryStore = useLibraryStore()
 const playerStore = usePlayerStore()
 const { openMenu } = useContextMenu()
+
+const showImportModal = ref(false)
+
+const handleImportFinished = () => {
+  loadOverviewData()
+  libraryStore.fetchPlaylists()
+  if (uiStore.toast) {
+    uiStore.toast.success('Импорт завершен', 'Музыка добавлена в библиотеку')
+  }
+}
 
 const goToChannelSetup = () => {
   router.push('/settings#channel')
@@ -804,7 +832,36 @@ onUnmounted(() => {
 
 /* ─── Tracks Section ─── */
 .overview-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-bottom: 14px;
+}
+
+.import-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-radius: 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.import-btn:hover {
+  background: rgba(255, 85, 0, 0.15);
+  border-color: rgba(255, 85, 0, 0.4);
+  color: #ff7733;
+  transform: translateY(-1px);
+}
+
+.import-icon {
+  color: #ff5500;
 }
 
 .shuffle-all-btn {
