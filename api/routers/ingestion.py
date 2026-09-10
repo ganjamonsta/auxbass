@@ -64,6 +64,17 @@ class QuickImportResponse(BaseModel):
     already_existed: bool
 
 
+class TrackPreviewItem(BaseModel):
+    url: str
+    title: str
+    artist: str
+    duration: Optional[int] = None
+    cover_url: Optional[str] = None
+    in_library: bool = False
+    already_in_tg: bool = False
+    track_id: Optional[int] = None
+
+
 class PreviewRequest(BaseModel):
     url: str
 
@@ -76,10 +87,12 @@ class PreviewResponse(BaseModel):
     author: Optional[str] = None
     cover_url: Optional[str] = None
     track_count: int = 1
+    tracks: List[TrackPreviewItem] = []
 
 
 class StartImportRequest(BaseModel):
     url: str
+    selected_urls: Optional[List[str]] = None
 
 
 class JobResponse(BaseModel):
@@ -101,6 +114,7 @@ class JobResponse(BaseModel):
     error_message: Optional[str] = None
     playlist_id: Optional[int] = None
     imported_track_ids: List[int] = []
+    selected_urls: Optional[List[str]] = None
     created_at: str
     updated_at: str
 
@@ -132,8 +146,9 @@ async def _ensure_user_in_db(user: TelegramUser):
 async def preview_url(
     req: PreviewRequest,
     user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Inspect an external music URL (SoundCloud, etc.) and return its metadata without importing."""
+    """Inspect an external music URL (SoundCloud, etc.) and return its metadata with tracks and library status."""
     url = req.url.strip()
     provider = provider_registry.find_provider(url)
     if not provider:
@@ -144,6 +159,35 @@ async def preview_url(
 
     try:
         entity = await provider.resolve_entity(url)
+        tracks_meta = await provider.fetch_tracklist(entity)
+
+        # Batch check against database
+        # 1. Fetch all track IDs in this user's library
+        user_lib_res = await db.execute(
+            select(UserLibrary.track_id).where(UserLibrary.user_id == user.id)
+        )
+        user_track_ids = set(user_lib_res.scalars().all())
+
+        preview_tracks: List[TrackPreviewItem] = []
+        for t in tracks_meta:
+            existing = await _find_existing_track(t.title, t.artist, t.duration, session=db)
+            already_in_tg = existing is not None
+            in_lib = (existing.id in user_track_ids) if existing else False
+            existing_id = existing.id if existing else None
+
+            preview_tracks.append(
+                TrackPreviewItem(
+                    url=t.url,
+                    title=t.title,
+                    artist=t.artist,
+                    duration=t.duration,
+                    cover_url=t.cover_url,
+                    in_library=in_lib,
+                    already_in_tg=already_in_tg,
+                    track_id=existing_id,
+                )
+            )
+
         return PreviewResponse(
             provider=entity.provider_name,
             entity_type=entity.entity_type.value,
@@ -151,10 +195,11 @@ async def preview_url(
             title=entity.title,
             author=entity.author,
             cover_url=entity.cover_url,
-            track_count=entity.track_count,
+            track_count=len(preview_tracks) if preview_tracks else entity.track_count,
+            tracks=preview_tracks,
         )
     except Exception as e:
-        logger.error(f"Error resolving preview for {url}: {e}")
+        logger.error(f"Error resolving preview for {url}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Could not resolve link: {str(e)}",
@@ -185,15 +230,19 @@ async def start_import(
             detail=f"Failed to inspect URL: {str(e)}",
         )
 
+    selected_urls = req.selected_urls
+    total_tracks = len(selected_urls) if selected_urls else entity.track_count
+
     job = await job_manager.create_job(
         user_id=user.id,
         url=url,
         provider_name=provider.name,
         entity_type=entity.entity_type.value,
         title=entity.title,
-        total_tracks=entity.track_count,
+        total_tracks=total_tracks,
         author=entity.author,
         cover_url=entity.cover_url,
+        selected_urls=selected_urls,
     )
 
     bot = _get_active_bot()

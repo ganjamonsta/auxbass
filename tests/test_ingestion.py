@@ -120,3 +120,24 @@ async def test_soundcloud_search_mock(monkeypatch):
     assert results[0].title == "Cool Song"
     assert results[0].duration == 180
     assert "t500x500" in results[0].cover_url
+
+
+@pytest.mark.asyncio
+async def test_job_manager_selective_import():
+    mgr = IngestionJobManager()
+    selected = ["https://soundcloud.com/test/track-1", "https://soundcloud.com/test/track-3"]
+    job = await mgr.create_job(
+        user_id=999,
+        url="https://soundcloud.com/test/sets/playlist",
+        provider_name="soundcloud",
+        entity_type="playlist",
+        title="Test Playlist",
+        total_tracks=len(selected),
+        selected_urls=selected,
+    )
+
+    assert job.selected_urls == selected
+    assert job.total_tracks == 2
+    d = job.to_dict()
+    assert d["selected_urls"] == selected
+

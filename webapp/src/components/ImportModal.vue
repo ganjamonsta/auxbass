@@ -11,7 +11,7 @@
               </div>
               <div class="header-titles">
                 <h3 class="modal-title">Импорт музыки</h3>
-                <p class="modal-subtitle">Добавление треков и плейлистов из внешних сервисов</p>
+                <p class="modal-subtitle">Выборочный импорт треков и плейлистов</p>
               </div>
             </div>
             <button class="close-btn" @click="handleClose" title="Закрыть">
@@ -40,7 +40,7 @@
                 ref="inputRef"
                 v-model="urlInput"
                 type="url"
-                placeholder="Вставьте ссылку на трек или плейлист..."
+                placeholder="Вставьте ссылку на трек, плейлист или лайки..."
                 class="url-input"
                 :disabled="resolving"
                 @keydown.enter="handlePreview"
@@ -56,7 +56,7 @@
             </div>
 
             <div class="hints-row">
-              <span>Пример: <code>soundcloud.com/artist/track-name</code></span>
+              <span>Пример: <code>soundcloud.com/artist/sets/playlist</code> или <code>.../user/likes</code></span>
             </div>
 
             <!-- Error Banner -->
@@ -65,21 +65,115 @@
               <span>{{ errorMessage }}</span>
             </div>
 
-            <!-- Preview Card -->
+            <!-- Preview Section -->
             <Transition name="slide-up">
-              <div v-if="preview" class="preview-card">
-                <div class="preview-cover">
-                  <img v-if="preview.cover_url" :src="preview.cover_url" alt="Cover" />
-                  <Music v-else :size="32" class="placeholder-icon" />
-                </div>
-                <div class="preview-info">
-                  <div class="preview-badge" :class="preview.provider">
-                    {{ preview.provider.toUpperCase() }} • {{ preview.entity_type === 'playlist' ? 'ПЛЕЙЛИСТ' : 'ТРЕК' }}
+              <div v-if="preview" class="preview-section">
+                <!-- Overview Card -->
+                <div class="preview-card">
+                  <div class="preview-cover">
+                    <img v-if="preview.cover_url" :src="preview.cover_url" alt="Cover" />
+                    <Music v-else :size="32" class="placeholder-icon" />
                   </div>
-                  <div class="preview-title" :title="preview.title">{{ preview.title }}</div>
-                  <div class="preview-author">{{ preview.author || 'Неизвестный автор' }}</div>
-                  <div class="preview-count">
-                    {{ preview.track_count }} {{ getTrackWord(preview.track_count) }}
+                  <div class="preview-info">
+                    <div class="preview-badge-row">
+                      <span class="preview-badge" :class="preview.provider">
+                        {{ preview.provider.toUpperCase() }} • {{ preview.entity_type === 'playlist' ? 'ПЛЕЙЛИСТ' : 'ТРЕК' }}
+                      </span>
+                      <!-- For single track recognition badge -->
+                      <template v-if="preview.tracks?.length === 1">
+                        <span v-if="preview.tracks[0].in_library" class="track-badge in-lib">
+                          <Check :size="11" /> В медиатеке
+                        </span>
+                        <span v-else-if="preview.tracks[0].already_in_tg" class="track-badge in-tg">
+                          <Zap :size="11" /> В базе TG
+                        </span>
+                        <span v-else class="track-badge new-track">
+                          Новый трек
+                        </span>
+                      </template>
+                    </div>
+
+                    <div class="preview-title" :title="preview.title">{{ preview.title }}</div>
+                    <div class="preview-author">{{ preview.author || 'Неизвестный автор' }}</div>
+                    <div class="preview-count">
+                      {{ preview.track_count }} {{ getTrackWord(preview.track_count) }}
+                      <template v-if="preview.tracks?.length > 1 && inLibraryCount > 0">
+                        • <span class="accent-lib">{{ inLibraryCount }} уже в медиатеке</span>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Multiple Tracks: Selection & Checklist -->
+                <div v-if="preview.tracks?.length > 1" class="selection-panel">
+                  <!-- Toolbar -->
+                  <div class="selection-toolbar">
+                    <div class="selection-info">
+                      <span class="sel-count">Выбрано: <strong>{{ selectedCount }}</strong> из {{ preview.tracks.length }}</span>
+                      <div class="tags-row">
+                        <span v-if="newTracksCount > 0" class="mini-tag new">{{ newTracksCount }} новых</span>
+                        <span v-if="inLibraryCount > 0" class="mini-tag lib">{{ inLibraryCount }} в медиатеке</span>
+                        <span v-if="alreadyInTgCount > 0" class="mini-tag tg">{{ alreadyInTgCount }} в TG</span>
+                      </div>
+                    </div>
+
+                    <div class="toolbar-actions">
+                      <button
+                        v-if="newTracksCount > 0"
+                        class="tool-btn highlight"
+                        title="Выбрать только ещё не скачанные треки"
+                        @click="selectOnlyNew"
+                      >
+                        <Sparkles :size="12" />
+                        <span>Новые ({{ newTracksCount }})</span>
+                      </button>
+                      <button class="tool-btn" @click="selectAll">Все</button>
+                      <button class="tool-btn" @click="deselectAll">Снять</button>
+                    </div>
+                  </div>
+
+                  <!-- Scrollable Tracklist -->
+                  <div class="tracklist-scroll">
+                    <div
+                      v-for="(track, idx) in preview.tracks"
+                      :key="track.url || idx"
+                      class="track-item"
+                      :class="{ selected: isSelected(track.url), 'is-in-library': track.in_library }"
+                      @click="toggleTrack(track.url)"
+                    >
+                      <!-- Custom Checkbox -->
+                      <div class="custom-checkbox" :class="{ checked: isSelected(track.url) }">
+                        <Check v-if="isSelected(track.url)" :size="12" class="check-icon" />
+                      </div>
+
+                      <span class="track-idx">{{ idx + 1 }}</span>
+
+                      <div class="track-thumb">
+                        <img v-if="track.cover_url" :src="track.cover_url" alt="Thumb" loading="lazy" />
+                        <Music v-else :size="14" class="thumb-fallback" />
+                      </div>
+
+                      <div class="track-meta">
+                        <div class="track-title" :title="track.title">{{ track.title }}</div>
+                        <div class="track-artist" :title="track.artist">{{ track.artist }}</div>
+                      </div>
+
+                      <div class="track-status">
+                        <span v-if="track.in_library" class="track-badge in-lib" title="Трек уже добавлен в вашу медиатеку">
+                          <Check :size="11" /> В медиатеке
+                        </span>
+                        <span v-else-if="track.already_in_tg" class="track-badge in-tg" title="Файл уже есть в базе Telegram. Добавится мгновенно без скачивания!">
+                          <Zap :size="11" /> В базе TG
+                        </span>
+                        <span v-else class="track-badge new-track">
+                          Новый
+                        </span>
+                      </div>
+
+                      <div class="track-duration">
+                        {{ formatDuration(track.duration) }}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -142,12 +236,17 @@
               <button
                 v-if="preview"
                 class="btn-primary"
-                :disabled="starting"
+                :disabled="starting || (preview.tracks?.length > 1 && selectedCount === 0)"
                 @click="handleStartImport"
               >
                 <div v-if="starting" class="spinner small"></div>
                 <template v-else>
-                  Импортировать {{ preview.track_count > 1 ? `(${preview.track_count})` : '' }}
+                  <template v-if="preview.tracks?.length > 1">
+                    Импортировать выбранные ({{ selectedCount }})
+                  </template>
+                  <template v-else>
+                    Импортировать трек
+                  </template>
                 </template>
               </button>
             </template>
@@ -182,6 +281,8 @@ import {
   AlertCircle,
   Music,
   Check,
+  Zap,
+  Sparkles,
 } from 'lucide-vue-next'
 import { ingestionApi } from '../api/client'
 import { useRouter } from 'vue-router'
@@ -203,6 +304,7 @@ const starting = ref(false)
 const preview = ref(null)
 const errorMessage = ref('')
 const activeJob = ref(null)
+const selectedUrls = ref(new Set())
 
 let pollTimer = null
 
@@ -213,6 +315,58 @@ const isValidUrl = computed(() => {
     trimmed.startsWith('https://')
   ) && (trimmed.includes('soundcloud.com') || trimmed.includes('spotify.com'))
 })
+
+const selectedCount = computed(() => selectedUrls.value.size)
+
+const inLibraryCount = computed(() => {
+  if (!preview.value?.tracks) return 0
+  return preview.value.tracks.filter(t => t.in_library).length
+})
+
+const alreadyInTgCount = computed(() => {
+  if (!preview.value?.tracks) return 0
+  return preview.value.tracks.filter(t => !t.in_library && t.already_in_tg).length
+})
+
+const newTracksCount = computed(() => {
+  if (!preview.value?.tracks) return 0
+  return preview.value.tracks.filter(t => !t.in_library).length
+})
+
+const isSelected = (url) => selectedUrls.value.has(url)
+
+const toggleTrack = (url) => {
+  const next = new Set(selectedUrls.value)
+  if (next.has(url)) {
+    next.delete(url)
+  } else {
+    next.add(url)
+  }
+  selectedUrls.value = next
+}
+
+const selectAll = () => {
+  if (!preview.value?.tracks) return
+  selectedUrls.value = new Set(preview.value.tracks.map(t => t.url))
+}
+
+const selectOnlyNew = () => {
+  if (!preview.value?.tracks) return
+  selectedUrls.value = new Set(
+    preview.value.tracks.filter(t => !t.in_library).map(t => t.url)
+  )
+}
+
+const deselectAll = () => {
+  selectedUrls.value = new Set()
+}
+
+const formatDuration = (seconds) => {
+  if (!seconds) return '--:--'
+  const m = Math.floor(seconds / 60)
+  const s = Math.floor(seconds % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
 
 const statusDescription = computed(() => {
   if (!activeJob.value) return ''
@@ -239,6 +393,7 @@ watch(
       errorMessage.value = ''
       preview.value = null
       activeJob.value = null
+      selectedUrls.value = new Set()
       nextTick(() => {
         inputRef.value?.focus()
       })
@@ -268,10 +423,22 @@ const handlePreview = async () => {
   errorMessage.value = ''
   resolving.value = true
   preview.value = null
+  selectedUrls.value = new Set()
 
   try {
     const res = await ingestionApi.preview(urlInput.value.trim())
     preview.value = res.data
+
+    if (preview.value.tracks && preview.value.tracks.length > 0) {
+      // By default, select tracks that are not yet in the library!
+      const newTracks = preview.value.tracks.filter(t => !t.in_library)
+      if (newTracks.length > 0) {
+        selectedUrls.value = new Set(newTracks.map(t => t.url))
+      } else {
+        // If all are in library, select all so user can re-import into a playlist
+        selectedUrls.value = new Set(preview.value.tracks.map(t => t.url))
+      }
+    }
   } catch (err) {
     const detail = err.response?.data?.detail || err.message || 'Ошибка поиска ссылки'
     errorMessage.value = detail
@@ -286,8 +453,12 @@ const handleStartImport = async () => {
   errorMessage.value = ''
   starting.value = true
 
+  const urlsToImport = (preview.value.tracks && preview.value.tracks.length > 1)
+    ? Array.from(selectedUrls.value)
+    : null
+
   try {
-    const res = await ingestionApi.start(preview.value.url)
+    const res = await ingestionApi.start(preview.value.url, urlsToImport)
     activeJob.value = res.data
     startPolling(activeJob.value.id)
   } catch (err) {
@@ -366,7 +537,8 @@ onUnmounted(() => {
 
 .import-modal-container {
   width: 100%;
-  max-width: 520px;
+  max-width: 560px;
+  max-height: 90vh;
   background: #141416;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 20px;
@@ -395,6 +567,7 @@ onUnmounted(() => {
   justify-content: space-between;
   padding: 20px 24px 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
 }
 
 .header-left {
@@ -447,9 +620,10 @@ onUnmounted(() => {
 .services-row {
   display: flex;
   gap: 10px;
-  padding: 14px 24px;
+  padding: 12px 24px;
   background: rgba(255, 255, 255, 0.02);
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
 }
 
 .service-pill {
@@ -502,15 +676,18 @@ onUnmounted(() => {
 
 /* Body */
 .modal-body {
-  padding: 20px 24px;
+  padding: 18px 24px;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  overflow-y: auto;
+  max-height: calc(90vh - 140px);
 }
 
 .input-wrapper {
   display: flex;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .url-input {
@@ -573,6 +750,13 @@ onUnmounted(() => {
   font-size: 0.85rem;
 }
 
+/* Preview Section */
+.preview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 /* Preview Card */
 .preview-card {
   display: flex;
@@ -608,11 +792,18 @@ onUnmounted(() => {
   min-width: 0;
 }
 
+.preview-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
 .preview-badge {
   font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.5px;
-  margin-bottom: 4px;
   color: #ff5500;
 }
 
@@ -635,6 +826,273 @@ onUnmounted(() => {
   font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.4);
   margin-top: 4px;
+}
+
+.accent-lib {
+  color: #4ade80;
+  font-weight: 500;
+}
+
+/* Selection Panel */
+.selection-panel {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.selection-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  gap: 10px;
+}
+
+.selection-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sel-count {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.sel-count strong {
+  color: #ff5500;
+  font-weight: 700;
+}
+
+.tags-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.mini-tag {
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.mini-tag.new {
+  background: rgba(255, 85, 0, 0.15);
+  color: #ff8800;
+}
+
+.mini-tag.lib {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+}
+
+.mini-tag.tg {
+  background: rgba(147, 51, 234, 0.15);
+  color: #c084fc;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.tool-btn {
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tool-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.tool-btn.highlight {
+  background: rgba(255, 85, 0, 0.18);
+  border-color: rgba(255, 85, 0, 0.4);
+  color: #ff9933;
+}
+
+.tool-btn.highlight:hover {
+  background: rgba(255, 85, 0, 0.3);
+  color: #fff;
+}
+
+/* Tracklist Scroll */
+.tracklist-scroll {
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  gap: 2px;
+}
+
+.tracklist-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tracklist-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+.track-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 1px solid transparent;
+  user-select: none;
+}
+
+.track-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.track-item.selected {
+  background: rgba(255, 85, 0, 0.06);
+  border-color: rgba(255, 85, 0, 0.15);
+}
+
+.track-item.is-in-library:not(.selected) {
+  opacity: 0.75;
+}
+
+.custom-checkbox {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.custom-checkbox.checked {
+  background: #ff5500;
+  border-color: #ff5500;
+  color: #fff;
+  box-shadow: 0 0 8px rgba(255, 85, 0, 0.4);
+}
+
+.check-icon {
+  color: #fff;
+}
+
+.track-idx {
+  width: 20px;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.35);
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.track-thumb {
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #1e1e24;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.track-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumb-fallback {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.track-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.track-title {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-artist {
+  font-size: 0.73rem;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.track-status {
+  flex-shrink: 0;
+}
+
+.track-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.track-badge.in-lib {
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #4ade80;
+}
+
+.track-badge.in-tg {
+  background: rgba(147, 51, 234, 0.15);
+  border: 1px solid rgba(147, 51, 234, 0.3);
+  color: #c084fc;
+}
+
+.track-badge.new-track {
+  background: rgba(255, 85, 0, 0.1);
+  border: 1px solid rgba(255, 85, 0, 0.25);
+  color: #ff8800;
+}
+
+.track-duration {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.4);
+  width: 38px;
+  text-align: right;
+  flex-shrink: 0;
 }
 
 /* Progress Body */
@@ -757,6 +1215,7 @@ onUnmounted(() => {
   gap: 12px;
   padding: 16px 24px 20px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
 }
 
 .btn-cancel {

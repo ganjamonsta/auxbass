@@ -29,12 +29,17 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-async def _find_existing_track(title: str, artist: str, duration: Optional[int]) -> Optional[Track]:
+async def _find_existing_track(
+    title: str,
+    artist: str,
+    duration: Optional[int],
+    session: Optional[Any] = None,
+) -> Optional[Track]:
     """Check if track with matching title & artist already exists in global library."""
     clean_title, clean_artist = clean_track_metadata(title, artist)
     norm_artist = normalize_artist(clean_artist)
 
-    async with get_session() as session:
+    async def _execute_lookup(s):
         query = select(Track).where(
             and_(
                 Track.normalized_artist == norm_artist,
@@ -42,7 +47,7 @@ async def _find_existing_track(title: str, artist: str, duration: Optional[int])
                 Track.is_unavailable == False,
             )
         )
-        result = await session.execute(query)
+        result = await s.execute(query)
         candidates = result.scalars().all()
 
         if not candidates:
@@ -54,7 +59,7 @@ async def _find_existing_track(title: str, artist: str, duration: Optional[int])
                     Track.is_unavailable == False,
                 )
             )
-            result2 = await session.execute(query2)
+            result2 = await s.execute(query2)
             candidates = result2.scalars().all()
 
         if not candidates:
@@ -67,6 +72,11 @@ async def _find_existing_track(title: str, artist: str, duration: Optional[int])
                     return t
 
         return candidates[0]
+
+    if session:
+        return await _execute_lookup(session)
+    async with get_session() as new_session:
+        return await _execute_lookup(new_session)
 
 
 class IngestionPipeline:
@@ -115,6 +125,18 @@ class IngestionPipeline:
                 if progress_callback:
                     await progress_callback(job)
                 return
+
+            # Filter tracks if user made a selective import
+            if job.selected_urls:
+                selected_set = set(job.selected_urls)
+                tracks_meta = [t for t in tracks_meta if t.url in selected_set]
+                if not tracks_meta:
+                    job.status = JobStatus.FAILED
+                    job.error_message = "No matching selected tracks found"
+                    job.updated_at = datetime.now(timezone.utc)
+                    if progress_callback:
+                        await progress_callback(job)
+                    return
 
             job.total_tracks = len(tracks_meta)
             job.updated_at = datetime.now(timezone.utc)

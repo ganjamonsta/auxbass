@@ -159,7 +159,11 @@ class SoundCloudProvider(BaseMusicProvider):
             raw_title = entry.get("title") or f"Track {idx}"
             uploader = entry.get("uploader") or entity.author
             artist, title = _parse_artist_and_title(raw_title, uploader)
-            track_url = entry.get("webpage_url") or entry.get("url") or entity.url
+            track_url = entry.get("webpage_url") or entry.get("url") or ""
+            if track_url and not track_url.startswith("http"):
+                track_url = f"https://soundcloud.com/{track_url.lstrip('/')}"
+            if not track_url:
+                track_url = f"{entity.url}#{idx}"
             duration = int(entry.get("duration") or 0) or None
             cover = _improve_sc_thumbnail(entry.get("thumbnail") or entity.cover_url)
 
