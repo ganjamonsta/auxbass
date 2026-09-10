@@ -1,133 +1,160 @@
 <template>
-  <div class="cockpit-header">
+  <header class="player-header">
     <div class="header-left">
-      <button class="hud-btn minimize" @click="$emit('close')" title="Свернуть">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M19 13H5v-2h14v2z"/>
-        </svg>
-      </button>
-      <div class="mode-indicator">
-        <span class="status-dot"></span>
-        <span class="mode-text">PLAYER ACTIVE</span>
+      <div class="playing-badge" :class="{ active: isPlaying }">
+        <div class="equalizer" v-if="isPlaying">
+          <span class="equalizer-bar"></span>
+          <span class="equalizer-bar"></span>
+          <span class="equalizer-bar"></span>
+        </div>
+        <span class="status-dot" v-else></span>
+        <span class="badge-text">{{ isPlaying ? 'СЕЙЧАС ИГРАЕТ' : 'ПАУЗА' }}</span>
+      </div>
+
+      <div v-if="contextTitle" class="context-pill" :title="contextTitle">
+        <span class="context-type">{{ contextTypeLabel }}</span>
+        <span class="context-name">{{ contextTitle }}</span>
       </div>
     </div>
-    
-    <div class="header-center">
-      <h1 class="cockpit-title">PLAYBACK CONTROL SYSTEM</h1>
+
+    <div class="header-right">
+      <button 
+        class="neu-btn-icon sm close-btn" 
+        @click="$emit('close')" 
+        title="Свернуть (Esc)"
+        aria-label="Закрыть"
+      >
+        <X :size="18" />
+      </button>
     </div>
-    
-    <div class="header-right"></div>
-  </div>
+  </header>
 </template>
 
 <script setup>
+import { computed } from 'vue'
+import { X } from 'lucide-vue-next'
+
+const props = defineProps({
+  isPlaying: Boolean,
+  contextInfo: Object,
+  track: Object
+})
+
 defineEmits(['close'])
+
+const contextTypeLabel = computed(() => {
+  if (!props.contextInfo?.type) return ''
+  const typeMap = {
+    playlist: 'ПЛЕЙЛИСТ',
+    album: 'АЛЬБОМ',
+    artist: 'АРТИСТ',
+    favorites: 'ИЗБРАННОЕ',
+    channel: 'КАНАЛ',
+    history: 'ИСТОРИЯ'
+  }
+  return typeMap[props.contextInfo.type.toLowerCase()] || props.contextInfo.type.toUpperCase()
+})
+
+const contextTitle = computed(() => {
+  if (props.contextInfo?.name) return props.contextInfo.name
+  if (props.track?.album_title) return props.track.album_title
+  return ''
+})
 </script>
 
 <style scoped>
-.cockpit-header {
+.player-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 25px 35px;
-  background: #12121e;
+  padding: 20px 32px 14px;
+  width: 100%;
+  flex-shrink: 0;
   position: relative;
   z-index: 10;
 }
 
-.header-left, .header-right {
+.header-left {
   display: flex;
   align-items: center;
-  gap: 15px;
-  flex: 1;
+  gap: 14px;
 }
 
-.header-center {
-  flex: 2;
-  display: flex;
-  justify-content: center;
-}
-
-.cockpit-title {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  background: linear-gradient(135deg, #db2220 0%, #e85c7c 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  font-family: 'Segoe UI', -apple-system, sans-serif;
-}
-
-.mode-indicator {
+.playing-badge {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 16px;
-  background: #12121e;
-  border-radius: 20px;
-  box-shadow: 
-    inset 4px 4px 8px #08080f,
-    inset -4px -4px 8px #1a1a28;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: var(--r-full);
+  background: var(--c-bg-1);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: inset 1px 1px 2px var(--sh-inset-dark), inset -1px -1px 2px var(--sh-inset-light);
 }
 
 .status-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #db2220 0%, #e85c7c 100%);
-  box-shadow: 0 2px 8px rgba(232, 92, 124, 0.6);
-  animation: statusPulse 2s ease-in-out infinite;
+  background: var(--c-text-3);
+  transition: all 0.2s ease;
 }
 
-@keyframes statusPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.7; transform: scale(0.9); }
+.playing-badge.active .status-dot {
+  background: var(--c-accent);
+  box-shadow: 0 0 8px var(--c-accent-glow);
 }
 
-.mode-text {
+.badge-text {
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 1.5px;
-  color: #db2220;
-  font-family: 'Segoe UI', sans-serif;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: var(--c-text-2);
 }
 
-.hud-btn {
-  width: 44px;
-  height: 44px;
-  background: #12121e;
-  border: none;
-  border-radius: 12px;
-  color: #db2220;
+.playing-badge.active .badge-text {
+  color: var(--c-accent);
+}
+
+.context-pill {
   display: flex;
   align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 
-    6px 6px 12px #08080f,
-    -6px -6px 12px #1a1a28;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: var(--r-full);
+  background: var(--c-bg-2);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  max-width: 320px;
 }
 
-.hud-btn:hover {
-  box-shadow: 
-    4px 4px 8px #08080f,
-    -4px -4px 8px #1a1a28;
-  transform: translateY(1px);
+.context-type {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--c-text-3);
 }
 
-.hud-btn:active {
-  box-shadow: 
-    inset 4px 4px 8px #08080f,
-    inset -4px -4px 8px #1a1a28;
-  transform: translateY(2px);
+.context-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.hud-btn.minimize {
-  color: #e87c7c;
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.hud-btn.minimize:hover {
-  color: #ff6464;
+.close-btn {
+  color: var(--c-text-2);
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  color: var(--c-text-1);
+  transform: scale(1.05);
 }
 </style>

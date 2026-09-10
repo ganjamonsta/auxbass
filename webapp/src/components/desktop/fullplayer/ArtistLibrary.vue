@@ -1,95 +1,106 @@
 <template>
-  <div class="artist-library-section" v-if="track">
-    <div class="library-header">
-      <div class="library-title-section">
-        <span class="library-label">ARTIST MEDIA</span>
-        <span class="library-count">{{ sortedArtistTracks.length }} tracks</span>
+  <div class="artist-library-container" v-if="track">
+    <!-- Header with count & sort options -->
+    <div class="library-toolbar">
+      <div class="library-heading">
+        <span class="toolbar-title">ТРЕКИ АРТИСТА</span>
+        <span class="toolbar-count" v-if="sortedArtistTracks.length">{{ sortedArtistTracks.length }}</span>
       </div>
-      <div class="sort-controls">
+
+      <div class="sort-segmented neu-surface">
         <button 
-          class="sort-btn" 
-          :class="{ active: artistSort === 'title' }"
-          @click="artistSort = 'title'"
-          title="По названию"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"/>
-          </svg>
-        </button>
-        <button 
-          class="sort-btn" 
-          :class="{ active: artistSort === 'year' }"
-          @click="artistSort = 'year'"
-          title="По году"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
-          </svg>
-        </button>
-        <button 
-          class="sort-btn" 
+          class="sort-pill" 
           :class="{ active: artistSort === 'plays' }"
           @click="artistSort = 'plays'"
           title="По популярности"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/>
-          </svg>
+          <Flame :size="13" />
+          <span>Топ</span>
         </button>
         <button 
-          class="sort-btn" 
-          :class="{ active: artistSort === 'duration' }"
-          @click="artistSort = 'duration'"
-          title="По длительности"
+          class="sort-pill" 
+          :class="{ active: artistSort === 'year' }"
+          @click="artistSort = 'year'"
+          title="По году"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
-          </svg>
+          <Calendar :size="13" />
+          <span>Год</span>
+        </button>
+        <button 
+          class="sort-pill" 
+          :class="{ active: artistSort === 'title' }"
+          @click="artistSort = 'title'"
+          title="По названию"
+        >
+          <ArrowDownAZ :size="13" />
+          <span>А-Я</span>
         </button>
       </div>
     </div>
-    
-    <div class="artist-tracks-list">
-      <div v-if="isLoadingArtistTracks" class="artist-tracks-empty">
-        <span>Загрузка...</span>
+
+    <!-- Tracks list -->
+    <div class="artist-tracks-scroll">
+      <!-- Loading state -->
+      <div v-if="isLoadingArtistTracks" class="loading-state">
+        <div class="spinner"></div>
+        <span>Загрузка треков...</span>
       </div>
-      <template v-else>
+
+      <!-- Loaded track items -->
+      <template v-else-if="sortedArtistTracks.length > 0">
         <div 
           v-for="(t, idx) in sortedArtistTracks" 
           :key="`artist-${t.id}-${idx}`"
           class="artist-track-item"
-          :class="{ active: t.id === track?.id }"
-          @click="handlePlayArtistTrack(t)"
+          :class="{ 'is-current': t.id === track?.id }"
+          @click="$emit('play', t)"
         >
-          <div class="artist-track-number">{{ idx + 1 }}</div>
-          <div class="artist-track-cover" :style="getTrackCoverStyle(t)">
-            <img v-if="t.cover_url" :src="getCoverUrl(t.cover_url, CoverSize.SMALL)" alt="" />
-            <span v-else>{{ getTrackInitials(t) }}</span>
+          <div class="track-number">
+            <span v-if="t.id === track?.id" class="now-playing-dot"></span>
+            <span v-else>{{ idx + 1 }}</span>
           </div>
-          <div class="artist-track-info">
-            <div class="artist-track-title">{{ t.title || 'Unknown' }}</div>
-            <div class="artist-track-meta">
-              <span v-if="t.album_title">{{ t.album_title }}</span>
-              <span v-if="t.year" class="track-year">{{ t.year }}</span>
+
+          <div class="track-cover" :style="getTrackCoverStyle(t)">
+            <img 
+              v-if="t.cover_url" 
+              :src="getCoverUrl(t.cover_url, CoverSize.SMALL)" 
+              alt="" 
+              class="cover-img"
+            />
+            <span v-else class="initials">{{ getTrackInitials(t) }}</span>
+          </div>
+
+          <div class="track-info">
+            <span class="track-name">{{ t.title || 'Без названия' }}</span>
+            <div class="track-meta">
+              <span v-if="t.album_title" class="album-name">{{ t.album_title }}</span>
+              <span v-if="t.year" class="year-tag">{{ t.year }}</span>
             </div>
           </div>
-          <div class="artist-track-stats">
-            <span v-if="t.play_count" class="plays" title="Прослушиваний">{{ t.play_count }}</span>
+
+          <div class="track-stats">
+            <span v-if="t.play_count" class="play-count" title="Прослушиваний">
+              <Headphones :size="11" />
+              {{ t.play_count }}
+            </span>
             <span class="duration">{{ formatTime(t.duration) }}</span>
           </div>
         </div>
-        
-        <div v-if="!sortedArtistTracks.length" class="artist-tracks-empty">
-          <span v-if="!track?.artist">Нет информации об артисте</span>
-          <span v-else>Треки {{ track.artist }} не найдены в библиотеке</span>
-        </div>
       </template>
+
+      <!-- Empty state -->
+      <div v-else class="empty-state">
+        <Music2 :size="32" class="empty-icon" />
+        <span v-if="!track?.artist">Имя исполнителя не указано</span>
+        <span v-else>Другие треки {{ track.artist }} не найдены</span>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { Flame, Calendar, ArrowDownAZ, Headphones, Music2 } from 'lucide-vue-next'
 import { tracksApi } from '@/api/client'
 import { useTrackSync } from '@/composables/useTrackSync'
 import { getTrackCoverStyle, getTrackInitials, getCoverUrl, CoverSize } from '@/utils'
@@ -98,14 +109,13 @@ const props = defineProps({
   track: Object
 })
 
-const emit = defineEmits(['play'])
+defineEmits(['play'])
 
 const artistTracks = ref([])
 const isLoadingArtistTracks = ref(false)
-
-// Sync artist tracks with global track events
-useTrackSync(artistTracks)
 const artistSort = ref('plays')
+
+useTrackSync(artistTracks)
 
 const loadArtistTracks = async () => {
   if (!props.track?.artist) {
@@ -135,7 +145,6 @@ watch(() => props.track?.artist, (newVal) => {
 
 const sortedArtistTracks = computed(() => {
   const tracks = [...artistTracks.value]
-  
   switch (artistSort.value) {
     case 'title':
       return tracks.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
@@ -143,19 +152,13 @@ const sortedArtistTracks = computed(() => {
       return tracks.sort((a, b) => (b.year || 0) - (a.year || 0))
     case 'plays':
       return tracks.sort((a, b) => (b.play_count || 0) - (a.play_count || 0))
-    case 'duration':
-      return tracks.sort((a, b) => (b.duration || 0) - (a.duration || 0))
     default:
       return tracks
   }
 })
 
-const handlePlayArtistTrack = (t) => {
-  emit('play', t)
-}
-
 const formatTime = (seconds) => {
-  if (!seconds || isNaN(seconds)) return '0:00'
+  if (!seconds || isNaN(seconds) || seconds < 0) return '0:00'
   const mins = Math.floor(seconds / 60)
   const secs = Math.floor(seconds % 60)
   return `${mins}:${secs.toString().padStart(2, '0')}`
@@ -163,232 +166,253 @@ const formatTime = (seconds) => {
 </script>
 
 <style scoped>
-.artist-library-section {
-  margin-top: 15px;
-  background: #12121e;
-  border-radius: 24px;
-  padding: 18px;
-  box-shadow: 
-    inset 6px 6px 12px #08080f,
-    inset -6px -6px 12px #1a1a28;
-  min-height: 250px;
-  max-height: 400px;
+.artist-library-container {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  width: 100%;
   overflow: hidden;
 }
 
-.library-header {
+.library-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 15px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid rgba(232, 92, 124, 0.1);
+  margin-bottom: 12px;
+  flex-shrink: 0;
+  padding-right: 6px;
 }
 
-.library-title-section {
+.library-heading {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-
-.library-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  color: #e85c7c;
-  font-family: 'Segoe UI', sans-serif;
-}
-
-.library-count {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  color: #9ca3af;
-  font-family: 'Segoe UI', sans-serif;
-}
-
-.sort-controls {
-  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-.sort-btn {
-  width: 32px;
-  height: 32px;
-  background: #12121e;
-  border: none;
-  border-radius: 10px;
-  color: #9ca3af;
+.toolbar-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: var(--c-text-3);
+}
+
+.toolbar-count {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: var(--r-full);
+  background: var(--c-bg-2);
+  color: var(--c-text-2);
+}
+
+.sort-segmented {
   display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--r-full);
+  background: var(--c-bg-1);
+}
+
+.sort-pill {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--c-text-3);
+  font-size: 11px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 
-    4px 4px 8px #08080f,
-    -4px -4px 8px #1a1a28;
+  transition: all 0.15s ease;
 }
 
-.sort-btn:hover {
-  color: #e85c7c;
-  box-shadow: 
-    2px 2px 6px #08080f,
-    -2px -2px 6px #1a1a28;
+.sort-pill:hover {
+  color: var(--c-text-1);
 }
 
-.sort-btn.active {
-  color: #e85c7c;
-  box-shadow: 
-    inset 3px 3px 6px #08080f,
-    inset -3px -3px 6px #1a1a28;
+.sort-pill.active {
+  background: var(--c-bg-3);
+  color: var(--c-accent);
 }
 
-.artist-tracks-list {
+.artist-tracks-scroll {
   flex: 1;
   overflow-y: auto;
-  overflow-x: hidden;
-  padding-right: 8px;
+  padding-right: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.artist-tracks-list::-webkit-scrollbar {
+.artist-tracks-scroll::-webkit-scrollbar {
   width: 6px;
 }
 
-.artist-tracks-list::-webkit-scrollbar-track {
+.artist-tracks-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.artist-tracks-list::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, #e85c7c 0%, #ff8ba8 100%);
-  border-radius: 3px;
+.artist-tracks-scroll::-webkit-scrollbar-thumb {
+  background: var(--c-bg-4);
+  border-radius: var(--r-full);
 }
 
 .artist-track-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
-  margin-bottom: 8px;
-  background: #12121e;
-  border-radius: 16px;
+  padding: 8px 12px;
+  border-radius: var(--r-md);
+  background: var(--c-bg-2);
+  border: 1px solid rgba(255, 255, 255, 0.02);
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 
-    4px 4px 8px #08080f,
-    -4px -4px 8px #1a1a28;
+  transition: all 0.15s ease;
+  user-select: none;
 }
 
 .artist-track-item:hover {
-  box-shadow: 
-    2px 2px 6px #08080f,
-    -2px -2px 6px #1a1a28;
-  transform: translateY(-1px);
+  background: var(--c-bg-3);
+  transform: translateX(3px);
+  border-color: rgba(255, 255, 255, 0.06);
 }
 
-.artist-track-item.active {
-  background: linear-gradient(135deg, rgba(232, 92, 124, 0.15) 0%, rgba(255, 139, 168, 0.1) 100%);
-  box-shadow: 
-    inset 3px 3px 6px #08080f,
-    inset -3px -3px 6px #1a1a28,
-    0 0 20px rgba(232, 92, 124, 0.2);
+.artist-track-item.is-current {
+  background: rgba(29, 185, 84, 0.1);
+  border-color: rgba(29, 185, 84, 0.3);
 }
 
-.artist-track-number {
-  width: 24px;
+.artist-track-item.is-current .track-name {
+  color: var(--c-accent);
+}
+
+.track-number {
+  width: 20px;
   text-align: center;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  color: #9ca3af;
-  font-family: 'Segoe UI', sans-serif;
+  font-family: var(--font-mono, monospace);
+  color: var(--c-text-3);
+  flex-shrink: 0;
 }
 
-.artist-track-item.active .artist-track-number {
-  color: #e85c7c;
+.now-playing-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-accent);
+  box-shadow: 0 0 8px var(--c-accent-glow);
 }
 
-.artist-track-cover {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
+.track-cover {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-sm);
   overflow: hidden;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #1a1a28 0%, #0f0f1a 100%);
-  box-shadow: 
-    inset 2px 2px 4px #08080f,
-    inset -2px -2px 4px #1a1a28;
+  background: var(--c-bg-3);
 }
 
-.artist-track-cover img {
+.cover-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.artist-track-cover span {
-  font-size: 14px;
-  font-weight: 600;
-  color: #e85c7c;
+.initials {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--c-accent);
 }
 
-.artist-track-info {
+.track-info {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
-.artist-track-title {
+.track-name {
   font-size: 13px;
   font-weight: 600;
-  color: #e8ecf1;
+  color: var(--c-text-1);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.artist-track-meta {
+.track-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--c-text-3);
 }
 
-.track-year {
-  color: #ff8ba8;
-  font-weight: 600;
+.album-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.artist-track-stats {
+.year-tag {
+  color: var(--c-text-4);
+  font-family: var(--font-mono, monospace);
+}
+
+.track-stats {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--c-text-3);
+  flex-shrink: 0;
 }
 
-.artist-track-stats .plays {
-  color: #ff8ba8;
-  font-weight: 600;
+.play-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--c-text-3);
 }
 
-.artist-track-stats .duration {
-  font-weight: 600;
-  color: #e8ecf1;
+.duration {
+  font-family: var(--font-mono, monospace);
+  color: var(--c-text-2);
 }
 
-.artist-tracks-empty {
+/* Loading & Empty */
+.loading-state, .empty-state {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100px;
-  color: #9ca3af;
+  gap: 10px;
+  padding: 48px 16px;
+  color: var(--c-text-3);
   font-size: 13px;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--c-bg-3);
+  border-top-color: var(--c-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.empty-icon {
+  opacity: 0.3;
 }
 </style>

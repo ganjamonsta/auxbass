@@ -1,140 +1,165 @@
 <template>
-  <div class="queue-panel-wrapper">
-    <!-- Context Information -->
-    <div class="context-module" v-if="contextInfo">
-      <div class="module-header">
-        <span class="module-label">CONTEXT</span>
-      </div>
-      <div class="context-info">
-        <div class="context-type">{{ contextType }}</div>
-        <div class="context-name">{{ contextInfo.name || 'Unknown' }}</div>
-        <div class="context-meta" v-if="contextInfo.tracks_count">
-          {{ contextInfo.tracks_count }} tracks
-        </div>
-      </div>
-    </div>
-
-    <!-- Queue Panel -->
-    <div class="queue-module">
-      <div class="module-header">
-        <span class="module-label">QUEUE</span>
-        <span class="queue-count">{{ queueLength }} tracks</span>
-      </div>
-      
-      <div class="queue-tabs">
+  <div class="queue-panel-container">
+    <!-- Tab Selector -->
+    <div class="deck-tabs-header">
+      <div class="segmented-tabs neu-surface">
         <button 
-          class="queue-tab" 
+          class="tab-btn" 
           :class="{ active: activeQueueTab === 'upcoming' }"
           @click="activeQueueTab = 'upcoming'"
         >
-          UP NEXT
+          <ListMusic :size="15" />
+          <span>Очередь</span>
+          <span class="tab-count" v-if="queueLength">{{ queueLength }}</span>
         </button>
+
         <button 
-          class="queue-tab" 
+          class="tab-btn" 
           :class="{ active: activeQueueTab === 'history' }"
           @click="activeQueueTab = 'history'"
         >
-          HISTORY
+          <History :size="15" />
+          <span>История</span>
+          <span class="tab-count" v-if="historyTracks?.length">{{ historyTracks.length }}</span>
         </button>
+
         <button 
-          class="queue-tab" 
+          class="tab-btn" 
           :class="{ active: activeQueueTab === 'lyrics' }"
           @click="activeQueueTab = 'lyrics'"
         >
-          LYRICS
+          <Mic2 :size="15" />
+          <span>Текст</span>
         </button>
       </div>
+    </div>
 
-      <div class="queue-list" ref="queueListRef">
-        <!-- Upcoming tracks -->
-        <template v-if="activeQueueTab === 'upcoming'">
+    <!-- Tab Content Area -->
+    <div class="deck-tab-content">
+      <!-- UPCOMING QUEUE TAB -->
+      <div v-if="activeQueueTab === 'upcoming'" class="tab-scroll-pane">
+        <!-- Lazy Shuffle Banner -->
+        <div v-if="lazyShuffleMode" class="lazy-shuffle-card neu-surface">
+          <Shuffle :size="18" class="lazy-icon" />
+          <div class="lazy-text">
+            <span class="lazy-title">Умное перемешивание</span>
+            <span class="lazy-counter">Трек {{ (lazyShuffleIndex || 0) + 1 }} из {{ lazyShuffleTotal }}</span>
+          </div>
+        </div>
+
+        <!-- Upcoming list -->
+        <div class="queue-track-list" v-if="upcomingQueue?.length">
           <div 
             v-for="(t, idx) in upcomingQueue" 
             :key="`q-${t.id}-${idx}`"
-            class="queue-track"
-            :class="{ active: idx === 0 }"
+            class="queue-item"
+            :class="{ 'now-playing': idx === 0 }"
             @click="$emit('playFromQueue', idx)"
             @contextmenu.prevent="openMenu('track', t, 'queue', $event)"
           >
-            <div class="queue-track-number">{{ idx + 1 }}</div>
-            <div class="queue-track-cover" :style="getTrackCoverStyle(t)">
-              <img v-if="t.cover_url" :src="getCoverUrl(t.cover_url, CoverSize.SMALL)" alt="" />
-              <span v-else>{{ getTrackInitials(t) }}</span>
+            <!-- Track Number or Playing icon -->
+            <div class="item-index">
+              <div v-if="idx === 0 && isPlaying" class="equalizer">
+                <span class="equalizer-bar"></span>
+                <span class="equalizer-bar"></span>
+                <span class="equalizer-bar"></span>
+              </div>
+              <span v-else>{{ idx + 1 }}</span>
             </div>
-            <div class="queue-track-info">
-              <div class="queue-track-title">{{ t.title || 'Unknown' }}</div>
-              <div class="queue-track-artist">{{ t.artist || 'Unknown' }}</div>
-            </div>
-            <div class="queue-track-duration">{{ formatTime(t.duration) }}</div>
-          </div>
-          
-          <div v-if="lazyShuffleMode" class="queue-lazy-info">
-            <div class="lazy-icon">🔀</div>
-            <div class="lazy-text">
-              <span>Shuffle Mode</span>
-              <span class="lazy-progress">{{ lazyShuffleIndex + 1 }} / {{ lazyShuffleTotal }}</span>
-            </div>
-          </div>
-          
-          <div v-if="!upcomingQueue.length && !lazyShuffleMode" class="queue-empty">
-            <span>Queue is empty</span>
-          </div>
-        </template>
 
-        <!-- History -->
-        <template v-else-if="activeQueueTab === 'history'">
+            <!-- Cover -->
+            <div class="item-cover" :style="getTrackCoverStyle(t)">
+              <img 
+                v-if="t.cover_url" 
+                :src="getCoverUrl(t.cover_url, CoverSize.SMALL)" 
+                alt="" 
+                class="cover-img"
+              />
+              <span v-else class="initials">{{ getTrackInitials(t) }}</span>
+            </div>
+
+            <!-- Meta info -->
+            <div class="item-info">
+              <span class="item-title">{{ t.title || 'Без названия' }}</span>
+              <span class="item-artist">{{ t.artist || 'Неизвестный исполнитель' }}</span>
+            </div>
+
+            <!-- Duration -->
+            <span class="item-duration">{{ formatTime(t.duration) }}</span>
+          </div>
+        </div>
+
+        <!-- Empty state -->
+        <div v-else-if="!lazyShuffleMode" class="empty-deck-state">
+          <ListMusic :size="36" class="empty-icon" />
+          <p class="empty-text">Очередь воспроизведения пуста</p>
+        </div>
+      </div>
+
+      <!-- HISTORY TAB -->
+      <div v-else-if="activeQueueTab === 'history'" class="tab-scroll-pane">
+        <div class="queue-track-list" v-if="historyTracks?.length">
           <div 
             v-for="(t, idx) in historyTracks" 
             :key="`h-${t.id}-${idx}`"
-            class="queue-track history"
+            class="queue-item history-item"
             @click="$emit('playFromHistory', idx)"
             @contextmenu.prevent="openMenu('track', t, 'history', $event)"
           >
-            <div class="queue-track-number">-{{ historyTracks.length - idx }}</div>
-            <div class="queue-track-cover" :style="getTrackCoverStyle(t)">
-              <img v-if="t.cover_url" :src="getCoverUrl(t.cover_url, CoverSize.SMALL)" alt="" />
-              <span v-else>{{ getTrackInitials(t) }}</span>
+            <div class="item-index history">
+              <span>-{{ historyTracks.length - idx }}</span>
             </div>
-            <div class="queue-track-info">
-              <div class="queue-track-title">{{ t.title || 'Unknown' }}</div>
-              <div class="queue-track-artist">{{ t.artist || 'Unknown' }}</div>
-            </div>
-            <div class="queue-track-duration">{{ formatTime(t.duration) }}</div>
-          </div>
-          
-          <div v-if="!historyTracks.length" class="queue-empty">
-            <span>No history</span>
-          </div>
-        </template>
 
-        <!-- Lyrics -->
-        <template v-else-if="activeQueueTab === 'lyrics'">
-          <div class="lyrics-panel-container">
-            <LyricsViewer
-              v-if="track"
-              :track="track"
-              :currentTime="progress"
-              :isPlaying="isPlaying"
-              :embedded="true"
-              @seek="$emit('seek', $event)"
-            />
-            <div v-else class="queue-empty">
-              <span>Нет активного трека</span>
+            <div class="item-cover" :style="getTrackCoverStyle(t)">
+              <img 
+                v-if="t.cover_url" 
+                :src="getCoverUrl(t.cover_url, CoverSize.SMALL)" 
+                alt="" 
+                class="cover-img"
+              />
+              <span v-else class="initials">{{ getTrackInitials(t) }}</span>
             </div>
+
+            <div class="item-info">
+              <span class="item-title">{{ t.title || 'Без названия' }}</span>
+              <span class="item-artist">{{ t.artist || 'Неизвестный исполнитель' }}</span>
+            </div>
+
+            <span class="item-duration">{{ formatTime(t.duration) }}</span>
           </div>
-        </template>
+        </div>
+
+        <div v-else class="empty-deck-state">
+          <History :size="36" class="empty-icon" />
+          <p class="empty-text">История прослушивания пуста</p>
+        </div>
+      </div>
+
+      <!-- LYRICS TAB -->
+      <div v-else-if="activeQueueTab === 'lyrics'" class="lyrics-container">
+        <LyricsViewer
+          v-if="track"
+          :track="track"
+          :currentTime="progress"
+          :isPlaying="isPlaying"
+          :embedded="true"
+          @seek="$emit('seek', $event)"
+        />
+        <div v-else class="empty-deck-state">
+          <Mic2 :size="36" class="empty-icon" />
+          <p class="empty-text">Нет активного трека для показа текста</p>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
+import { ListMusic, History, Mic2, Shuffle } from 'lucide-vue-next'
 import { getTrackCoverStyle, getTrackInitials, getCoverUrl, CoverSize } from '@/utils'
 import { useContextMenu } from '@/composables/useContextMenu'
 import LyricsViewer from '@/components/LyricsViewer.vue'
-
-const { openMenu } = useContextMenu()
 
 const props = defineProps({
   track: Object,
@@ -142,7 +167,10 @@ const props = defineProps({
   isPlaying: Boolean,
   contextInfo: Object,
   queueLength: Number,
-  upcomingQueue: Array,
+  upcomingQueue: {
+    type: Array,
+    default: () => []
+  },
   historyTracks: {
     type: Array,
     default: () => []
@@ -152,7 +180,9 @@ const props = defineProps({
   lazyShuffleTotal: Number
 })
 
-const emit = defineEmits(['playFromQueue', 'playFromHistory', 'seek'])
+defineEmits(['playFromQueue', 'playFromHistory', 'seek'])
+
+const { openMenu } = useContextMenu()
 
 const activeQueueTab = ref('upcoming')
 
@@ -162,17 +192,11 @@ function setTab(tab) {
 
 defineExpose({
   setTab,
-  activeQueueTab,
-})
-
-const contextType = computed(() => {
-  if (!props.contextInfo) return ''
-  // Basic mapping, assuming simple types or converting to uppercase
-  return (props.contextInfo.type || 'CONTEXT').toUpperCase()
+  activeQueueTab
 })
 
 const formatTime = (seconds) => {
-  if (!seconds || isNaN(seconds)) return '0:00'
+  if (!seconds || isNaN(seconds) || seconds < 0) return '0:00'
   const mins = Math.floor(seconds / 60)
   const secs = Math.floor(seconds % 60)
   return `${mins}:${secs.toString().padStart(2, '0')}`
@@ -180,306 +204,283 @@ const formatTime = (seconds) => {
 </script>
 
 <style scoped>
-.queue-panel-wrapper {
+.queue-panel-container {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  height: 100%;
+  width: 100%;
   overflow: hidden;
-  flex: 1;
-  min-height: 0;
 }
 
-/* Context Module */
-.context-module {
-  background: #12121e;
-  border-radius: 20px;
-  padding: 18px;
-  box-shadow: 
-    6px 6px 12px #000000,
-    -6px -6px 12px #1a1a28;
-}
-
-.module-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.module-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  color: #db2220;
-  font-family: 'Segoe UI', sans-serif;
-}
-
-.context-info {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.context-type {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  color: #e85c7c;
-  font-family: 'Segoe UI', sans-serif;
-}
-
-.context-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: #e8ecf1;
-}
-
-.context-meta {
-  font-size: 12px;
-  color: #718096;
-}
-
-/* Queue Module */
-.queue-module {
-  flex: 1;
-  background: #12121e;
-  border-radius: 20px;
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  box-shadow: 
-    6px 6px 12px #000000,
-    -6px -6px 12px #1a1a28;
-}
-
-.queue-count {
-  font-size: 11px;
-  color: #718096;
-  font-family: 'Segoe UI', sans-serif;
-}
-
-.queue-tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.queue-tab {
-  flex: 1;
-  padding: 10px;
-  border: none;
-  background: #12121e;
-  border-radius: 12px;
-  color: #718096;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 1.2px;
-  font-family: 'Segoe UI', sans-serif;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 
-    4px 4px 8px #08080f,
-    -4px -4px 8px #1a1a28;
-}
-
-.queue-tab:hover {
-  box-shadow: 
-    3px 3px 6px #08080f,
-    -3px -3px 6px #1a1a28;
-  color: #db2220;
-}
-
-.queue-tab.active {
-  background: linear-gradient(135deg, #db2220 0%, #e85c7c 100%);
-  color: #ffffff;
-  box-shadow: 
-    inset 3px 3px 6px rgba(232, 92, 124, 0.4),
-    4px 4px 8px #000000,
-    -4px -4px 8px #1a1a28;
-}
-
-.queue-list {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-}
-
-.queue-list::-webkit-scrollbar {
-  width: 8px;
-}
-
-.queue-list::-webkit-scrollbar-track {
-  background: #12121e;
-  border-radius: 10px;
-  box-shadow: 
-    inset 2px 2px 4px #08080f,
-    inset -2px -2px 4px #1a1a28;
-}
-
-.queue-list::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #db2220 0%, #e85c7c 100%);
-  border-radius: 10px;
-  box-shadow: 0 2px 6px rgba(232, 92, 124, 0.4);
-}
-
-.queue-list::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #e85c7c 0%, #db2220 100%);
-}
-
-.queue-track {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px;
-  border-radius: 12px;
-  margin-bottom: 6px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  background: #12121e;
-}
-
-.queue-track:hover {
-  box-shadow: 
-    4px 4px 8px #000000,
-    -4px -4px 8px #1a1a28;
-  transform: translateY(-1px);
-}
-
-.queue-track.active {
-  background: linear-gradient(135deg, #db2220 0%, #e85c7c 100%);
-  box-shadow: 
-    6px 6px 12px #000000,
-    -6px -6px 12px #1a1a28,
-    inset 0 0 20px rgba(232, 92, 124, 0.4);
-}
-
-.queue-track.active .queue-track-title,
-.queue-track.active .queue-track-artist,
-.queue-track.active .queue-track-duration,
-.queue-track.active .queue-track-number {
-  color: #ffffff;
-}
-
-.queue-track.history {
-  opacity: 0.8;
-}
-
-.queue-track-number {
-  width: 28px;
-  text-align: center;
-  font-size: 12px;
-  font-weight: 600;
-  color: #db2220;
-  font-family: 'Segoe UI', monospace;
-  flex-shrink: 0;
-}
-
-.queue-track-cover {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  overflow: hidden;
-  flex-shrink: 0;
+/* Tab Header */
+.deck-tabs-header {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #1a1a28;
-  box-shadow: 
-    inset 3px 3px 6px #08080f,
-    inset -3px -3px 6px #1a1a28;
-}
-
-.queue-track-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.queue-track-cover span {
-  font-size: 14px;
-  font-weight: 600;
-  color: #db2220;
-}
-
-.queue-track-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.queue-track-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #e8ecf1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.queue-track-artist {
-  font-size: 11px;
-  color: #718096;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.queue-track-duration {
-  font-size: 11px;
-  color: #a0aec0;
-  font-family: 'Segoe UI', monospace;
+  padding: 0 0 16px;
   flex-shrink: 0;
 }
 
-.queue-lazy-info {
+.segmented-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--r-full);
+  background: var(--c-bg-1);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: var(--r-full);
+  border: none;
+  background: transparent;
+  color: var(--c-text-3);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+  color: var(--c-text-1);
+}
+
+.tab-btn.active {
+  background: var(--c-bg-3);
+  color: var(--c-accent);
+  box-shadow: 
+    2px 2px 6px var(--sh-dark),
+    -1px -1px 3px var(--sh-light);
+}
+
+.tab-count {
+  padding: 1px 6px;
+  border-radius: var(--r-full);
+  font-size: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--c-text-2);
+}
+
+.tab-btn.active .tab-count {
+  background: rgba(29, 185, 84, 0.2);
+  color: var(--c-accent);
+}
+
+/* Content Area */
+.deck-tab-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.tab-scroll-pane {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tab-scroll-pane::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tab-scroll-pane::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tab-scroll-pane::-webkit-scrollbar-thumb {
+  background: var(--c-bg-4);
+  border-radius: var(--r-full);
+}
+
+.tab-scroll-pane::-webkit-scrollbar-thumb:hover {
+  background: var(--c-text-3);
+}
+
+/* Lazy shuffle card */
+.lazy-shuffle-card {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px;
-  background: #12121e;
-  border-radius: 12px;
-  margin-top: 8px;
-  box-shadow: 
-    inset 4px 4px 8px #08080f,
-    inset -4px -4px 8px #1a1a28;
+  padding: 12px 16px;
+  border-radius: var(--r-lg);
+  background: var(--c-bg-2);
+  border: 1px solid rgba(29, 185, 84, 0.2);
+  margin-bottom: 8px;
 }
 
 .lazy-icon {
-  font-size: 24px;
+  color: var(--c-accent);
 }
 
 .lazy-text {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+}
+
+.lazy-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--c-text-1);
+}
+
+.lazy-counter {
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  color: var(--c-accent);
+}
+
+/* Track list */
+.queue-track-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: var(--r-md);
+  background: var(--c-bg-2);
+  border: 1px solid rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.queue-item:hover {
+  background: var(--c-bg-3);
+  transform: translateX(3px);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.queue-item.now-playing {
+  background: rgba(29, 185, 84, 0.1);
+  border-color: rgba(29, 185, 84, 0.3);
+}
+
+.queue-item.now-playing .item-title {
+  color: var(--c-accent);
+}
+
+.queue-item.history-item {
+  opacity: 0.75;
+}
+
+.queue-item.history-item:hover {
+  opacity: 1;
+}
+
+.item-index {
+  width: 24px;
+  text-align: center;
   font-size: 12px;
-  color: #db2220;
   font-weight: 600;
+  font-family: var(--font-mono, monospace);
+  color: var(--c-text-3);
+  flex-shrink: 0;
 }
 
-.lazy-progress {
-  font-size: 10px;
-  color: #e85c7c;
-  font-family: 'Segoe UI', monospace;
+.item-index.history {
+  color: var(--c-text-4);
 }
 
-.queue-empty {
+.item-cover {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 50px 20px;
-  color: #a0aec0;
-  font-size: 13px;
-  font-family: 'Segoe UI', sans-serif;
+  background: var(--c-bg-3);
 }
 
-.lyrics-panel-container {
+.cover-img {
+  width: 100%;
   height: 100%;
-  min-height: 420px;
+  object-fit: cover;
+}
+
+.initials {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--c-accent);
+}
+
+.item-info {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
+  gap: 2px;
+}
+
+.item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.item-artist {
+  font-size: 12px;
+  color: var(--c-text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.item-duration {
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  color: var(--c-text-3);
+  flex-shrink: 0;
+}
+
+/* Empty state */
+.empty-deck-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 24px;
+  color: var(--c-text-3);
+}
+
+.empty-icon {
+  opacity: 0.4;
+}
+
+.empty-text {
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* Lyrics container */
+.lyrics-container {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 </style>

@@ -1,62 +1,67 @@
 <template>
-  <Transition name="fullplayer-desktop">
-    <div v-if="show" class="fullplayer-desktop" @click.self="$emit('close')">
-      <div class="cockpit-container">
-        
+  <Transition name="fullplayer-fade">
+    <div 
+      v-if="show" 
+      class="fullplayer-backdrop" 
+      @click.self="handleBackdropClick"
+    >
+      <!-- Ambient background glow (GPU accelerated, 0% CPU overhead) -->
+      <div class="ambient-glow" :style="ambientGlowStyle"></div>
+
+      <!-- Main Player Window -->
+      <div class="fullplayer-window neu-panel">
+        <!-- Top Header (context & close button) -->
         <PlayerHeader 
+          :isPlaying="isPlaying"
+          :contextInfo="contextInfo"
+          :track="track"
           @close="$emit('close')" 
         />
 
-        <!-- Main Content Grid -->
-        <div class="cockpit-grid" @contextmenu.prevent="openTrackContextMenu">
-          <!-- Left Panel: Cover Art & Visualizer -->
-          <div class="panel-left">
+        <!-- Main Body: 2-Column Split -->
+        <div class="player-body" @contextmenu.prevent="openTrackContextMenu">
+          <!-- Left Column: Hero (Cover, Meta, Seekbar, Controls, Volume) -->
+          <div class="hero-column">
+            <!-- Cover Art & Vinyl -->
             <CoverSection 
               :track="track" 
               :loading="loading" 
               :isPlaying="isPlaying" 
             />
 
-            <ArtistLibrary 
-              :track="track" 
-              @play="handlePlayArtistTrack" 
+            <!-- Track Info & Badges -->
+            <TrackInfo 
+              :track="track"
+              :hdTrackInfo="hdTrackInfo"
+              :isLiked="isLiked"
+              @goToAlbum="handleGoToAlbum"
+              @goToArtist="handleGoToArtist"
+              @tagClick="handleTagClick"
             />
-          </div>
 
-          <!-- Center Panel: Main Information Display -->
-          <div class="panel-center">
-            <div class="panel-center-main">
-              <TrackInfo 
-                :track="track"
-                :hdTrackInfo="hdTrackInfo"
-                :isLiked="isLiked"
-                @goToAlbum="handleGoToAlbum"
-                @goToArtist="handleGoToArtist"
-                @tagClick="handleTagClick"
-              />
+            <!-- Playback Controls & Seekbar -->
+            <PlayerControls 
+              :isPlaying="isPlaying"
+              :progress="progress"
+              :duration="duration"
+              :buffered="buffered"
+              :shuffle="shuffle"
+              :repeat="repeat"
+              :isLiked="isLiked"
+              :hdTrackInfo="hdTrackInfo"
+              @seek="$emit('seek', $event)"
+              @toggle="$emit('toggle')"
+              @prev="$emit('prev')"
+              @next="$emit('next')"
+              @toggleShuffle="$emit('toggleShuffle')"
+              @toggleRepeat="$emit('toggleRepeat')"
+              @like="$emit('like')"
+              @addToPlaylist="handleAddToPlaylist"
+              @downloadHD="handleDownloadHD"
+              @toggleLyrics="handleToggleLyrics"
+            />
 
-              <PlayerControls 
-                :isPlaying="isPlaying"
-                :progress="progress"
-                :duration="duration"
-                :buffered="buffered"
-                :shuffle="shuffle"
-                :repeat="repeat"
-                :isLiked="isLiked"
-                :hdTrackInfo="hdTrackInfo"
-                @seek="$emit('seek', $event)"
-                @toggle="$emit('toggle')"
-                @prev="$emit('prev')"
-                @next="$emit('next')"
-                @toggleShuffle="$emit('toggleShuffle')"
-                @toggleRepeat="$emit('toggleRepeat')"
-                @like="$emit('like')"
-                @addToPlaylist="handleAddToPlaylist"
-                @downloadHD="handleDownloadHD"
-                @toggleLyrics="handleToggleLyrics"
-              />
-            </div>
-
+            <!-- Volume Control -->
             <VolumeControl 
               :volume="volume"
               :isMuted="isMuted"
@@ -65,44 +70,102 @@
             />
           </div>
 
-          <!-- Right Panel: Queue & Context -->
-          <div class="panel-right">
-            <QueuePanel 
-              ref="queuePanelRef"
-              :track="track"
-              :progress="progress"
-              :isPlaying="isPlaying"
-              :contextInfo="contextInfo"
-              :queueLength="queueLength"
-              :upcomingQueue="upcomingQueue"
-              :historyTracks="historyTracks"
-              :lazyShuffleMode="lazyShuffleMode"
-              :lazyShuffleIndex="lazyShuffleIndex"
-              :lazyShuffleTotal="lazyShuffleTotal"
-              @seek="$emit('seek', $event)"
-              @playFromQueue="$emit('playFromQueue', $event)"
-              @playFromHistory="$emit('playFromHistory', $event)"
-            />
+          <!-- Right Column: Interactive Content Deck -->
+          <div class="deck-column neu-surface">
+            <!-- Deck Tab Bar -->
+            <div class="deck-tab-bar">
+              <button 
+                class="deck-tab-btn" 
+                :class="{ active: activeDeckTab === 'queue' }"
+                @click="activeDeckTab = 'queue'"
+              >
+                <ListMusic :size="15" />
+                <span>Очередь</span>
+                <span class="tab-badge" v-if="queueLength">{{ queueLength }}</span>
+              </button>
 
-            <PlayerStats 
-              :bufferedPercent="bufferedPercent"
-              :bitrate="track?.bitrate"
-              :playCount="track?.play_count"
-              :playModeText="playModeText"
-            />
+              <button 
+                class="deck-tab-btn" 
+                :class="{ active: activeDeckTab === 'lyrics' }"
+                @click="activeDeckTab = 'lyrics'"
+              >
+                <Mic2 :size="15" />
+                <span>Текст</span>
+              </button>
+
+              <button 
+                class="deck-tab-btn" 
+                :class="{ active: activeDeckTab === 'artist' }"
+                @click="activeDeckTab = 'artist'"
+              >
+                <User :size="15" />
+                <span>Артист</span>
+              </button>
+
+              <button 
+                class="deck-tab-btn" 
+                :class="{ active: activeDeckTab === 'stats' }"
+                @click="activeDeckTab = 'stats'"
+              >
+                <Info :size="15" />
+                <span>О треке</span>
+              </button>
+            </div>
+
+            <!-- Deck Content Panes -->
+            <div class="deck-body">
+              <!-- Queue Pane -->
+              <QueuePanel 
+                v-if="activeDeckTab === 'queue'"
+                :track="track"
+                :progress="progress"
+                :isPlaying="isPlaying"
+                :contextInfo="contextInfo"
+                :queueLength="queueLength"
+                :upcomingQueue="upcomingQueue"
+                :historyTracks="historyTracks"
+                :lazyShuffleMode="lazyShuffleMode"
+                :lazyShuffleIndex="lazyShuffleIndex"
+                :lazyShuffleTotal="lazyShuffleTotal"
+                @seek="$emit('seek', $event)"
+                @playFromQueue="$emit('playFromQueue', $event)"
+                @playFromHistory="$emit('playFromHistory', $event)"
+              />
+
+              <!-- Full Height Lyrics Pane -->
+              <div v-else-if="activeDeckTab === 'lyrics'" class="deck-lyrics-wrapper">
+                <LyricsViewer
+                  v-if="track"
+                  :track="track"
+                  :currentTime="progress"
+                  :isPlaying="isPlaying"
+                  :embedded="true"
+                  @seek="$emit('seek', $event)"
+                />
+                <div v-else class="deck-empty-state">
+                  <Mic2 :size="36" class="empty-icon" />
+                  <p>Нет активного трека</p>
+                </div>
+              </div>
+
+              <!-- Artist Tracks Pane -->
+              <ArtistLibrary 
+                v-else-if="activeDeckTab === 'artist'"
+                :track="track" 
+                @play="handlePlayArtistTrack" 
+              />
+
+              <!-- Track Stats / Info Pane -->
+              <PlayerStats 
+                v-else-if="activeDeckTab === 'stats'"
+                :bufferedPercent="bufferedPercent"
+                :bitrate="track?.bitrate"
+                :playCount="track?.play_count"
+                :playModeText="playModeText"
+                :track="track"
+              />
+            </div>
           </div>
-        </div>
-
-        <!-- Animated grid background -->
-        <div class="grid-background"></div>
-        
-        <!-- Glow effects -->
-        <div class="glow-effect glow-1"></div>
-        <div class="glow-effect glow-2"></div>
-
-        <!-- Full-screen background visualizer -->
-        <div class="fullscreen-visualizer" :class="{ 'playing': isPlaying }">
-          <div class="viz-bar" v-for="i in 64" :key="i" :style="getVisualizerStyle(i)"></div>
         </div>
       </div>
     </div>
@@ -113,19 +176,19 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
-import { useAuthStore } from '@/stores/auth'
-import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
+import { getCoverUrl, CoverSize } from '@/utils'
+import { ListMusic, Mic2, User, Info } from 'lucide-vue-next'
 
-// New sub-components
 import PlayerHeader from './fullplayer/PlayerHeader.vue'
 import CoverSection from './fullplayer/CoverSection.vue'
-import ArtistLibrary from './fullplayer/ArtistLibrary.vue'
 import TrackInfo from './fullplayer/TrackInfo.vue'
 import PlayerControls from './fullplayer/PlayerControls.vue'
 import VolumeControl from './fullplayer/VolumeControl.vue'
 import QueuePanel from './fullplayer/QueuePanel.vue'
+import ArtistLibrary from './fullplayer/ArtistLibrary.vue'
 import PlayerStats from './fullplayer/PlayerStats.vue'
+import LyricsViewer from '@/components/LyricsViewer.vue'
 
 const props = defineProps({
   show: Boolean,
@@ -153,7 +216,7 @@ const props = defineProps({
   contextInfo: Object
 })
 
-defineEmits([
+const emit = defineEmits([
   'close', 'toggle', 'next', 'prev', 'seek', 'setVolume',
   'toggleMute', 'toggleShuffle', 'toggleRepeat', 'like',
   'playFromQueue', 'playFromHistory'
@@ -161,85 +224,72 @@ defineEmits([
 
 const router = useRouter()
 const playerStore = usePlayerStore()
-const authStore = useAuthStore()
-const uiStore = useUIStore()
 const { openMenu } = useContextMenu()
 
-// Computed
+// Active deck tab: 'queue' | 'lyrics' | 'artist' | 'stats'
+const activeDeckTab = ref('queue')
+
 const bufferedPercent = computed(() => {
   if (!props.duration) return 0
   return Math.round((props.buffered / props.duration) * 100)
 })
 
 const playModeText = computed(() => {
-  if (props.shuffle) return 'SHUFFLE'
-  if (props.repeat === 'one') return 'REPEAT 1'
-  if (props.repeat === 'all') return 'REPEAT ALL'
-  return 'NORMAL'
+  if (props.shuffle) return 'Случайно'
+  if (props.repeat === 'one') return 'Повтор 1'
+  if (props.repeat === 'all') return 'Повтор всех'
+  return 'Обычный'
 })
 
-// Full-screen visualizer
-const visualizerBars = ref(Array(64).fill(0))
-const visualizerPeak = ref(0)
-let visualizerInterval = null
-
-const getVisualizerStyle = (index) => {
-  const height = visualizerBars.value[index - 1] || 5
-  const delay = index * 0.015
-  
-  // Dynamic color based on peak intensity
-  const intensity = visualizerPeak.value / 100
-  const hue = 350 + (intensity * 30) // Shift from red to pink/purple on peaks
-  const saturation = 70 + (intensity * 30)
-  
-  return {
-    height: `${height}%`,
-    animationDelay: `${delay}s`,
-    background: `linear-gradient(to top, hsl(${hue}, ${saturation}%, 50%), hsl(${hue}, ${saturation}%, 65%))`,
-    boxShadow: `0 0 ${4 + intensity * 8}px hsla(${hue}, ${saturation}%, 60%, ${0.3 + intensity * 0.4})`
+const ambientGlowStyle = computed(() => {
+  if (props.track?.cover_url) {
+    return {
+      backgroundImage: `url(${getCoverUrl(props.track.cover_url, CoverSize.MEDIUM)})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      filter: 'blur(80px) saturate(1.4) brightness(0.4)',
+      opacity: props.isPlaying ? 0.35 : 0.2
+    }
   }
-}
+  return {
+    background: 'radial-gradient(circle at 40% 40%, var(--c-accent-glow) 0%, transparent 70%)',
+    opacity: props.isPlaying ? 0.3 : 0.15
+  }
+})
 
-const animateVisualizer = () => {
-  if (props.isPlaying) {
-    const newBars = visualizerBars.value.map((_, i) => {
-      // Create more dynamic waves across bars
-      const baseHeight = 15 + Math.random() * 85
-      const wave = Math.sin(Date.now() / 500 + i * 0.2) * 20
-      return Math.max(5, Math.min(100, baseHeight + wave))
-    })
-    visualizerBars.value = newBars
-    
-    // Calculate peak for color changes
-    const avgHeight = newBars.reduce((a, b) => a + b, 0) / newBars.length
-    visualizerPeak.value = avgHeight
-  } else {
-    visualizerBars.value = visualizerBars.value.map(v => {
-      return Math.max(5, v * 0.92)
-    })
-    visualizerPeak.value = visualizerPeak.value * 0.9
+// Keyboard navigation
+const handleKeydown = (e) => {
+  if (!props.show) return
+
+  // Don't trigger if user is typing in an input or textarea
+  const target = e.target
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+    return
+  }
+
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    emit('close')
+  } else if (e.key === ' ' || e.code === 'Space') {
+    e.preventDefault()
+    emit('toggle')
   }
 }
 
 onMounted(() => {
-  visualizerInterval = setInterval(animateVisualizer, 80)
+  window.addEventListener('keydown', handleKeydown)
 })
 
 onUnmounted(() => {
-  if (visualizerInterval) {
-    clearInterval(visualizerInterval)
-  }
+  window.removeEventListener('keydown', handleKeydown)
 })
 
-watch(() => props.isPlaying, (playing) => {
-  if (!playing) {
-    visualizerBars.value = visualizerBars.value.map(v => Math.max(5, v * 0.8))
-  }
-})
+const handleBackdropClick = () => {
+  emit('close')
+}
 
-// Methods
-const openTrackContextMenu = () => {
-  openMenu('track', props.track, 'player')
+const openTrackContextMenu = (event) => {
+  openMenu('track', props.track, 'player', event)
 }
 
 const handleDownloadHD = () => {
@@ -253,30 +303,24 @@ const handlePlayArtistTrack = (track) => {
 }
 
 const handleGoToAlbum = () => {
-  if (!props.track?.album) return
-  router.push(`/album/${props.track.album.id}`)
+  const albumId = props.track?.album?.id || props.track?.album_id
+  if (!albumId) return
+  emit('close')
+  router.push(`/album/${albumId}`)
 }
 
 const handleGoToArtist = (artistName) => {
   if (!artistName) return
-  router.push(`/artist/${encodeURIComponent(artistName)}`)
   emit('close')
+  router.push(`/artist/${encodeURIComponent(artistName)}`)
 }
 
 const handleAddToPlaylist = () => {
   openMenu('track', props.track, 'player')
 }
 
-const queuePanelRef = ref(null)
-
 const handleToggleLyrics = () => {
-  if (queuePanelRef.value) {
-    if (queuePanelRef.value.activeQueueTab === 'lyrics') {
-      queuePanelRef.value.setTab('upcoming')
-    } else {
-      queuePanelRef.value.setTab('lyrics')
-    }
-  }
+  activeDeckTab.value = activeDeckTab.value === 'lyrics' ? 'queue' : 'lyrics'
 }
 
 const handleTagClick = (tag) => {
@@ -288,176 +332,222 @@ const handleTagClick = (tag) => {
 </script>
 
 <style scoped>
-/* Design tokens come from design-system.css */
-
-.fullplayer-desktop {
+/* Full player backdrop overlay */
+.fullplayer-backdrop {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: var(--z-player, 1000);
-  background: linear-gradient(135deg, #0f0f1a 0%, #08080f 100%);
+  inset: 0;
+  z-index: var(--z-modal, 1200);
+  background: rgba(8, 8, 8, 0.88);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 24px;
+  overflow: hidden;
 }
 
-.cockpit-container {
+/* Ambient glow layer */
+.ambient-glow {
+  position: absolute;
+  inset: -60px;
+  pointer-events: none;
+  z-index: 0;
+  transform: translateZ(0);
+  transition: opacity 0.5s ease;
+}
+
+/* Main window container */
+.fullplayer-window {
   position: relative;
+  z-index: 1;
   width: 100%;
-  max-width: 1800px;
-  height: 100%;
-  max-height: 1000px;
-  background: #12121e;
-  border-radius: 40px;
+  max-width: 1460px;
+  height: 90vh;
+  min-height: 640px;
+  max-height: 880px;
+  background: var(--c-bg-1);
+  border-radius: var(--r-xl);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   box-shadow: 
-    20px 20px 60px var(--sh-dark),
-    -20px -20px 60px var(--sh-light);
-  overflow: hidden;
+    0 24px 72px rgba(0, 0, 0, 0.8),
+    0 0 1px rgba(255, 255, 255, 0.1);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
-/* Main Grid */
-.cockpit-grid {
+/* 2-Column Split Body */
+.player-body {
   display: grid;
-  grid-template-columns: 380px 1fr 360px;
-  gap: 25px;
-  padding: 25px 35px;
+  grid-template-columns: minmax(420px, 480px) 1fr;
+  gap: 32px;
+  padding: 0 36px 28px;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
-  position: relative;
-  z-index: 5;
 }
 
-/* Panel Containers */
-.panel-left {
+/* Left Hero Column */
+.hero-column {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-right: 10px;
+  padding-right: 4px;
 }
 
-.panel-left::-webkit-scrollbar {
-  width: 6px;
+.hero-column::-webkit-scrollbar {
+  width: 4px;
 }
 
-.panel-left::-webkit-scrollbar-track {
+.hero-column::-webkit-scrollbar-thumb {
+  background: var(--c-bg-4);
+  border-radius: var(--r-full);
+}
+
+/* Right Deck Column */
+.deck-column {
+  display: flex;
+  flex-direction: column;
+  background: var(--c-bg-2);
+  border-radius: var(--r-xl);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  padding: 16px 20px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Deck Tab Bar */
+.deck-tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: var(--r-full);
+  background: var(--c-bg-1);
+  margin-bottom: 16px;
+  flex-shrink: 0;
+  align-self: center;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.deck-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 18px;
+  border-radius: var(--r-full);
+  border: none;
   background: transparent;
+  color: var(--c-text-3);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
 }
 
-.panel-left::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, var(--c-accent) 0%, var(--c-accent-light) 100%);
-  border-radius: 3px;
+.deck-tab-btn:hover {
+  color: var(--c-text-1);
 }
 
-.panel-center {
-  display: flex;
-  flex-direction: row;
-  gap: 18px;
-  overflow: hidden;
-  padding-right: 0;
+.deck-tab-btn.active {
+  background: var(--c-bg-3);
+  color: var(--c-accent);
+  box-shadow: 
+    2px 2px 6px var(--sh-dark),
+    -1px -1px 3px var(--sh-light);
 }
 
-.panel-center-main {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  overflow-y: hidden;
-  padding-right: 0;
+.tab-badge {
+  padding: 1px 6px;
+  border-radius: var(--r-full);
+  font-size: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--c-text-2);
+}
+
+.deck-tab-btn.active .tab-badge {
+  background: rgba(29, 185, 84, 0.2);
+  color: var(--c-accent);
+}
+
+/* Deck Content Pane */
+.deck-body {
   flex: 1;
-}
-
-.panel-center-main::-webkit-scrollbar {
-  width: 8px;
-}
-
-.panel-center-main::-webkit-scrollbar-track {
-  background: #12121e;
-  border-radius: 10px;
-  @apply shadow-neu-inset;
-}
-
-.panel-center-main::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, var(--c-accent) 0%, var(--c-accent-light) 100%);
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(232, 92, 124, 0.4);
-}
-
-.panel-center-main::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, var(--c-accent-light) 0%, var(--c-accent) 100%);
-}
-
-.panel-right {
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 18px;
   overflow: hidden;
+}
+
+.deck-lyrics-wrapper {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.deck-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 24px;
+  color: var(--c-text-3);
+  font-size: 14px;
+}
+
+.empty-icon {
+  opacity: 0.3;
 }
 
 /* Transitions */
-.fullplayer-desktop-enter-active,
-.fullplayer-desktop-leave-active {
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+.fullplayer-fade-enter-active,
+.fullplayer-fade-leave-active {
+  transition: opacity 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.fullplayer-desktop-enter-from,
-.fullplayer-desktop-leave-to {
+.fullplayer-fade-enter-active .fullplayer-window,
+.fullplayer-fade-leave-active .fullplayer-window {
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.fullplayer-fade-enter-from,
+.fullplayer-fade-leave-to {
   opacity: 0;
-  transform: scale(0.98);
 }
 
-/* Background elements - kept for structure but display:none in original css */
-.grid-background,
-.glow-effect {
-  display: none;
+.fullplayer-fade-enter-from .fullplayer-window {
+  transform: scale(0.96) translateY(8px);
 }
 
-/* Full-screen background visualizer */
-.fullscreen-visualizer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 0;
-  padding: 0;
-  z-index: 1;
-  opacity: 0.12;
-  pointer-events: none;
-  transition: opacity 0.3s ease;
+.fullplayer-fade-leave-to .fullplayer-window {
+  transform: scale(0.97) translateY(4px);
 }
 
-.fullscreen-visualizer.playing {
-  opacity: 0.18;
-}
-
-.fullscreen-visualizer .viz-bar {
-  flex: 1;
-  min-height: 4px;
-  border-radius: 0;
-  transition: height 0.08s ease, background 0.2s ease;
-  filter: blur(1px);
-}
-
-/* Responsive adjustments */
-@media (max-width: 1600px) {
-  .cockpit-grid {
-    grid-template-columns: 320px 1fr 320px;
+/* Responsive breakpoint adjustments */
+@media (max-width: 1280px) {
+  .player-body {
+    grid-template-columns: 380px 1fr;
+    gap: 24px;
+    padding: 0 24px 20px;
   }
 }
 
-@media (max-width: 1400px) {
-  .cockpit-grid {
-    grid-template-columns: 280px 1fr 300px;
-    gap: 15px;
+@media (max-height: 740px) {
+  .fullplayer-window {
+    height: 94vh;
+  }
+  .player-body {
+    padding: 0 24px 16px;
   }
 }
 </style>
