@@ -239,24 +239,21 @@ const formatTime = (seconds) => {
 
 .artist-tracks-scroll {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding-right: 6px;
+  overflow-x: hidden;
+  padding-right: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .artist-tracks-scroll::-webkit-scrollbar {
-  width: 6px;
-}
-
-.artist-tracks-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.artist-tracks-scroll::-webkit-scrollbar-thumb {
-  background: var(--c-bg-4);
-  border-radius: var(--r-full);
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 .artist-track-item {

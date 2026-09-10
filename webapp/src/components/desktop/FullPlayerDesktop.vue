@@ -1,16 +1,22 @@
 <template>
-  <Transition name="fullplayer-fade">
+  <Transition name="dj-console-fade">
     <div 
       v-if="show" 
-      class="fullplayer-backdrop" 
+      class="dj-console-backdrop" 
       @click.self="handleBackdropClick"
     >
-      <!-- Ambient background glow (GPU accelerated, 0% CPU overhead) -->
-      <div class="ambient-glow" :style="ambientGlowStyle"></div>
+      <!-- Ambient light from current track -->
+      <div class="dj-ambient-glow" :style="ambientGlowStyle"></div>
 
-      <!-- Main Player Window -->
-      <div class="fullplayer-window neu-panel">
-        <!-- Top Header (context & close button) -->
+      <!-- Monolithic DJ Hardware Console Unit -->
+      <div class="dj-chassis-unit">
+        <!-- Corner Hex Bolts (DJ Hardware aesthetic) -->
+        <div class="chassis-bolt tl"><div class="hex-slot"></div></div>
+        <div class="chassis-bolt tr"><div class="hex-slot"></div></div>
+        <div class="chassis-bolt bl"><div class="hex-slot"></div></div>
+        <div class="chassis-bolt br"><div class="hex-slot"></div></div>
+
+        <!-- Master Console Top Bar -->
         <PlayerHeader 
           :isPlaying="isPlaying"
           :contextInfo="contextInfo"
@@ -18,18 +24,18 @@
           @close="$emit('close')" 
         />
 
-        <!-- Main Body: 2-Column Split -->
-        <div class="player-body" @contextmenu.prevent="openTrackContextMenu">
-          <!-- Left Column: Hero (Cover, Meta, Seekbar, Controls, Volume) -->
-          <div class="hero-column">
-            <!-- Cover Art & Vinyl -->
+        <!-- Main Console Workstation (Deck A + Deck B) -->
+        <div class="dj-workstation" @contextmenu.prevent="openTrackContextMenu">
+          <!-- LEFT: DECK A (Turntable + LCD + Transport + Fader) - STRICTLY NO SCROLL -->
+          <div class="deck-a-section">
+            <!-- Turntable Platter with Vinyl -->
             <CoverSection 
               :track="track" 
               :loading="loading" 
               :isPlaying="isPlaying" 
             />
 
-            <!-- Track Info & Badges -->
+            <!-- LCD Rack Monitor -->
             <TrackInfo 
               :track="track"
               :hdTrackInfo="hdTrackInfo"
@@ -39,7 +45,7 @@
               @tagClick="handleTagClick"
             />
 
-            <!-- Playback Controls & Seekbar -->
+            <!-- Transport Buttons & Scrubber & Volume Fader -->
             <PlayerControls 
               :isPlaying="isPlaying"
               :progress="progress"
@@ -49,6 +55,8 @@
               :repeat="repeat"
               :isLiked="isLiked"
               :hdTrackInfo="hdTrackInfo"
+              :volume="volume"
+              :isMuted="isMuted"
               @seek="$emit('seek', $event)"
               @toggle="$emit('toggle')"
               @prev="$emit('prev')"
@@ -59,81 +67,102 @@
               @addToPlaylist="handleAddToPlaylist"
               @downloadHD="handleDownloadHD"
               @toggleLyrics="handleToggleLyrics"
-            />
-
-            <!-- Volume Control -->
-            <VolumeControl 
-              :volume="volume"
-              :isMuted="isMuted"
-              @toggleMute="$emit('toggleMute')"
               @setVolume="$emit('setVolume', $event)"
+              @toggleMute="$emit('toggleMute')"
             />
           </div>
 
-          <!-- Right Column: Interactive Content Deck -->
-          <div class="deck-column neu-surface">
-            <!-- Deck Tab Bar -->
-            <div class="deck-tab-bar">
+          <!-- RIGHT: DECK B (Digital Sampler / Crate / Lyrics / Artist / Specs) -->
+          <div class="deck-b-section">
+            <!-- Hardware Channel Selector (NO DUPLICATE TABS) -->
+            <div class="channel-selector-bar">
               <button 
-                class="deck-tab-btn" 
-                :class="{ active: activeDeckTab === 'queue' }"
-                @click="activeDeckTab = 'queue'"
+                class="channel-btn" 
+                :class="{ active: activeDeckChannel === 'queue' }"
+                @click="activeDeckChannel = 'queue'"
               >
-                <ListMusic :size="15" />
-                <span>Очередь</span>
-                <span class="tab-badge" v-if="queueLength">{{ queueLength }}</span>
+                <span class="channel-led"></span>
+                <ListMusic :size="13" />
+                <span>ОЧЕРЕДЬ</span>
+                <span class="channel-count" v-if="queueLength">{{ queueLength }}</span>
               </button>
 
               <button 
-                class="deck-tab-btn" 
-                :class="{ active: activeDeckTab === 'lyrics' }"
-                @click="activeDeckTab = 'lyrics'"
+                class="channel-btn" 
+                :class="{ active: activeDeckChannel === 'history' }"
+                @click="activeDeckChannel = 'history'"
               >
-                <Mic2 :size="15" />
-                <span>Текст</span>
+                <span class="channel-led"></span>
+                <History :size="13" />
+                <span>ИСТОРИЯ</span>
+                <span class="channel-count" v-if="historyTracks?.length">{{ historyTracks.length }}</span>
               </button>
 
               <button 
-                class="deck-tab-btn" 
-                :class="{ active: activeDeckTab === 'artist' }"
-                @click="activeDeckTab = 'artist'"
+                class="channel-btn" 
+                :class="{ active: activeDeckChannel === 'lyrics' }"
+                @click="activeDeckChannel = 'lyrics'"
               >
-                <User :size="15" />
-                <span>Артист</span>
+                <span class="channel-led"></span>
+                <Mic2 :size="13" />
+                <span>ТЕКСТ</span>
               </button>
 
               <button 
-                class="deck-tab-btn" 
-                :class="{ active: activeDeckTab === 'stats' }"
-                @click="activeDeckTab = 'stats'"
+                class="channel-btn" 
+                :class="{ active: activeDeckChannel === 'artist' }"
+                @click="activeDeckChannel = 'artist'"
               >
-                <Info :size="15" />
-                <span>О треке</span>
+                <span class="channel-led"></span>
+                <User :size="13" />
+                <span>АРТИСТ</span>
+              </button>
+
+              <button 
+                class="channel-btn" 
+                :class="{ active: activeDeckChannel === 'stats' }"
+                @click="activeDeckChannel = 'stats'"
+              >
+                <span class="channel-led"></span>
+                <Cpu :size="13" />
+                <span>ИНФО</span>
               </button>
             </div>
 
-            <!-- Deck Content Panes -->
-            <div class="deck-body">
-              <!-- Queue Pane -->
+            <!-- Deck B Screen Container (HIDDEN SCROLLBARS) -->
+            <div class="deck-b-screen">
+              <!-- Upcoming Queue -->
               <QueuePanel 
-                v-if="activeDeckTab === 'queue'"
+                v-if="activeDeckChannel === 'queue'"
                 :track="track"
-                :progress="progress"
-                :isPlaying="isPlaying"
-                :contextInfo="contextInfo"
-                :queueLength="queueLength"
                 :upcomingQueue="upcomingQueue"
                 :historyTracks="historyTracks"
+                :isPlaying="isPlaying"
+                :contextInfo="contextInfo"
                 :lazyShuffleMode="lazyShuffleMode"
                 :lazyShuffleIndex="lazyShuffleIndex"
                 :lazyShuffleTotal="lazyShuffleTotal"
-                @seek="$emit('seek', $event)"
+                activeSubMode="upcoming"
                 @playFromQueue="$emit('playFromQueue', $event)"
+              />
+
+              <!-- History Queue -->
+              <QueuePanel 
+                v-else-if="activeDeckChannel === 'history'"
+                :track="track"
+                :upcomingQueue="upcomingQueue"
+                :historyTracks="historyTracks"
+                :isPlaying="isPlaying"
+                :contextInfo="contextInfo"
+                :lazyShuffleMode="lazyShuffleMode"
+                :lazyShuffleIndex="lazyShuffleIndex"
+                :lazyShuffleTotal="lazyShuffleTotal"
+                activeSubMode="history"
                 @playFromHistory="$emit('playFromHistory', $event)"
               />
 
-              <!-- Full Height Lyrics Pane -->
-              <div v-else-if="activeDeckTab === 'lyrics'" class="deck-lyrics-wrapper">
+              <!-- Live Lyrics Karaoke Monitor -->
+              <div v-else-if="activeDeckChannel === 'lyrics'" class="lyrics-monitor">
                 <LyricsViewer
                   v-if="track"
                   :track="track"
@@ -142,22 +171,22 @@
                   :embedded="true"
                   @seek="$emit('seek', $event)"
                 />
-                <div v-else class="deck-empty-state">
-                  <Mic2 :size="36" class="empty-icon" />
+                <div v-else class="deck-empty-display">
+                  <Mic2 :size="32" class="empty-icon" />
                   <p>Нет активного трека</p>
                 </div>
               </div>
 
-              <!-- Artist Tracks Pane -->
+              <!-- Artist Library -->
               <ArtistLibrary 
-                v-else-if="activeDeckTab === 'artist'"
+                v-else-if="activeDeckChannel === 'artist'"
                 :track="track" 
                 @play="handlePlayArtistTrack" 
               />
 
-              <!-- Track Stats / Info Pane -->
+              <!-- Track Technical Specifications -->
               <PlayerStats 
-                v-else-if="activeDeckTab === 'stats'"
+                v-else-if="activeDeckChannel === 'stats'"
                 :bufferedPercent="bufferedPercent"
                 :bitrate="track?.bitrate"
                 :playCount="track?.play_count"
@@ -173,18 +202,17 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { getCoverUrl, CoverSize } from '@/utils'
-import { ListMusic, Mic2, User, Info } from 'lucide-vue-next'
+import { ListMusic, History, Mic2, User, Cpu } from 'lucide-vue-next'
 
 import PlayerHeader from './fullplayer/PlayerHeader.vue'
 import CoverSection from './fullplayer/CoverSection.vue'
 import TrackInfo from './fullplayer/TrackInfo.vue'
 import PlayerControls from './fullplayer/PlayerControls.vue'
-import VolumeControl from './fullplayer/VolumeControl.vue'
 import QueuePanel from './fullplayer/QueuePanel.vue'
 import ArtistLibrary from './fullplayer/ArtistLibrary.vue'
 import PlayerStats from './fullplayer/PlayerStats.vue'
@@ -226,8 +254,8 @@ const router = useRouter()
 const playerStore = usePlayerStore()
 const { openMenu } = useContextMenu()
 
-// Active deck tab: 'queue' | 'lyrics' | 'artist' | 'stats'
-const activeDeckTab = ref('queue')
+// Dedicated Channel on Deck B: 'queue' | 'history' | 'lyrics' | 'artist' | 'stats'
+const activeDeckChannel = ref('queue')
 
 const bufferedPercent = computed(() => {
   if (!props.duration) return 0
@@ -235,10 +263,10 @@ const bufferedPercent = computed(() => {
 })
 
 const playModeText = computed(() => {
-  if (props.shuffle) return 'Случайно'
-  if (props.repeat === 'one') return 'Повтор 1'
-  if (props.repeat === 'all') return 'Повтор всех'
-  return 'Обычный'
+  if (props.shuffle) return 'СЛУЧАЙНО'
+  if (props.repeat === 'one') return 'ПОВТОР 1'
+  if (props.repeat === 'all') return 'ПОВТОР ВСЕ'
+  return 'СТАНДАРТ'
 })
 
 const ambientGlowStyle = computed(() => {
@@ -247,21 +275,20 @@ const ambientGlowStyle = computed(() => {
       backgroundImage: `url(${getCoverUrl(props.track.cover_url, CoverSize.MEDIUM)})`,
       backgroundSize: 'cover',
       backgroundPosition: 'center',
-      filter: 'blur(80px) saturate(1.4) brightness(0.4)',
-      opacity: props.isPlaying ? 0.35 : 0.2
+      filter: 'blur(70px) saturate(1.4) brightness(0.35)',
+      opacity: props.isPlaying ? 0.35 : 0.18
     }
   }
   return {
     background: 'radial-gradient(circle at 40% 40%, var(--c-accent-glow) 0%, transparent 70%)',
-    opacity: props.isPlaying ? 0.3 : 0.15
+    opacity: props.isPlaying ? 0.25 : 0.12
   }
 })
 
-// Keyboard navigation
+// Keyboard shortcuts
 const handleKeydown = (e) => {
   if (!props.show) return
 
-  // Don't trigger if user is typing in an input or textarea
   const target = e.target
   if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
     return
@@ -320,7 +347,7 @@ const handleAddToPlaylist = () => {
 }
 
 const handleToggleLyrics = () => {
-  activeDeckTab.value = activeDeckTab.value === 'lyrics' ? 'queue' : 'lyrics'
+  activeDeckChannel.value = activeDeckChannel.value === 'lyrics' ? 'queue' : 'lyrics'
 }
 
 const handleTagClick = (tag) => {
@@ -332,160 +359,210 @@ const handleTagClick = (tag) => {
 </script>
 
 <style scoped>
-/* Full player backdrop overlay */
-.fullplayer-backdrop {
+/* Backdrop */
+.dj-console-backdrop {
   position: fixed;
   inset: 0;
   z-index: var(--z-modal, 1200);
-  background: rgba(8, 8, 8, 0.88);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
+  background: rgba(5, 6, 8, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 16px;
   overflow: hidden;
 }
 
-/* Ambient glow layer */
-.ambient-glow {
+/* Ambient glow behind console */
+.dj-ambient-glow {
   position: absolute;
-  inset: -60px;
+  inset: -40px;
   pointer-events: none;
   z-index: 0;
   transform: translateZ(0);
-  transition: opacity 0.5s ease;
+  transition: opacity 0.4s ease;
 }
 
-/* Main window container */
-.fullplayer-window {
+/* Monolithic DJ Hardware Chassis */
+.dj-chassis-unit {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 1460px;
-  height: 90vh;
-  min-height: 640px;
-  max-height: 880px;
-  background: var(--c-bg-1);
-  border-radius: var(--r-xl);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  max-width: 1380px;
+  height: 86vh;
+  min-height: 600px;
+  max-height: 820px;
+  background: #111215;
+  border-radius: 16px;
+  border: 2px solid #22252e;
   box-shadow: 
-    0 24px 72px rgba(0, 0, 0, 0.8),
-    0 0 1px rgba(255, 255, 255, 0.1);
+    0 32px 80px rgba(0, 0, 0, 0.95),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 0 1px #090a0c;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-/* 2-Column Split Body */
-.player-body {
+/* Corner Hex Bolts */
+.chassis-bolt {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #4a505f 0%, #1e2129 80%);
+  border: 1px solid #090a0d;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.hex-slot {
+  width: 6px;
+  height: 2px;
+  background: #090a0d;
+}
+
+.chassis-bolt.tl { top: 6px; left: 6px; }
+.chassis-bolt.tr { top: 6px; right: 6px; }
+.chassis-bolt.bl { bottom: 6px; left: 6px; }
+.chassis-bolt.br { bottom: 6px; right: 6px; }
+
+/* Main Console Workstation Grid */
+.dj-workstation {
   display: grid;
-  grid-template-columns: minmax(420px, 480px) 1fr;
-  gap: 32px;
-  padding: 0 36px 28px;
+  grid-template-columns: 460px 1fr;
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  background: #0e0f12;
 }
 
-/* Left Hero Column */
-.hero-column {
+/* LEFT: DECK A (STRICTLY NO SCROLLBARS, FIT 100%) */
+.deck-a-section {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-right: 4px;
+  padding: 14px 20px;
+  border-right: 2px solid #07080a;
+  box-shadow: 2px 0 0 rgba(255, 255, 255, 0.04);
+  background: linear-gradient(180deg, #13151a 0%, #0d0e11 100%);
+  overflow: hidden; /* ABSOLUTELY NO SCROLLBAR */
+  height: 100%;
 }
 
-.hero-column::-webkit-scrollbar {
-  width: 4px;
-}
-
-.hero-column::-webkit-scrollbar-thumb {
-  background: var(--c-bg-4);
-  border-radius: var(--r-full);
-}
-
-/* Right Deck Column */
-.deck-column {
+/* RIGHT: DECK B (DIGITAL CRATE & SAMPLER) */
+.deck-b-section {
   display: flex;
   flex-direction: column;
-  background: var(--c-bg-2);
-  border-radius: var(--r-xl);
-  border: 1px solid rgba(255, 255, 255, 0.03);
-  padding: 16px 20px;
+  background: #0b0c0f;
+  padding: 14px 18px;
   min-height: 0;
   overflow: hidden;
 }
 
-/* Deck Tab Bar */
-.deck-tab-bar {
+/* Hardware Channel Selector Bar (NO DUPLICATE TABS) */
+.channel-selector-bar {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 4px;
-  border-radius: var(--r-full);
-  background: var(--c-bg-1);
-  margin-bottom: 16px;
+  background: #07080a;
+  border: 1px solid #1c1f28;
+  border-radius: var(--r-xs);
+  margin-bottom: 12px;
   flex-shrink: 0;
-  align-self: center;
-  border: 1px solid rgba(255, 255, 255, 0.04);
-}
-
-.deck-tab-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 18px;
-  border-radius: var(--r-full);
-  border: none;
-  background: transparent;
-  color: var(--c-text-3);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.18s ease;
   user-select: none;
 }
 
-.deck-tab-btn:hover {
-  color: var(--c-text-1);
+.channel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--c-text-3);
+  font-size: 11px;
+  font-weight: 800;
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  transition: all 0.12s ease;
 }
 
-.deck-tab-btn.active {
-  background: var(--c-bg-3);
+.channel-led {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #232731;
+  transition: all 0.15s ease;
+}
+
+.channel-btn:hover {
+  color: #ffffff;
+  background: #14171e;
+}
+
+.channel-btn.active {
+  background: #181c24;
+  color: #ffffff;
+  border-color: #2b3140;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.channel-btn.active .channel-led {
+  background: var(--c-accent);
+  box-shadow: 0 0 6px var(--c-accent);
+}
+
+.channel-count {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  background: #07080a;
+  color: var(--c-text-3);
+}
+
+.channel-btn.active .channel-count {
   color: var(--c-accent);
-  box-shadow: 
-    2px 2px 6px var(--sh-dark),
-    -1px -1px 3px var(--sh-light);
+  background: rgba(29, 185, 84, 0.15);
 }
 
-.tab-badge {
-  padding: 1px 6px;
-  border-radius: var(--r-full);
-  font-size: 10px;
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--c-text-2);
-}
-
-.deck-tab-btn.active .tab-badge {
-  background: rgba(29, 185, 84, 0.2);
-  color: var(--c-accent);
-}
-
-/* Deck Content Pane */
-.deck-body {
+/* Deck B Screen (STRICTLY HIDDEN SCROLLBARS) */
+.deck-b-screen {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  background: #0e1014;
+  border-radius: var(--r-xs);
+  border: 1px solid #1a1d25;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.9);
+  padding: 10px;
   overflow: hidden;
 }
 
-.deck-lyrics-wrapper {
+/* Ensure any nested scrollable pane has ZERO visible scrollbar */
+.deck-b-screen * {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.deck-b-screen *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Lyrics Monitor */
+.lyrics-monitor {
   flex: 1;
   min-height: 0;
   height: 100%;
@@ -494,60 +571,49 @@ const handleTagClick = (tag) => {
   overflow: hidden;
 }
 
-.deck-empty-state {
+.deck-empty-display {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 48px 24px;
-  color: var(--c-text-3);
-  font-size: 14px;
+  gap: 10px;
+  height: 100%;
+  color: var(--c-text-4);
+  font-size: 13px;
 }
 
 .empty-icon {
   opacity: 0.3;
 }
 
-/* Transitions */
-.fullplayer-fade-enter-active,
-.fullplayer-fade-leave-active {
-  transition: opacity 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+/* Fade transitions */
+.dj-console-fade-enter-active,
+.dj-console-fade-leave-active {
+  transition: opacity 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.fullplayer-fade-enter-active .fullplayer-window,
-.fullplayer-fade-leave-active .fullplayer-window {
-  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+.dj-console-fade-enter-active .dj-chassis-unit,
+.dj-console-fade-leave-active .dj-chassis-unit {
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.fullplayer-fade-enter-from,
-.fullplayer-fade-leave-to {
+.dj-console-fade-enter-from,
+.dj-console-fade-leave-to {
   opacity: 0;
 }
 
-.fullplayer-fade-enter-from .fullplayer-window {
-  transform: scale(0.96) translateY(8px);
+.dj-console-fade-enter-from .dj-chassis-unit {
+  transform: scale(0.96) translateY(12px);
 }
 
-.fullplayer-fade-leave-to .fullplayer-window {
-  transform: scale(0.97) translateY(4px);
+.dj-console-fade-leave-to .dj-chassis-unit {
+  transform: scale(0.98) translateY(6px);
 }
 
-/* Responsive breakpoint adjustments */
-@media (max-width: 1280px) {
-  .player-body {
-    grid-template-columns: 380px 1fr;
-    gap: 24px;
-    padding: 0 24px 20px;
-  }
-}
-
-@media (max-height: 740px) {
-  .fullplayer-window {
-    height: 94vh;
-  }
-  .player-body {
-    padding: 0 24px 16px;
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .dj-workstation {
+    grid-template-columns: 420px 1fr;
   }
 }
 </style>

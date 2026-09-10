@@ -1,38 +1,55 @@
 <template>
-  <div class="cover-section">
-    <div class="cover-container" :class="{ playing: isPlaying }">
-      <!-- Ambient glow behind cover -->
-      <div class="cover-glow" :style="coverGlowStyle"></div>
+  <div class="dj-turntable-deck">
+    <!-- Turntable Platter Base -->
+    <div class="platter-chassis">
+      <!-- Direct Drive & Speed Badge -->
+      <div class="deck-indicator-top">
+        <span class="speed-badge">33 ⅓ RPM</span>
+        <span class="drive-badge">DIRECT DRIVE</span>
+      </div>
 
-      <!-- Vinyl disc -->
-      <div class="vinyl-disc" :class="{ spinning: isPlaying }">
-        <div class="vinyl-groove"></div>
-        <div class="vinyl-groove inner"></div>
-        <div class="vinyl-label" :style="coverStyle">
-          <div class="vinyl-center"></div>
+      <!-- Rotating Turntable Platter -->
+      <div class="turntable-platter" :class="{ spinning: isPlaying }">
+        <!-- Aluminum Strobe Rim -->
+        <div class="strobe-rim"></div>
+
+        <!-- Vinyl Grooves -->
+        <div class="vinyl-body">
+          <div class="groove-ring ring-1"></div>
+          <div class="groove-ring ring-2"></div>
+          <div class="groove-ring ring-3"></div>
+
+          <!-- Center Record Label with Cover Art -->
+          <div class="record-label" :style="coverStyle">
+            <img 
+              v-if="track?.cover_url" 
+              :src="getCoverUrl(track.cover_url, CoverSize.MEDIUM)" 
+              alt="Обложка трека" 
+              class="cover-image"
+              loading="eager"
+            />
+            <span v-else class="initials">{{ coverInitials }}</span>
+            
+            <!-- Center Spindle -->
+            <div class="center-spindle">
+              <div class="spindle-dot"></div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Front Album Cover -->
-      <div class="cover-art neu-surface" :style="coverStyle">
-        <img 
-          v-if="track?.cover_url" 
-          :src="getCoverUrl(track.cover_url, CoverSize.XL)" 
-          alt="Обложка трека" 
-          class="cover-image"
-          loading="eager"
-        />
-        <div v-else class="cover-placeholder">
-          <span class="cover-initials">{{ coverInitials }}</span>
+      <!-- Turntable Tone-arm Accent (DJ Deck aesthetic) -->
+      <div class="tonearm-assembly" :class="{ engaged: isPlaying }">
+        <div class="tonearm-base"></div>
+        <div class="tonearm-shaft"></div>
+        <div class="tonearm-headshell">
+          <div class="cartridge-light" :class="{ active: isPlaying }"></div>
         </div>
+      </div>
 
-        <!-- Loading overlay -->
-        <Transition name="fade">
-          <div v-if="loading" class="loading-overlay">
-            <div class="loading-spinner"></div>
-            <span class="loading-text">Загрузка...</span>
-          </div>
-        </Transition>
+      <!-- Loading overlay -->
+      <div v-if="loading" class="deck-loading-overlay">
+        <div class="turntable-spinner"></div>
       </div>
     </div>
   </div>
@@ -50,230 +67,266 @@ const props = defineProps({
 
 const coverStyle = computed(() => getTrackCoverStyle(props.track))
 const coverInitials = computed(() => getTrackInitials(props.track))
-
-const coverGlowStyle = computed(() => {
-  if (props.track?.cover_url) {
-    return {
-      backgroundImage: `url(${getCoverUrl(props.track.cover_url, CoverSize.MEDIUM)})`,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center'
-    }
-  }
-  return {
-    background: 'radial-gradient(circle, var(--c-accent-glow) 0%, transparent 70%)'
-  }
-})
 </script>
 
 <style scoped>
-.cover-section {
+.dj-turntable-deck {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  padding: 10px 0 20px;
+  padding: 8px 0;
+  flex-shrink: 0;
 }
 
-.cover-container {
+.platter-chassis {
   position: relative;
-  width: 320px;
-  height: 320px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Ambient glow */
-.cover-glow {
-  position: absolute;
-  inset: -15px;
-  border-radius: var(--r-xl);
-  filter: blur(28px);
-  opacity: 0.28;
-  z-index: 0;
-  pointer-events: none;
-  transform: translateZ(0);
-  transition: opacity 0.4s ease;
-}
-
-.cover-container.playing .cover-glow {
-  opacity: 0.42;
-}
-
-/* Vinyl disc */
-.vinyl-disc {
-  position: absolute;
-  top: 10px;
-  bottom: 10px;
-  left: 10px;
-  width: 300px;
-  height: 300px;
+  width: 250px;
+  height: 250px;
   border-radius: 50%;
-  background: radial-gradient(circle, #252525 0%, #151515 50%, #0d0d0d 100%);
-  border: 2px solid #2e2e2e;
+  background: radial-gradient(circle, #1a1c22 0%, #0d0e11 80%);
+  border: 3px solid #232730;
   box-shadow: 
-    8px 8px 24px rgba(0, 0, 0, 0.7),
-    inset 0 0 20px rgba(0, 0, 0, 0.9);
-  z-index: 1;
-  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.4s ease;
-  pointer-events: none;
+    0 12px 28px rgba(0, 0, 0, 0.8),
+    inset 0 2px 6px rgba(0, 0, 0, 0.9);
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0;
-  transform: translateX(0);
 }
 
-.cover-container.playing .vinyl-disc {
-  opacity: 1;
-  transform: translateX(64px);
-}
-
-.vinyl-disc.spinning {
-  animation: vinylSpin 6s linear infinite;
-}
-
-@keyframes vinylSpin {
-  from {
-    transform: translateX(64px) rotate(0deg);
-  }
-  to {
-    transform: translateX(64px) rotate(360deg);
-  }
-}
-
-.vinyl-groove {
+/* Indicators */
+.deck-indicator-top {
   position: absolute;
-  inset: 18px;
-  border-radius: 50%;
-  border: 1px dashed rgba(255, 255, 255, 0.06);
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 10;
+  pointer-events: none;
 }
 
-.vinyl-groove.inner {
-  inset: 48px;
+.speed-badge, .drive-badge {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  padding: 2px 7px;
+  border-radius: 2px;
+  background: #090a0d;
+  color: var(--c-accent);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: var(--font-mono, monospace);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.drive-badge {
+  color: var(--c-text-3);
+}
+
+/* Turntable Platter */
+.turntable-platter {
+  position: relative;
+  width: 228px;
+  height: 228px;
+  border-radius: 50%;
+  background: #0b0c0f;
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.turntable-platter.spinning {
+  animation: turntableRotate 4s linear infinite;
+}
+
+@keyframes turntableRotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Aluminum Strobe Rim with tactile notches */
+.strobe-rim {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 4px dashed #3a3f4c;
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+/* Vinyl Body */
+.vinyl-body {
+  position: relative;
+  width: 212px;
+  height: 212px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #252830 0%, #121418 60%, #0a0b0d 100%);
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.7),
+    inset 0 0 16px rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.groove-ring {
+  position: absolute;
+  border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.04);
+  pointer-events: none;
 }
 
-.vinyl-label {
-  width: 100px;
-  height: 100px;
+.ring-1 { inset: 12px; }
+.ring-2 { inset: 26px; border-style: dashed; }
+.ring-3 { inset: 42px; }
+
+/* Center Label with Cover Art */
+.record-label {
+  position: relative;
+  width: 104px;
+  height: 104px;
   border-radius: 50%;
+  border: 2px solid #2a2e38;
+  box-shadow: 0 0 14px rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-  border: 2px solid rgba(255, 255, 255, 0.1);
   overflow: hidden;
-}
-
-.vinyl-center {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #0d0d0d;
-  border: 3px solid #333;
-}
-
-/* Cover art */
-.cover-art {
-  position: relative;
-  width: 320px;
-  height: 320px;
-  border-radius: var(--r-xl);
-  overflow: hidden;
-  z-index: 2;
-  box-shadow: 
-    8px 8px 24px var(--sh-dark),
-    -4px -4px 12px var(--sh-light);
-  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   background: var(--c-bg-2);
-}
-
-.cover-container.playing .cover-art {
-  transform: scale(0.98);
+  z-index: 2;
 }
 
 .cover-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block;
+  pointer-events: none;
 }
 
-.cover-placeholder {
-  width: 100%;
-  height: 100%;
+.initials {
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--c-accent);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+}
+
+/* Spindle */
+.center-spindle {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ced4da 0%, #6c757d 60%, #343a40 100%);
+  border: 2px solid #212529;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(145deg, var(--c-bg-3) 0%, var(--c-bg-1) 100%);
+  z-index: 3;
 }
 
-.cover-initials {
-  font-size: 72px;
-  font-weight: 800;
-  color: var(--c-accent);
-  text-shadow: 0 2px 12px var(--c-accent-glow);
-  user-select: none;
+.spindle-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #000;
+}
+
+/* Tonearm Assembly */
+.tonearm-assembly {
+  position: absolute;
+  top: 10px;
+  right: -14px;
+  width: 50px;
+  height: 180px;
+  pointer-events: none;
+  z-index: 8;
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transform-origin: 35px 25px;
+  transform: rotate(-16deg);
+}
+
+.tonearm-assembly.engaged {
+  transform: rotate(8deg);
+}
+
+.tonearm-base {
+  position: absolute;
+  top: 10px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #495057 0%, #212529 100%);
+  border: 2px solid #6c757d;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+}
+
+.tonearm-shaft {
+  position: absolute;
+  top: 25px;
+  right: 18px;
+  width: 3px;
+  height: 130px;
+  background: linear-gradient(90deg, #adb5bd 0%, #495057 100%);
+  border-radius: 2px;
+  transform-origin: top center;
+  transform: rotate(4deg);
+}
+
+.tonearm-headshell {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  width: 14px;
+  height: 24px;
+  background: #212529;
+  border: 1px solid #495057;
+  border-radius: 2px;
+  transform: rotate(20deg);
+}
+
+.cartridge-light {
+  position: absolute;
+  bottom: 2px;
+  left: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #333;
+}
+
+.cartridge-light.active {
+  background: var(--c-accent);
+  box-shadow: 0 0 8px var(--c-accent);
 }
 
 /* Loading overlay */
-.loading-overlay {
+.deck-loading-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(13, 13, 13, 0.75);
-  backdrop-filter: blur(8px);
+  border-radius: 50%;
+  background: rgba(9, 10, 13, 0.7);
+  backdrop-filter: blur(4px);
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  z-index: 5;
+  z-index: 10;
 }
 
-.loading-spinner {
-  width: 42px;
-  height: 42px;
+.turntable-spinner {
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  border: 3px solid var(--c-bg-3);
+  border: 3px solid rgba(255, 255, 255, 0.1);
   border-top-color: var(--c-accent);
-  animation: spin 0.8s linear infinite;
+  animation: spinnerRotate 0.8s linear infinite;
 }
 
-.loading-text {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--c-text-2);
-  letter-spacing: 0.5px;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
+@keyframes spinnerRotate {
   to { transform: rotate(360deg); }
-}
-
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.25s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-@media (max-width: 1440px) {
-  .cover-container, .cover-art {
-    width: 280px;
-    height: 280px;
-  }
-  .vinyl-disc {
-    width: 260px;
-    height: 260px;
-  }
 }
 </style>
