@@ -106,6 +106,10 @@
                   <Download :size="18" />
                   <span>Скачать в Telegram</span>
                 </button>
+                <button class="menu-item" @click="exec('share')">
+                  <Share2 :size="18" />
+                  <span>Поделиться</span>
+                </button>
                 <!-- HD version available for current playing track (streamable version playing, HD original exists) -->
                 <button v-if="hasHDVersion" class="menu-item" @click="exec('downloadHD')">
                   <Disc3 :size="18" />
@@ -162,6 +166,10 @@
                   <ListMusic :size="18" />
                   <span>Добавить в очередь</span>
                 </button>
+                <button class="menu-item" @click="exec('share')">
+                  <Share2 :size="18" />
+                  <span>Поделиться</span>
+                </button>
 
                 <!-- Only for user playlists that user owns -->
                 <template v-if="isPlaylistOwner">
@@ -214,6 +222,10 @@
                 <button class="menu-item" @click="exec('addToQueue')">
                   <ListMusic :size="18" />
                   <span>Добавить в очередь</span>
+                </button>
+                <button class="menu-item" @click="exec('share')">
+                  <Share2 :size="18" />
+                  <span>Поделиться</span>
                 </button>
                 <div class="menu-divider" />
                 <button v-if="hasAlbumArtist" class="menu-item" @click="exec('goToArtist')">
@@ -326,7 +338,7 @@ import TagChips from '@/components/TagChips.vue'
 import { 
   X, User, Disc3, Play, ListMusic, Plus, Minus, Pencil, 
   Download, Trash2, FolderOpen, Shuffle, Music, Mic2, ChevronRight, ChevronDown,
-  ThumbsDown, Heart
+  ThumbsDown, Heart, Share2
 } from 'lucide-vue-next'
 
 const router = useRouter()

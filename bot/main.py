@@ -15,6 +15,7 @@ from shared.config import get_settings
 from shared.database import init_db, close_db
 
 from bot.handlers.menu import router as menu_router
+from bot.handlers.inline import router as inline_router
 from bot.handlers.ingestion import router as ingestion_router
 from bot.handlers.audio import router as audio_router
 from bot.handlers.download import router as download_router
@@ -52,6 +53,15 @@ async def main():
         token=settings.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML)
     )
+
+    # Detect bot username if not set
+    try:
+        me = await bot.get_me()
+        if me.username and not settings.bot_username:
+            settings.bot_username = me.username
+        logger.info(f"Bot connected: @{settings.bot_username or me.username} (ID: {me.id})")
+    except Exception as e:
+        logger.warning(f"Failed to fetch bot user info: {e}")
     
     # Initialize channel service with bot
     init_channel_service(bot)
@@ -66,6 +76,7 @@ async def main():
     
     # Register routers — menu_router first (handles /start, /menu, all menu callbacks)
     dp.include_router(menu_router)
+    dp.include_router(inline_router)
     dp.include_router(ingestion_router)
     dp.include_router(audio_router)
     dp.include_router(download_router)

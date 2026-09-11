@@ -14,13 +14,18 @@
         </svg>
       </button>
       <span class="player-title">Сейчас играет</span>
-      <button class="menu-btn" @click="openTrackContextMenu($event)" title="Меню трека" aria-label="Меню трека">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <circle cx="12" cy="5" r="2"/>
-          <circle cx="12" cy="12" r="2"/>
-          <circle cx="12" cy="19" r="2"/>
-        </svg>
-      </button>
+      <div class="header-actions">
+        <button class="share-header-btn" @click="handleShareTrack" title="Поделиться треком">
+          <Share2 :size="18" />
+        </button>
+        <button class="menu-btn" @click="openTrackContextMenu($event)" title="Меню трека" aria-label="Меню трека">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="12" cy="5" r="2"/>
+            <circle cx="12" cy="12" r="2"/>
+            <circle cx="12" cy="19" r="2"/>
+          </svg>
+        </button>
+      </div>
     </div>
 
     <!-- Cover art with generated gradient - swipe area for track navigation & long-press for menu -->
@@ -314,7 +319,7 @@
 <script setup>
 import { ref, computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
-import { Disc3 } from 'lucide-vue-next'
+import { Disc3, Share2 } from 'lucide-vue-next'
 import { getTrackCoverStyle, getTrackInitials, splitArtists, getDisplayTitle, getDisplayArtist, getAllTrackArtists, getCoverUrl, CoverSize } from '@/utils'
 import TagChips from '@/components/TagChips.vue'
 import TrackTags from '@/components/TrackTags.vue'
@@ -324,6 +329,7 @@ import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useAuthStore } from '@/stores/auth'
+import { useShare } from '@/composables/useShare'
 
 const props = defineProps({
   track: Object,
@@ -404,6 +410,18 @@ const libraryStore = useLibraryStore()
 const uiStore = useUIStore()
 const authStore = useAuthStore()
 const { openMenu } = useContextMenu()
+const { openShare } = useShare()
+
+const handleShareTrack = () => {
+  if (!props.track?.id) return
+  openShare({
+    type: 'track',
+    id: props.track.id,
+    title: getDisplayTitle(props.track),
+    subtitle: getDisplayArtist(props.track) || 'Неизвестен',
+    coverUrl: props.track.cover_url || '',
+  })
+}
 
 const telegram = inject('telegram')
 
@@ -753,6 +771,41 @@ const formatTime = (seconds) => {
   text-transform: uppercase;
   letter-spacing: 2px;
   color: var(--c-text-2);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-actions .menu-btn,
+.header-actions .share-header-btn {
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border-radius: var(--r-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--c-text-1);
+  transition: all 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 
+    3px 4px 8px rgba(0, 0, 0, 0.4),
+    -1px -1px 3px rgba(255, 255, 255, 0.05),
+    inset 0 1px 1px rgba(255, 255, 255, 0.2);
+}
+
+.header-actions .menu-btn:active,
+.header-actions .share-header-btn:active {
+  transform: scale(0.92);
+  background: rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.05);
+  box-shadow: 
+    inset 2px 2px 5px rgba(0, 0, 0, 0.6),
+    inset -1px -1px 2px rgba(255, 255, 255, 0.05);
 }
 
 /* ─── Cover Art ─── */

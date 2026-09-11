@@ -27,6 +27,8 @@ from shared.database import get_session
 from shared.models import (
     User,
     Track,
+    Playlist,
+    Album,
     ChannelMessage,
     ChannelMessageStatus,
     UserChannel,
@@ -34,6 +36,11 @@ from shared.models import (
 )
 
 from bot.services import track_service, channel_service
+from bot.services.delivery import (
+    deliver_playlist_tracks,
+    deliver_single_track,
+    deliver_album_tracks,
+)
 from bot.handlers.menu_keyboards import (
     get_main_menu_keyboard,
     get_channel_not_connected_keyboard,
@@ -45,6 +52,8 @@ from bot.handlers.menu_keyboards import (
     get_channel_back_keyboard,
     get_stats_menu_keyboard,
     get_deep_link_keyboard,
+    get_playlist_share_keyboard,
+    get_album_share_keyboard,
 )
 
 router = Router()
@@ -167,15 +176,35 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject 
 
     if command and command.args:
         args = command.args.strip()
-        if args.startswith("user_"):
+        if args == "open_player":
             await message.answer(
-                f"👋 Привет, <b>{user.first_name}</b>!\n\n"
-                "👤 Вам отправили профиль пользователя в <b>TG Player</b>.\n\n"
-                "Нажмите кнопку ниже, чтобы открыть его медиатеку:",
-                reply_markup=get_deep_link_keyboard(args, "👤 Открыть профиль"),
+                "🎵 <b>TG Player</b> — твоя персональная музыкальная библиотека.\n\n"
+                "Нажми кнопку ниже, чтобы открыть плеер:",
+                reply_markup=get_main_menu_keyboard()
             )
             return
+        elif args.startswith("files_playlist_") or args.startswith("files_pl_"):
+            try:
+                pid = int(args.replace("files_playlist_", "").replace("files_pl_", ""))
+                await deliver_playlist_tracks(message.bot, chat_id=message.chat.id, playlist_id=pid, user_id=user.id)
+                return
+            except Exception as e:
+                logger.error(f"Failed to deliver playlist from start arg {args}: {e}")
         elif args.startswith("playlist_"):
+            try:
+                pid = int(args.replace("playlist_", ""))
+                async with get_session() as session:
+                    pl = await session.get(Playlist, pid)
+                    if pl:
+                        await message.answer(
+                            f"👋 Привет, <b>{user.first_name}</b>!\n\n"
+                            f"🎧 Вам отправили плейлист «<b>{pl.name}</b>» в <b>TG Player</b>.\n\n"
+                            "Выберите действие:",
+                            reply_markup=get_playlist_share_keyboard(pid),
+                        )
+                        return
+            except Exception as e:
+                logger.error(f"Failed to show playlist preview for {args}: {e}")
             await message.answer(
                 f"👋 Привет, <b>{user.first_name}</b>!\n\n"
                 "🎧 Вам отправили плейлист в <b>TG Player</b>.\n\n"
@@ -183,12 +212,56 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject 
                 reply_markup=get_deep_link_keyboard(args, "🎧 Открыть плейлист"),
             )
             return
-        elif args.startswith("track_"):
+        elif args.startswith("files_track_") or args.startswith("track_"):
+            try:
+                tid = int(args.replace("files_track_", "").replace("track_", ""))
+                sent = await deliver_single_track(message.bot, chat_id=message.chat.id, track_id=tid, user_id=user.id)
+                if sent:
+                    return
+            except Exception as e:
+                logger.error(f"Failed to send track from start arg {args}: {e}")
             await message.answer(
                 f"👋 Привет, <b>{user.first_name}</b>!\n\n"
                 "🎵 Вам отправили трек в <b>TG Player</b>.\n\n"
                 "Нажмите кнопку ниже, чтобы включить его в плеере:",
                 reply_markup=get_deep_link_keyboard(args, "🎵 Слушать трек"),
+            )
+            return
+        elif args.startswith("files_album_"):
+            try:
+                aid = int(args.replace("files_album_", ""))
+                await deliver_album_tracks(message.bot, chat_id=message.chat.id, album_id=aid, user_id=user.id)
+                return
+            except Exception as e:
+                logger.error(f"Failed to deliver album from start arg {args}: {e}")
+        elif args.startswith("album_"):
+            try:
+                aid = int(args.replace("album_", ""))
+                async with get_session() as session:
+                    al = await session.get(Album, aid)
+                    if al:
+                        await message.answer(
+                            f"👋 Привет, <b>{user.first_name}</b>!\n\n"
+                            f"💿 Вам отправили альбом «<b>{al.name}</b>» ({al.artist or 'Неизвестен'}) в <b>TG Player</b>.\n\n"
+                            "Выберите действие:",
+                            reply_markup=get_album_share_keyboard(aid),
+                        )
+                        return
+            except Exception as e:
+                logger.error(f"Failed to show album preview for {args}: {e}")
+            await message.answer(
+                f"👋 Привет, <b>{user.first_name}</b>!\n\n"
+                "💿 Вам отправили альбом в <b>TG Player</b>.\n\n"
+                "Нажмите кнопку ниже, чтобы послушать его в плеере:",
+                reply_markup=get_deep_link_keyboard(args, "💿 Слушать альбом"),
+            )
+            return
+        elif args.startswith("user_"):
+            await message.answer(
+                f"👋 Привет, <b>{user.first_name}</b>!\n\n"
+                "👤 Вам отправили профиль пользователя в <b>TG Player</b>.\n\n"
+                "Нажмите кнопку ниже, чтобы открыть его медиатеку:",
+                reply_markup=get_deep_link_keyboard(args, "👤 Открыть профиль"),
             )
             return
 

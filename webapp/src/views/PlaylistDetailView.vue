@@ -139,10 +139,13 @@ const { share } = useShare()
 
 const handleSharePlaylist = () => {
   if (!playlist.value) return
+  const trackCount = playlist.value.tracks?.length || playlist.value.tracks_count || 0
   share({
     type: 'playlist',
     id: playlist.value.id,
     title: playlist.value.name,
+    subtitle: trackCount ? `${trackCount} треков` : 'Плейлист',
+    coverUrl: playlist.value.custom_cover_url || (playlist.value.tracks?.[0]?.cover_url || ''),
     text: `Послушай плейлист «${playlist.value.name}» в TG Player!`,
   })
 }

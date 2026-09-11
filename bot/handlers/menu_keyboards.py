@@ -70,6 +70,46 @@ def get_deep_link_keyboard(param: str, label: str = "🎵 Открыть в пл
     ])
 
 
+def get_playlist_share_keyboard(playlist_id: int) -> InlineKeyboardMarkup:
+    """Keyboard for shared playlist: Open in Player + Get Files in Chat"""
+    sep = "&" if "?" in settings.webapp_url else "?"
+    url = f"{settings.webapp_url}{sep}startapp=playlist_{playlist_id}"
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text="🎧 Открыть в плеере",
+            web_app=WebAppInfo(url=url),
+        )],
+        [InlineKeyboardButton(
+            text="📥 Получить файлы в чате",
+            callback_data=f"download_playlist:{playlist_id}",
+        )],
+        [InlineKeyboardButton(
+            text="🏠 Главное меню",
+            callback_data="menu:main",
+        )]
+    ])
+
+
+def get_album_share_keyboard(album_id: int) -> InlineKeyboardMarkup:
+    """Keyboard for shared album: Open in Player + Get Files in Chat"""
+    sep = "&" if "?" in settings.webapp_url else "?"
+    url = f"{settings.webapp_url}{sep}startapp=album_{album_id}"
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text="💿 Слушать альбом в плеере",
+            web_app=WebAppInfo(url=url),
+        )],
+        [InlineKeyboardButton(
+            text="📥 Получить файлы в чате",
+            callback_data=f"download_album:{album_id}",
+        )],
+        [InlineKeyboardButton(
+            text="🏠 Главное меню",
+            callback_data="menu:main",
+        )]
+    ])
+
+
 # ──────────────────────── Channel ────────────────────────
 
 def get_channel_not_connected_keyboard() -> InlineKeyboardMarkup:

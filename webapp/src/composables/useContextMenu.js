@@ -17,6 +17,7 @@ import { useUIStore } from '@/stores/ui'
 import { useModals } from '@/composables/useModals'
 import { playerApi, playlistsApi, albumsApi, tracksApi } from '@/api/client'
 import { getAllTrackArtists } from '@/utils/formatters'
+import { useShare } from '@/composables/useShare'
 
 // Singleton state - shared across all components
 const isOpen = ref(false)
@@ -43,6 +44,7 @@ export function useContextMenu() {
   const libraryStore = useLibraryStore()
   const uiStore = useUIStore()
   const { closeFullPlayer } = useModals()
+  const { openShare } = useShare()
   const telegram = inject('telegram', null)
 
   // ═══════════════════════════════════════════════════════════
@@ -263,6 +265,18 @@ export function useContextMenu() {
       }
       closeMenu()
     },
+
+    share: (track) => {
+      closeMenu()
+      if (!track?.id) return
+      openShare({
+        type: 'track',
+        id: track.id,
+        title: track.title || track.file_name || 'Трек',
+        subtitle: track.artist || 'Неизвестен',
+        coverUrl: track.cover_url || '',
+      })
+    },
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -344,6 +358,19 @@ export function useContextMenu() {
       }
       closeMenu()
     },
+
+    share: (playlist) => {
+      closeMenu()
+      if (!playlist?.id) return
+      const trackCount = playlist.tracks_count ?? playlist.tracks?.length ?? 0
+      openShare({
+        type: 'playlist',
+        id: playlist.id,
+        title: playlist.name,
+        subtitle: trackCount ? `${trackCount} треков` : 'Плейлист',
+        coverUrl: playlist.custom_cover_url || '',
+      })
+    },
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -415,6 +442,18 @@ export function useContextMenu() {
       if (artist) {
         router.push(`/artist/${encodeURIComponent(artist)}`)
       }
+    },
+
+    share: (album) => {
+      closeMenu()
+      if (!album?.id) return
+      openShare({
+        type: 'album',
+        id: album.id,
+        title: album.name,
+        subtitle: album.artist || 'Альбом',
+        coverUrl: album.cover_url || '',
+      })
     },
   }
 

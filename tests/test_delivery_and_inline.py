@@ -1,0 +1,111 @@
+"""
+Tests for Telegram Inline mode formatting and Delivery keyboards.
+"""
+import re
+import pytest
+from bot.handlers.inline import _format_playlist_card, _format_album_card
+from bot.services.delivery import get_track_player_button, get_playlist_player_button
+from bot.handlers.menu_keyboards import get_playlist_share_keyboard, get_album_share_keyboard
+from shared.models import Playlist, Album, Track, User
+
+
+class DummyUser:
+    display_name = "Test DJ"
+
+
+class DummyPlaylist:
+    id = 42
+    name = "Synthwave Essentials"
+    description = "Best retro beats for coding"
+    owner = DummyUser()
+
+
+class DummyAlbum:
+    id = 7
+    name = "Endless Summer"
+    artist = "The Midnight"
+
+
+class DummyTrack:
+    id = 101
+    title = "Days of Thunder"
+    artist = "The Midnight"
+    duration = 215
+    file_id = "BAACAgIAAxkBAAI..."
+    album_name = "Days of Thunder"
+
+
+def test_format_playlist_card():
+    playlist = DummyPlaylist()
+    tracks = [DummyTrack(), DummyTrack()]
+    bot_username = "test_player_bot"
+
+    text, keyboard = _format_playlist_card(playlist, tracks, bot_username)
+
+    assert "Synthwave Essentials" in text
+    assert "Best retro beats for coding" in text
+    assert "2" in text  # 2 tracks
+    assert "Test DJ" in text
+    assert "TG Player" in text
+
+    # Check keyboard buttons
+    buttons = [btn for row in keyboard.inline_keyboard for btn in row]
+    urls = [btn.url for btn in buttons if btn.url]
+
+    assert any("startapp=playlist_42" in url for url in urls)
+    assert any("start=files_playlist_42" in url for url in urls)
+
+
+def test_format_album_card():
+    album = DummyAlbum()
+    tracks = [DummyTrack()]
+    bot_username = "test_player_bot"
+
+    text, keyboard = _format_album_card(album, tracks, bot_username)
+
+    assert "Endless Summer" in text
+    assert "The Midnight" in text
+
+    buttons = [btn for row in keyboard.inline_keyboard for btn in row]
+    urls = [btn.url for btn in buttons if btn.url]
+
+    assert any("startapp=album_7" in url for url in urls)
+    assert any("start=files_album_7" in url for url in urls)
+
+
+def test_delivery_player_buttons():
+    kb_track = get_track_player_button(99)
+    btn_track = kb_track.inline_keyboard[0][0]
+    assert "startapp=track_99" in btn_track.url
+
+    kb_pl = get_playlist_player_button(55)
+    btn_pl = kb_pl.inline_keyboard[0][0]
+    assert "startapp=playlist_55" in btn_pl.url
+
+
+def test_share_keyboards():
+    kb_pl = get_playlist_share_keyboard(12)
+    buttons = [btn for row in kb_pl.inline_keyboard for btn in row]
+    callbacks = [btn.callback_data for btn in buttons if btn.callback_data]
+    assert "download_playlist:12" in callbacks
+
+    kb_al = get_album_share_keyboard(34)
+    buttons_al = [btn for row in kb_al.inline_keyboard for btn in row]
+    callbacks_al = [btn.callback_data for btn in buttons_al if btn.callback_data]
+    assert "download_album:34" in callbacks_al
+
+
+def test_inline_regex_parsing():
+    pl_pattern = r'^(?:playlist|pl)[:_](\d+)$'
+    assert re.match(pl_pattern, "playlist:123").group(1) == "123"
+    assert re.match(pl_pattern, "pl:55").group(1) == "55"
+    assert re.match(pl_pattern, "PL_77").group(1) == "77"
+
+    tr_pattern = r'^(?:track|tr)[:_](\d+)$'
+    assert re.match(tr_pattern, "track:999").group(1) == "999"
+    assert re.match(tr_pattern, "tr:10").group(1) == "10"
+    assert re.match(tr_pattern, "TR_4").group(1) == "4"
+
+    al_pattern = r'^(?:album|al)[:_](\d+)$'
+    assert re.match(al_pattern, "album:42").group(1) == "42"
+    assert re.match(al_pattern, "al:1").group(1) == "1"

@@ -28,6 +28,7 @@ export const useAuthStore = defineStore('auth', () => {
   
   // App config
   const appName = ref('TG Player')  // Default, will be overridden by bot_username
+  const botUsername = ref('')
 
   // Getters
   const isAuthenticated = computed(() => authStorage.isAuthenticated())
@@ -96,6 +97,7 @@ export const useAuthStore = defineStore('auth', () => {
       const response = await authApi.getConfig()
       if (response.data?.bot_username) {
         appName.value = response.data.bot_username
+        botUsername.value = response.data.bot_username
       }
     } catch (err) {
       console.error('Failed to fetch config:', err)
@@ -168,6 +170,7 @@ export const useAuthStore = defineStore('auth', () => {
     channelInfo,
     showChannelBanner,
     appName,
+    botUsername,
     // Getters
     isAuthenticated,
     isTelegramWebApp,

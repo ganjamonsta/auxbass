@@ -121,6 +121,16 @@
         </div>
       </div>
       
+      <!-- Share button -->
+      <button 
+        v-if="track"
+        class="share-ctrl-btn" 
+        @click="handleShare"
+        title="Поделиться треком"
+      >
+        <Share2 :size="16" />
+      </button>
+
       <!-- Like button -->
       <button 
         class="like-btn" 
@@ -149,13 +159,26 @@ import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { getCoverUrl, CoverSize } from '@/utils'
-import { Play, Square, Pause, Volume2, VolumeX, SkipBack, SkipForward, Shuffle, Repeat, Repeat1 } from 'lucide-vue-next'
+import { Play, Square, Pause, Volume2, VolumeX, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Share2 } from 'lucide-vue-next'
 import { useNetworkMonitor } from '@/composables/useNetworkMonitor'
+import { useShare } from '@/composables/useShare'
 
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
 const { openMenu } = useContextMenu()
+const { openShare } = useShare()
 const networkMonitor = useNetworkMonitor()
+
+const handleShare = () => {
+  if (!track.value?.id) return
+  openShare({
+    type: 'track',
+    id: track.value.id,
+    title: track.value.title || track.value.file_name || 'Трек',
+    subtitle: track.value.artist || 'Неизвестен',
+    coverUrl: track.value.cover_url || '',
+  })
+}
 
 const emit = defineEmits(['expand'])
 
@@ -835,6 +858,24 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.share-ctrl-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.share-ctrl-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #60a5fa;
 }
 
 .like-btn:hover {

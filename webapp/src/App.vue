@@ -187,6 +187,9 @@
       <!-- Global toast notifications -->
       <ToastContainer />
 
+      <!-- Share Modal -->
+      <ShareModal />
+
       <!-- Profile Context Menu -->
       <ProfileMenu v-model="showProfileMenu" />
     </template>
@@ -210,6 +213,7 @@ import NetworkBanner from '@/components/NetworkBanner.vue'
 import MaintenanceBanner from '@/components/MaintenanceBanner.vue'
 import PwaInstallBanner from '@/components/PwaInstallBanner.vue'
 import PwaInstallModal from '@/components/PwaInstallModal.vue'
+import ShareModal from '@/components/ShareModal.vue'
 import { useNetworkMonitor } from '@/composables/useNetworkMonitor'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
 import { usePwaInstall } from '@/composables/usePwaInstall'
