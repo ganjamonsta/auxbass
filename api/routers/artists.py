@@ -12,13 +12,13 @@ from collections import defaultdict
 from urllib.parse import unquote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import select, func, desc, asc, or_
+from sqlalchemy import select, func, desc, asc, or_, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from shared.database import get_db
 from shared.models import (
-    Track, Album, AlbumTrack, UserLibrary, User
+    Track, Album, AlbumTrack, UserLibrary, User, TrackTag, TrackEnrichment
 )
 from shared.matching import normalize_artist, normalize_artist_display, extract_featured_artists, get_all_track_artists, extract_artists_from_filename
 
@@ -203,6 +203,65 @@ def get_best_display_name(artist_names: list[str]) -> str:
     return normalize_artist_display(best)
 
 
+async def get_artists_tags(
+    db: AsyncSession,
+    normalized_artists: list[str],
+    limit_per_artist: int = 4,
+) -> dict[str, list[str]]:
+    """
+    Get top tags for a list of normalized artists.
+    Aggregates from TrackTag (user & Last.fm) and TrackEnrichment.genre.
+    Returns dict mapping normalized_artist -> list of top tags.
+    """
+    if not normalized_artists:
+        return {}
+
+    tags_by_artist: dict[str, list[str]] = defaultdict(list)
+    seen_by_artist: dict[str, set[str]] = defaultdict(set)
+
+    # 1. Fetch top tags from TrackTag
+    query = (
+        select(Track.normalized_artist, TrackTag.tag, func.count(TrackTag.id).label("cnt"))
+        .join(TrackTag, TrackTag.track_id == Track.id)
+        .where(Track.normalized_artist.in_(normalized_artists))
+        .group_by(Track.normalized_artist, TrackTag.tag)
+        .order_by(desc("cnt"))
+    )
+    result = await db.execute(query)
+    for norm_artist, tag, _ in result.all():
+        if not norm_artist or not tag:
+            continue
+        tag_lower = tag.lower().strip()
+        if tag_lower and tag_lower not in seen_by_artist[norm_artist]:
+            if len(tags_by_artist[norm_artist]) < limit_per_artist:
+                seen_by_artist[norm_artist].add(tag_lower)
+                tags_by_artist[norm_artist].append(tag)
+
+    # 2. For artists that still have room for tags, check TrackEnrichment.genre
+    missing = [a for a in normalized_artists if len(tags_by_artist[a]) < limit_per_artist]
+    if missing:
+        genre_query = (
+            select(Track.normalized_artist, TrackEnrichment.genre, func.count(TrackEnrichment.id).label("cnt"))
+            .join(TrackEnrichment, TrackEnrichment.track_id == Track.id)
+            .where(Track.normalized_artist.in_(missing))
+            .where(TrackEnrichment.genre.is_not(None))
+            .where(TrackEnrichment.genre != "")
+            .group_by(Track.normalized_artist, TrackEnrichment.genre)
+            .order_by(desc("cnt"))
+        )
+        genre_result = await db.execute(genre_query)
+        for norm_artist, genre, _ in genre_result.all():
+            if not norm_artist or not genre:
+                continue
+            g_lower = genre.lower().strip()
+            if g_lower and g_lower not in seen_by_artist[norm_artist]:
+                if len(tags_by_artist[norm_artist]) < limit_per_artist:
+                    seen_by_artist[norm_artist].add(g_lower)
+                    tags_by_artist[norm_artist].append(genre.lower())
+
+    return dict(tags_by_artist)
+
+
 @router.get("", response_model=ArtistsListResponse)
 async def get_my_artists(
     offset: int = Query(0, ge=0),
@@ -265,10 +324,41 @@ async def get_my_artists(
     
     # Apply search filter early (before expensive album lookups)
     if search:
-        search_lower = search.lower()
+        search_clean = search.lstrip('#').strip().lower()
+        search_lower = search_clean
+        tag_term = f"%{search_clean}%"
+
+        # Find artists whose tracks match this tag/genre in user's library
+        tag_matched_artists = set()
+        if search_clean:
+            tt_query = (
+                select(Track.normalized_artist)
+                .join(TrackTag, TrackTag.track_id == Track.id)
+                .join(UserLibrary, UserLibrary.track_id == Track.id)
+                .where(UserLibrary.user_id == user.id)
+                .where(TrackTag.tag.ilike(tag_term))
+                .where(Track.normalized_artist.is_not(None))
+            )
+            tt_res = await db.execute(tt_query.distinct())
+            tag_matched_artists.update(row[0] for row in tt_res.all() if row[0])
+
+            te_query = (
+                select(Track.normalized_artist)
+                .join(TrackEnrichment, TrackEnrichment.track_id == Track.id)
+                .join(UserLibrary, UserLibrary.track_id == Track.id)
+                .where(UserLibrary.user_id == user.id)
+                .where(Track.normalized_artist.is_not(None))
+                .where(or_(
+                    TrackEnrichment.genre.ilike(tag_term),
+                    func.cast(TrackEnrichment.tags, String).ilike(tag_term)
+                ))
+            )
+            te_res = await db.execute(te_query.distinct())
+            tag_matched_artists.update(row[0] for row in te_res.all() if row[0])
+
         aggregated = [
             a for a in aggregated 
-            if search_lower in a["normalized"] or search_lower in a["name"].lower()
+            if search_lower in a["normalized"] or search_lower in a["name"].lower() or a["normalized"] in tag_matched_artists
         ]
     
     total = len(aggregated)
@@ -319,6 +409,10 @@ async def get_my_artists(
     # Paginate
     page_items = aggregated[offset:offset + limit]
     page = (offset // limit) + 1 if limit > 0 else 1
+
+    # Load tags for artists on this page
+    page_norm_artists = [a["normalized"] for a in page_items]
+    artist_tags_map = await get_artists_tags(db, page_norm_artists)
     
     # Build response
     items = []
@@ -335,6 +429,7 @@ async def get_my_artists(
             album_count=artist_data["album_count"],
             cover_url=cover_url,
             image_url=cover_url,
+            tags=artist_tags_map.get(artist_data["normalized"]) or None,
             latest_release_date=artist_data["latest_release_date"],
         ))
     
@@ -428,10 +523,41 @@ async def get_global_artists(
     
     # Apply search filter
     if search:
-        search_lower = search.lower()
+        search_clean = search.lstrip('#').strip().lower()
+        search_lower = search_clean
+        tag_term = f"%{search_clean}%"
+
+        # Find artists whose public tracks match this tag/genre
+        tag_matched_artists = set()
+        if search_clean:
+            tt_query = (
+                select(Track.normalized_artist)
+                .join(TrackTag, TrackTag.track_id == Track.id)
+                .join(User, User.id == Track.uploader_id)
+                .where(Track.is_public == True, Track.is_unavailable == False, User.hide_profile == False)
+                .where(TrackTag.tag.ilike(tag_term))
+                .where(Track.normalized_artist.is_not(None))
+            )
+            tt_res = await db.execute(tt_query.distinct())
+            tag_matched_artists.update(row[0] for row in tt_res.all() if row[0])
+
+            te_query = (
+                select(Track.normalized_artist)
+                .join(TrackEnrichment, TrackEnrichment.track_id == Track.id)
+                .join(User, User.id == Track.uploader_id)
+                .where(Track.is_public == True, Track.is_unavailable == False, User.hide_profile == False)
+                .where(Track.normalized_artist.is_not(None))
+                .where(or_(
+                    TrackEnrichment.genre.ilike(tag_term),
+                    func.cast(TrackEnrichment.tags, String).ilike(tag_term)
+                ))
+            )
+            te_res = await db.execute(te_query.distinct())
+            tag_matched_artists.update(row[0] for row in te_res.all() if row[0])
+
         aggregated = [
             a for a in aggregated 
-            if search_lower in a["normalized"] or search_lower in a["name"].lower()
+            if search_lower in a["normalized"] or search_lower in a["name"].lower() or a["normalized"] in tag_matched_artists
         ]
     
     total = len(aggregated)
@@ -453,6 +579,10 @@ async def get_global_artists(
     # Paginate
     page_items = aggregated[offset:offset + limit]
     page = (offset // limit) + 1 if limit > 0 else 1
+
+    # Load tags for artists on this page
+    page_norm_artists = [a["normalized"] for a in page_items]
+    artist_tags_map = await get_artists_tags(db, page_norm_artists)
     
     # Build response items
     items = []
@@ -469,6 +599,7 @@ async def get_global_artists(
             album_count=artist_data["album_count"],
             cover_url=cover_url,
             image_url=cover_url,
+            tags=artist_tags_map.get(artist_data["normalized"]) or None,
             latest_release_date=artist_data["latest_release_date"],
         ))
     
@@ -577,6 +708,11 @@ async def get_artist_info(
             artist_tags = await lastfm_client.get_artist_top_tags(actual_name)
     except Exception as e:
         logger.warning(f"Failed to get artist tags: {e}")
+    
+    # Fallback to local DB tags if Last.fm returned no tags
+    if not artist_tags:
+        db_tags_map = await get_artists_tags(db, [normalized_search], limit_per_artist=6)
+        artist_tags = db_tags_map.get(normalized_search) or None
     
     from api.routers.albums import album_to_response
     album_items = [album_to_response(album, track_count=album_track_counts.get(album.id, 0)) 

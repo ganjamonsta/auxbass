@@ -19,6 +19,16 @@
           <span v-if="playlist.is_public" class="public-badge"><Globe :size="14" /> Публичный</span>
           <span v-if="playlist.owner_name && !isOwner" class="owner-info" :class="{ 'clickable': !!playlist.owner_id }" @click="goToOwner">от {{ playlist.owner_name }}</span>
         </p>
+        <!-- Playlist tags -->
+        <TagChips
+          v-if="playlist.tags?.length"
+          :tags="playlist.tags"
+          :max="5"
+          size="sm"
+          :clickable="true"
+          class="playlist-tags"
+          @tagClick="handleTagClick"
+        />
       </div>
     </div>
 
@@ -107,6 +117,7 @@ import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useTrackActions, usePlaybackActions, useTrackSync, useShare } from '@/composables'
 import TrackItem from '@/components/TrackItem.vue'
+import TagChips from '@/components/TagChips.vue'
 import EditPlaylistModal from '@/components/EditPlaylistModal.vue'
 import api from '@/api/client'
 import { Music, Check, Plus, Globe, Play, Shuffle, Edit3, Share2 } from 'lucide-vue-next'
@@ -270,6 +281,13 @@ const toggleSubscription = async () => {
   }
 }
 
+// Handle tag click: navigate to search
+const handleTagClick = (tag) => {
+  if (!tag) return
+  const cleanTag = tag.replace(/^#/, '')
+  router.push({ path: '/search', query: { tag: cleanTag } })
+}
+
 const onPlaylistChanged = (e) => {
   const changedId = e?.detail?.playlistId
   if (!changedId || String(changedId) === String(route.params.id) || (playlist.value && String(changedId) === String(playlist.value.id))) {
@@ -403,5 +421,9 @@ watch(
 
 .share-btn:hover {
   background: var(--c-bg-3);
+}
+
+.playlist-tags {
+  margin-top: 8px;
 }
 </style>

@@ -38,6 +38,15 @@
           {{ artist.track_count }} треков • {{ artist.album_count }} альбомов
         </p>
         <span v-if="isGlobal" class="global-artist-badge"><Globe :size="12" /> Вся коллекция</span>
+        <TagChips
+          v-if="artist.tags?.length"
+          :tags="artist.tags"
+          :max="5"
+          size="sm"
+          :clickable="true"
+          class="artist-tags"
+          @tagClick="handleTagClick"
+        />
       </div>
     </div>
 
@@ -133,6 +142,7 @@ import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useTrackActions, usePlaybackActions } from '@/composables'
 import VirtualTrackList from '@/components/VirtualTrackList.vue'
+import TagChips from '@/components/TagChips.vue'
 import api, { playerApi } from '@/api/client'
 import { User, Disc3, Globe, Music, Play, Shuffle } from 'lucide-vue-next'
 import { getCoverUrl, CoverSize } from '@/utils'
@@ -244,6 +254,13 @@ const goToGlobal = () => {
   })
 }
 
+// Handle tag click: navigate to search
+const handleTagClick = (tag) => {
+  if (!tag) return
+  const cleanTag = tag.replace(/^#/, '')
+  router.push({ path: '/search', query: { tag: cleanTag } })
+}
+
 // Track actions (handleLikeTrack, handleAddToLibrary, handleDirectDownload, handleHdNotice) 
 // are provided by useTrackActions composable above
 
@@ -305,6 +322,10 @@ watch(
   border: 1px solid rgba(29, 185, 84, 0.25);
   margin-top: 6px;
   width: fit-content;
+}
+
+.artist-tags {
+  margin-top: 8px;
 }
 
 .not-in-library-content {

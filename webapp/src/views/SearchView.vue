@@ -165,6 +165,52 @@
                   <template v-if="artist.track_count">{{ artist.track_count }} {{ formatTrackCount(artist.track_count) }}</template>
                   <template v-else>Исполнитель</template>
                 </div>
+                <div v-if="artist.tags?.length" class="card-tags center">
+                  <span v-for="t in artist.tags.slice(0, 2)" :key="t" class="card-tag">#{{ t }}</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Matching Albums Overview -->
+          <section v-if="albumsResults.length > 0" class="result-section">
+            <div class="result-header">
+              <div class="header-left">
+                <Disc3 :size="18" class="header-icon" />
+                <h3 class="result-title">Альбомы</h3>
+                <span class="result-count">{{ albumsResults.length }}</span>
+              </div>
+              <button 
+                v-if="albumsResults.length > 6" 
+                class="section-view-all" 
+                @click="activeFilter = 'albums'"
+              >
+                <span>Все альбомы</span>
+                <ArrowRight :size="14" />
+              </button>
+            </div>
+            <div class="horizontal-scroll">
+              <div 
+                v-for="album in albumsResults.slice(0, 10)" 
+                :key="album.id"
+                class="feed-card"
+                @click="goToAlbum(album.id)"
+                @contextmenu.prevent="openMenu('album', album, 'search', $event)"
+              >
+                <div class="feed-card-cover">
+                  <img 
+                    v-if="album.cover_url" 
+                    :src="getCoverUrl(album.cover_url, CoverSize.MEDIUM)" 
+                    alt="" 
+                    loading="lazy"
+                  />
+                  <Disc3 v-else :size="32" />
+                </div>
+                <div class="feed-card-title">{{ album.name }}</div>
+                <div class="feed-card-subtitle">{{ album.artist }}</div>
+                <div v-if="album.tags?.length" class="card-tags">
+                  <span v-for="t in album.tags.slice(0, 2)" :key="t" class="card-tag">#{{ t }}</span>
+                </div>
               </div>
             </div>
           </section>
@@ -205,6 +251,9 @@
                 </div>
                 <div class="feed-card-title">{{ pl.name }}</div>
                 <div class="feed-card-subtitle">{{ pl.track_count || 0 }} {{ formatTrackCount(pl.track_count || 0) }}</div>
+                <div v-if="pl.tags?.length" class="card-tags">
+                  <span v-for="t in pl.tags.slice(0, 2)" :key="t" class="card-tag">#{{ t }}</span>
+                </div>
               </div>
             </div>
           </section>
@@ -382,6 +431,9 @@
                 <template v-if="artist.track_count">{{ artist.track_count }} {{ formatTrackCount(artist.track_count) }}</template>
                 <template v-else>Исполнитель</template>
               </div>
+              <div v-if="artist.tags?.length" class="card-tags center">
+                <span v-for="t in artist.tags.slice(0, 2)" :key="t" class="card-tag">#{{ t }}</span>
+              </div>
             </div>
           </div>
           <div v-else-if="!isArtistsSearching" class="no-results-box">
@@ -458,6 +510,44 @@
           </div>
         </div>
 
+        <!-- ==================== TAB: ALBUMS ==================== -->
+        <div v-else-if="activeFilter === 'albums'" class="albums-results-mode">
+          <div class="section-header">
+            <span class="section-title">
+              <Disc3 :size="18" /> Альбомы
+            </span>
+            <span class="section-count">{{ albumsResults.length }}</span>
+          </div>
+          <div v-if="albumsResults.length > 0" class="albums-grid">
+            <div 
+              v-for="album in albumsResults" 
+              :key="album.id"
+              class="feed-card"
+              @click="goToAlbum(album.id)"
+              @contextmenu.prevent="openMenu('album', album, 'search', $event)"
+            >
+              <div class="feed-card-cover">
+                <img 
+                  v-if="album.cover_url" 
+                  :src="getCoverUrl(album.cover_url, CoverSize.MEDIUM)" 
+                  alt="" 
+                  loading="lazy"
+                />
+                <Disc3 v-else :size="32" />
+              </div>
+              <div class="feed-card-title">{{ album.name }}</div>
+              <div class="feed-card-subtitle">{{ album.artist }}</div>
+              <div v-if="album.tags?.length" class="card-tags">
+                <span v-for="t in album.tags.slice(0, 2)" :key="t" class="card-tag">#{{ t }}</span>
+              </div>
+            </div>
+          </div>
+          <div v-else-if="!isAlbumsSearching" class="no-results-box">
+            <p class="no-results-text">Альбомы не найдены</p>
+            <p class="no-results-hint">Попробуйте изменить поисковый запрос</p>
+          </div>
+        </div>
+
         <!-- ==================== TAB: PLAYLISTS ==================== -->
         <div v-else-if="activeFilter === 'playlists'" class="playlists-results-mode">
           <div class="section-header">
@@ -485,6 +575,9 @@
               </div>
               <div class="feed-card-title">{{ pl.name }}</div>
               <div class="feed-card-subtitle">{{ pl.track_count || 0 }} {{ formatTrackCount(pl.track_count || 0) }}</div>
+              <div v-if="pl.tags?.length" class="card-tags">
+                <span v-for="t in pl.tags.slice(0, 2)" :key="t" class="card-tag">#{{ t }}</span>
+              </div>
             </div>
           </div>
           <div v-else-if="!isPlaylistsSearching" class="no-results-box">
@@ -587,7 +680,7 @@ import {
   useTrackActions, 
   useTrackSync 
 } from '@/composables'
-import api, { tracksApi, artistsApi, playlistsApi, ingestionApi } from '@/api/client'
+import api, { tracksApi, artistsApi, albumsApi, playlistsApi, ingestionApi } from '@/api/client'
 import SearchBar from '@/components/ui/SearchBar.vue'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackSkeleton from '@/components/TrackSkeleton.vue'
@@ -597,6 +690,7 @@ import {
   Hash, 
   Play, 
   Users, 
+  Disc3,
   Globe, 
   Folder, 
   ArrowRight,
@@ -654,10 +748,12 @@ useTrackSync(libraryResults, { isLibraryList: true })
 useTrackSync(friendsResults)
 useTrackSync(globalResults)
 
-// ─── Artists & Playlists Search State ───
+// ─── Artists, Albums & Playlists Search State ───
 const artistsResults = ref([])
+const albumsResults = ref([])
 const playlistsResults = ref([])
 const isArtistsSearching = ref(false)
+const isAlbumsSearching = ref(false)
 const isPlaylistsSearching = ref(false)
 
 // ─── SoundCloud External Search State ───
@@ -755,13 +851,14 @@ const handleQuickAddSoundCloud = async (scTrack) => {
 
 // Combined search loading state
 const isLoading = computed(() => {
-  return isTracksSearching.value || isArtistsSearching.value || isPlaylistsSearching.value || isSoundCloudSearching.value
+  return isTracksSearching.value || isArtistsSearching.value || isAlbumsSearching.value || isPlaylistsSearching.value || isSoundCloudSearching.value
 })
 
 const isInitialLoading = computed(() => {
   return isLoading.value && 
          allTracksList.value.length === 0 && 
          artistsResults.value.length === 0 && 
+         albumsResults.value.length === 0 && 
          playlistsResults.value.length === 0 &&
          soundcloudResults.value.length === 0
 })
@@ -776,6 +873,7 @@ const filterChips = [
   { id: 'tracks', label: 'Треки' },
   { id: 'soundcloud', label: 'SoundCloud' },
   { id: 'artists', label: 'Артисты' },
+  { id: 'albums', label: 'Альбомы' },
   { id: 'playlists', label: 'Плейлисты' },
 ]
 
@@ -793,6 +891,9 @@ const getChipBadge = (chipId) => {
   }
   if (chipId === 'artists') {
     return artistsResults.value.length > 0 ? artistsResults.value.length : null
+  }
+  if (chipId === 'albums') {
+    return albumsResults.value.length > 0 ? albumsResults.value.length : null
   }
   if (chipId === 'playlists') {
     return playlistsResults.value.length > 0 ? playlistsResults.value.length : null
@@ -819,7 +920,7 @@ const topTracks = computed(() => {
 const noResults = computed(() => {
   if (isLoading.value || isFriendsLoading.value || isGlobalLoading.value) return false
   if (activeFilter.value === 'all') {
-    return topTracks.value.length === 0 && artistsResults.value.length === 0 && playlistsResults.value.length === 0 && soundcloudResults.value.length === 0
+    return topTracks.value.length === 0 && artistsResults.value.length === 0 && albumsResults.value.length === 0 && playlistsResults.value.length === 0 && soundcloudResults.value.length === 0
   }
   if (activeFilter.value === 'tracks') {
     return allTracksList.value.length === 0
@@ -829,6 +930,9 @@ const noResults = computed(() => {
   }
   if (activeFilter.value === 'artists') {
     return artistsResults.value.length === 0
+  }
+  if (activeFilter.value === 'albums') {
+    return albumsResults.value.length === 0
   }
   if (activeFilter.value === 'playlists') {
     return playlistsResults.value.length === 0
@@ -933,15 +1037,21 @@ const switchScope = async (scope) => {
 }
 
 // ─── Search Execution ───
+const goToAlbum = (albumId) => {
+  router.push(`/album/${albumId}`)
+}
+
 const searchArtistsAndPlaylists = async (query) => {
   const cleanQ = query.replace(/^#/, '').trim()
   if (!cleanQ) {
     artistsResults.value = []
+    albumsResults.value = []
     playlistsResults.value = []
     return
   }
 
   isArtistsSearching.value = true
+  isAlbumsSearching.value = true
   isPlaylistsSearching.value = true
 
   // 1. Search Artists (Global network + fallback)
@@ -956,7 +1066,18 @@ const searchArtistsAndPlaylists = async (query) => {
     isArtistsSearching.value = false
   }
 
-  // 2. Search Playlists (Personal + Global)
+  // 2. Search Albums (Global network + fallback)
+  try {
+    const res = await albumsApi.getGlobal({ search: cleanQ, limit: 30 })
+    albumsResults.value = res.data?.items || []
+  } catch (e) {
+    console.error('Failed to search albums:', e)
+    albumsResults.value = []
+  } finally {
+    isAlbumsSearching.value = false
+  }
+
+  // 3. Search Playlists (Personal + Global)
   try {
     const [myRes, globalRes] = await Promise.allSettled([
       playlistsApi.getAll({ search: cleanQ, limit: 20 }),
@@ -993,6 +1114,7 @@ const performSearch = (q) => {
   } else {
     clearTrackSearch()
     artistsResults.value = []
+    albumsResults.value = []
     playlistsResults.value = []
     soundcloudResults.value = []
   }
@@ -1007,6 +1129,7 @@ const handleClear = () => {
   clearSearchInput()
   clearTrackSearch()
   artistsResults.value = []
+  albumsResults.value = []
   playlistsResults.value = []
   soundcloudResults.value = []
   if (route.query.q || route.query.search || route.query.tag) {
@@ -1287,8 +1410,8 @@ onUnmounted(() => {
   cursor: not-allowed;
 }
 
-/* Grids for Artists & Playlists tabs */
-.artists-grid, .playlists-grid {
+/* Grids for Artists, Albums & Playlists tabs */
+.artists-grid, .albums-grid, .playlists-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
   gap: 14px;
@@ -1296,13 +1419,14 @@ onUnmounted(() => {
 }
 
 @media (min-width: 768px) {
-  .artists-grid, .playlists-grid {
+  .artists-grid, .albums-grid, .playlists-grid {
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 16px;
   }
 }
 
 .artists-grid .feed-card,
+.albums-grid .feed-card,
 .playlists-grid .feed-card {
   width: 100%;
   flex: initial;
@@ -1405,6 +1529,30 @@ onUnmounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Card Tags */
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.card-tags.center {
+  justify-content: center;
+}
+
+.card-tag {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--c-accent, #1db954);
+  background: rgba(29, 185, 84, 0.12);
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+  line-height: 14px;
 }
 
 /* Empty Results */

@@ -6,15 +6,16 @@ Filters out singles (albums with <2 tracks) and shows full tracklist with missin
 """
 import json
 from typing import Optional, List
+from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func, desc, asc
+from sqlalchemy import select, func, desc, asc, or_, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from shared.database import get_db
 from shared.models import (
-    Track, Album, AlbumTrack, UserLibrary
+    Track, Album, AlbumTrack, UserLibrary, TrackTag, TrackEnrichment
 )
 from shared.matching import normalize_artist, normalize_title, fuzzy_match_title
 
@@ -52,6 +53,65 @@ def album_to_response(album: Album, track_count: Optional[int] = None, tags: Opt
         has_full_tracklist=bool(album.full_tracklist),
         tags=tags,
     )
+
+
+async def get_albums_tags(
+    db: AsyncSession,
+    album_ids: list[int],
+    limit_per_album: int = 4,
+) -> dict[int, list[str]]:
+    """
+    Get top tags for a list of album IDs.
+    Aggregates from TrackTag (user & Last.fm) and TrackEnrichment.genre of album tracks.
+    Returns dict mapping album_id -> list of top tags.
+    """
+    if not album_ids:
+        return {}
+
+    tags_by_album: dict[int, list[str]] = defaultdict(list)
+    seen_by_album: dict[int, set[str]] = defaultdict(set)
+
+    # 1. Fetch top tags from TrackTag via AlbumTrack
+    query = (
+        select(AlbumTrack.album_id, TrackTag.tag, func.count(TrackTag.id).label("cnt"))
+        .join(TrackTag, TrackTag.track_id == AlbumTrack.track_id)
+        .where(AlbumTrack.album_id.in_(album_ids))
+        .group_by(AlbumTrack.album_id, TrackTag.tag)
+        .order_by(desc("cnt"))
+    )
+    result = await db.execute(query)
+    for album_id, tag, _ in result.all():
+        if not album_id or not tag:
+            continue
+        tag_lower = tag.lower().strip()
+        if tag_lower and tag_lower not in seen_by_album[album_id]:
+            if len(tags_by_album[album_id]) < limit_per_album:
+                seen_by_album[album_id].add(tag_lower)
+                tags_by_album[album_id].append(tag)
+
+    # 2. Check TrackEnrichment.genre for albums with room
+    missing = [aid for aid in album_ids if len(tags_by_album[aid]) < limit_per_album]
+    if missing:
+        genre_query = (
+            select(AlbumTrack.album_id, TrackEnrichment.genre, func.count(TrackEnrichment.id).label("cnt"))
+            .join(TrackEnrichment, TrackEnrichment.track_id == AlbumTrack.track_id)
+            .where(AlbumTrack.album_id.in_(missing))
+            .where(TrackEnrichment.genre.is_not(None))
+            .where(TrackEnrichment.genre != "")
+            .group_by(AlbumTrack.album_id, TrackEnrichment.genre)
+            .order_by(desc("cnt"))
+        )
+        genre_result = await db.execute(genre_query)
+        for album_id, genre, _ in genre_result.all():
+            if not album_id or not genre:
+                continue
+            g_lower = genre.lower().strip()
+            if g_lower and g_lower not in seen_by_album[album_id]:
+                if len(tags_by_album[album_id]) < limit_per_album:
+                    seen_by_album[album_id].add(g_lower)
+                    tags_by_album[album_id].append(genre.lower())
+
+    return dict(tags_by_album)
 
 
 @router.get("", response_model=AlbumsListResponse)
@@ -97,11 +157,28 @@ async def get_my_albums(
     
     # Apply search
     if search:
-        # Use ilike for case-insensitive search (works better with Cyrillic in PostgreSQL)
-        search_term = f"%{search}%"
-        search_filter = (
-            Album.name.ilike(search_term) |
-            Album.artist.ilike(search_term)
+        search_clean = search.lstrip('#').strip()
+        search_term = f"%{search_clean}%"
+
+        tag_album_ids = (
+            select(AlbumTrack.album_id)
+            .join(TrackTag, TrackTag.track_id == AlbumTrack.track_id)
+            .where(TrackTag.tag.ilike(search_term))
+        )
+        genre_album_ids = (
+            select(AlbumTrack.album_id)
+            .join(TrackEnrichment, TrackEnrichment.track_id == AlbumTrack.track_id)
+            .where(or_(
+                TrackEnrichment.genre.ilike(search_term),
+                func.cast(TrackEnrichment.tags, String).ilike(search_term)
+            ))
+        )
+
+        search_filter = or_(
+            Album.name.ilike(search_term),
+            Album.artist.ilike(search_term),
+            Album.id.in_(tag_album_ids),
+            Album.id.in_(genre_album_ids),
         )
         query = query.where(search_filter)
         count_query = count_query.where(search_filter)
@@ -135,9 +212,11 @@ async def get_my_albums(
     result = await db.execute(query)
     rows = result.all()
     
-    # Build response - track counts are included in query result
+    # Build response - track counts and tags are included
+    album_ids = [album.id for album, _ in rows]
+    album_tags_map = await get_albums_tags(db, album_ids)
     items = [
-        album_to_response(album, track_count)
+        album_to_response(album, track_count, tags=album_tags_map.get(album.id))
         for album, track_count in rows
     ]
     
@@ -194,11 +273,28 @@ async def get_global_albums(
     
     # Apply search
     if search:
-        # Use ilike for case-insensitive search (works better with Cyrillic in PostgreSQL)
-        search_term = f"%{search}%"
-        search_filter = (
-            Album.name.ilike(search_term) |
-            Album.artist.ilike(search_term)
+        search_clean = search.lstrip('#').strip()
+        search_term = f"%{search_clean}%"
+
+        tag_album_ids = (
+            select(AlbumTrack.album_id)
+            .join(TrackTag, TrackTag.track_id == AlbumTrack.track_id)
+            .where(TrackTag.tag.ilike(search_term))
+        )
+        genre_album_ids = (
+            select(AlbumTrack.album_id)
+            .join(TrackEnrichment, TrackEnrichment.track_id == AlbumTrack.track_id)
+            .where(or_(
+                TrackEnrichment.genre.ilike(search_term),
+                func.cast(TrackEnrichment.tags, String).ilike(search_term)
+            ))
+        )
+
+        search_filter = or_(
+            Album.name.ilike(search_term),
+            Album.artist.ilike(search_term),
+            Album.id.in_(tag_album_ids),
+            Album.id.in_(genre_album_ids),
         )
         query = query.where(search_filter)
         count_query = count_query.where(search_filter)
@@ -233,8 +329,10 @@ async def get_global_albums(
     rows = result.all()
     
     # Build response
+    album_ids = [album.id for album, _ in rows]
+    album_tags_map = await get_albums_tags(db, album_ids)
     items = [
-        album_to_response(album, track_count)
+        album_to_response(album, track_count, tags=album_tags_map.get(album.id))
         for album, track_count in rows
     ]
     
@@ -452,6 +550,10 @@ async def get_album(
             album_tags = collected_tags
     except Exception:
         album_tags = None
+
+    if not album_tags:
+        db_tags = await get_albums_tags(db, [album.id], limit_per_album=5)
+        album_tags = db_tags.get(album.id) or None
     
     return AlbumDetailResponse(
         id=album.id,

@@ -4,13 +4,15 @@ TG Player API v2 - Playlists Router
 User playlist management.
 """
 import logging
+import re
 from typing import Optional, List
+from collections import defaultdict
 from datetime import datetime
 import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
-from sqlalchemy import select, func, delete, update, union_all, asc, desc, or_
+from sqlalchemy import select, func, delete, update, union_all, asc, desc, or_, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from aiogram.types import BufferedInputFile
@@ -18,7 +20,7 @@ from aiogram.types import BufferedInputFile
 from shared.database import get_db
 from shared.models import (
     Playlist, PlaylistTrack, Track, UserLibrary, AlbumTrack, User,
-    PlaylistSubscription, TrackEnrichment, UserChannel
+    PlaylistSubscription, TrackEnrichment, UserChannel, TrackTag
 )
 from shared.config import get_settings
 from api.routers.images import _get_bot
@@ -44,6 +46,83 @@ from api.schemas.playlists import (
 
 
 router = APIRouter(tags=["Playlists"])
+
+
+async def get_playlists_tags(
+    db: AsyncSession,
+    playlist_ids: list[int],
+    limit_per_playlist: int = 4,
+) -> dict[int, list[str]]:
+    """
+    Get top tags for a list of playlist IDs.
+    Aggregates from TrackTag (user & Last.fm) and TrackEnrichment.genre of playlist tracks,
+    as well as any #hashtags in playlist description.
+    Returns dict mapping playlist_id -> list of top tags.
+    """
+    if not playlist_ids:
+        return {}
+
+    tags_by_playlist: dict[int, list[str]] = defaultdict(list)
+    seen_by_playlist: dict[int, set[str]] = defaultdict(set)
+
+    # 1. First, check playlist descriptions for explicit #hashtags
+    desc_query = (
+        select(Playlist.id, Playlist.description)
+        .where(Playlist.id.in_(playlist_ids))
+        .where(Playlist.description.is_not(None))
+    )
+    desc_result = await db.execute(desc_query)
+    for pl_id, description in desc_result.all():
+        if description:
+            hashtags = re.findall(r'#([a-zA-Zа-яА-ЯёЁ0-9_-]+)', description)
+            for ht in hashtags:
+                ht_clean = ht.lower().strip()
+                if ht_clean and ht_clean not in seen_by_playlist[pl_id]:
+                    if len(tags_by_playlist[pl_id]) < limit_per_playlist:
+                        seen_by_playlist[pl_id].add(ht_clean)
+                        tags_by_playlist[pl_id].append(ht_clean)
+
+    # 2. Fetch top tags from TrackTag via PlaylistTrack
+    query = (
+        select(PlaylistTrack.playlist_id, TrackTag.tag, func.count(TrackTag.id).label("cnt"))
+        .join(TrackTag, TrackTag.track_id == PlaylistTrack.track_id)
+        .where(PlaylistTrack.playlist_id.in_(playlist_ids))
+        .group_by(PlaylistTrack.playlist_id, TrackTag.tag)
+        .order_by(desc("cnt"))
+    )
+    result = await db.execute(query)
+    for pl_id, tag, _ in result.all():
+        if not pl_id or not tag:
+            continue
+        tag_lower = tag.lower().strip()
+        if tag_lower and tag_lower not in seen_by_playlist[pl_id]:
+            if len(tags_by_playlist[pl_id]) < limit_per_playlist:
+                seen_by_playlist[pl_id].add(tag_lower)
+                tags_by_playlist[pl_id].append(tag)
+
+    # 3. Check TrackEnrichment.genre for playlists that still have room
+    missing = [pid for pid in playlist_ids if len(tags_by_playlist[pid]) < limit_per_playlist]
+    if missing:
+        genre_query = (
+            select(PlaylistTrack.playlist_id, TrackEnrichment.genre, func.count(TrackEnrichment.id).label("cnt"))
+            .join(TrackEnrichment, TrackEnrichment.track_id == PlaylistTrack.track_id)
+            .where(PlaylistTrack.playlist_id.in_(missing))
+            .where(TrackEnrichment.genre.is_not(None))
+            .where(TrackEnrichment.genre != "")
+            .group_by(PlaylistTrack.playlist_id, TrackEnrichment.genre)
+            .order_by(desc("cnt"))
+        )
+        genre_result = await db.execute(genre_query)
+        for pl_id, genre, _ in genre_result.all():
+            if not pl_id or not genre:
+                continue
+            g_lower = genre.lower().strip()
+            if g_lower and g_lower not in seen_by_playlist[pl_id]:
+                if len(tags_by_playlist[pl_id]) < limit_per_playlist:
+                    seen_by_playlist[pl_id].add(g_lower)
+                    tags_by_playlist[pl_id].append(genre.lower())
+
+    return dict(tags_by_playlist)
 
 
 async def get_playlist_info(
@@ -158,9 +237,31 @@ async def get_my_playlists(
     
     # Apply search
     if search:
-        search_term = f"%{search}%"
-        query = query.where(Playlist.name.ilike(search_term))
-        count_query = count_query.where(Playlist.name.ilike(search_term))
+        search_clean = search.lstrip('#').strip()
+        search_term = f"%{search_clean}%"
+
+        tag_playlist_ids = (
+            select(PlaylistTrack.playlist_id)
+            .join(TrackTag, TrackTag.track_id == PlaylistTrack.track_id)
+            .where(TrackTag.tag.ilike(search_term))
+        )
+        genre_playlist_ids = (
+            select(PlaylistTrack.playlist_id)
+            .join(TrackEnrichment, TrackEnrichment.track_id == PlaylistTrack.track_id)
+            .where(or_(
+                TrackEnrichment.genre.ilike(search_term),
+                func.cast(TrackEnrichment.tags, String).ilike(search_term)
+            ))
+        )
+
+        search_filter = or_(
+            Playlist.name.ilike(search_term),
+            Playlist.description.ilike(search_term),
+            Playlist.id.in_(tag_playlist_ids),
+            Playlist.id.in_(genre_playlist_ids),
+        )
+        query = query.where(search_filter)
+        count_query = count_query.where(search_filter)
     
     # Count total
     total = await db.scalar(count_query) or 0
@@ -184,6 +285,9 @@ async def get_my_playlists(
     result = await db.execute(query)
     rows = result.all()
     
+    playlist_ids = [playlist.id for playlist, _, _ in rows]
+    playlist_tags_map = await get_playlists_tags(db, playlist_ids)
+
     items = []
     for playlist, owner, tc in rows:
         track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.custom_cover_url)
@@ -209,6 +313,7 @@ async def get_my_playlists(
             cover_url=cover_url,
             custom_cover_url=playlist.custom_cover_url,
             covers=covers,
+            tags=playlist_tags_map.get(playlist.id),
             is_public=playlist.is_public,
             owner_id=owner.id,
             owner_name=owner.display_name,
@@ -320,17 +425,33 @@ async def get_global_playlists(
     
     # Apply search
     if search:
-        search_term = f"%{search}%"
+        search_clean = search.lstrip('#').strip()
+        search_term = f"%{search_clean}%"
         user_name_match = or_(
             User.username.ilike(search_term),
             User.first_name.ilike(search_term),
             User.last_name.ilike(search_term),
             (func.coalesce(User.first_name, '') + ' ' + func.coalesce(User.last_name, '')).ilike(search_term),
         )
+        tag_playlist_ids = (
+            select(PlaylistTrack.playlist_id)
+            .join(TrackTag, TrackTag.track_id == PlaylistTrack.track_id)
+            .where(TrackTag.tag.ilike(search_term))
+        )
+        genre_playlist_ids = (
+            select(PlaylistTrack.playlist_id)
+            .join(TrackEnrichment, TrackEnrichment.track_id == PlaylistTrack.track_id)
+            .where(or_(
+                TrackEnrichment.genre.ilike(search_term),
+                func.cast(TrackEnrichment.tags, String).ilike(search_term)
+            ))
+        )
         search_filter = or_(
             Playlist.name.ilike(search_term),
             Playlist.description.ilike(search_term),
             user_name_match,
+            Playlist.id.in_(tag_playlist_ids),
+            Playlist.id.in_(genre_playlist_ids),
         )
         query = query.where(search_filter)
         count_query = (
@@ -362,6 +483,9 @@ async def get_global_playlists(
     result = await db.execute(query)
     rows = result.all()
     
+    playlist_ids = [playlist.id for playlist, _, _ in rows]
+    playlist_tags_map = await get_playlists_tags(db, playlist_ids)
+
     items = []
     for playlist, owner, tc in rows:
         track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.custom_cover_url)
@@ -387,6 +511,7 @@ async def get_global_playlists(
             cover_url=cover_url,
             custom_cover_url=playlist.custom_cover_url,
             covers=covers,
+            tags=playlist_tags_map.get(playlist.id),
             is_public=playlist.is_public,
             owner_id=owner.id,
             owner_name=owner.display_name,
@@ -527,6 +652,10 @@ async def get_playlist(
             playlist_tags = collected_tags
     except Exception:
         playlist_tags = None
+
+    if not playlist_tags:
+        db_tags = await get_playlists_tags(db, [playlist.id], limit_per_playlist=5)
+        playlist_tags = db_tags.get(playlist.id) or None
     
     return PlaylistDetailResponse(
         id=playlist.id,
@@ -896,6 +1025,9 @@ async def get_public_playlists(
     )
     rows = result.all()
     
+    playlist_ids = [playlist.id for playlist, _ in rows]
+    playlist_tags_map = await get_playlists_tags(db, playlist_ids)
+
     items = []
     for playlist, owner in rows:
         track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.custom_cover_url)
@@ -922,6 +1054,7 @@ async def get_public_playlists(
             cover_url=cover_url,
             custom_cover_url=playlist.custom_cover_url,
             covers=covers,
+            tags=playlist_tags_map.get(playlist.id),
             is_public=playlist.is_public,
             owner_id=owner.id,
             owner_name=owner.display_name,
