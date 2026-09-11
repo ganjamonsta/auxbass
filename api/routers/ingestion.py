@@ -7,10 +7,12 @@ import re
 import logging
 import asyncio
 import tempfile
+import io
+import csv
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form
 from aiogram import Bot
 from aiogram.enums import ParseMode
 from aiogram.types import FSInputFile
@@ -22,7 +24,7 @@ from sqlalchemy.orm import selectinload
 from shared.config import get_settings
 from shared.database import get_session, get_db
 from shared.models import (
-    User, Track, UserLibrary, AlbumTrack, LibrarySource,
+    User, Track, UserLibrary, AlbumTrack, Playlist, PlaylistTrack, LibrarySource,
     UserExternalAccount, UserChannel, ChannelMessage, ChannelMessageStatus, utcnow
 )
 from api.routers.auth import get_current_user, TelegramUser
@@ -121,6 +123,39 @@ class TrackPreviewItem(BaseModel):
     in_library: bool = False
     already_in_tg: bool = False
     track_id: Optional[int] = None
+
+
+class ExportifyTrackItem(BaseModel):
+    url: str
+    title: str
+    artist: str
+    album: Optional[str] = None
+    duration: Optional[int] = None
+    cover_url: Optional[str] = None
+    track_uri: Optional[str] = None
+    isrc: Optional[str] = None
+    in_library: bool = False
+    in_channel: bool = False
+    already_in_tg: bool = False
+    track_id: Optional[int] = None
+    liked_at: Optional[str] = None
+
+
+class ExportifyPreviewResponse(BaseModel):
+    filename: str
+    total_tracks: int
+    new_tracks_count: int
+    in_library_count: int
+    in_channel_count: int
+    already_in_tg_count: int
+    tracks: List[ExportifyTrackItem]
+
+
+class ExportifyStartRequest(BaseModel):
+    title: Optional[str] = "Spotify Import"
+    tracks: List[ExportifyTrackItem]
+    create_playlist: bool = False
+    playlist_name: Optional[str] = None
 
 
 class PreviewRequest(BaseModel):
@@ -812,7 +847,7 @@ async def connect_spotify_account(
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Connect a Spotify account or sp_dc session token."""
+    """Connect a Spotify profile username or link."""
     sp_provider = provider_registry.get_provider("spotify")
     if not sp_provider:
         raise HTTPException(
@@ -859,8 +894,7 @@ async def connect_spotify_account(
         account.avatar_url = profile.get("avatar_url")
         account.likes_count = profile.get("likes_count", 0)
         account.tracks_count = profile.get("tracks_count", 0)
-        if req.auth_token:
-            account.auth_token = req.auth_token
+        account.auth_token = req.auth_token
         account.last_synced_at = utcnow()
 
     await db.commit()
@@ -895,42 +929,58 @@ async def disconnect_spotify_account(
     return {"ok": True, "message": "Spotify аккаунт отключен"}
 
 
-@router.get("/account/spotify/likes", response_model=UserLikesResponse)
-async def get_spotify_likes(
-    limit: int = Query(40, ge=1, le=50),
-    cursor: Optional[str] = None,
+# ============== Exportify Spotify CSV Import & Deduplication ==============
+
+@router.post("/spotify/exportify/preview", response_model=ExportifyPreviewResponse)
+async def preview_exportify_csv(
+    file: Optional[UploadFile] = File(None),
+    csv_text: Optional[str] = Form(None),
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Fetch user's liked tracks from Spotify with local library & channel backup status."""
-    account = await db.scalar(
-        select(UserExternalAccount)
-        .where(UserExternalAccount.user_id == user.id, UserExternalAccount.provider == "spotify")
-    )
-    if not account:
+    """
+    Parse an Exportify CSV file (Liked Songs or any playlist), extract track metadata,
+    and perform robust recognition against local library, Telegram storage, and backup channel.
+    """
+    raw_content = ""
+    filename = "exported_tracks.csv"
+
+    if file:
+        filename = file.filename or "exportify.csv"
+        content_bytes = await file.read()
+        try:
+            raw_content = content_bytes.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            raw_content = content_bytes.decode("latin-1", errors="replace")
+    elif csv_text:
+        raw_content = csv_text
+    else:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Spotify аккаунт не подключен. Перейдите в настройки для подключения.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Необходимо прикрепить файл CSV или передать текст CSV.",
         )
 
-    sp_provider = provider_registry.get_provider("spotify")
-    if not sp_provider:
+    if not raw_content.strip():
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Spotify provider unavailable",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CSV файл пуст.",
         )
 
-    try:
-        ident = account.external_id or account.username
-        tracks_meta, next_cursor = await sp_provider.fetch_user_likes(
-            ident, limit=limit, next_href=cursor, auth_token=account.auth_token
-        )
-    except Exception as e:
-        logger.error(f"Failed to fetch Spotify likes for {account.username}: {e}", exc_info=True)
+    reader = csv.DictReader(io.StringIO(raw_content))
+    if not reader.fieldnames:
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Не удалось получить лайки со Spotify: {str(e)}",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Не удалось прочитать заголовки CSV файла.",
         )
+
+    field_map = {f.strip().lower(): f for f in reader.fieldnames if f}
+
+    def get_val(row, *candidates):
+        for c in candidates:
+            k = field_map.get(c.lower())
+            if k and row.get(k):
+                return row[k].strip()
+        return None
 
     # Preload user's library and channel backup status in batch
     user_lib_q = select(UserLibrary.track_id).where(UserLibrary.user_id == user.id)
@@ -943,46 +993,173 @@ async def get_spotify_likes(
     )
     user_channel_track_ids = set((await db.scalars(user_ch_q)).all())
 
-    items: List[SoundCloudLikeItem] = []
-    for t in tracks_meta:
-        existing = await _find_existing_track(t.title, t.artist, t.duration, session=db)
+    items: List[ExportifyTrackItem] = []
+    in_lib_cnt = 0
+    in_chan_cnt = 0
+    in_tg_cnt = 0
+
+    for idx, row in enumerate(reader, start=1):
+        title = get_val(row, "Track Name", "Name", "Title")
+        artist = get_val(row, "Artist Name(s)", "Artist Name", "Artist", "Artists")
+        if not title or not artist:
+            continue
+
+        album = get_val(row, "Album Name", "Album")
+        cover_url = get_val(row, "Album Image URL", "Cover URL", "Image URL")
+        track_uri = get_val(row, "Track URI", "URI", "Spotify URI")
+        isrc = get_val(row, "ISRC")
+        liked_at = get_val(row, "Added At", "Liked At")
+
+        # Duration (ms -> s)
+        dur_str = get_val(row, "Track Duration (ms)", "Duration (ms)", "Duration_ms", "Duration")
+        duration = None
+        if dur_str:
+            try:
+                dur_num = float(dur_str.replace(",", "."))
+                if dur_num > 1000:
+                    duration = int(dur_num / 1000)
+                else:
+                    duration = int(dur_num)
+            except ValueError:
+                pass
+
+        if track_uri and "spotify:track:" in track_uri:
+            track_id_str = track_uri.split(":")[-1]
+            url = f"https://open.spotify.com/track/{track_id_str}"
+        else:
+            url = f"spotify:exportify:{idx}"
+
+        # Accurate recognition against database
+        existing = await _find_existing_track(title, artist, duration, session=db)
         already_in_tg = existing is not None
         in_lib = (existing.id in user_lib_track_ids) if existing else False
         in_chan = (existing.id in user_channel_track_ids) if existing else False
         existing_id = existing.id if existing else None
 
+        if already_in_tg:
+            in_tg_cnt += 1
+        if in_lib:
+            in_lib_cnt += 1
+        if in_chan:
+            in_chan_cnt += 1
+
         items.append(
-            SoundCloudLikeItem(
-                url=t.url,
-                title=t.title,
-                artist=t.artist,
-                duration=t.duration,
-                cover_url=t.cover_url,
+            ExportifyTrackItem(
+                url=url,
+                title=title,
+                artist=artist,
+                album=album,
+                duration=duration,
+                cover_url=cover_url,
+                track_uri=track_uri,
+                isrc=isrc,
                 in_library=in_lib,
                 in_channel=in_chan,
                 already_in_tg=already_in_tg,
                 track_id=existing_id,
-                liked_at=t.extra.get("liked_at") if t.extra else None,
+                liked_at=liked_at,
             )
         )
 
-    account_resp = ExternalAccountResponse(
-        provider=account.provider,
-        username=account.username,
-        display_name=account.display_name,
-        profile_url=account.profile_url,
-        avatar_url=account.avatar_url,
-        likes_count=account.likes_count,
-        tracks_count=account.tracks_count,
-        connected=True,
-        last_synced_at=account.last_synced_at.isoformat() if account.last_synced_at else None,
+    new_cnt = sum(1 for it in items if not it.in_library)
+
+    return ExportifyPreviewResponse(
+        filename=filename,
+        total_tracks=len(items),
+        new_tracks_count=new_cnt,
+        in_library_count=in_lib_cnt,
+        in_channel_count=in_chan_cnt,
+        already_in_tg_count=in_tg_cnt,
+        tracks=items,
     )
 
-    return UserLikesResponse(
-        provider="spotify",
-        account=account_resp,
-        total_likes=account.likes_count,
-        items=items,
-        next_cursor=next_cursor,
+
+@router.post("/spotify/exportify/start", response_model=JobResponse)
+async def start_exportify_import(
+    req: ExportifyStartRequest,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Start background ingestion job for selected Exportify tracks.
+    Tracks already stored on Telegram servers are instantly linked without re-downloading.
+    Tracks already in the user's channel are not re-sent.
+    """
+    if not req.tracks:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Список треков для импорта пуст.",
+        )
+
+    await _ensure_user_in_db(user)
+
+    playlist_id = None
+    if req.create_playlist:
+        p_name = req.playlist_name or req.title or "Spotify Playlist"
+        cover = req.tracks[0].cover_url if req.tracks and req.tracks[0].cover_url else None
+        new_pl = Playlist(
+            owner_id=user.id,
+            name=p_name,
+            description="Imported from Spotify via Exportify",
+            cover_url=cover,
+            is_public=False,
+        )
+        db.add(new_pl)
+        await db.commit()
+        await db.refresh(new_pl)
+        playlist_id = new_pl.id
+
+    custom_tracks_data = [t.model_dump() for t in req.tracks]
+
+    job = await job_manager.create_job(
+        user_id=user.id,
+        url="https://exportify.app",
+        provider_name="spotify",
+        entity_type="playlist" if playlist_id else "tracks",
+        title=req.playlist_name or req.title or "Spotify Import",
+        total_tracks=len(req.tracks),
+        cover_url=req.tracks[0].cover_url if req.tracks else None,
+        custom_tracks=custom_tracks_data,
     )
+    if playlist_id:
+        job.playlist_id = playlist_id
+
+    bot = _get_active_bot()
+    pipeline = IngestionPipeline(bot)
+
+    # Spawn background task
+    asyncio.create_task(pipeline.execute_job(job))
+
+    return JobResponse(
+        id=job.id,
+        user_id=job.user_id,
+        url=job.url,
+        provider_name=job.provider_name,
+        entity_type=job.entity_type,
+        title=job.title,
+        author=job.author,
+        cover_url=job.cover_url,
+        total_tracks=job.total_tracks,
+        processed_tracks=job.processed_tracks,
+        skipped_tracks=job.skipped_tracks,
+        failed_tracks=job.failed_tracks,
+        current_track_title=job.current_track_title,
+        status=job.status.value,
+        progress_percent=job.progress_percent,
+        error_message=job.error_message,
+        playlist_id=job.playlist_id,
+        imported_track_ids=job.imported_track_ids,
+        selected_urls=job.selected_urls,
+        created_at=job.created_at.isoformat(),
+        updated_at=job.updated_at.isoformat(),
+    )
+
+
+@router.get("/account/spotify/likes")
+async def get_spotify_likes_info():
+    """Inform user to use the rock-solid Exportify CSV import."""
+    return {
+        "ok": True,
+        "message": "Используйте импорт CSV через Exportify (вкладка Spotify ➔ Импорт CSV или Настройки)",
+    }
 

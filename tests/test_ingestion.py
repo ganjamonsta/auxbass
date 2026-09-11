@@ -444,6 +444,118 @@ async def test_soundcloud_drm_fallback_to_audio_resolver(monkeypatch):
     assert audio.audio_path == "/tmp/fake_resolved.mp3"
 
 
+def test_exportify_csv_parsing():
+    import csv
+    import io
+
+    csv_data = (
+        'Track URI,Track Name,Artist URI(s),Artist Name(s),Album URI,Album Name,Album Release Date,Album Image URL,Track Duration (ms),ISRC,Added By,Added At\n'
+        'spotify:track:4cOdK2wGLETKBW3PvgPWqT,Never Gonna Give You Up,spotify:artist:0gxyHStUsqpMadRV0Di1Qt,Rick Astley,spotify:album:1kugj9e22r9w,Whenever You Need Somebody,1987-11-12,https://i.scdn.co/image/ab67616d0000b273,213573,GBARL8700072,spotify:user:123,2023-01-01T12:00:00Z\n'
+        'spotify:track:12345,Fasten Your Seatbelt - Original Mix,spotify:artist:999,"Pendulum, The Freestylers",spotify:album:888,Hold Your Colour,2005-07-25,https://i.scdn.co/image/cover123,278000,GBAHT0500123,spotify:user:123,2023-01-02T12:00:00Z\n'
+    )
+
+    reader = csv.DictReader(io.StringIO(csv_data))
+    rows = list(reader)
+    assert len(rows) == 2
+
+    r1 = rows[0]
+    assert r1["Track Name"] == "Never Gonna Give You Up"
+    assert r1["Artist Name(s)"] == "Rick Astley"
+    assert int(float(r1["Track Duration (ms)"]) / 1000) == 213
+    assert r1["ISRC"] == "GBARL8700072"
+
+    r2 = rows[1]
+    assert r2["Track Name"] == "Fasten Your Seatbelt - Original Mix"
+    assert r2["Artist Name(s)"] == "Pendulum, The Freestylers"
+    assert int(float(r2["Track Duration (ms)"]) / 1000) == 278
+
+
+def test_robust_norm_title_and_version_stripping():
+    from bot.services.ingestion.pipeline import _robust_norm_title
+
+    assert _robust_norm_title("Fasten Your Seatbelt - Original Mix") == "fasten your seatbelt"
+    assert _robust_norm_title("Fasten Your Seatbelt (feat. The Freestylers)") == "fasten your seatbelt"
+    assert _robust_norm_title("In The End - 2020 Remaster") == "in the end"
+    assert _robust_norm_title("Midnight City - Radio Edit") == "midnight city"
+    assert _robust_norm_title("Midnight City (Original Mix)") == "midnight city"
+    assert _robust_norm_title("Clint Eastwood - Ed Case/Sweetie Irie Re-Fix") == "clint eastwood"
+    assert _robust_norm_title("Clint Eastwood (Ed Case/Sweetie Irie Refix)") == "clint eastwood"
+
+
+@pytest.mark.asyncio
+async def test_find_existing_track_tolerant_matching():
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from shared.models import Base, Track, User
+    from bot.services.ingestion.pipeline import _find_existing_track
+
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    async_session = async_sessionmaker(engine, expire_on_commit=False)
+
+    async with async_session() as session:
+        user = User(id=123, username="tester")
+        session.add(user)
+        await session.flush()
+
+        t1 = Track(
+            id=1,
+            file_id="fid_1",
+            file_unique_id="fuid_1",
+            title="Fasten Your Seatbelt (feat. The Freestylers)",
+            artist="Pendulum",
+            normalized_artist="pendulum",
+            duration=278,
+            uploader_id=123,
+        )
+        t2 = Track(
+            id=2,
+            file_id="fid_2",
+            file_unique_id="fuid_2",
+            title="Around the World",
+            artist="Daft Punk",
+            normalized_artist="daft punk",
+            duration=429,
+            uploader_id=123,
+        )
+        session.add_all([t1, t2])
+        await session.commit()
+
+        # 1. Match with version suffix and collaborator: "Fasten Your Seatbelt - Original Mix"
+        found = await _find_existing_track(
+            title="Fasten Your Seatbelt - Original Mix",
+            artist="Pendulum, The Freestylers",
+            duration=278,
+            session=session,
+        )
+        assert found is not None
+        assert found.id == 1
+
+        # 2. Match exact Daft Punk with close duration (±1s)
+        found2 = await _find_existing_track(
+            title="Around the World",
+            artist="Daft Punk",
+            duration=428,
+            session=session,
+        )
+        assert found2 is not None
+        assert found2.id == 2
+
+        # 3. Same artist, completely different track duration/title -> should NOT match!
+        found3 = await _find_existing_track(
+            title="One More Time",
+            artist="Daft Punk",
+            duration=320,
+            session=session,
+        )
+        assert found3 is None
+
+    await engine.dispose()
+
+
+
+
 
 
 

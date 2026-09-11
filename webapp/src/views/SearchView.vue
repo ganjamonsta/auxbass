@@ -777,12 +777,11 @@
             </button>
             <button 
               class="sc-subtab-btn" 
-              :class="{ active: spSubTab === 'likes' }"
-              @click="switchToSpotifyLikesTab"
+              :class="{ active: spSubTab === 'exportify' }"
+              @click="spSubTab = 'exportify'"
             >
-              <Heart :size="15" />
-              <span>Мои лайки</span>
-              <span v-if="spAccount?.likes_count" class="sc-subtab-count sp-count">{{ spAccount.likes_count }}</span>
+              <FileSpreadsheet :size="15" />
+              <span>Импорт Exportify (CSV)</span>
             </button>
           </div>
 
@@ -874,156 +873,46 @@
             </div>
           </template>
 
-          <!-- 2. LIKES MODE -->
-          <template v-else-if="spSubTab === 'likes'">
-            <!-- Account Connected Header -->
-            <div v-if="spAccount?.connected" class="sc-likes-header-card sp-header-card">
-              <div class="sc-likes-user-bar">
-                <img 
-                  v-if="spAccount.avatar_url" 
-                  :src="spAccount.avatar_url" 
-                  alt="" 
-                  class="sc-likes-avatar"
-                  referrerpolicy="no-referrer" 
-                />
-                <div v-else class="sc-likes-avatar-placeholder sp-placeholder">
-                  <Radio :size="18" />
+          <!-- 2. EXPORTIFY CSV MODE -->
+          <template v-else-if="spSubTab === 'exportify'">
+            <div class="sp-exportify-view-card">
+              <div class="sp-exportify-header-banner">
+                <div class="sp-exportify-icon-large">
+                  <FileSpreadsheet :size="32" />
                 </div>
-                <div class="sc-likes-user-meta">
-                  <span class="sc-likes-username">{{ spAccount.display_name || spAccount.username }}</span>
-                  <span class="sc-likes-stats-text">💚 {{ spAccount.likes_count || spLikes.length }} лайков на Spotify</span>
+                <div class="sp-exportify-banner-text">
+                  <h3 class="sp-exportify-title">Импорт медиатеки Spotify через Exportify</h3>
+                  <p class="sp-exportify-subtitle">
+                    100% бесплатно и без ограничений: выгрузите любимые треки или плейлисты в CSV и импортируйте их в высоком качестве 320 kbps с автоматическим распознаванием дубликатов.
+                  </p>
                 </div>
               </div>
 
-              <div class="sc-likes-header-actions">
-                <button 
-                  class="sc-sync-btn sp-sync-btn"
-                  :disabled="isSyncingAllSpLikes || isSpLikesLoading || unimportedSpLikesCount === 0"
-                  @click="handleSyncAllSpLikes"
-                  title="Импортировать все новые треки в медиатеку и канал"
-                >
-                  <div v-if="isSyncingAllSpLikes" class="spinner small"></div>
-                  <CloudDownload v-else :size="15" />
-                  <span>{{ isSyncingAllSpLikes ? 'Синхронизация...' : `Синхронизировать новые (${unimportedSpLikesCount})` }}</span>
-                </button>
-                <button 
-                  class="sc-refresh-icon-btn" 
-                  :disabled="isSpLikesLoading"
-                  @click="fetchSpLikes(true)"
-                  title="Обновить список лайков"
-                >
-                  <RefreshCw :size="15" :class="{ 'spin-icon': isSpLikesLoading }" />
-                </button>
-              </div>
-            </div>
-
-            <!-- Sync progress bar if active -->
-            <div v-if="syncSpJobProgress" class="sc-sync-progress-banner sp-progress-banner">
-              <div class="sc-sync-info-row">
-                <span class="sc-sync-msg">Импорт: {{ syncSpJobProgress.current_track_title || 'Загрузка...' }}</span>
-                <span class="sc-sync-count">{{ syncSpJobProgress.processed_tracks }} / {{ syncSpJobProgress.total_tracks }}</span>
-              </div>
-              <div class="sc-sync-bar-track">
-                <div 
-                  class="sc-sync-bar-fill sp-bar-fill" 
-                  :style="{ width: `${Math.round((syncSpJobProgress.processed_tracks / (syncSpJobProgress.total_tracks || 1)) * 100)}%` }"
-                ></div>
-              </div>
-            </div>
-
-            <!-- Loading indicator -->
-            <div v-if="isSpLikesLoading && spLikes.length === 0" class="section-loading-indicator">
-              <div class="spinner small"></div>
-              <span>Загрузка любимых треков со Spotify...</span>
-            </div>
-
-            <!-- Likes Track List -->
-            <div v-else-if="spLikes.length > 0" class="sc-results-list full-list">
-              <div
-                v-for="item in spLikes"
-                :key="item.url"
-                class="sc-track-item sp-item"
-                @click="handleQuickPlaySpotify(item)"
-              >
-                <div class="sc-track-cover sp-cover">
-                  <img v-if="item.cover_url" :src="item.cover_url" alt="" loading="lazy" referrerpolicy="no-referrer" />
-                  <Music v-else :size="20" />
-                  <div v-if="importingTrackUrl === item.url" class="sc-track-loading">
-                    <div class="spinner small"></div>
-                  </div>
-                  <div v-else class="sc-track-play">
-                    <Play :size="14" fill="currentColor" />
-                  </div>
+              <div class="sp-exportify-steps-grid">
+                <div class="sp-step-card">
+                  <span class="sp-step-badge">1</span>
+                  <h4>Экспорт на exportify.app</h4>
+                  <p>Откройте бесплатный веб-сервис в браузере (работает в 1 клик):</p>
+                  <a href="https://exportify.app" target="_blank" rel="noopener noreferrer" class="sp-ext-link-btn">
+                    <span>exportify.app</span>
+                    <ExternalLink :size="13" />
+                  </a>
                 </div>
-
-                <div class="sc-track-info">
-                  <div class="sc-track-title" :title="item.title">{{ item.title }}</div>
-                  <div class="sc-track-artist-row">
-                    <span class="sc-track-artist">{{ item.artist }}</span>
-                    <!-- Badges -->
-                    <div class="sc-track-badges">
-                      <span v-if="item.in_library" class="sc-badge-pill in-lib" title="Уже в вашей медиатеке">
-                        <Check :size="10" /> В медиатеке
-                      </span>
-                      <span v-if="item.in_channel" class="sc-badge-pill in-chan" title="Забэкаплен в Telegram-канал">
-                        <CloudDownload :size="10" /> В канале
-                      </span>
-                      <span v-else-if="item.already_in_tg" class="sc-badge-pill in-tg" title="Уже есть на сервере Telegram">
-                        В базе TG
-                      </span>
-                    </div>
-                  </div>
+                <div class="sp-step-card">
+                  <span class="sp-step-badge">2</span>
+                  <h4>Скачайте CSV-файл</h4>
+                  <p>Нажмите <b>«Export»</b> напротив <b>«Liked Songs»</b> или любого плейлиста.</p>
                 </div>
-
-                <div class="sc-track-actions">
-                  <span v-if="item.duration" class="sc-track-duration">{{ formatDuration(item.duration) }}</span>
-                  <button 
-                    v-if="!item.in_library"
-                    class="sc-add-btn sp-add" 
-                    :disabled="importingTrackUrl === item.url"
-                    @click.stop="handleQuickAddSpotify(item)"
-                    title="Добавить в медиатеку и канал"
-                  >
-                    <Plus :size="16" />
+                <div class="sp-step-card highlight">
+                  <span class="sp-step-badge">3</span>
+                  <h4>Загрузите сюда</h4>
+                  <p>Откройте окно импорта и перетащите скачанный файл:</p>
+                  <button class="sp-open-modal-btn" @click="showExportifyModal = true">
+                    <Upload :size="15" />
+                    <span>Открыть окно импорта CSV</span>
                   </button>
-                  <span v-else class="sc-added-indicator" title="Уже в медиатеке">
-                    <Check :size="16" />
-                  </span>
                 </div>
               </div>
-
-              <!-- Load more likes button -->
-              <div v-if="spLikesCursor" class="sc-load-more-wrap">
-                <button 
-                  class="sc-load-more-btn sp-load-more"
-                  :disabled="isLoadingMoreSpLikes"
-                  @click="loadMoreSpLikes"
-                >
-                  <div v-if="isLoadingMoreSpLikes" class="spinner small"></div>
-                  <template v-else>Загрузить ещё лайки</template>
-                </button>
-              </div>
-            </div>
-
-            <!-- Not Connected Prompt -->
-            <div v-else-if="!spAccount?.connected && !isSpLikesLoading" class="sc-not-connected-banner sp-banner">
-              <div class="sc-banner-icon sp-banner-icon">
-                <Radio :size="32" />
-              </div>
-              <h4 class="sc-banner-title">Аккаунт Spotify не подключен</h4>
-              <p class="sc-banner-desc">
-                Привяжите ваш профиль Spotify в настройках, чтобы просматривать лайки, слушать и автоматически сохранять аудиофайлы в личный Telegram-канал.
-              </p>
-              <button class="sc-btn primary sp-primary" @click="router.push('/settings')">
-                <Settings :size="15" />
-                <span>Открыть настройки</span>
-              </button>
-            </div>
-
-            <!-- Empty likes -->
-            <div v-else-if="!isSpLikesLoading" class="no-results-box">
-              <p class="no-results-text">Любимых треков на Spotify пока нет</p>
-              <p class="no-results-hint">Добавьте треки в «Любимые треки» на Spotify и нажмите «Обновить»</p>
             </div>
           </template>
         </div>
@@ -1182,6 +1071,13 @@
         </div>
       </div>
     </div>
+
+    <!-- Exportify CSV Modal -->
+    <ExportifyImportModal
+      :show="showExportifyModal"
+      @close="showExportifyModal = false"
+      @imported="libraryStore.fetchTracks({ refresh: true })"
+    />
   </div>
 </template>
 
@@ -1202,6 +1098,7 @@ import api, { tracksApi, artistsApi, albumsApi, playlistsApi, ingestionApi } fro
 import SearchBar from '@/components/ui/SearchBar.vue'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackSkeleton from '@/components/TrackSkeleton.vue'
+import ExportifyImportModal from '@/components/ExportifyImportModal.vue'
 import { getCoverUrl, CoverSize, formatDuration } from '@/utils'
 import { 
   Music, 
@@ -1219,7 +1116,9 @@ import {
   CloudDownload,
   ExternalLink,
   Radio,
-  Settings
+  Settings,
+  FileSpreadsheet,
+  Upload
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -1503,15 +1402,10 @@ const spotifyResults = ref([])
 const isSpotifySearching = ref(false)
 const isLoadingMoreSpotify = ref(false)
 
-const spSubTab = ref('search') // 'search' | 'likes'
+const spSubTab = ref('search') // 'search' | 'exportify'
+const showExportifyModal = ref(false)
 const spAccount = ref(null)
 const isSpAccountLoading = ref(false)
-const spLikes = ref([])
-const isSpLikesLoading = ref(false)
-const spLikesCursor = ref(null)
-const isLoadingMoreSpLikes = ref(false)
-const isSyncingAllSpLikes = ref(false)
-const syncSpJobProgress = ref(null)
 
 const fetchSpAccountForSearch = async () => {
   isSpAccountLoading.value = true
@@ -3219,5 +3113,131 @@ onUnmounted(() => {
 
 .sp-header-card {
   border-left: 3px solid #1ed760;
+}
+
+/* Exportify View Card */
+.sp-exportify-view-card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 10px 0;
+}
+
+.sp-exportify-header-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(29, 185, 84, 0.08);
+  border: 1px solid rgba(29, 185, 84, 0.2);
+  border-radius: 16px;
+  padding: 20px 24px;
+}
+
+.sp-exportify-icon-large {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: rgba(29, 185, 84, 0.16);
+  color: #1ed760;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sp-exportify-title {
+  margin: 0 0 6px 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.sp-exportify-subtitle {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #a7b1bc;
+}
+
+.sp-exportify-steps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+.sp-step-card {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sp-step-card.highlight {
+  background: rgba(29, 185, 84, 0.06);
+  border-color: rgba(29, 185, 84, 0.25);
+}
+
+.sp-step-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #1db954;
+  color: #000;
+  font-weight: 700;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sp-step-card h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #f1f3f5;
+}
+
+.sp-step-card p {
+  margin: 0;
+  font-size: 12px;
+  color: #8b929a;
+  line-height: 1.4;
+}
+
+.sp-ext-link-btn {
+  margin-top: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #1ed760;
+  text-decoration: underline;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sp-open-modal-btn {
+  margin-top: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #1db954;
+  color: #000;
+  border: none;
+  padding: 9px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(29, 185, 84, 0.3);
+}
+
+.sp-open-modal-btn:hover {
+  background: #24d864;
+  transform: translateY(-1px);
 }
 </style>

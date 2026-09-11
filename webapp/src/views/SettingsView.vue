@@ -171,51 +171,53 @@
         </span>
       </div>
 
-      <!-- Connected State -->
-      <div v-if="spAccount?.connected" class="sc-connected-card">
-        <div class="sc-user-row">
-          <img 
-            v-if="spAccount.avatar_url" 
-            :src="spAccount.avatar_url" 
-            alt="Spotify Avatar" 
-            class="sc-avatar" 
-            referrerpolicy="no-referrer"
-          />
-          <div v-else class="sc-avatar-placeholder sp-placeholder">
-            <Radio :size="24" />
-          </div>
-          <div class="sc-user-details">
-            <span class="sc-user-title">{{ spAccount.display_name || spAccount.username }}</span>
-            <a :href="spAccount.profile_url" target="_blank" rel="noopener" class="sc-user-link">
-              @{{ spAccount.username }} <ExternalLink :size="12" />
-            </a>
-          </div>
-          <div class="sc-likes-badge" title="Количество лайков на Spotify">
-            <span class="sc-likes-num">{{ spAccount.likes_count || 0 }}</span>
-            <span class="sc-likes-label">лайков</span>
-          </div>
-        </div>
-
-        <div class="sc-connected-actions">
-          <button class="sc-btn primary sp-primary" @click="goToSpotifyLikes">
-            <Heart :size="16" />
-            <span>Мои лайки Spotify</span>
-          </button>
-          <button class="sc-btn secondary" :disabled="isDisconnectingSp" @click="handleDisconnectSp">
-            <Unlink :size="16" />
-            <span>Отвязать</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Not Connected State -->
-      <div v-else class="sc-connect-card">
+      <!-- Spotify Section -->
+      <div class="sc-connect-card">
         <p class="sc-desc">
-          Привяжите ваш профиль Spotify, чтобы синхронизировать ваши сохраненные треки в медиатеку и автоматически создавать бэкап аудио в Telegram-канал.
+          Переносите любимые треки и плейлисты из Spotify в высоком качестве 320 kbps через экспорт CSV (сервис Exportify). 
+          Все треки распознаются, проверяются на дубликаты и автоматически сохраняются в ваш Telegram-канал.
         </p>
 
-        <div class="sc-input-group">
-          <label class="sc-label">Ссылка на профиль или никнейм Spotify:</label>
+        <!-- Quick Exportify Action Card -->
+        <div class="sp-settings-action-box">
+          <div class="sp-settings-box-info">
+            <div class="sp-settings-icon-wrap">
+              <FileSpreadsheet :size="24" />
+            </div>
+            <div>
+              <div class="sp-settings-box-title">Импорт через Exportify CSV</div>
+              <div class="sp-settings-box-desc">Бесплатно в 1 клик, без Premium и ввода паролей/токенов</div>
+            </div>
+          </div>
+
+          <div class="sp-settings-buttons">
+            <button class="sc-btn primary sp-primary" @click="showExportifyModal = true">
+              <Upload :size="15" />
+              <span>Загрузить CSV файл</span>
+            </button>
+            <a 
+              href="https://exportify.app" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              class="sc-btn secondary"
+              title="Открыть exportify.app в новой вкладке"
+            >
+              <span>exportify.app</span>
+              <ExternalLink :size="13" />
+            </a>
+          </div>
+        </div>
+
+        <!-- Optional Profile Connection -->
+        <div v-if="spAccount?.connected" class="sc-connected-info-row">
+          <span class="sc-conn-text">Привязан профиль: <b>{{ spAccount.display_name || spAccount.username }}</b></span>
+          <button class="sc-unlink-btn" :disabled="isDisconnectingSp" @click="handleDisconnectSp">
+            <Unlink :size="13" />
+            <span>Отвязать профиль</span>
+          </button>
+        </div>
+        <div v-else class="sc-input-group" style="margin-top: 14px;">
+          <label class="sc-label">Привязать профиль Spotify (опционально):</label>
           <div class="sc-input-row">
             <input 
               v-model="spUsernameInput" 
@@ -226,37 +228,13 @@
               @keydown.enter="handleConnectSp"
             />
             <button 
-              class="sc-btn primary sp-primary" 
+              class="sc-btn secondary" 
               :disabled="!spUsernameInput.trim() || isConnectingSp"
               @click="handleConnectSp"
             >
               <div v-if="isConnectingSp" class="spinner small"></div>
-              <template v-else>Подключить</template>
+              <template v-else>Сохранить</template>
             </button>
-          </div>
-        </div>
-
-        <div class="sc-token-foldout">
-          <button class="sc-foldout-toggle" @click="showSpTokenField = !showSpTokenField">
-            <Key :size="14" />
-            <span>{{ showSpTokenField ? 'Скрыть токен' : 'Сессионный токен sp_dc (для доступа к лайкам)' }}</span>
-            <ChevronDown :size="14" :class="{ rotated: showSpTokenField }" />
-          </button>
-          <div v-if="showSpTokenField" class="sc-token-box">
-            <input 
-              v-model="spTokenInput" 
-              type="password" 
-              placeholder="Токен сессии (sp_dc или Access Token BQC...)"
-              class="sc-input token-input"
-              :disabled="isConnectingSp"
-            />
-            <span class="sc-hint">
-              В браузере откройте open.spotify.com ➔ F12 ➔ <b>Console</b> ➔ вставьте строчку:
-              <br/>
-              <code style="font-size: 11px; user-select: all; background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 4px;">copy((await (await fetch('/get_access_token?reason=transport&productType=web_player')).json()).accessToken)</code>
-              <br/>
-              Токен скопируется в буфер обмена автоматически! Либо скопируйте cookie <b>sp_dc</b> из Application ➔ Cookies.
-            </span>
           </div>
         </div>
 
@@ -594,6 +572,12 @@
         Музыкальный плеер с хранением в Telegram
       </p>
     </section>
+
+    <!-- Exportify Modal -->
+    <ExportifyImportModal 
+      :show="showExportifyModal" 
+      @close="showExportifyModal = false" 
+    />
   </div>
 </template>
 
@@ -607,8 +591,9 @@ import {
   Megaphone, Check, Folder, Heart, ListMusic, Cloud, RefreshCw, Lock, 
   User, Bell, Sliders, Headphones, Smartphone, Download, HardDrive, 
   Trash2, ChevronRight, ExternalLink, Unlink, Key, ChevronDown, 
-  AlertCircle, Radio 
+  AlertCircle, Radio, FileSpreadsheet, Upload 
 } from 'lucide-vue-next'
+import ExportifyImportModal from '@/components/ExportifyImportModal.vue'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import { getCacheStats, getCachedAudioStats } from '@/utils/audioCacheDb'
 import { clearAudioCache } from '@/stores/playerCache'
@@ -618,6 +603,7 @@ const route = useRoute()
 const authStore = useAuthStore()
 const playerStore = usePlayerStore()
 const pwaInstall = usePwaInstall()
+const showExportifyModal = ref(false)
 
 const goToMyProfile = () => {
   if (authStore.user?.id) {
@@ -2107,6 +2093,54 @@ h1 {
 .sp-placeholder {
   background: rgba(29, 185, 84, 0.15) !important;
   color: #1db954 !important;
+}
+
+.sp-settings-action-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: linear-gradient(135deg, rgba(29, 185, 84, 0.12), rgba(29, 185, 84, 0.04));
+  border: 1px solid rgba(29, 185, 84, 0.25);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+  margin-top: 12px;
+  margin-bottom: 6px;
+}
+
+.sp-settings-box-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sp-settings-icon-wrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: rgba(29, 185, 84, 0.2);
+  color: #1db954;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sp-settings-box-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.sp-settings-box-desc {
+  font-size: 12px;
+  color: var(--c-text-secondary);
+  margin-top: 2px;
+}
+
+.sp-settings-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 /* ═══════════════════════════════════════════════

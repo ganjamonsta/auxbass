@@ -334,5 +334,9 @@ export const ingestionApi = {
   connectSpotifyAccount: (data) => api.post('/ingestion/account/spotify/connect', data),
   disconnectSpotifyAccount: () => api.delete('/ingestion/account/spotify'),
   getSpotifyLikes: (params = {}) => api.get('/ingestion/account/spotify/likes', { params }),
+  previewExportifyCsv: (formData) => api.post('/ingestion/spotify/exportify/preview', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  startExportifyImport: (data) => api.post('/ingestion/spotify/exportify/start', data),
 }
 

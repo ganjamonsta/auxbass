@@ -19,7 +19,13 @@ from sqlalchemy import select, and_, or_
 from shared.config import get_settings
 from shared.database import get_session
 from shared.models import Track, Playlist, PlaylistTrack, UserLibrary, LibrarySource
-from shared.matching import normalize_artist, clean_track_metadata
+from shared.matching import (
+    normalize_artist,
+    normalize_title,
+    clean_track_metadata,
+    fuzzy_match_artist,
+    fuzzy_match_title,
+)
 
 from bot.services.tracks import track_service
 from .base import TrackMetadata, EntityType, SourceEntity
@@ -29,6 +35,18 @@ from .registry import provider_registry
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+VERSION_SUFFIX_PATTERN = re.compile(
+    r'\s+[-–—]\s*(?:.*?(?:remix|refix|re-fix|mix|edit|version|dub|bootleg|rework|flip|vip|remaster|deluxe).*?)$',
+    re.IGNORECASE
+)
+
+
+def _robust_norm_title(t: Optional[str]) -> str:
+    if not t:
+        return ""
+    cleaned = VERSION_SUFFIX_PATTERN.sub('', t)
+    return normalize_title(cleaned)
+
 
 async def _find_existing_track(
     title: str,
@@ -36,27 +54,38 @@ async def _find_existing_track(
     duration: Optional[int],
     session: Optional[Any] = None,
 ) -> Optional[Track]:
-    """Check if track with matching title & artist already exists in global library."""
+    """
+    Check if track with matching title & artist already exists in global library.
+    Uses multi-level tolerant recognition (exact -> normalized -> version-stripped -> fuzzy)
+    with strict duration tolerance (<= 7s) to prevent duplicate downloads and channel spam.
+    """
     clean_title, clean_artist = clean_track_metadata(title, artist)
     norm_artist = normalize_artist(clean_artist)
+    norm_title = normalize_title(clean_title)
+    robust_title = _robust_norm_title(clean_title)
 
     async def _execute_lookup(s):
+        # 1. Search candidates by normalized artist or artist match
         query = select(Track).where(
             and_(
-                Track.normalized_artist == norm_artist,
-                Track.title.ilike(clean_title),
+                or_(
+                    Track.normalized_artist == norm_artist,
+                    Track.artist.ilike(f"%{clean_artist}%"),
+                ),
                 Track.is_unavailable == False,
             )
         )
         result = await s.execute(query)
         candidates = result.scalars().all()
 
+        # 2. If no candidates found by artist, try searching by title
         if not candidates:
-            # Try without exact artist normalization (case-insensitive search)
             query2 = select(Track).where(
                 and_(
-                    Track.artist.ilike(clean_artist),
-                    Track.title.ilike(clean_title),
+                    or_(
+                        Track.title.ilike(clean_title),
+                        Track.title.ilike(f"%{clean_title}%"),
+                    ),
                     Track.is_unavailable == False,
                 )
             )
@@ -66,13 +95,52 @@ async def _find_existing_track(
         if not candidates:
             return None
 
-        # If duration provided, find the closest match within ±5 seconds
-        if duration:
-            for t in candidates:
-                if t.duration and abs(t.duration - duration) <= 5:
-                    return t
+        best_candidate = None
+        best_score = -1
 
-        return candidates[0]
+        for t in candidates:
+            t_clean_title, t_clean_artist = clean_track_metadata(t.title, t.artist)
+            t_norm_artist = t.normalized_artist or normalize_artist(t_clean_artist)
+            t_norm_title = normalize_title(t_clean_title)
+            t_robust_title = _robust_norm_title(t_clean_title)
+
+            # Check artist compatibility
+            artist_match = (
+                (norm_artist == t_norm_artist)
+                or (norm_artist in t_norm_artist)
+                or (t_norm_artist in norm_artist)
+                or (fuzzy_match_artist(clean_artist, t_clean_artist) >= 0.75)
+            )
+            if not artist_match:
+                continue
+
+            dur_diff = abs(t.duration - duration) if (t.duration and duration) else None
+
+            # If duration is provided on both sides, reject if difference > 7s
+            if duration and t.duration and dur_diff is not None and dur_diff > 7:
+                continue
+
+            score = 0
+            if t.title and clean_title and t.title.lower() == clean_title.lower():
+                score = 100
+            elif t_norm_title and norm_title and t_norm_title == norm_title:
+                score = 80
+            elif t_robust_title and robust_title and t_robust_title == robust_title:
+                score = 60
+            elif fuzzy_match_title(clean_title, t_clean_title) >= 0.75:
+                score = 40
+            else:
+                continue
+
+            # If duration matched closely, add bonus
+            if dur_diff is not None:
+                score += max(0, 10 - dur_diff)
+
+            if score > best_score:
+                best_score = score
+                best_candidate = t
+
+        return best_candidate
 
     if session:
         return await _execute_lookup(session)
@@ -117,11 +185,28 @@ class IngestionPipeline:
                 track_count=job.total_tracks,
             )
 
-            # 1. Fetch full tracklist
-            tracks_meta = await provider.fetch_tracklist(entity)
+            # 1. Fetch full tracklist (or use pre-parsed custom tracks from Exportify CSV)
+            if getattr(job, "custom_tracks", None):
+                tracks_meta = [
+                    TrackMetadata(
+                        provider_name=job.provider_name,
+                        url=t.get("url") or f"https://open.spotify.com/track/{t.get('external_id') or t.get('id') or idx}",
+                        title=t.get("title", "Unknown Track"),
+                        artist=t.get("artist", "Unknown Artist"),
+                        album=t.get("album"),
+                        duration=t.get("duration"),
+                        cover_url=t.get("cover_url") or job.cover_url,
+                        external_id=str(t.get("external_id") or t.get("id") or idx),
+                        extra=t.get("extra") or {},
+                    )
+                    for idx, t in enumerate(job.custom_tracks, start=1)
+                ]
+            else:
+                tracks_meta = await provider.fetch_tracklist(entity)
+
             if not tracks_meta:
                 job.status = JobStatus.FAILED
-                job.error_message = "No tracks found at this URL"
+                job.error_message = "No tracks found to import"
                 job.updated_at = datetime.now(timezone.utc)
                 if progress_callback:
                     await progress_callback(job)
