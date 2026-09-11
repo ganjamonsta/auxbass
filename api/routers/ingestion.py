@@ -1115,7 +1115,7 @@ async def start_exportify_import(
         user_id=user.id,
         url="https://exportify.app",
         provider_name="spotify",
-        entity_type="playlist" if playlist_id else "tracks",
+        entity_type=EntityType.PLAYLIST.value if playlist_id else EntityType.TRACKS.value,
         title=req.playlist_name or req.title or "Spotify Import",
         total_tracks=len(req.tracks),
         cover_url=req.tracks[0].cover_url if req.tracks else None,

@@ -554,6 +554,14 @@ async def test_find_existing_track_tolerant_matching():
     await engine.dispose()
 
 
+def test_entity_type_tracks_enum():
+    from bot.services.ingestion.base import EntityType
+
+    assert EntityType("tracks") == EntityType.TRACKS
+    assert EntityType.TRACKS.value == "tracks"
+
+
+
 
 
 

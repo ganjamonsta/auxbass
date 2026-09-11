@@ -13,6 +13,7 @@ class EntityType(str, Enum):
     PLAYLIST = "playlist"
     ALBUM = "album"
     ARTIST = "artist"
+    TRACKS = "tracks"
 
 
 @dataclass

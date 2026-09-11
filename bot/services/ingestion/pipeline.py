@@ -175,9 +175,14 @@ class IngestionPipeline:
             return
 
         try:
+            try:
+                e_type = EntityType(job.entity_type)
+            except (ValueError, KeyError):
+                e_type = EntityType.PLAYLIST if (job.playlist_id or (job.total_tracks and job.total_tracks > 1)) else EntityType.TRACK
+
             entity = SourceEntity(
                 provider_name=job.provider_name,
-                entity_type=EntityType(job.entity_type),
+                entity_type=e_type,
                 url=job.url,
                 title=job.title,
                 author=job.author,
