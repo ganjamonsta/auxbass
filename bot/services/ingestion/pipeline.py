@@ -6,6 +6,7 @@ import os
 import shutil
 import logging
 import asyncio
+import re
 import tempfile
 from datetime import datetime, timezone
 from typing import Optional, Callable, Any, List, Dict
@@ -298,7 +299,11 @@ class IngestionPipeline:
                         await asyncio.sleep(1.5)
 
                 except Exception as e:
-                    logger.error(f"[Ingestion] Failed to import track {track_meta.title}: {e}", exc_info=True)
+                    clean_msg = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', str(e))
+                    if "drm protected" in clean_msg.lower() or "защищён drm" in clean_msg.lower():
+                        logger.warning(f"[Ingestion] Skipped DRM protected track {track_meta.title}: {clean_msg}")
+                    else:
+                        logger.error(f"[Ingestion] Failed to import track {track_meta.title}: {clean_msg}")
                     job.failed_tracks += 1
                     job.processed_tracks += 1
 

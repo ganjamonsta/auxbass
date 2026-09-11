@@ -499,11 +499,26 @@
                 </div>
                 <div class="sc-track-info">
                   <div class="sc-track-title" :title="item.title">{{ item.title }}</div>
-                  <div class="sc-track-artist">{{ item.artist }}</div>
+                  <div class="sc-track-artist-row">
+                    <span class="sc-track-artist">{{ item.artist }}</span>
+                    <!-- Badges -->
+                    <div v-if="item.in_library || item.in_channel || item.already_in_tg" class="sc-track-badges">
+                      <span v-if="item.in_library" class="sc-badge-pill in-lib" title="Уже в вашей медиатеке">
+                        <Check :size="10" /> В медиатеке
+                      </span>
+                      <span v-if="item.in_channel" class="sc-badge-pill in-chan" title="Забэкаплен в Telegram-канал">
+                        <CloudDownload :size="10" /> В канале
+                      </span>
+                      <span v-else-if="item.already_in_tg" class="sc-badge-pill in-tg" title="Уже есть на сервере Telegram">
+                        В базе TG
+                      </span>
+                    </div>
+                  </div>
                 </div>
                 <div class="sc-track-actions">
                   <span v-if="item.duration" class="sc-track-duration">{{ formatDuration(item.duration) }}</span>
                   <button 
+                    v-if="!item.in_library"
                     class="sc-add-btn" 
                     :disabled="importingTrackUrl === item.url"
                     @click.stop="handleQuickAddSoundCloud(item)"
@@ -511,6 +526,9 @@
                   >
                     <Plus :size="16" />
                   </button>
+                  <span v-else class="sc-added-indicator" title="Уже в медиатеке">
+                    <Check :size="16" />
+                  </span>
                 </div>
               </div>
 
@@ -1108,17 +1126,22 @@ const handleQuickPlaySoundCloud = async (scTrack) => {
       artist: scTrack.artist,
       duration: scTrack.duration,
       cover_url: scTrack.cover_url,
+      add_to_library: false,
     })
 
     const track = res.data?.track
     if (track) {
+      if (track.in_library) {
+        scTrack.in_library = true
+      }
+      scTrack.already_in_tg = true
+      scTrack.track_id = track.id
       playerStore.playTrack(track, [track], 0)
-      libraryStore.fetchTracks({ refresh: true })
-      uiStore.toast?.success('В эфире!', `${track.artist} — ${track.title}`)
     }
   } catch (e) {
-    console.error('Failed to quick import track:', e)
-    uiStore.toast?.error('Ошибка импорта', e.response?.data?.detail || 'Не удалось загрузить трек')
+    console.error('Failed to quick play track:', e)
+    const errorMsg = e.response?.data?.detail || 'Не удалось загрузить трек'
+    uiStore.toast?.error('Ошибка воспроизведения', errorMsg)
   } finally {
     importingTrackUrl.value = null
   }
@@ -1135,16 +1158,21 @@ const handleQuickAddSoundCloud = async (scTrack) => {
       artist: scTrack.artist,
       duration: scTrack.duration,
       cover_url: scTrack.cover_url,
+      add_to_library: true,
     })
 
     const track = res.data?.track
     if (track) {
+      scTrack.in_library = true
+      scTrack.already_in_tg = true
+      scTrack.track_id = track.id
       libraryStore.fetchTracks({ refresh: true })
       uiStore.toast?.success('В медиатеке', `${track.artist} — ${track.title}`)
     }
   } catch (e) {
-    console.error('Failed to quick import track:', e)
-    uiStore.toast?.error('Ошибка импорта', e.response?.data?.detail || 'Не удалось загрузить трек')
+    console.error('Failed to quick add track:', e)
+    const errorMsg = e.response?.data?.detail || 'Не удалось добавить трек'
+    uiStore.toast?.error('Ошибка импорта', errorMsg)
   } finally {
     importingTrackUrl.value = null
   }

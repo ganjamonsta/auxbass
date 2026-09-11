@@ -105,6 +105,7 @@ class TrackService:
         forward_source_name: Optional[str] = None,
         forward_source_username: Optional[str] = None,
         enrich: bool = True,
+        add_to_library: bool = True,
     ) -> SaveTrackResult:
         """
         Save a new track or add existing one to user's library.
@@ -214,15 +215,17 @@ class TrackService:
                     was_in_library=True,
                 )
             
-            # Add to user's library
-            lib_entry = UserLibrary(
-                user_id=user_id,
-                track_id=track_id,
-                source=library_source,
-            )
-            session.add(lib_entry)
-            
-            logger.info(f"Added track {track_id} to user {user_id}'s library")
+            # Add to user's library if requested
+            if add_to_library:
+                lib_entry = UserLibrary(
+                    user_id=user_id,
+                    track_id=track_id,
+                    source=library_source,
+                )
+                session.add(lib_entry)
+                logger.info(f"Added track {track_id} to user {user_id}'s library")
+            else:
+                logger.info(f"Track {track_id} registered globally without adding to user {user_id}'s library")
         
         if is_new and enrich:
             enrichment_worker.notify_new_track()

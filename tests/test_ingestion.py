@@ -258,4 +258,59 @@ async def test_soundcloud_user_profile_and_likes_mock(monkeypatch):
     assert next_cursor == "https://api-v2.soundcloud.com/users/123456/likes?offset=2"
 
 
+@pytest.mark.asyncio
+async def test_soundcloud_drm_protection_handling(monkeypatch):
+    sc = SoundCloudProvider()
+    meta = TrackMetadata(
+        provider_name="soundcloud",
+        url="https://soundcloud.com/pendulum/fasten-your-seatbelt-ft-the",
+        title="Fasten Your Seatbelt",
+        artist="Pendulum",
+    )
+
+    class MockYDL:
+        def __init__(self, *args, **kwargs):
+            pass
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+        def download(self, urls):
+            import yt_dlp
+            raise yt_dlp.utils.DownloadError("\x1b[0;31mERROR:\x1b[0m [soundcloud] 1236088255: This video is DRM protected")
+
+    import yt_dlp
+    monkeypatch.setattr(yt_dlp, "YoutubeDL", MockYDL)
+
+    with pytest.raises(ValueError) as exc_info:
+        await sc.download_track(meta, "/tmp/fake_dir")
+
+    assert "защищён DRM" in str(exc_info.value)
+    assert "\x1b[" not in str(exc_info.value)
+
+
+def test_quick_import_request_and_search_response_schemas():
+    from api.routers.ingestion import QuickImportRequest, SearchItemResponse
+
+    # Defaults to add_to_library = False
+    req = QuickImportRequest(url="https://soundcloud.com/artist/track")
+    assert req.add_to_library is False
+
+    req_add = QuickImportRequest(url="https://soundcloud.com/artist/track", add_to_library=True)
+    assert req_add.add_to_library is True
+
+    search_item = SearchItemResponse(
+        provider="soundcloud",
+        url="https://soundcloud.com/artist/track",
+        title="Track",
+        artist="Artist",
+        in_library=True,
+        in_channel=False,
+        already_in_tg=True,
+    )
+    assert search_item.in_library is True
+    assert search_item.already_in_tg is True
+
+
+
 

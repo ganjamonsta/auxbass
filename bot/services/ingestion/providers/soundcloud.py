@@ -220,6 +220,8 @@ class SoundCloudProvider(BaseMusicProvider):
             ydl_opts = {
                 "format": "bestaudio/best",
                 "outtmpl": out_template,
+                "concurrent_fragment_downloads": 5,
+                "color": "never",
                 "postprocessors": [
                     {
                         "key": "FFmpegExtractAudio",
@@ -230,8 +232,14 @@ class SoundCloudProvider(BaseMusicProvider):
                 "quiet": True,
                 "no_warnings": True,
             }
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([track_meta.url])
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    ydl.download([track_meta.url])
+            except Exception as e:
+                err_msg = str(e)
+                if "drm protected" in err_msg.lower():
+                    raise ValueError("Этот трек защищён DRM (SoundCloud Go+) и недоступен для бесплатного воспроизведения.") from e
+                raise
 
         await asyncio.to_thread(_download)
 

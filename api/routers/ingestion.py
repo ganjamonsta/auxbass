@@ -3,6 +3,7 @@ TG Player API - External Music Ingestion Router
 Provides endpoints for link preview, background import, and job tracking.
 """
 import os
+import re
 import logging
 import asyncio
 import tempfile
@@ -52,6 +53,10 @@ class SearchItemResponse(BaseModel):
     duration: Optional[int] = None
     cover_url: Optional[str] = None
     external_id: Optional[str] = None
+    in_library: bool = False
+    in_channel: bool = False
+    already_in_tg: bool = False
+    track_id: Optional[int] = None
 
 
 class QuickImportRequest(BaseModel):
@@ -60,6 +65,7 @@ class QuickImportRequest(BaseModel):
     artist: Optional[str] = None
     duration: Optional[int] = None
     cover_url: Optional[str] = None
+    add_to_library: bool = False
 
 
 class QuickImportResponse(BaseModel):
@@ -339,8 +345,9 @@ async def search_external_tracks(
     provider: str = Query("soundcloud"),
     limit: int = Query(30, ge=1, le=100),
     user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Search external music platforms (SoundCloud) by keyword."""
+    """Search external music platforms (SoundCloud) by keyword with user library status."""
     prov = provider_registry.get_provider(provider)
     if not prov:
         raise HTTPException(
@@ -349,18 +356,37 @@ async def search_external_tracks(
         )
 
     results = await prov.search(q, limit=limit)
-    return [
-        SearchItemResponse(
-            provider=r.provider_name,
-            url=r.url,
-            title=r.title,
-            artist=r.artist,
-            duration=r.duration,
-            cover_url=r.cover_url,
-            external_id=r.external_id,
+    if not results:
+        return []
+
+    # Batch check against database
+    user_lib_res = await db.execute(
+        select(UserLibrary.track_id).where(UserLibrary.user_id == user.id)
+    )
+    user_track_ids = set(user_lib_res.scalars().all())
+
+    items: List[SearchItemResponse] = []
+    for r in results:
+        existing = await _find_existing_track(r.title, r.artist, r.duration, session=db)
+        already_in_tg = existing is not None
+        in_lib = (existing.id in user_track_ids) if existing else False
+        existing_id = existing.id if existing else None
+
+        items.append(
+            SearchItemResponse(
+                provider=r.provider_name,
+                url=r.url,
+                title=r.title,
+                artist=r.artist,
+                duration=r.duration,
+                cover_url=r.cover_url,
+                external_id=r.external_id,
+                in_library=in_lib,
+                already_in_tg=already_in_tg,
+                track_id=existing_id,
+            )
         )
-        for r in results
-    ]
+    return items
 
 
 @router.post("/quick-import", response_model=QuickImportResponse)
@@ -382,26 +408,28 @@ async def quick_import_track(
         existing_track = await _find_existing_track(req.title, req.artist, req.duration)
 
     if existing_track:
-        # Link to library if not already linked
-        await track_service.save_track(
-            user_id=user.id,
-            file_id=existing_track.file_id,
-            file_unique_id=existing_track.file_unique_id,
-            title=existing_track.title,
-            artist=existing_track.artist,
-            duration=existing_track.duration,
-            library_source=LibrarySource.UPLOADED,
-            enrich=False,
-        )
+        if req.add_to_library:
+            # Link to library if not already linked
+            await track_service.save_track(
+                user_id=user.id,
+                file_id=existing_track.file_id,
+                file_unique_id=existing_track.file_unique_id,
+                title=existing_track.title,
+                artist=existing_track.artist,
+                duration=existing_track.duration,
+                library_source=LibrarySource.UPLOADED,
+                enrich=False,
+                add_to_library=True,
+            )
 
-        # Auto-forward to user's Telegram backup channel if active
-        try:
-            from bot.services.channels import get_channel_service
-            ch_svc = get_channel_service()
-            if ch_svc:
-                await ch_svc.forward_track_to_channel(user.id, existing_track.id)
-        except Exception as e:
-            logger.debug(f"Quick-import channel forward failed for existing track: {e}")
+            # Auto-forward to user's Telegram backup channel if active
+            try:
+                from bot.services.channels import get_channel_service
+                ch_svc = get_channel_service()
+                if ch_svc:
+                    await ch_svc.forward_track_to_channel(user.id, existing_track.id)
+            except Exception as e:
+                logger.debug(f"Quick-import channel forward failed for existing track: {e}")
 
         # Refresh track with relationships
         track_obj = await db.scalar(
@@ -442,10 +470,21 @@ async def quick_import_track(
         try:
             downloaded = await provider.download_track(track_meta, temp_dir)
         except Exception as e:
-            logger.error(f"Failed to download audio from {req.url}: {e}")
+            raw_err = str(e)
+            clean_err = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', raw_err)
+            clean_err = re.sub(r'^ERROR:\s*', '', clean_err).strip()
+
+            if "drm protected" in clean_err.lower() or "защищён drm" in clean_err.lower():
+                user_msg = "Этот трек защищён DRM (SoundCloud Go+) и недоступен для бесплатного воспроизведения."
+                status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+            else:
+                user_msg = f"Не удалось загрузить трек: {clean_err}"
+                status_code = status.HTTP_502_BAD_GATEWAY
+
+            logger.error(f"Failed to download audio from {req.url}: {clean_err}")
             raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Could not download track: {str(e)}",
+                status_code=status_code,
+                detail=user_msg,
             )
 
         if downloaded.file_size > 50 * 1024 * 1024:
@@ -473,10 +512,11 @@ async def quick_import_track(
                 thumbnail=thumb_input,
             )
         except Exception as e:
-            logger.error(f"Failed to upload audio to Telegram: {e}")
+            clean_upload_err = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', str(e))
+            logger.error(f"Failed to upload audio to Telegram: {clean_upload_err}")
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Telegram upload failed: {str(e)}",
+                detail=f"Telegram upload failed: {clean_upload_err}",
             )
 
         if not sent_msg or not sent_msg.audio:
@@ -497,16 +537,18 @@ async def quick_import_track(
             file_name=safe_filename,
             library_source=LibrarySource.UPLOADED,
             enrich=True,
+            add_to_library=req.add_to_library,
         )
 
-        # Auto-forward to user's Telegram backup channel if active
-        try:
-            from bot.services.channels import get_channel_service
-            ch_svc = get_channel_service()
-            if ch_svc:
-                await ch_svc.forward_track_to_channel(user.id, save_res.track_id)
-        except Exception as e:
-            logger.debug(f"Quick-import channel forward failed for new track: {e}")
+        # Auto-forward to user's Telegram backup channel ONLY if add_to_library is True
+        if req.add_to_library:
+            try:
+                from bot.services.channels import get_channel_service
+                ch_svc = get_channel_service()
+                if ch_svc:
+                    await ch_svc.forward_track_to_channel(user.id, save_res.track_id)
+            except Exception as e:
+                logger.debug(f"Quick-import channel forward failed for new track: {e}")
 
         track_obj = await db.scalar(
             select(Track)
