@@ -102,10 +102,6 @@
                   <Pencil :size="18" />
                   <span>Редактировать</span>
                 </button>
-                <button class="menu-item" @click="exec('download')">
-                  <Download :size="18" />
-                  <span>Скачать в Telegram</span>
-                </button>
                 <button class="menu-item" @click="exec('share')">
                   <Share2 :size="18" />
                   <span>Поделиться</span>
@@ -337,7 +333,7 @@ import EditTrackModal from '@/components/EditTrackModal.vue'
 import TagChips from '@/components/TagChips.vue'
 import { 
   X, User, Disc3, Play, ListMusic, Plus, Minus, Pencil, 
-  Download, Trash2, FolderOpen, Shuffle, Music, Mic2, ChevronRight, ChevronDown,
+  Trash2, FolderOpen, Shuffle, Music, Mic2, ChevronRight, ChevronDown,
   ThumbsDown, Heart, Share2
 } from 'lucide-vue-next'
 

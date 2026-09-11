@@ -1,9 +1,11 @@
 import { ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
+import { playerApi } from '@/api/client'
 
 // Global singleton state so ShareModal can be controlled from anywhere
 const isShareOpen = ref(false)
+const isDownloading = ref(false)
 const sharePayload = ref({
   type: 'playlist', // 'track' | 'playlist' | 'album' | 'user'
   id: null,
@@ -151,6 +153,46 @@ export function useShare() {
     closeShare()
   }
 
+  /**
+   * Download item directly to the user's private chat with the bot
+   */
+  const downloadToTelegram = async () => {
+    const { type, id } = sharePayload.value
+    if (!id) return
+
+    isDownloading.value = true
+    try {
+      if (type === 'track') {
+        try {
+          await playerApi.download(id)
+          uiStore.toast.success('Отправлено', 'Трек отправлен вам в Telegram')
+          closeShare()
+          return
+        } catch (err) {
+          console.warn('Direct download API failed, trying bot deep link:', err)
+        }
+      }
+
+      // Deep link to bot /start files_<type>_<id>
+      const botUser = getBotUsername()
+      const startParam = `files_${type}_${id}`
+      const botUrl = `https://t.me/${botUser}?start=${startParam}`
+
+      if (window.Telegram?.WebApp?.openTelegramLink) {
+        window.Telegram.WebApp.openTelegramLink(botUrl)
+      } else {
+        window.open(botUrl, '_blank')
+      }
+      uiStore.toast.info('Переход в бота', 'Бот отправит файлы в диалог')
+      closeShare()
+    } catch (err) {
+      console.error('Failed to download to Telegram:', err)
+      uiStore.toast.error('Ошибка', 'Не удалось отправить файлы в Telegram')
+    } finally {
+      isDownloading.value = false
+    }
+  }
+
   // Backward compatibility method
   const share = async (params) => {
     openShare(params)
@@ -158,6 +200,7 @@ export function useShare() {
 
   return {
     isShareOpen,
+    isDownloading,
     sharePayload,
     getBotUsername,
     getDeepLink,
@@ -165,6 +208,7 @@ export function useShare() {
     openShare,
     closeShare,
     shareToTelegramChat,
+    downloadToTelegram,
     copyLink,
     shareWeb,
     share,

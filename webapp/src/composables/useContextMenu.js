@@ -151,17 +151,16 @@ export function useContextMenu() {
       showEditModal.value = true
     },
 
-    download: async (track) => {
-      if (track?.id) {
-        try {
-          await playerApi.download(track.id)
-          uiStore.toast.success('Отправлено', 'Трек отправлен в Telegram')
-        } catch (error) {
-          console.error('Failed to download track:', error)
-          uiStore.toast.error('Ошибка', 'Не удалось отправить трек')
-        }
-      }
+    download: (track) => {
       closeMenu()
+      if (!track?.id) return
+      openShare({
+        type: 'track',
+        id: track.id,
+        title: track.title || track.file_name || 'Трек',
+        subtitle: track.artist || 'Неизвестен',
+        coverUrl: track.cover_url || '',
+      })
     },
 
     downloadHD: async () => {

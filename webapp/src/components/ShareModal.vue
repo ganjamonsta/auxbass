@@ -56,7 +56,19 @@
                 </div>
               </button>
 
-              <!-- Action 2: Copy link -->
+              <!-- Action 2: Download directly to own Telegram -->
+              <button v-if="sharePayload.type !== 'user'" class="share-btn download-share-btn" @click="downloadToTelegram" :disabled="isDownloading">
+                <div class="btn-icon-wrapper download-glow">
+                  <div v-if="isDownloading" class="btn-spinner"></div>
+                  <CloudDownload v-else :size="20" />
+                </div>
+                <div class="btn-content">
+                  <span class="btn-title">{{ downloadButtonTitle }}</span>
+                  <span class="btn-desc">{{ downloadButtonDesc }}</span>
+                </div>
+              </button>
+
+              <!-- Action 3: Copy link -->
               <button class="share-btn" @click="handleCopy">
                 <div class="btn-icon-wrapper">
                   <Check v-if="copied" :size="20" class="copied-icon" />
@@ -105,16 +117,19 @@ import {
   Music, 
   Disc3, 
   Folder, 
-  User 
+  User,
+  CloudDownload
 } from 'lucide-vue-next'
 import { useShare } from '@/composables/useShare'
 import { useUIStore } from '@/stores/ui'
 
 const { 
   isShareOpen, 
+  isDownloading,
   sharePayload, 
   closeShare, 
   shareToTelegramChat, 
+  downloadToTelegram,
   copyLink, 
   shareWeb, 
   getBotUsername, 
@@ -145,6 +160,22 @@ const typeLabel = computed(() => {
     case 'user': return 'ПРОФИЛЬ'
     default: return 'МЕДИА'
   }
+})
+
+const downloadButtonTitle = computed(() => {
+  switch (sharePayload.value.type) {
+    case 'track': return 'Скачать трек в Telegram'
+    case 'playlist': return 'Скачать плейлист в Telegram'
+    case 'album': return 'Скачать альбом в Telegram'
+    default: return 'Скачать файлы в Telegram'
+  }
+})
+
+const downloadButtonDesc = computed(() => {
+  if (sharePayload.value.type === 'track') {
+    return 'Прислать аудиофайл в личные сообщения с ботом'
+  }
+  return 'Прислать все треки в личные сообщения с ботом'
 })
 
 const typeIcon = computed(() => {
@@ -361,6 +392,41 @@ const copyInlineCommand = async () => {
 .primary-share-btn:hover {
   background: linear-gradient(135deg, rgba(37, 99, 235, 0.3), rgba(30, 64, 175, 0.2));
   border-color: rgba(59, 130, 246, 0.5);
+}
+
+/* Download action button */
+.download-share-btn {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(6, 182, 212, 0.08));
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.download-share-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(6, 182, 212, 0.15));
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
+.download-share-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.download-glow {
+  background: linear-gradient(135deg, #10b981, #06b6d4);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+}
+
+.btn-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .btn-icon-wrapper {

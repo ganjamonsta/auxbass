@@ -53,6 +53,9 @@
         <button class="action-btn shuffle-btn" @click="shufflePlay" :disabled="isShuffling" title="Перемешать">
           <Shuffle :size="18" />
         </button>
+        <button class="action-btn share-btn" @click="handleShareAlbum" title="Поделиться">
+          <Share2 :size="18" />
+        </button>
       </div>
     </div>
 
@@ -209,11 +212,13 @@ import { useTrackActions, usePlaybackActions, useTrackSync } from '@/composables
 import TrackItem from '@/components/TrackItem.vue'
 import TagChips from '@/components/TagChips.vue'
 import api from '@/api/client'
-import { Disc3, Check, Music, X, Play, Shuffle, Plus, Users } from 'lucide-vue-next'
+import { Disc3, Check, Music, X, Play, Shuffle, Plus, Users, Share2 } from 'lucide-vue-next'
 import { splitArtists, getCoverUrl, CoverSize } from '@/utils/formatters'
+import { useShare } from '@/composables/useShare'
 
 // Universal context menu
 const { openMenu } = useContextMenu()
+const { openShare } = useShare()
 
 const route = useRoute()
 const router = useRouter()
@@ -223,6 +228,18 @@ const uiStore = useUIStore()
 
 // Unified track actions
 const { handleDirectDownload, handleHdNotice, handleLikeTrack, handleAddToLibrary } = useTrackActions()
+
+const handleShareAlbum = () => {
+  if (!album.value) return
+  openShare({
+    type: 'album',
+    id: album.value.id,
+    title: album.value.title || album.value.name,
+    subtitle: album.value.artist || 'Альбом',
+    coverUrl: album.value.cover_url || '',
+    text: `Послушай альбом «${album.value.title || album.value.name}» в TG Player!`,
+  })
+}
 
 const album = ref(null)
 const loading = ref(true)
