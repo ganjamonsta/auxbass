@@ -8,22 +8,17 @@ import './styles/index.css'
 // Initialize Telegram WebApp
 const tg = window.Telegram?.WebApp
 
-// Update viewport CSS variables and force layout recalculation
+// Update viewport CSS variables smoothly without layout thrashing
 function updateViewportHeight() {
   if (tg) {
     const vh = tg.viewportHeight
     const svh = tg.viewportStableHeight
     
-    document.documentElement.style.setProperty('--tg-viewport-height', `${vh}px`)
-    document.documentElement.style.setProperty('--tg-viewport-stable-height', `${svh}px`)
-    
-    // Force layout recalculation by temporarily hiding and showing content
-    const appEl = document.getElementById('app')
-    if (appEl) {
-      // Trigger reflow
-      appEl.style.display = 'none'
-      void appEl.offsetHeight // Force reflow
-      appEl.style.display = ''
+    if (vh) {
+      document.documentElement.style.setProperty('--tg-viewport-height', `${vh}px`)
+    }
+    if (svh) {
+      document.documentElement.style.setProperty('--tg-viewport-stable-height', `${svh}px`)
     }
   }
 }

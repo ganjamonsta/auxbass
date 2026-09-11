@@ -50,8 +50,9 @@ export const useAuthStore = defineStore('auth', () => {
       }
       initialized.value = true
       
-      // Fetch channel status and config after auth
-      await Promise.all([fetchStatus(), fetchConfig()])
+      // Fetch channel status and config in background without blocking initial navigation
+      fetchStatus().catch(err => console.warn('[Auth] Background status fetch error:', err))
+      fetchConfig().catch(err => console.warn('[Auth] Background config fetch error:', err))
     } catch (err) {
       // If network is offline or request failed due to connection error, keep existing session!
       const isOfflineError = (typeof navigator !== 'undefined' && !navigator.onLine) || !err.response || err.code === 'ERR_NETWORK' || err.code === 'ECONNABORTED'
@@ -127,8 +128,9 @@ export const useAuthStore = defineStore('auth', () => {
         authStorage.setUser(response.data.user)
       }
       
-      // Fetch channel status and config after successful login
-      await Promise.all([fetchStatus(), fetchConfig()])
+      // Fetch channel status and config in background
+      fetchStatus().catch(() => {})
+      fetchConfig().catch(() => {})
       
       initialized.value = true
       return response.data

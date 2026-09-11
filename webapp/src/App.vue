@@ -197,7 +197,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, inject, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, inject, watch, nextTick, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
@@ -205,26 +205,28 @@ import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
 import { useModals } from '@/composables/useModals'
 import PageHeader from '@/components/PageHeader.vue'
-import FullPlayer from '@/components/FullPlayer.vue'
-import ChannelBanner from '@/components/ChannelBanner.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
-import ContextMenu from '@/components/ContextMenu.vue'
-import NetworkBanner from '@/components/NetworkBanner.vue'
-import MaintenanceBanner from '@/components/MaintenanceBanner.vue'
-import PwaInstallBanner from '@/components/PwaInstallBanner.vue'
-import PwaInstallModal from '@/components/PwaInstallModal.vue'
-import ShareModal from '@/components/ShareModal.vue'
+import { MobileFooter } from '@/components/layout'
 import { useNetworkMonitor } from '@/composables/useNetworkMonitor'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
 import { usePwaInstall } from '@/composables/usePwaInstall'
-import { MobileFooter, ProfileMenu } from '@/components/layout'
 import { Music, Disc3, User, Folder, Library } from 'lucide-vue-next'
-// Desktop components
-import Sidebar from '@/components/desktop/Sidebar.vue'
-import DesktopPlayer from '@/components/desktop/DesktopPlayer.vue'
-import NowPlayingSidebar from '@/components/desktop/NowPlayingSidebar.vue'
-import FullPlayerDesktop from '@/components/desktop/FullPlayerDesktop.vue'
 import { tracksApi } from '@/api/client'
+
+// Heavy and conditional components loaded asynchronously on demand
+const FullPlayer = defineAsyncComponent(() => import('@/components/FullPlayer.vue'))
+const FullPlayerDesktop = defineAsyncComponent(() => import('@/components/desktop/FullPlayerDesktop.vue'))
+const Sidebar = defineAsyncComponent(() => import('@/components/desktop/Sidebar.vue'))
+const DesktopPlayer = defineAsyncComponent(() => import('@/components/desktop/DesktopPlayer.vue'))
+const NowPlayingSidebar = defineAsyncComponent(() => import('@/components/desktop/NowPlayingSidebar.vue'))
+const ContextMenu = defineAsyncComponent(() => import('@/components/ContextMenu.vue'))
+const ProfileMenu = defineAsyncComponent(() => import('@/components/layout/ProfileMenu.vue'))
+const ShareModal = defineAsyncComponent(() => import('@/components/ShareModal.vue'))
+const PwaInstallModal = defineAsyncComponent(() => import('@/components/PwaInstallModal.vue'))
+const PwaInstallBanner = defineAsyncComponent(() => import('@/components/PwaInstallBanner.vue'))
+const ChannelBanner = defineAsyncComponent(() => import('@/components/ChannelBanner.vue'))
+const MaintenanceBanner = defineAsyncComponent(() => import('@/components/MaintenanceBanner.vue'))
+const NetworkBanner = defineAsyncComponent(() => import('@/components/NetworkBanner.vue'))
 
 const route = useRoute()
 const router = useRouter()
@@ -572,17 +574,14 @@ onMounted(async () => {
   // Listen for auth:logout events from API interceptor
   window.addEventListener('auth:logout', handleAuthLogout)
   
-  // Initialize auth
+  // Initialize auth if not already initialized
   if (authStore.isAuthenticated && !authStore.initialized) {
     await authStore.initialize()
-    
-    // Initialize library after auth
-    await libraryStore.init()
-    
-    // Restore player state if available (persisted queue, track, position)
-    if (playerStore.hasSavedState() && !playerStore.currentTrack && !playerStore.isPlaying) {
-      await playerStore.restoreState()
-    }
+  }
+
+  // Restore player state if available (persisted queue, track, position) without blocking UI
+  if (playerStore.hasSavedState() && !playerStore.currentTrack && !playerStore.isPlaying) {
+    playerStore.restoreState()
   }
 
   // Handle deep link / start_param navigation

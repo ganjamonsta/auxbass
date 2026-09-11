@@ -421,13 +421,6 @@ watch(
   color: var(--c-accent);
 }
 
-.share-btn {
-  background: var(--c-bg-2);
-}
-
-.share-btn:hover {
-  background: var(--c-bg-3);
-}
 
 .playlist-tags {
   margin-top: 8px;

@@ -5,9 +5,29 @@ import apiCache from '../utils/apiCache'
 import { getAllCachedTracks } from '../utils/audioCacheDb'
 
 export const useLibraryStore = defineStore('library', () => {
-  // State - My Library
+  // LocalStorage keys for instant hydration (SWR)
+  const CACHE_KEY_PLAYLISTS = 'tg_player_cached_playlists'
+  const CACHE_KEY_LIKED = 'tg_player_cached_liked'
+  const CACHE_KEY_HISTORY = 'tg_player_cached_history'
+
+  const loadFromStorage = (key, defaultVal) => {
+    try {
+      const raw = localStorage.getItem(key)
+      return raw ? JSON.parse(raw) : defaultVal
+    } catch {
+      return defaultVal
+    }
+  }
+
+  const saveToStorage = (key, val) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(val))
+    } catch (_) {}
+  }
+
+  // State - My Library with instant local cache hydration
   const tracks = ref([])
-  const playlists = ref([])
+  const playlists = ref(loadFromStorage(CACHE_KEY_PLAYLISTS, []))
   const artists = ref([])
   const globalArtists = ref([])  // All artists from global library
   const artistScope = ref('library')  // 'library' or 'global'
@@ -46,8 +66,8 @@ export const useLibraryStore = defineStore('library', () => {
   
   const artistImages = ref(loadArtistImagesFromCache())  // Cache for artist images with persistence
   const genres = ref([])
-  const history = ref([])
-  const likedTracks = ref([])  // Liked tracks
+  const history = ref(loadFromStorage(CACHE_KEY_HISTORY, []))
+  const likedTracks = ref(loadFromStorage(CACHE_KEY_LIKED, []))  // Liked tracks
   const loading = ref(false)
   const refreshing = ref(false)
   const total = ref(0)
@@ -69,33 +89,25 @@ export const useLibraryStore = defineStore('library', () => {
   const selectedUser = ref(null)
   const selectedUserTracks = ref([])
 
-  // Initialize
+  // Lightweight init: only fetch primary user collections, non-blocking
   const init = async () => {
-    await Promise.all([
-      fetchTracks(),
+    return Promise.allSettled([
       fetchPlaylists(),
-      fetchArtists(),
-      fetchGenres(),    // For home feed genres
-      fetchHistory(),   // For home feed
-      fetchLikedTracks(),  // Liked tracks
-      fetchGlobalStats(), // Global library stats
-      fetchRecentUploads(), // Recent uploads from all users
+      fetchLikedTracks(),
+      fetchHistory(20),
     ])
   }
 
-  // Refresh all data (pull-to-refresh)
+  // Refresh active data (pull-to-refresh)
   const refresh = async () => {
     refreshing.value = true
     try {
-      await Promise.all([
+      await Promise.allSettled([
         fetchTracks(),
         fetchPlaylists(),
-        fetchArtists(),
-        fetchGenres(),
-        fetchHistory(),
         fetchLikedTracks(),
-        fetchGlobalStats(),
-        fetchRecentUploads(),
+        fetchHistory(20),
+        fetchRecentUploads(15),
       ])
     } finally {
       refreshing.value = false
@@ -201,6 +213,7 @@ export const useLibraryStore = defineStore('library', () => {
         cover_url: bust(p.cover_url),
         covers: (p.covers || (p.cover_url ? [p.cover_url] : [])).map(bust)
       }))
+      saveToStorage(CACHE_KEY_PLAYLISTS, playlists.value.slice(0, 25))
     } catch (error) {
       console.error('Failed to fetch playlists:', error)
     }
@@ -583,6 +596,7 @@ export const useLibraryStore = defineStore('library', () => {
     try {
       const response = await tracksApi.getHistory(limit)
       history.value = response.data?.items || (Array.isArray(response.data) ? response.data : [])
+      saveToStorage(CACHE_KEY_HISTORY, history.value.slice(0, 25))
       return history.value
     } catch (error) {
       console.error('Failed to fetch history:', error)
@@ -608,6 +622,7 @@ export const useLibraryStore = defineStore('library', () => {
       const response = await tracksApi.getLiked()
       // API returns { items: [...], total: N }
       likedTracks.value = response.data?.items || (Array.isArray(response.data) ? response.data : [])
+      saveToStorage(CACHE_KEY_LIKED, likedTracks.value.slice(0, 50))
       return likedTracks.value
     } catch (error) {
       console.error('Failed to fetch liked tracks:', error)

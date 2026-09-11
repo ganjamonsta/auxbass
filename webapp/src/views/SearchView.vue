@@ -1116,7 +1116,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, onActivated } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, onActivated, defineAsyncComponent } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
@@ -1132,7 +1132,7 @@ import api, { tracksApi, artistsApi, albumsApi, playlistsApi, ingestionApi } fro
 import SearchBar from '@/components/ui/SearchBar.vue'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackSkeleton from '@/components/TrackSkeleton.vue'
-import ExportifyImportModal from '@/components/ExportifyImportModal.vue'
+const ExportifyImportModal = defineAsyncComponent(() => import('@/components/ExportifyImportModal.vue'))
 import { getCoverUrl, CoverSize, formatDuration } from '@/utils'
 import { 
   Music, 

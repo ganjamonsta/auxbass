@@ -1061,11 +1061,18 @@ export const usePlayerStore = defineStore('player', () => {
 
     initAudio(); updateMediaSession(); startStateSaving()
 
-    // Background prefetch
-    const prefetchIds = [savedState.currentTrack, ...savedState.queue.slice((savedState.queueIndex ?? 0) + 1, (savedState.queueIndex ?? 0) + 4)].map(t => t.id)
-    playerApi.getBatchUrls(prefetchIds)
-      .then(r => { for (const item of (r.data.urls || [])) { if (item.url && !item.error) setCachedUrl(item.track_id, item.url, item.expires_at) } })
-      .catch(() => {})
+    // Deferred background prefetch to not compete with initial page rendering
+    const schedulePrefetch = typeof window !== 'undefined' && window.requestIdleCallback
+      ? window.requestIdleCallback
+      : (cb) => setTimeout(cb, 1200)
+
+    schedulePrefetch(() => {
+      if (!currentTrack.value) return
+      const prefetchIds = [savedState.currentTrack, ...savedState.queue.slice((savedState.queueIndex ?? 0) + 1, (savedState.queueIndex ?? 0) + 4)].map(t => t.id)
+      playerApi.getBatchUrls(prefetchIds)
+        .then(r => { for (const item of (r.data.urls || [])) { if (item.url && !item.error) setCachedUrl(item.track_id, item.url, item.expires_at) } })
+        .catch(() => {})
+    })
     return true
   }
 
