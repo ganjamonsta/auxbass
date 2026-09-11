@@ -97,15 +97,15 @@ def test_share_keyboards():
 
 def test_inline_regex_parsing():
     pl_pattern = r'^(?:playlist|pl)[:_](\d+)$'
-    assert re.match(pl_pattern, "playlist:123").group(1) == "123"
-    assert re.match(pl_pattern, "pl:55").group(1) == "55"
-    assert re.match(pl_pattern, "PL_77").group(1) == "77"
+    assert re.match(pl_pattern, "playlist:123", re.IGNORECASE).group(1) == "123"
+    assert re.match(pl_pattern, "pl:55", re.IGNORECASE).group(1) == "55"
+    assert re.match(pl_pattern, "PL_77", re.IGNORECASE).group(1) == "77"
 
     tr_pattern = r'^(?:track|tr)[:_](\d+)$'
-    assert re.match(tr_pattern, "track:999").group(1) == "999"
-    assert re.match(tr_pattern, "tr:10").group(1) == "10"
-    assert re.match(tr_pattern, "TR_4").group(1) == "4"
+    assert re.match(tr_pattern, "track:999", re.IGNORECASE).group(1) == "999"
+    assert re.match(tr_pattern, "tr:10", re.IGNORECASE).group(1) == "10"
+    assert re.match(tr_pattern, "TR_4", re.IGNORECASE).group(1) == "4"
 
     al_pattern = r'^(?:album|al)[:_](\d+)$'
-    assert re.match(al_pattern, "album:42").group(1) == "42"
-    assert re.match(al_pattern, "al:1").group(1) == "1"
+    assert re.match(al_pattern, "album:42", re.IGNORECASE).group(1) == "42"
+    assert re.match(al_pattern, "al:1", re.IGNORECASE).group(1) == "1"
