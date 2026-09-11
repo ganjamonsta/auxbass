@@ -7,6 +7,7 @@ from typing import Dict, List, Optional
 
 from .base import BaseMusicProvider
 from .providers.soundcloud import SoundCloudProvider
+from .providers.spotify import SpotifyProvider
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ class ProviderRegistry:
     def _register_default_providers(self):
         """Register built-in providers."""
         self.register(SoundCloudProvider())
+        self.register(SpotifyProvider())
 
     def register(self, provider: BaseMusicProvider):
         """Register a provider instance."""

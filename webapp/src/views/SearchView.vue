@@ -26,7 +26,7 @@
     </div>
 
     <!-- Search Results Mode -->
-    <div v-if="searchQuery.trim() || activeFilter === 'soundcloud'" class="search-results-container">
+    <div v-if="searchQuery.trim() || activeFilter === 'soundcloud' || activeFilter === 'spotify'" class="search-results-container">
       <!-- Loading initial search results skeleton -->
       <div v-if="isInitialLoading" class="search-skeleton-list">
         <TrackSkeleton v-for="n in 8" :key="n" />
@@ -116,6 +116,60 @@
                     class="sc-add-btn" 
                     :disabled="importingTrackUrl === item.url"
                     @click.stop="handleQuickAddSoundCloud(item)"
+                    title="Добавить в медиатеку"
+                  >
+                    <Plus :size="16" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Matching Spotify Global Search Overview -->
+          <section v-if="spotifyResults.length > 0" class="result-section spotify-section">
+            <div class="result-header">
+              <div class="header-left">
+                <span class="sp-badge">SP</span>
+                <h3 class="result-title">Spotify (Каталог)</h3>
+                <span class="result-count">{{ spotifyResults.length }}</span>
+              </div>
+              <button 
+                v-if="spotifyResults.length > 5" 
+                class="section-view-all" 
+                @click="activeFilter = 'spotify'"
+              >
+                <span>Все {{ spotifyResults.length }}</span>
+                <ArrowRight :size="14" />
+              </button>
+            </div>
+            
+            <div class="sc-results-list">
+              <div
+                v-for="item in spotifyResults.slice(0, 5)"
+                :key="item.url"
+                class="sc-track-item sp-item"
+                @click="handleQuickPlaySpotify(item)"
+              >
+                <div class="sc-track-cover sp-cover">
+                  <img v-if="item.cover_url" :src="item.cover_url" alt="" loading="lazy" referrerpolicy="no-referrer" />
+                  <Music v-else :size="20" />
+                  <div v-if="importingTrackUrl === item.url" class="sc-track-loading">
+                    <div class="spinner small"></div>
+                  </div>
+                  <div v-else class="sc-track-play">
+                    <Play :size="14" fill="currentColor" />
+                  </div>
+                </div>
+                <div class="sc-track-info">
+                  <div class="sc-track-title" :title="item.title">{{ item.title }}</div>
+                  <div class="sc-track-artist">{{ item.artist }}</div>
+                </div>
+                <div class="sc-track-actions">
+                  <span v-if="item.duration" class="sc-track-duration">{{ formatDuration(item.duration) }}</span>
+                  <button 
+                    class="sc-add-btn sp-add" 
+                    :disabled="importingTrackUrl === item.url"
+                    @click.stop="handleQuickAddSpotify(item)"
                     title="Добавить в медиатеку"
                   >
                     <Plus :size="16" />
@@ -708,6 +762,272 @@
           </template>
         </div>
 
+        <!-- ==================== TAB: SPOTIFY ==================== -->
+        <div v-else-if="activeFilter === 'spotify'" class="spotify-results-mode">
+          <!-- Sub-tab Switcher -->
+          <div class="sc-tab-switcher">
+            <button 
+              class="sc-subtab-btn" 
+              :class="{ active: spSubTab === 'search' }"
+              @click="spSubTab = 'search'"
+            >
+              <Globe :size="15" />
+              <span>Глобальный поиск</span>
+              <span v-if="spotifyResults.length > 0" class="sc-subtab-count sp-count">{{ spotifyResults.length }}</span>
+            </button>
+            <button 
+              class="sc-subtab-btn" 
+              :class="{ active: spSubTab === 'likes' }"
+              @click="switchToSpotifyLikesTab"
+            >
+              <Heart :size="15" />
+              <span>Мои лайки</span>
+              <span v-if="spAccount?.likes_count" class="sc-subtab-count sp-count">{{ spAccount.likes_count }}</span>
+            </button>
+          </div>
+
+          <!-- 1. SEARCH MODE -->
+          <template v-if="spSubTab === 'search'">
+            <div class="section-header">
+              <span class="section-title">
+                <span class="sp-badge">SP</span> Spotify (Глобальный поиск)
+              </span>
+              <span class="section-count">{{ spotifyResults.length }}</span>
+            </div>
+
+            <div v-if="isSpotifySearching" class="section-loading-indicator">
+              <div class="spinner small"></div>
+              <span>Поиск на Spotify...</span>
+            </div>
+
+            <div v-else-if="spotifyResults.length > 0" class="sc-results-list full-list">
+              <div
+                v-for="item in spotifyResults"
+                :key="item.url"
+                class="sc-track-item sp-item"
+                @click="handleQuickPlaySpotify(item)"
+              >
+                <div class="sc-track-cover sp-cover">
+                  <img v-if="item.cover_url" :src="item.cover_url" alt="" loading="lazy" referrerpolicy="no-referrer" />
+                  <Music v-else :size="20" />
+                  <div v-if="importingTrackUrl === item.url" class="sc-track-loading">
+                    <div class="spinner small"></div>
+                  </div>
+                  <div v-else class="sc-track-play">
+                    <Play :size="14" fill="currentColor" />
+                  </div>
+                </div>
+                <div class="sc-track-info">
+                  <div class="sc-track-title" :title="item.title">{{ item.title }}</div>
+                  <div class="sc-track-artist-row">
+                    <span class="sc-track-artist">{{ item.artist }}</span>
+                    <!-- Badges -->
+                    <div v-if="item.in_library || item.in_channel || item.already_in_tg" class="sc-track-badges">
+                      <span v-if="item.in_library" class="sc-badge-pill in-lib" title="Уже в вашей медиатеке">
+                        <Check :size="10" /> В медиатеке
+                      </span>
+                      <span v-if="item.in_channel" class="sc-badge-pill in-chan" title="Забэкаплен в Telegram-канал">
+                        <CloudDownload :size="10" /> В канале
+                      </span>
+                      <span v-else-if="item.already_in_tg" class="sc-badge-pill in-tg" title="Уже есть на сервере Telegram">
+                        В базе TG
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div class="sc-track-actions">
+                  <span v-if="item.duration" class="sc-track-duration">{{ formatDuration(item.duration) }}</span>
+                  <button 
+                    v-if="!item.in_library"
+                    class="sc-add-btn sp-add" 
+                    :disabled="importingTrackUrl === item.url"
+                    @click.stop="handleQuickAddSpotify(item)"
+                    title="Добавить в медиатеку"
+                  >
+                    <Plus :size="16" />
+                  </button>
+                  <span v-else class="sc-added-indicator" title="Уже в медиатеке">
+                    <Check :size="16" />
+                  </span>
+                </div>
+              </div>
+
+              <!-- Load More Spotify Button -->
+              <div class="sc-load-more-wrap">
+                <button 
+                  v-if="spotifyResults.length < 60"
+                  class="sc-load-more-btn sp-load-more"
+                  :disabled="isLoadingMoreSpotify"
+                  @click="loadMoreSpotify"
+                >
+                  <div v-if="isLoadingMoreSpotify" class="spinner small"></div>
+                  <template v-else>Загрузить ещё (до 60)</template>
+                </button>
+                <span v-else class="sc-end-notice">Показаны 60 лучших результатов Spotify</span>
+              </div>
+            </div>
+
+            <div v-else-if="!isSpotifySearching" class="no-results-box">
+              <p class="no-results-text">
+                {{ searchQuery.trim() ? 'В каталоге ничего не найдено' : 'Введите поисковый запрос выше для поиска треков в каталоге Spotify' }}
+              </p>
+            </div>
+          </template>
+
+          <!-- 2. LIKES MODE -->
+          <template v-else-if="spSubTab === 'likes'">
+            <!-- Account Connected Header -->
+            <div v-if="spAccount?.connected" class="sc-likes-header-card sp-header-card">
+              <div class="sc-likes-user-bar">
+                <img 
+                  v-if="spAccount.avatar_url" 
+                  :src="spAccount.avatar_url" 
+                  alt="" 
+                  class="sc-likes-avatar"
+                  referrerpolicy="no-referrer" 
+                />
+                <div v-else class="sc-likes-avatar-placeholder sp-placeholder">
+                  <Radio :size="18" />
+                </div>
+                <div class="sc-likes-user-meta">
+                  <span class="sc-likes-username">{{ spAccount.display_name || spAccount.username }}</span>
+                  <span class="sc-likes-stats-text">💚 {{ spAccount.likes_count || spLikes.length }} лайков на Spotify</span>
+                </div>
+              </div>
+
+              <div class="sc-likes-header-actions">
+                <button 
+                  class="sc-sync-btn sp-sync-btn"
+                  :disabled="isSyncingAllSpLikes || isSpLikesLoading || unimportedSpLikesCount === 0"
+                  @click="handleSyncAllSpLikes"
+                  title="Импортировать все новые треки в медиатеку и канал"
+                >
+                  <div v-if="isSyncingAllSpLikes" class="spinner small"></div>
+                  <CloudDownload v-else :size="15" />
+                  <span>{{ isSyncingAllSpLikes ? 'Синхронизация...' : `Синхронизировать новые (${unimportedSpLikesCount})` }}</span>
+                </button>
+                <button 
+                  class="sc-refresh-icon-btn" 
+                  :disabled="isSpLikesLoading"
+                  @click="fetchSpLikes(true)"
+                  title="Обновить список лайков"
+                >
+                  <RefreshCw :size="15" :class="{ 'spin-icon': isSpLikesLoading }" />
+                </button>
+              </div>
+            </div>
+
+            <!-- Sync progress bar if active -->
+            <div v-if="syncSpJobProgress" class="sc-sync-progress-banner sp-progress-banner">
+              <div class="sc-sync-info-row">
+                <span class="sc-sync-msg">Импорт: {{ syncSpJobProgress.current_track_title || 'Загрузка...' }}</span>
+                <span class="sc-sync-count">{{ syncSpJobProgress.processed_tracks }} / {{ syncSpJobProgress.total_tracks }}</span>
+              </div>
+              <div class="sc-sync-bar-track">
+                <div 
+                  class="sc-sync-bar-fill sp-bar-fill" 
+                  :style="{ width: `${Math.round((syncSpJobProgress.processed_tracks / (syncSpJobProgress.total_tracks || 1)) * 100)}%` }"
+                ></div>
+              </div>
+            </div>
+
+            <!-- Loading indicator -->
+            <div v-if="isSpLikesLoading && spLikes.length === 0" class="section-loading-indicator">
+              <div class="spinner small"></div>
+              <span>Загрузка любимых треков со Spotify...</span>
+            </div>
+
+            <!-- Likes Track List -->
+            <div v-else-if="spLikes.length > 0" class="sc-results-list full-list">
+              <div
+                v-for="item in spLikes"
+                :key="item.url"
+                class="sc-track-item sp-item"
+                @click="handleQuickPlaySpotify(item)"
+              >
+                <div class="sc-track-cover sp-cover">
+                  <img v-if="item.cover_url" :src="item.cover_url" alt="" loading="lazy" referrerpolicy="no-referrer" />
+                  <Music v-else :size="20" />
+                  <div v-if="importingTrackUrl === item.url" class="sc-track-loading">
+                    <div class="spinner small"></div>
+                  </div>
+                  <div v-else class="sc-track-play">
+                    <Play :size="14" fill="currentColor" />
+                  </div>
+                </div>
+
+                <div class="sc-track-info">
+                  <div class="sc-track-title" :title="item.title">{{ item.title }}</div>
+                  <div class="sc-track-artist-row">
+                    <span class="sc-track-artist">{{ item.artist }}</span>
+                    <!-- Badges -->
+                    <div class="sc-track-badges">
+                      <span v-if="item.in_library" class="sc-badge-pill in-lib" title="Уже в вашей медиатеке">
+                        <Check :size="10" /> В медиатеке
+                      </span>
+                      <span v-if="item.in_channel" class="sc-badge-pill in-chan" title="Забэкаплен в Telegram-канал">
+                        <CloudDownload :size="10" /> В канале
+                      </span>
+                      <span v-else-if="item.already_in_tg" class="sc-badge-pill in-tg" title="Уже есть на сервере Telegram">
+                        В базе TG
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="sc-track-actions">
+                  <span v-if="item.duration" class="sc-track-duration">{{ formatDuration(item.duration) }}</span>
+                  <button 
+                    v-if="!item.in_library"
+                    class="sc-add-btn sp-add" 
+                    :disabled="importingTrackUrl === item.url"
+                    @click.stop="handleQuickAddSpotify(item)"
+                    title="Добавить в медиатеку и канал"
+                  >
+                    <Plus :size="16" />
+                  </button>
+                  <span v-else class="sc-added-indicator" title="Уже в медиатеке">
+                    <Check :size="16" />
+                  </span>
+                </div>
+              </div>
+
+              <!-- Load more likes button -->
+              <div v-if="spLikesCursor" class="sc-load-more-wrap">
+                <button 
+                  class="sc-load-more-btn sp-load-more"
+                  :disabled="isLoadingMoreSpLikes"
+                  @click="loadMoreSpLikes"
+                >
+                  <div v-if="isLoadingMoreSpLikes" class="spinner small"></div>
+                  <template v-else>Загрузить ещё лайки</template>
+                </button>
+              </div>
+            </div>
+
+            <!-- Not Connected Prompt -->
+            <div v-else-if="!spAccount?.connected && !isSpLikesLoading" class="sc-not-connected-banner sp-banner">
+              <div class="sc-banner-icon sp-banner-icon">
+                <Radio :size="32" />
+              </div>
+              <h4 class="sc-banner-title">Аккаунт Spotify не подключен</h4>
+              <p class="sc-banner-desc">
+                Привяжите ваш профиль Spotify в настройках, чтобы просматривать лайки, слушать и автоматически сохранять аудиофайлы в личный Telegram-канал.
+              </p>
+              <button class="sc-btn primary sp-primary" @click="router.push('/settings')">
+                <Settings :size="15" />
+                <span>Открыть настройки</span>
+              </button>
+            </div>
+
+            <!-- Empty likes -->
+            <div v-else-if="!isSpLikesLoading" class="no-results-box">
+              <p class="no-results-text">Любимых треков на Spotify пока нет</p>
+              <p class="no-results-hint">Добавьте треки в «Любимые треки» на Spotify и нажмите «Обновить»</p>
+            </div>
+          </template>
+        </div>
+
         <!-- ==================== TAB: ALBUMS ==================== -->
         <div v-else-if="activeFilter === 'albums'" class="albums-results-mode">
           <div class="section-header">
@@ -1178,9 +1498,225 @@ const handleQuickAddSoundCloud = async (scTrack) => {
   }
 }
 
+// ─── Spotify External Search & Likes State ───
+const spotifyResults = ref([])
+const isSpotifySearching = ref(false)
+const isLoadingMoreSpotify = ref(false)
+
+const spSubTab = ref('search') // 'search' | 'likes'
+const spAccount = ref(null)
+const isSpAccountLoading = ref(false)
+const spLikes = ref([])
+const isSpLikesLoading = ref(false)
+const spLikesCursor = ref(null)
+const isLoadingMoreSpLikes = ref(false)
+const isSyncingAllSpLikes = ref(false)
+const syncSpJobProgress = ref(null)
+
+const fetchSpAccountForSearch = async () => {
+  isSpAccountLoading.value = true
+  try {
+    const res = await ingestionApi.getSpotifyAccount()
+    spAccount.value = res.data
+  } catch (e) {
+    console.error('Failed to get Spotify account:', e)
+  } finally {
+    isSpAccountLoading.value = false
+  }
+}
+
+const fetchSpLikes = async (reset = true) => {
+  if (isSpLikesLoading.value) return
+  isSpLikesLoading.value = true
+  try {
+    if (reset) {
+      spLikesCursor.value = null
+    }
+    const res = await ingestionApi.getSpotifyLikes({ limit: 40 })
+    spLikes.value = res.data?.items || []
+    spLikesCursor.value = res.data?.next_cursor || null
+    if (res.data?.account) {
+      spAccount.value = res.data.account
+    }
+  } catch (e) {
+    console.error('Failed to fetch Spotify likes:', e)
+    if (e.response?.status !== 404) {
+      uiStore.toast?.error('Ошибка', e.response?.data?.detail || 'Не удалось загрузить лайки')
+    }
+  } finally {
+    isSpLikesLoading.value = false
+  }
+}
+
+const loadMoreSpLikes = async () => {
+  if (!spLikesCursor.value || isLoadingMoreSpLikes.value) return
+  isLoadingMoreSpLikes.value = true
+  try {
+    const res = await ingestionApi.getSpotifyLikes({ cursor: spLikesCursor.value, limit: 40 })
+    const more = res.data?.items || []
+    spLikes.value = [...spLikes.value, ...more]
+    spLikesCursor.value = res.data?.next_cursor || null
+  } catch (e) {
+    console.error('Failed to load more Spotify likes:', e)
+  } finally {
+    isLoadingMoreSpLikes.value = false
+  }
+}
+
+const switchToSpotifyLikesTab = () => {
+  spSubTab.value = 'likes'
+  if (spLikes.value.length === 0 && spAccount.value?.connected) {
+    fetchSpLikes(true)
+  }
+}
+
+const unimportedSpLikesCount = computed(() => {
+  return spLikes.value.filter(t => !t.in_library).length
+})
+
+const handleSyncAllSpLikes = async () => {
+  if (isSyncingAllSpLikes.value) return
+  const toImport = spLikes.value.filter(t => !t.in_library)
+  if (toImport.length === 0) {
+    uiStore.toast?.info('Синхронизация', 'Все треки из лайков уже в вашей медиатеке!')
+    return
+  }
+
+  isSyncingAllSpLikes.value = true
+  try {
+    const urls = toImport.map(t => t.url)
+    const res = await ingestionApi.start(urls[0], urls)
+    const jobId = res.data?.id
+    uiStore.toast?.success('Синхронизация', `Запущен импорт ${urls.length} треков Spotify в медиатеку и Telegram-канал`)
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const jobRes = await ingestionApi.getJob(jobId)
+        const job = jobRes.data
+        syncSpJobProgress.value = job
+        if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
+          clearInterval(pollInterval)
+          isSyncingAllSpLikes.value = false
+          syncSpJobProgress.value = null
+          await fetchSpLikes(true)
+          libraryStore.fetchTracks({ refresh: true })
+          if (job.status === 'completed') {
+            uiStore.toast?.success('Готово', `Синхронизировано со Spotify: ${job.processed_tracks}`)
+          }
+        }
+      } catch (err) {
+        clearInterval(pollInterval)
+        isSyncingAllSpLikes.value = false
+        syncSpJobProgress.value = null
+      }
+    }, 2000)
+  } catch (e) {
+    console.error('Failed to start Spotify sync job:', e)
+    uiStore.toast?.error('Ошибка', 'Не удалось запустить синхронизацию')
+    isSyncingAllSpLikes.value = false
+  }
+}
+
+const searchSpotify = async (query, limit = 30) => {
+  const cleanQ = query.replace(/^#/, '').trim()
+  if (!cleanQ || cleanQ.length < 2) {
+    spotifyResults.value = []
+    return
+  }
+
+  isSpotifySearching.value = true
+  try {
+    const res = await ingestionApi.search(cleanQ, 'spotify', limit)
+    spotifyResults.value = res.data || []
+  } catch (e) {
+    console.error('Failed to search Spotify:', e)
+    spotifyResults.value = []
+  } finally {
+    isSpotifySearching.value = false
+  }
+}
+
+const loadMoreSpotify = async () => {
+  const cleanQ = searchQuery.value.replace(/^#/, '').trim()
+  if (!cleanQ || isLoadingMoreSpotify.value) return
+  isLoadingMoreSpotify.value = true
+  try {
+    const targetLimit = Math.min(60, spotifyResults.value.length + 30)
+    const res = await ingestionApi.search(cleanQ, 'spotify', targetLimit)
+    spotifyResults.value = res.data || []
+  } catch (e) {
+    console.error('Failed to load more from Spotify:', e)
+  } finally {
+    isLoadingMoreSpotify.value = false
+  }
+}
+
+const handleQuickPlaySpotify = async (spTrack) => {
+  if (importingTrackUrl.value) return
+  importingTrackUrl.value = spTrack.url
+
+  try {
+    const res = await ingestionApi.quickImport({
+      url: spTrack.url,
+      title: spTrack.title,
+      artist: spTrack.artist,
+      duration: spTrack.duration,
+      cover_url: spTrack.cover_url,
+      add_to_library: false,
+    })
+
+    const track = res.data?.track
+    if (track) {
+      if (track.in_library) {
+        spTrack.in_library = true
+      }
+      spTrack.already_in_tg = true
+      spTrack.track_id = track.id
+      playerStore.playTrack(track, [track], 0)
+    }
+  } catch (e) {
+    console.error('Failed to quick play Spotify track:', e)
+    const errorMsg = e.response?.data?.detail || 'Не удалось загрузить трек'
+    uiStore.toast?.error('Ошибка воспроизведения', errorMsg)
+  } finally {
+    importingTrackUrl.value = null
+  }
+}
+
+const handleQuickAddSpotify = async (spTrack) => {
+  if (importingTrackUrl.value) return
+  importingTrackUrl.value = spTrack.url
+
+  try {
+    const res = await ingestionApi.quickImport({
+      url: spTrack.url,
+      title: spTrack.title,
+      artist: spTrack.artist,
+      duration: spTrack.duration,
+      cover_url: spTrack.cover_url,
+      add_to_library: true,
+    })
+
+    const track = res.data?.track
+    if (track) {
+      spTrack.in_library = true
+      spTrack.already_in_tg = true
+      spTrack.track_id = track.id
+      libraryStore.fetchTracks({ refresh: true })
+      uiStore.toast?.success('В медиатеке', `${track.artist} — ${track.title}`)
+    }
+  } catch (e) {
+    console.error('Failed to quick add Spotify track:', e)
+    const errorMsg = e.response?.data?.detail || 'Не удалось добавить трек'
+    uiStore.toast?.error('Ошибка импорта', errorMsg)
+  } finally {
+    importingTrackUrl.value = null
+  }
+}
+
 // Combined search loading state
 const isLoading = computed(() => {
-  return isTracksSearching.value || isArtistsSearching.value || isAlbumsSearching.value || isPlaylistsSearching.value || isSoundCloudSearching.value
+  return isTracksSearching.value || isArtistsSearching.value || isAlbumsSearching.value || isPlaylistsSearching.value || isSoundCloudSearching.value || isSpotifySearching.value
 })
 
 const isInitialLoading = computed(() => {
@@ -1189,7 +1725,8 @@ const isInitialLoading = computed(() => {
          artistsResults.value.length === 0 && 
          albumsResults.value.length === 0 && 
          playlistsResults.value.length === 0 &&
-         soundcloudResults.value.length === 0
+         soundcloudResults.value.length === 0 &&
+         spotifyResults.value.length === 0
 })
 
 // Dynamic Tags state
@@ -1201,6 +1738,7 @@ const filterChips = [
   { id: 'all', label: 'Все' },
   { id: 'tracks', label: 'Треки' },
   { id: 'soundcloud', label: 'SoundCloud' },
+  { id: 'spotify', label: 'Spotify' },
   { id: 'artists', label: 'Артисты' },
   { id: 'albums', label: 'Альбомы' },
   { id: 'playlists', label: 'Плейлисты' },
@@ -1220,6 +1758,12 @@ const getChipBadge = (chipId) => {
       return scLikes.value.length
     }
     return soundcloudResults.value.length > 0 ? soundcloudResults.value.length : (scAccount.value?.connected ? '★' : null)
+  }
+  if (chipId === 'spotify') {
+    if (spSubTab.value === 'likes' && spLikes.value.length > 0) {
+      return spLikes.value.length
+    }
+    return spotifyResults.value.length > 0 ? spotifyResults.value.length : (spAccount.value?.connected ? '★' : null)
   }
   if (chipId === 'artists') {
     return artistsResults.value.length > 0 ? artistsResults.value.length : null
@@ -1252,13 +1796,16 @@ const topTracks = computed(() => {
 const noResults = computed(() => {
   if (isLoading.value || isFriendsLoading.value || isGlobalLoading.value) return false
   if (activeFilter.value === 'all') {
-    return topTracks.value.length === 0 && artistsResults.value.length === 0 && albumsResults.value.length === 0 && playlistsResults.value.length === 0 && soundcloudResults.value.length === 0
+    return topTracks.value.length === 0 && artistsResults.value.length === 0 && albumsResults.value.length === 0 && playlistsResults.value.length === 0 && soundcloudResults.value.length === 0 && spotifyResults.value.length === 0
   }
   if (activeFilter.value === 'tracks') {
     return allTracksList.value.length === 0
   }
   if (activeFilter.value === 'soundcloud') {
     return soundcloudResults.value.length === 0
+  }
+  if (activeFilter.value === 'spotify') {
+    return spotifyResults.value.length === 0
   }
   if (activeFilter.value === 'artists') {
     return artistsResults.value.length === 0
@@ -1443,12 +1990,14 @@ const performSearch = (q) => {
     executeTrackSearch()
     searchArtistsAndPlaylists(query)
     searchSoundCloud(query)
+    searchSpotify(query)
   } else {
     clearTrackSearch()
     artistsResults.value = []
     albumsResults.value = []
     playlistsResults.value = []
     soundcloudResults.value = []
+    spotifyResults.value = []
   }
 }
 
@@ -1464,6 +2013,7 @@ const handleClear = () => {
   albumsResults.value = []
   playlistsResults.value = []
   soundcloudResults.value = []
+  spotifyResults.value = []
   if (route.query.q || route.query.search || route.query.tag) {
     router.replace({ path: '/search', query: {} })
   }
@@ -1536,6 +2086,12 @@ const applyRouteQuery = () => {
       scSubTab.value = 'likes'
       fetchScLikes()
     }
+  } else if (route.query.tab === 'spotify') {
+    activeFilter.value = 'spotify'
+    if (route.query.mode === 'likes') {
+      spSubTab.value = 'likes'
+      fetchSpLikes()
+    }
   }
   if (tagParam && typeof tagParam === 'string') {
     const formatted = tagParam.startsWith('#') ? tagParam : `#${tagParam}`
@@ -1555,6 +2111,7 @@ const handleResetState = (event) => {
 onMounted(() => {
   loadTags()
   fetchScAccountForSearch()
+  fetchSpAccountForSearch()
   applyRouteQuery()
   window.addEventListener('reset-view-state', handleResetState)
 })
@@ -2601,5 +3158,66 @@ onUnmounted(() => {
   max-width: 440px;
   line-height: 1.5;
   margin: 0 0 16px 0;
+}
+
+/* Spotify Styling */
+.sp-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #1ed760;
+  color: #000;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.sp-count {
+  background: rgba(30, 215, 96, 0.2);
+  color: #1ed760;
+}
+
+.sp-sync-btn {
+  background: #1ed760 !important;
+  color: #000 !important;
+  box-shadow: 0 2px 8px rgba(30, 215, 96, 0.3) !important;
+}
+
+.sp-sync-btn:hover:not(:disabled) {
+  background: #22e668 !important;
+}
+
+.sp-progress-banner {
+  background: rgba(30, 215, 96, 0.1) !important;
+  border-color: rgba(30, 215, 96, 0.25) !important;
+}
+
+.sp-bar-fill {
+  background: #1ed760 !important;
+}
+
+.sp-banner-icon {
+  background: rgba(30, 215, 96, 0.12) !important;
+  color: #1ed760 !important;
+}
+
+.sp-primary {
+  background: #1ed760 !important;
+  color: #000 !important;
+  font-weight: 700 !important;
+}
+
+.sp-primary:hover:not(:disabled) {
+  background: #22e668 !important;
+}
+
+.sp-placeholder {
+  color: #1ed760 !important;
+}
+
+.sp-header-card {
+  border-left: 3px solid #1ed760;
 }
 </style>

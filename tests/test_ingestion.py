@@ -312,5 +312,138 @@ def test_quick_import_request_and_search_response_schemas():
     assert search_item.already_in_tg is True
 
 
+def test_spotify_url_matching_and_registry():
+    from bot.services.ingestion.providers.spotify import SpotifyProvider
+    sp = SpotifyProvider()
+
+    assert sp.can_handle("https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT")
+    assert sp.can_handle("https://open.spotify.com/intl-de/track/4cOdK2wGLETKBW3PvgPWqT?si=123")
+    assert sp.can_handle("https://open.spotify.com/album/4m2880jivSbbyEGAKfITCa")
+    assert sp.can_handle("https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M")
+    assert sp.can_handle("spotify:track:4cOdK2wGLETKBW3PvgPWqT")
+    assert sp.can_handle("spotify:album:4m2880jivSbbyEGAKfITCa")
+    assert not sp.can_handle("https://soundcloud.com/artist/track")
+    assert not sp.can_handle("https://youtube.com/watch?v=123")
+
+    # Registry lookup
+    reg = ProviderRegistry()
+    found = reg.find_provider("https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT")
+    assert found is not None
+    assert found.name == "spotify"
+
+
+@pytest.mark.asyncio
+async def test_spotify_resolve_entity_and_tracklist(monkeypatch):
+    from bot.services.ingestion.providers.spotify import SpotifyProvider
+    sp = SpotifyProvider()
+
+    mock_track_data = {
+        "title": "Never Be Like You",
+        "name": "Never Be Like You",
+        "artists": [{"name": "Flume"}, {"name": "Kai"}],
+        "duration": 234000,
+        "id": "abc123track",
+        "visualIdentity": {
+            "image": [{"url": "https://i.scdn.co/image/ab67616d0000b273_hd.jpg", "width": 640}]
+        },
+        "album": {"name": "Skin"},
+    }
+
+    async def mock_fetch_embed(etype, eid):
+        return mock_track_data
+
+    monkeypatch.setattr(sp, "_fetch_embed_data", mock_fetch_embed)
+
+    entity = await sp.resolve_entity("https://open.spotify.com/track/abc123track")
+    assert entity.entity_type == EntityType.TRACK
+    assert entity.title == "Never Be Like You"
+    assert entity.author == "Flume, Kai"
+    assert entity.cover_url == "https://i.scdn.co/image/ab67616d0000b273_hd.jpg"
+
+    tracks = await sp.fetch_tracklist(entity)
+    assert len(tracks) == 1
+    assert tracks[0].title == "Never Be Like You"
+    assert tracks[0].artist == "Flume, Kai"
+    assert tracks[0].duration == 234
+    assert tracks[0].album == "Skin"
+
+
+@pytest.mark.asyncio
+async def test_audio_resolver_matching_logic():
+    from bot.services.ingestion.audio_resolver import AudioResolver
+    resolver = AudioResolver()
+
+    target = TrackMetadata(
+        provider_name="spotify",
+        url="https://open.spotify.com/track/123",
+        title="Fasten Your Seatbelt",
+        artist="Pendulum",
+        duration=190,
+    )
+
+    candidates = [
+        # Bad duration candidate (>15s difference)
+        {"title": "Pendulum - Fasten Your Seatbelt (Extended Mix)", "duration": 340, "webpage_url": "https://soundcloud.com/test/long"},
+        # Completely different song
+        {"title": "Another Artist - Completely Different Song", "duration": 190, "webpage_url": "https://soundcloud.com/test/diff"},
+        # Good candidate matching title and close duration
+        {"title": "Pendulum - Fasten Your Seatbelt", "duration": 191, "webpage_url": "https://soundcloud.com/test/good"},
+    ]
+
+    best = resolver._pick_best_candidate(target, candidates, exclude_urls=set())
+    assert best is not None
+    assert best["webpage_url"] == "https://soundcloud.com/test/good"
+
+
+@pytest.mark.asyncio
+async def test_soundcloud_drm_fallback_to_audio_resolver(monkeypatch):
+    from bot.services.ingestion.providers.soundcloud import SoundCloudProvider
+    from bot.services.ingestion.base import DownloadedAudio
+    sc = SoundCloudProvider()
+
+    meta = TrackMetadata(
+        provider_name="soundcloud",
+        url="https://soundcloud.com/pendulum/fasten-your-seatbelt-ft-the",
+        title="Fasten Your Seatbelt",
+        artist="Pendulum",
+        duration=190,
+    )
+
+    class MockYDLDRM:
+        def __init__(self, *args, **kwargs):
+            pass
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+        def download(self, urls):
+            import yt_dlp
+            raise yt_dlp.utils.DownloadError("ERROR: [soundcloud] 1236088255: This video is DRM protected")
+
+    import yt_dlp
+    monkeypatch.setattr(yt_dlp, "YoutubeDL", MockYDLDRM)
+
+    # Mock audio_resolver.resolve_and_download to return valid audio
+    called = {}
+    async def mock_resolve_and_download(track_meta, temp_dir, exclude_urls=None):
+        called["resolved"] = True
+        called["exclude_urls"] = exclude_urls
+        return DownloadedAudio(
+            audio_path="/tmp/fake_resolved.mp3",
+            metadata=track_meta,
+            file_size=5000000,
+            mime_type="audio/mpeg",
+        )
+
+    from bot.services.ingestion.audio_resolver import audio_resolver
+    monkeypatch.setattr(audio_resolver, "resolve_and_download", mock_resolve_and_download)
+
+    audio = await sc.download_track(meta, "/tmp/fake_dir")
+    assert called.get("resolved") is True
+    assert meta.url in called.get("exclude_urls", set())
+    assert audio.audio_path == "/tmp/fake_resolved.mp3"
+
+
+
 
 

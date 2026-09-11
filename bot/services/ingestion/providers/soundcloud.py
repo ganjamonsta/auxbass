@@ -94,7 +94,20 @@ class SoundCloudProvider(BaseMusicProvider):
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 return ydl.extract_info(clean_url, download=False)
 
-        info = await asyncio.to_thread(_extract)
+        try:
+            info = await asyncio.to_thread(_extract)
+        except Exception as e:
+            err_str = str(e).lower()
+            if "drm protected" in err_str or "proxy" in err_str or "unable to download" in err_str:
+                logger.info(f"[SoundCloud] yt-dlp inspection failed for '{clean_url}', attempting oEmbed fallback: {e}")
+                try:
+                    info = await self._resolve_drm_via_oembed(clean_url)
+                except Exception as oe_err:
+                    logger.warning(f"[SoundCloud] oEmbed fallback failed: {oe_err}")
+                    raise e from None
+            else:
+                raise
+
         if not info:
             raise ValueError(f"Could not resolve SoundCloud URL: {clean_url}")
 
@@ -135,6 +148,40 @@ class SoundCloudProvider(BaseMusicProvider):
                 track_count=1,
                 raw_data=info,
             )
+
+    async def _resolve_drm_via_oembed(self, url: str) -> dict:
+        """Fetch basic track metadata from SoundCloud oEmbed API for DRM tracks."""
+        import aiohttp
+        oembed_url = f"https://soundcloud.com/oembed?format=json&url={url}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        }
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.get(oembed_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                if resp.status != 200:
+                    raise ValueError(f"SoundCloud oEmbed failed (HTTP {resp.status})")
+                data = await resp.json()
+
+        author = data.get("author_name") or "SoundCloud"
+        raw_title = data.get("title") or "Track"
+        # Often formatted as: "Track Title by author"
+        if raw_title.lower().endswith(f" by {author.lower()}"):
+            raw_title = raw_title[: -(len(author) + 4)].strip()
+
+        # Extract track id from iframe html if possible
+        html = data.get("html") or ""
+        m = re.search(r"/tracks%2F(\d+)", html) or re.search(r"/tracks/(\d+)", html)
+        ext_id = m.group(1) if m else None
+
+        return {
+            "_type": "url",
+            "title": raw_title,
+            "uploader": author,
+            "artist": author,
+            "thumbnail": data.get("thumbnail_url"),
+            "id": ext_id,
+            "is_drm": True,
+        }
 
     async def fetch_tracklist(self, entity: SourceEntity) -> List[TrackMetadata]:
         """Fetch all track metadata from the entity."""
@@ -238,10 +285,26 @@ class SoundCloudProvider(BaseMusicProvider):
             except Exception as e:
                 err_msg = str(e)
                 if "drm protected" in err_msg.lower():
-                    raise ValueError("Этот трек защищён DRM (SoundCloud Go+) и недоступен для бесплатного воспроизведения.") from e
+                    raise ValueError("DRM_PROTECTED") from e
                 raise
 
-        await asyncio.to_thread(_download)
+        try:
+            await asyncio.to_thread(_download)
+        except Exception as e:
+            if "drm protected" in str(e).lower() or "DRM_PROTECTED" in str(e):
+                logger.info(
+                    f"SoundCloud DRM encountered for '{track_meta.artist} - {track_meta.title}'. "
+                    f"Resolving unencrypted alternative stream..."
+                )
+                from ..audio_resolver import audio_resolver
+                try:
+                    return await audio_resolver.resolve_and_download(
+                        track_meta, temp_dir, exclude_urls={track_meta.url}
+                    )
+                except Exception as resolve_err:
+                    logger.warning(f"AudioResolver fallback failed for '{track_meta.title}': {resolve_err}")
+                    raise ValueError("Этот трек защищён DRM (SoundCloud Go+) и недоступен для бесплатного воспроизведения.") from e
+            raise
 
         # Expected output is audio.mp3
         expected_audio = os.path.join(temp_dir, "audio.mp3")

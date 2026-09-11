@@ -160,6 +160,109 @@
       </div>
     </section>
 
+    <!-- Spotify Integration section -->
+    <section class="section sc-integration-section">
+      <div class="section-title-wrap">
+        <h2>
+          <Radio :size="20" class="sp-icon" /> Spotify
+        </h2>
+        <span class="sc-status-pill" :class="{ connected: spAccount?.connected }">
+          {{ spAccount?.connected ? 'Подключен' : 'Не подключен' }}
+        </span>
+      </div>
+
+      <!-- Connected State -->
+      <div v-if="spAccount?.connected" class="sc-connected-card">
+        <div class="sc-user-row">
+          <img 
+            v-if="spAccount.avatar_url" 
+            :src="spAccount.avatar_url" 
+            alt="Spotify Avatar" 
+            class="sc-avatar" 
+            referrerpolicy="no-referrer"
+          />
+          <div v-else class="sc-avatar-placeholder sp-placeholder">
+            <Radio :size="24" />
+          </div>
+          <div class="sc-user-details">
+            <span class="sc-user-title">{{ spAccount.display_name || spAccount.username }}</span>
+            <a :href="spAccount.profile_url" target="_blank" rel="noopener" class="sc-user-link">
+              @{{ spAccount.username }} <ExternalLink :size="12" />
+            </a>
+          </div>
+          <div class="sc-likes-badge" title="Количество лайков на Spotify">
+            <span class="sc-likes-num">{{ spAccount.likes_count || 0 }}</span>
+            <span class="sc-likes-label">лайков</span>
+          </div>
+        </div>
+
+        <div class="sc-connected-actions">
+          <button class="sc-btn primary sp-primary" @click="goToSpotifyLikes">
+            <Heart :size="16" />
+            <span>Мои лайки Spotify</span>
+          </button>
+          <button class="sc-btn secondary" :disabled="isDisconnectingSp" @click="handleDisconnectSp">
+            <Unlink :size="16" />
+            <span>Отвязать</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Not Connected State -->
+      <div v-else class="sc-connect-card">
+        <p class="sc-desc">
+          Привяжите ваш профиль Spotify, чтобы синхронизировать ваши сохраненные треки в медиатеку и автоматически создавать бэкап аудио в Telegram-канал.
+        </p>
+
+        <div class="sc-input-group">
+          <label class="sc-label">Ссылка на профиль или никнейм Spotify:</label>
+          <div class="sc-input-row">
+            <input 
+              v-model="spUsernameInput" 
+              type="text" 
+              placeholder="spotify.com/user/ваш-ник или ваш-ник"
+              class="sc-input"
+              :disabled="isConnectingSp"
+              @keydown.enter="handleConnectSp"
+            />
+            <button 
+              class="sc-btn primary sp-primary" 
+              :disabled="!spUsernameInput.trim() || isConnectingSp"
+              @click="handleConnectSp"
+            >
+              <div v-if="isConnectingSp" class="spinner small"></div>
+              <template v-else>Подключить</template>
+            </button>
+          </div>
+        </div>
+
+        <div class="sc-token-foldout">
+          <button class="sc-foldout-toggle" @click="showSpTokenField = !showSpTokenField">
+            <Key :size="14" />
+            <span>{{ showSpTokenField ? 'Скрыть токен' : 'Сессионный токен sp_dc (для доступа к лайкам)' }}</span>
+            <ChevronDown :size="14" :class="{ rotated: showSpTokenField }" />
+          </button>
+          <div v-if="showSpTokenField" class="sc-token-box">
+            <input 
+              v-model="spTokenInput" 
+              type="password" 
+              placeholder="Значение cookie sp_dc из браузера"
+              class="sc-input token-input"
+              :disabled="isConnectingSp"
+            />
+            <span class="sc-hint">
+              В браузере откройте open.spotify.com -> F12 -> Application -> Cookies -> скопируйте значение cookie <b>sp_dc</b>.
+            </span>
+          </div>
+        </div>
+
+        <div v-if="spConnectError" class="sc-error-msg">
+          <AlertCircle :size="16" />
+          <span>{{ spConnectError }}</span>
+        </div>
+      </div>
+    </section>
+
     <!-- User section -->
     <section class="section">
       <h2>Аккаунт</h2>
@@ -603,6 +706,67 @@ const goToSoundCloudLikes = () => {
   router.push({ path: '/search', query: { tab: 'soundcloud', mode: 'likes' } })
 }
 
+// ─── Spotify Integration State ───
+const spAccount = ref(null)
+const loadingSpAccount = ref(false)
+const isConnectingSp = ref(false)
+const isDisconnectingSp = ref(false)
+const spUsernameInput = ref('')
+const spTokenInput = ref('')
+const showSpTokenField = ref(false)
+const spConnectError = ref('')
+
+const fetchSpAccount = async () => {
+  loadingSpAccount.value = true
+  try {
+    const res = await ingestionApi.getSpotifyAccount()
+    spAccount.value = res.data
+  } catch (e) {
+    console.error('Failed to fetch Spotify account:', e)
+  } finally {
+    loadingSpAccount.value = false
+  }
+}
+
+const handleConnectSp = async () => {
+  const cleanUser = spUsernameInput.value.trim()
+  if (!cleanUser) return
+  isConnectingSp.value = true
+  spConnectError.value = ''
+  try {
+    const res = await ingestionApi.connectSpotifyAccount({
+      username_or_url: cleanUser,
+      auth_token: spTokenInput.value.trim() || undefined,
+    })
+    spAccount.value = res.data
+    spUsernameInput.value = ''
+    spTokenInput.value = ''
+    showSpTokenField.value = false
+  } catch (e) {
+    console.error('Failed to connect Spotify:', e)
+    spConnectError.value = e.response?.data?.detail || 'Не удалось привязать профиль Spotify'
+  } finally {
+    isConnectingSp.value = false
+  }
+}
+
+const handleDisconnectSp = async () => {
+  if (!confirm('Отвязать аккаунт Spotify?')) return
+  isDisconnectingSp.value = true
+  try {
+    await ingestionApi.disconnectSpotifyAccount()
+    spAccount.value = { connected: false }
+  } catch (e) {
+    console.error('Failed to disconnect Spotify:', e)
+  } finally {
+    isDisconnectingSp.value = false
+  }
+}
+
+const goToSpotifyLikes = () => {
+  router.push({ path: '/search', query: { tab: 'spotify', mode: 'likes' } })
+}
+
 // Avatar gradient based on user ID for unique colors
 const avatarGradient = computed(() => {
   const id = authStore.user?.id || 0
@@ -779,6 +943,7 @@ onMounted(() => {
   loadPrivacySettings()
   refreshCacheStats()
   fetchScAccount()
+  fetchSpAccount()
   
   // Load saved theme preference
   const savedTheme = localStorage.getItem('theme')
@@ -1922,6 +2087,22 @@ h1 {
 .clear-cache-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.sp-primary {
+  background: #1db954 !important;
+  color: #000000 !important;
+  font-weight: 600;
+}
+.sp-primary:hover:not(:disabled) {
+  background: #1ed760 !important;
+}
+.sp-icon {
+  color: #1db954;
+}
+.sp-placeholder {
+  background: rgba(29, 185, 84, 0.15) !important;
+  color: #1db954 !important;
 }
 
 /* ═══════════════════════════════════════════════

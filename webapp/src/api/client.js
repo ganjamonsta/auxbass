@@ -330,5 +330,9 @@ export const ingestionApi = {
   connectSoundCloudAccount: (data) => api.post('/ingestion/account/soundcloud/connect', data),
   disconnectSoundCloudAccount: () => api.delete('/ingestion/account/soundcloud'),
   getSoundCloudLikes: (params = {}) => api.get('/ingestion/account/soundcloud/likes', { params }),
+  getSpotifyAccount: () => api.get('/ingestion/account/spotify'),
+  connectSpotifyAccount: (data) => api.post('/ingestion/account/spotify/connect', data),
+  disconnectSpotifyAccount: () => api.delete('/ingestion/account/spotify'),
+  getSpotifyLikes: (params = {}) => api.get('/ingestion/account/spotify/likes', { params }),
 }
 
