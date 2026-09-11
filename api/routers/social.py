@@ -596,43 +596,65 @@ async def get_user_albums(
 
 @router.get("/search")
 async def search_users(
-    q: str = Query(..., min_length=2),
+    q: Optional[str] = Query(None),
+    query: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    per_page: int = Query(20, ge=1, le=50),
+    per_page: int = Query(20, ge=1, le=100),
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Search users by username or name"""
-    search_pattern = f"%{q}%"
+    page = page if isinstance(page, int) else getattr(page, "default", 1)
+    per_page = per_page if isinstance(per_page, int) else getattr(per_page, "default", 20)
+
+    raw_query = ""
+    if isinstance(query, str):
+        raw_query = query
+    elif isinstance(q, str):
+        raw_query = q
+    raw_query = raw_query.strip()
+
+    # Strip leading '@' in case user searches @username
+    clean_q = raw_query.lstrip("@").strip()
     
-    # Count matching users (exclude hidden users)
+    if len(clean_q) < 2:
+        return UserListResponse(
+            items=[],
+            total=0,
+            page=page,
+            per_page=per_page,
+        )
+
+    search_pattern = f"%{clean_q}%"
+    
+    search_filter = or_(
+        User.username.ilike(search_pattern),
+        User.first_name.ilike(search_pattern),
+        User.last_name.ilike(search_pattern),
+        (func.coalesce(User.first_name, '') + ' ' + func.coalesce(User.last_name, '')).ilike(search_pattern),
+    )
+    privacy_filter = func.coalesce(User.hide_from_search, False) == False
+
+    # Count matching users (exclude hidden users and self)
     total = await db.scalar(
         select(func.count(User.id))
         .where(
-            User.hide_from_search == False,
+            privacy_filter,
             User.id != user.id,  # Exclude self
-            or_(
-                User.username.ilike(search_pattern),
-                User.first_name.ilike(search_pattern),
-                User.last_name.ilike(search_pattern),
-            )
+            search_filter,
         )
     ) or 0
     
-    # Get matching users (exclude hidden users)
+    # Get matching users (exclude hidden users and self)
     offset = (page - 1) * per_page
     result = await db.execute(
         select(User)
         .where(
-            User.hide_from_search == False,
+            privacy_filter,
             User.id != user.id,  # Exclude self
-            or_(
-                User.username.ilike(search_pattern),
-                User.first_name.ilike(search_pattern),
-                User.last_name.ilike(search_pattern),
-            )
+            search_filter,
         )
-        .order_by(User.username)
+        .order_by(User.username.nullslast(), User.first_name)
         .offset(offset)
         .limit(per_page)
     )
