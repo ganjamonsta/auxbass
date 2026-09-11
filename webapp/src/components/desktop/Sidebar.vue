@@ -98,7 +98,8 @@
     <div class="sidebar-footer">
       <div 
         class="user-info clickable" 
-        @click="showProfileMenu = true" 
+        :class="{ active: showProfileMenu }"
+        @click="showProfileMenu = !showProfileMenu" 
         @contextmenu.prevent="showProfileMenu = true"
         v-longpress="() => { showProfileMenu = true }"
         title="Меню профиля"
@@ -129,7 +130,7 @@
     </div>
 
     <!-- Context Menu for Profile -->
-    <ProfileMenu v-model="showProfileMenu" />
+    <ProfileMenu v-model="showProfileMenu" placement="sidebar" />
   </aside>
 </template>
 
@@ -570,8 +571,9 @@ onUnmounted(() => {
   transition: background 0.15s ease;
 }
 
-.user-info.clickable:hover {
-  background: rgba(255, 255, 255, 0.08);
+.user-info.clickable:hover,
+.user-info.clickable.active {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .footer-btn {

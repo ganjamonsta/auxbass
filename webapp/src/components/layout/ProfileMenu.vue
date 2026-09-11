@@ -4,13 +4,15 @@
       <div 
         v-if="modelValue" 
         class="profile-menu-backdrop" 
+        :class="{ 'is-mobile': isMobile, 'is-desktop': !isMobile }"
         @click="close"
         @keydown.esc="close"
         tabindex="-1"
       >
         <div 
           class="profile-menu-container" 
-          :class="{ 'is-mobile': isMobile }"
+          :class="{ 'is-mobile': isMobile, 'is-desktop': !isMobile }"
+          :style="!isMobile ? desktopStyle : {}"
           @click.stop
         >
           <!-- Mobile drag handle -->
@@ -101,9 +103,10 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { usePlayerStore } from '@/stores/player'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import { 
   Users, 
@@ -119,6 +122,10 @@ const props = defineProps({
   modelValue: {
     type: Boolean,
     default: false
+  },
+  placement: {
+    type: String,
+    default: 'sidebar' // 'sidebar' | 'header'
   }
 })
 
@@ -126,11 +133,65 @@ const emit = defineEmits(['update:modelValue', 'close'])
 
 const router = useRouter()
 const authStore = useAuthStore()
+const playerStore = usePlayerStore()
 const pwaInstall = usePwaInstall()
 
 const isMobile = ref(window.innerWidth < 1024)
+const desktopStyle = ref({})
+
 const updateScreen = () => {
   isMobile.value = window.innerWidth < 1024
+}
+
+const updateDesktopPosition = () => {
+  if (isMobile.value) {
+    desktopStyle.value = {}
+    return
+  }
+
+  // Header placement
+  if (props.placement === 'header') {
+    const headerBtn = document.querySelector('.header-profile-btn')
+    if (headerBtn) {
+      const rect = headerBtn.getBoundingClientRect()
+      desktopStyle.value = {
+        position: 'fixed',
+        top: `${Math.round(rect.bottom + 8)}px`,
+        right: `${Math.max(16, Math.round(window.innerWidth - rect.right))}px`,
+        width: '280px',
+        maxHeight: `calc(100vh - ${Math.round(rect.bottom + 24)}px)`,
+        transformOrigin: 'top right'
+      }
+      return
+    }
+  }
+
+  // Sidebar placement (default for desktop)
+  const footerEl = document.querySelector('.sidebar-footer')
+  if (footerEl) {
+    const rect = footerEl.getBoundingClientRect()
+    const bottom = Math.max(12, Math.round(window.innerHeight - rect.top + 8))
+    const left = Math.max(8, Math.round(rect.left + 10))
+    const width = Math.min(264, Math.max(240, Math.round(rect.width - 20)))
+    const maxHeight = Math.max(220, Math.round(rect.top - 20))
+
+    desktopStyle.value = {
+      position: 'fixed',
+      left: `${left}px`,
+      bottom: `${bottom}px`,
+      width: `${width}px`,
+      maxHeight: `${maxHeight}px`,
+      transformOrigin: 'bottom left'
+    }
+  } else {
+    desktopStyle.value = {
+      position: 'fixed',
+      left: '12px',
+      bottom: '80px',
+      width: '260px',
+      transformOrigin: 'bottom left'
+    }
+  }
 }
 
 const userName = computed(() => {
@@ -148,11 +209,8 @@ const userHandle = computed(() => {
 })
 
 const userInitials = computed(() => {
-  const u = authStore.user
-  if (!u) return '?'
-  if (u.first_name) return u.first_name.charAt(0).toUpperCase()
-  if (u.username) return u.username.charAt(0).toUpperCase()
-  return 'U'
+  const name = userName.value || 'U'
+  return name.substring(0, 2).toUpperCase()
 })
 
 const friendsCount = computed(() => {
@@ -191,12 +249,42 @@ const handleLogout = () => {
   }
 }
 
+const handleResize = () => {
+  updateScreen()
+  if (props.modelValue && !isMobile.value) {
+    updateDesktopPosition()
+  }
+}
+
+const handleKeyDown = (e) => {
+  if (e.key === 'Escape' && props.modelValue) {
+    close()
+  }
+}
+
+watch(() => props.modelValue, (isOpen) => {
+  if (isOpen && !isMobile.value) {
+    nextTick(updateDesktopPosition)
+  }
+})
+
+watch(() => playerStore.currentTrack, () => {
+  if (props.modelValue && !isMobile.value) {
+    nextTick(updateDesktopPosition)
+  }
+})
+
 onMounted(() => {
-  window.addEventListener('resize', updateScreen)
+  window.addEventListener('resize', handleResize)
+  window.addEventListener('keydown', handleKeyDown)
+  if (props.modelValue && !isMobile.value) {
+    nextTick(updateDesktopPosition)
+  }
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', updateScreen)
+  window.removeEventListener('resize', handleResize)
+  window.removeEventListener('keydown', handleKeyDown)
 })
 </script>
 
@@ -205,6 +293,10 @@ onUnmounted(() => {
   position: fixed;
   inset: 0;
   z-index: var(--z-contextmenu, 1100);
+}
+
+/* Mobile backdrop: dimmed overlay with blur */
+.profile-menu-backdrop.is-mobile {
   background: rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -212,6 +304,15 @@ onUnmounted(() => {
   justify-content: flex-end;
   align-items: flex-start;
   padding: 60px 16px 16px;
+}
+
+/* Desktop backdrop: transparent, NO BLUR, catches clicks outside to close */
+.profile-menu-backdrop.is-desktop {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  display: block;
+  padding: 0;
 }
 
 .profile-menu-container {
@@ -224,6 +325,25 @@ onUnmounted(() => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+/* Desktop container */
+.profile-menu-container.is-desktop {
+  background: #141821;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.profile-menu-container.is-desktop::-webkit-scrollbar {
+  width: 4px;
+}
+
+.profile-menu-container.is-desktop::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
 }
 
 /* Mobile Bottom Sheet style */
@@ -413,11 +533,12 @@ onUnmounted(() => {
 /* Animations */
 .profile-menu-fade-enter-active,
 .profile-menu-fade-leave-active {
-  transition: opacity 0.2s ease;
+  transition: opacity 0.18s ease;
 }
 
-.profile-menu-fade-enter-active .profile-menu-container,
-.profile-menu-fade-leave-active .profile-menu-container {
+/* Mobile slide transition */
+.profile-menu-fade-enter-active .profile-menu-container.is-mobile,
+.profile-menu-fade-leave-active .profile-menu-container.is-mobile {
   transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
@@ -426,14 +547,18 @@ onUnmounted(() => {
   opacity: 0;
 }
 
-.profile-menu-fade-enter-from .profile-menu-container:not(.is-mobile) {
-  transform: translateY(-8px) scale(0.96);
+.profile-menu-fade-enter-from .profile-menu-container.is-desktop,
+.profile-menu-fade-leave-to .profile-menu-container.is-desktop {
+  opacity: 0;
+  transform: translateY(6px) scale(0.97);
 }
 
-.profile-menu-fade-enter-from .profile-menu-container.is-mobile {
-  transform: translateY(100%);
+.profile-menu-fade-enter-active .profile-menu-container.is-desktop,
+.profile-menu-fade-leave-active .profile-menu-container.is-desktop {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.18s ease;
 }
 
+.profile-menu-fade-enter-from .profile-menu-container.is-mobile,
 .profile-menu-fade-leave-to .profile-menu-container.is-mobile {
   transform: translateY(100%);
 }

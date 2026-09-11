@@ -24,7 +24,7 @@
           </template>
           <template #actions>
             <button
-              v-if="authStore.user"
+              v-if="authStore.user && !isDesktop"
               class="header-profile-btn"
               @click="showProfileMenu = true"
               @contextmenu.prevent="showProfileMenu = true"
@@ -191,7 +191,7 @@
       <ShareModal />
 
       <!-- Profile Context Menu -->
-      <ProfileMenu v-model="showProfileMenu" />
+      <ProfileMenu v-model="showProfileMenu" placement="header" />
     </template>
   </div>
 </template>
