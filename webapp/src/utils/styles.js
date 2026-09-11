@@ -130,3 +130,21 @@ export function getTrackInitials(track) {
   }
   return title.substring(0, 2).toUpperCase()
 }
+
+/**
+ * Generate cover style for playlist placeholder based on name hash
+ * @param {object} playlist - Playlist object
+ * @returns {object} Style object
+ */
+export function getPlaylistCoverStyle(playlist) {
+  if (playlist?.covers?.length) return {}
+  const str = playlist?.name || 'Playlist'
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const hue = Math.abs(hash % 360)
+  return {
+    background: `linear-gradient(135deg, hsl(${hue}, 50%, 35%) 0%, hsl(${(hue + 35) % 360}, 40%, 25%) 100%)`
+  }
+}

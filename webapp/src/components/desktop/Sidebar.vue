@@ -142,7 +142,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { usePwaInstall } from '@/composables/usePwaInstall'
-import { getCoverUrl, CoverSize } from '@/utils'
+import { getCoverUrl, CoverSize, getPlaylistCoverStyle } from '@/utils'
 import { Download } from 'lucide-vue-next'
 import ProfileMenu from '@/components/layout/ProfileMenu.vue'
 
@@ -230,21 +230,6 @@ const logout = async () => {
 const goToMyProfile = () => {
   if (authStore.user?.id) {
     router.push(`/user/${authStore.user.id}`)
-  }
-}
-
-const getPlaylistCoverStyle = (playlist) => {
-  if (playlist.covers?.length) return {}
-  
-  const str = playlist.name || 'Playlist'
-  let hash = 0
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  const hue = Math.abs(hash % 360)
-  
-  return {
-    background: `linear-gradient(135deg, hsl(${hue}, 50%, 40%) 0%, hsl(${(hue + 30) % 360}, 40%, 30%) 100%)`
   }
 }
 
