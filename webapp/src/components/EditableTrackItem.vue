@@ -12,28 +12,12 @@
     @dragend="$emit('dragend')"
     @dragover="$emit('dragover', $event)"
     @drop="$emit('drop', $event)"
+    @handleTouchStart="$emit('handleTouchStart', $event)"
+    @handleTouchMove="$emit('handleTouchMove', $event)"
+    @handleTouchEnd="$emit('handleTouchEnd', $event)"
   >
     <template #action>
       <div class="edit-item-actions">
-        <!-- Reorder buttons for reliable touch / mobile reordering -->
-        <button
-          type="button"
-          class="reorder-btn"
-          :disabled="index === 0"
-          @click.stop="$emit('moveUp', index)"
-          title="Переместить выше"
-        >
-          <ChevronUp :size="16" />
-        </button>
-        <button
-          type="button"
-          class="reorder-btn"
-          :disabled="isLast"
-          @click.stop="$emit('moveDown', index)"
-          title="Переместить ниже"
-        >
-          <ChevronDown :size="16" />
-        </button>
         <button
           type="button"
           class="remove-btn"
@@ -49,18 +33,26 @@
 
 <script setup>
 import BaseTrackItem from './BaseTrackItem.vue'
-import { ChevronUp, ChevronDown, X } from 'lucide-vue-next'
+import { X } from 'lucide-vue-next'
 
 defineProps({
   track: { type: Object, required: true },
   index: { type: Number, required: true },
   isDragging: Boolean,
   isDragOver: Boolean,
-  isLast: Boolean,
   allTracks: { type: Array, default: () => [] }
 })
 
-defineEmits(['dragstart', 'dragend', 'dragover', 'drop', 'remove', 'moveUp', 'moveDown'])
+defineEmits([
+  'dragstart',
+  'dragend',
+  'dragover',
+  'drop',
+  'remove',
+  'handleTouchStart',
+  'handleTouchMove',
+  'handleTouchEnd'
+])
 </script>
 
 <style scoped>
@@ -71,7 +63,6 @@ defineEmits(['dragstart', 'dragend', 'dragover', 'drop', 'remove', 'moveUp', 'mo
   flex-shrink: 0;
 }
 
-.reorder-btn,
 .remove-btn {
   width: 28px;
   height: 28px;
@@ -86,25 +77,13 @@ defineEmits(['dragstart', 'dragend', 'dragover', 'drop', 'remove', 'moveUp', 'mo
   color: var(--c-text-2, #aaa);
 }
 
-.reorder-btn:hover:not(:disabled) {
-  background: var(--c-accent, #6366f1);
-  color: #000;
-  transform: scale(1.05);
-}
-
-.reorder-btn:disabled {
-  opacity: 0.25;
-  cursor: not-allowed;
-}
-
 .remove-btn:hover {
   background: var(--c-error, #ef4444);
   color: #fff;
   transform: scale(1.05);
 }
 
-.remove-btn:active,
-.reorder-btn:active:not(:disabled) {
+.remove-btn:active {
   transform: scale(0.95);
 }
 </style>

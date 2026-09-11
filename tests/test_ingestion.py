@@ -561,6 +561,49 @@ def test_entity_type_tracks_enum():
     assert EntityType.TRACKS.value == "tracks"
 
 
+def test_bot_music_url_pattern_matching():
+    import re
+
+    pattern = re.compile(r"https?://(?:(?:m|www)\.)?(?:soundcloud\.com|on\.soundcloud\.com|open\.spotify\.com|spotify\.link)/\S+")
+
+    # SoundCloud URLs
+    assert pattern.search("https://soundcloud.com/threepux/move-for-me-threepux-flip?si=123")
+    assert pattern.search("https://m.soundcloud.com/artist/track-name")
+    assert pattern.search("https://on.soundcloud.com/abcdef")
+    assert pattern.search("Check this out: https://soundcloud.com/artist/sets/cool-album bro")
+
+    # Spotify URLs
+    assert pattern.search("https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT")
+    assert pattern.search("https://open.spotify.com/album/4m2880jivSbbyEGAKfITCa")
+    assert pattern.search("https://spotify.link/xYz123")
+
+    # Non-music URLs
+    assert not pattern.search("https://youtube.com/watch?v=123")
+    assert not pattern.search("https://google.com")
+    assert not pattern.search("hello world")
+
+
+def test_ingestion_job_upload_tracking():
+    from bot.services.ingestion.job_manager import IngestionJob, JobStatus
+
+    job = IngestionJob(
+        id="job-123",
+        user_id=456,
+        url="https://soundcloud.com/artist/track",
+        provider_name="soundcloud",
+        entity_type="track",
+        title="Test Track",
+    )
+    assert job.uploaded_chat_id is None
+    assert job.uploaded_message_id is None
+
+    job.uploaded_chat_id = 456
+    job.uploaded_message_id = 789
+    assert job.uploaded_chat_id == 456
+    assert job.uploaded_message_id == 789
+
+
+
 
 
 

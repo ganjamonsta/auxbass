@@ -222,27 +222,29 @@ const openEditModal = () => {
   showEditModal.value = true
 }
 
-const handleSavePlaylist = async ({ name, isPublic, covers }) => {
+const handleSavePlaylist = async ({ name, isPublic, covers, tracks: savedTracks }) => {
   playlist.value.name = name
   playlist.value.is_public = isPublic
+  if (savedTracks) {
+    playlist.value.tracks = savedTracks
+    playlist.value.track_count = savedTracks.length
+  }
   
   // Update covers array (track collage covers from save response)
   if (covers?.length) {
     playlist.value.covers = covers.map(addCacheBust)
   }
   
-  // Notify entire app (sidebar, grids, cache)
-  await libraryStore.notifyPlaylistChange(playlist.value.id)
-  
   showEditModal.value = false
   uiStore.toast.success('Сохранено', 'Плейлист обновлён')
+
+  // Notify entire app (sidebar, grids, cache) AFTER modal is closed
+  await libraryStore.notifyPlaylistChange(playlist.value.id)
 }
 
 const handleTracksUpdate = (tracks) => {
   playlist.value.tracks = tracks
   playlist.value.track_count = tracks.length
-  // Notify app about track list change (updates sidebar counts, covers, cache)
-  libraryStore.notifyPlaylistChange(playlist.value.id)
 }
 
 const deletePlaylist = async () => {
@@ -292,6 +294,7 @@ const handleTagClick = (tag) => {
 }
 
 const onPlaylistChanged = (e) => {
+  if (showEditModal.value) return // Prevent clobbering active modal editing state
   const changedId = e?.detail?.playlistId
   if (!changedId || String(changedId) === String(route.params.id) || (playlist.value && String(changedId) === String(playlist.value.id))) {
     loadPlaylist()

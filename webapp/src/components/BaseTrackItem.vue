@@ -7,14 +7,22 @@
       'is-playing': isCurrentTrack,
       'dimmed': dimmed || track.is_disliked
     }"
+    :data-track-index="index"
     :draggable="draggable && !isSeeking"
     @dragstart="handleDragStart"
     @dragend="$emit('dragend')"
     @dragover.prevent="$emit('dragover', $event)"
+    @dragenter.prevent="$emit('dragenter', $event)"
     @drop="$emit('drop', $event)"
   >
     <!-- Drag handle (optional) -->
-    <div v-if="showDragHandle" class="drag-handle">
+    <div 
+      v-if="showDragHandle" 
+      class="drag-handle"
+      @touchstart="$emit('handleTouchStart', $event)"
+      @touchmove="$emit('handleTouchMove', $event)"
+      @touchend="$emit('handleTouchEnd', $event)"
+    >
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
         <path d="M3 15h18v-2H3v2zm0 4h18v-2H3v2zm0-8h18V9H3v2zm0-6v2h18V5H3z"/>
       </svg>
@@ -84,7 +92,16 @@ const props = defineProps({
   dimmed: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['dragstart', 'dragend', 'dragover', 'drop'])
+const emit = defineEmits([
+  'dragstart',
+  'dragend',
+  'dragover',
+  'dragenter',
+  'drop',
+  'handleTouchStart',
+  'handleTouchMove',
+  'handleTouchEnd'
+])
 
 const playerStore = usePlayerStore()
 
@@ -201,8 +218,10 @@ const startTouchDrag = (event) => {
   position: relative;
 }
 
+.base-track-item[draggable="true"] { user-select: none; }
 .base-track-item:hover { background: var(--c-bg-3); }
-.base-track-item.is-dragging { opacity: 0.5; transform: scale(0.98); }
+.base-track-item.is-dragging { opacity: 0.4; transform: scale(0.98); }
+.base-track-item.is-dragging * { pointer-events: none; }
 .base-track-item.drag-over { background: var(--c-bg-4); }
 .base-track-item.is-playing { background: rgba(29, 185, 84, 0.1); }
 .base-track-item.dimmed { opacity: 0.6; }
@@ -215,20 +234,25 @@ const startTouchDrag = (event) => {
   right: 0;
   height: 2px;
   background: var(--c-accent);
+  border-radius: 1px;
 }
 
 .drag-handle {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
+  width: 26px;
   height: 32px;
   cursor: grab;
   color: var(--c-text-3);
   flex-shrink: 0;
+  user-select: none;
+  touch-action: none;
+  transition: color 0.15s ease;
 }
 
-.drag-handle:active { cursor: grabbing; }
+.drag-handle:hover { color: var(--c-text-1); }
+.drag-handle:active { cursor: grabbing; color: var(--c-accent); }
 
 .track-number {
   width: 20px;

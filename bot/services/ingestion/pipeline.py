@@ -350,6 +350,9 @@ class IngestionPipeline:
                             job.processed_tracks += 1
                             continue
 
+                        job.uploaded_chat_id = target_chat_id
+                        job.uploaded_message_id = sent_msg.message_id
+
                         # D. Register in database & trigger enrichment
                         save_result = await track_service.save_track(
                             user_id=job.user_id,

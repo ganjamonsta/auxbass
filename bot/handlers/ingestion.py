@@ -14,6 +14,7 @@ from aiogram.exceptions import TelegramBadRequest
 
 from shared.database import get_session
 from shared.models import User
+from shared.config import get_settings
 from bot.services.ingestion import (
     provider_registry,
     job_manager,
@@ -23,8 +24,10 @@ from bot.services.ingestion import (
     IngestionJob,
 )
 from bot.handlers.menu_keyboards import get_webapp_keyboard, get_deep_link_keyboard
+from bot.services.delivery import deliver_single_track, get_track_player_button
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 router = Router()
 
 URL_EXTRACT_PATTERN = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
@@ -45,7 +48,7 @@ async def _ensure_user_exists(user_id: int, username: Optional[str], first_name:
             await session.commit()
 
 
-@router.message(F.text, F.text.regexp(r"https?://(?:(?:m|www)\.)?(?:soundcloud\.com|on\.soundcloud\.com)/\S+"))
+@router.message(F.text, F.text.regexp(r"https?://(?:(?:m|www)\.)?(?:soundcloud\.com|on\.soundcloud\.com|open\.spotify\.com|spotify\.link)/\S+"))
 async def handle_music_url_message(message: Message):
     """Detect and process external music URLs sent to the bot."""
     match = URL_EXTRACT_PATTERN.search(message.text)
@@ -110,13 +113,52 @@ async def handle_music_url_message(message: Message):
 
         if job.status == JobStatus.COMPLETED and job.imported_track_ids:
             track_id = job.imported_track_ids[0]
-            await status_msg.edit_text(
-                f"✅ <b>Трек добавлен в библиотеку!</b>\n\n"
-                f"🎵 <b>{entity.author} — {entity.title}</b>\n"
-                f"☁️ Источник: <i>{provider.name.title()}</i>",
-                reply_markup=get_deep_link_keyboard(f"track_{track_id}", "▶️ Слушать в плеере"),
-                parse_mode="HTML"
-            )
+
+            # If audio was uploaded directly to this chat during pipeline,
+            # attach caption and player markup to that message to avoid sending duplicates
+            if job.uploaded_chat_id == message.chat.id and job.uploaded_message_id:
+                try:
+                    caption = (
+                        f"🎧 <b>{entity.author} — {entity.title}</b>\n\n"
+                        f"☁️ <i>{provider.name.title()}</i>"
+                    )
+                    await message.bot.edit_message_caption(
+                        chat_id=message.chat.id,
+                        message_id=job.uploaded_message_id,
+                        caption=caption,
+                        parse_mode="HTML",
+                        reply_markup=get_track_player_button(track_id),
+                    )
+                except Exception as e:
+                    logger.debug(f"Could not edit caption on uploaded audio: {e}")
+
+                try:
+                    await status_msg.delete()
+                except Exception:
+                    pass
+            else:
+                # Track was either deduplicated from existing DB or uploaded to buffer chat.
+                # Send audio directly to the user's chat!
+                delivered = await deliver_single_track(
+                    bot=message.bot,
+                    chat_id=message.chat.id,
+                    track_id=track_id,
+                    user_id=user.id,
+                    reply_to_message_id=message.message_id,
+                )
+                if delivered:
+                    try:
+                        await status_msg.delete()
+                    except Exception:
+                        pass
+                else:
+                    await status_msg.edit_text(
+                        f"✅ <b>Трек добавлен в библиотеку!</b>\n\n"
+                        f"🎵 <b>{entity.author} — {entity.title}</b>\n"
+                        f"☁️ Источник: <i>{provider.name.title()}</i>",
+                        reply_markup=get_deep_link_keyboard(f"track_{track_id}", "▶️ Слушать в плеере"),
+                        parse_mode="HTML"
+                    )
         else:
             err = job.error_message or "Не удалось обработать аудиофайл"
             await status_msg.edit_text(
@@ -171,11 +213,25 @@ async def handle_music_url_message(message: Message):
             logger.error(f"Playlist ingestion error: {e}")
 
         if job.status == JobStatus.COMPLETED:
-            kb = (
-                get_deep_link_keyboard(f"playlist_{job.playlist_id}", "📁 Открыть плейлист")
-                if job.playlist_id
-                else get_webapp_keyboard()
-            )
+            kb_rows = []
+            if job.playlist_id:
+                bot_user = settings.bot_username or "tg_player_bot"
+                kb_rows.append([
+                    InlineKeyboardButton(
+                        text="📁 Открыть в плеере",
+                        url=f"https://t.me/{bot_user}?startapp=playlist_{job.playlist_id}"
+                    )
+                ])
+                kb_rows.append([
+                    InlineKeyboardButton(
+                        text="📥 Скачать треки в чат",
+                        callback_data=f"download_playlist:{job.playlist_id}"
+                    )
+                ])
+            else:
+                kb_rows = get_webapp_keyboard().inline_keyboard
+
+            kb = InlineKeyboardMarkup(inline_keyboard=kb_rows)
             try:
                 await status_msg.edit_text(
                     f"✅ <b>Плейлист успешно импортирован!</b>\n\n"

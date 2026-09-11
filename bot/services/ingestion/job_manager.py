@@ -38,6 +38,8 @@ class IngestionJob:
     error_message: Optional[str] = None
     playlist_id: Optional[int] = None
     imported_track_ids: List[int] = field(default_factory=list)
+    uploaded_chat_id: Optional[int] = None
+    uploaded_message_id: Optional[int] = None
     selected_urls: Optional[List[str]] = None
     custom_tracks: Optional[List[Dict[str, Any]]] = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))

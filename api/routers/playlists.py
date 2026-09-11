@@ -167,7 +167,7 @@ async def get_playlist_info(
         .where(TrackEnrichment.cover_url.is_not(None))
         .where(TrackEnrichment.cover_url != "")
         .options(selectinload(Track.enrichment))
-        .order_by(PlaylistTrack.position)
+        .order_by(PlaylistTrack.position.asc(), PlaylistTrack.id.asc())
         .limit(4)
     )
     track_covers = []
@@ -599,7 +599,7 @@ async def get_playlist(
             selectinload(Track.enrichment),
             selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
         )
-        .order_by(PlaylistTrack.position)
+        .order_by(PlaylistTrack.position.asc(), PlaylistTrack.id.asc())
     )
     rows = result.unique().all()
     

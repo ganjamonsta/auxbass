@@ -144,25 +144,21 @@
           <div class="section-label">Треки в плейлисте ({{ tracks.length }})</div>
           <div v-if="tracks.length" class="tracks-editor">
             <EditableTrackItem
-              v-for="(track, index) in virtualTracks"
+              v-for="(track, index) in tracks"
               :key="'edit-' + track.id"
               :track="track"
               :index="index"
-              :isLast="index === tracks.length - 1"
               :isDragging="dragIndex === index"
               :isDragOver="dragOverIndex === index"
               @dragstart="handleDragStart($event, index)"
               @dragend="handleDragEnd"
               @dragover="handleDragOver($event, index)"
               @drop="onDrop($event, index)"
-              @moveUp="onMoveUp(index)"
-              @moveDown="onMoveDown(index)"
+              @handleTouchStart="handleTouchStart($event, index)"
+              @handleTouchMove="handleTouchMove"
+              @handleTouchEnd="onTouchEnd"
               @remove="removeTrackFromList(track, index)"
             />
-            <!-- Infinite scroll trigger -->
-            <div ref="tracksLoadTrigger" v-if="hasMoreTracks" class="load-trigger"></div>
-            <!-- Loading skeletons -->
-            <TrackSkeleton v-for="i in tracksSkeletonCount" :key="'skel-' + i" />
           </div>
           <div v-else class="empty-playlist-hint">
             <span><Music :size="32" /></span>
@@ -233,27 +229,7 @@ const isPublic = ref(false)
 const tracks = ref([])
 const saving = ref(false)
 
-// Infinite scroll for playlist tracks
 const scrollContentRef = ref(null)
-
-const {
-  items: virtualTracks,
-  hasMore: hasMoreTracks,
-  loadTriggerRef: tracksLoadTrigger,
-  loadingMore: virtualLoadingMore,
-  loadingSkeletonCount: tracksSkeletonCount,
-  reset: resetVirtualScroll,
-  clear: clearVirtualScroll,
-} = useVirtualScroll({
-  fetchFn: async ({ offset, limit }) => ({
-    items: tracks.value.slice(offset, offset + limit),
-    total: tracks.value.length
-  }),
-  limit: 9999,
-  immediate: false,
-  scrollContainer: scrollContentRef,
-  skeletonCount: 6
-})
 
 // Delete confirmation (double-click pattern)
 const deleteConfirmPending = ref(false)
@@ -345,34 +321,35 @@ const removingTrackId = ref(null)
 const onTracksReorder = async (reordered) => {
   tracks.value = reordered
   emit('update:tracks', reordered)
-  nextTick(() => resetVirtualScroll())
   try {
     await playlistsApi.reorder(props.playlist.id, reordered.map(t => t.id))
-    await libraryStore.notifyPlaylistChange(props.playlist.id)
   } catch (error) {
     console.error('Failed to reorder tracks:', error)
     uiStore.toast.error('Ошибка', 'Не удалось сохранить порядок треков')
   }
 }
 
-const { dragIndex, dragOverIndex, handleDragStart, handleDragEnd, handleDragOver, handleDrop, moveUp, moveDown } = useDragReorder()
-
-const onMoveUp = async (index) => {
-  const reordered = moveUp(tracks.value, index)
-  if (reordered) {
-    await onTracksReorder(reordered)
-  }
-}
-
-const onMoveDown = async (index) => {
-  const reordered = moveDown(tracks.value, index)
-  if (reordered) {
-    await onTracksReorder(reordered)
-  }
-}
+const {
+  dragIndex,
+  dragOverIndex,
+  handleDragStart,
+  handleDragEnd,
+  handleDragOver,
+  handleDrop,
+  handleTouchStart,
+  handleTouchMove,
+  handleTouchEnd
+} = useDragReorder()
 
 const onDrop = async (event, toIndex) => {
   const reordered = await handleDrop(event, toIndex, tracks.value)
+  if (reordered) {
+    await onTracksReorder(reordered)
+  }
+}
+
+const onTouchEnd = async () => {
+  const reordered = await handleTouchEnd(tracks.value)
   if (reordered) {
     await onTracksReorder(reordered)
   }
@@ -442,24 +419,23 @@ const removeCover = async () => {
 
 // Watch for playlist changes
 watch(() => props.playlist, (pl) => {
-  if (pl) {
+  if (pl && !props.show) {
     name.value = pl.name || ''
     isPublic.value = pl.is_public || false
     customCoverUrl.value = pl.custom_cover_url || null
     tracks.value = [...(pl.tracks || [])]
-    if (props.show) {
-      nextTick(() => resetVirtualScroll())
-    }
   }
 }, { immediate: true })
 
 watch(() => props.show, (show) => {
-  if (show && tracks.value.length) {
-    nextTick(() => resetVirtualScroll())
+  if (show && props.playlist) {
+    name.value = props.playlist.name || ''
+    isPublic.value = props.playlist.is_public || false
+    customCoverUrl.value = props.playlist.custom_cover_url || null
+    tracks.value = [...(props.playlist.tracks || [])]
   }
   if (!show) {
     clearSearch()
-    clearVirtualScroll()
     clearLibrarySearch()
     deleteConfirmPending.value = false
     if (deleteConfirmTimer) clearTimeout(deleteConfirmTimer)
@@ -476,7 +452,6 @@ const addTrack = async (track) => {
     await playlistsApi.addTrack(props.playlist.id, track.id)
     tracks.value.push(track)
     emit('update:tracks', tracks.value)
-    nextTick(() => resetVirtualScroll())
     await libraryStore.notifyPlaylistChange(props.playlist.id)
     uiStore.toast.success('Добавлено', `Трек "${track.title || 'Без названия'}" добавлен`)
   } catch (error) {
@@ -495,7 +470,6 @@ const removeTrack = async (track) => {
     await playlistsApi.removeTrack(props.playlist.id, track.id)
     tracks.value = tracks.value.filter(t => t.id !== track.id)
     emit('update:tracks', tracks.value)
-    nextTick(() => resetVirtualScroll())
     await libraryStore.notifyPlaylistChange(props.playlist.id)
     uiStore.toast.success('Удалено', 'Трек убран из плейлиста')
   } catch (error) {
@@ -512,7 +486,6 @@ const removeTrackFromList = async (track, index) => {
     const idx = tracks.value.findIndex(t => t.id === track.id)
     if (idx !== -1) tracks.value.splice(idx, 1)
     emit('update:tracks', tracks.value)
-    nextTick(() => resetVirtualScroll())
     await libraryStore.notifyPlaylistChange(props.playlist.id)
     uiStore.toast.success('Удалено', 'Трек убран из плейлиста')
   } catch (error) {
@@ -530,12 +503,17 @@ const save = async () => {
       name: name.value.trim(),
       is_public: isPublic.value
     })
+
+    if (tracks.value.length > 0) {
+      await playlistsApi.reorder(props.playlist.id, tracks.value.map(t => t.id))
+    }
     
     emit('save', { 
       name: name.value.trim(), 
       isPublic: isPublic.value, 
       covers: response?.covers || [],
-      customCoverUrl: customCoverUrl.value
+      customCoverUrl: customCoverUrl.value,
+      tracks: [...tracks.value]
     })
   } catch (error) {
     console.error('Failed to save:', error)

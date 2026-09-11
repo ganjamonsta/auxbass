@@ -18,6 +18,8 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from shared.config import get_settings
 from shared.database import init_db, close_db
 from bot.handlers.menu import router as menu_router
+from bot.handlers.inline import router as inline_router
+from bot.handlers.ingestion import router as ingestion_router
 from bot.handlers.audio import router as audio_router
 from bot.handlers.download import router as download_router
 from bot.handlers.channel_pins import router as channel_pins_router
@@ -58,11 +60,14 @@ async def run_bot():
     )
     
     init_channel_service(bot)
+    await start_channel_service()
     
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
     
     dp.include_router(menu_router)
+    dp.include_router(inline_router)
+    dp.include_router(ingestion_router)
     dp.include_router(audio_router)
     dp.include_router(download_router)
     dp.include_router(channel_pins_router)
