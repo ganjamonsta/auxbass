@@ -26,7 +26,7 @@
     </div>
 
     <!-- Search Results Mode -->
-    <div v-if="searchQuery.trim()" class="search-results-container">
+    <div v-if="searchQuery.trim() || activeFilter === 'soundcloud'" class="search-results-container">
       <!-- Loading initial search results skeleton -->
       <div v-if="isInitialLoading" class="search-skeleton-list">
         <TrackSkeleton v-for="n in 8" :key="n" />
@@ -444,70 +444,250 @@
 
         <!-- ==================== TAB: SOUNDCLOUD ==================== -->
         <div v-else-if="activeFilter === 'soundcloud'" class="soundcloud-results-mode">
-          <div class="section-header">
-            <span class="section-title">
-              <span class="sc-badge">SC</span> SoundCloud (Глобальный поиск)
-            </span>
-            <span class="section-count">{{ soundcloudResults.length }}</span>
-          </div>
-
-          <div v-if="isSoundCloudSearching" class="section-loading-indicator">
-            <div class="spinner small"></div>
-            <span>Поиск на SoundCloud...</span>
-          </div>
-
-          <div v-else-if="soundcloudResults.length > 0" class="sc-results-list full-list">
-            <div
-              v-for="item in soundcloudResults"
-              :key="item.url"
-              class="sc-track-item"
-              @click="handleQuickPlaySoundCloud(item)"
+          <!-- Sub-tab Switcher -->
+          <div class="sc-tab-switcher">
+            <button 
+              class="sc-subtab-btn" 
+              :class="{ active: scSubTab === 'search' }"
+              @click="scSubTab = 'search'"
             >
-              <div class="sc-track-cover">
-                <img v-if="item.cover_url" :src="item.cover_url" alt="" loading="lazy" referrerpolicy="no-referrer" />
-                <Music v-else :size="20" />
-                <div v-if="importingTrackUrl === item.url" class="sc-track-loading">
-                  <div class="spinner small"></div>
+              <Globe :size="15" />
+              <span>Глобальный поиск</span>
+              <span v-if="soundcloudResults.length > 0" class="sc-subtab-count">{{ soundcloudResults.length }}</span>
+            </button>
+            <button 
+              class="sc-subtab-btn" 
+              :class="{ active: scSubTab === 'likes' }"
+              @click="switchToLikesTab"
+            >
+              <Heart :size="15" />
+              <span>Мои лайки</span>
+              <span v-if="scAccount?.likes_count" class="sc-subtab-count">{{ scAccount.likes_count }}</span>
+            </button>
+          </div>
+
+          <!-- 1. SEARCH MODE -->
+          <template v-if="scSubTab === 'search'">
+            <div class="section-header">
+              <span class="section-title">
+                <span class="sc-badge">SC</span> SoundCloud (Глобальный поиск)
+              </span>
+              <span class="section-count">{{ soundcloudResults.length }}</span>
+            </div>
+
+            <div v-if="isSoundCloudSearching" class="section-loading-indicator">
+              <div class="spinner small"></div>
+              <span>Поиск на SoundCloud...</span>
+            </div>
+
+            <div v-else-if="soundcloudResults.length > 0" class="sc-results-list full-list">
+              <div
+                v-for="item in soundcloudResults"
+                :key="item.url"
+                class="sc-track-item"
+                @click="handleQuickPlaySoundCloud(item)"
+              >
+                <div class="sc-track-cover">
+                  <img v-if="item.cover_url" :src="item.cover_url" alt="" loading="lazy" referrerpolicy="no-referrer" />
+                  <Music v-else :size="20" />
+                  <div v-if="importingTrackUrl === item.url" class="sc-track-loading">
+                    <div class="spinner small"></div>
+                  </div>
+                  <div v-else class="sc-track-play">
+                    <Play :size="14" fill="currentColor" />
+                  </div>
                 </div>
-                <div v-else class="sc-track-play">
-                  <Play :size="14" fill="currentColor" />
+                <div class="sc-track-info">
+                  <div class="sc-track-title" :title="item.title">{{ item.title }}</div>
+                  <div class="sc-track-artist">{{ item.artist }}</div>
+                </div>
+                <div class="sc-track-actions">
+                  <span v-if="item.duration" class="sc-track-duration">{{ formatDuration(item.duration) }}</span>
+                  <button 
+                    class="sc-add-btn" 
+                    :disabled="importingTrackUrl === item.url"
+                    @click.stop="handleQuickAddSoundCloud(item)"
+                    title="Добавить в медиатеку"
+                  >
+                    <Plus :size="16" />
+                  </button>
                 </div>
               </div>
-              <div class="sc-track-info">
-                <div class="sc-track-title" :title="item.title">{{ item.title }}</div>
-                <div class="sc-track-artist">{{ item.artist }}</div>
-              </div>
-              <div class="sc-track-actions">
-                <span v-if="item.duration" class="sc-track-duration">{{ formatDuration(item.duration) }}</span>
+
+              <!-- Load More SoundCloud Button -->
+              <div class="sc-load-more-wrap">
                 <button 
-                  class="sc-add-btn" 
-                  :disabled="importingTrackUrl === item.url"
-                  @click.stop="handleQuickAddSoundCloud(item)"
-                  title="Добавить в медиатеку"
+                  v-if="soundcloudResults.length < 60"
+                  class="sc-load-more-btn"
+                  :disabled="isLoadingMoreSoundCloud"
+                  @click="loadMoreSoundCloud"
                 >
-                  <Plus :size="16" />
+                  <div v-if="isLoadingMoreSoundCloud" class="spinner small"></div>
+                  <template v-else>Загрузить ещё (до 60)</template>
+                </button>
+                <span v-else class="sc-end-notice">Показаны 60 лучших результатов SoundCloud</span>
+              </div>
+            </div>
+
+            <div v-else-if="!isSoundCloudSearching" class="no-results-box">
+              <p class="no-results-text">
+                {{ searchQuery.trim() ? 'На SoundCloud ничего не найдено' : 'Введите поисковый запрос выше для поиска треков на SoundCloud' }}
+              </p>
+            </div>
+          </template>
+
+          <!-- 2. LIKES MODE -->
+          <template v-else-if="scSubTab === 'likes'">
+            <!-- Account Connected Header -->
+            <div v-if="scAccount?.connected" class="sc-likes-header-card">
+              <div class="sc-likes-user-bar">
+                <img 
+                  v-if="scAccount.avatar_url" 
+                  :src="scAccount.avatar_url" 
+                  alt="" 
+                  class="sc-likes-avatar"
+                  referrerpolicy="no-referrer" 
+                />
+                <div v-else class="sc-likes-avatar-placeholder">
+                  <Radio :size="18" />
+                </div>
+                <div class="sc-likes-user-meta">
+                  <span class="sc-likes-username">{{ scAccount.display_name || scAccount.username }}</span>
+                  <span class="sc-likes-stats-text">❤️ {{ scAccount.likes_count || scLikes.length }} лайков на SoundCloud</span>
+                </div>
+              </div>
+
+              <div class="sc-likes-header-actions">
+                <button 
+                  class="sc-sync-btn"
+                  :disabled="isSyncingAllLikes || isScLikesLoading || unimportedLikesCount === 0"
+                  @click="handleSyncAllLikes"
+                  title="Импортировать все новые треки в медиатеку и канал"
+                >
+                  <div v-if="isSyncingAllLikes" class="spinner small"></div>
+                  <CloudDownload v-else :size="15" />
+                  <span>{{ isSyncingAllLikes ? 'Синхронизация...' : `Синхронизировать новые (${unimportedLikesCount})` }}</span>
+                </button>
+                <button 
+                  class="sc-refresh-icon-btn" 
+                  :disabled="isScLikesLoading"
+                  @click="fetchScLikes(true)"
+                  title="Обновить список лайков"
+                >
+                  <RefreshCw :size="15" :class="{ 'spin-icon': isScLikesLoading }" />
                 </button>
               </div>
             </div>
 
-            <!-- Load More SoundCloud Button -->
-            <div class="sc-load-more-wrap">
-              <button 
-                v-if="soundcloudResults.length < 60"
-                class="sc-load-more-btn"
-                :disabled="isLoadingMoreSoundCloud"
-                @click="loadMoreSoundCloud"
-              >
-                <div v-if="isLoadingMoreSoundCloud" class="spinner small"></div>
-                <template v-else>Загрузить ещё (до 60)</template>
-              </button>
-              <span v-else class="sc-end-notice">Показаны 60 лучших результатов SoundCloud</span>
+            <!-- Sync progress bar if active -->
+            <div v-if="syncJobProgress" class="sc-sync-progress-banner">
+              <div class="sc-sync-info-row">
+                <span class="sc-sync-msg">Импорт: {{ syncJobProgress.current_track_title || 'Загрузка...' }}</span>
+                <span class="sc-sync-count">{{ syncJobProgress.processed_tracks }} / {{ syncJobProgress.total_tracks }}</span>
+              </div>
+              <div class="sc-sync-bar-track">
+                <div 
+                  class="sc-sync-bar-fill" 
+                  :style="{ width: `${Math.round((syncJobProgress.processed_tracks / (syncJobProgress.total_tracks || 1)) * 100)}%` }"
+                ></div>
+              </div>
             </div>
-          </div>
 
-          <div v-else-if="!isSoundCloudSearching" class="no-results-box">
-            <p class="no-results-text">На SoundCloud ничего не найдено</p>
-          </div>
+            <!-- Loading indicator -->
+            <div v-if="isScLikesLoading && scLikes.length === 0" class="section-loading-indicator">
+              <div class="spinner small"></div>
+              <span>Загрузка лайков с SoundCloud...</span>
+            </div>
+
+            <!-- Likes Track List -->
+            <div v-else-if="scLikes.length > 0" class="sc-results-list full-list">
+              <div
+                v-for="item in scLikes"
+                :key="item.url"
+                class="sc-track-item"
+                @click="handleQuickPlaySoundCloud(item)"
+              >
+                <div class="sc-track-cover">
+                  <img v-if="item.cover_url" :src="item.cover_url" alt="" loading="lazy" referrerpolicy="no-referrer" />
+                  <Music v-else :size="20" />
+                  <div v-if="importingTrackUrl === item.url" class="sc-track-loading">
+                    <div class="spinner small"></div>
+                  </div>
+                  <div v-else class="sc-track-play">
+                    <Play :size="14" fill="currentColor" />
+                  </div>
+                </div>
+
+                <div class="sc-track-info">
+                  <div class="sc-track-title" :title="item.title">{{ item.title }}</div>
+                  <div class="sc-track-artist-row">
+                    <span class="sc-track-artist">{{ item.artist }}</span>
+                    <!-- Badges -->
+                    <div class="sc-track-badges">
+                      <span v-if="item.in_library" class="sc-badge-pill in-lib" title="Уже в вашей медиатеке">
+                        <Check :size="10" /> В медиатеке
+                      </span>
+                      <span v-if="item.in_channel" class="sc-badge-pill in-chan" title="Забэкаплен в Telegram-канал">
+                        <CloudDownload :size="10" /> В канале
+                      </span>
+                      <span v-else-if="item.already_in_tg" class="sc-badge-pill in-tg" title="Уже есть на сервере Telegram">
+                        В базе TG
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="sc-track-actions">
+                  <span v-if="item.duration" class="sc-track-duration">{{ formatDuration(item.duration) }}</span>
+                  <button 
+                    v-if="!item.in_library"
+                    class="sc-add-btn" 
+                    :disabled="importingTrackUrl === item.url"
+                    @click.stop="handleQuickAddSoundCloud(item)"
+                    title="Добавить в медиатеку и канал"
+                  >
+                    <Plus :size="16" />
+                  </button>
+                  <span v-else class="sc-added-indicator" title="Уже в медиатеке">
+                    <Check :size="16" />
+                  </span>
+                </div>
+              </div>
+
+              <!-- Load more likes button -->
+              <div v-if="scLikesCursor" class="sc-load-more-wrap">
+                <button 
+                  class="sc-load-more-btn"
+                  :disabled="isLoadingMoreScLikes"
+                  @click="loadMoreScLikes"
+                >
+                  <div v-if="isLoadingMoreScLikes" class="spinner small"></div>
+                  <template v-else>Загрузить ещё лайки</template>
+                </button>
+              </div>
+            </div>
+
+            <!-- Not Connected Prompt -->
+            <div v-else-if="!scAccount?.connected && !isScLikesLoading" class="sc-not-connected-banner">
+              <div class="sc-banner-icon">
+                <Radio :size="32" />
+              </div>
+              <h4 class="sc-banner-title">Аккаунт SoundCloud не подключен</h4>
+              <p class="sc-banner-desc">
+                Привяжите ваш профиль SoundCloud в настройках, чтобы просматривать лайки, слушать и автоматически сохранять аудиофайлы в личный Telegram-канал.
+              </p>
+              <button class="sc-btn primary" @click="router.push('/settings')">
+                <Settings :size="15" />
+                <span>Открыть настройки</span>
+              </button>
+            </div>
+
+            <!-- Empty likes -->
+            <div v-else-if="!isScLikesLoading" class="no-results-box">
+              <p class="no-results-text">Лайков на SoundCloud пока нет</p>
+              <p class="no-results-hint">Поставьте лайки на SoundCloud и нажмите «Обновить»</p>
+            </div>
+          </template>
         </div>
 
         <!-- ==================== TAB: ALBUMS ==================== -->
@@ -694,7 +874,14 @@ import {
   Globe, 
   Folder, 
   ArrowRight,
-  Plus 
+  Plus,
+  Heart,
+  RefreshCw,
+  Check,
+  CloudDownload,
+  ExternalLink,
+  Radio,
+  Settings
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -756,11 +943,125 @@ const isArtistsSearching = ref(false)
 const isAlbumsSearching = ref(false)
 const isPlaylistsSearching = ref(false)
 
-// ─── SoundCloud External Search State ───
+// ─── SoundCloud External Search & Likes State ───
 const soundcloudResults = ref([])
 const isSoundCloudSearching = ref(false)
 const isLoadingMoreSoundCloud = ref(false)
 const importingTrackUrl = ref(null)
+
+const scSubTab = ref('search') // 'search' | 'likes'
+const scAccount = ref(null)
+const isScAccountLoading = ref(false)
+const scLikes = ref([])
+const isScLikesLoading = ref(false)
+const scLikesCursor = ref(null)
+const isLoadingMoreScLikes = ref(false)
+const isSyncingAllLikes = ref(false)
+const syncJobProgress = ref(null)
+
+const fetchScAccountForSearch = async () => {
+  isScAccountLoading.value = true
+  try {
+    const res = await ingestionApi.getSoundCloudAccount()
+    scAccount.value = res.data
+  } catch (e) {
+    console.error('Failed to get SC account:', e)
+  } finally {
+    isScAccountLoading.value = false
+  }
+}
+
+const fetchScLikes = async (reset = true) => {
+  if (isScLikesLoading.value) return
+  isScLikesLoading.value = true
+  try {
+    if (reset) {
+      scLikesCursor.value = null
+    }
+    const res = await ingestionApi.getSoundCloudLikes({ limit: 40 })
+    scLikes.value = res.data?.items || []
+    scLikesCursor.value = res.data?.next_cursor || null
+    if (res.data?.account) {
+      scAccount.value = res.data.account
+    }
+  } catch (e) {
+    console.error('Failed to fetch SC likes:', e)
+    if (e.response?.status !== 404) {
+      uiStore.toast?.error('Ошибка', e.response?.data?.detail || 'Не удалось загрузить лайки')
+    }
+  } finally {
+    isScLikesLoading.value = false
+  }
+}
+
+const loadMoreScLikes = async () => {
+  if (!scLikesCursor.value || isLoadingMoreScLikes.value) return
+  isLoadingMoreScLikes.value = true
+  try {
+    const res = await ingestionApi.getSoundCloudLikes({ cursor: scLikesCursor.value, limit: 40 })
+    const more = res.data?.items || []
+    scLikes.value = [...scLikes.value, ...more]
+    scLikesCursor.value = res.data?.next_cursor || null
+  } catch (e) {
+    console.error('Failed to load more likes:', e)
+  } finally {
+    isLoadingMoreScLikes.value = false
+  }
+}
+
+const switchToLikesTab = () => {
+  scSubTab.value = 'likes'
+  if (scLikes.value.length === 0 && scAccount.value?.connected) {
+    fetchScLikes(true)
+  }
+}
+
+const unimportedLikesCount = computed(() => {
+  return scLikes.value.filter(t => !t.in_library).length
+})
+
+const handleSyncAllLikes = async () => {
+  if (isSyncingAllLikes.value) return
+  const toImport = scLikes.value.filter(t => !t.in_library)
+  if (toImport.length === 0) {
+    uiStore.toast?.info('Синхронизация', 'Все треки из лайков уже в вашей медиатеке!')
+    return
+  }
+
+  isSyncingAllLikes.value = true
+  try {
+    const urls = toImport.map(t => t.url)
+    const res = await ingestionApi.start(urls[0], urls)
+    const jobId = res.data?.id
+    uiStore.toast?.success('Синхронизация', `Запущен импорт ${urls.length} треков в медиатеку и Telegram-канал`)
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const jobRes = await ingestionApi.getJob(jobId)
+        const job = jobRes.data
+        syncJobProgress.value = job
+        if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
+          clearInterval(pollInterval)
+          isSyncingAllLikes.value = false
+          syncJobProgress.value = null
+          await fetchScLikes(true)
+          libraryStore.fetchTracks({ refresh: true })
+          if (job.status === 'completed') {
+            uiStore.toast?.success('Готово', `Синхронизировано треков: ${job.processed_tracks}`)
+          }
+        }
+      } catch (err) {
+        clearInterval(pollInterval)
+        isSyncingAllLikes.value = false
+        syncJobProgress.value = null
+      }
+    }, 2000)
+  } catch (e) {
+    console.error('Failed to start sync job:', e)
+    uiStore.toast?.error('Ошибка', 'Не удалось запустить синхронизацию')
+    isSyncingAllLikes.value = false
+  }
+}
 
 const searchSoundCloud = async (query, limit = 30) => {
   const cleanQ = query.replace(/^#/, '').trim()
@@ -887,7 +1188,10 @@ const getChipBadge = (chipId) => {
     return totalTracksCount.value > 0 ? totalTracksCount.value : null
   }
   if (chipId === 'soundcloud') {
-    return soundcloudResults.value.length > 0 ? soundcloudResults.value.length : null
+    if (scSubTab.value === 'likes' && scLikes.value.length > 0) {
+      return scLikes.value.length
+    }
+    return soundcloudResults.value.length > 0 ? soundcloudResults.value.length : (scAccount.value?.connected ? '★' : null)
   }
   if (chipId === 'artists') {
     return artistsResults.value.length > 0 ? artistsResults.value.length : null
@@ -1198,6 +1502,13 @@ const handlePlayTagMix = async (tagName) => {
 const applyRouteQuery = () => {
   const tagParam = route.query.tag
   const queryParam = route.query.q || route.query.search
+  if (route.query.tab === 'soundcloud') {
+    activeFilter.value = 'soundcloud'
+    if (route.query.mode === 'likes') {
+      scSubTab.value = 'likes'
+      fetchScLikes()
+    }
+  }
   if (tagParam && typeof tagParam === 'string') {
     const formatted = tagParam.startsWith('#') ? tagParam : `#${tagParam}`
     setQuery(formatted, true)
@@ -1215,6 +1526,7 @@ const handleResetState = (event) => {
 
 onMounted(() => {
   loadTags()
+  fetchScAccountForSearch()
   applyRouteQuery()
   window.addEventListener('reset-view-state', handleResetState)
 })
@@ -1972,5 +2284,294 @@ onUnmounted(() => {
 .sc-end-notice {
   font-size: 0.82rem;
   color: rgba(255, 255, 255, 0.4);
+}
+
+/* ═══════════════════════════════════════════════
+   SoundCloud Sub-tabs, Likes & Badges Styles
+   ═══════════════════════════════════════════════ */
+.sc-tab-switcher {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sc-subtab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  background: none;
+  color: var(--c-text-3);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sc-subtab-btn:hover {
+  color: var(--c-text-1);
+}
+
+.sc-subtab-btn.active {
+  background: #ff5500;
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(255, 85, 0, 0.35);
+}
+
+.sc-subtab-count {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.sc-likes-header-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(255, 85, 0, 0.06);
+  border: 1px solid rgba(255, 85, 0, 0.2);
+  border-radius: 14px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.sc-likes-user-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sc-likes-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2px solid #ff5500;
+  object-fit: cover;
+}
+
+.sc-likes-avatar-placeholder {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(255, 85, 0, 0.2);
+  color: #ff5500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sc-likes-user-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.sc-likes-username {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--c-text-1);
+}
+
+.sc-likes-stats-text {
+  font-size: 12px;
+  color: var(--c-text-3);
+}
+
+.sc-likes-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sc-sync-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: #ff5500;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(255, 85, 0, 0.3);
+  transition: all 0.2s ease;
+}
+
+.sc-sync-btn:hover:not(:disabled) {
+  background: #ff6611;
+  transform: translateY(-1px);
+}
+
+.sc-sync-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sc-refresh-icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--c-text-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sc-refresh-icon-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.spin-icon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.sc-sync-progress-banner {
+  padding: 10px 14px;
+  background: rgba(255, 85, 0, 0.1);
+  border: 1px solid rgba(255, 85, 0, 0.25);
+  border-radius: 10px;
+  margin-bottom: 14px;
+}
+
+.sc-sync-info-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-text-1);
+  margin-bottom: 6px;
+}
+
+.sc-sync-msg {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80%;
+}
+
+.sc-sync-bar-track {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.sc-sync-bar-fill {
+  height: 100%;
+  background: #ff5500;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.sc-track-artist-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sc-track-badges {
+  display: flex;
+  gap: 4px;
+}
+
+.sc-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.2px;
+}
+
+.sc-badge-pill.in-lib {
+  background: rgba(30, 215, 96, 0.15);
+  color: #1ed760;
+  border: 1px solid rgba(30, 215, 96, 0.3);
+}
+
+.sc-badge-pill.in-chan {
+  background: rgba(0, 136, 204, 0.15);
+  color: #29b6f6;
+  border: 1px solid rgba(0, 136, 204, 0.3);
+}
+
+.sc-badge-pill.in-tg {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--c-text-3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sc-added-indicator {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1ed760;
+}
+
+.sc-not-connected-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 32px 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  margin-top: 16px;
+}
+
+.sc-banner-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(255, 85, 0, 0.12);
+  color: #ff5500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.sc-banner-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--c-text-1);
+  margin: 0 0 6px 0;
+}
+
+.sc-banner-desc {
+  font-size: 13px;
+  color: var(--c-text-3);
+  max-width: 440px;
+  line-height: 1.5;
+  margin: 0 0 16px 0;
 }
 </style>

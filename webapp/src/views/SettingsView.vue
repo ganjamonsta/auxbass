@@ -52,6 +52,114 @@
       </template>
     </section>
 
+    <!-- SoundCloud Integration Section -->
+    <section class="section soundcloud-section">
+      <div class="sc-header-row">
+        <h2>
+          <span class="sc-logo-badge">SC</span>
+          Интеграция SoundCloud
+        </h2>
+        <span v-if="scAccount?.connected" class="sc-status-pill connected">
+          <Check :size="12" /> Подключён
+        </span>
+        <span v-else class="sc-status-pill">Не привязан</span>
+      </div>
+
+      <div v-if="loadingScAccount" class="sc-loading-box">
+        <div class="spinner small"></div>
+        <span>Проверка аккаунта...</span>
+      </div>
+
+      <!-- Connected State -->
+      <div v-else-if="scAccount?.connected" class="sc-connected-card">
+        <div class="sc-profile-top">
+          <img 
+            v-if="scAccount.avatar_url" 
+            :src="scAccount.avatar_url" 
+            alt="SoundCloud avatar" 
+            class="sc-avatar" 
+            referrerpolicy="no-referrer"
+          />
+          <div v-else class="sc-avatar-placeholder">
+            <Radio :size="24" />
+          </div>
+          <div class="sc-user-details">
+            <span class="sc-user-title">{{ scAccount.display_name || scAccount.username }}</span>
+            <a :href="scAccount.profile_url" target="_blank" rel="noopener" class="sc-user-link">
+              @{{ scAccount.username }} <ExternalLink :size="12" />
+            </a>
+          </div>
+          <div class="sc-likes-badge" title="Количество лайков на SoundCloud">
+            <span class="sc-likes-num">{{ scAccount.likes_count || 0 }}</span>
+            <span class="sc-likes-label">лайков</span>
+          </div>
+        </div>
+
+        <div class="sc-connected-actions">
+          <button class="sc-btn primary" @click="goToSoundCloudLikes">
+            <Heart :size="16" />
+            <span>Мои лайки SoundCloud</span>
+          </button>
+          <button class="sc-btn secondary" :disabled="isDisconnectingSc" @click="handleDisconnectSc">
+            <Unlink :size="16" />
+            <span>Отвязать</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Not Connected State -->
+      <div v-else class="sc-connect-card">
+        <p class="sc-desc">
+          Привяжите ваш профиль SoundCloud, чтобы в один клик переносить лайкнутые треки в медиатеку и автоматически сохранять бэкап аудио в личный Telegram-канал.
+        </p>
+
+        <div class="sc-input-group">
+          <label class="sc-label">Ссылка на профиль или никнейм SoundCloud:</label>
+          <div class="sc-input-row">
+            <input 
+              v-model="scUsernameInput" 
+              type="text" 
+              placeholder="soundcloud.com/ваш-ник или ваш-ник"
+              class="sc-input"
+              :disabled="isConnectingSc"
+              @keydown.enter="handleConnectSc"
+            />
+            <button 
+              class="sc-btn primary" 
+              :disabled="!scUsernameInput.trim() || isConnectingSc"
+              @click="handleConnectSc"
+            >
+              <div v-if="isConnectingSc" class="spinner small"></div>
+              <template v-else>Подключить</template>
+            </button>
+          </div>
+        </div>
+
+        <div class="sc-token-foldout">
+          <button class="sc-foldout-toggle" @click="showTokenField = !showTokenField">
+            <Key :size="14" />
+            <span>{{ showTokenField ? 'Скрыть токен' : 'Приватные треки / OAuth Token (опционально)' }}</span>
+            <ChevronDown :size="14" :class="{ rotated: showTokenField }" />
+          </button>
+          <div v-if="showTokenField" class="sc-token-box">
+            <input 
+              v-model="scTokenInput" 
+              type="password" 
+              placeholder="OAuth Token из cookie oauth_token (необязательно)"
+              class="sc-input token-input"
+              :disabled="isConnectingSc"
+            />
+            <span class="sc-hint">Требуется только если ваши лайки закрыты от публичного доступа.</span>
+          </div>
+        </div>
+
+        <div v-if="scConnectError" class="sc-error-msg">
+          <AlertCircle :size="16" />
+          <span>{{ scConnectError }}</span>
+        </div>
+      </div>
+    </section>
+
     <!-- User section -->
     <section class="section">
       <h2>Аккаунт</h2>
@@ -387,8 +495,13 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
-import api, { authApi } from '@/api/client'
-import { Megaphone, Check, Folder, Heart, ListMusic, Cloud, RefreshCw, Lock, User, Bell, Sliders, Headphones, Smartphone, Download, HardDrive, Trash2, ChevronRight } from 'lucide-vue-next'
+import api, { authApi, ingestionApi } from '@/api/client'
+import { 
+  Megaphone, Check, Folder, Heart, ListMusic, Cloud, RefreshCw, Lock, 
+  User, Bell, Sliders, Headphones, Smartphone, Download, HardDrive, 
+  Trash2, ChevronRight, ExternalLink, Unlink, Key, ChevronDown, 
+  AlertCircle, Radio 
+} from 'lucide-vue-next'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import { getCacheStats, getCachedAudioStats } from '@/utils/audioCacheDb'
 import { clearAudioCache } from '@/stores/playerCache'
@@ -428,6 +541,67 @@ const privacySettings = ref({
   hide_profile: false,
   notify_subscription: true,
 })
+
+// ─── SoundCloud Integration State ───
+const scAccount = ref(null)
+const loadingScAccount = ref(false)
+const isConnectingSc = ref(false)
+const isDisconnectingSc = ref(false)
+const scUsernameInput = ref('')
+const scTokenInput = ref('')
+const showTokenField = ref(false)
+const scConnectError = ref('')
+
+const fetchScAccount = async () => {
+  loadingScAccount.value = true
+  try {
+    const res = await ingestionApi.getSoundCloudAccount()
+    scAccount.value = res.data
+  } catch (e) {
+    console.error('Failed to fetch SoundCloud account:', e)
+  } finally {
+    loadingScAccount.value = false
+  }
+}
+
+const handleConnectSc = async () => {
+  const cleanUser = scUsernameInput.value.trim()
+  if (!cleanUser) return
+  isConnectingSc.value = true
+  scConnectError.value = ''
+  try {
+    const res = await ingestionApi.connectSoundCloudAccount({
+      username_or_url: cleanUser,
+      auth_token: scTokenInput.value.trim() || undefined,
+    })
+    scAccount.value = res.data
+    scUsernameInput.value = ''
+    scTokenInput.value = ''
+    showTokenField.value = false
+  } catch (e) {
+    console.error('Failed to connect SoundCloud:', e)
+    scConnectError.value = e.response?.data?.detail || 'Не удалось привязать профиль SoundCloud'
+  } finally {
+    isConnectingSc.value = false
+  }
+}
+
+const handleDisconnectSc = async () => {
+  if (!confirm('Отвязать аккаунт SoundCloud?')) return
+  isDisconnectingSc.value = true
+  try {
+    await ingestionApi.disconnectSoundCloudAccount()
+    scAccount.value = { connected: false }
+  } catch (e) {
+    console.error('Failed to disconnect SoundCloud:', e)
+  } finally {
+    isDisconnectingSc.value = false
+  }
+}
+
+const goToSoundCloudLikes = () => {
+  router.push({ path: '/search', query: { tab: 'soundcloud', mode: 'likes' } })
+}
 
 // Avatar gradient based on user ID for unique colors
 const avatarGradient = computed(() => {
@@ -604,6 +778,7 @@ onMounted(() => {
   loadBotConfig()
   loadPrivacySettings()
   refreshCacheStats()
+  fetchScAccount()
   
   // Load saved theme preference
   const savedTheme = localStorage.getItem('theme')
@@ -811,6 +986,309 @@ h1 {
   font-size: 13px;
   margin-top: var(--sp-1);
   line-height: 1.3;
+}
+
+.cache-desc {
+  font-size: 13px;
+  color: var(--c-text-3);
+  margin-top: var(--sp-2);
+  line-height: 1.4;
+}
+
+/* ═══════════════════════════════════════════════
+   SoundCloud Integration Card Styles
+   ═══════════════════════════════════════════════ */
+.soundcloud-section {
+  position: relative;
+}
+
+.sc-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-4);
+}
+
+.sc-logo-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ff5500;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  border-radius: 4px;
+  padding: 1px 5px;
+  letter-spacing: 0.5px;
+}
+
+.sc-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--c-text-3);
+}
+
+.sc-status-pill.connected {
+  background: rgba(255, 85, 0, 0.15);
+  color: #ff7700;
+  border: 1px solid rgba(255, 85, 0, 0.3);
+}
+
+.sc-loading-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  background: var(--c-bg-2);
+  border-radius: var(--r-lg);
+  color: var(--c-text-3);
+  font-size: 13px;
+}
+
+.sc-connected-card {
+  padding: 16px;
+  background: var(--c-bg-2);
+  border-radius: var(--r-lg);
+  border: 1px solid rgba(255, 85, 0, 0.15);
+  box-shadow: 
+    3px 3px 8px var(--sh-dark),
+    -2px -2px 4px var(--sh-light);
+}
+
+.sc-profile-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.sc-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #ff5500;
+  box-shadow: 0 2px 10px rgba(255, 85, 0, 0.25);
+}
+
+.sc-avatar-placeholder {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255, 85, 0, 0.2);
+  color: #ff5500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sc-user-details {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sc-user-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--c-text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sc-user-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #ff7700;
+  text-decoration: none;
+}
+
+.sc-user-link:hover {
+  text-decoration: underline;
+}
+
+.sc-likes-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 6px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sc-likes-num {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ff5500;
+}
+
+.sc-likes-label {
+  font-size: 11px;
+  color: var(--c-text-3);
+  text-transform: uppercase;
+}
+
+.sc-connected-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.sc-connect-card {
+  padding: 16px;
+  background: var(--c-bg-2);
+  border-radius: var(--r-lg);
+  box-shadow: 
+    3px 3px 8px var(--sh-dark),
+    -2px -2px 4px var(--sh-light);
+  border: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+.sc-desc {
+  font-size: 13px;
+  color: var(--c-text-2);
+  line-height: 1.5;
+  margin: 0 0 14px 0;
+}
+
+.sc-input-group {
+  margin-bottom: 12px;
+}
+
+.sc-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-text-3);
+  margin-bottom: 6px;
+}
+
+.sc-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.sc-input {
+  flex: 1;
+  background: var(--c-bg-1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+  color: var(--c-text-1);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.sc-input:focus {
+  border-color: #ff5500;
+}
+
+.sc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border-radius: var(--r-md);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.sc-btn.primary {
+  background: #ff5500;
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(255, 85, 0, 0.3);
+}
+
+.sc-btn.primary:hover:not(:disabled) {
+  background: #ff6611;
+  transform: translateY(-1px);
+}
+
+.sc-btn.primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sc-btn.secondary {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--c-text-2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sc-btn.secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--c-text-1);
+}
+
+.sc-token-foldout {
+  margin-top: 10px;
+}
+
+.sc-foldout-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--c-text-3);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.sc-foldout-toggle:hover {
+  color: var(--c-text-2);
+}
+
+.sc-foldout-toggle .rotated {
+  transform: rotate(180deg);
+}
+
+.sc-token-box {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.token-input {
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.sc-hint {
+  font-size: 11px;
+  color: var(--c-text-3);
+}
+
+.sc-error-msg {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+  background: rgba(255, 68, 68, 0.1);
+  border: 1px solid rgba(255, 68, 68, 0.2);
+  color: #ff5555;
+  font-size: 12px;
 }
 
 /* ─── Stat Skeleton ─── */

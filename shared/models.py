@@ -134,6 +134,10 @@ class User(Base):
         uselist=False,
         cascade="all, delete-orphan"
     )
+    external_accounts: Mapped[List["UserExternalAccount"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
     
     @property
     def display_name(self) -> str:
@@ -784,3 +788,39 @@ class UserFollow(Base):
         Index("idx_user_follow_follower", "follower_id"),
         Index("idx_user_follow_following", "following_id"),
     )
+
+
+# ============== External Connected Accounts (SoundCloud, Spotify) ==============
+
+class UserExternalAccount(Base):
+    """
+    Connected external streaming service account (SoundCloud, Spotify, etc.)
+    """
+    __tablename__ = "user_external_accounts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
+    provider: Mapped[str] = mapped_column(String(50), nullable=False)  # 'soundcloud', 'spotify'
+
+    external_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    username: Mapped[str] = mapped_column(String(255), nullable=False)
+    display_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    profile_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    auth_token: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
+    likes_count: Mapped[int] = mapped_column(Integer, default=0)
+    tracks_count: Mapped[int] = mapped_column(Integer, default=0)
+
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+    # Relationship to user
+    user: Mapped["User"] = relationship(back_populates="external_accounts")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "provider", name="uq_user_external_provider"),
+        Index("idx_user_external_user", "user_id"),
+    )
+

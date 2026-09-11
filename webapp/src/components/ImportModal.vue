@@ -59,6 +59,13 @@
               <span>Пример: <code>soundcloud.com/artist/sets/playlist</code> или <code>.../user/likes</code></span>
             </div>
 
+            <div v-if="scAccount?.connected" class="sc-quick-actions-bar">
+              <button class="sc-chip-btn" @click="handleLoadMyLikes">
+                <Heart :size="13" />
+                <span>Загрузить мои лайки SoundCloud (@{{ scAccount.username }})</span>
+              </button>
+            </div>
+
             <!-- Error Banner -->
             <div v-if="errorMessage" class="error-banner">
               <AlertCircle :size="16" class="error-icon" />
@@ -283,6 +290,7 @@ import {
   Check,
   Zap,
   Sparkles,
+  Heart,
 } from 'lucide-vue-next'
 import { ingestionApi } from '../api/client'
 import { useRouter } from 'vue-router'
@@ -307,6 +315,39 @@ const activeJob = ref(null)
 const selectedUrls = ref(new Set())
 
 let pollTimer = null
+
+// Connected SoundCloud account shortcut
+const scAccount = ref(null)
+
+const checkScAccount = async () => {
+  try {
+    const res = await ingestionApi.getSoundCloudAccount()
+    if (res.data?.connected) {
+      scAccount.value = res.data
+    } else {
+      scAccount.value = null
+    }
+  } catch (_) {
+    scAccount.value = null
+  }
+}
+
+const handleLoadMyLikes = () => {
+  if (scAccount.value?.profile_url) {
+    urlInput.value = `${scAccount.value.profile_url}/likes`
+    nextTick(() => {
+      handlePreview()
+    })
+  }
+}
+
+const handleReset = () => {
+  errorMessage.value = ''
+  preview.value = null
+  activeJob.value = null
+  selectedUrls.value = new Set()
+  stopPolling()
+}
 
 const isValidUrl = computed(() => {
   const trimmed = urlInput.value.trim().toLowerCase()
@@ -390,15 +431,13 @@ watch(
   () => props.show,
   (val) => {
     if (val) {
-      errorMessage.value = ''
-      preview.value = null
-      activeJob.value = null
-      selectedUrls.value = new Set()
+      handleReset()
+      checkScAccount()
       nextTick(() => {
         inputRef.value?.focus()
       })
     } else {
-      stopPolling()
+      handleReset()
     }
   }
 )
@@ -1270,5 +1309,32 @@ onUnmounted(() => {
   to {
     transform: rotate(360deg);
   }
+}
+
+.sc-quick-actions-bar {
+  margin-top: 8px;
+  display: flex;
+}
+
+.sc-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(255, 85, 0, 0.12);
+  border: 1px solid rgba(255, 85, 0, 0.3);
+  border-radius: 999px;
+  color: #ff7700;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sc-chip-btn:hover {
+  background: #ff5500;
+  color: #fff;
+  border-color: #ff5500;
+  box-shadow: 0 2px 8px rgba(255, 85, 0, 0.3);
 }
 </style>

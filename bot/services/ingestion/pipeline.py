@@ -198,6 +198,15 @@ class IngestionPipeline:
                         if job.playlist_id:
                             await self._add_track_to_playlist(job.playlist_id, existing.id, len(job.imported_track_ids) + 1)
 
+                        # Auto-forward to user's Telegram backup channel if active
+                        try:
+                            from bot.services.channels import get_channel_service
+                            ch_svc = get_channel_service()
+                            if ch_svc:
+                                await ch_svc.forward_track_to_channel(job.user_id, existing.id)
+                        except Exception as e:
+                            logger.debug(f"[Ingestion] Channel forward skipped for existing track {existing.id}: {e}")
+
                         job.imported_track_ids.append(existing.id)
                         job.skipped_tracks += 1
                         job.processed_tracks += 1
@@ -268,6 +277,15 @@ class IngestionPipeline:
                         # E. Add to playlist
                         if job.playlist_id:
                             await self._add_track_to_playlist(job.playlist_id, save_result.track_id, len(job.imported_track_ids) + 1)
+
+                        # Auto-forward to user's Telegram backup channel if active
+                        try:
+                            from bot.services.channels import get_channel_service
+                            ch_svc = get_channel_service()
+                            if ch_svc:
+                                await ch_svc.forward_track_to_channel(job.user_id, save_result.track_id)
+                        except Exception as e:
+                            logger.debug(f"[Ingestion] Channel forward failed for new track {save_result.track_id}: {e}")
 
                         job.imported_track_ids.append(save_result.track_id)
                         job.processed_tracks += 1

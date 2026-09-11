@@ -326,4 +326,9 @@ export const ingestionApi = {
   getRecent: () => api.get('/ingestion/recent'),
   search: (q, provider = 'soundcloud', limit = 30) => api.get('/ingestion/search', { params: { q, provider, limit } }),
   quickImport: (data) => api.post('/ingestion/quick-import', data),
+  getSoundCloudAccount: () => api.get('/ingestion/account/soundcloud'),
+  connectSoundCloudAccount: (data) => api.post('/ingestion/account/soundcloud/connect', data),
+  disconnectSoundCloudAccount: () => api.delete('/ingestion/account/soundcloud'),
+  getSoundCloudLikes: (params = {}) => api.get('/ingestion/account/soundcloud/likes', { params }),
 }
+

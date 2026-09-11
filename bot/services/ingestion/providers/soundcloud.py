@@ -323,3 +323,155 @@ class SoundCloudProvider(BaseMusicProvider):
                 )
             )
         return results
+
+    _cached_client_id: Optional[str] = None
+
+    async def get_client_id(self) -> str:
+        """Get or discover a valid SoundCloud API client_id using yt-dlp."""
+        if self._cached_client_id:
+            return self._cached_client_id
+
+        def _discover():
+            ydl_opts = {"quiet": True, "no_warnings": True}
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ie = yt_dlp.extractor.soundcloud.SoundcloudUserIE(ydl)
+                ie.initialize()
+                return ie._CLIENT_ID
+
+        try:
+            cid = await asyncio.to_thread(_discover)
+            if cid:
+                self._cached_client_id = cid
+                return cid
+        except Exception as e:
+            logger.warning(f"Failed to extract SoundCloud client_id via yt-dlp: {e}")
+
+        # Fallback default client_id
+        return "Pb72ranhoyt6gw7hM7TkzUItXlMWSNSo"
+
+    async def resolve_user_profile(self, username_or_url: str, auth_token: Optional[str] = None) -> dict:
+        """
+        Resolve SoundCloud user profile by username or URL.
+        Returns user info dictionary: external_id, username, display_name, avatar_url, profile_url, likes_count, tracks_count.
+        """
+        raw = username_or_url.strip()
+        if "soundcloud.com/" in raw:
+            m = re.search(r"soundcloud\.com/([a-zA-Z0-9_\-]+)", raw)
+            permalink = m.group(1) if m else raw.rstrip("/").split("/")[-1]
+        else:
+            permalink = raw.lstrip("@")
+
+        client_id = await self.get_client_id()
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+        }
+        if auth_token:
+            headers["Authorization"] = f"OAuth {auth_token.strip()}"
+
+        target_url = f"https://soundcloud.com/{permalink}"
+        api_url = f"https://api-v2.soundcloud.com/resolve?url={target_url}&client_id={client_id}"
+
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.get(api_url) as resp:
+                if resp.status == 404:
+                    raise ValueError(f"Пользователь SoundCloud '{permalink}' не найден.")
+                if resp.status != 200:
+                    text = await resp.text()
+                    raise ValueError(f"SoundCloud API error ({resp.status}): {text[:100]}")
+                data = await resp.json()
+
+        avatar = _improve_sc_thumbnail(data.get("avatar_url"))
+        likes_count = data.get("likes_count") or data.get("public_favorites_count") or 0
+        tracks_count = data.get("track_count") or 0
+
+        return {
+            "external_id": str(data.get("id")),
+            "username": data.get("permalink") or permalink,
+            "display_name": data.get("username") or permalink,
+            "profile_url": data.get("permalink_url") or target_url,
+            "avatar_url": avatar,
+            "likes_count": likes_count,
+            "tracks_count": tracks_count,
+        }
+
+    async def fetch_user_likes(
+        self,
+        external_id_or_username: str,
+        limit: int = 50,
+        next_href: Optional[str] = None,
+        auth_token: Optional[str] = None,
+    ) -> tuple[List[TrackMetadata], Optional[str]]:
+        """
+        Fetch liked tracks for a SoundCloud user.
+        Returns (list_of_tracks, next_cursor_href).
+        """
+        client_id = await self.get_client_id()
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+        }
+        if auth_token:
+            headers["Authorization"] = f"OAuth {auth_token.strip()}"
+
+        if next_href:
+            req_url = next_href
+            if "client_id=" not in req_url:
+                delim = "&" if "?" in req_url else "?"
+                req_url = f"{req_url}{delim}client_id={client_id}"
+        else:
+            user_id = str(external_id_or_username).strip()
+            if not user_id.isdigit():
+                profile = await self.resolve_user_profile(user_id, auth_token=auth_token)
+                user_id = profile["external_id"]
+
+            req_url = f"https://api-v2.soundcloud.com/users/{user_id}/likes?limit={limit}&client_id={client_id}"
+
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.get(req_url) as resp:
+                if resp.status != 200:
+                    text = await resp.text()
+                    raise ValueError(f"SoundCloud likes error ({resp.status}): {text[:100]}")
+                data = await resp.json()
+
+        collection = data.get("collection") or []
+        next_url = data.get("next_href")
+
+        tracks: List[TrackMetadata] = []
+        for item in collection:
+            if not isinstance(item, dict):
+                continue
+            tr = item.get("track") or item
+            if not isinstance(tr, dict) or not tr.get("title"):
+                continue
+
+            raw_title = tr.get("title") or "SoundCloud Track"
+            user_obj = tr.get("user") or {}
+            uploader = user_obj.get("username") or "SoundCloud"
+            artist, title = _parse_artist_and_title(raw_title, uploader)
+
+            track_url = tr.get("permalink_url") or ""
+            if not track_url and tr.get("permalink"):
+                track_url = f"https://soundcloud.com/{user_obj.get('permalink', 'artist')}/{tr.get('permalink')}"
+            if not track_url:
+                continue
+
+            dur_raw = tr.get("duration") or 0
+            duration = int(dur_raw / 1000) if dur_raw > 1000 else int(dur_raw) or None
+            cover = _improve_sc_thumbnail(tr.get("artwork_url") or user_obj.get("avatar_url"))
+
+            tracks.append(
+                TrackMetadata(
+                    provider_name=self.name,
+                    url=track_url,
+                    title=title,
+                    artist=artist,
+                    duration=duration,
+                    cover_url=cover,
+                    external_id=str(tr.get("id") or ""),
+                    extra={"uploader": uploader, "liked_at": item.get("created_at")},
+                )
+            )
+
+        return tracks, next_url
+

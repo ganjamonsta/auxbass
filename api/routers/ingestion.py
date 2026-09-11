@@ -20,7 +20,10 @@ from sqlalchemy.orm import selectinload
 
 from shared.config import get_settings
 from shared.database import get_session, get_db
-from shared.models import User, Track, UserLibrary, AlbumTrack, LibrarySource
+from shared.models import (
+    User, Track, UserLibrary, AlbumTrack, LibrarySource,
+    UserExternalAccount, UserChannel, ChannelMessage, ChannelMessageStatus, utcnow
+)
 from api.routers.auth import get_current_user, TelegramUser
 from api.schemas.tracks import TrackResponse
 from api.routers.library import track_to_response
@@ -62,6 +65,45 @@ class QuickImportRequest(BaseModel):
 class QuickImportResponse(BaseModel):
     track: TrackResponse
     already_existed: bool
+
+
+class ExternalAccountResponse(BaseModel):
+    provider: str
+    username: str
+    display_name: Optional[str] = None
+    profile_url: Optional[str] = None
+    avatar_url: Optional[str] = None
+    likes_count: int = 0
+    tracks_count: int = 0
+    connected: bool = True
+    last_synced_at: Optional[str] = None
+
+
+class ConnectAccountRequest(BaseModel):
+    username_or_url: str
+    auth_token: Optional[str] = None
+
+
+class SoundCloudLikeItem(BaseModel):
+    url: str
+    title: str
+    artist: str
+    duration: Optional[int] = None
+    cover_url: Optional[str] = None
+    in_library: bool = False
+    in_channel: bool = False
+    already_in_tg: bool = False
+    track_id: Optional[int] = None
+    liked_at: Optional[str] = None
+
+
+class UserLikesResponse(BaseModel):
+    provider: str
+    account: ExternalAccountResponse
+    total_likes: int
+    items: List[SoundCloudLikeItem]
+    next_cursor: Optional[str] = None
+
 
 
 class TrackPreviewItem(BaseModel):
@@ -352,6 +394,15 @@ async def quick_import_track(
             enrich=False,
         )
 
+        # Auto-forward to user's Telegram backup channel if active
+        try:
+            from bot.services.channels import get_channel_service
+            ch_svc = get_channel_service()
+            if ch_svc:
+                await ch_svc.forward_track_to_channel(user.id, existing_track.id)
+        except Exception as e:
+            logger.debug(f"Quick-import channel forward failed for existing track: {e}")
+
         # Refresh track with relationships
         track_obj = await db.scalar(
             select(Track)
@@ -448,6 +499,15 @@ async def quick_import_track(
             enrich=True,
         )
 
+        # Auto-forward to user's Telegram backup channel if active
+        try:
+            from bot.services.channels import get_channel_service
+            ch_svc = get_channel_service()
+            if ch_svc:
+                await ch_svc.forward_track_to_channel(user.id, save_res.track_id)
+        except Exception as e:
+            logger.debug(f"Quick-import channel forward failed for new track: {e}")
+
         track_obj = await db.scalar(
             select(Track)
             .where(Track.id == save_res.track_id)
@@ -465,3 +525,213 @@ async def quick_import_track(
             track=track_to_response(track_obj, lib_entry),
             already_existed=False,
         )
+
+
+# ============== Connected External Accounts (SoundCloud) ==============
+
+@router.get("/account/soundcloud")
+async def get_soundcloud_account(
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get connected SoundCloud account for current user."""
+    account = await db.scalar(
+        select(UserExternalAccount)
+        .where(UserExternalAccount.user_id == user.id, UserExternalAccount.provider == "soundcloud")
+    )
+    if not account:
+        return {"connected": False}
+
+    return ExternalAccountResponse(
+        provider=account.provider,
+        username=account.username,
+        display_name=account.display_name,
+        profile_url=account.profile_url,
+        avatar_url=account.avatar_url,
+        likes_count=account.likes_count,
+        tracks_count=account.tracks_count,
+        connected=True,
+        last_synced_at=account.last_synced_at.isoformat() if account.last_synced_at else None,
+    )
+
+
+@router.post("/account/soundcloud/connect", response_model=ExternalAccountResponse)
+async def connect_soundcloud_account(
+    req: ConnectAccountRequest,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Connect a SoundCloud profile to user account."""
+    sc_provider = provider_registry.get_provider("soundcloud")
+    if not sc_provider:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="SoundCloud provider unavailable",
+        )
+
+    await _ensure_user_in_db(user)
+
+    try:
+        profile = await sc_provider.resolve_user_profile(req.username_or_url, req.auth_token)
+    except Exception as e:
+        logger.warning(f"Failed to resolve SoundCloud profile '{req.username_or_url}': {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Не удалось подключить профиль SoundCloud: {str(e)}",
+        )
+
+    account = await db.scalar(
+        select(UserExternalAccount)
+        .where(UserExternalAccount.user_id == user.id, UserExternalAccount.provider == "soundcloud")
+    )
+
+    if not account:
+        account = UserExternalAccount(
+            user_id=user.id,
+            provider="soundcloud",
+            external_id=profile.get("external_id"),
+            username=profile["username"],
+            display_name=profile.get("display_name"),
+            profile_url=profile.get("profile_url"),
+            avatar_url=profile.get("avatar_url"),
+            auth_token=req.auth_token,
+            likes_count=profile.get("likes_count", 0),
+            tracks_count=profile.get("tracks_count", 0),
+            last_synced_at=utcnow(),
+        )
+        db.add(account)
+    else:
+        account.external_id = profile.get("external_id")
+        account.username = profile["username"]
+        account.display_name = profile.get("display_name")
+        account.profile_url = profile.get("profile_url")
+        account.avatar_url = profile.get("avatar_url")
+        account.likes_count = profile.get("likes_count", 0)
+        account.tracks_count = profile.get("tracks_count", 0)
+        if req.auth_token:
+            account.auth_token = req.auth_token
+        account.last_synced_at = utcnow()
+
+    await db.commit()
+    await db.refresh(account)
+
+    return ExternalAccountResponse(
+        provider=account.provider,
+        username=account.username,
+        display_name=account.display_name,
+        profile_url=account.profile_url,
+        avatar_url=account.avatar_url,
+        likes_count=account.likes_count,
+        tracks_count=account.tracks_count,
+        connected=True,
+        last_synced_at=account.last_synced_at.isoformat() if account.last_synced_at else None,
+    )
+
+
+@router.delete("/account/soundcloud")
+async def disconnect_soundcloud_account(
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Disconnect SoundCloud account."""
+    account = await db.scalar(
+        select(UserExternalAccount)
+        .where(UserExternalAccount.user_id == user.id, UserExternalAccount.provider == "soundcloud")
+    )
+    if account:
+        await db.delete(account)
+        await db.commit()
+    return {"ok": True, "message": "SoundCloud аккаунт отключен"}
+
+
+@router.get("/account/soundcloud/likes", response_model=UserLikesResponse)
+async def get_soundcloud_likes(
+    limit: int = Query(40, ge=1, le=100),
+    cursor: Optional[str] = None,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Fetch user's liked tracks from SoundCloud with local library & channel backup status."""
+    account = await db.scalar(
+        select(UserExternalAccount)
+        .where(UserExternalAccount.user_id == user.id, UserExternalAccount.provider == "soundcloud")
+    )
+    if not account:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="SoundCloud аккаунт не подключен. Перейдите в настройки для подключения.",
+        )
+
+    sc_provider = provider_registry.get_provider("soundcloud")
+    if not sc_provider:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="SoundCloud provider unavailable",
+        )
+
+    try:
+        ident = account.external_id or account.username
+        tracks_meta, next_cursor = await sc_provider.fetch_user_likes(
+            ident, limit=limit, next_href=cursor, auth_token=account.auth_token
+        )
+    except Exception as e:
+        logger.error(f"Failed to fetch SoundCloud likes for {account.username}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Не удалось получить лайки с SoundCloud: {str(e)}",
+        )
+
+    # Preload user's library and channel backup status in batch
+    user_lib_q = select(UserLibrary.track_id).where(UserLibrary.user_id == user.id)
+    user_lib_track_ids = set((await db.scalars(user_lib_q)).all())
+
+    user_ch_q = (
+        select(ChannelMessage.track_id)
+        .join(UserChannel, ChannelMessage.channel_id == UserChannel.id)
+        .where(UserChannel.user_id == user.id, ChannelMessage.status == ChannelMessageStatus.SENT)
+    )
+    user_channel_track_ids = set((await db.scalars(user_ch_q)).all())
+
+    items: List[SoundCloudLikeItem] = []
+    for t in tracks_meta:
+        existing = await _find_existing_track(t.title, t.artist, t.duration, session=db)
+        already_in_tg = existing is not None
+        in_lib = (existing.id in user_lib_track_ids) if existing else False
+        in_chan = (existing.id in user_channel_track_ids) if existing else False
+        existing_id = existing.id if existing else None
+
+        items.append(
+            SoundCloudLikeItem(
+                url=t.url,
+                title=t.title,
+                artist=t.artist,
+                duration=t.duration,
+                cover_url=t.cover_url,
+                in_library=in_lib,
+                in_channel=in_chan,
+                already_in_tg=already_in_tg,
+                track_id=existing_id,
+                liked_at=t.extra.get("liked_at") if t.extra else None,
+            )
+        )
+
+    account_resp = ExternalAccountResponse(
+        provider=account.provider,
+        username=account.username,
+        display_name=account.display_name,
+        profile_url=account.profile_url,
+        avatar_url=account.avatar_url,
+        likes_count=account.likes_count,
+        tracks_count=account.tracks_count,
+        connected=True,
+        last_synced_at=account.last_synced_at.isoformat() if account.last_synced_at else None,
+    )
+
+    return UserLikesResponse(
+        provider="soundcloud",
+        account=account_resp,
+        total_likes=account.likes_count,
+        items=items,
+        next_cursor=next_cursor,
+    )
+

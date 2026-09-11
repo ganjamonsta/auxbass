@@ -51,6 +51,28 @@ def migrate_sqlite_db(db_path: str):
             cursor.execute("PRAGMA foreign_keys=ON;")
             print("  [OK] channel_messages table migrated!")
 
+    # Create user_external_accounts table if it does not exist
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_external_accounts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            provider VARCHAR(50) NOT NULL,
+            external_id VARCHAR(100),
+            username VARCHAR(255) NOT NULL,
+            display_name VARCHAR(255),
+            profile_url VARCHAR(500),
+            avatar_url VARCHAR(500),
+            auth_token VARCHAR(500),
+            likes_count INTEGER DEFAULT 0,
+            tracks_count INTEGER DEFAULT 0,
+            last_synced_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, provider)
+        );
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_external_user ON user_external_accounts(user_id);")
+
     # Define all required columns per table with their SQLite types & defaults
     schema_definitions = {
         "channel_messages": [

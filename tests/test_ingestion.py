@@ -170,3 +170,92 @@ async def test_soundcloud_search_thumbnails_list_mock(monkeypatch):
     assert results[0].cover_url == "https://i1.sndcdn.com/artworks-123-t500x500.jpg"
 
 
+@pytest.mark.asyncio
+async def test_soundcloud_user_profile_and_likes_mock(monkeypatch):
+    sc = SoundCloudProvider()
+    sc._cached_client_id = "test_client_id"
+
+    # Mock resolve_user_profile HTTP call
+    class MockResponse:
+        def __init__(self, data, status=200):
+            self._data = data
+            self.status = status
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+        async def json(self):
+            return self._data
+
+        async def text(self):
+            return str(self._data)
+
+    profile_payload = {
+        "id": 123456,
+        "permalink": "cool_artist",
+        "username": "Cool Artist",
+        "avatar_url": "https://i1.sndcdn.com/avatars-000-large.jpg",
+        "permalink_url": "https://soundcloud.com/cool_artist",
+        "likes_count": 42,
+        "track_count": 10,
+    }
+
+    likes_payload = {
+        "collection": [
+            {
+                "created_at": "2026-01-01T00:00:00Z",
+                "track": {
+                    "id": 98765,
+                    "title": "Banger Track",
+                    "user": {"username": "Another Producer", "permalink": "producer"},
+                    "permalink_url": "https://soundcloud.com/producer/banger-track",
+                    "duration": 180000,
+                    "artwork_url": "https://i1.sndcdn.com/artworks-999-large.jpg",
+                },
+            }
+        ],
+        "next_href": "https://api-v2.soundcloud.com/users/123456/likes?offset=2",
+    }
+
+    class MockSession:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+        def get(self, url, **kwargs):
+            if "/resolve" in str(url):
+                return MockResponse(profile_payload)
+            if "/likes" in str(url):
+                return MockResponse(likes_payload)
+            return MockResponse({}, status=404)
+
+    import aiohttp
+    monkeypatch.setattr(aiohttp, "ClientSession", MockSession)
+
+    # 1. Test profile resolution
+    prof = await sc.resolve_user_profile("cool_artist")
+    assert prof["external_id"] == "123456"
+    assert prof["username"] == "cool_artist"
+    assert prof["display_name"] == "Cool Artist"
+    assert prof["likes_count"] == 42
+    assert "t500x500" in prof["avatar_url"]
+
+    # 2. Test user likes fetching
+    likes, next_cursor = await sc.fetch_user_likes("123456", limit=10)
+    assert len(likes) == 1
+    assert likes[0].title == "Banger Track"
+    assert likes[0].artist == "Another Producer"
+    assert likes[0].duration == 180
+    assert "t500x500" in likes[0].cover_url
+    assert next_cursor == "https://api-v2.soundcloud.com/users/123456/likes?offset=2"
+
+
+
