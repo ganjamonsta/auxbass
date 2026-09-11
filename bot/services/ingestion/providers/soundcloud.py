@@ -7,7 +7,8 @@ import re
 import asyncio
 import logging
 import aiohttp
-from typing import Optional, List, Dict, Any
+import time
+from typing import Optional, List, Dict, Any, Tuple
 
 import yt_dlp
 
@@ -345,11 +346,22 @@ class SoundCloudProvider(BaseMusicProvider):
             mime_type="audio/mpeg",
         )
 
+    _search_cache: Dict[str, Tuple[float, List[TrackMetadata]]] = {}
+    _SEARCH_CACHE_TTL = 300  # 5 minutes
+
     async def search(self, query: str, limit: int = 30) -> List[TrackMetadata]:
         """Search SoundCloud for tracks matching query."""
         clean_query = query.strip()
-        if not clean_query:
+        # SoundCloud scsearch cannot handle hashtags
+        if not clean_query or clean_query.startswith("#"):
             return []
+
+        cache_key = clean_query.lower()
+        now = time.time()
+        if cache_key in self._search_cache:
+            ts, cached_results = self._search_cache[cache_key]
+            if now - ts < self._SEARCH_CACHE_TTL and len(cached_results) >= limit:
+                return cached_results[:limit]
 
         def _search():
             ydl_opts = {
@@ -393,6 +405,13 @@ class SoundCloudProvider(BaseMusicProvider):
                     extra={"uploader": uploader},
                 )
             )
+
+        self._search_cache[cache_key] = (now, results)
+        if len(self._search_cache) > 200:
+            for k in list(self._search_cache.keys()):
+                if now - self._search_cache[k][0] >= self._SEARCH_CACHE_TTL:
+                    self._search_cache.pop(k, None)
+
         return results
 
     _cached_client_id: Optional[str] = None

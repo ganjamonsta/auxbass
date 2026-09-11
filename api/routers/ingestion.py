@@ -40,7 +40,7 @@ from bot.services.ingestion import (
     EntityType,
     TrackMetadata,
 )
-from bot.services.ingestion.pipeline import _find_existing_track
+from bot.services.ingestion.pipeline import _find_existing_track, _find_existing_tracks_batch
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/ingestion", tags=["ingestion"])
@@ -400,9 +400,9 @@ async def search_external_tracks(
     )
     user_track_ids = set(user_lib_res.scalars().all())
 
+    existing_tracks = await _find_existing_tracks_batch(results, session=db)
     items: List[SearchItemResponse] = []
-    for r in results:
-        existing = await _find_existing_track(r.title, r.artist, r.duration, session=db)
+    for r, existing in zip(results, existing_tracks):
         already_in_tg = existing is not None
         in_lib = (existing.id in user_track_ids) if existing else False
         existing_id = existing.id if existing else None

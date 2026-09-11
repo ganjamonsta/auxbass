@@ -72,61 +72,58 @@ export function useTrackSearch({ perPage = 50, debounceDelay = 300 } = {}) {
 
     _currentQuery = query
 
-    // 1) User's library
     libraryPage.value = 1
-    isSearching.value = true
-    try {
-      const libraryRes = await api.get('/library', {
-        params: { search: query, per_page: perPage, page: 1 }
-      })
-      libraryResults.value = libraryRes.data.items || []
-      libraryTotal.value = libraryRes.data.total != null ? libraryRes.data.total : libraryResults.value.length
-    } catch (error) {
-      console.error('Failed to search library:', error)
-      libraryResults.value = []
-      libraryTotal.value = 0
-    } finally {
-      isSearching.value = false
-    }
-
-    _libraryIds = new Set(libraryResults.value.map(t => t.id))
-
-    // 2) Friends' libraries
     friendsPage.value = 1
-    isFriendsLoading.value = true
-    try {
-      const friendsRes = await socialApi.searchFriends(query, perPage, 1)
-      const friendsItems = friendsRes.data.items || []
-      friendsTotal.value = friendsRes.data.total || 0
-      friendsResults.value = friendsItems.filter(t => !_libraryIds.has(t.id))
-    } catch (error) {
-      console.error('Failed to search friends:', error)
-      friendsResults.value = []
-      friendsTotal.value = 0
-    } finally {
-      isFriendsLoading.value = false
-    }
-
-    // 3) Global network
     globalPage.value = 1
+
+    isSearching.value = true
+    isFriendsLoading.value = true
     isGlobalLoading.value = true
+
     try {
-      const globalRes = await tracksApi.getGlobal({
-        search: query,
-        per_page: perPage,
-        page: 1
-      })
-      const globalItems = globalRes.data.items || []
-      globalTotal.value = globalRes.data.total || 0
+      const [libraryRes, friendsRes, globalRes] = await Promise.all([
+        api.get('/library', {
+          params: { search: query, per_page: perPage, page: 1 }
+        }).catch(error => {
+          console.error('Failed to search library:', error)
+          return null
+        }),
+        socialApi.searchFriends(query, perPage, 1).catch(error => {
+          console.error('Failed to search friends:', error)
+          return null
+        }),
+        tracksApi.getGlobal({
+          search: query,
+          per_page: perPage,
+          page: 1
+        }).catch(error => {
+          console.error('Failed to search global:', error)
+          return null
+        })
+      ])
+
+      // 1) User's library
+      const libItems = libraryRes?.data?.items || []
+      libraryResults.value = libItems
+      libraryTotal.value = libraryRes?.data?.total != null ? libraryRes.data.total : libItems.length
+
+      _libraryIds = new Set(libItems.map(t => t.id))
+
+      // 2) Friends' libraries
+      const friendsItems = friendsRes?.data?.items || []
+      friendsTotal.value = friendsRes?.data?.total || 0
+      friendsResults.value = friendsItems.filter(t => !_libraryIds.has(t.id))
+
+      // 3) Global network
       const friendsIds = new Set(friendsResults.value.map(t => t.id))
+      const globalItems = globalRes?.data?.items || []
+      globalTotal.value = globalRes?.data?.total || 0
       globalResults.value = globalItems.filter(
         t => !_libraryIds.has(t.id) && !friendsIds.has(t.id)
       )
-    } catch (error) {
-      console.error('Failed to search global:', error)
-      globalResults.value = []
-      globalTotal.value = 0
     } finally {
+      isSearching.value = false
+      isFriendsLoading.value = false
       isGlobalLoading.value = false
     }
   }
@@ -232,38 +229,36 @@ export function useTrackSearch({ perPage = 50, debounceDelay = 300 } = {}) {
     _currentQuery = query
     _libraryIds = new Set(existingLibraryTracks.map(t => t.id))
 
-    // Friends
+    // Friends & Global in parallel
     friendsPage.value = 1
-    isFriendsLoading.value = true
-    try {
-      const friendsRes = await socialApi.searchFriends(query, perPage, 1)
-      const friendsItems = friendsRes.data.items || []
-      friendsTotal.value = friendsRes.data.total || 0
-      friendsResults.value = friendsItems.filter(t => !_libraryIds.has(t.id))
-    } catch (error) {
-      console.error('Failed to search friends:', error)
-      friendsResults.value = []
-      friendsTotal.value = 0
-    } finally {
-      isFriendsLoading.value = false
-    }
-
-    // Global
     globalPage.value = 1
+    isFriendsLoading.value = true
     isGlobalLoading.value = true
+
     try {
-      const globalRes = await tracksApi.getGlobal({ search: query, per_page: perPage, page: 1 })
-      const globalItems = globalRes.data.items || []
-      globalTotal.value = globalRes.data.total || 0
+      const [friendsRes, globalRes] = await Promise.all([
+        socialApi.searchFriends(query, perPage, 1).catch(error => {
+          console.error('Failed to search friends:', error)
+          return null
+        }),
+        tracksApi.getGlobal({ search: query, per_page: perPage, page: 1 }).catch(error => {
+          console.error('Failed to search global:', error)
+          return null
+        })
+      ])
+
+      const friendsItems = friendsRes?.data?.items || []
+      friendsTotal.value = friendsRes?.data?.total || 0
+      friendsResults.value = friendsItems.filter(t => !_libraryIds.has(t.id))
+
       const friendsIds = new Set(friendsResults.value.map(t => t.id))
+      const globalItems = globalRes?.data?.items || []
+      globalTotal.value = globalRes?.data?.total || 0
       globalResults.value = globalItems.filter(
         t => !_libraryIds.has(t.id) && !friendsIds.has(t.id)
       )
-    } catch (error) {
-      console.error('Failed to search global:', error)
-      globalResults.value = []
-      globalTotal.value = 0
     } finally {
+      isFriendsLoading.value = false
       isGlobalLoading.value = false
     }
   }

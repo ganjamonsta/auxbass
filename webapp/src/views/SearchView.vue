@@ -1717,19 +1717,27 @@ const handleQuickAddSpotify = async (spTrack) => {
   }
 }
 
-// Combined search loading state
-const isLoading = computed(() => {
-  return isTracksSearching.value || isArtistsSearching.value || isAlbumsSearching.value || isPlaylistsSearching.value || isSoundCloudSearching.value || isSpotifySearching.value
+// Local database search loading state (fast, < 150ms)
+const isLocalSearching = computed(() => {
+  return isTracksSearching.value || isArtistsSearching.value || isAlbumsSearching.value || isPlaylistsSearching.value
 })
 
+// Combined search loading state:
+// When viewing SoundCloud or Spotify tab, reflect external loading state.
+// Otherwise reflect local search state so search input spinner never freezes for 3-5s.
+const isLoading = computed(() => {
+  if (activeFilter.value === 'soundcloud') return isSoundCloudSearching.value
+  if (activeFilter.value === 'spotify') return isSpotifySearching.value
+  return isLocalSearching.value
+})
+
+// Skeletons are only shown while local database search is executing and no results are shown yet
 const isInitialLoading = computed(() => {
-  return isLoading.value && 
+  return isLocalSearching.value && 
          allTracksList.value.length === 0 && 
          artistsResults.value.length === 0 && 
          albumsResults.value.length === 0 && 
-         playlistsResults.value.length === 0 &&
-         soundcloudResults.value.length === 0 &&
-         spotifyResults.value.length === 0
+         playlistsResults.value.length === 0
 })
 
 // Dynamic Tags state
@@ -1939,38 +1947,35 @@ const searchArtistsAndPlaylists = async (query) => {
   isAlbumsSearching.value = true
   isPlaylistsSearching.value = true
 
-  // 1. Search Artists (Global network + fallback)
   try {
-    const res = await artistsApi.getGlobal({ search: cleanQ, limit: 30 })
-    artistsResults.value = res.data?.items || []
-  } catch (e) {
-    console.error('Failed to search artists:', e)
-    const all = libraryStore.artists || []
-    artistsResults.value = all.filter(a => (a.name || a.artist || '').toLowerCase().includes(cleanQ.toLowerCase()))
-  } finally {
-    isArtistsSearching.value = false
-  }
-
-  // 2. Search Albums (Global network + fallback)
-  try {
-    const res = await albumsApi.getGlobal({ search: cleanQ, limit: 30 })
-    albumsResults.value = res.data?.items || []
-  } catch (e) {
-    console.error('Failed to search albums:', e)
-    albumsResults.value = []
-  } finally {
-    isAlbumsSearching.value = false
-  }
-
-  // 3. Search Playlists (Personal + Global)
-  try {
-    const [myRes, globalRes] = await Promise.allSettled([
+    const [artistsRes, albumsRes, myPlaylistsRes, globalPlaylistsRes] = await Promise.allSettled([
+      artistsApi.getGlobal({ search: cleanQ, limit: 30 }),
+      albumsApi.getGlobal({ search: cleanQ, limit: 30 }),
       playlistsApi.getAll({ search: cleanQ, limit: 20 }),
       playlistsApi.getGlobal({ search: cleanQ, limit: 20 })
     ])
-    const myItems = myRes.status === 'fulfilled' ? (myRes.value.data?.items || myRes.value.data || []) : []
-    const globalItems = globalRes.status === 'fulfilled' ? (globalRes.value.data?.items || globalRes.value.data || []) : []
-    
+
+    // 1. Artists
+    if (artistsRes.status === 'fulfilled') {
+      artistsResults.value = artistsRes.value.data?.items || []
+    } else {
+      console.error('Failed to search artists:', artistsRes.reason)
+      const all = libraryStore.artists || []
+      artistsResults.value = all.filter(a => (a.name || a.artist || '').toLowerCase().includes(cleanQ.toLowerCase()))
+    }
+
+    // 2. Albums
+    if (albumsRes.status === 'fulfilled') {
+      albumsResults.value = albumsRes.value.data?.items || []
+    } else {
+      console.error('Failed to search albums:', albumsRes.reason)
+      albumsResults.value = []
+    }
+
+    // 3. Playlists (Personal + Global)
+    const myItems = myPlaylistsRes.status === 'fulfilled' ? (myPlaylistsRes.value.data?.items || myPlaylistsRes.value.data || []) : []
+    const globalItems = globalPlaylistsRes.status === 'fulfilled' ? (globalPlaylistsRes.value.data?.items || globalPlaylistsRes.value.data || []) : []
+
     const seen = new Set()
     const combined = []
     for (const pl of [...myItems, ...globalItems]) {
@@ -1979,12 +1984,15 @@ const searchArtistsAndPlaylists = async (query) => {
         combined.push(pl)
       }
     }
-    playlistsResults.value = combined
-  } catch (e) {
-    console.error('Failed to search playlists:', e)
-    const all = libraryStore.playlists || []
-    playlistsResults.value = all.filter(p => (p.name || '').toLowerCase().includes(cleanQ.toLowerCase()))
+    if (combined.length > 0 || (myPlaylistsRes.status === 'fulfilled' && globalPlaylistsRes.status === 'fulfilled')) {
+      playlistsResults.value = combined
+    } else {
+      const all = libraryStore.playlists || []
+      playlistsResults.value = all.filter(p => (p.name || '').toLowerCase().includes(cleanQ.toLowerCase()))
+    }
   } finally {
+    isArtistsSearching.value = false
+    isAlbumsSearching.value = false
     isPlaylistsSearching.value = false
   }
 }
@@ -1992,11 +2000,26 @@ const searchArtistsAndPlaylists = async (query) => {
 const performSearch = (q) => {
   const query = (q || '').trim()
   if (query) {
+    const isTagSearch = query.startsWith('#')
     trackSearchQuery.value = query
     executeTrackSearch()
     searchArtistsAndPlaylists(query)
-    searchSoundCloud(query)
-    searchSpotify(query)
+
+    // Hashtag queries search within catalog tags and should never trigger external web scraping
+    if (!isTagSearch) {
+      const isOverview = activeFilter.value === 'all'
+      // Request 5 items for overview tab so external scraper returns fast; full 30 when in dedicated tab
+      const externalLimit = isOverview ? 5 : 30
+      if (activeFilter.value === 'all' || activeFilter.value === 'soundcloud') {
+        searchSoundCloud(query, externalLimit)
+      }
+      if (activeFilter.value === 'all' || activeFilter.value === 'spotify') {
+        searchSpotify(query, externalLimit)
+      }
+    } else {
+      soundcloudResults.value = []
+      spotifyResults.value = []
+    }
   } else {
     clearTrackSearch()
     artistsResults.value = []
@@ -2012,6 +2035,17 @@ watch(debouncedQuery, (newVal) => {
   performSearch(newVal)
 })
 
+// On-demand external search when switching to dedicated SoundCloud or Spotify tabs
+watch(activeFilter, (newFilter) => {
+  const query = (searchQuery.value || '').trim()
+  if (!query || query.startsWith('#')) return
+  if (newFilter === 'soundcloud' && soundcloudResults.value.length < 30) {
+    searchSoundCloud(query, 30)
+  } else if (newFilter === 'spotify' && spotifyResults.value.length < 30) {
+    searchSpotify(query, 30)
+  }
+})
+
 const handleClear = () => {
   clearSearchInput()
   clearTrackSearch()
@@ -2020,6 +2054,9 @@ const handleClear = () => {
   playlistsResults.value = []
   soundcloudResults.value = []
   spotifyResults.value = []
+  if (tags.value.length === 0) {
+    loadTags()
+  }
   if (route.query.q || route.query.search || route.query.tag) {
     router.replace({ path: '/search', query: {} })
   }
@@ -2115,7 +2152,10 @@ const handleResetState = (event) => {
 }
 
 onMounted(() => {
-  loadTags()
+  const hasInitialQuery = Boolean(route.query.tag || route.query.q || route.query.search)
+  if (!hasInitialQuery) {
+    loadTags()
+  }
   fetchScAccountForSearch()
   fetchSpAccountForSearch()
   applyRouteQuery()

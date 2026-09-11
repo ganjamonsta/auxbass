@@ -48,6 +48,55 @@ def _robust_norm_title(t: Optional[str]) -> str:
     return normalize_title(cleaned)
 
 
+def _score_candidate(
+    t: Track,
+    clean_title: str,
+    clean_artist: str,
+    norm_title: str,
+    norm_artist: str,
+    robust_title: str,
+    duration: Optional[int],
+) -> int:
+    t_clean_title, t_clean_artist = clean_track_metadata(t.title, t.artist)
+    t_norm_artist = t.normalized_artist or normalize_artist(t_clean_artist)
+    t_norm_title = normalize_title(t_clean_title)
+    t_robust_title = _robust_norm_title(t_clean_title)
+
+    # Check artist compatibility
+    artist_match = (
+        (norm_artist == t_norm_artist)
+        or (norm_artist in t_norm_artist)
+        or (t_norm_artist in norm_artist)
+        or (fuzzy_match_artist(clean_artist, t_clean_artist) >= 0.75)
+    )
+    if not artist_match:
+        return -1
+
+    dur_diff = abs(t.duration - duration) if (t.duration and duration) else None
+
+    # If duration is provided on both sides, reject if difference > 7s
+    if duration and t.duration and dur_diff is not None and dur_diff > 7:
+        return -1
+
+    score = 0
+    if t.title and clean_title and t.title.lower() == clean_title.lower():
+        score = 100
+    elif t_norm_title and norm_title and t_norm_title == norm_title:
+        score = 80
+    elif t_robust_title and robust_title and t_robust_title == robust_title:
+        score = 60
+    elif fuzzy_match_title(clean_title, t_clean_title) >= 0.75:
+        score = 40
+    else:
+        return -1
+
+    # If duration matched closely, add bonus
+    if dur_diff is not None:
+        score += max(0, 10 - dur_diff)
+
+    return score
+
+
 async def _find_existing_track(
     title: str,
     artist: str,
@@ -99,43 +148,7 @@ async def _find_existing_track(
         best_score = -1
 
         for t in candidates:
-            t_clean_title, t_clean_artist = clean_track_metadata(t.title, t.artist)
-            t_norm_artist = t.normalized_artist or normalize_artist(t_clean_artist)
-            t_norm_title = normalize_title(t_clean_title)
-            t_robust_title = _robust_norm_title(t_clean_title)
-
-            # Check artist compatibility
-            artist_match = (
-                (norm_artist == t_norm_artist)
-                or (norm_artist in t_norm_artist)
-                or (t_norm_artist in norm_artist)
-                or (fuzzy_match_artist(clean_artist, t_clean_artist) >= 0.75)
-            )
-            if not artist_match:
-                continue
-
-            dur_diff = abs(t.duration - duration) if (t.duration and duration) else None
-
-            # If duration is provided on both sides, reject if difference > 7s
-            if duration and t.duration and dur_diff is not None and dur_diff > 7:
-                continue
-
-            score = 0
-            if t.title and clean_title and t.title.lower() == clean_title.lower():
-                score = 100
-            elif t_norm_title and norm_title and t_norm_title == norm_title:
-                score = 80
-            elif t_robust_title and robust_title and t_robust_title == robust_title:
-                score = 60
-            elif fuzzy_match_title(clean_title, t_clean_title) >= 0.75:
-                score = 40
-            else:
-                continue
-
-            # If duration matched closely, add bonus
-            if dur_diff is not None:
-                score += max(0, 10 - dur_diff)
-
+            score = _score_candidate(t, clean_title, clean_artist, norm_title, norm_artist, robust_title, duration)
             if score > best_score:
                 best_score = score
                 best_candidate = t
@@ -146,6 +159,72 @@ async def _find_existing_track(
         return await _execute_lookup(session)
     async with get_session() as new_session:
         return await _execute_lookup(new_session)
+
+
+async def _find_existing_tracks_batch(
+    items: List[Any],
+    session: Optional[Any] = None,
+) -> List[Optional[Track]]:
+    """
+    Batch find existing tracks for a list of items using a single indexed query.
+    Falls back to individual _find_existing_track only when no batch candidate matches.
+    """
+    if not items:
+        return []
+
+    async def _execute_batch(s):
+        prepared = []
+        norm_artists = set()
+        for item in items:
+            title = getattr(item, "title", "") or ""
+            artist = getattr(item, "artist", "") or ""
+            dur = getattr(item, "duration", None)
+            clean_title, clean_artist = clean_track_metadata(title, artist)
+            n_art = normalize_artist(clean_artist)
+            n_tit = normalize_title(clean_title)
+            r_tit = _robust_norm_title(clean_title)
+            prepared.append((clean_title, clean_artist, n_tit, n_art, r_tit, dur))
+            if n_art:
+                norm_artists.add(n_art)
+
+        candidates_by_artist: Dict[str, List[Track]] = {}
+        if norm_artists:
+            query = select(Track).where(
+                and_(
+                    Track.normalized_artist.in_(norm_artists),
+                    Track.is_unavailable == False,
+                )
+            )
+            res = await s.execute(query)
+            for t in res.scalars().all():
+                norm_a = t.normalized_artist or ""
+                if norm_a not in candidates_by_artist:
+                    candidates_by_artist[norm_a] = []
+                candidates_by_artist[norm_a].append(t)
+
+        results: List[Optional[Track]] = []
+        for clean_title, clean_artist, n_tit, n_art, r_tit, dur in prepared:
+            candidates = candidates_by_artist.get(n_art, [])
+            best_candidate = None
+            best_score = -1
+            for cand in candidates:
+                score = _score_candidate(cand, clean_title, clean_artist, n_tit, n_art, r_tit, dur)
+                if score > best_score:
+                    best_score = score
+                    best_candidate = cand
+
+            if best_candidate:
+                results.append(best_candidate)
+            else:
+                found = await _find_existing_track(clean_title, clean_artist, dur, session=s)
+                results.append(found)
+
+        return results
+
+    if session:
+        return await _execute_batch(session)
+    async with get_session() as new_session:
+        return await _execute_batch(new_session)
 
 
 class IngestionPipeline:
