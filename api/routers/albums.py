@@ -400,9 +400,12 @@ async def get_album(
             try:
                 tracklist_data = json.loads(album.full_tracklist)
                 
-                # Create lookup by normalized title
+                # Create lookup by track_number and by normalized title
+                tracks_by_pos = {}
                 tracks_by_title = {}
                 for track, at in rows:
+                    if at.track_number and at.track_number > 0:
+                        tracks_by_pos[at.track_number] = track
                     norm_title = normalize_title(track.title or "")
                     tracks_by_title[norm_title] = track
                 
@@ -410,9 +413,12 @@ async def get_album(
                 for item in tracklist_data:
                     item_title = item.get("title", "")
                     norm_item_title = normalize_title(item_title)
+                    item_num = item.get("track_number", 0)
                     
                     matched_track = None
-                    if norm_item_title in tracks_by_title:
+                    if item_num and item_num in tracks_by_pos:
+                        matched_track = tracks_by_pos[item_num]
+                    elif norm_item_title in tracks_by_title:
                         matched_track = tracks_by_title[norm_item_title]
                     else:
                         best_match_score = 0.0
@@ -422,11 +428,13 @@ async def get_album(
                                 best_match_score = score
                                 matched_track = track
                     
+                    effective_duration = (matched_track.duration if matched_track and matched_track.duration else None) or item.get("duration", 0)
+                    
                     tracklist_item = AlbumTracklistItem(
                         track_number=item.get("track_number", 0),
                         title=item_title,
                         artist=item.get("artist", ""),
-                        duration=item.get("duration", 0),
+                        duration=effective_duration,
                         deezer_id=item.get("deezer_id"),
                         in_library=matched_track.id in user_library_ids if matched_track else False,
                         track_id=matched_track.id if matched_track else None,
@@ -479,9 +487,12 @@ async def get_album(
             try:
                 tracklist_data = json.loads(album.full_tracklist)
                 
-                # Use ALL album tracks for matching, not just user's library
+                # Use ALL album tracks for matching: lookup by position and normalized title
+                all_tracks_by_pos = {}
                 all_tracks_by_title = {}
                 for track, at in all_album_rows:
+                    if at.track_number and at.track_number > 0:
+                        all_tracks_by_pos[at.track_number] = track
                     norm_title = normalize_title(track.title or "")
                     all_tracks_by_title[norm_title] = track
                 
@@ -489,10 +500,12 @@ async def get_album(
                 for item in tracklist_data:
                     item_title = item.get("title", "")
                     norm_item_title = normalize_title(item_title)
+                    item_num = item.get("track_number", 0)
                     
                     matched_track = None
-                    
-                    if norm_item_title in all_tracks_by_title:
+                    if item_num and item_num in all_tracks_by_pos:
+                        matched_track = all_tracks_by_pos[item_num]
+                    elif norm_item_title in all_tracks_by_title:
                         matched_track = all_tracks_by_title[norm_item_title]
                     else:
                         best_match_score = 0.0
@@ -514,11 +527,13 @@ async def get_album(
                         else:
                             track_response = track_to_response(matched_track, in_library=False)
                     
+                    effective_duration = (matched_track.duration if matched_track and matched_track.duration else None) or item.get("duration", 0)
+                    
                     tracklist_item = AlbumTracklistItem(
                         track_number=item.get("track_number", 0),
                         title=item_title,
                         artist=item.get("artist", ""),
-                        duration=item.get("duration", 0),
+                        duration=effective_duration,
                         deezer_id=item.get("deezer_id"),
                         in_library=in_library,
                         track_id=matched_track.id if matched_track else None,
@@ -555,13 +570,21 @@ async def get_album(
         db_tags = await get_albums_tags(db, [album.id], limit_per_album=5)
         album_tags = db_tags.get(album.id) or None
     
+    # Calculate track_count: count unique album tracks present in the response
+    if full_tracklist:
+        actual_track_count = sum(1 for it in full_tracklist if it.track)
+    else:
+        actual_track_count = len(set(t.id for t in tracks))
+        if album.total_tracks and actual_track_count > album.total_tracks:
+            actual_track_count = album.total_tracks
+            
     return AlbumDetailResponse(
         id=album.id,
         name=album.name,
         artist=album.artist,
         cover_url=album.cover_url,
         release_date=album.release_date,
-        track_count=len(tracks),
+        track_count=actual_track_count,
         total_tracks=album.total_tracks,
         deezer_album_id=album.deezer_album_id,
         has_full_tracklist=bool(album.full_tracklist),

@@ -70,7 +70,7 @@ class AlbumService:
                 if album:
                     # Update with any new info
                     await self._update_album_if_needed(
-                        album, cover_url, release_date, full_tracklist
+                        album, cover_url, release_date, full_tracklist, deezer_album_id, total_tracks
                     )
                     return album.id
             
@@ -85,10 +85,8 @@ class AlbumService:
             for candidate in candidates:
                 if fuzzy_match_album(album_name, candidate.name) >= ALBUM_MATCH_THRESHOLD:
                     await self._update_album_if_needed(
-                        candidate, cover_url, release_date, full_tracklist
+                        candidate, cover_url, release_date, full_tracklist, deezer_album_id, total_tracks
                     )
-                    if deezer_album_id and not candidate.deezer_album_id:
-                        candidate.deezer_album_id = deezer_album_id
                     return candidate.id
             
             # Create new album
@@ -115,14 +113,35 @@ class AlbumService:
         cover_url: Optional[str],
         release_date: Optional[str],
         full_tracklist: Optional[List[dict]] = None,
+        deezer_album_id: Optional[int] = None,
+        total_tracks: Optional[int] = None,
     ):
-        """Update album with new info if current is missing"""
+        """Update album with new info if current is missing or can be improved"""
         if cover_url and not album.cover_url:
             album.cover_url = cover_url
         if release_date and not album.release_date:
             album.release_date = release_date
-        if full_tracklist and not album.full_tracklist:
-            album.full_tracklist = json.dumps(full_tracklist)
+        if deezer_album_id and not album.deezer_album_id:
+            album.deezer_album_id = deezer_album_id
+        if total_tracks and (not album.total_tracks or album.total_tracks == 0):
+            album.total_tracks = total_tracks
+            
+        # Update full_tracklist if missing or if the new one is more complete (has durations)
+        if full_tracklist:
+            if not album.full_tracklist:
+                album.full_tracklist = json.dumps(full_tracklist)
+                if not album.total_tracks:
+                    album.total_tracks = len(full_tracklist)
+            else:
+                try:
+                    existing_list = json.loads(album.full_tracklist)
+                    existing_has_zero_durs = any(not it.get("duration") for it in existing_list)
+                    new_has_durs = any(bool(it.get("duration")) for it in full_tracklist)
+                    if existing_has_zero_durs and new_has_durs:
+                        album.full_tracklist = json.dumps(full_tracklist)
+                        album.total_tracks = len(full_tracklist)
+                except Exception:
+                    album.full_tracklist = json.dumps(full_tracklist)
         album.updated_at = utcnow()
     
     async def assign_track_to_album(
@@ -140,7 +159,7 @@ class AlbumService:
             track_number: Position in album (1-based)
         """
         async with get_session() as session:
-            # Check if already assigned
+            # 1. Check if this exact track is already assigned to this album
             result = await session.execute(
                 select(AlbumTrack).where(
                     and_(
@@ -156,6 +175,37 @@ class AlbumService:
                 if track_number is not None and existing.track_number != track_number:
                     existing.track_number = track_number
                 return
+            
+            # 2. Prevent duplicate tracks on the same track_number position
+            if track_number and track_number > 0:
+                pos_result = await session.execute(
+                    select(AlbumTrack, Track)
+                    .join(Track, Track.id == AlbumTrack.track_id)
+                    .where(
+                        AlbumTrack.album_id == album_id,
+                        AlbumTrack.track_number == track_number,
+                    )
+                )
+                existing_at_pos = pos_result.first()
+                if existing_at_pos:
+                    existing_at, existing_t = existing_at_pos
+                    new_track = await session.get(Track, track_id)
+                    
+                    # If existing track is unavailable and new track is available, replace it
+                    if existing_t.is_unavailable and new_track and not new_track.is_unavailable:
+                        logger.info(
+                            f"Replacing unavailable track {existing_t.id} with available track {track_id} "
+                            f"at position {track_number} in album {album_id}"
+                        )
+                        existing_at.track_id = track_id
+                        return
+                    else:
+                        # Position already taken - don't add duplicate
+                        logger.debug(
+                            f"Album {album_id} position {track_number} already occupied by track {existing_t.id}. "
+                            f"Skipping duplicate assignment for track {track_id}."
+                        )
+                        return
             
             # Create assignment
             album_track = AlbumTrack(
@@ -246,22 +296,22 @@ class AlbumService:
                 )
                 return None
             
-            # Load full tracklist - Last.fm first (richer database), Deezer fallback
+            # Load full tracklist - Deezer first (has accurate durations, track positions and deezer IDs), Last.fm fallback
             full_tracklist = None
             total_tracks = None
             
-            # Try Last.fm first (richer database, more albums)
-            if track.artist:
-                full_tracklist = await self._fetch_album_tracklist_lastfm(
-                    album_name=enrichment.album_name,
-                    artist_name=track.artist,
-                )
-            
-            # Fallback to Deezer if Last.fm unavailable
-            if not full_tracklist and enrichment.deezer_album_id:
+            # 1. Try Deezer first if deezer_album_id available
+            if enrichment.deezer_album_id:
                 full_tracklist = await self._fetch_album_tracklist(
                     enrichment.deezer_album_id,
                     expected_artist=track.artist,
+                )
+            
+            # 2. Fallback to Last.fm if Deezer unavailable
+            if not full_tracklist and track.artist:
+                full_tracklist = await self._fetch_album_tracklist_lastfm(
+                    album_name=enrichment.album_name,
+                    artist_name=track.artist,
                 )
             
             if full_tracklist:

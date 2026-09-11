@@ -27,7 +27,7 @@
         <p class="hero-meta">
           <span v-if="album.release_date">{{ formatYear(album.release_date) }} • </span>
           <span v-if="album.total_tracks">
-            {{ album.track_count }}/{{ album.total_tracks }} треков
+            {{ Math.min(album.track_count, album.total_tracks) }}/{{ album.total_tracks }} треков
           </span>
           <span v-else>{{ album.track_count }} треков</span>
         </p>
@@ -93,7 +93,7 @@
             </span>
           </div>
           
-          <span class="track-duration">{{ formatDuration(item.duration) }}</span>
+          <span class="track-duration">{{ formatDuration(item.track?.duration || item.duration) }}</span>
           
           <!-- Add to library button for tracks not in user's library -->
           <button

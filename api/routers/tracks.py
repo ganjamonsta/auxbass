@@ -1138,6 +1138,12 @@ async def mark_unavailable(
     if not track:
         raise HTTPException(status_code=404, detail="Track not found")
     
+    # Do not mark tracks > 20MB as unavailable — they are valid files that cannot
+    # be streamed via standard Telegram Bot API getFile, but are available for download.
+    if track.file_size and track.file_size > 20 * 1024 * 1024:
+        logger.info(f"Ignoring mark_unavailable for large track {track_id} ({track.file_size} bytes)")
+        return {"status": "ignored_large_file", "track_id": track_id}
+    
     # Only mark if not already unavailable
     if not track.is_unavailable:
         track.is_unavailable = True
