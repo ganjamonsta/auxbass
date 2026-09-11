@@ -97,7 +97,7 @@
                 @click="handleQuickPlaySoundCloud(item)"
               >
                 <div class="sc-track-cover">
-                  <img v-if="item.cover_url" :src="item.cover_url" alt="" loading="lazy" />
+                  <img v-if="item.cover_url" :src="item.cover_url" alt="" loading="lazy" referrerpolicy="no-referrer" />
                   <Music v-else :size="20" />
                   <div v-if="importingTrackUrl === item.url" class="sc-track-loading">
                     <div class="spinner small"></div>
@@ -412,7 +412,7 @@
               @click="handleQuickPlaySoundCloud(item)"
             >
               <div class="sc-track-cover">
-                <img v-if="item.cover_url" :src="item.cover_url" alt="" loading="lazy" />
+                <img v-if="item.cover_url" :src="item.cover_url" alt="" loading="lazy" referrerpolicy="no-referrer" />
                 <Music v-else :size="20" />
                 <div v-if="importingTrackUrl === item.url" class="sc-track-loading">
                   <div class="spinner small"></div>
@@ -436,6 +436,20 @@
                   <Plus :size="16" />
                 </button>
               </div>
+            </div>
+
+            <!-- Load More SoundCloud Button -->
+            <div class="sc-load-more-wrap">
+              <button 
+                v-if="soundcloudResults.length < 60"
+                class="sc-load-more-btn"
+                :disabled="isLoadingMoreSoundCloud"
+                @click="loadMoreSoundCloud"
+              >
+                <div v-if="isLoadingMoreSoundCloud" class="spinner small"></div>
+                <template v-else>Загрузить ещё (до 60)</template>
+              </button>
+              <span v-else class="sc-end-notice">Показаны 60 лучших результатов SoundCloud</span>
             </div>
           </div>
 
@@ -649,9 +663,10 @@ const isPlaylistsSearching = ref(false)
 // ─── SoundCloud External Search State ───
 const soundcloudResults = ref([])
 const isSoundCloudSearching = ref(false)
+const isLoadingMoreSoundCloud = ref(false)
 const importingTrackUrl = ref(null)
 
-const searchSoundCloud = async (query) => {
+const searchSoundCloud = async (query, limit = 30) => {
   const cleanQ = query.replace(/^#/, '').trim()
   if (!cleanQ || cleanQ.length < 2) {
     soundcloudResults.value = []
@@ -660,13 +675,28 @@ const searchSoundCloud = async (query) => {
 
   isSoundCloudSearching.value = true
   try {
-    const res = await ingestionApi.search(cleanQ, 'soundcloud', 15)
+    const res = await ingestionApi.search(cleanQ, 'soundcloud', limit)
     soundcloudResults.value = res.data || []
   } catch (e) {
     console.error('Failed to search SoundCloud:', e)
     soundcloudResults.value = []
   } finally {
     isSoundCloudSearching.value = false
+  }
+}
+
+const loadMoreSoundCloud = async () => {
+  const cleanQ = searchQuery.value.replace(/^#/, '').trim()
+  if (!cleanQ || isLoadingMoreSoundCloud.value) return
+  isLoadingMoreSoundCloud.value = true
+  try {
+    const targetLimit = Math.min(60, soundcloudResults.value.length + 30)
+    const res = await ingestionApi.search(cleanQ, 'soundcloud', targetLimit)
+    soundcloudResults.value = res.data || []
+  } catch (e) {
+    console.error('Failed to load more from SoundCloud:', e)
+  } finally {
+    isLoadingMoreSoundCloud.value = false
   }
 }
 
@@ -1755,5 +1785,44 @@ onUnmounted(() => {
 .sc-add-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.sc-load-more-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+  margin-bottom: 24px;
+}
+
+.sc-load-more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  background: rgba(255, 85, 0, 0.12);
+  border: 1px solid rgba(255, 85, 0, 0.3);
+  border-radius: 12px;
+  color: #ff7700;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sc-load-more-btn:hover:not(:disabled) {
+  background: #ff5500;
+  color: #fff;
+  border-color: #ff5500;
+  box-shadow: 0 4px 16px rgba(255, 85, 0, 0.3);
+}
+
+.sc-load-more-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sc-end-notice {
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.4);
 }
 </style>

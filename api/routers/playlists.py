@@ -325,7 +325,7 @@ async def get_global_playlists(
             User.username.ilike(search_term),
             User.first_name.ilike(search_term),
             User.last_name.ilike(search_term),
-            func.concat(func.coalesce(User.first_name, ''), ' ', func.coalesce(User.last_name, '')).ilike(search_term),
+            (func.coalesce(User.first_name, '') + ' ' + func.coalesce(User.last_name, '')).ilike(search_term),
         )
         search_filter = or_(
             Playlist.name.ilike(search_term),

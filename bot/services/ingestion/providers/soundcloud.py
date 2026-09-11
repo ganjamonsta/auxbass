@@ -25,7 +25,34 @@ def _improve_sc_thumbnail(thumb_url: Optional[str]) -> Optional[str]:
     """Upgrade SoundCloud thumbnail to 500x500 resolution."""
     if not thumb_url:
         return None
-    return thumb_url.replace("-large.", "-t500x500.")
+    for pattern in ("-large.", "-small.", "-badge.", "-t67x67.", "-t300x300.", "-crop."):
+        if pattern in thumb_url:
+            return thumb_url.replace(pattern, "-t500x500.")
+    return thumb_url
+
+
+def _extract_sc_thumbnail(entry: Optional[dict], fallback: Optional[str] = None) -> Optional[str]:
+    """Extract best available thumbnail from a SoundCloud entry dictionary."""
+    if not entry or not isinstance(entry, dict):
+        return _improve_sc_thumbnail(fallback)
+
+    # 1. Check thumbnails list (populated in extract_flat mode)
+    thumbnails = entry.get("thumbnails")
+    if isinstance(thumbnails, list) and thumbnails:
+        # High quality targets
+        for target_id in ("t500x500", "original", "t300x300", "crop", "large"):
+            for t in thumbnails:
+                if isinstance(t, dict) and t.get("id") == target_id and t.get("url"):
+                    return _improve_sc_thumbnail(t["url"])
+
+        # Fallback to the last one (usually highest quality)
+        for t in reversed(thumbnails):
+            if isinstance(t, dict) and t.get("url"):
+                return _improve_sc_thumbnail(t["url"])
+
+    # 2. Check direct fields
+    direct = entry.get("thumbnail") or entry.get("artwork_url") or entry.get("avatar_url") or fallback
+    return _improve_sc_thumbnail(direct)
 
 
 def _parse_artist_and_title(raw_title: str, uploader: Optional[str]) -> tuple[str, str]:
@@ -82,7 +109,7 @@ class SoundCloudProvider(BaseMusicProvider):
             entries = list(raw_entries)
             title = info.get("title") or "SoundCloud Playlist"
             author = info.get("uploader") or info.get("channel") or "SoundCloud"
-            cover = _improve_sc_thumbnail(info.get("thumbnail"))
+            cover = _extract_sc_thumbnail(info, info.get("thumbnail"))
             return SourceEntity(
                 provider_name=self.name,
                 entity_type=EntityType.PLAYLIST,
@@ -97,7 +124,7 @@ class SoundCloudProvider(BaseMusicProvider):
             raw_title = info.get("title") or "SoundCloud Track"
             uploader = info.get("uploader") or info.get("artist")
             artist, title = _parse_artist_and_title(raw_title, uploader)
-            cover = _improve_sc_thumbnail(info.get("thumbnail"))
+            cover = _extract_sc_thumbnail(info, info.get("thumbnail"))
             return SourceEntity(
                 provider_name=self.name,
                 entity_type=EntityType.TRACK,
@@ -117,7 +144,7 @@ class SoundCloudProvider(BaseMusicProvider):
             uploader = raw.get("uploader") or entity.author
             artist, title = _parse_artist_and_title(raw_title, uploader)
             duration = int(raw.get("duration") or 0) or None
-            cover = _improve_sc_thumbnail(raw.get("thumbnail") or entity.cover_url)
+            cover = _extract_sc_thumbnail(raw, entity.cover_url)
 
             return [
                 TrackMetadata(
@@ -165,7 +192,7 @@ class SoundCloudProvider(BaseMusicProvider):
             if not track_url:
                 track_url = f"{entity.url}#{idx}"
             duration = int(entry.get("duration") or 0) or None
-            cover = _improve_sc_thumbnail(entry.get("thumbnail") or entity.cover_url)
+            cover = _extract_sc_thumbnail(entry, entity.cover_url)
 
             tracks.append(
                 TrackMetadata(
@@ -247,7 +274,7 @@ class SoundCloudProvider(BaseMusicProvider):
             mime_type="audio/mpeg",
         )
 
-    async def search(self, query: str, limit: int = 15) -> List[TrackMetadata]:
+    async def search(self, query: str, limit: int = 30) -> List[TrackMetadata]:
         """Search SoundCloud for tracks matching query."""
         clean_query = query.strip()
         if not clean_query:
@@ -281,7 +308,7 @@ class SoundCloudProvider(BaseMusicProvider):
             if not track_url:
                 continue
             duration = int(entry.get("duration") or 0) or None
-            cover = _improve_sc_thumbnail(entry.get("thumbnail"))
+            cover = _extract_sc_thumbnail(entry)
 
             results.append(
                 TrackMetadata(

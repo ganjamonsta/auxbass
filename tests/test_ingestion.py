@@ -141,3 +141,32 @@ async def test_job_manager_selective_import():
     d = job.to_dict()
     assert d["selected_urls"] == selected
 
+
+@pytest.mark.asyncio
+async def test_soundcloud_search_thumbnails_list_mock(monkeypatch):
+    sc = SoundCloudProvider()
+
+    async def mock_to_thread(func):
+        return {
+            "entries": [
+                {
+                    "title": "andy warhol",
+                    "uploader": "Kai Angel & 9mice",
+                    "webpage_url": "https://soundcloud.com/test/andy-warhol",
+                    "duration": 173,
+                    "thumbnail": None,
+                    "thumbnails": [
+                        {"id": "mini", "url": "https://i1.sndcdn.com/artworks-123-mini.jpg"},
+                        {"id": "t500x500", "url": "https://i1.sndcdn.com/artworks-123-t500x500.jpg"},
+                    ],
+                    "id": "999888",
+                }
+            ]
+        }
+
+    monkeypatch.setattr(asyncio, "to_thread", mock_to_thread)
+    results = await sc.search("andy warhol", limit=1)
+    assert len(results) == 1
+    assert results[0].cover_url == "https://i1.sndcdn.com/artworks-123-t500x500.jpg"
+
+

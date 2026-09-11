@@ -295,7 +295,7 @@ async def get_recent_jobs(
 async def search_external_tracks(
     q: str = Query(..., min_length=1),
     provider: str = Query("soundcloud"),
-    limit: int = Query(15, ge=1, le=50),
+    limit: int = Query(30, ge=1, le=100),
     user: TelegramUser = Depends(get_current_user),
 ):
     """Search external music platforms (SoundCloud) by keyword."""
