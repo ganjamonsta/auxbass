@@ -231,7 +231,11 @@
                   v-for="(track, idx) in previewData.tracks" 
                   :key="track.url || idx"
                   class="track-row"
-                  :class="{ selected: selectedUrls.has(track.url), 'in-library': track.in_library }"
+                  :class="{ 
+                    selected: selectedUrls.has(track.url), 
+                    'in-library': track.in_library,
+                    'now-playing': isTrackPlaying(track) 
+                  }"
                   @click="toggleTrack(track.url)"
                 >
                   <div class="track-checkbox" :class="{ checked: selectedUrls.has(track.url) }">
@@ -240,13 +244,30 @@
 
                   <span class="track-index">{{ idx + 1 }}</span>
 
-                  <div class="track-thumb">
+                  <!-- Track thumbnail with quick play overlay -->
+                  <div 
+                    class="track-thumb"
+                    :class="{ 'is-playing': isTrackPlaying(track), 'is-loading': previewLoadingUrl === track.url }"
+                    @click.stop="handlePreviewTrack(track, $event)"
+                    :title="isTrackPlaying(track) ? 'Пауза' : 'Слушать аудио'"
+                  >
                     <img v-if="track.cover_url" :src="track.cover_url" alt="" loading="lazy" />
                     <Music v-else :size="14" />
+
+                    <div class="thumb-play-overlay">
+                      <div v-if="previewLoadingUrl === track.url" class="spinner micro"></div>
+                      <Pause v-else-if="isTrackPlaying(track)" :size="13" fill="currentColor" />
+                      <Play v-else :size="13" fill="currentColor" />
+                    </div>
                   </div>
 
                   <div class="track-meta">
-                    <div class="track-title" :title="track.title">{{ track.title }}</div>
+                    <div class="track-title" :title="track.title">
+                      <span class="title-text">{{ track.title }}</span>
+                      <span v-if="isTrackPlaying(track)" class="playing-indicator" title="Сейчас играет">
+                        <Volume2 :size="13" />
+                      </span>
+                    </div>
                     <div class="track-artist-row">
                       <span class="track-artist" :title="track.artist">{{ track.artist }}</span>
                       <span v-if="track.album" class="track-album" :title="track.album">• {{ track.album }}</span>
@@ -266,8 +287,19 @@
                     </span>
                   </div>
 
-                  <div class="track-duration">
-                    {{ formatDuration(track.duration) }}
+                  <!-- Preview play action and duration -->
+                  <div class="track-actions-right">
+                    <button 
+                      class="track-row-play-btn"
+                      :class="{ 'is-playing': isTrackPlaying(track), 'is-loading': previewLoadingUrl === track.url }"
+                      @click.stop="handlePreviewTrack(track, $event)"
+                      :title="isTrackPlaying(track) ? 'Пауза' : 'Слушать аудио'"
+                    >
+                      <div v-if="previewLoadingUrl === track.url" class="spinner micro"></div>
+                      <Pause v-else-if="isTrackPlaying(track)" :size="12" fill="currentColor" />
+                      <Play v-else :size="12" fill="currentColor" />
+                    </button>
+                    <span class="track-duration">{{ formatDuration(track.duration) }}</span>
                   </div>
                 </div>
               </div>
@@ -312,10 +344,14 @@ import {
   Music2,
   Zap,
   RefreshCw,
+  Play,
+  Pause,
+  Volume2,
 } from 'lucide-vue-next'
 import { ingestionApi } from '@/api/client'
 import { useUIStore } from '@/stores/ui'
 import { useLibraryStore } from '@/stores/library'
+import { usePlayerStore } from '@/stores/player'
 
 const props = defineProps({
   show: {
@@ -328,6 +364,10 @@ const emit = defineEmits(['close', 'imported'])
 
 const uiStore = useUIStore()
 const libraryStore = useLibraryStore()
+const playerStore = usePlayerStore()
+
+const playingTrackUrl = ref(null)
+const previewLoadingUrl = ref(null)
 
 const fileInputRef = ref(null)
 const isDragging = ref(false)
@@ -463,6 +503,61 @@ const toggleTrack = (url) => {
     next.add(url)
   }
   selectedUrls.value = next
+}
+
+const isTrackPlaying = (track) => {
+  if (!playerStore.isPlaying) return false
+  if (track.track_id && playerStore.currentTrack?.id === track.track_id) return true
+  return playingTrackUrl.value === track.url
+}
+
+const handlePreviewTrack = async (track, event) => {
+  if (event) {
+    event.stopPropagation()
+  }
+
+  // If already playing this track, toggle play/pause
+  if (isTrackPlaying(track)) {
+    playerStore.togglePlay()
+    return
+  }
+
+  // If already in player as current track, just resume
+  if (
+    (track.track_id && playerStore.currentTrack?.id === track.track_id) ||
+    playingTrackUrl.value === track.url
+  ) {
+    playerStore.togglePlay()
+    return
+  }
+
+  if (previewLoadingUrl.value) return
+  previewLoadingUrl.value = track.url
+
+  try {
+    const res = await ingestionApi.quickImport({
+      url: track.url,
+      title: track.title,
+      artist: track.artist,
+      duration: track.duration,
+      cover_url: track.cover_url,
+      add_to_library: false,
+    })
+
+    const resolved = res.data?.track
+    if (resolved) {
+      track.track_id = resolved.id
+      track.already_in_tg = true
+      playingTrackUrl.value = track.url
+      playerStore.playTrack(resolved, [resolved], 0)
+    }
+  } catch (err) {
+    console.error('Failed to preview track:', err)
+    const msg = err.response?.data?.detail || 'Не удалось воспроизвести трек'
+    uiStore.toast?.error('Ошибка воспроизведения', msg)
+  } finally {
+    previewLoadingUrl.value = null
+  }
 }
 
 const resetPreview = () => {
@@ -1028,6 +1123,7 @@ watch(
 }
 
 .track-thumb {
+  position: relative;
   width: 36px;
   height: 36px;
   border-radius: 6px;
@@ -1038,6 +1134,88 @@ watch(
   align-items: center;
   justify-content: center;
   color: #64748b;
+  cursor: pointer;
+}
+
+.thumb-play-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.track-thumb:hover .thumb-play-overlay,
+.track-thumb.is-playing .thumb-play-overlay,
+.track-thumb.is-loading .thumb-play-overlay {
+  opacity: 1;
+}
+
+.track-thumb.is-playing .thumb-play-overlay {
+  color: #1ed760;
+}
+
+.track-row.now-playing {
+  border-left: 2px solid #1db954;
+  background: rgba(29, 185, 84, 0.12) !important;
+}
+
+.playing-indicator {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  color: #1ed760;
+  vertical-align: middle;
+}
+
+.track-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.track-row-play-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.track-row-play-btn:hover {
+  background: rgba(29, 185, 84, 0.2);
+  border-color: rgba(29, 185, 84, 0.4);
+  color: #1ed760;
+  transform: scale(1.08);
+}
+
+.track-row-play-btn.is-playing {
+  background: #1db954;
+  border-color: #1db954;
+  color: #000000;
+}
+
+.track-row-play-btn.is-loading {
+  background: rgba(255, 255, 255, 0.05);
+  cursor: wait;
+}
+
+.spinner.micro {
+  width: 12px;
+  height: 12px;
+  border-width: 1.5px;
 }
 
 .track-thumb img {

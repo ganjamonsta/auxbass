@@ -516,7 +516,8 @@
             >
               <Heart :size="15" />
               <span>Мои лайки</span>
-              <span v-if="scAccount?.likes_count" class="sc-subtab-count">{{ scAccount.likes_count }}</span>
+              <span v-if="searchQuery.trim()" class="sc-subtab-count">{{ filteredScLikes.length }}</span>
+              <span v-else-if="scAccount?.likes_count" class="sc-subtab-count">{{ scAccount.likes_count }}</span>
             </button>
           </div>
 
@@ -671,10 +672,18 @@
               <span>Загрузка лайков с SoundCloud...</span>
             </div>
 
+            <!-- Active Search Filter Banner for Likes -->
+            <div v-if="searchQuery.trim() && scLikes.length > 0" class="sc-likes-filter-notice">
+              <span>Фильтр лайков: <b>«{{ searchQuery.trim() }}»</b> (найдено {{ filteredScLikes.length }})</span>
+              <button class="clear-filter-mini-btn" @click="clearSearchInput" title="Сбросить фильтр поиска">
+                ✕ Сбросить
+              </button>
+            </div>
+
             <!-- Likes Track List -->
-            <div v-else-if="scLikes.length > 0" class="sc-results-list full-list">
+            <div v-if="filteredScLikes.length > 0" class="sc-results-list full-list">
               <div
-                v-for="item in scLikes"
+                v-for="item in filteredScLikes"
                 :key="item.url"
                 class="sc-track-item"
                 @click="handleQuickPlaySoundCloud(item)"
@@ -730,11 +739,36 @@
               <div v-if="scLikesCursor" class="sc-load-more-wrap">
                 <button 
                   class="sc-load-more-btn"
-                  :disabled="isLoadingMoreScLikes"
-                  @click="loadMoreScLikes"
+                  :disabled="isLoadingMoreScLikes || isSearchingDeeperLikes"
+                  @click="searchQuery.trim() ? loadAllLikesUntilMatch() : loadMoreScLikes()"
                 >
-                  <div v-if="isLoadingMoreScLikes" class="spinner small"></div>
-                  <template v-else>Загрузить ещё лайки</template>
+                  <div v-if="isLoadingMoreScLikes || isSearchingDeeperLikes" class="spinner small"></div>
+                  <template v-else>
+                    {{ searchQuery.trim() ? 'Искать глубже в остальных лайках' : `Загрузить ещё лайки (${scLikes.length} из ${scAccount?.likes_count || '...'})` }}
+                  </template>
+                </button>
+              </div>
+            </div>
+
+            <!-- No results in likes matching query -->
+            <div v-else-if="searchQuery.trim() && scLikes.length > 0 && !isScLikesLoading" class="no-results-box">
+              <p class="no-results-text">В загруженных лайках нет треков по запросу «{{ searchQuery }}»</p>
+              <p class="no-results-hint">
+                Проверено {{ scLikes.length }} из {{ scAccount?.likes_count || scLikes.length }} лайков вашего профиля.
+              </p>
+              <div class="sc-no-results-actions">
+                <button 
+                  v-if="scLikesCursor"
+                  class="sc-load-more-btn"
+                  :disabled="isLoadingMoreScLikes || isSearchingDeeperLikes"
+                  @click="loadAllLikesUntilMatch"
+                >
+                  <div v-if="isLoadingMoreScLikes || isSearchingDeeperLikes" class="spinner small"></div>
+                  <template v-else>Искать дальше в остальных лайках</template>
+                </button>
+                <button class="sc-load-more-btn sc-global-fallback-btn" @click="scSubTab = 'search'">
+                  <Globe :size="15" />
+                  <span>Искать во всём каталоге SoundCloud</span>
                 </button>
               </div>
             </div>
@@ -1253,13 +1287,88 @@ const switchToLikesTab = () => {
   }
 }
 
-const unimportedLikesCount = computed(() => {
-  return scLikes.value.filter(t => !t.in_library).length
+const isSearchingDeeperLikes = ref(false)
+
+function isCloseMatch(term, text) {
+  if (!term || !text) return false
+  if (text.includes(term)) return true
+
+  // Word-by-word comparison
+  const words = text.split(/[\s\-_|,./()\[\]]+/).filter(w => w.length >= 4)
+  for (const word of words) {
+    if (word.includes(term) || term.includes(word)) return true
+    if (term.length >= 5 && Math.abs(term.length - word.length) <= 2) {
+      let prev = []
+      for (let j = 0; j <= word.length; j++) prev[j] = j
+      for (let i = 1; i <= term.length; i++) {
+        const curr = [i]
+        for (let j = 1; j <= word.length; j++) {
+          const cost = term[i - 1] === word[j - 1] ? 0 : 1
+          curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost)
+        }
+        prev = curr
+      }
+      const maxDist = term.length >= 8 ? 2 : 1
+      if (prev[word.length] <= maxDist) return true
+    }
+  }
+  return false
+}
+
+const filteredScLikes = computed(() => {
+  const q = searchQuery.value?.trim().toLowerCase()
+  if (!q) return scLikes.value
+
+  const terms = q.split(/\s+/).filter(Boolean)
+
+  return scLikes.value.filter(track => {
+    const title = (track.title || '').toLowerCase()
+    const artist = (track.artist || '').toLowerCase()
+    const album = (track.album || '').toLowerCase()
+    const combined = `${artist} ${title} ${album}`
+
+    return terms.every(term => isCloseMatch(term, combined))
+  })
 })
+
+const unimportedLikesCount = computed(() => {
+  const targetList = searchQuery.value?.trim() ? filteredScLikes.value : scLikes.value
+  return targetList.filter(t => !t.in_library).length
+})
+
+const loadAllLikesUntilMatch = async () => {
+  if (isSearchingDeeperLikes.value || !scLikesCursor.value) return
+  isSearchingDeeperLikes.value = true
+  try {
+    let pages = 0
+    while (scLikesCursor.value && pages < 6) {
+      pages++
+      const res = await ingestionApi.getSoundCloudLikes({ cursor: scLikesCursor.value, limit: 50 })
+      const more = res.data?.items || []
+      if (more.length === 0) break
+      scLikes.value = [...scLikes.value, ...more]
+      scLikesCursor.value = res.data?.next_cursor || null
+      if (filteredScLikes.value.length > 0 || !scLikesCursor.value) {
+        break
+      }
+    }
+    if (filteredScLikes.value.length > 0) {
+      uiStore.toast?.success('Найдено', `Найдено треков в лайках: ${filteredScLikes.value.length}`)
+    } else if (!scLikesCursor.value) {
+      uiStore.toast?.info('Поиск завершён', 'Проверены все доступные лайки вашего профиля')
+    }
+  } catch (e) {
+    console.error('Failed to load deeper SoundCloud likes:', e)
+    uiStore.toast?.error('Ошибка', 'Не удалось загрузить следующие страницы лайков')
+  } finally {
+    isSearchingDeeperLikes.value = false
+  }
+}
 
 const handleSyncAllLikes = async () => {
   if (isSyncingAllLikes.value) return
-  const toImport = scLikes.value.filter(t => !t.in_library)
+  const targetList = searchQuery.value?.trim() ? filteredScLikes.value : scLikes.value
+  const toImport = targetList.filter(t => !t.in_library)
   if (toImport.length === 0) {
     uiStore.toast?.info('Синхронизация', 'Все треки из лайков уже в вашей медиатеке!')
     return
@@ -1648,8 +1757,11 @@ const getChipBadge = (chipId) => {
     return totalTracksCount.value > 0 ? totalTracksCount.value : null
   }
   if (chipId === 'soundcloud') {
-    if (scSubTab.value === 'likes' && scLikes.value.length > 0) {
-      return scLikes.value.length
+    if (scSubTab.value === 'likes') {
+      if (searchQuery.value?.trim()) {
+        return filteredScLikes.value.length
+      }
+      return scLikes.value.length > 0 ? scLikes.value.length : (scAccount.value?.likes_count || null)
     }
     return soundcloudResults.value.length > 0 ? soundcloudResults.value.length : (scAccount.value?.connected ? '★' : null)
   }
@@ -2811,6 +2923,50 @@ onUnmounted(() => {
   padding: 1px 6px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.2);
+}
+
+.sc-likes-filter-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: rgba(255, 85, 0, 0.1);
+  border: 1px solid rgba(255, 85, 0, 0.25);
+  border-radius: 10px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--c-text-1);
+}
+
+.clear-filter-mini-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 6px;
+  color: #ffaa77;
+  font-size: 11px;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.clear-filter-mini-btn:hover {
+  background: rgba(255, 85, 0, 0.25);
+  color: #fff;
+}
+
+.sc-no-results-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.sc-global-fallback-btn {
+  background: #ff5500 !important;
+  color: #fff !important;
+  border-color: #ff5500 !important;
 }
 
 .sc-likes-header-card {
