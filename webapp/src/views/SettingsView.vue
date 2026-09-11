@@ -246,12 +246,16 @@
             <input 
               v-model="spTokenInput" 
               type="password" 
-              placeholder="Значение cookie sp_dc из браузера"
+              placeholder="Токен сессии (sp_dc или Access Token BQC...)"
               class="sc-input token-input"
               :disabled="isConnectingSp"
             />
             <span class="sc-hint">
-              В браузере откройте open.spotify.com -> F12 -> Application -> Cookies -> скопируйте значение cookie <b>sp_dc</b>.
+              В браузере откройте open.spotify.com ➔ F12 ➔ <b>Console</b> ➔ вставьте строчку:
+              <br/>
+              <code style="font-size: 11px; user-select: all; background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 4px;">copy((await (await fetch('/get_access_token?reason=transport&productType=web_player')).json()).accessToken)</code>
+              <br/>
+              Токен скопируется в буфер обмена автоматически! Либо скопируйте cookie <b>sp_dc</b> из Application ➔ Cookies.
             </span>
           </div>
         </div>

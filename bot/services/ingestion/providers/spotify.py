@@ -224,22 +224,45 @@ class SpotifyProvider(BaseMusicProvider):
 
     async def _get_access_token_from_sp_dc(self, sp_dc: str) -> Tuple[str, Optional[str]]:
         """
-        Exchange browser cookie sp_dc for an authorized user accessToken.
+        Exchange browser cookie sp_dc for an authorized user accessToken,
+        or accept direct Bearer accessToken (starts with BQ...).
         Returns (access_token, user_client_id).
         """
-        clean_dc = sp_dc.strip().strip('"').strip("'")
+        raw = sp_dc.strip().strip('"').strip("'")
+        if raw.startswith("Bearer "):
+            raw = raw[7:].strip()
+
+        # If user directly provided an Access Token (starts with BQ...)
+        if raw.startswith("BQ") or (len(raw) > 100 and "=" not in raw and "_" not in raw[:30]):
+            return raw, None
+
         token_url = "https://open.spotify.com/get_access_token?reason=transport&productType=web_player"
         headers = {
-            "User-Agent": self.USER_AGENT,
-            "Cookie": f"sp_dc={clean_dc}",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Cookie": f"sp_dc={raw}",
             "Accept": "application/json",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Referer": "https://open.spotify.com/",
+            "Origin": "https://open.spotify.com",
+            "sec-ch-ua": '"Chromium";v="124", "Google Chrome";v="124"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"Windows"',
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-origin",
+            "app-platform": "WebPlayer",
+            "spotify-app-version": "1.2.37.525.g980753d0",
         }
 
         async with aiohttp.ClientSession(headers=headers) as session:
             async with session.get(token_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 if resp.status != 200:
                     text = await resp.text()
-                    raise ValueError(f"Не удалось авторизовать sp_dc токен в Spotify (HTTP {resp.status}): {text[:80]}")
+                    raise ValueError(
+                        f"Spotify отклонил сессию (HTTP {resp.status}). "
+                        f"Если вы ввели sp_dc, попробуйте скопировать Access Token напрямую из консоли браузера на open.spotify.com: "
+                        f"copy((await (await fetch('/get_access_token?reason=transport&productType=web_player')).json()).accessToken)"
+                    )
                 data = await resp.json()
 
         access_token = data.get("accessToken")
@@ -247,7 +270,7 @@ class SpotifyProvider(BaseMusicProvider):
         if not access_token or is_anonymous:
             raise ValueError(
                 "Недействительный токен sp_dc или сессия истекла. "
-                "Пожалуйста, скопируйте свежее значение cookie 'sp_dc' из браузера."
+                "Пожалуйста, скопируйте свежее значение токена из браузера."
             )
 
         client_id = data.get("clientId")
