@@ -8,48 +8,30 @@
       description="Все альбомы, доступные в системе"
     />
 
-    <!-- Unified Toolbar: Back button + Title + Controls + Expandable Search -->
+    <!-- Action Bar: Sort & Expandable Search -->
     <div class="library-toolbar" :class="{ 'search-active': isSearchOpen }">
-      <!-- Left side: Back button and Section Title (hidden when search is open) -->
-      <div v-if="!isSearchOpen" class="toolbar-left">
-        <button 
-          v-if="showBack" 
-          type="button"
-          class="subtab-back-btn" 
-          @click="$emit('back')"
-          title="Все разделы"
-        >
-          <ChevronLeft :size="18" />
-          <span>Все разделы</span>
-        </button>
-        <h1 class="toolbar-section-title">Альбомы</h1>
-      </div>
-
-      <!-- Right side: Controls & Expandable Search (controls pressed up to search) -->
-      <div class="toolbar-right">
-        <!-- Sort controls (hidden when search is open) -->
-        <div v-if="!isSearchOpen" class="toolbar-controls">
-          <div class="stats" v-if="virtualGridRef?.total">
-            {{ virtualGridRef?.total }}
-          </div>
-          <SortChips
-            :currentOption="currentOption"
-            :sortOrder="sortOrder"
-            @next="onNextSort"
-            @toggle-order="onToggleOrder"
-          />
-        </div>
-
-        <!-- Expandable Search -->
-        <ExpandableSearch
-          v-model="localQuery"
-          v-model:open="isSearchOpen"
-          placeholder="Поиск альбомов..."
-          title="Поиск альбомов"
-          @input="onSearchInput"
-          @clear="onSearchClear"
+      <!-- Sort controls (hidden when search is open) -->
+      <div v-if="!isSearchOpen" class="toolbar-controls">
+        <SortChips
+          :currentOption="currentOption"
+          :sortOrder="sortOrder"
+          @next="onNextSort"
+          @toggle-order="onToggleOrder"
         />
+        <div class="stats" v-if="virtualGridRef?.total">
+          {{ virtualGridRef?.total }}
+        </div>
       </div>
+
+      <!-- Expandable Search -->
+      <ExpandableSearch
+        v-model="localQuery"
+        v-model:open="isSearchOpen"
+        placeholder="Поиск альбомов..."
+        title="Поиск альбомов"
+        @input="onSearchInput"
+        @clear="onSearchClear"
+      />
     </div>
 
     <!-- Spotify-style virtual grid -->
@@ -94,7 +76,7 @@ import ExpandableSearch from '@/components/ui/ExpandableSearch.vue'
 import VirtualGrid from '@/components/VirtualGrid.vue'
 import InfoBanner from '@/components/InfoBanner.vue'
 import api from '@/api/client'
-import { Disc3, ChevronLeft, Search } from 'lucide-vue-next'
+import { Disc3, Search } from 'lucide-vue-next'
 
 // Universal context menu
 const { openMenu } = useContextMenu()
@@ -264,68 +246,11 @@ defineExpose({
   margin-bottom: 16px;
   gap: 12px;
   min-height: 40px;
+  width: 100%;
 }
 
 .library-toolbar.search-active {
   justify-content: stretch;
-}
-
-.toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-shrink: 0;
-}
-
-.toolbar-section-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--c-text-1, #fff);
-  margin: 0;
-  line-height: 1;
-  white-space: nowrap;
-  letter-spacing: -0.02em;
-}
-
-.toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-
-.library-toolbar.search-active .toolbar-right {
-  width: 100%;
-  margin-left: 0;
-}
-
-.subtab-back-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
-  height: 38px;
-  padding: 0 14px 0 10px;
-  color: var(--c-text-2, rgba(255, 255, 255, 0.75));
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
-}
-
-.subtab-back-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: var(--c-text-1, #fff);
-  transform: translateY(-1px);
-}
-
-.subtab-back-btn:active {
-  transform: scale(0.96);
 }
 
 .toolbar-controls {
@@ -336,34 +261,13 @@ defineExpose({
   flex-shrink: 0;
 }
 
-@media (max-width: 640px) {
-  .subtab-back-btn span {
-    display: none;
-  }
-  .subtab-back-btn {
-    width: 38px;
-    padding: 0;
-    justify-content: center;
-  }
-  .toolbar-section-title {
-    font-size: 16px;
-  }
-}
-
 .stats {
   color: var(--c-text-2);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 500;
 }
 
-@media (max-width: 640px) {
-  .subtab-back-btn span {
-    display: none;
-  }
-  .subtab-back-btn {
-    width: 38px;
-    padding: 0;
-    justify-content: center;
-  }
+@media (max-width: 480px) {
   .stats {
     display: none;
   }

@@ -12,32 +12,33 @@
 
     <!-- Has channel - show library -->
     <template v-else>
-      <!-- Overview Dashboard View without search -->
-      <div v-if="currentTabId === 'overview' && !debouncedQuery" class="overview-dashboard">
-        <!-- Overview Toolbar: Tab Pills + Expandable Search -->
-        <div class="library-toolbar overview-toolbar" :class="{ 'search-active': isOverviewSearchOpen }">
-          <div v-if="!isOverviewSearchOpen" class="library-tabs-pills">
-            <button 
-              v-for="t in tabs" 
-              :key="t.id"
-              class="library-tab-pill" 
-              :class="{ active: currentTabId === t.id }"
-              @click="setTab(t.id)"
-            >
-              <span>{{ t.label }}</span>
-            </button>
-          </div>
-
-          <ExpandableSearch
-            v-model="searchQuery"
-            v-model:open="isOverviewSearchOpen"
-            :placeholder="searchPlaceholder"
-            title="Поиск по медиатеке"
-            @input="debouncedSearch"
-            @clear="handleClearSearch"
-          />
+      <!-- Persistent Library Tabs Navigation (always visible across all tabs) -->
+      <div class="library-persistent-nav" :class="{ 'search-active': isOverviewSearchOpen }">
+        <div v-if="!isOverviewSearchOpen" class="library-tabs-pills">
+          <button 
+            v-for="t in tabs" 
+            :key="t.id"
+            class="library-tab-pill" 
+            :class="{ active: currentTabId === t.id }"
+            @click="setTab(t.id)"
+          >
+            <span>{{ t.label }}</span>
+          </button>
         </div>
 
+        <ExpandableSearch
+          v-if="currentTabId === 'overview'"
+          v-model="searchQuery"
+          v-model:open="isOverviewSearchOpen"
+          :placeholder="searchPlaceholder"
+          title="Поиск по медиатеке"
+          @input="debouncedSearch"
+          @clear="handleClearSearch"
+        />
+      </div>
+
+      <!-- Overview Dashboard View without search -->
+      <div v-if="currentTabId === 'overview' && !debouncedQuery" class="overview-dashboard">
         <!-- Section: Плейлисты (Horizontal Scroll) -->
         <section v-if="loadingPlaylists" class="library-section">
           <div class="section-header">
@@ -265,8 +266,6 @@
         <component 
           :is="currentTabComponent" 
           :searchQuery="debouncedQuery"
-          :showBack="true"
-          @back="setTab('overview')"
           @update:searchQuery="handleSubtabSearch"
         />
       </div>
@@ -631,8 +630,8 @@ onUnmounted(() => {
   margin: 0 auto;
 }
 
-/* ─── Overview Toolbar & Tab Pills ─── */
-.library-toolbar {
+/* ─── Persistent Library Tabs Navigation ─── */
+.library-persistent-nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -641,7 +640,7 @@ onUnmounted(() => {
   min-height: 40px;
 }
 
-.library-toolbar.search-active {
+.library-persistent-nav.search-active {
   justify-content: stretch;
 }
 
@@ -652,6 +651,7 @@ onUnmounted(() => {
   overflow-x: auto;
   scrollbar-width: none;
   padding: 2px 0;
+  -webkit-overflow-scrolling: touch;
 }
 
 .library-tabs-pills::-webkit-scrollbar {
@@ -689,31 +689,6 @@ onUnmounted(() => {
   border-color: var(--c-accent, #1db954);
   font-weight: 700;
   box-shadow: 0 2px 12px rgba(29, 185, 84, 0.35);
-}
-
-.subtab-back-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
-  padding: 6px 14px 6px 10px;
-  color: var(--c-text-2, rgba(255, 255, 255, 0.75));
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.subtab-back-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: var(--c-text-1, #fff);
-  transform: translateY(-1px);
-}
-
-.subtab-back-btn:active {
-  transform: scale(0.96);
 }
 
 /* ─── Sections ─── */

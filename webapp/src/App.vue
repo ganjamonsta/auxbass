@@ -332,9 +332,6 @@ const showHeader = computed(() => {
 })
 
 const showBackButton = computed(() => {
-  if (route.name === 'library' && uiStore.libraryTab !== 'overview') {
-    return true
-  }
   if (route.name === 'search' && (route.query.tab || route.query.mode)) {
     return true
   }
@@ -356,16 +353,9 @@ const pageTitle = computed(() => {
     }
     return 'Поиск'
   }
-  // Для страницы библиотеки показываем название текущего раздела
+  // Для страницы библиотеки заголовок стабилен — «Медиатека»
   if (route.name === 'library') {
-    const libraryTitles = {
-      overview: 'Медиатека',
-      tracks: 'Треки',
-      albums: 'Альбомы',
-      artists: 'Артисты',
-      playlists: 'Плейлисты'
-    }
-    return libraryTitles[uiStore.libraryTab] || 'Медиатека'
+    return 'Медиатека'
   }
   
   const titles = {
@@ -386,16 +376,7 @@ const pageTitle = computed(() => {
   return titles[route.name] || ''
 })
 
-const libraryIcon = computed(() => {
-  const icons = {
-    overview: Library,
-    tracks: Music,
-    albums: Disc3,
-    artists: User,
-    playlists: Folder
-  }
-  return icons[uiStore.libraryTab] || Library
-})
+const libraryIcon = computed(() => Library)
 
 const userInitials = computed(() => {
   const u = authStore.user
