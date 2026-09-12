@@ -207,7 +207,7 @@
             </div>
           </div>
           <div class="sp-exportify-actions">
-            <button class="action-btn primary sp-primary-btn" @click="showExportifyModal = true">
+            <button class="action-btn primary sp-primary-btn" @click="tasksStore.openExportifyModal()">
               <Upload :size="15" />
               <span>Загрузить CSV файл</span>
             </button>
@@ -690,12 +690,6 @@
         <p class="about-desc">Музыкальный плеер с хранением и стримингом в Telegram</p>
       </div>
     </section>
-
-    <!-- Exportify Modal -->
-    <ExportifyImportModal 
-      :show="showExportifyModal" 
-      @close="showExportifyModal = false" 
-    />
   </div>
 </template>
 
@@ -704,6 +698,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
+import { useTasksStore } from '@/stores/tasks'
 import api, { authApi, ingestionApi } from '@/api/client'
 import { 
   Megaphone, Check, Folder, Heart, ListMusic, Cloud, RefreshCw, Lock, 
@@ -711,7 +706,6 @@ import {
   Trash2, ChevronRight, ExternalLink, Unlink, Key, ChevronDown, 
   AlertCircle, Radio, FileSpreadsheet, Upload, LogOut, Library 
 } from 'lucide-vue-next'
-import ExportifyImportModal from '@/components/ExportifyImportModal.vue'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import { getCacheStats, getCachedAudioStats } from '@/utils/audioCacheDb'
 import { clearAudioCache } from '@/stores/playerCache'
@@ -720,8 +714,8 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const playerStore = usePlayerStore()
+const tasksStore = useTasksStore()
 const pwaInstall = usePwaInstall()
-const showExportifyModal = ref(false)
 
 const goToMyProfile = () => {
   if (authStore.user?.id) {

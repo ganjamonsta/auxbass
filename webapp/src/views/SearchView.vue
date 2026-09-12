@@ -965,7 +965,7 @@
                   <span class="sp-step-badge">3</span>
                   <h4>Загрузите сюда</h4>
                   <p>Откройте окно импорта и перетащите скачанный файл:</p>
-                  <button class="sp-open-modal-btn" @click="showExportifyModal = true">
+                  <button class="sp-open-modal-btn" @click="tasksStore.openExportifyModal()">
                     <Upload :size="15" />
                     <span>Открыть окно импорта CSV</span>
                   </button>
@@ -1130,21 +1130,16 @@
       </div>
     </div>
 
-    <!-- Exportify CSV Modal -->
-    <ExportifyImportModal
-      :show="showExportifyModal"
-      @close="showExportifyModal = false"
-      @imported="libraryStore.fetchTracks({ refresh: true })"
-    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, onActivated, defineAsyncComponent } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, onActivated } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { useUIStore } from '@/stores/ui'
+import { useTasksStore } from '@/stores/tasks'
 import { 
   useContextMenu, 
   useDebouncedSearch, 
@@ -1156,7 +1151,6 @@ import api, { tracksApi, artistsApi, albumsApi, playlistsApi, ingestionApi } fro
 import SearchBar from '@/components/ui/SearchBar.vue'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackSkeleton from '@/components/TrackSkeleton.vue'
-const ExportifyImportModal = defineAsyncComponent(() => import('@/components/ExportifyImportModal.vue'))
 import { getCoverUrl, CoverSize, formatDuration } from '@/utils'
 import { 
   Music, 
@@ -1185,6 +1179,7 @@ const route = useRoute()
 const libraryStore = useLibraryStore()
 const playerStore = usePlayerStore()
 const uiStore = useUIStore()
+const tasksStore = useTasksStore()
 const { openMenu } = useContextMenu()
 const { handleDirectDownload, handleHdNotice } = useTrackActions()
 
@@ -1537,7 +1532,6 @@ const isSpotifySearching = ref(false)
 const isLoadingMoreSpotify = ref(false)
 
 const spSubTab = ref('search') // 'search' | 'exportify'
-const showExportifyModal = ref(false)
 const spAccount = ref(null)
 const isSpAccountLoading = ref(false)
 

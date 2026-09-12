@@ -195,7 +195,7 @@
 
             <button 
               class="import-btn" 
-              @click="showImportModal = true"
+              @click="tasksStore.openImportModal()"
               title="Импорт музыки из SoundCloud / Spotify"
             >
               <CloudDownload :size="16" class="import-icon" />
@@ -261,13 +261,6 @@
         />
       </div>
     </template>
-
-    <!-- Import External Music Modal -->
-    <ImportModal
-      :show="showImportModal"
-      @close="showImportModal = false"
-      @imported="handleImportFinished"
-    />
   </div>
 </template>
 
@@ -278,6 +271,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
+import { useTasksStore } from '@/stores/tasks'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useDebouncedSearch } from '@/composables'
 import api from '@/api/client'
@@ -288,7 +282,6 @@ import LibraryArtists from '@/components/library/LibraryArtists.vue'
 import LibraryPlaylists from '@/components/library/LibraryPlaylists.vue'
 import TrackItem from '@/components/TrackItem.vue'
 import SearchBar from '@/components/ui/SearchBar.vue'
-import ImportModal from '@/components/ImportModal.vue'
 import { 
   Play, 
   Music, 
@@ -306,9 +299,8 @@ const authStore = useAuthStore()
 const uiStore = useUIStore()
 const libraryStore = useLibraryStore()
 const playerStore = usePlayerStore()
+const tasksStore = useTasksStore()
 const { openMenu } = useContextMenu()
-
-const showImportModal = ref(false)
 
 const handleImportFinished = () => {
   loadOverviewData()

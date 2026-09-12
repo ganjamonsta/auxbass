@@ -194,11 +194,13 @@
       <ExportifyImportModal 
         :show="tasksStore.showExportifyModal"
         @close="tasksStore.closeExportifyModal"
+        @imported="libraryStore.fetchTracks({ refresh: true })"
       />
 
       <ImportModal
         :show="tasksStore.showImportModal"
         @close="tasksStore.closeImportModal"
+        @imported="libraryStore.fetchTracks({ refresh: true })"
       />
 
       <!-- Share Modal -->
