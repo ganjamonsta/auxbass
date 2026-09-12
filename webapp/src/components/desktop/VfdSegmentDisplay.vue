@@ -3,6 +3,8 @@
     class="vfd-display" 
     ref="displayRef"
     @click="cycleMode"
+    @mouseenter="onHover(true)"
+    @mouseleave="onHover(false)"
     :title="modeTooltip"
   >
     <!-- VFD Glass Face Effects -->
@@ -20,53 +22,18 @@
       </span>
       <span v-if="isPlaying" class="vfd-play-indicator">
         <span class="vfd-spin-disc">
-          <svg viewBox="0 0 16 22" class="vfd-disc-svg">
-            <g transform="skewX(-7.5)">
-              <path 
-                v-for="(pathD, segKey) in SEGMENT_PATHS" 
-                :key="segKey"
-                :d="pathD"
-                :class="getSegmentClass(discFrameMask, segKey)"
-              />
-            </g>
-          </svg>
+          <canvas ref="discCanvas" class="vfd-disc-canvas" width="16" height="22"></canvas>
         </span>
       </span>
     </div>
 
-    <!-- 16-Segment Alphanumeric Starburst Cells Grid -->
-    <div class="vfd-cells-row">
-      <div 
-        v-for="(cellMask, idx) in renderedMasks" 
-        :key="idx" 
-        class="vfd-cell"
-        :class="{ 'audio-pulsing': isPlaying && isBeatPulse }"
-      >
-        <svg viewBox="0 0 16 22" class="vfd-cell-svg">
-          <g transform="skewX(-7.5)">
-            <!-- 16 Segments -->
-            <path 
-              v-for="(pathD, segKey) in SEGMENT_PATHS" 
-              :key="segKey"
-              :d="pathD"
-              :class="getSegmentClass(cellMask, segKey)"
-            />
-            <!-- Decimal Point / Dot -->
-            <circle 
-              cx="15.2" 
-              cy="20.0" 
-              r="0.9" 
-              :class="getSegmentClass(cellMask, 'DP')" 
-            />
-          </g>
-        </svg>
-      </div>
-    </div>
+    <!-- High-Performance 2D Canvas for all 16-Segment Cells -->
+    <canvas ref="canvasRef" class="vfd-canvas"></canvas>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { 
   SEGMENTS, 
   getCharMask, 
@@ -96,66 +63,56 @@ const props = defineProps({
   hdTrackInfo: {
     type: Object,
     default: null
-  },
-  progress: {
-    type: Number,
-    default: 0
-  },
-  duration: {
-    type: Number,
-    default: 0
   }
 })
 
 const emit = defineEmits(['click'])
 
-// Exact SVG Vector Paths for 16-Segment Starburst Display
+// 16-Segment Vector Path coordinates (viewBox 0 0 16 22)
 const SEGMENT_PATHS = {
-  // Top horizontal segments
   A1: 'M 2.2 1.5 L 7.4 1.5 L 6.6 3.2 L 3.2 3.2 Z',
   A2: 'M 8.6 1.5 L 13.8 1.5 L 12.8 3.2 L 9.4 3.2 Z',
-  // Upper outer verticals
   F:  'M 1.5 2.2 L 3.2 3.8 L 3.2 9.6 L 1.5 10.4 Z',
   B:  'M 14.5 2.2 L 14.5 10.4 L 12.8 9.6 L 12.8 3.8 Z',
-  // Middle horizontal segments
   G1: 'M 2.6 11.0 L 3.6 10.3 L 7.4 10.3 L 6.8 11.7 L 3.6 11.7 Z',
   G2: 'M 8.6 10.3 L 12.4 10.3 L 13.4 11.0 L 12.4 11.7 L 9.2 11.7 Z',
-  // Lower outer verticals
   E:  'M 1.5 11.6 L 3.2 12.4 L 3.2 18.2 L 1.5 19.8 Z',
   C:  'M 14.5 11.6 L 14.5 19.8 L 12.8 18.2 L 12.8 12.4 Z',
-  // Bottom horizontal segments
   D1: 'M 3.2 18.8 L 6.6 18.8 L 7.4 20.5 L 2.2 20.5 Z',
   D2: 'M 9.4 18.8 L 12.8 18.8 L 13.8 20.5 L 8.6 20.5 Z',
-  // Upper and lower center verticals
   J:  'M 7.4 3.8 L 8.6 3.8 L 8.6 9.8 L 7.4 9.8 Z',
   M:  'M 7.4 12.2 L 8.6 12.2 L 8.6 18.2 L 7.4 18.2 Z',
-  // Diagonals (h, k, l, n)
   H:  'M 3.8 4.2 L 4.9 3.8 L 7.2 9.4 L 6.1 9.8 Z',
   K:  'M 11.1 3.8 L 12.2 4.2 L 9.9 9.8 L 8.8 9.4 Z',
   L:  'M 6.1 12.2 L 7.2 12.6 L 4.9 18.2 L 3.8 17.8 Z',
   N:  'M 8.8 12.6 L 9.9 12.2 L 12.2 17.8 L 11.1 18.2 Z'
 }
 
-// Display Modes: 'auto' (track when playing/paused, idle when stopped), 'clock', 'specs', 'viz'
-const userMode = ref('auto')
-const displayRef = ref(null)
-const cellCount = ref(24)
+let SEG_ENTRIES = null
+let ALL_SEG_ENTRIES = null
 
-// Calculate dynamic cell count to fit container width
-const updateCellCount = () => {
-  if (!displayRef.value) return
-  const width = displayRef.value.clientWidth
-  if (width <= 0) return
-  // Each cell is ~14px wide + 2px gap = 16px
-  const count = Math.max(14, Math.min(48, Math.floor((width - 40) / 15.5)))
-  cellCount.value = count
+const initPathObjects = () => {
+  if (SEG_ENTRIES || typeof Path2D === 'undefined') return
+  SEG_ENTRIES = Object.entries(SEGMENT_PATHS).map(([key, d]) => [
+    SEGMENTS[key],
+    new Path2D(d)
+  ])
+  const dp = new Path2D()
+  dp.arc(15.2, 20.0, 0.9, 0, Math.PI * 2)
+  ALL_SEG_ENTRIES = [...SEG_ENTRIES, [SEGMENTS.DP, dp]]
 }
 
-let resizeObserver = null
+// Display Modes: 'auto', 'clock', 'specs', 'viz'
+const userMode = ref('auto')
+const displayRef = ref(null)
+const canvasRef = ref(null)
+const discCanvas = ref(null)
+const cellCount = ref(24)
+const isHovered = ref(false)
 
 // Marquee state
 const marqueeIndex = ref(0)
-const marqueeDwell = ref(0) // Pause at start / end
+const marqueeDwell = ref(0)
 const isGlitching = ref(false)
 const glitchMasks = ref([])
 const glitchProgress = ref(0)
@@ -165,7 +122,7 @@ const discFrame = ref(0)
 const discFrameMask = computed(() => DISC_FRAMES[discFrame.value % DISC_FRAMES.length])
 
 // Idle animation state
-const idleMode = ref(0) // 0: Spec show, 1: Clock, 2: Larson, 3: Standby disc
+const idleMode = ref(0)
 const larsonPos = ref(0)
 const larsonDir = ref(1)
 const idleTimer = ref(0)
@@ -185,10 +142,10 @@ const updateClock = () => {
   currentTimeStr.value = `[ ${hh}:${mm}:${ss} ]  ${day} ${date} ${mon}`
 }
 
-// Audio-reactive beat pulse
+// Audio-reactive pulse
 const isBeatPulse = ref(false)
 
-// Mode Badge & Tooltip
+// Badges & tooltips
 const currentModeBadge = computed(() => {
   if (userMode.value === 'clock') return 'CLK'
   if (userMode.value === 'specs') return 'DSP'
@@ -203,8 +160,12 @@ const modeTooltip = computed(() => {
   return 'VFD Режим: ' + currentModeBadge.value + ' (Нажмите для переключения: Трек / Часы / Спецификации / Спектр)'
 })
 
-const cycleMode = (e) => {
-  // Cycle modes on click
+const onHover = (hovering) => {
+  isHovered.value = hovering
+  scheduleDraw()
+}
+
+const cycleMode = () => {
   if (userMode.value === 'auto') {
     userMode.value = 'clock'
   } else if (userMode.value === 'clock') {
@@ -215,17 +176,17 @@ const cycleMode = (e) => {
     userMode.value = 'auto'
   }
   triggerGlitch()
+  checkVizLoop()
 }
 
-// Trigger decode glitch transition
 const triggerGlitch = () => {
   isGlitching.value = true
   glitchProgress.value = 0
   const count = cellCount.value
   glitchMasks.value = Array.from({ length: count }, () => getRandomGlitchMask())
+  startGlitchLoop()
 }
 
-// Get string for Specs mode
 const getSpecsString = () => {
   const isHd = !!props.hdTrackInfo
   const volPct = Math.round((props.volume || 1) * 100)
@@ -233,7 +194,6 @@ const getSpecsString = () => {
   return `${format}  *  VOL ${volPct}%  *  DIRECT DSP`
 }
 
-// Get string for Demo / Idle mode
 const IDLE_DEMO_TEXTS = [
   'AUX BASS HIGH END REFERENCE STEREO',
   '24-BIT 96kHz DIRECT D/A CONVERTER',
@@ -241,54 +201,34 @@ const IDLE_DEMO_TEXTS = [
   'NO DISC  -  INSERT AUDIO MEDIA'
 ]
 
-// Determine target text string
 const activeString = computed(() => {
-  if (userMode.value === 'clock') {
-    return currentTimeStr.value
-  }
-  if (userMode.value === 'specs') {
-    return getSpecsString()
-  }
-  if (userMode.value === 'viz') {
-    return '' // Larson or VU bars handle masks directly
-  }
+  if (userMode.value === 'clock') return currentTimeStr.value
+  if (userMode.value === 'specs') return getSpecsString()
+  if (userMode.value === 'viz') return ''
 
-  // Auto mode
   if (props.track) {
     const artist = props.track.artist || 'UNKNOWN ARTIST'
     const title = props.track.title || props.track.file_name || 'UNTITLED'
     return `${artist} - ${title}`.toUpperCase()
   }
 
-  // Idle mode when no track
-  if (idleMode.value === 0) {
-    return IDLE_DEMO_TEXTS[0]
-  } else if (idleMode.value === 1) {
-    return currentTimeStr.value
-  } else if (idleMode.value === 2) {
-    return '' // Handled by Larson scanner
-  } else {
-    return IDLE_DEMO_TEXTS[3]
-  }
+  if (idleMode.value === 0) return IDLE_DEMO_TEXTS[0]
+  if (idleMode.value === 1) return currentTimeStr.value
+  if (idleMode.value === 2) return ''
+  return IDLE_DEMO_TEXTS[3]
 })
 
-// Compute masks to display across all cells
 const renderedMasks = computed(() => {
   const count = cellCount.value
   const fullText = activeString.value
 
-  // Special mode: Larson wave visualizer
   if (userMode.value === 'viz' || (!props.track && idleMode.value === 2)) {
     return getLarsonMasks(count, larsonPos.value)
   }
 
-  // Text encoding
   let displayedText = fullText
-  if (!fullText) {
-    return new Array(count).fill(0)
-  }
+  if (!fullText) return new Array(count).fill(0)
 
-  // Marquee handling if text exceeds cell count
   if (fullText.length > count) {
     const loopStr = fullText + '   ///   '
     const startIndex = marqueeIndex.value % loopStr.length
@@ -298,20 +238,16 @@ const renderedMasks = computed(() => {
     }
     displayedText = slice
   } else {
-    // Pad or center text
     const pad = Math.floor((count - fullText.length) / 2)
     displayedText = ' '.repeat(pad) + fullText
   }
 
   const baseMasks = encodeString(displayedText, count)
 
-  // Apply glitch transition if active
   if (isGlitching.value && glitchMasks.value.length === count) {
     const resolvedIndex = Math.floor((glitchProgress.value / 100) * count)
     return baseMasks.map((mask, idx) => {
-      if (idx < resolvedIndex) {
-        return mask
-      }
+      if (idx < resolvedIndex) return mask
       return glitchMasks.value[idx] || mask
     })
   }
@@ -319,18 +255,250 @@ const renderedMasks = computed(() => {
   return baseMasks
 })
 
-// Helper to determine segment CSS class
-const getSegmentClass = (cellMask, segKey) => {
-  const bit = SEGMENTS[segKey]
-  if (!bit) return 'seg-off'
-  const isOn = (cellMask & bit) !== 0
-  return isOn ? 'seg-on' : 'seg-off'
+// Calculate dynamic cell count to fit container width
+const updateCellCount = () => {
+  if (!displayRef.value) return
+  const width = displayRef.value.clientWidth
+  if (width <= 0) return
+  const count = Math.max(14, Math.min(48, Math.floor((width - 44) / 15.5)))
+  if (cellCount.value !== count) {
+    cellCount.value = count
+  }
+}
+
+// High performance requestAnimationFrame drawing
+let drawScheduled = false
+const scheduleDraw = () => {
+  if (drawScheduled) return
+  drawScheduled = true
+  requestAnimationFrame(() => {
+    drawScheduled = false
+    drawVfd()
+  })
+}
+
+const drawVfd = () => {
+  const canvas = canvasRef.value
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  initPathObjects()
+  if (!ALL_SEG_ENTRIES) return
+
+  const dpr = window.devicePixelRatio || 1
+  const w = canvas.clientWidth
+  const h = canvas.clientHeight
+  if (w <= 0 || h <= 0) return
+
+  const targetW = Math.round(w * dpr)
+  const targetH = Math.round(h * dpr)
+  if (canvas.width !== targetW || canvas.height !== targetH) {
+    canvas.width = targetW
+    canvas.height = targetH
+  }
+
+  ctx.save()
+  ctx.scale(dpr, dpr)
+  ctx.clearRect(0, 0, w, h)
+
+  const masks = renderedMasks.value
+  const count = masks.length
+  if (count === 0) {
+    ctx.restore()
+    return
+  }
+
+  const cellH = Math.min(18.5, h - 2)
+  const scale = cellH / 22
+  const cellW = 16 * scale
+  const gap = 1.8
+  const pitch = cellW + gap
+  const totalW = count * pitch - gap
+  const leftReserved = 42
+  const startX = Math.max(leftReserved, (w - totalW) / 2)
+  const startY = (h - cellH) / 2
+  const skewTan = -0.13165 // skewX(-7.5deg)
+
+  // PASS 1: Ghost / Inactive segments
+  ctx.fillStyle = 'rgba(0, 240, 255, 0.055)'
+  ctx.strokeStyle = 'rgba(0, 240, 255, 0.02)'
+  ctx.lineWidth = 0.2
+
+  for (let i = 0; i < count; i++) {
+    const mask = masks[i]
+    ctx.save()
+    ctx.translate(startX + i * pitch, startY)
+    ctx.transform(1, 0, skewTan, 1, 0, 0)
+    ctx.scale(scale, scale)
+    for (let s = 0; s < ALL_SEG_ENTRIES.length; s++) {
+      const [bit, path] = ALL_SEG_ENTRIES[s]
+      if ((mask & bit) === 0) {
+        ctx.fill(path)
+        ctx.stroke(path)
+      }
+    }
+    ctx.restore()
+  }
+
+  // PASS 2: Glowing phosphor layer for active segments
+  const hovered = isHovered.value
+  const pulse = isBeatPulse.value && props.isPlaying
+  ctx.shadowColor = hovered ? 'rgba(0, 240, 255, 0.95)' : 'rgba(0, 240, 255, 0.8)'
+  ctx.shadowBlur = (hovered ? 6.5 : (pulse ? 5.2 : 4)) * dpr
+  ctx.fillStyle = hovered ? '#ffffff' : (pulse ? '#a5f5ff' : '#8fefff')
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = 0.15
+
+  for (let i = 0; i < count; i++) {
+    const mask = masks[i]
+    if (!mask) continue
+    ctx.save()
+    ctx.translate(startX + i * pitch, startY)
+    ctx.transform(1, 0, skewTan, 1, 0, 0)
+    ctx.scale(scale, scale)
+    for (let s = 0; s < ALL_SEG_ENTRIES.length; s++) {
+      const [bit, path] = ALL_SEG_ENTRIES[s]
+      if ((mask & bit) !== 0) {
+        ctx.fill(path)
+        ctx.stroke(path)
+      }
+    }
+    ctx.restore()
+  }
+
+  // PASS 3: Crisp high-white center core for true vacuum tube luminescence
+  ctx.shadowBlur = 0
+  ctx.fillStyle = '#f0fdff'
+  for (let i = 0; i < count; i++) {
+    const mask = masks[i]
+    if (!mask) continue
+    ctx.save()
+    ctx.translate(startX + i * pitch, startY)
+    ctx.transform(1, 0, skewTan, 1, 0, 0)
+    ctx.scale(scale, scale)
+    for (let s = 0; s < ALL_SEG_ENTRIES.length; s++) {
+      const [bit, path] = ALL_SEG_ENTRIES[s]
+      if ((mask & bit) !== 0) {
+        ctx.fill(path)
+      }
+    }
+    ctx.restore()
+  }
+
+  ctx.restore()
+}
+
+// Spinning disc rendering on tiny status canvas
+const drawDisc = () => {
+  const canvas = discCanvas.value
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  initPathObjects()
+  if (!SEG_ENTRIES) return
+
+  const mask = discFrameMask.value
+  ctx.clearRect(0, 0, 16, 22)
+  ctx.save()
+  ctx.transform(1, 0, -0.13165, 1, 0, 0)
+
+  // off
+  ctx.fillStyle = 'rgba(0, 240, 255, 0.055)'
+  for (let s = 0; s < SEG_ENTRIES.length; s++) {
+    const [bit, path] = SEG_ENTRIES[s]
+    if ((mask & bit) === 0) ctx.fill(path)
+  }
+
+  // on
+  ctx.shadowColor = 'rgba(0, 240, 255, 0.85)'
+  ctx.shadowBlur = 4
+  ctx.fillStyle = '#8fefff'
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = 0.15
+  for (let s = 0; s < SEG_ENTRIES.length; s++) {
+    const [bit, path] = SEG_ENTRIES[s]
+    if ((mask & bit) !== 0) {
+      ctx.fill(path)
+      ctx.stroke(path)
+    }
+  }
+  ctx.restore()
+}
+
+// Glitch loop (runs ONLY while isGlitching is true)
+let glitchAnimId = null
+let lastGlitchTime = 0
+
+const stepGlitch = (now) => {
+  if (!isGlitching.value) {
+    glitchAnimId = null
+    return
+  }
+  if (now - lastGlitchTime >= 45) {
+    lastGlitchTime = now
+    glitchProgress.value += 16
+    for (let i = 0; i < glitchMasks.value.length; i++) {
+      if (Math.random() > 0.4) {
+        glitchMasks.value[i] = getRandomGlitchMask()
+      }
+    }
+    if (glitchProgress.value >= 100) {
+      isGlitching.value = false
+      glitchAnimId = null
+      scheduleDraw()
+      return
+    }
+    scheduleDraw()
+  }
+  glitchAnimId = requestAnimationFrame(stepGlitch)
+}
+
+const startGlitchLoop = () => {
+  lastGlitchTime = performance.now()
+  if (!glitchAnimId) {
+    glitchAnimId = requestAnimationFrame(stepGlitch)
+  }
+}
+
+// Viz / Larson Scanner loop (runs ONLY when in viz mode or idle mode 2)
+let vizAnimId = null
+let lastVizTime = 0
+
+const stepViz = (now) => {
+  const isVizActive = userMode.value === 'viz' || (!props.track && idleMode.value === 2)
+  if (!isVizActive) {
+    vizAnimId = null
+    return
+  }
+  if (now - lastVizTime >= 50) {
+    lastVizTime = now
+    const count = cellCount.value
+    larsonPos.value += larsonDir.value
+    if (larsonPos.value >= count - 1) {
+      larsonPos.value = count - 1
+      larsonDir.value = -1
+    } else if (larsonPos.value <= 0) {
+      larsonPos.value = 0
+      larsonDir.value = 1
+    }
+    scheduleDraw()
+  }
+  vizAnimId = requestAnimationFrame(stepViz)
+}
+
+const checkVizLoop = () => {
+  const isVizActive = userMode.value === 'viz' || (!props.track && idleMode.value === 2)
+  if (isVizActive && !vizAnimId) {
+    lastVizTime = performance.now()
+    vizAnimId = requestAnimationFrame(stepViz)
+  }
 }
 
 // Watchers
 watch(() => props.displayText, () => {
   marqueeIndex.value = 0
-  marqueeDwell.value = 14 // 14 ticks ~ 2.8s dwell pause
+  marqueeDwell.value = 14
   triggerGlitch()
 })
 
@@ -340,30 +508,45 @@ watch(() => props.track?.id, () => {
   triggerGlitch()
 })
 
-// Main animation loop intervals
+watch(() => props.isPlaying, (playing) => {
+  if (playing) {
+    nextTick(() => drawDisc())
+  }
+  scheduleDraw()
+})
+
+watch(() => renderedMasks.value, () => {
+  scheduleDraw()
+})
+
+let resizeObserver = null
 let marqueeTimer = null
-let fastAnimationTimer = null
 let clockTimer = null
 
 onMounted(() => {
+  initPathObjects()
   updateClock()
   updateCellCount()
 
   if (displayRef.value && window.ResizeObserver) {
     resizeObserver = new ResizeObserver(() => {
       updateCellCount()
+      scheduleDraw()
     })
     resizeObserver.observe(displayRef.value)
   }
 
   triggerGlitch()
+  scheduleDraw()
+  if (props.isPlaying) {
+    drawDisc()
+  }
 
-  // Marquee & idle ticker (every 200ms)
+  // Marquee ticker (every 200ms) - extremely lightweight canvas redraw
   marqueeTimer = setInterval(() => {
     const fullText = activeString.value
     const count = cellCount.value
 
-    // Dwell handling
     if (marqueeDwell.value > 0) {
       marqueeDwell.value--
     } else {
@@ -372,67 +555,45 @@ onMounted(() => {
         const loopLen = fullText.length + 9
         if (marqueeIndex.value >= loopLen) {
           marqueeIndex.value = 0
-          marqueeDwell.value = 12 // Pause again at start
+          marqueeDwell.value = 12
         }
       }
     }
 
-    // Disc spin
     if (props.isPlaying) {
       discFrame.value = (discFrame.value + 1) % DISC_FRAMES.length
       isBeatPulse.value = !isBeatPulse.value
+      drawDisc()
     }
 
-    // Idle cycle (every 30 ticks ~ 6 seconds)
     if (!props.track && userMode.value === 'auto') {
       idleTimer.value++
       if (idleTimer.value > 30) {
         idleTimer.value = 0
         idleMode.value = (idleMode.value + 1) % 4
         triggerGlitch()
+        checkVizLoop()
       }
     }
+
+    scheduleDraw()
   }, 200)
 
-  // Fast animation ticker (every 50ms) for Glitch and Larson wave
-  fastAnimationTimer = setInterval(() => {
-    // Glitch progression
-    if (isGlitching.value) {
-      glitchProgress.value += 16
-      // Randomize unsolved glitch cells
-      for (let i = 0; i < glitchMasks.value.length; i++) {
-        if (Math.random() > 0.4) {
-          glitchMasks.value[i] = getRandomGlitchMask()
-        }
-      }
-      if (glitchProgress.value >= 100) {
-        isGlitching.value = false
-      }
+  // Clock ticker (1 second) - only redraws if clock mode is visible
+  clockTimer = setInterval(() => {
+    updateClock()
+    if (userMode.value === 'clock' || (!props.track && idleMode.value === 1)) {
+      scheduleDraw()
     }
-
-    // Larson Scanner movement
-    if (userMode.value === 'viz' || (!props.track && idleMode.value === 2)) {
-      const count = cellCount.value
-      larsonPos.value += larsonDir.value
-      if (larsonPos.value >= count - 1) {
-        larsonPos.value = count - 1
-        larsonDir.value = -1
-      } else if (larsonPos.value <= 0) {
-        larsonPos.value = 0
-        larsonDir.value = 1
-      }
-    }
-  }, 50)
-
-  // 1-second Clock updater
-  clockTimer = setInterval(updateClock, 1000)
+  }, 1000)
 })
 
 onUnmounted(() => {
   if (resizeObserver) resizeObserver.disconnect()
   if (marqueeTimer) clearInterval(marqueeTimer)
-  if (fastAnimationTimer) clearInterval(fastAnimationTimer)
   if (clockTimer) clearInterval(clockTimer)
+  if (glitchAnimId) cancelAnimationFrame(glitchAnimId)
+  if (vizAnimId) cancelAnimationFrame(vizAnimId)
 })
 </script>
 
@@ -448,7 +609,7 @@ onUnmounted(() => {
   justify-content: center;
   background: radial-gradient(ellipse at center, rgba(3, 16, 26, 0.95) 0%, rgba(1, 6, 12, 0.98) 100%);
   border-radius: 3px;
-  padding: 1px 8px;
+  padding: 1px 6px;
   user-select: none;
   cursor: pointer;
   overflow: hidden;
@@ -550,70 +711,16 @@ onUnmounted(() => {
   display: inline-block;
 }
 
-.vfd-disc-svg {
+.vfd-disc-canvas {
   width: 100%;
   height: 100%;
+  display: block;
 }
 
-/* Cells Grid */
-.vfd-cells-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1.8px;
+.vfd-canvas {
   width: 100%;
   height: 100%;
+  display: block;
   z-index: 2;
-}
-
-.vfd-cell {
-  position: relative;
-  flex-shrink: 0;
-  width: 13.5px;
-  height: 19px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.05s ease;
-}
-
-.vfd-cell.audio-pulsing {
-  filter: brightness(1.08);
-}
-
-.vfd-cell-svg {
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-
-/* 16-Segment Styles */
-
-/* Inactive Ghost Segment - faint, translucent, physical depth */
-.seg-off {
-  fill: rgba(0, 240, 255, 0.055);
-  stroke: rgba(0, 240, 255, 0.02);
-  stroke-width: 0.2;
-  transition: fill 0.1s ease;
-}
-
-/* Active Segment - Glowing Neon Phosphor Core & Bloom */
-.seg-on {
-  fill: #8fefff;
-  stroke: #ffffff;
-  stroke-width: 0.15;
-  filter: 
-    drop-shadow(0 0 1px #ffffff) 
-    drop-shadow(0 0 3.5px #00f0ff) 
-    drop-shadow(0 0 8px rgba(0, 240, 255, 0.85));
-  transition: fill 0.06s ease, filter 0.06s ease;
-}
-
-.vfd-display:hover .seg-on {
-  fill: #ffffff;
-  filter: 
-    drop-shadow(0 0 1.5px #ffffff) 
-    drop-shadow(0 0 4.5px #00f0ff) 
-    drop-shadow(0 0 11px rgba(0, 240, 255, 0.95));
 }
 </style>

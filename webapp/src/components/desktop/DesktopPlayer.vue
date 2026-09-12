@@ -106,8 +106,6 @@
               :isPlaying="isPlaying"
               :volume="volume"
               :hdTrackInfo="playerStore.hdTrackInfo"
-              :progress="progress"
-              :duration="duration"
             />
           </div>
 
