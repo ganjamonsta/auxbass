@@ -21,48 +21,54 @@
       </div>
     </div>
 
-    <!-- Unified Toolbar: Back button + Controls + Expandable Search -->
+    <!-- Unified Toolbar: Back button + Title + Controls + Expandable Search -->
     <div class="library-toolbar" :class="{ 'search-active': isSearchOpen }">
-      <!-- Back button (hidden when search is open) -->
-      <button 
-        v-if="showBack && !isSearchOpen" 
-        type="button"
-        class="subtab-back-btn" 
-        @click="$emit('back')"
-        title="Все разделы"
-      >
-        <ChevronLeft :size="18" />
-        <span>Все разделы</span>
-      </button>
-
-      <!-- Sort & Action controls (hidden when search is open) -->
-      <div v-if="!isSearchOpen" class="toolbar-controls">
-        <div class="stats" v-if="virtualGridRef?.total">
-          {{ virtualGridRef?.total }} плейлистов
-        </div>
-        <SortChips
-          :currentOption="currentOption"
-          :sortOrder="sortOrder"
-          @next="onNextSort"
-          @toggle-order="onToggleOrder"
-        />
-        <button v-if="scope === 'global'" class="btn-pill-primary" @click="showManageModal = true">
-          <Plus :size="16" /> <span>Добавить</span>
+      <!-- Left side: Back button and Section Title (hidden when search is open) -->
+      <div v-if="!isSearchOpen" class="toolbar-left">
+        <button 
+          v-if="showBack" 
+          type="button"
+          class="subtab-back-btn" 
+          @click="$emit('back')"
+          title="Все разделы"
+        >
+          <ChevronLeft :size="18" />
+          <span>Все разделы</span>
         </button>
-        <button v-else class="btn-pill-primary" @click="handleCreatePlaylist">
-          <Plus :size="16" /> <span>Создать</span>
-        </button>
+        <h1 class="toolbar-section-title">Плейлисты</h1>
       </div>
 
-      <!-- Expandable Search -->
-      <ExpandableSearch
-        v-model="localQuery"
-        v-model:open="isSearchOpen"
-        placeholder="Поиск плейлистов..."
-        title="Поиск плейлистов"
-        @input="onSearchInput"
-        @clear="onSearchClear"
-      />
+      <!-- Right side: Controls & Expandable Search (controls pressed up to search) -->
+      <div class="toolbar-right">
+        <!-- Sort & Action controls (hidden when search is open) -->
+        <div v-if="!isSearchOpen" class="toolbar-controls">
+          <div class="stats" v-if="virtualGridRef?.total">
+            {{ virtualGridRef?.total }}
+          </div>
+          <SortChips
+            :currentOption="currentOption"
+            :sortOrder="sortOrder"
+            @next="onNextSort"
+            @toggle-order="onToggleOrder"
+          />
+          <button v-if="scope === 'global'" class="btn-pill-primary" @click="showManageModal = true">
+            <Plus :size="16" /> <span>Добавить</span>
+          </button>
+          <button v-else class="btn-pill-primary" @click="handleCreatePlaylist">
+            <Plus :size="16" /> <span>Создать</span>
+          </button>
+        </div>
+
+        <!-- Expandable Search -->
+        <ExpandableSearch
+          v-model="localQuery"
+          v-model:open="isSearchOpen"
+          placeholder="Поиск плейлистов..."
+          title="Поиск плейлистов"
+          @input="onSearchInput"
+          @clear="onSearchClear"
+        />
+      </div>
     </div>
 
     <!-- Spotify-style virtual grid -->
@@ -442,6 +448,36 @@ defineExpose({
   justify-content: stretch;
 }
 
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.toolbar-section-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--c-text-1, #fff);
+  margin: 0;
+  line-height: 1;
+  white-space: nowrap;
+  letter-spacing: -0.02em;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.library-toolbar.search-active .toolbar-right {
+  width: 100%;
+  margin-left: 0;
+}
+
 .subtab-back-btn {
   display: inline-flex;
   align-items: center;
@@ -476,6 +512,20 @@ defineExpose({
   gap: 10px;
   flex-wrap: nowrap;
   flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .subtab-back-btn span {
+    display: none;
+  }
+  .subtab-back-btn {
+    width: 38px;
+    padding: 0;
+    justify-content: center;
+  }
+  .toolbar-section-title {
+    font-size: 16px;
+  }
 }
 
 .stats {

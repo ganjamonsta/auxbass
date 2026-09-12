@@ -1,47 +1,53 @@
 <template>
   <div class="library-tracks">
-    <!-- Unified Toolbar: Back button + Controls + Expandable Search -->
+    <!-- Unified Toolbar: Back button + Title + Controls + Expandable Search -->
     <div class="library-toolbar" :class="{ 'search-active': isSearchOpen }">
-      <!-- Back button (hidden when search is open) -->
-      <button 
-        v-if="showBack && !isSearchOpen" 
-        type="button"
-        class="subtab-back-btn" 
-        @click="$emit('back')"
-        title="Все разделы"
-      >
-        <ChevronLeft :size="18" />
-        <span>Все разделы</span>
-      </button>
-
-      <!-- Action controls (hidden when search is open) -->
-      <div v-if="!isSearchOpen" class="toolbar-controls">
-        <button class="shuffle-all-btn" @click="shuffleAll" :disabled="!total || shuffling">
-          <div v-if="shuffling" class="spinner small"></div>
-          <Shuffle v-else :size="16" class="shuffle-icon" />
-          <span class="shuffle-text">
-            <template v-if="shuffling">Загрузка...</template>
-            <template v-else-if="total > 0">Перемешать ({{ total }})</template>
-            <template v-else>Перемешать</template>
-          </span>
+      <!-- Left side: Back button and Section Title (hidden when search is open) -->
+      <div v-if="!isSearchOpen" class="toolbar-left">
+        <button 
+          v-if="showBack" 
+          type="button"
+          class="subtab-back-btn" 
+          @click="$emit('back')"
+          title="Все разделы"
+        >
+          <ChevronLeft :size="18" />
+          <span>Все разделы</span>
         </button>
-        <SortChips
-          :currentOption="currentOption"
-          :sortOrder="sortOrder"
-          @next="onNextSort"
-          @toggle-order="onToggleOrder"
-        />
+        <h1 class="toolbar-section-title">Треки</h1>
       </div>
 
-      <!-- Expandable Search -->
-      <ExpandableSearch
-        v-model="localQuery"
-        v-model:open="isSearchOpen"
-        placeholder="Название или исполнитель..."
-        title="Поиск по трекам"
-        @input="onSearchInput"
-        @clear="onSearchClear"
-      />
+      <!-- Right side: Controls & Expandable Search (controls pressed up to search) -->
+      <div class="toolbar-right">
+        <!-- Action controls (hidden when search is open) -->
+        <div v-if="!isSearchOpen" class="toolbar-controls">
+          <button class="shuffle-all-btn" @click="shuffleAll" :disabled="!total || shuffling">
+            <div v-if="shuffling" class="spinner small"></div>
+            <Shuffle v-else :size="16" class="shuffle-icon" />
+            <span class="shuffle-text">
+              <template v-if="shuffling">Загрузка...</template>
+              <template v-else-if="total > 0">Перемешать ({{ total }})</template>
+              <template v-else>Перемешать</template>
+            </span>
+          </button>
+          <SortChips
+            :currentOption="currentOption"
+            :sortOrder="sortOrder"
+            @next="onNextSort"
+            @toggle-order="onToggleOrder"
+          />
+        </div>
+
+        <!-- Expandable Search -->
+        <ExpandableSearch
+          v-model="localQuery"
+          v-model:open="isSearchOpen"
+          placeholder="Название или исполнитель..."
+          title="Поиск по трекам"
+          @input="onSearchInput"
+          @clear="onSearchClear"
+        />
+      </div>
     </div>
 
     <!-- Virtual track list (without search) -->
@@ -623,6 +629,36 @@ onUnmounted(() => {
   justify-content: stretch;
 }
 
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.toolbar-section-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--c-text-1, #fff);
+  margin: 0;
+  line-height: 1;
+  white-space: nowrap;
+  letter-spacing: -0.02em;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.library-toolbar.search-active .toolbar-right {
+  width: 100%;
+  margin-left: 0;
+}
+
 .subtab-back-btn {
   display: inline-flex;
   align-items: center;
@@ -668,9 +704,15 @@ onUnmounted(() => {
     padding: 0;
     justify-content: center;
   }
+  .toolbar-section-title {
+    font-size: 16px;
+  }
   .shuffle-all-btn {
     min-width: auto;
     padding: 0 12px;
+  }
+  .shuffle-text {
+    display: none;
   }
 }
 
