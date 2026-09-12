@@ -41,9 +41,31 @@ class ApiCache {
   }
 
   /**
+   * Determine if the endpoint should be cached
+   */
+  isCacheable(url) {
+    if (!url) return false
+    // Explicit blacklist for dynamic/job polling/auth endpoints
+    if (
+      url.includes('/ingestion/jobs') ||
+      url.includes('/ingestion/recent') ||
+      url.includes('/auth/') ||
+      url.includes('/status') ||
+      url.includes('/health') ||
+      url.includes('/stream') ||
+      url.includes('/download')
+    ) {
+      return false
+    }
+    return true
+  }
+
+  /**
    * Get TTL for specific endpoint
    */
   getTTL(url) {
+    if (!this.isCacheable(url)) return 0
+
     if (url.includes('/tracks/liked')) return this.ttls.liked
     if (url.includes('/tracks/global/stats')) return this.ttls.stats
     if (url.includes('/library/stats')) return this.ttls.stats
@@ -63,7 +85,11 @@ class ApiCache {
    * Store value in cache
    */
   set(key, value, customTTL = null) {
+    if (!this.isCacheable(key)) return
+
     const ttl = customTTL || this.getTTL(key)
+    if (ttl <= 0) return
+
     const expiresAt = Date.now() + ttl
     
     this.cache.set(key, {
@@ -79,6 +105,10 @@ class ApiCache {
    * Get value from cache
    */
   get(key) {
+    if (!this.isCacheable(key)) {
+      return null
+    }
+
     const entry = this.cache.get(key)
     
     if (!entry) {

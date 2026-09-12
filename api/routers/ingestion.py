@@ -192,6 +192,8 @@ class JobResponse(BaseModel):
     skipped_tracks: int
     failed_tracks: int
     current_track_title: Optional[str] = None
+    current_step: Optional[str] = None
+    download_percent: Optional[int] = None
     status: str
     progress_percent: int
     error_message: Optional[str] = None
@@ -1128,31 +1130,10 @@ async def start_exportify_import(
     pipeline = IngestionPipeline(bot)
 
     # Spawn background task
-    asyncio.create_task(pipeline.execute_job(job))
+    task = asyncio.create_task(pipeline.execute_job(job))
+    job_manager.register_task(job.id, task)
 
-    return JobResponse(
-        id=job.id,
-        user_id=job.user_id,
-        url=job.url,
-        provider_name=job.provider_name,
-        entity_type=job.entity_type,
-        title=job.title,
-        author=job.author,
-        cover_url=job.cover_url,
-        total_tracks=job.total_tracks,
-        processed_tracks=job.processed_tracks,
-        skipped_tracks=job.skipped_tracks,
-        failed_tracks=job.failed_tracks,
-        current_track_title=job.current_track_title,
-        status=job.status.value,
-        progress_percent=job.progress_percent,
-        error_message=job.error_message,
-        playlist_id=job.playlist_id,
-        imported_track_ids=job.imported_track_ids,
-        selected_urls=job.selected_urls,
-        created_at=job.created_at.isoformat(),
-        updated_at=job.updated_at.isoformat(),
-    )
+    return JobResponse(**job.to_dict())
 
 
 @router.get("/account/spotify/likes")

@@ -321,9 +321,9 @@ export const socialApi = {
 export const ingestionApi = {
   preview: (url) => api.post('/ingestion/preview', { url }),
   start: (url, selectedUrls = null) => api.post('/ingestion/start', { url, selected_urls: selectedUrls }),
-  getJob: (jobId) => api.get(`/ingestion/jobs/${jobId}`),
+  getJob: (jobId) => api.get(`/ingestion/jobs/${jobId}`, { bypassCache: true }),
   cancelJob: (jobId) => api.post(`/ingestion/jobs/${jobId}/cancel`),
-  getRecent: () => api.get('/ingestion/recent'),
+  getRecent: () => api.get('/ingestion/recent', { bypassCache: true }),
   search: (q, provider = 'soundcloud', limit = 30) => api.get('/ingestion/search', { params: { q, provider, limit } }),
   quickImport: (data) => api.post('/ingestion/quick-import', data),
   getSoundCloudAccount: () => api.get('/ingestion/account/soundcloud'),

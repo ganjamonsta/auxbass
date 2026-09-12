@@ -233,6 +233,20 @@
                   :class="{ completed: activeJob.status === 'completed' }"
                 ></div>
               </div>
+
+              <!-- Track mini progress for download -->
+              <div 
+                v-if="activeJob.download_percent !== null && activeJob.download_percent !== undefined && activeJob.status === 'in_progress'"
+                class="track-mini-progress"
+              >
+                <div class="track-mini-bar-track">
+                  <div class="track-mini-bar-fill" :style="{ width: `${activeJob.download_percent}%` }"></div>
+                </div>
+                <div class="track-mini-meta">
+                  <span>{{ activeJob.current_step || 'Скачивание аудио 320 kbps' }}</span>
+                  <span>{{ activeJob.download_percent }}%</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -415,7 +429,9 @@ const statusDescription = computed(() => {
     case 'pending':
       return 'В очереди на импорт...'
     case 'in_progress':
-      return `Импортировано ${activeJob.value.processed_tracks} из ${activeJob.value.total_tracks} треков`
+      return activeJob.value.current_step
+        ? `${activeJob.value.current_step} • ${activeJob.value.processed_tracks} из ${activeJob.value.total_tracks}`
+        : `Импортировано ${activeJob.value.processed_tracks} из ${activeJob.value.total_tracks} треков`
     case 'completed':
       return `Готово! Добавлено ${activeJob.value.imported_track_ids?.length || activeJob.value.processed_tracks} треков`
     case 'failed':
@@ -1336,5 +1352,37 @@ onUnmounted(() => {
   color: #fff;
   border-color: #ff5500;
   box-shadow: 0 2px 8px rgba(255, 85, 0, 0.3);
+}
+
+.track-mini-progress {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+}
+
+.track-mini-bar-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.track-mini-bar-fill {
+  height: 100%;
+  background: #ff7700;
+  border-radius: 2px;
+  transition: width 0.2s ease;
+}
+
+.track-mini-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #ff9944;
+  font-weight: 500;
 }
 </style>

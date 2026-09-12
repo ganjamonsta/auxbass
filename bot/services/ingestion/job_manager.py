@@ -34,6 +34,8 @@ class IngestionJob:
     skipped_tracks: int = 0
     failed_tracks: int = 0
     current_track_title: Optional[str] = None
+    current_step: Optional[str] = None
+    download_percent: Optional[int] = None
     status: JobStatus = JobStatus.PENDING
     error_message: Optional[str] = None
     playlist_id: Optional[int] = None
@@ -66,6 +68,8 @@ class IngestionJob:
             "skipped_tracks": self.skipped_tracks,
             "failed_tracks": self.failed_tracks,
             "current_track_title": self.current_track_title,
+            "current_step": self.current_step,
+            "download_percent": self.download_percent,
             "status": self.status.value,
             "progress_percent": self.progress_percent,
             "error_message": self.error_message,

@@ -8,7 +8,7 @@ import asyncio
 import logging
 import aiohttp
 import time
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any, Tuple, Callable
 
 import yt_dlp
 
@@ -259,10 +259,33 @@ class SoundCloudProvider(BaseMusicProvider):
 
         return tracks
 
-    async def download_track(self, track_meta: TrackMetadata, temp_dir: str) -> DownloadedAudio:
+    async def download_track(
+        self,
+        track_meta: TrackMetadata,
+        temp_dir: str,
+        progress_hook: Optional[Callable[[int], None]] = None,
+    ) -> DownloadedAudio:
         """Download track to MP3 and fetch high quality cover artwork."""
         os.makedirs(temp_dir, exist_ok=True)
         out_template = os.path.join(temp_dir, "audio.%(ext)s")
+
+        def _yt_progress(d):
+            if not progress_hook:
+                return
+            if d.get("status") == "downloading":
+                total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+                downloaded = d.get("downloaded_bytes") or 0
+                if total > 0:
+                    pct = min(99, max(0, int((downloaded / total) * 100)))
+                    try:
+                        progress_hook(pct)
+                    except Exception:
+                        pass
+            elif d.get("status") == "finished":
+                try:
+                    progress_hook(100)
+                except Exception:
+                    pass
 
         def _download():
             ydl_opts = {
@@ -270,6 +293,7 @@ class SoundCloudProvider(BaseMusicProvider):
                 "outtmpl": out_template,
                 "concurrent_fragment_downloads": 5,
                 "color": "never",
+                "progress_hooks": [_yt_progress] if progress_hook else [],
                 "postprocessors": [
                     {
                         "key": "FFmpegExtractAudio",
@@ -300,7 +324,7 @@ class SoundCloudProvider(BaseMusicProvider):
                 from ..audio_resolver import audio_resolver
                 try:
                     return await audio_resolver.resolve_and_download(
-                        track_meta, temp_dir, exclude_urls={track_meta.url}
+                        track_meta, temp_dir, exclude_urls={track_meta.url}, progress_hook=progress_hook
                     )
                 except Exception as resolve_err:
                     logger.warning(f"AudioResolver fallback failed for '{track_meta.title}': {resolve_err}")

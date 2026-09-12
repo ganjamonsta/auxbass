@@ -32,9 +32,14 @@
                     <span>{{ statusText }}</span>
                   </div>
                   <h4 class="progress-job-title">{{ activeJob.title || 'Импорт Spotify' }}</h4>
-                  <p class="progress-current-track" v-if="activeJob.current_track_title">
-                    {{ activeJob.current_track_title }}
-                  </p>
+                  <div class="progress-current-track-wrap" v-if="activeJob.current_track_title">
+                    <p class="progress-current-track">
+                      {{ activeJob.current_track_title }}
+                    </p>
+                    <span v-if="activeJob.current_step && activeJob.status === 'in_progress'" class="progress-step-pill">
+                      {{ activeJob.current_step }}
+                    </span>
+                  </div>
                 </div>
 
                 <div class="progress-bar-wrap">
@@ -48,6 +53,23 @@
                   <div class="progress-stats-row">
                     <span class="stat-count">{{ activeJob.processed_tracks }} из {{ activeJob.total_tracks }}</span>
                     <span class="stat-percent">{{ activeJob.progress_percent }}%</span>
+                  </div>
+                </div>
+
+                <!-- Current track mini progress (yt-dlp download) -->
+                <div 
+                  v-if="activeJob.download_percent !== null && activeJob.download_percent !== undefined && activeJob.status === 'in_progress'" 
+                  class="track-mini-progress"
+                >
+                  <div class="track-mini-bar-track">
+                    <div 
+                      class="track-mini-bar-fill"
+                      :style="{ width: `${activeJob.download_percent}%` }"
+                    ></div>
+                  </div>
+                  <div class="track-mini-meta">
+                    <span>Скачивание аудио 320 kbps</span>
+                    <span>{{ activeJob.download_percent }}%</span>
                   </div>
                 </div>
 
@@ -395,7 +417,7 @@ const statusText = computed(() => {
   if (!activeJob.value) return ''
   switch (activeJob.value.status) {
     case 'in_progress':
-      return 'Синхронизация...'
+      return activeJob.value.current_step || 'Синхронизация...'
     case 'completed':
       return 'Импорт успешно завершён!'
     case 'failed':
@@ -1381,11 +1403,62 @@ watch(
   color: #fff;
 }
 
+.progress-current-track-wrap {
+  margin: 0 0 16px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
 .progress-current-track {
-  margin: 0 0 20px 0;
+  margin: 0;
   font-size: 13px;
-  color: #94a3b8;
-  font-family: monospace;
+  color: #f1f3f5;
+  font-weight: 500;
+}
+
+.progress-step-pill {
+  font-size: 11px;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.track-mini-progress {
+  margin: 6px 0 14px 0;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+}
+
+.track-mini-bar-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.track-mini-bar-fill {
+  height: 100%;
+  background: #38bdf8;
+  border-radius: 2px;
+  transition: width 0.2s ease;
+}
+
+.track-mini-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #7dd3fc;
+  font-weight: 500;
 }
 
 .progress-bar-wrap {

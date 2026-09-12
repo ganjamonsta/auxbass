@@ -5,7 +5,7 @@ Scalable foundation for external audio sources (SoundCloud, Spotify, YouTube Mus
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Callable
 
 
 class EntityType(str, Enum):
@@ -78,7 +78,12 @@ class BaseMusicProvider(ABC):
         pass
 
     @abstractmethod
-    async def download_track(self, track_meta: TrackMetadata, temp_dir: str) -> DownloadedAudio:
+    async def download_track(
+        self,
+        track_meta: TrackMetadata,
+        temp_dir: str,
+        progress_hook: Optional[Callable[[int], None]] = None,
+    ) -> DownloadedAudio:
         """Download track audio and artwork into the specified directory."""
         pass
 

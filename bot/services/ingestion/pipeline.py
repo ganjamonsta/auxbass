@@ -340,6 +340,8 @@ class IngestionPipeline:
                     break
 
                 job.current_track_title = f"{track_meta.artist} - {track_meta.title}"
+                job.current_step = "Поиск аудио 320 kbps"
+                job.download_percent = 0
                 job.updated_at = datetime.now(timezone.utc)
                 if progress_callback:
                     await progress_callback(job)
@@ -352,6 +354,10 @@ class IngestionPipeline:
 
                     if existing:
                         logger.info(f"[Ingestion] Found existing track {existing.id} ({existing.artist} - {existing.title})")
+                        job.current_step = "Трек уже в базе (мгновенно)"
+                        job.download_percent = 100
+                        job.updated_at = datetime.now(timezone.utc)
+
                         # Add existing track to user's library
                         await track_service.save_track(
                             user_id=job.user_id,
@@ -380,6 +386,8 @@ class IngestionPipeline:
                         job.imported_track_ids.append(existing.id)
                         job.skipped_tracks += 1
                         job.processed_tracks += 1
+                        job.download_percent = None
+                        job.current_step = None
                         job.updated_at = datetime.now(timezone.utc)
                         if progress_callback:
                             await progress_callback(job)
@@ -387,16 +395,34 @@ class IngestionPipeline:
 
                     # B. Download audio to temporary directory
                     with tempfile.TemporaryDirectory() as temp_dir:
-                        downloaded = await provider.download_track(track_meta, temp_dir)
+                        job.current_step = "Скачивание аудиопотока"
+                        job.download_percent = 0
+                        job.updated_at = datetime.now(timezone.utc)
+
+                        def on_download_progress(pct: int):
+                            job.download_percent = pct
+                            job.current_step = f"Скачивание аудио ({pct}%)"
+                            job.updated_at = datetime.now(timezone.utc)
+
+                        downloaded = await provider.download_track(
+                            track_meta, temp_dir, progress_hook=on_download_progress
+                        )
 
                         # Check Telegram 50MB limit
                         if downloaded.file_size > 50 * 1024 * 1024:
                             logger.warning(f"[Ingestion] File {downloaded.audio_path} exceeds 50MB ({downloaded.file_size} bytes). Skipping.")
                             job.failed_tracks += 1
                             job.processed_tracks += 1
+                            job.download_percent = None
+                            job.current_step = None
+                            job.updated_at = datetime.now(timezone.utc)
                             continue
 
                         # C. Upload to Telegram
+                        job.current_step = "Загрузка в Telegram"
+                        job.download_percent = 100
+                        job.updated_at = datetime.now(timezone.utc)
+
                         safe_filename = f"{track_meta.artist} - {track_meta.title}.mp3".replace("/", "-")
                         audio_input = FSInputFile(downloaded.audio_path, filename=safe_filename)
                         thumb_input = None
@@ -427,12 +453,18 @@ class IngestionPipeline:
                         if not sent_msg or not sent_msg.audio:
                             job.failed_tracks += 1
                             job.processed_tracks += 1
+                            job.download_percent = None
+                            job.current_step = None
+                            job.updated_at = datetime.now(timezone.utc)
                             continue
 
                         job.uploaded_chat_id = target_chat_id
                         job.uploaded_message_id = sent_msg.message_id
 
                         # D. Register in database & trigger enrichment
+                        job.current_step = "Сохранение в медиатеку"
+                        job.updated_at = datetime.now(timezone.utc)
+
                         save_result = await track_service.save_track(
                             user_id=job.user_id,
                             file_id=sent_msg.audio.file_id,
@@ -462,6 +494,8 @@ class IngestionPipeline:
 
                         job.imported_track_ids.append(save_result.track_id)
                         job.processed_tracks += 1
+                        job.download_percent = None
+                        job.current_step = None
                         job.updated_at = datetime.now(timezone.utc)
                         if progress_callback:
                             await progress_callback(job)
@@ -478,11 +512,18 @@ class IngestionPipeline:
                         logger.error(f"[Ingestion] Failed to import track {track_meta.title}: {clean_msg}")
                     job.failed_tracks += 1
                     job.processed_tracks += 1
+                    job.download_percent = None
+                    job.current_step = None
+                    job.updated_at = datetime.now(timezone.utc)
+                    if progress_callback:
+                        await progress_callback(job)
 
             # Done processing all tracks
             if job.status != JobStatus.CANCELLED:
                 job.status = JobStatus.COMPLETED
                 job.current_track_title = None
+                job.current_step = "Импорт завершен"
+                job.download_percent = None
                 job.updated_at = datetime.now(timezone.utc)
                 if progress_callback:
                     await progress_callback(job)

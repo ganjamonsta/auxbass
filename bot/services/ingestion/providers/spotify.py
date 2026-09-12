@@ -9,7 +9,7 @@ import json
 import logging
 import asyncio
 import tempfile
-from typing import Optional, List, Tuple, Dict, Any
+from typing import Optional, List, Tuple, Dict, Any, Callable
 
 import aiohttp
 
@@ -190,13 +190,20 @@ class SpotifyProvider(BaseMusicProvider):
 
         return tracks
 
-    async def download_track(self, track_meta: TrackMetadata, temp_dir: str) -> DownloadedAudio:
+    async def download_track(
+        self,
+        track_meta: TrackMetadata,
+        temp_dir: str,
+        progress_hook: Optional[Callable[[int], None]] = None,
+    ) -> DownloadedAudio:
         """
         Download track using the Audio Sourcing Engine.
         Matches unencrypted audio streams, applies 320kbps MP3 conversion,
         and saves official high-resolution artwork.
         """
-        return await audio_resolver.resolve_and_download(track_meta, temp_dir)
+        return await audio_resolver.resolve_and_download(
+            track_meta, temp_dir, progress_hook=progress_hook
+        )
 
     async def search(self, query: str, limit: int = 30) -> List[TrackMetadata]:
         """

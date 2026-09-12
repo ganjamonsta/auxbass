@@ -8,7 +8,7 @@ import re
 import logging
 import asyncio
 import tempfile
-from typing import Optional, List, Set
+from typing import Optional, List, Set, Callable
 
 import aiohttp
 import yt_dlp
@@ -38,6 +38,7 @@ class AudioResolver:
         track_meta: TrackMetadata,
         temp_dir: str,
         exclude_urls: Optional[Set[str]] = None,
+        progress_hook: Optional[Callable[[int], None]] = None,
     ) -> DownloadedAudio:
         """
         Find an alternative unencrypted audio stream matching the track,
@@ -74,7 +75,7 @@ class AudioResolver:
         )
 
         # 3. Download audio stream
-        audio_path = await self._download_stream(best_candidate["url"], temp_dir)
+        audio_path = await self._download_stream(best_candidate["url"], temp_dir, progress_hook=progress_hook)
 
         # 4. Download high-quality cover artwork if available
         cover_path = None
@@ -165,9 +166,32 @@ class AudioResolver:
         valid_candidates.sort(key=lambda x: x[0])
         return valid_candidates[0][1]
 
-    async def _download_stream(self, url: str, temp_dir: str) -> str:
+    async def _download_stream(
+        self,
+        url: str,
+        temp_dir: str,
+        progress_hook: Optional[Callable[[int], None]] = None,
+    ) -> str:
         """Download candidate audio stream to MP3 at 320kbps."""
         out_template = os.path.join(temp_dir, "resolved_audio.%(ext)s")
+
+        def _yt_progress(d):
+            if not progress_hook:
+                return
+            if d.get("status") == "downloading":
+                total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+                downloaded = d.get("downloaded_bytes") or 0
+                if total > 0:
+                    pct = min(99, max(0, int((downloaded / total) * 100)))
+                    try:
+                        progress_hook(pct)
+                    except Exception:
+                        pass
+            elif d.get("status") == "finished":
+                try:
+                    progress_hook(100)
+                except Exception:
+                    pass
 
         def _dl():
             ydl_opts = {
@@ -175,6 +199,7 @@ class AudioResolver:
                 "outtmpl": out_template,
                 "concurrent_fragment_downloads": 5,
                 "color": "never",
+                "progress_hooks": [_yt_progress] if progress_hook else [],
                 "postprocessors": [
                     {
                         "key": "FFmpegExtractAudio",
