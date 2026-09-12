@@ -439,6 +439,8 @@ onUnmounted(() => {
 <style scoped>
 .vfd-display {
   position: relative;
+  flex: 1;
+  min-width: 0;
   width: 100%;
   height: 22px;
   display: flex;
