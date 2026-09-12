@@ -26,14 +26,19 @@
             <button
               v-if="authStore.user && !isDesktop"
               class="header-profile-btn"
+              :class="{ 'has-active-imports': tasksStore.hasActiveImports }"
               @click="showProfileMenu = true"
               @contextmenu.prevent="showProfileMenu = true"
               v-longpress="() => { showProfileMenu = true }"
-              title="Меню профиля"
+              :title="tasksStore.hasActiveImports ? `Импорт: ${tasksStore.overallProgress}% (открыть меню профиля)` : 'Меню профиля'"
             >
-              <div class="header-avatar-badge">
+              <div class="header-avatar-badge" :class="{ 'importing': tasksStore.hasActiveImports }">
                 {{ userInitials }}
+                <div v-if="tasksStore.hasActiveImports" class="header-import-spinner-ring"></div>
               </div>
+              <span v-if="tasksStore.hasActiveImports" class="header-import-pill">
+                {{ tasksStore.overallProgress }}%
+              </span>
             </button>
           </template>
         </PageHeader>
@@ -187,9 +192,6 @@
       <!-- Global toast notifications -->
       <ToastContainer />
 
-      <!-- Minimized Background Tasks Widget -->
-      <FloatingTaskWidget />
-
       <!-- Global Ingestion Modals (accessible from any screen) -->
       <ExportifyImportModal 
         :show="tasksStore.showExportifyModal"
@@ -244,7 +246,6 @@ const PwaInstallBanner = defineAsyncComponent(() => import('@/components/PwaInst
 const ChannelBanner = defineAsyncComponent(() => import('@/components/ChannelBanner.vue'))
 const MaintenanceBanner = defineAsyncComponent(() => import('@/components/MaintenanceBanner.vue'))
 const NetworkBanner = defineAsyncComponent(() => import('@/components/NetworkBanner.vue'))
-const FloatingTaskWidget = defineAsyncComponent(() => import('@/components/FloatingTaskWidget.vue'))
 const ExportifyImportModal = defineAsyncComponent(() => import('@/components/ExportifyImportModal.vue'))
 const ImportModal = defineAsyncComponent(() => import('@/components/ImportModal.vue'))
 
@@ -876,9 +877,11 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
 }
 
 .header-avatar-badge {
+  position: relative;
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -891,6 +894,41 @@ html, body {
   justify-content: center;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
   transition: transform 0.15s ease;
+}
+
+.header-avatar-badge.importing {
+  box-shadow: 0 0 10px rgba(29, 185, 84, 0.4);
+}
+
+.header-import-spinner-ring {
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: var(--c-accent, #1db954);
+  border-right-color: #38bdf8;
+  animation: header-avatar-spin 1.2s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes header-avatar-spin {
+  to { transform: rotate(360deg); }
+}
+
+.header-import-pill {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(29, 185, 84, 0.2);
+  border: 1px solid rgba(29, 185, 84, 0.4);
+  padding: 2px 7px;
+  border-radius: 10px;
+  animation: pill-pulse 2s ease-in-out infinite;
+}
+
+@keyframes pill-pulse {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 0.6; }
 }
 
 .header-profile-btn:hover .header-avatar-badge {

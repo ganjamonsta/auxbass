@@ -168,16 +168,25 @@
     <div class="sidebar-footer">
       <div 
         class="user-info clickable" 
-        :class="{ active: showProfileMenu }"
+        :class="{ active: showProfileMenu, 'has-active-imports': tasksStore.hasActiveImports }"
         @click="showProfileMenu = !showProfileMenu" 
         @contextmenu.prevent="showProfileMenu = true"
         v-longpress="() => { showProfileMenu = true }"
-        title="Меню профиля"
+        :title="tasksStore.hasActiveImports ? `Импорт: ${tasksStore.overallProgress}% (открыть меню профиля)` : 'Меню профиля'"
       >
-        <div class="user-avatar">
-          {{ userInitials }}
+        <div class="user-avatar-wrap">
+          <div class="user-avatar" :class="{ 'importing': tasksStore.hasActiveImports }">
+            {{ userInitials }}
+          </div>
+          <div v-if="tasksStore.hasActiveImports" class="avatar-import-ring"></div>
         </div>
-        <span class="user-name">{{ userName }}</span>
+        <div class="user-info-text">
+          <span class="user-name">{{ userName }}</span>
+          <span v-if="tasksStore.hasActiveImports" class="user-import-indicator">
+            <span class="import-pulsing-dot"></span>
+            <span class="import-label">Импорт {{ tasksStore.overallProgress }}%</span>
+          </span>
+        </div>
       </div>
       <button 
         v-if="!pwaInstall.isInstalled" 
@@ -210,6 +219,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
+import { useTasksStore } from '@/stores/tasks'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import { getCoverUrl, CoverSize, getPlaylistCoverStyle } from '@/utils'
@@ -222,6 +232,7 @@ const router = useRouter()
 const libraryStore = useLibraryStore()
 const authStore = useAuthStore()
 const uiStore = useUIStore()
+const tasksStore = useTasksStore()
 const pwaInstall = usePwaInstall()
 const showProfileMenu = ref(false)
 const cachedTracksCount = ref(0)
@@ -740,6 +751,16 @@ onUnmounted(() => {
   min-width: 0;
 }
 
+.user-avatar-wrap {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .user-avatar {
   width: 32px;
   height: 32px;
@@ -752,14 +773,72 @@ onUnmounted(() => {
   font-weight: 600;
   color: white;
   flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.user-avatar.importing {
+  box-shadow: 0 0 10px rgba(29, 185, 84, 0.35);
+}
+
+.avatar-import-ring {
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: var(--c-accent, #1db954);
+  border-right-color: #38bdf8;
+  animation: avatar-spin 1.2s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes avatar-spin {
+  to { transform: rotate(360deg); }
+}
+
+.user-info-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .user-name {
-  font-size: 14px;
+  font-size: 13px;
   color: white;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.user-import-indicator {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 1px;
+}
+
+.import-pulsing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--c-accent, #1db954);
+  box-shadow: 0 0 6px var(--c-accent, #1db954);
+  animation: dot-pulse 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes dot-pulse {
+  0%, 100% { transform: scale(0.9); opacity: 0.6; }
+  50% { transform: scale(1.3); opacity: 1; }
+}
+
+.import-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-accent, #1db954);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .user-info.clickable {

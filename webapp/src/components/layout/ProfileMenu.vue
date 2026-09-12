@@ -34,6 +34,97 @@
             </div>
           </div>
 
+          <!-- Active Background Imports / Ingestion Section -->
+          <div v-if="tasksStore.hasActiveImports" class="profile-imports-section">
+            <div class="profile-section-header">
+              <div class="profile-section-title">
+                <CloudDownload :size="13" class="section-icon" />
+                <span>Импорт медиатеки</span>
+              </div>
+              <span class="profile-section-count">
+                {{ tasksStore.activeMinimizedJobs.length }}
+              </span>
+            </div>
+
+            <div class="profile-import-cards">
+              <div
+                v-for="item in tasksStore.activeMinimizedJobs"
+                :key="item.job.id"
+                class="profile-import-card"
+                :class="[item.meta?.type || 'generic', item.job.status, { 'is-queue': item.meta?.isQueue }]"
+                @click="handleRestoreJob(item.job.id)"
+                :title="item.meta?.isQueue ? 'Очередь загрузки треков' : 'Нажмите, чтобы развернуть окно импорта'"
+              >
+                <!-- Top row: icon + title + progress + actions -->
+                <div class="import-card-top">
+                  <div class="import-icon-badge">
+                    <div v-if="item.job.status === 'in_progress'" class="import-spinner"></div>
+                    <Check v-else-if="item.job.status === 'completed'" :size="13" class="import-status-glyph success" />
+                    <AlertCircle v-else :size="13" class="import-status-glyph error" />
+
+                    <Music2 v-if="item.meta?.type === 'exportify'" :size="12" class="import-type-glyph" />
+                    <CloudDownload v-else :size="12" class="import-type-glyph" />
+                  </div>
+
+                  <div class="import-main-info">
+                    <div class="import-name-row">
+                      <span class="import-name" :title="item.job.title">{{ item.job.title }}</span>
+                      <span class="import-pct-badge">
+                        {{ item.job.progress_percent }}%
+                      </span>
+                    </div>
+                    <div class="import-stats-row">
+                      <span class="import-tracks-count">
+                        {{ item.job.processed_tracks }} / {{ item.job.total_tracks }} треков
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="import-actions" @click.stop>
+                    <button
+                      v-if="!item.meta?.isQueue"
+                      class="import-action-btn restore"
+                      @click="handleRestoreJob(item.job.id)"
+                      title="Развернуть"
+                    >
+                      <Maximize2 :size="12" />
+                    </button>
+                    <button
+                      v-if="item.job.status === 'in_progress'"
+                      class="import-action-btn cancel"
+                      @click="handleCancelJob(item.job.id)"
+                      :title="item.meta?.isQueue ? 'Отменить очередь' : 'Отменить импорт'"
+                    >
+                      <X :size="12" />
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Subtext row -->
+                <div class="import-subtext" :title="subtextFor(item.job)">
+                  {{ subtextFor(item.job) }}
+                </div>
+
+                <!-- Mini download bar if currently downloading audio file -->
+                <div 
+                  v-if="item.job.download_percent !== null && item.job.download_percent !== undefined && item.job.status === 'in_progress'"
+                  class="import-download-bar"
+                >
+                  <div class="import-download-fill" :style="{ width: `${item.job.download_percent}%` }"></div>
+                </div>
+
+                <!-- Overall progress line -->
+                <div class="import-progress-bar">
+                  <div 
+                    class="import-progress-fill"
+                    :style="{ width: `${item.job.progress_percent}%` }"
+                    :class="{ completed: item.job.status === 'completed' }"
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="profile-menu-divider"></div>
 
           <!-- Menu Navigation Options -->
@@ -107,6 +198,7 @@ import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
+import { useTasksStore } from '@/stores/tasks'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import { 
   Users, 
@@ -115,7 +207,13 @@ import {
   Download, 
   LogOut, 
   ChevronRight, 
-  Sparkles 
+  Sparkles,
+  CloudDownload,
+  Music2,
+  Check,
+  AlertCircle,
+  Maximize2,
+  X
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -134,6 +232,7 @@ const emit = defineEmits(['update:modelValue', 'close'])
 const router = useRouter()
 const authStore = useAuthStore()
 const playerStore = usePlayerStore()
+const tasksStore = useTasksStore()
 const pwaInstall = usePwaInstall()
 
 const isMobile = ref(window.innerWidth < 1024)
@@ -262,6 +361,30 @@ const handleKeyDown = (e) => {
   }
 }
 
+const subtextFor = (job) => {
+  if (!job) return ''
+  if (job.status === 'completed') return job.current_step || 'Импорт завершён'
+  if (job.status === 'failed') return job.error_message || 'Ошибка'
+  if (job.status === 'cancelled') return 'Отменено'
+
+  if (job.current_step && job.current_track_title) {
+    return `${job.current_track_title} • ${job.current_step}`
+  }
+  if (job.current_track_title) {
+    return job.current_track_title
+  }
+  return job.current_step || 'Синхронизация...'
+}
+
+const handleRestoreJob = (jobId) => {
+  close()
+  tasksStore.restoreJob(jobId)
+}
+
+const handleCancelJob = (jobId) => {
+  tasksStore.cancelJob(jobId)
+}
+
 watch(() => props.modelValue, (isOpen) => {
   if (isOpen && !isMobile.value) {
     nextTick(updateDesktopPosition)
@@ -269,6 +392,12 @@ watch(() => props.modelValue, (isOpen) => {
 })
 
 watch(() => playerStore.currentTrack, () => {
+  if (props.modelValue && !isMobile.value) {
+    nextTick(updateDesktopPosition)
+  }
+})
+
+watch(() => tasksStore.activeMinimizedJobs.length, () => {
   if (props.modelValue && !isMobile.value) {
     nextTick(updateDesktopPosition)
   }
@@ -436,6 +565,241 @@ onUnmounted(() => {
   height: 1px;
   background: rgba(255, 255, 255, 0.08);
   margin: 4px 12px;
+}
+
+/* Active Imports Section */
+.profile-imports-section {
+  padding: 2px 8px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.profile-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
+}
+
+.profile-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.section-icon {
+  color: var(--c-accent, #1db954);
+}
+
+.profile-section-count {
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.profile-import-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.profile-import-card {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 8px 10px 9px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.profile-import-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.profile-import-card.exportify {
+  border-color: rgba(29, 185, 84, 0.3);
+  background: rgba(29, 185, 84, 0.06);
+}
+
+.profile-import-card.import {
+  border-color: rgba(255, 85, 0, 0.3);
+  background: rgba(255, 85, 0, 0.06);
+}
+
+.profile-import-card.completed {
+  border-color: rgba(34, 197, 94, 0.3);
+  background: rgba(16, 28, 22, 0.6);
+}
+
+.import-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.import-icon-badge {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.profile-import-card.exportify .import-icon-badge {
+  background: linear-gradient(135deg, #1db954 0%, #15883e 100%);
+}
+
+.profile-import-card.import .import-icon-badge {
+  background: linear-gradient(135deg, #ff6600 0%, #cc4400 100%);
+}
+
+.import-spinner {
+  position: absolute;
+  inset: -2px;
+  border: 2px solid transparent;
+  border-top-color: #fff;
+  border-radius: 10px;
+  animation: spin 0.9s linear infinite;
+}
+
+.import-main-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.import-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.import-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-text-1, #fff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.import-pct-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #1ed760;
+  background: rgba(29, 185, 84, 0.15);
+  padding: 1px 5px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+
+.profile-import-card.import .import-pct-badge {
+  color: #ff8833;
+  background: rgba(255, 85, 0, 0.15);
+}
+
+.import-tracks-count {
+  font-size: 10px;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
+}
+
+.import-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.import-action-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.import-action-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.import-action-btn.cancel:hover {
+  background: rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+}
+
+.import-subtext {
+  font-size: 10px;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.6));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 4px;
+}
+
+.import-download-bar {
+  width: 100%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.import-download-fill {
+  height: 100%;
+  background: #38bdf8;
+  border-radius: 2px;
+  transition: width 0.2s ease;
+}
+
+.import-progress-bar {
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 5px;
+}
+
+.import-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #1db954 0%, #38bdf8 100%);
+  transition: width 0.3s ease;
+}
+
+.import-progress-fill.completed {
+  background: #22c55e;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* Menu Items */

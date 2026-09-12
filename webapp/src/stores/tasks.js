@@ -312,7 +312,7 @@ export const useTasksStore = defineStore('tasks', () => {
 
     uiStore.toast?.info(
       'Процесс свернут',
-      'Импорт продолжается в фоне. Вы можете продолжать слушать музыку!'
+      'Импорт продолжается в фоне. Прогресс доступен в меню профиля'
     )
   }
 
@@ -468,6 +468,21 @@ export const useTasksStore = defineStore('tasks', () => {
     return list
   })
 
+  const hasActiveImports = computed(() => activeMinimizedJobs.value.length > 0)
+
+  const isImportingInProgress = computed(() => {
+    return activeMinimizedJobs.value.some(item => item.job?.status === 'in_progress')
+  })
+
+  const overallProgress = computed(() => {
+    const active = activeMinimizedJobs.value
+    if (active.length === 0) return 0
+    const inProgress = active.filter(item => item.job?.status === 'in_progress')
+    const list = inProgress.length > 0 ? inProgress : active
+    const total = list.reduce((acc, item) => acc + (Number(item.job?.progress_percent) || 0), 0)
+    return Math.min(100, Math.max(0, Math.round(total / list.length)))
+  })
+
   return {
     jobs,
     jobMetas,
@@ -477,6 +492,9 @@ export const useTasksStore = defineStore('tasks', () => {
     currentExportifyJob,
     currentImportJob,
     activeMinimizedJobs,
+    hasActiveImports,
+    isImportingInProgress,
+    overallProgress,
     downloadQueue,
     isQueueProcessing,
     currentQueueTrack,
