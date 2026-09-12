@@ -147,7 +147,8 @@ const {
   getLoadedItems,
   reset,
   refresh,
-  updateScroll
+  updateScroll,
+  patchItem
 } = useVirtualScroll({
   fetchFn: props.fetchFn,
   pageSize: props.pageSize,
@@ -176,6 +177,7 @@ const handleContextMenu = (item, event) => emit('contextmenu', { item, event })
 defineExpose({
   reset,
   refresh,
+  patchItem,
   total,
   items: computed(() => getLoadedItems()),
   updateScroll

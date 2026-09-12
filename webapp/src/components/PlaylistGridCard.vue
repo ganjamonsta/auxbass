@@ -233,6 +233,13 @@ const handleClick = (e) => {
   transform: translateY(0);
 }
 
+/* Hide play button on mobile devices */
+@media (max-width: 768px) {
+  .play-btn {
+    display: none;
+  }
+}
+
 /* Liked songs cover styling */
 .liked-cover {
   width: 100%;
