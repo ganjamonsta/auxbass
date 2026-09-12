@@ -14,9 +14,19 @@
                 <p class="modal-subtitle">Распознавание треков, защита от дублей и аудио 320 kbps</p>
               </div>
             </div>
-            <button class="close-btn" @click="handleClose" title="Закрыть">
-              <X :size="18" />
-            </button>
+            <div class="header-right-actions">
+              <button 
+                v-if="activeJob && activeJob.status === 'in_progress'"
+                class="minimize-btn" 
+                @click="handleMinimize" 
+                title="Свернуть в фон"
+              >
+                <Minus :size="16" />
+              </button>
+              <button class="close-btn" @click="handleClose" title="Закрыть">
+                <X :size="18" />
+              </button>
+            </div>
           </div>
 
           <!-- Body -->
@@ -93,13 +103,22 @@
                   <Check :size="16" />
                   <span>Готово</span>
                 </button>
-                <button 
-                  v-else
-                  class="action-btn secondary"
-                  @click="handleCancelJob"
-                >
-                  <span>Отменить импорт</span>
-                </button>
+                <template v-else>
+                  <button 
+                    class="action-btn secondary"
+                    @click="handleMinimize"
+                    title="Свернуть процесс (продолжится в фоне)"
+                  >
+                    <Minus :size="15" />
+                    <span>Свернуть в фон</span>
+                  </button>
+                  <button 
+                    class="action-btn danger-outline"
+                    @click="handleCancelJob"
+                  >
+                    <span>Отменить</span>
+                  </button>
+                </template>
               </div>
             </div>
 
@@ -369,11 +388,13 @@ import {
   Play,
   Pause,
   Volume2,
+  Minus,
 } from 'lucide-vue-next'
 import { ingestionApi } from '@/api/client'
 import { useUIStore } from '@/stores/ui'
 import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
+import { useTasksStore } from '@/stores/tasks'
 
 const props = defineProps({
   show: {
@@ -387,6 +408,7 @@ const emit = defineEmits(['close', 'imported'])
 const uiStore = useUIStore()
 const libraryStore = useLibraryStore()
 const playerStore = usePlayerStore()
+const tasksStore = useTasksStore()
 
 const playingTrackUrl = ref(null)
 const previewLoadingUrl = ref(null)
@@ -603,6 +625,10 @@ const handleStartImport = async () => {
 
     const res = await ingestionApi.startExportifyImport(payload)
     activeJob.value = res.data
+    tasksStore.registerJob(res.data, {
+      type: 'exportify',
+      title: playlistName.value || 'Импорт Spotify',
+    })
     uiStore.toast?.success('Импорт запущен', `Загрузка ${chosenTracks.length} треков в медиатеку и Telegram-канал`)
 
     startPollingJob(res.data.id)
@@ -642,10 +668,17 @@ const stopPollingJob = () => {
   }
 }
 
+const handleMinimize = () => {
+  if (activeJob.value) {
+    tasksStore.minimizeJob(activeJob.value.id)
+  }
+  emit('close')
+}
+
 const handleCancelJob = async () => {
   if (!activeJob.value) return
   try {
-    await ingestionApi.cancelJob(activeJob.value.id)
+    await tasksStore.cancelJob(activeJob.value.id)
     activeJob.value.status = 'cancelled'
   } catch (e) {
     console.error('Cancel job error:', e)
@@ -659,6 +692,10 @@ const handleFinish = () => {
 }
 
 const handleClose = () => {
+  if (activeJob.value && activeJob.value.status === 'in_progress') {
+    handleMinimize()
+    return
+  }
   stopPollingJob()
   activeJob.value = null
   resetPreview()
@@ -666,12 +703,31 @@ const handleClose = () => {
 }
 
 watch(
+  () => tasksStore.currentExportifyJob,
+  (job) => {
+    if (job) {
+      activeJob.value = job
+    }
+  },
+  { immediate: true }
+)
+
+watch(
   () => props.show,
   (val) => {
-    if (!val) {
-      stopPollingJob()
-      activeJob.value = null
-      resetPreview()
+    if (val) {
+      if (tasksStore.currentExportifyJob) {
+        activeJob.value = tasksStore.currentExportifyJob
+        if (activeJob.value.status === 'in_progress') {
+          startPollingJob(activeJob.value.id)
+        }
+      }
+    } else {
+      if (!activeJob.value || activeJob.value.status !== 'in_progress') {
+        stopPollingJob()
+        activeJob.value = null
+        resetPreview()
+      }
     }
   }
 )
@@ -741,6 +797,32 @@ watch(
   margin: 2px 0 0 0;
   font-size: 12px;
   color: #8b929a;
+}
+
+.header-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.minimize-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.minimize-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .close-btn {
@@ -1519,8 +1601,28 @@ watch(
 
 .progress-footer-actions {
   display: flex;
+  align-items: center;
   justify-content: center;
+  gap: 12px;
   margin-top: 20px;
+}
+
+.action-btn.danger-outline {
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.action-btn.danger-outline:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #fff;
 }
 
 /* Spinner */

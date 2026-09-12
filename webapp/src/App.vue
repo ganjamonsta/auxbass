@@ -187,6 +187,20 @@
       <!-- Global toast notifications -->
       <ToastContainer />
 
+      <!-- Minimized Background Tasks Widget -->
+      <FloatingTaskWidget />
+
+      <!-- Global Ingestion Modals (accessible from any screen) -->
+      <ExportifyImportModal 
+        :show="tasksStore.showExportifyModal"
+        @close="tasksStore.closeExportifyModal"
+      />
+
+      <ImportModal
+        :show="tasksStore.showImportModal"
+        @close="tasksStore.closeImportModal"
+      />
+
       <!-- Share Modal -->
       <ShareModal />
 
@@ -203,6 +217,7 @@ import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
+import { useTasksStore } from '@/stores/tasks'
 import { useModals } from '@/composables/useModals'
 import PageHeader from '@/components/PageHeader.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
@@ -227,6 +242,9 @@ const PwaInstallBanner = defineAsyncComponent(() => import('@/components/PwaInst
 const ChannelBanner = defineAsyncComponent(() => import('@/components/ChannelBanner.vue'))
 const MaintenanceBanner = defineAsyncComponent(() => import('@/components/MaintenanceBanner.vue'))
 const NetworkBanner = defineAsyncComponent(() => import('@/components/NetworkBanner.vue'))
+const FloatingTaskWidget = defineAsyncComponent(() => import('@/components/FloatingTaskWidget.vue'))
+const ExportifyImportModal = defineAsyncComponent(() => import('@/components/ExportifyImportModal.vue'))
+const ImportModal = defineAsyncComponent(() => import('@/components/ImportModal.vue'))
 
 const route = useRoute()
 const router = useRouter()
@@ -234,6 +252,7 @@ const authStore = useAuthStore()
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
 const uiStore = useUIStore()
+const tasksStore = useTasksStore()
 const telegram = inject('telegram')
 const networkMonitor = useNetworkMonitor()
 const pwaInstall = usePwaInstall()
@@ -314,6 +333,9 @@ const showBackButton = computed(() => {
   if (route.name === 'library' && uiStore.libraryTab !== 'overview') {
     return true
   }
+  if (route.name === 'search' && (route.query.tab || route.query.mode)) {
+    return true
+  }
   // Main navigation tabs do not need a back button
   const mainNavRoutes = ['home', 'library', 'search', 'friends', 'liked', 'settings']
   return !mainNavRoutes.includes(route.name)
@@ -324,6 +346,12 @@ const pageTitle = computed(() => {
     return 'Главная'
   }
   if (route.name === 'search') {
+    if (route.query.tab === 'soundcloud') {
+      return route.query.mode === 'likes' ? 'SoundCloud • Лайки' : 'SoundCloud'
+    }
+    if (route.query.tab === 'spotify') {
+      return route.query.mode === 'likes' ? 'Spotify • Лайки' : (route.query.mode === 'exportify' ? 'Spotify • Exportify' : 'Spotify')
+    }
     return 'Поиск'
   }
   // Для страницы библиотеки показываем название текущего раздела
@@ -409,6 +437,14 @@ const goBack = () => {
   if (route.name === 'library' && uiStore.libraryTab !== 'overview') {
     uiStore.setLibraryTab('overview')
     router.replace({ path: '/library', query: {} })
+    return
+  }
+  if (route.name === 'search' && (route.query.tab || route.query.mode)) {
+    if (window.history.length > 1) {
+      router.back()
+    } else {
+      router.replace({ path: '/search', query: {} })
+    }
     return
   }
   if (window.history.length > 1) {

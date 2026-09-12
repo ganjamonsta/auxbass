@@ -14,9 +14,19 @@
                 <p class="modal-subtitle">Выборочный импорт треков и плейлистов</p>
               </div>
             </div>
-            <button class="close-btn" @click="handleClose" title="Закрыть">
-              <X :size="18" />
-            </button>
+            <div class="header-right-actions">
+              <button 
+                v-if="activeJob && activeJob.status === 'in_progress'"
+                class="minimize-btn" 
+                @click="handleMinimize" 
+                title="Свернуть в фон"
+              >
+                <Minus :size="16" />
+              </button>
+              <button class="close-btn" @click="handleClose" title="Закрыть">
+                <X :size="18" />
+              </button>
+            </div>
           </div>
 
           <!-- Service Pills -->
@@ -272,13 +282,22 @@
               </button>
             </template>
             <template v-else>
-              <button
-                v-if="activeJob.status === 'in_progress'"
-                class="btn-cancel"
-                @click="handleCancelJob"
-              >
-                Отменить
-              </button>
+              <template v-if="activeJob.status === 'in_progress'">
+                <button
+                  class="btn-secondary"
+                  @click="handleMinimize"
+                  title="Свернуть процесс в компактный виджет"
+                >
+                  <Minus :size="15" />
+                  <span>Свернуть в фон</span>
+                </button>
+                <button
+                  class="btn-cancel"
+                  @click="handleCancelJob"
+                >
+                  Отменить
+                </button>
+              </template>
               <button
                 v-else
                 class="btn-primary"
@@ -305,9 +324,11 @@ import {
   Zap,
   Sparkles,
   Heart,
+  Minus,
 } from 'lucide-vue-next'
 import { ingestionApi } from '../api/client'
 import { useRouter } from 'vue-router'
+import { useTasksStore } from '@/stores/tasks'
 
 const props = defineProps({
   show: {
@@ -318,6 +339,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'imported'])
 const router = useRouter()
+const tasksStore = useTasksStore()
 
 const inputRef = ref(null)
 const urlInput = ref('')
@@ -356,10 +378,13 @@ const handleLoadMyLikes = () => {
 }
 
 const handleReset = () => {
+  urlInput.value = ''
   errorMessage.value = ''
   preview.value = null
-  activeJob.value = null
   selectedUrls.value = new Set()
+  if (!activeJob.value || activeJob.value.status !== 'in_progress') {
+    activeJob.value = null
+  }
   stopPolling()
 }
 
@@ -443,25 +468,55 @@ const statusDescription = computed(() => {
   }
 })
 
+const handleMinimize = () => {
+  if (activeJob.value) {
+    tasksStore.minimizeJob(activeJob.value.id)
+  }
+  emit('close')
+}
+
+const handleClose = () => {
+  if (activeJob.value && activeJob.value.status === 'in_progress') {
+    handleMinimize()
+    return
+  }
+  stopPolling()
+  activeJob.value = null
+  emit('close')
+}
+
+watch(
+  () => tasksStore.currentImportJob,
+  (job) => {
+    if (job) {
+      activeJob.value = job
+    }
+  },
+  { immediate: true }
+)
+
 watch(
   () => props.show,
   (val) => {
     if (val) {
       handleReset()
+      if (tasksStore.currentImportJob) {
+        activeJob.value = tasksStore.currentImportJob
+        if (activeJob.value.status === 'in_progress') {
+          startPolling(activeJob.value.id)
+        }
+      }
       checkScAccount()
       nextTick(() => {
         inputRef.value?.focus()
       })
     } else {
-      handleReset()
+      if (!activeJob.value || activeJob.value.status !== 'in_progress') {
+        handleReset()
+      }
     }
   }
 )
-
-const handleClose = () => {
-  stopPolling()
-  emit('close')
-}
 
 const getTrackWord = (count) => {
   const rem10 = count % 10
@@ -515,6 +570,10 @@ const handleStartImport = async () => {
   try {
     const res = await ingestionApi.start(preview.value.url, urlsToImport)
     activeJob.value = res.data
+    tasksStore.registerJob(res.data, {
+      type: 'import',
+      title: preview.value.title || 'Импорт музыки',
+    })
     startPolling(activeJob.value.id)
   } catch (err) {
     const detail = err.response?.data?.detail || err.message || 'Не удалось запустить импорт'
@@ -556,7 +615,7 @@ const stopPolling = () => {
 const handleCancelJob = async () => {
   if (!activeJob.value) return
   try {
-    await ingestionApi.cancelJob(activeJob.value.id)
+    await tasksStore.cancelJob(activeJob.value.id)
     activeJob.value.status = 'cancelled'
     stopPolling()
   } catch (err) {
@@ -654,6 +713,31 @@ onUnmounted(() => {
   font-size: 0.8rem;
   color: rgba(255, 255, 255, 0.5);
   margin: 2px 0 0;
+}
+
+.header-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.minimize-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.minimize-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .close-btn {
@@ -1287,6 +1371,26 @@ onUnmounted(() => {
 .btn-cancel:hover {
   background: rgba(255, 255, 255, 0.06);
   color: #fff;
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .btn-primary {

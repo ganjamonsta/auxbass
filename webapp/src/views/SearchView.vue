@@ -11,14 +11,14 @@
       />
     </div>
 
-    <!-- Filter chips (when query is active) -->
-    <div v-if="searchQuery.trim()" class="search-type-chips">
+    <!-- Filter chips (when query is active OR when a tab filter is active) -->
+    <div v-if="searchQuery.trim() || activeFilter !== 'all'" class="search-type-chips">
       <button 
         v-for="chip in filterChips" 
         :key="chip.id"
         class="type-chip"
         :class="{ active: activeFilter === chip.id }"
-        @click="activeFilter = chip.id"
+        @click="setFilter(chip.id)"
       >
         <span>{{ chip.label }}</span>
         <span v-if="getChipBadge(chip.id)" class="chip-badge">{{ getChipBadge(chip.id) }}</span>
@@ -498,12 +498,24 @@
 
         <!-- ==================== TAB: SOUNDCLOUD ==================== -->
         <div v-else-if="activeFilter === 'soundcloud'" class="soundcloud-results-mode">
+          <!-- Back to full search breadcrumb bar -->
+          <div class="sc-nav-breadcrumb-bar">
+            <button class="sc-back-search-btn" @click="resetToAllSearch">
+              <ArrowLeft :size="15" />
+              <span>Все разделы поиска</span>
+            </button>
+            <div class="sc-service-pill sc">
+              <span class="sc-badge">SC</span>
+              <span>SoundCloud</span>
+            </div>
+          </div>
+
           <!-- Sub-tab Switcher -->
           <div class="sc-tab-switcher">
             <button 
               class="sc-subtab-btn" 
               :class="{ active: scSubTab === 'search' }"
-              @click="scSubTab = 'search'"
+              @click="setScSubTab('search')"
             >
               <Globe :size="15" />
               <span>Глобальный поиск</span>
@@ -512,7 +524,7 @@
             <button 
               class="sc-subtab-btn" 
               :class="{ active: scSubTab === 'likes' }"
-              @click="switchToLikesTab"
+              @click="setScSubTab('likes')"
             >
               <Heart :size="15" />
               <span>Мои лайки</span>
@@ -798,12 +810,24 @@
 
         <!-- ==================== TAB: SPOTIFY ==================== -->
         <div v-else-if="activeFilter === 'spotify'" class="spotify-results-mode">
+          <!-- Back to full search breadcrumb bar -->
+          <div class="sc-nav-breadcrumb-bar">
+            <button class="sc-back-search-btn" @click="resetToAllSearch">
+              <ArrowLeft :size="15" />
+              <span>Все разделы поиска</span>
+            </button>
+            <div class="sc-service-pill sp">
+              <span class="sp-badge">SP</span>
+              <span>Spotify</span>
+            </div>
+          </div>
+
           <!-- Sub-tab Switcher -->
           <div class="sc-tab-switcher">
             <button 
               class="sc-subtab-btn" 
               :class="{ active: spSubTab === 'search' }"
-              @click="spSubTab = 'search'"
+              @click="setSpSubTab('search')"
             >
               <Globe :size="15" />
               <span>Глобальный поиск</span>
@@ -812,7 +836,7 @@
             <button 
               class="sc-subtab-btn" 
               :class="{ active: spSubTab === 'exportify' }"
-              @click="spSubTab = 'exportify'"
+              @click="setSpSubTab('exportify')"
             >
               <FileSpreadsheet :size="15" />
               <span>Импорт Exportify (CSV)</span>
@@ -1143,6 +1167,7 @@ import {
   Globe, 
   Folder, 
   ArrowRight,
+  ArrowLeft,
   Plus,
   Heart,
   RefreshCw,
@@ -2057,7 +2082,7 @@ const handleClear = () => {
   if (tags.value.length === 0) {
     loadTags()
   }
-  if (route.query.q || route.query.search || route.query.tag) {
+  if (route.query.q || route.query.search || route.query.tag || route.query.tab || route.query.mode) {
     router.replace({ path: '/search', query: {} })
   }
 }
@@ -2119,6 +2144,48 @@ const handlePlayTagMix = async (tagName) => {
   }
 }
 
+// ─── Filter & Sub-Tab Navigation ───
+const setFilter = (chipId) => {
+  activeFilter.value = chipId
+  const newQuery = { ...route.query }
+  if (chipId === 'soundcloud') {
+    newQuery.tab = 'soundcloud'
+    newQuery.mode = scSubTab.value || 'search'
+    router.replace({ path: '/search', query: newQuery })
+  } else if (chipId === 'spotify') {
+    newQuery.tab = 'spotify'
+    newQuery.mode = spSubTab.value || 'search'
+    router.replace({ path: '/search', query: newQuery })
+  } else {
+    delete newQuery.tab
+    delete newQuery.mode
+    router.replace({ path: '/search', query: newQuery })
+  }
+}
+
+const resetToAllSearch = () => {
+  activeFilter.value = 'all'
+  const newQuery = { ...route.query }
+  delete newQuery.tab
+  delete newQuery.mode
+  router.replace({ path: '/search', query: newQuery })
+}
+
+const setScSubTab = (mode) => {
+  scSubTab.value = mode
+  if (mode === 'likes') {
+    switchToLikesTab()
+  }
+  const newQuery = { ...route.query, tab: 'soundcloud', mode }
+  router.replace({ path: '/search', query: newQuery })
+}
+
+const setSpSubTab = (mode) => {
+  spSubTab.value = mode
+  const newQuery = { ...route.query, tab: 'spotify', mode }
+  router.replace({ path: '/search', query: newQuery })
+}
+
 // ─── Route Synchronization ───
 const applyRouteQuery = () => {
   const tagParam = route.query.tag
@@ -2127,15 +2194,31 @@ const applyRouteQuery = () => {
     activeFilter.value = 'soundcloud'
     if (route.query.mode === 'likes') {
       scSubTab.value = 'likes'
-      fetchScLikes()
+      if (scLikes.value.length === 0) {
+        fetchScLikes()
+      }
+    } else {
+      scSubTab.value = 'search'
     }
   } else if (route.query.tab === 'spotify') {
     activeFilter.value = 'spotify'
     if (route.query.mode === 'likes') {
       spSubTab.value = 'likes'
-      fetchSpLikes()
+      if (spLikes.value.length === 0) {
+        fetchSpLikes()
+      }
+    } else if (route.query.mode === 'exportify') {
+      spSubTab.value = 'exportify'
+    } else {
+      spSubTab.value = 'search'
+    }
+  } else if (!route.query.tab) {
+    // When navigated to /search without a tab parameter, reset any external provider filter
+    if (activeFilter.value === 'soundcloud' || activeFilter.value === 'spotify') {
+      activeFilter.value = 'all'
     }
   }
+
   if (tagParam && typeof tagParam === 'string') {
     const formatted = tagParam.startsWith('#') ? tagParam : `#${tagParam}`
     setQuery(formatted, true)
@@ -2148,6 +2231,9 @@ const handleResetState = (event) => {
   if (event.detail?.route === '/search') {
     handleClear()
     activeFilter.value = 'all'
+    if (Object.keys(route.query).length > 0) {
+      router.replace({ path: '/search', query: {} })
+    }
   }
 }
 
@@ -2162,9 +2248,9 @@ onMounted(() => {
   window.addEventListener('reset-view-state', handleResetState)
 })
 
-// Watch route query params for reactive updates (e.g. from tag clicks, browser navigation)
+// Watch route query params for reactive updates (e.g. from tag clicks, browser navigation, tab switches)
 watch(
-  () => [route.query.tag, route.query.q, route.query.search],
+  () => [route.query.tag, route.query.q, route.query.search, route.query.tab, route.query.mode],
   () => {
     applyRouteQuery()
   }
@@ -2918,8 +3004,48 @@ onUnmounted(() => {
 }
 
 /* ═══════════════════════════════════════════════
-   SoundCloud Sub-tabs, Likes & Badges Styles
+   SoundCloud & Spotify Breadcrumb & Sub-tabs
    ═══════════════════════════════════════════════ */
+.sc-nav-breadcrumb-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 2px 0;
+}
+
+.sc-back-search-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--c-text-1, #fff);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.sc-back-search-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: var(--c-accent, #1db954);
+  transform: translateX(-2px);
+}
+
+.sc-service-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
+}
+
 .sc-tab-switcher {
   display: flex;
   gap: 8px;

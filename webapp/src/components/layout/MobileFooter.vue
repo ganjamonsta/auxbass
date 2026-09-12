@@ -154,8 +154,9 @@ const handleNavClick = (path) => {
     // Smoothly scroll to top
     scrollToTop()
 
-    // If already at or near top (or user taps again at top), reset view state / filters
-    if (currentScroll <= 30) {
+    // If already at or near top (or user taps again at top), or if currently in search sub-tabs/filters, reset view state
+    const hasSearchFilters = path === '/search' && (route.query.tab || route.query.mode || route.query.q || route.query.search || route.query.tag)
+    if (currentScroll <= 30 || hasSearchFilters) {
       emit('reset-view', path)
       window.dispatchEvent(new CustomEvent('reset-view-state', { detail: { route: path } }))
     }
