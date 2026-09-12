@@ -372,7 +372,7 @@ import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
-import { useTrackActions, usePlaybackActions, useShare } from '@/composables'
+import { useTrackActions, useShare } from '@/composables'
 import { socialApi, playlistsApi } from '@/api/client'
 import { getCoverUrl, CoverSize } from '@/utils'
 import TrackItem from '@/components/TrackItem.vue'
@@ -405,7 +405,6 @@ const { share } = useShare()
 
 // Unified actions
 const { handleDirectDownload, handleLikeTrack, handleAddToLibrary } = useTrackActions()
-const { playTrack, playQueue } = usePlaybackActions()
 
 const userId = computed(() => {
   const raw = route.params.id
@@ -606,14 +605,14 @@ const handleShare = () => {
 // Track actions
 const handlePlayUserLibrary = async () => {
   if (overviewTracks.value?.length > 0) {
-    playQueue(overviewTracks.value, 0)
+    playerStore.play(overviewTracks.value[0], overviewTracks.value)
     uiStore.toast.success('Воспроизведение', `Играет медиатека ${user.value.display_name}`)
   } else {
     try {
       const res = await socialApi.getUserLibrary(userId.value, { page: 1, per_page: 50 })
       const tracks = res.data?.items || []
       if (tracks.length > 0) {
-        playQueue(tracks, 0)
+        playerStore.play(tracks[0], tracks)
         uiStore.toast.success('Воспроизведение', `Играет медиатека ${user.value.display_name}`)
       } else {
         uiStore.toast.info('Пусто', 'У пользователя нет доступных треков')
@@ -630,7 +629,7 @@ const handleShuffleUserLibrary = async () => {
     const tracks = res.data?.items || []
     if (tracks.length > 0) {
       const shuffled = [...tracks].sort(() => Math.random() - 0.5)
-      playQueue(shuffled, 0)
+      playerStore.play(shuffled[0], shuffled)
       uiStore.toast.success('Перемешивание', `Играет медиатека ${user.value.display_name}`)
     } else {
       uiStore.toast.info('Пусто', 'У пользователя нет доступных треков')
@@ -654,20 +653,31 @@ const fetchUserTracks = async ({ offset, limit }) => {
   }
 }
 
-const handleTrackClick = (track, index) => {
-  if (activeTab.value === 'tracks' && virtualTrackListRef.value?.allItems) {
-    const items = virtualTrackListRef.value.allItems.filter(Boolean)
-    const validIndex = items.findIndex((t) => t.id === track.id)
-    playQueue(items, validIndex >= 0 ? validIndex : index)
-  } else if (overviewTracks.value?.length) {
-    playQueue(overviewTracks.value, index)
+const handleTrackClick = (payload, index) => {
+  // If emitted from VirtualTrackList: payload = { track, index, allTracks }
+  if (payload && payload.track) {
+    const track = payload.track
+    const queue = payload.allTracks?.length ? payload.allTracks : [track]
+    playerStore.play(track, queue)
+    return
+  }
+  // If emitted from overview TrackItem: payload = track, index = index
+  const track = payload
+  if (overviewTracks.value?.length) {
+    playerStore.play(track, overviewTracks.value)
   } else {
-    playTrack(track)
+    playerStore.play(track)
   }
 }
 
-const handleTrackMenu = (track, index, event) => {
-  openMenu('track', track, 'social', event)
+const handleTrackMenu = (payload, index, event) => {
+  // If emitted from VirtualTrackList: payload = { track, index, event, context }
+  if (payload && payload.track) {
+    openMenu('track', payload.track, payload.context || 'social', payload.event)
+    return
+  }
+  // If emitted from overview TrackItem: payload = track, index = index, event = event
+  openMenu('track', payload, 'social', event)
 }
 
 // Playlist actions
@@ -693,8 +703,14 @@ const shufflePlaylist = async (playlist) => {
   await playerStore.playShuffleAll('playlist', playlist.id, playlist.name)
 }
 
-const handlePlaylistContextMenu = (playlist, event) => {
-  openMenu('playlist', playlist, 'social', event)
+const handlePlaylistContextMenu = (payload, event) => {
+  // If emitted from VirtualGrid: payload = { item, event }
+  if (payload && payload.item) {
+    openMenu('playlist', payload.item, 'social', payload.event)
+    return
+  }
+  // If emitted from overview feed-card: payload = playlist, event = event
+  openMenu('playlist', payload, 'social', event)
 }
 
 // Album actions
@@ -720,8 +736,14 @@ const shuffleAlbum = async (album) => {
   await playerStore.playShuffleAll('album', album.id, album.name)
 }
 
-const handleAlbumContextMenu = (album, event) => {
-  openMenu('album', album, 'social', event)
+const handleAlbumContextMenu = (payload, event) => {
+  // If emitted from VirtualGrid: payload = { item, event }
+  if (payload && payload.item) {
+    openMenu('album', payload.item, 'social', payload.event)
+    return
+  }
+  // If emitted from overview feed-card: payload = album, event = event
+  openMenu('album', payload, 'social', event)
 }
 
 watch(

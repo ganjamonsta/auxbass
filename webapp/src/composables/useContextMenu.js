@@ -60,8 +60,27 @@ export function useContextMenu() {
    * @param {string} type - 'track' | 'playlist' | 'album' | 'artist' | 'user'
    * @param {Object} data - The item data
    * @param {string} context - Optional context ('player', 'sidebar', 'library', etc.)
+   * @param {Event} event - Mouse or touch event
    */
   const openMenu = (type, data, context = null, event = null) => {
+    // If context was passed as an Event object (e.g. openMenu('track', track, $event))
+    if (context instanceof Event || (context && typeof context === 'object' && ('clientX' in context || 'touches' in context))) {
+      event = context
+      context = null
+    }
+
+    // Defensive unwrap: if data is a wrapped event payload from VirtualTrackList or VirtualGrid
+    if (data && typeof data === 'object') {
+      if (data.track && !data.id) {
+        if (!event && data.event) event = data.event
+        if (!context && data.context) context = data.context
+        data = data.track
+      } else if (data.item && !data.id && !data.name && !data.title) {
+        if (!event && data.event) event = data.event
+        data = data.item
+      }
+    }
+
     haptic('light')
     menuType.value = type
     menuData.value = data
