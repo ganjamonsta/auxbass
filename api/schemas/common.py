@@ -14,6 +14,9 @@ class TelegramUser(BaseModel):
     username: Optional[str] = None
     photo_url: Optional[str] = None
     is_premium: Optional[bool] = None  # Telegram Premium status
+    custom_nickname: Optional[str] = None
+    custom_avatar_url: Optional[str] = None
+    hide_telegram_id: bool = False
 
 
 class UserStatusResponse(BaseModel):

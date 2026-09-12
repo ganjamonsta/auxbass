@@ -156,8 +156,11 @@ async def _ensure_sqlite_columns(conn):
             ("uploader_id", "INTEGER"),
         ],
         "users": [
+            ("custom_nickname", "TEXT"),
+            ("custom_avatar_url", "TEXT"),
             ("hide_from_search", "INTEGER DEFAULT 0"),
             ("hide_profile", "INTEGER DEFAULT 0"),
+            ("hide_telegram_id", "INTEGER DEFAULT 0"),
             ("notify_subscription", "INTEGER DEFAULT 1"),
         ],
         "user_channels": [

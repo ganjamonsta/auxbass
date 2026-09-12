@@ -40,6 +40,9 @@ class UserProfileResponse(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     display_name: str
+    custom_nickname: Optional[str] = None
+    avatar_url: Optional[str] = None
+    hide_telegram_id: bool = False
     is_following: bool = False
     track_count: int = 0
     playlist_count: int = 0
@@ -65,6 +68,29 @@ class FriendLibraryResponse(BaseModel):
 
 
 # ============== Helper Functions ==============
+
+def build_user_profile_response(
+    u: User,
+    viewer_id: int,
+    stats: dict,
+    is_following: bool = False,
+) -> UserProfileResponse:
+    """Build UserProfileResponse respecting hide_telegram_id for non-self requests"""
+    is_self = (u.id == viewer_id)
+    show_tg = is_self or not getattr(u, 'hide_telegram_id', False)
+    
+    return UserProfileResponse(
+        id=u.id,
+        username=u.username if show_tg else None,
+        first_name=u.first_name if show_tg else None,
+        last_name=u.last_name if show_tg else None,
+        display_name=u.display_name,
+        custom_nickname=getattr(u, 'custom_nickname', None),
+        avatar_url=getattr(u, 'custom_avatar_url', None),
+        hide_telegram_id=getattr(u, 'hide_telegram_id', False) or False,
+        is_following=is_following,
+        **stats,
+    )
 
 async def get_user_stats(db: AsyncSession, user_id: int) -> dict:
     """Get user's library statistics"""
@@ -257,15 +283,7 @@ async def get_following(
     items = []
     for u in users:
         stats = await get_user_stats(db, u.id)
-        items.append(UserProfileResponse(
-            id=u.id,
-            username=u.username,
-            first_name=u.first_name,
-            last_name=u.last_name,
-            display_name=u.display_name,
-            is_following=True,  # We're getting users we follow
-            **stats,
-        ))
+        items.append(build_user_profile_response(u, user.id, stats, is_following=True))
     
     return UserListResponse(
         items=items,
@@ -305,15 +323,7 @@ async def get_followers(
     for u in users:
         stats = await get_user_stats(db, u.id)
         following = await is_following(db, user.id, u.id)
-        items.append(UserProfileResponse(
-            id=u.id,
-            username=u.username,
-            first_name=u.first_name,
-            last_name=u.last_name,
-            display_name=u.display_name,
-            is_following=following,
-            **stats,
-        ))
+        items.append(build_user_profile_response(u, user.id, stats, is_following=following))
     
     return UserListResponse(
         items=items,
@@ -413,10 +423,12 @@ async def search_friends_libraries(
         track_data = track_to_response(track, viewer_entry)
         # Add owner info
         track_data_dict = track_data.model_dump() if hasattr(track_data, 'model_dump') else track_data.dict()
+        owner_show_tg = (user.id == owner.id or not getattr(owner, 'hide_telegram_id', False))
         track_data_dict['owner'] = {
             'id': owner.id,
             'display_name': owner.display_name,
-            'username': owner.username,
+            'avatar_url': getattr(owner, 'custom_avatar_url', None),
+            'username': owner.username if owner_show_tg else None,
         }
         track_data_dict['in_library'] = viewer_entry is not None
         items.append(track_data_dict)
@@ -445,15 +457,7 @@ async def get_user_profile(
     stats = await get_user_stats(db, user_id)
     following = await is_following(db, user.id, user_id) if user_id != user.id else False
     
-    return UserProfileResponse(
-        id=target.id,
-        username=target.username,
-        first_name=target.first_name,
-        last_name=target.last_name,
-        display_name=target.display_name,
-        is_following=following,
-        **stats,
-    )
+    return build_user_profile_response(target, user.id, stats, is_following=following)
 
 
 @router.get("/user/{user_id}/library")
@@ -518,6 +522,8 @@ async def get_user_library(
         "user": {
             "id": target.id,
             "display_name": target.display_name,
+            "avatar_url": getattr(target, 'custom_avatar_url', None),
+            "username": target.username if (user.id == target.id or not getattr(target, 'hide_telegram_id', False)) else None,
         }
     }
 
@@ -588,6 +594,8 @@ async def get_user_albums(
         "user": {
             "id": target.id,
             "display_name": target.display_name,
+            "avatar_url": getattr(target, 'custom_avatar_url', None),
+            "username": target.username if (user.id == target.id or not getattr(target, 'hide_telegram_id', False)) else None,
         }
     }
 
@@ -631,6 +639,7 @@ async def search_users(
         User.username.ilike(search_pattern),
         User.first_name.ilike(search_pattern),
         User.last_name.ilike(search_pattern),
+        User.custom_nickname.ilike(search_pattern),
         (func.coalesce(User.first_name, '') + ' ' + func.coalesce(User.last_name, '')).ilike(search_pattern),
     )
     privacy_filter = func.coalesce(User.hide_from_search, False) == False
@@ -664,15 +673,7 @@ async def search_users(
     for u in users:
         stats = await get_user_stats(db, u.id)
         following = await is_following(db, user.id, u.id) if u.id != user.id else False
-        items.append(UserProfileResponse(
-            id=u.id,
-            username=u.username,
-            first_name=u.first_name,
-            last_name=u.last_name,
-            display_name=u.display_name,
-            is_following=following,
-            **stats,
-        ))
+        items.append(build_user_profile_response(u, user.id, stats, is_following=following))
     
     return UserListResponse(
         items=items,

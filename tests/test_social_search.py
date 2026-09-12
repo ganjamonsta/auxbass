@@ -58,3 +58,27 @@ async def test_search_users_endpoints():
         # 7. Short query (< 2 chars) should safely return empty
         res = await search_users(query="a", user=current_tg_user, db=session)
         assert res.total == 0
+
+        # 8. User with custom nickname and hide_telegram_id
+        custom_user = User(
+            id=4,
+            username="secret_tg_name",
+            first_name="Иван",
+            last_name="Иванов",
+            custom_nickname="CyberDemon",
+            custom_avatar_url="/api/avatars/avatar_4.jpg",
+            hide_telegram_id=True,
+        )
+        session.add(custom_user)
+        await session.commit()
+
+        # Search by custom nickname
+        res = await search_users(query="CyberDemon", user=current_tg_user, db=session)
+        assert res.total == 1
+        item = res.items[0]
+        assert item.id == 4
+        assert item.display_name == "CyberDemon"
+        assert item.avatar_url == "/api/avatars/avatar_4.jpg"
+        # Since hide_telegram_id is True and current_user != 4, username must be hidden
+        assert item.username is None
+        assert item.hide_telegram_id is True

@@ -11,7 +11,8 @@ from urllib.parse import parse_qsl, unquote
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, HTTPException, Header, Depends, Response
+from pathlib import Path
+from fastapi import APIRouter, HTTPException, Header, Depends, Response, UploadFile, File
 from pydantic import BaseModel
 import jwt
 
@@ -26,6 +27,8 @@ from api.schemas.auth import (
     CodeGenerated,
 )
 
+AVATARS_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "avatars"
+AVATARS_DIR.mkdir(parents=True, exist_ok=True)
 
 router = APIRouter()
 settings = get_settings()
@@ -177,6 +180,7 @@ async def get_current_user(
                 username=payload.get("username"),
                 photo_url=payload.get("photo_url"),
             )
+            await ensure_user_in_db(user)
             return user
     
     raise HTTPException(
@@ -215,13 +219,14 @@ async def get_optional_user(
                 username=payload.get("username"),
                 photo_url=payload.get("photo_url"),
             )
+            await ensure_user_in_db(user)
             return user
     
     return None
 
 
 async def ensure_user_in_db(user: TelegramUser):
-    """Ensure user exists in database, create if not"""
+    """Ensure user exists in database, create if not, and populate customization fields"""
     async with get_session() as session:
         db_user = await session.get(User, user.id)
         if not db_user:
@@ -233,6 +238,26 @@ async def ensure_user_in_db(user: TelegramUser):
                 is_premium=user.is_premium or False,
             )
             session.add(db_user)
+            await session.commit()
+            await session.refresh(db_user)
+        else:
+            changed = False
+            if user.username and db_user.username != user.username:
+                db_user.username = user.username
+                changed = True
+            if user.first_name and db_user.first_name != user.first_name:
+                db_user.first_name = user.first_name
+                changed = True
+            if user.last_name and db_user.last_name != user.last_name:
+                db_user.last_name = user.last_name
+                changed = True
+            if changed:
+                await session.commit()
+
+        user.custom_nickname = db_user.custom_nickname
+        user.custom_avatar_url = db_user.custom_avatar_url
+        user.hide_telegram_id = db_user.hide_telegram_id or False
+        return db_user
 
 
 # ============== Premium/Channel Check ==============
@@ -463,12 +488,14 @@ async def refresh_token(user: TelegramUser = Depends(get_current_user)):
 class PrivacySettingsRequest(BaseModel):
     hide_from_search: Optional[bool] = None
     hide_profile: Optional[bool] = None
+    hide_telegram_id: Optional[bool] = None
     notify_subscription: Optional[bool] = None
 
 
 class PrivacySettingsResponse(BaseModel):
     hide_from_search: bool
     hide_profile: bool
+    hide_telegram_id: bool
     notify_subscription: bool
 
 
@@ -483,9 +510,10 @@ async def get_privacy_settings(
         raise HTTPException(status_code=404, detail="User not found")
     
     return PrivacySettingsResponse(
-        hide_from_search=db_user.hide_from_search,
-        hide_profile=db_user.hide_profile,
-        notify_subscription=db_user.notify_subscription,
+        hide_from_search=db_user.hide_from_search or False,
+        hide_profile=db_user.hide_profile or False,
+        hide_telegram_id=db_user.hide_telegram_id or False,
+        notify_subscription=db_user.notify_subscription if db_user.notify_subscription is not None else True,
     )
 
 
@@ -505,6 +533,9 @@ async def update_privacy_settings(
     
     if settings_data.hide_profile is not None:
         db_user.hide_profile = settings_data.hide_profile
+
+    if settings_data.hide_telegram_id is not None:
+        db_user.hide_telegram_id = settings_data.hide_telegram_id
     
     if settings_data.notify_subscription is not None:
         db_user.notify_subscription = settings_data.notify_subscription
@@ -513,7 +544,134 @@ async def update_privacy_settings(
     await db.refresh(db_user)
     
     return PrivacySettingsResponse(
-        hide_from_search=db_user.hide_from_search,
-        hide_profile=db_user.hide_profile,
-        notify_subscription=db_user.notify_subscription,
+        hide_from_search=db_user.hide_from_search or False,
+        hide_profile=db_user.hide_profile or False,
+        hide_telegram_id=db_user.hide_telegram_id or False,
+        notify_subscription=db_user.notify_subscription if db_user.notify_subscription is not None else True,
     )
+
+
+# ============== Profile Customization ==============
+
+class ProfileUpdateRequest(BaseModel):
+    custom_nickname: Optional[str] = None
+    custom_avatar_url: Optional[str] = None
+    clear_avatar: Optional[bool] = False
+
+
+@router.put("/profile", response_model=TelegramUser)
+async def update_profile(
+    profile_data: ProfileUpdateRequest,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update user profile nickname or avatar URL"""
+    db_user = await db.get(User, user.id)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if profile_data.custom_nickname is not None:
+        val = profile_data.custom_nickname.strip()
+        db_user.custom_nickname = val if val else None
+
+    if profile_data.clear_avatar:
+        if db_user.custom_avatar_url and db_user.custom_avatar_url.startswith("/api/avatars/"):
+            old_file = AVATARS_DIR / db_user.custom_avatar_url.replace("/api/avatars/", "")
+            if old_file.exists() and old_file.is_file():
+                try:
+                    old_file.unlink()
+                except OSError:
+                    pass
+        db_user.custom_avatar_url = None
+    elif profile_data.custom_avatar_url is not None:
+        db_user.custom_avatar_url = profile_data.custom_avatar_url.strip() or None
+
+    await db.commit()
+    await db.refresh(db_user)
+
+    user.custom_nickname = db_user.custom_nickname
+    user.custom_avatar_url = db_user.custom_avatar_url
+    user.hide_telegram_id = db_user.hide_telegram_id or False
+    return user
+
+
+@router.post("/profile/avatar")
+async def upload_avatar(
+    file: UploadFile = File(...),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Upload custom avatar image"""
+    db_user = await db.get(User, user.id)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    content_type = file.content_type or ""
+    if not (content_type.startswith("image/") or content_type in ["application/octet-stream"]):
+        raise HTTPException(status_code=400, detail="Only image files are allowed")
+
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image size exceeds 10MB limit")
+
+    ext = "jpg"
+    if file.filename and "." in file.filename:
+        ext = file.filename.rsplit(".", 1)[1].lower()
+        if ext not in ["jpg", "jpeg", "png", "webp", "gif"]:
+            ext = "jpg"
+
+    # Remove old avatar file if local
+    if db_user.custom_avatar_url and db_user.custom_avatar_url.startswith("/api/avatars/"):
+        old_file = AVATARS_DIR / db_user.custom_avatar_url.replace("/api/avatars/", "")
+        if old_file.exists() and old_file.is_file():
+            try:
+                old_file.unlink()
+            except OSError:
+                pass
+
+    filename = f"avatar_{user.id}_{int(datetime.now(timezone.utc).timestamp())}.{ext}"
+    filepath = AVATARS_DIR / filename
+    with open(filepath, "wb") as f:
+        f.write(content)
+
+    avatar_url = f"/api/avatars/{filename}"
+    db_user.custom_avatar_url = avatar_url
+    await db.commit()
+    await db.refresh(db_user)
+
+    user.custom_avatar_url = avatar_url
+    user.custom_nickname = db_user.custom_nickname
+    user.hide_telegram_id = db_user.hide_telegram_id or False
+    return {
+        "status": "ok",
+        "avatar_url": avatar_url,
+        "user": user,
+    }
+
+
+@router.delete("/profile/avatar", response_model=TelegramUser)
+async def delete_avatar(
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete custom avatar"""
+    db_user = await db.get(User, user.id)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if db_user.custom_avatar_url and db_user.custom_avatar_url.startswith("/api/avatars/"):
+        old_file = AVATARS_DIR / db_user.custom_avatar_url.replace("/api/avatars/", "")
+        if old_file.exists() and old_file.is_file():
+            try:
+                old_file.unlink()
+            except OSError:
+                pass
+
+    db_user.custom_avatar_url = None
+    await db.commit()
+    await db.refresh(db_user)
+
+    user.custom_avatar_url = None
+    user.custom_nickname = db_user.custom_nickname
+    user.hide_telegram_id = db_user.hide_telegram_id or False
+    return user

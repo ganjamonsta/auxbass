@@ -104,9 +104,14 @@ class User(Base):
     last_name: Mapped[Optional[str]] = mapped_column(String(255))
     is_premium: Mapped[bool] = mapped_column(Boolean, default=False)
     
+    # Profile customization
+    custom_nickname: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    custom_avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
     # Privacy settings
     hide_from_search: Mapped[bool] = mapped_column(Boolean, default=False)  # Hide from user search, keep library visible
     hide_profile: Mapped[bool] = mapped_column(Boolean, default=False)  # Hide library and albums from others
+    hide_telegram_id: Mapped[bool] = mapped_column(Boolean, default=False)  # Hide Telegram username & ID from other users
     
     # Notification settings
     notify_subscription: Mapped[bool] = mapped_column(Boolean, default=True)  # Notify when subscription event occurs
@@ -141,7 +146,9 @@ class User(Base):
     
     @property
     def display_name(self) -> str:
-        """Get user's display name"""
+        """Get user's display name (prefers custom nickname if set)"""
+        if self.custom_nickname and self.custom_nickname.strip():
+            return self.custom_nickname.strip()
         if self.first_name:
             name = self.first_name
             if self.last_name:

@@ -14,7 +14,10 @@
         @click="goToMyProfile"
         title="Мой профиль"
       >
-        <span class="header-avatar-badge">{{ userInitials }}</span>
+        <span class="header-avatar-badge">
+          <img v-if="authStore.userAvatarUrl" :src="authStore.userAvatarUrl" class="sidebar-avatar-img" />
+          <template v-else>{{ userInitials }}</template>
+        </span>
       </div>
     </div>
 
@@ -176,7 +179,8 @@
       >
         <div class="user-avatar-wrap">
           <div class="user-avatar" :class="{ 'importing': tasksStore.hasActiveImports }">
-            {{ userInitials }}
+            <img v-if="authStore.userAvatarUrl" :src="authStore.userAvatarUrl" class="sidebar-avatar-img" />
+            <template v-else>{{ userInitials }}</template>
           </div>
           <div v-if="tasksStore.hasActiveImports" class="avatar-import-ring"></div>
         </div>
@@ -293,9 +297,7 @@ const formatCount = (count) => {
 
 // User info
 const userName = computed(() => {
-  const user = authStore.user
-  if (!user) return 'User'
-  return user.first_name || user.username || `User ${user.id}`
+  return authStore.userDisplayName || 'User'
 })
 
 const userInitials = computed(() => {
@@ -396,6 +398,7 @@ onUnmounted(() => {
   justify-content: center;
   border: 1px solid rgba(255, 255, 255, 0.15);
   cursor: pointer;
+  overflow: hidden;
   transition: transform 0.15s ease, border-color 0.15s ease;
 }
 
@@ -773,7 +776,15 @@ onUnmounted(() => {
   font-weight: 600;
   color: white;
   flex-shrink: 0;
+  overflow: hidden;
   transition: transform 0.2s ease;
+}
+
+.sidebar-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .user-avatar.importing {

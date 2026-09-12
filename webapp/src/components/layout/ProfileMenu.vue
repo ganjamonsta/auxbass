@@ -23,7 +23,8 @@
           <!-- User Card -->
           <div class="profile-user-card" @click="goToMyProfile">
             <div class="profile-avatar">
-              {{ userInitials }}
+              <img v-if="authStore.userAvatarUrl" :src="authStore.userAvatarUrl" class="profile-avatar-img" />
+              <template v-else>{{ userInitials }}</template>
             </div>
             <div class="profile-user-details">
               <span class="profile-user-name">{{ userName }}</span>
@@ -294,10 +295,7 @@ const updateDesktopPosition = () => {
 }
 
 const userName = computed(() => {
-  const u = authStore.user
-  if (!u) return 'Пользователь'
-  if (u.first_name && u.last_name) return `${u.first_name} ${u.last_name}`
-  return u.first_name || u.username || `Пользователь #${u.id}`
+  return authStore.userDisplayName || 'Пользователь'
 })
 
 const userHandle = computed(() => {
@@ -528,7 +526,15 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  overflow: hidden;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.profile-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .profile-user-details {

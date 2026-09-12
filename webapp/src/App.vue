@@ -33,7 +33,8 @@
               :title="tasksStore.hasActiveImports ? `Импорт: ${tasksStore.overallProgress}% (открыть меню профиля)` : 'Меню профиля'"
             >
               <div class="header-avatar-badge" :class="{ 'importing': tasksStore.hasActiveImports }">
-                {{ userInitials }}
+                <img v-if="authStore.userAvatarUrl" :src="authStore.userAvatarUrl" class="header-avatar-img" />
+                <span v-else>{{ userInitials }}</span>
                 <div v-if="tasksStore.hasActiveImports" class="header-import-spinner-ring"></div>
               </div>
               <span v-if="tasksStore.hasActiveImports" class="header-import-pill">
@@ -380,6 +381,8 @@ const pageTitle = computed(() => {
 const libraryIcon = computed(() => Library)
 
 const userInitials = computed(() => {
+  const name = authStore.userDisplayName
+  if (name) return name.charAt(0).toUpperCase()
   const u = authStore.user
   if (!u) return '?'
   if (u.first_name) return u.first_name.charAt(0).toUpperCase()
@@ -894,6 +897,14 @@ html, body {
   justify-content: center;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
   transition: transform 0.15s ease;
+  overflow: hidden;
+}
+
+.header-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .header-avatar-badge.importing {

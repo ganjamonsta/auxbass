@@ -7,8 +7,11 @@ CREATE TABLE IF NOT EXISTS users (
     first_name VARCHAR(255),
     last_name VARCHAR(255),
     is_premium BOOLEAN DEFAULT FALSE,
+    custom_nickname VARCHAR(255),
+    custom_avatar_url VARCHAR(500),
     hide_from_search BOOLEAN DEFAULT FALSE,
     hide_profile BOOLEAN DEFAULT FALSE,
+    hide_telegram_id BOOLEAN DEFAULT FALSE,
     notify_subscription BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()

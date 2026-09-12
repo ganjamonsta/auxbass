@@ -282,26 +282,111 @@
       <div class="section-header">
         <h2>
           <User :size="18" />
-          <span>Аккаунт</span>
+          <span>Аккаунт и профиль</span>
         </h2>
       </div>
 
       <div class="settings-card account-card">
         <div class="user-profile-row" v-if="authStore.user" @click="goToMyProfile" title="Открыть свой профиль">
-          <div class="avatar" :style="avatarGradient">
-            <User v-if="!authStore.user.first_name" :size="24" />
-            <span v-else class="avatar-letter">{{ authStore.user.first_name.charAt(0) }}</span>
+          <div class="avatar-wrap">
+            <div class="avatar" :style="avatarGradient">
+              <img 
+                v-if="authStore.user?.custom_avatar_url" 
+                :src="authStore.user.custom_avatar_url" 
+                alt="Avatar" 
+                class="avatar-image-cover" 
+              />
+              <User v-else-if="!authStore.user.first_name && !authStore.user.custom_nickname" :size="24" />
+              <span v-else class="avatar-letter">{{ (authStore.user.custom_nickname || authStore.user.first_name || 'U').charAt(0).toUpperCase() }}</span>
+            </div>
           </div>
           <div class="user-details">
             <span class="user-name">
-              {{ authStore.user.first_name }} {{ authStore.user.last_name || '' }}
+              {{ authStore.userDisplayName }}
             </span>
-            <span class="user-id">@{{ authStore.user.username || ('ID: ' + authStore.user.id) }}</span>
+            <span class="user-id">
+              @{{ authStore.user.username || ('ID: ' + authStore.user.id) }}
+              <span v-if="privacySettings.hide_telegram_id" class="hidden-privacy-pill" title="Скрыт от других пользователей">
+                <EyeOff :size="11" /> скрыт
+              </span>
+            </span>
           </div>
           <button class="view-profile-btn" @click.stop="goToMyProfile">
             <span>Профиль</span>
             <ChevronRight :size="16" />
           </button>
+        </div>
+
+        <div class="card-divider"></div>
+
+        <!-- Avatar upload / delete actions -->
+        <div class="profile-custom-block">
+          <span class="custom-block-label">Аватарка профиля</span>
+          <div class="avatar-edit-actions">
+            <input 
+              ref="avatarFileInputRef" 
+              type="file" 
+              accept="image/*" 
+              style="display: none" 
+              @change="handleAvatarFileChange" 
+            />
+            <button 
+              class="action-btn primary small-btn" 
+              :disabled="isUploadingAvatar" 
+              @click="avatarFileInputRef?.click()"
+            >
+              <Camera :size="14" />
+              <span>{{ isUploadingAvatar ? 'Загрузка...' : (authStore.user?.custom_avatar_url ? 'Сменить фото' : 'Загрузить фото') }}</span>
+            </button>
+            <button 
+              v-if="authStore.user?.custom_avatar_url" 
+              class="action-btn danger-ghost small-btn" 
+              :disabled="isUploadingAvatar" 
+              @click="handleRemoveAvatar"
+            >
+              <Trash2 :size="14" />
+              <span>Удалить фото</span>
+            </button>
+          </div>
+          <span class="field-hint">Поддерживаются форматы JPG, PNG, WEBP до 10 МБ.</span>
+        </div>
+
+        <div class="card-divider"></div>
+
+        <!-- Custom Nickname block -->
+        <div class="profile-custom-block">
+          <span class="custom-block-label">Кастомный никнейм</span>
+          <div class="nickname-input-row">
+            <input 
+              v-model="customNicknameInput" 
+              type="text" 
+              maxlength="50"
+              placeholder="Введите никнейм (например, xFer Serum)" 
+              class="service-text-input nickname-input" 
+              :disabled="isSavingProfile"
+              @keydown.enter="handleSaveNickname"
+            />
+            <button 
+              class="action-btn primary small-btn save-nick-btn" 
+              :disabled="isSavingProfile || customNicknameInput === (authStore.user?.custom_nickname || '')" 
+              @click="handleSaveNickname"
+            >
+              <Check v-if="!isSavingProfile" :size="14" />
+              <div v-else class="spinner small"></div>
+              <span>Сохранить</span>
+            </button>
+            <button 
+              v-if="authStore.user?.custom_nickname" 
+              class="action-btn danger-ghost small-btn" 
+              :disabled="isSavingProfile" 
+              @click="handleResetNickname" 
+              title="Сбросить на имя из Telegram"
+            >
+              <X :size="14" />
+              <span>Сбросить</span>
+            </button>
+          </div>
+          <span class="field-hint">Отображается вместо имени из Telegram во всем интерфейсе и для других пользователей.</span>
         </div>
 
         <div class="card-divider"></div>
@@ -387,6 +472,23 @@
               type="checkbox" 
               v-model="privacySettings.hide_profile" 
               @change="updatePrivacy('hide_profile', $event.target.checked)"
+            />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-divider"></div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-name">Скрыть Telegram ID и ник</span>
+            <span class="setting-desc">Ваш @username и Telegram ID не будут видны другим пользователям в профиле и поиске</span>
+          </div>
+          <label class="toggle">
+            <input 
+              type="checkbox" 
+              v-model="privacySettings.hide_telegram_id" 
+              @change="updatePrivacy('hide_telegram_id', $event.target.checked)"
             />
             <span class="toggle-slider"></span>
           </label>
@@ -704,7 +806,8 @@ import {
   Megaphone, Check, Folder, Heart, ListMusic, Cloud, RefreshCw, Lock, 
   User, Bell, Sliders, Headphones, Smartphone, Download, HardDrive, 
   Trash2, ChevronRight, ExternalLink, Unlink, Key, ChevronDown, 
-  AlertCircle, Radio, FileSpreadsheet, Upload, LogOut, Library 
+  AlertCircle, Radio, FileSpreadsheet, Upload, LogOut, Library,
+  Camera, EyeOff, X
 } from 'lucide-vue-next'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import { getCacheStats, getCachedAudioStats } from '@/utils/audioCacheDb'
@@ -727,6 +830,69 @@ const handleInstallClick = () => {
   pwaInstall.promptInstall()
 }
 
+// ─── Profile Customization State ───
+const customNicknameInput = ref(authStore.user?.custom_nickname || '')
+const isSavingProfile = ref(false)
+const isUploadingAvatar = ref(false)
+const avatarFileInputRef = ref(null)
+
+watch(() => authStore.user, (newU) => {
+  if (newU) {
+    customNicknameInput.value = newU.custom_nickname || ''
+  }
+}, { immediate: true })
+
+const handleSaveNickname = async () => {
+  if (isSavingProfile.value) return
+  isSavingProfile.value = true
+  try {
+    await authStore.updateProfile({ custom_nickname: customNicknameInput.value.trim() })
+  } catch (err) {
+    console.error('Failed to update nickname:', err)
+  } finally {
+    isSavingProfile.value = false
+  }
+}
+
+const handleResetNickname = async () => {
+  if (isSavingProfile.value) return
+  isSavingProfile.value = true
+  try {
+    await authStore.updateProfile({ custom_nickname: '' })
+    customNicknameInput.value = ''
+  } catch (err) {
+    console.error('Failed to reset nickname:', err)
+  } finally {
+    isSavingProfile.value = false
+  }
+}
+
+const handleAvatarFileChange = async (e) => {
+  const file = e.target.files?.[0]
+  if (!file) return
+  isUploadingAvatar.value = true
+  try {
+    await authStore.uploadAvatar(file)
+  } catch (err) {
+    console.error('Failed to upload avatar:', err)
+  } finally {
+    isUploadingAvatar.value = false
+    if (e.target) e.target.value = ''
+  }
+}
+
+const handleRemoveAvatar = async () => {
+  if (!confirm('Удалить аватарку профиля?')) return
+  isUploadingAvatar.value = true
+  try {
+    await authStore.deleteAvatar()
+  } catch (err) {
+    console.error('Failed to delete avatar:', err)
+  } finally {
+    isUploadingAvatar.value = false
+  }
+}
+
 const STATS_STORAGE_KEY = 'tg_player_library_stats'
 
 const getCachedStats = () => {
@@ -744,6 +910,7 @@ const botUsername = ref('tg_player_bot')  // Default, will be updated from confi
 const privacySettings = ref({
   hide_from_search: false,
   hide_profile: false,
+  hide_telegram_id: false,
   notify_subscription: true,
 })
 
@@ -938,6 +1105,9 @@ const loadPrivacySettings = async () => {
 const updatePrivacy = async (field, value) => {
   try {
     await api.put('/auth/privacy', { [field]: value })
+    if (field === 'hide_telegram_id' && authStore.user) {
+      authStore.user.hide_telegram_id = value
+    }
   } catch (error) {
     console.error('Failed to update privacy:', error)
     // Revert on error
@@ -2000,6 +2170,74 @@ const handleResetState = (event) => {
   cursor: pointer;
   flex-shrink: 0;
   transition: all 0.15s ease;
+}
+
+.avatar-wrap {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+}
+
+.avatar-image-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.hidden-privacy-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  padding: 1px 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  font-size: 10px;
+  color: var(--c-text-2);
+}
+
+.profile-custom-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.custom-block-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text-1);
+}
+
+.avatar-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.nickname-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nickname-input {
+  flex: 1;
+}
+
+.small-btn {
+  padding: 8px 14px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.save-nick-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .view-profile-btn:hover {

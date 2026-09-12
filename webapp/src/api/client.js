@@ -171,6 +171,13 @@ export const authApi = {
   getConfig: () => api.get('/auth/config'),
   verifyCode: (data) => api.post('/auth/verify-code', data),
   refresh: () => api.post('/auth/refresh'),
+  updateProfile: (data) => api.put('/auth/profile', data),
+  uploadAvatar: (formData) => api.post('/auth/profile/avatar', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  deleteAvatar: () => api.delete('/auth/profile/avatar'),
+  getPrivacy: () => api.get('/auth/privacy'),
+  updatePrivacy: (data) => api.put('/auth/privacy', data),
 }
 
 // Tracks

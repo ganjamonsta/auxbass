@@ -15,11 +15,12 @@
       <!-- My Profile banner -->
       <div v-if="authStore.user" class="my-profile-banner" @click="router.push(`/user/${authStore.user.id}`)">
         <div class="user-avatar my-avatar">
-          {{ getInitials(authStore.user) }}
+          <img v-if="authStore.userAvatarUrl" :src="authStore.userAvatarUrl" class="card-avatar-img" />
+          <template v-else>{{ getInitials(authStore.user) }}</template>
         </div>
         <div class="user-info">
           <div class="user-name">
-            {{ authStore.user.first_name }} {{ authStore.user.last_name || '' }}
+            {{ authStore.userDisplayName }}
             <span class="self-badge">Вы</span>
           </div>
           <div class="user-meta">
@@ -82,7 +83,8 @@
             @click="viewUserProfile(user)"
           >
             <div class="user-avatar">
-              {{ getInitials(user) }}
+              <img v-if="user.avatar_url" :src="user.avatar_url" class="card-avatar-img" />
+              <template v-else>{{ getInitials(user) }}</template>
             </div>
             <div class="user-info">
               <div class="user-name">{{ user.display_name }}</div>
@@ -119,7 +121,8 @@
             @click="viewUserProfile(user)"
           >
             <div class="user-avatar">
-              {{ getInitials(user) }}
+              <img v-if="user.avatar_url" :src="user.avatar_url" class="card-avatar-img" />
+              <template v-else>{{ getInitials(user) }}</template>
             </div>
             <div class="user-info">
               <div class="user-name">{{ user.display_name }}</div>
@@ -172,7 +175,8 @@
             @click="viewUserProfile(user)"
           >
             <div class="user-avatar">
-              {{ getInitials(user) }}
+              <img v-if="user.avatar_url" :src="user.avatar_url" class="card-avatar-img" />
+              <template v-else>{{ getInitials(user) }}</template>
             </div>
             <div class="user-info">
               <div class="user-name">{{ user.display_name }}</div>
@@ -209,7 +213,8 @@
         <div class="profile-modal">
           <div class="profile-header">
             <div class="profile-avatar">
-              {{ getInitials(selectedUser) }}
+              <img v-if="selectedUser.avatar_url" :src="selectedUser.avatar_url" class="card-avatar-img" />
+              <template v-else>{{ getInitials(selectedUser) }}</template>
             </div>
             <div class="profile-info">
               <h2>{{ selectedUser.display_name }}</h2>
@@ -401,6 +406,13 @@ const userAlbums = ref([])
 let searchTimer = null
 
 const getInitials = (user) => {
+  if (!user) return '?'
+  if (user.custom_nickname) {
+    return user.custom_nickname.charAt(0).toUpperCase()
+  }
+  if (user.display_name) {
+    return user.display_name.charAt(0).toUpperCase()
+  }
   if (user.first_name) {
     return user.first_name.charAt(0).toUpperCase()
   }
@@ -713,7 +725,15 @@ const handleResetState = (event) => {
   font-weight: 700;
   color: #fff;
   flex-shrink: 0;
+  overflow: hidden;
   box-shadow: 2px 2px 6px var(--sh-dark);
+}
+
+.card-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
 }
 
 .user-info {
@@ -799,6 +819,7 @@ const handleResetState = (event) => {
   font-size: 22px;
   font-weight: 700;
   color: #fff;
+  overflow: hidden;
   box-shadow: 4px 4px 10px var(--sh-dark);
   flex-shrink: 0;
 }

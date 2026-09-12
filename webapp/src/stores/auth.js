@@ -161,6 +161,46 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function updateProfile(data) {
+    const response = await authApi.updateProfile(data)
+    user.value = response.data
+    authStorage.setUser(response.data)
+    return response.data
+  }
+
+  async function uploadAvatar(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await authApi.uploadAvatar(formData)
+    if (response.data?.user) {
+      user.value = response.data.user
+      authStorage.setUser(response.data.user)
+    } else if (response.data?.avatar_url) {
+      user.value = { ...user.value, custom_avatar_url: response.data.avatar_url }
+      authStorage.setUser(user.value)
+    }
+    return response.data
+  }
+
+  async function deleteAvatar() {
+    const response = await authApi.deleteAvatar()
+    user.value = response.data
+    authStorage.setUser(response.data)
+    return response.data
+  }
+
+  const userDisplayName = computed(() => {
+    const u = user.value
+    if (!u) return ''
+    if (u.custom_nickname && u.custom_nickname.trim()) return u.custom_nickname.trim()
+    if (u.first_name) {
+      return (u.first_name + (u.last_name ? ' ' + u.last_name : '')).trim()
+    }
+    return u.username || `Пользователь #${u.id}`
+  })
+
+  const userAvatarUrl = computed(() => user.value?.custom_avatar_url || null)
+
   return {
     // State
     user,
@@ -176,11 +216,16 @@ export const useAuthStore = defineStore('auth', () => {
     // Getters
     isAuthenticated,
     isTelegramWebApp,
+    userDisplayName,
+    userAvatarUrl,
     // Actions
     initialize,
     loginWithCode,
     logout,
     refreshUser,
+    updateProfile,
+    uploadAvatar,
+    deleteAvatar,
     fetchStatus,
     fetchConfig,
     promptChannelSetup,
