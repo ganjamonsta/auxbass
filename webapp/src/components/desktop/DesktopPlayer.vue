@@ -100,12 +100,15 @@
                 <line x1="12" y1="20" x2="12.01" y2="20"/>
               </svg>
             </span>
-            <div class="lcd-text-container" ref="textContainer">
-              <div class="lcd-text" :class="{ scrolling: shouldScroll }">
-                <span class="segment-text">{{ displayText }}</span>
-                <span v-if="shouldScroll" class="segment-text clone">{{ displayText }}</span>
-              </div>
-            </div>
+            <VfdSegmentDisplay 
+              :track="track"
+              :displayText="displayText"
+              :isPlaying="isPlaying"
+              :volume="volume"
+              :hdTrackInfo="playerStore.hdTrackInfo"
+              :progress="progress"
+              :duration="duration"
+            />
           </div>
 
           <!-- Waveform & Progress row -->
@@ -222,6 +225,7 @@ import { getCoverUrl, CoverSize } from '@/utils'
 import { Play, Square, Pause, Volume2, VolumeX, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Share2 } from 'lucide-vue-next'
 import { useNetworkMonitor } from '@/composables/useNetworkMonitor'
 import { useShare } from '@/composables/useShare'
+import VfdSegmentDisplay from './VfdSegmentDisplay.vue'
 
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
@@ -265,9 +269,9 @@ const isLiked = computed(() => {
   return track.value.is_liked === true
 })
 
-// Handle LCD click - open full player (but not on waveform)
+// Handle LCD click - open full player (but not on waveform or VFD display)
 const handleLcdClick = (e) => {
-  if (isSeeking.value || e.target.closest('.waveform-container')) {
+  if (isSeeking.value || e.target.closest('.waveform-container') || e.target.closest('.vfd-display')) {
     return
   }
   emit('expand')
@@ -323,21 +327,7 @@ const displayText = computed(() => {
   return `${artist} - ${title}`.toUpperCase()
 })
 
-const textContainer = ref(null)
-const shouldScroll = ref(false)
 
-// Check if text needs scrolling
-const checkTextOverflow = () => {
-  if (!textContainer.value) return
-  const container = textContainer.value
-  const textElement = container.querySelector('.segment-text')
-  if (!textElement) return
-  
-  // Compare text width with container width
-  const textWidth = textElement.scrollWidth
-  const containerWidth = container.clientWidth
-  shouldScroll.value = textWidth > containerWidth
-}
 
 // Deterministic hash-based waveform peak generator
 // Generates musical amplitude peaks (0.15 - 0.98) with zero network traffic & zero latency
@@ -580,23 +570,20 @@ watch(() => playerStore.progress, () => {
   }
 })
 
-// Watch for track changes and check text overflow & redraw waveform
+// Watch for track changes and redraw waveform
 watch([track, displayText, duration], () => {
   nextTick(() => {
-    checkTextOverflow()
     drawWaveform()
   })
 })
 
 const handleResize = () => {
-  checkTextOverflow()
   drawWaveform()
 }
 
 onMounted(() => {
   eqInterval = setInterval(animateEq, 100)
   nextTick(() => {
-    checkTextOverflow()
     drawWaveform()
   })
   window.addEventListener('resize', handleResize)
@@ -809,9 +796,10 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
-  height: 16px;
+  height: 22px;
+  position: relative;
 }
 
 .lcd-net-icon {
@@ -829,43 +817,6 @@ onUnmounted(() => {
 @keyframes desktop-net-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
-}
-
-.lcd-text-container {
-  flex: 1;
-  overflow: hidden;
-  mask-image: linear-gradient(90deg, transparent, black 3%, black 97%, transparent);
-}
-
-.lcd-text {
-  display: flex;
-  white-space: nowrap;
-  justify-content: center;
-}
-
-.lcd-text.scrolling {
-  justify-content: flex-start;
-  animation: lcd-scroll 12s linear infinite;
-}
-
-@keyframes lcd-scroll {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
-.segment-text {
-  font-family: 'Courier New', monospace;
-  font-size: 13px;
-  font-weight: 800;
-  color: #00f0ff;
-  text-shadow: 
-    0 0 6px rgba(0, 240, 255, 0.8),
-    0 0 14px rgba(56, 189, 248, 0.4);
-  letter-spacing: 0.8px;
-}
-
-.lcd-text.scrolling .segment-text {
-  padding-right: 50px;
 }
 
 /* Waveform Row */
