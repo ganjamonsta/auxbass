@@ -266,6 +266,7 @@
         <component 
           :is="currentTabComponent" 
           :searchQuery="debouncedQuery"
+          :hideToolbar="currentTabId === 'overview'"
           @update:searchQuery="handleSubtabSearch"
         />
       </div>
@@ -339,6 +340,10 @@ const currentTabId = computed({
 })
 
 const setTab = (tabId) => {
+  if (currentTabId.value !== tabId) {
+    handleClearSearch()
+    isOverviewSearchOpen.value = false
+  }
   currentTabId.value = tabId
   const query = { ...route.query }
   if (tabId === 'overview') {
@@ -587,9 +592,13 @@ watch(
   (newTab) => {
     if (newTab && typeof newTab === 'string' && tabs.some(t => t.id === newTab)) {
       if (currentTabId.value !== newTab) {
+        handleClearSearch()
+        isOverviewSearchOpen.value = false
         currentTabId.value = newTab
       }
     } else if (!newTab && currentTabId.value !== 'overview') {
+      handleClearSearch()
+      isOverviewSearchOpen.value = false
       currentTabId.value = 'overview'
     }
   }

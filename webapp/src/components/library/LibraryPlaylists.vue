@@ -9,7 +9,7 @@
     />
 
     <!-- Action Bar: Sort & Create Controls + Expandable Search -->
-    <div class="library-toolbar" :class="{ 'search-active': isSearchOpen }">
+    <div v-if="!hideToolbar" class="library-toolbar" :class="{ 'search-active': isSearchOpen }">
       <!-- Sort & Action controls (hidden when search is open) -->
       <div v-if="!isSearchOpen" class="toolbar-controls">
         <SortChips
@@ -173,6 +173,10 @@ const props = defineProps({
   showBack: {
     type: Boolean,
     default: true
+  },
+  hideToolbar: {
+    type: Boolean,
+    default: false
   }
 })
 

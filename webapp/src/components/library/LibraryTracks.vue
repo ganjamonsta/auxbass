@@ -1,7 +1,7 @@
 <template>
   <div class="library-tracks">
     <!-- Action Bar: Shuffle, Sort & Expandable Search -->
-    <div class="library-toolbar" :class="{ 'search-active': isSearchOpen }">
+    <div v-if="!hideToolbar" class="library-toolbar" :class="{ 'search-active': isSearchOpen }">
       <!-- Action controls (hidden when search is open) -->
       <div v-if="!isSearchOpen" class="toolbar-controls">
         <button class="shuffle-all-btn" @click="shuffleAll" :disabled="!total || shuffling">
@@ -240,6 +240,10 @@ const props = defineProps({
   showBack: {
     type: Boolean,
     default: true
+  },
+  hideToolbar: {
+    type: Boolean,
+    default: false
   }
 })
 
