@@ -8,19 +8,6 @@
       description="Все плейлисты, доступные в системе"
     />
 
-    <!-- Liked tracks card (library scope only) -->
-    <div v-if="scope === 'library'" class="liked-section" @click="goToLiked">
-      <div class="liked-card-inline">
-        <div class="liked-icon-box">
-          <Heart :size="20" fill="currentColor" />
-        </div>
-        <div class="liked-info">
-          <span class="liked-title">Понравившиеся</span>
-          <span class="liked-count">{{ likedCount }} треков</span>
-        </div>
-      </div>
-    </div>
-
     <!-- Unified Toolbar: Back button + Title + Controls + Expandable Search -->
     <div class="library-toolbar" :class="{ 'search-active': isSearchOpen }">
       <!-- Left side: Back button and Section Title (hidden when search is open) -->
@@ -185,7 +172,7 @@ import ExpandableSearch from '@/components/ui/ExpandableSearch.vue'
 import VirtualGrid from '@/components/VirtualGrid.vue'
 import InfoBanner from '@/components/InfoBanner.vue'
 import api from '@/api/client'
-import { Heart, Plus, FileText, Music, ChevronLeft, Search } from 'lucide-vue-next'
+import { Plus, FileText, Music, ChevronLeft, Search } from 'lucide-vue-next'
 import { getCoverUrl, CoverSize } from '@/utils'
 
 // Universal context menu
@@ -261,7 +248,12 @@ const {
 } = useSort(sortStorageKey.value, 'playlists', { sortBy: 'created_at', sortOrder: 'desc' })
 
 // Liked tracks count (library scope only)
-const likedCount = ref(0)
+const likedCount = ref(libraryStore.likedTracks?.length || 0)
+
+watch(() => libraryStore.likedTracks?.length, (len) => {
+  likedCount.value = len || 0
+  virtualGridRef.value?.patchItem('liked', { track_count: likedCount.value })
+})
 
 // Create modal state
 const showCreateModal = ref(false)
@@ -274,9 +266,13 @@ const ownPlaylists = ref([])
 
 // Fetch function for virtual grid
 const fetchPlaylists = async ({ offset, limit }) => {
+  const isLib = props.scope === 'library'
+  const likedTitle = 'Понравившиеся'
+  const q = (props.searchQuery || '').trim().toLowerCase()
+  const matchesSearch = !q || likedTitle.toLowerCase().includes(q) || 'liked'.includes(q)
+  const showLikedCard = isLib && matchesSearch
+
   const params = { 
-    offset, 
-    limit,
     sort_by: sortBy.value,
     sort_order: sortOrder.value
   }
@@ -284,8 +280,39 @@ const fetchPlaylists = async ({ offset, limit }) => {
     params.search = props.searchQuery
   }
   const endpoint = props.scope === 'global' ? '/playlists/global' : '/playlists'
-  const response = await api.get(endpoint, { params })
-  return response.data
+
+  if (!showLikedCard) {
+    const response = await api.get(endpoint, { params: { ...params, offset, limit } })
+    return response.data
+  }
+
+  const likedItem = {
+    id: 'liked',
+    is_liked: true,
+    name: likedTitle,
+    track_count: likedCount.value,
+    is_owner: false,
+    is_public: false,
+  }
+
+  if (offset === 0) {
+    const apiLimit = Math.max(1, limit - 1)
+    const response = await api.get(endpoint, { params: { ...params, offset: 0, limit: apiLimit } })
+    const items = [likedItem, ...(response.data?.items || [])]
+    const apiTotal = response.data?.total ?? response.data?.items?.length ?? 0
+    return {
+      items,
+      total: apiTotal + 1
+    }
+  } else {
+    const apiOffset = offset - 1
+    const response = await api.get(endpoint, { params: { ...params, offset: apiOffset, limit } })
+    const apiTotal = response.data?.total ?? response.data?.items?.length ?? 0
+    return {
+      items: response.data?.items || [],
+      total: apiTotal + 1
+    }
+  }
 }
 
 // Sort handlers
@@ -306,6 +333,10 @@ watch(() => props.searchQuery, () => {
 
 // Navigation
 const goToPlaylist = (playlist) => {
+  if (playlist.id === 'liked' || playlist.is_liked) {
+    router.push('/liked')
+    return
+  }
   router.push(`/playlist/${playlist.id}`)
 }
 
@@ -315,11 +346,23 @@ const goToLiked = () => {
 
 // Context menu
 const handleContextMenu = ({ item, event }) => {
+  if (item.id === 'liked' || item.is_liked) {
+    openMenu('liked', { name: 'Понравившиеся', track_count: likedCount.value }, props.scope, event)
+    return
+  }
   openMenu('playlist', item, props.scope, event)
 }
 
 // Shuffle playlist
 const shufflePlaylist = async (playlist) => {
+  if (playlist.id === 'liked' || playlist.is_liked) {
+    try {
+      await playerStore.playShuffleAll('library')
+    } catch (error) {
+      console.error('Failed to shuffle liked tracks:', error)
+    }
+    return
+  }
   try {
     await playerStore.playShuffleAll('playlist', playlist.id)
   } catch (error) {
@@ -554,57 +597,6 @@ defineExpose({
     justify-content: center;
   }
 }
-
-/* Liked card (inline, above grid) */
-.liked-section {
-  margin-bottom: 16px;
-  cursor: pointer;
-}
-
-.liked-card-inline {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(168, 85, 247, 0.1));
-  border-radius: 12px;
-  transition: background 0.2s;
-}
-
-.liked-card-inline:hover {
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.25), rgba(168, 85, 247, 0.15));
-}
-
-.liked-icon-box {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #7c3aed, #a855f7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  flex-shrink: 0;
-}
-
-.liked-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.liked-title {
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--c-text-1);
-}
-
-.liked-count {
-  font-size: 12px;
-  color: var(--c-text-2);
-}
-
-/* Liked card -- end above -- */
 
 /* Create first button */
 .create-first-btn {
