@@ -9,7 +9,11 @@
     @touchcancel="handleTouchEnd"
   >
     <div class="playlist-cover">
-      <div class="cover-grid" :class="{ 'single-cover': playlist.covers?.length === 1 }" v-if="playlist.covers?.length">
+      <!-- Special cover for Liked Songs -->
+      <div v-if="playlist.id === 'liked' || playlist.is_liked" class="liked-cover">
+        <Heart :size="38" fill="currentColor" />
+      </div>
+      <div class="cover-grid" :class="{ 'single-cover': playlist.covers?.length === 1 }" v-else-if="playlist.covers?.length">
         <img
           v-for="(cover, i) in playlist.covers.slice(0, 4)"
           :key="`${i}-${cover}`"
@@ -45,7 +49,7 @@
 </template>
 
 <script setup>
-import { Music, Globe, Crown, UserPlus, Play } from 'lucide-vue-next'
+import { Music, Globe, Crown, UserPlus, Play, Heart } from 'lucide-vue-next'
 import { getCoverUrl, CoverSize } from '@/utils'
 
 const props = defineProps({
@@ -229,10 +233,24 @@ const handleClick = (e) => {
   transform: translateY(0);
 }
 
-/* Hide play button on mobile devices */
-@media (max-width: 768px) {
-  .play-btn {
-    display: none;
-  }
+/* Liked songs cover styling */
+.liked-cover {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #450af5 0%, #7c3aed 50%, #c084fc 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  box-shadow: inset 0 0 24px rgba(255, 255, 255, 0.18);
+  transition: filter 0.25s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.liked-cover svg {
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.35));
+}
+
+.playlist-card:hover .liked-cover {
+  filter: brightness(1.08);
 }
 </style>
