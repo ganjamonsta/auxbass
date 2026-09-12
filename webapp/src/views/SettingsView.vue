@@ -67,7 +67,7 @@
     </section>
 
     <!-- 2. SoundCloud Integration Section -->
-    <section class="settings-section">
+    <section id="soundcloud" class="settings-section">
       <div class="section-header">
         <h2>
           <span class="sc-logo-badge">SC</span>
@@ -176,8 +176,8 @@
       </div>
     </section>
 
-    <!-- 3. Spotify Integration Section -->
-    <section class="settings-section">
+    <!-- 3. Spotify Integration & Import Section -->
+    <section id="import" class="settings-section">
       <div class="section-header">
         <h2>
           <Radio :size="18" class="sp-icon" />
@@ -1051,17 +1051,38 @@ onMounted(() => {
   const savedTheme = localStorage.getItem('theme')
   darkMode.value = savedTheme !== 'light'
   
-  // Scroll to channel section if hash is #channel
-  if (route.hash === '#channel') {
-    setTimeout(() => {
-      document.getElementById('channel')?.scrollIntoView({ behavior: 'smooth' })
-    }, 100)
+  const scrollToTargetSection = () => {
+    const target = route.query.section || (route.hash ? route.hash.replace('#', '') : null)
+    if (target) {
+      setTimeout(() => {
+        const el = document.getElementById(target)
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          el.classList.add('section-highlight')
+          setTimeout(() => el.classList.remove('section-highlight'), 2200)
+        }
+      }, 150)
+    }
   }
+
+  scrollToTargetSection()
   
   window.addEventListener('cache-updated', refreshCacheStats)
   
   // Слушаем событие сброса состояния
   window.addEventListener('reset-view-state', handleResetState)
+})
+
+watch([() => route.hash, () => route.query.section], () => {
+  const target = route.query.section || (route.hash ? route.hash.replace('#', '') : null)
+  if (target) {
+    const el = document.getElementById(target)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      el.classList.add('section-highlight')
+      setTimeout(() => el.classList.remove('section-highlight'), 2200)
+    }
+  }
 })
 
 onUnmounted(() => {
@@ -1109,6 +1130,18 @@ const handleResetState = (event) => {
 .settings-section {
   margin-bottom: var(--sp-5);
   width: 100%;
+  transition: all 0.3s ease;
+}
+
+.settings-section.section-highlight {
+  outline: 2px solid var(--c-accent, #1db954);
+  border-radius: 12px;
+  animation: section-pulse 2.2s ease-out;
+}
+
+@keyframes section-pulse {
+  0% { box-shadow: 0 0 25px rgba(29, 185, 84, 0.7); }
+  100% { box-shadow: none; }
 }
 
 .section-header {

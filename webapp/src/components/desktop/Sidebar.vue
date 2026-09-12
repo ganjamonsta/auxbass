@@ -27,22 +27,61 @@
         <span>Главная</span>
       </router-link>
 
-      <router-link to="/library" class="nav-item" :class="{ active: isActive('/library') && route.query.tab !== 'playlists' }">
+      <!-- Library Root -->
+      <div 
+        class="nav-item clickable" 
+        :class="{ active: route.name === 'library' && (!route.query.tab || route.query.tab === 'overview') }"
+        @click="goToLibraryTab('overview')"
+      >
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="m16 6 4 14M12 6v14M8 8v12M4 4v16"></path>
         </svg>
         <span>Библиотека</span>
-      </router-link>
+      </div>
 
-      <div 
-        class="nav-item clickable" 
-        :class="{ active: route.name === 'library' && route.query.tab === 'playlists' }"
-        @click="goToPersonalPlaylists"
-      >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
-        </svg>
-        <span>Плейлисты</span>
+      <!-- Library Sub-links -->
+      <div class="sidebar-subnav">
+        <div 
+          class="nav-subitem clickable" 
+          :class="{ active: route.name === 'library' && route.query.tab === 'tracks' }"
+          @click="goToLibraryTab('tracks')"
+          title="Все треки медиатеки"
+        >
+          <Music :size="15" />
+          <span>Все треки</span>
+          <span v-if="libraryStore.tracks?.length" class="sub-count">{{ libraryStore.tracks.length }}</span>
+        </div>
+
+        <div 
+          class="nav-subitem clickable" 
+          :class="{ active: route.name === 'library' && route.query.tab === 'playlists' }"
+          @click="goToLibraryTab('playlists')"
+          title="Мои плейлисты"
+        >
+          <ListMusic :size="15" />
+          <span>Плейлисты</span>
+          <span v-if="userPlaylists.length" class="sub-count">{{ userPlaylists.length }}</span>
+        </div>
+
+        <div 
+          class="nav-subitem clickable" 
+          :class="{ active: route.name === 'library' && route.query.tab === 'artists' }"
+          @click="goToLibraryTab('artists')"
+          title="Исполнители"
+        >
+          <Mic2 :size="15" />
+          <span>Артисты</span>
+        </div>
+
+        <div 
+          class="nav-subitem clickable" 
+          :class="{ active: route.name === 'library' && route.query.tab === 'albums' }"
+          @click="goToLibraryTab('albums')"
+          title="Альбомы"
+        >
+          <Disc3 :size="15" />
+          <span>Альбомы</span>
+        </div>
       </div>
 
       <router-link to="/friends" class="nav-item" :class="{ active: isActive('/friends') }">
@@ -62,6 +101,17 @@
         <FolderDown :size="20" class="offline-icon" />
         <span>Offline</span>
         <span v-if="cachedTracksCount > 0" class="nav-count offline-count">{{ cachedTracksCount }}</span>
+      </router-link>
+
+      <!-- Import Section link -->
+      <router-link 
+        to="/settings?section=import" 
+        class="nav-item import-highlight-item" 
+        :class="{ active: route.path === '/settings' && (route.query.section === 'import' || route.hash === '#import') }"
+        title="Импорт музыки из Spotify и SoundCloud"
+      >
+        <Upload :size="20" class="import-icon" />
+        <span>Импорт</span>
       </router-link>
     </nav>
 
@@ -153,7 +203,7 @@ import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import { getCoverUrl, CoverSize, getPlaylistCoverStyle } from '@/utils'
-import { Download, FolderDown } from 'lucide-vue-next'
+import { Download, FolderDown, Upload, Music, ListMusic, Mic2, Disc3 } from 'lucide-vue-next'
 import { getCacheStats } from '@/utils/audioCacheDb'
 import ProfileMenu from '@/components/layout/ProfileMenu.vue'
 
@@ -193,9 +243,17 @@ const hasMorePlaylists = computed(() => {
 })
 
 // Navigation
+const goToLibraryTab = (tab) => {
+  uiStore.setLibraryTab(tab)
+  if (tab === 'overview') {
+    router.push('/library')
+  } else {
+    router.push({ path: '/library', query: { tab } })
+  }
+}
+
 const goToPersonalPlaylists = () => {
-  uiStore.setLibraryTab('playlists')
-  router.push('/library')
+  goToLibraryTab('playlists')
 }
 
 // Format large numbers
@@ -382,6 +440,54 @@ onUnmounted(() => {
   opacity: 1;
 }
 
+/* Sidebar Subnav (Under Library) */
+.sidebar-subnav {
+  margin: 3px 0 6px 16px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-subitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.nav-subitem:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: white;
+}
+
+.nav-subitem.active {
+  background: rgba(29, 185, 84, 0.12);
+  color: var(--c-accent, #1db954);
+  font-weight: 600;
+}
+
+.nav-subitem.active svg {
+  color: var(--c-accent, #1db954);
+}
+
+.sub-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
 .offline-highlight-item {
   margin-top: 8px;
   background: rgba(255, 255, 255, 0.06);
@@ -405,6 +511,21 @@ onUnmounted(() => {
 .offline-highlight-item .offline-count {
   background: rgba(255, 255, 255, 0.14);
   color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
+}
+
+.import-highlight-item {
+  margin-top: 4px;
+}
+
+.import-highlight-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+}
+
+.import-highlight-item.active {
+  background: rgba(29, 185, 84, 0.12);
+  color: var(--c-accent, #1db954);
   font-weight: 600;
 }
 
