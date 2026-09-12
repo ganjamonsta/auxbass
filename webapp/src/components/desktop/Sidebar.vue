@@ -27,6 +27,16 @@
         <span>Главная</span>
       </router-link>
 
+      <router-link 
+        to="/search" 
+        class="nav-item" 
+        :class="{ active: isActive('/search') }"
+        @click="onSearchClick"
+      >
+        <Search :size="22" />
+        <span>Поиск</span>
+      </router-link>
+
       <!-- Library Root -->
       <div 
         class="nav-item clickable" 
@@ -103,12 +113,12 @@
         <span v-if="cachedTracksCount > 0" class="nav-count offline-count">{{ cachedTracksCount }}</span>
       </router-link>
 
-      <!-- Import Section link -->
+      <!-- Import Section link (links to Settings) -->
       <router-link 
-        to="/settings?section=import" 
+        to="/settings" 
         class="nav-item import-highlight-item" 
-        :class="{ active: route.path === '/settings' && (route.query.section === 'import' || route.hash === '#import') }"
-        title="Импорт музыки из Spotify и SoundCloud"
+        :class="{ active: route.path === '/settings' }"
+        title="Импорт и настройки"
       >
         <Upload :size="20" class="import-icon" />
         <span>Импорт</span>
@@ -203,7 +213,7 @@ import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import { getCoverUrl, CoverSize, getPlaylistCoverStyle } from '@/utils'
-import { Download, FolderDown, Upload, Music, ListMusic, Mic2, Disc3 } from 'lucide-vue-next'
+import { Download, FolderDown, Upload, Music, ListMusic, Mic2, Disc3, Search } from 'lucide-vue-next'
 import { getCacheStats } from '@/utils/audioCacheDb'
 import ProfileMenu from '@/components/layout/ProfileMenu.vue'
 
@@ -215,6 +225,12 @@ const uiStore = useUIStore()
 const pwaInstall = usePwaInstall()
 const showProfileMenu = ref(false)
 const cachedTracksCount = ref(0)
+
+const onSearchClick = () => {
+  if (route.path === '/search') {
+    window.dispatchEvent(new CustomEvent('nav-tab-click', { detail: { route: '/search' } }))
+  }
+}
 
 const updateCachedStats = async () => {
   try {

@@ -1062,6 +1062,8 @@ onMounted(() => {
           setTimeout(() => el.classList.remove('section-highlight'), 2200)
         }
       }, 150)
+    } else {
+      window.scrollTo({ top: 0, behavior: 'instant' })
     }
   }
 
@@ -1082,6 +1084,8 @@ watch([() => route.hash, () => route.query.section], () => {
       el.classList.add('section-highlight')
       setTimeout(() => el.classList.remove('section-highlight'), 2200)
     }
+  } else {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 })
 

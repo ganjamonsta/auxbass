@@ -4,16 +4,44 @@
     <div class="player-left">
       <div 
         class="volume-knob"
+        :class="{ adjusting: isAdjustingVolume }"
         @mousedown="startVolumeAdjust"
         @wheel.prevent="handleVolumeWheel"
         :style="{ '--rotation': volumeRotation + 'deg' }"
+        :title="`Громкость: ${Math.round(volume * 100)}%`"
       >
+        <svg class="volume-arc-svg" viewBox="0 0 58 58">
+          <circle
+            class="volume-arc-bg"
+            cx="29"
+            cy="29"
+            r="26"
+            fill="none"
+          />
+          <circle
+            v-if="volume > 0.005"
+            class="volume-arc-glow"
+            cx="29"
+            cy="29"
+            r="26"
+            fill="none"
+            :stroke-dasharray="`${volumeArcLength} 163.36`"
+          />
+          <circle
+            v-if="volume > 0.005"
+            class="volume-arc-fill"
+            cx="29"
+            cy="29"
+            r="26"
+            fill="none"
+            :stroke-dasharray="`${volumeArcLength} 163.36`"
+          />
+        </svg>
         <div class="knob-outer">
           <div class="knob-inner">
             <div class="knob-indicator"></div>
           </div>
         </div>
-        <div class="knob-ring" :class="{ active: isAdjustingVolume }"></div>
       </div>
       <span class="vol-label">VOL</span>
     </div>
@@ -252,6 +280,11 @@ const startVolume = ref(0)
 
 const volumeRotation = computed(() => {
   return -135 + (volume.value * 270)
+})
+
+const volumeArcLength = computed(() => {
+  const v = Math.max(0, Math.min(1, Number(volume.value) || 0))
+  return (v * 122.52).toFixed(2)
 })
 
 const startVolumeAdjust = (e) => {
@@ -618,7 +651,71 @@ onUnmounted(() => {
 
 .volume-knob {
   position: relative;
+  width: 50px;
+  height: 50px;
   cursor: pointer;
+  user-select: none;
+}
+
+.volume-arc-svg {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 58px;
+  height: 58px;
+  pointer-events: none;
+  transform: rotate(135deg);
+  transform-origin: center;
+  overflow: visible;
+  z-index: 1;
+}
+
+.volume-arc-bg {
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 2.5;
+  stroke-dasharray: 122.52 163.36;
+  stroke-linecap: round;
+  transition: stroke 0.2s;
+}
+
+.volume-knob:hover .volume-arc-bg {
+  stroke: rgba(0, 240, 255, 0.2);
+}
+
+.volume-arc-glow {
+  stroke: #00f0ff;
+  stroke-width: 5;
+  stroke-linecap: round;
+  opacity: 0.55;
+  filter: blur(2.5px);
+  transition: stroke-dasharray 0.06s ease-out;
+}
+
+.volume-arc-fill {
+  stroke: #00f0ff;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 3px #00f0ff) drop-shadow(0 0 7px rgba(0, 240, 255, 0.8));
+  transition: stroke-dasharray 0.06s ease-out;
+}
+
+.volume-knob:hover .volume-arc-glow,
+.volume-knob.adjusting .volume-arc-glow {
+  opacity: 0.8;
+  stroke-width: 6;
+  filter: blur(3px);
+}
+
+.volume-knob:hover .volume-arc-fill,
+.volume-knob.adjusting .volume-arc-fill {
+  stroke: #5ce9ff;
+  filter: drop-shadow(0 0 5px #00f0ff) drop-shadow(0 0 10px rgba(0, 240, 255, 0.95));
+}
+
+.volume-knob.adjusting .knob-inner,
+.volume-knob.adjusting .volume-arc-fill,
+.volume-knob.adjusting .volume-arc-glow {
+  transition: none !important;
 }
 
 .knob-outer {
@@ -658,25 +755,19 @@ onUnmounted(() => {
   box-shadow: 0 0 8px #4DC3FF, 0 0 16px rgba(77, 195, 255, 0.6);
 }
 
-.knob-ring {
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  transition: all 0.2s;
-}
-
-.knob-ring.active {
-  border-color: #4DC3FF;
-  box-shadow: 0 0 15px rgba(77, 195, 255, 0.5);
-}
-
 .vol-label {
   font-size: 8px;
   color: #4DC3FF;
   text-shadow: 0 0 5px rgba(77, 195, 255, 0.6);
   font-weight: bold;
   letter-spacing: 1px;
+  transition: color 0.2s, text-shadow 0.2s;
+}
+
+.player-left:hover .vol-label,
+.volume-knob.adjusting + .vol-label {
+  color: #00f0ff;
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.9);
 }
 
 /* LCD Panel */

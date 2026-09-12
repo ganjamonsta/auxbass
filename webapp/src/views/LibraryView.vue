@@ -12,18 +12,31 @@
 
     <!-- Has channel - show library -->
     <template v-else>
-      <!-- Search bar -->
-      <div class="search-section">
-        <SearchBar 
-          v-model="searchQuery"
-          :placeholder="searchPlaceholder"
-          @input="debouncedSearch"
-          @clear="handleClearSearch"
-        />
-      </div>
-
       <!-- Overview Dashboard View without search -->
       <div v-if="currentTabId === 'overview' && !debouncedQuery" class="overview-dashboard">
+        <!-- Overview Toolbar: Tab Pills + Expandable Search -->
+        <div class="library-toolbar overview-toolbar" :class="{ 'search-active': isOverviewSearchOpen }">
+          <div v-if="!isOverviewSearchOpen" class="library-tabs-pills">
+            <button 
+              v-for="t in tabs" 
+              :key="t.id"
+              class="library-tab-pill" 
+              :class="{ active: currentTabId === t.id }"
+              @click="setTab(t.id)"
+            >
+              <span>{{ t.label }}</span>
+            </button>
+          </div>
+
+          <ExpandableSearch
+            v-model="searchQuery"
+            v-model:open="isOverviewSearchOpen"
+            :placeholder="searchPlaceholder"
+            title="Поиск по медиатеке"
+            @input="debouncedSearch"
+            @clear="handleClearSearch"
+          />
+        </div>
 
         <!-- Section: Плейлисты (Horizontal Scroll) -->
         <section v-if="loadingPlaylists" class="library-section">
@@ -249,15 +262,12 @@
 
       <!-- Specific Tab or Search Active View -->
       <div v-else class="library-content">
-        <div v-if="currentTabId !== 'overview' && !debouncedQuery" class="subtab-header">
-          <button class="subtab-back-btn" @click="setTab('overview')">
-            <ChevronLeft :size="18" />
-            <span>Все разделы</span>
-          </button>
-        </div>
         <component 
           :is="currentTabComponent" 
           :searchQuery="debouncedQuery"
+          :showBack="true"
+          @back="setTab('overview')"
+          @update:searchQuery="handleSubtabSearch"
         />
       </div>
     </template>
@@ -281,7 +291,7 @@ import LibraryAlbums from '@/components/library/LibraryAlbums.vue'
 import LibraryArtists from '@/components/library/LibraryArtists.vue'
 import LibraryPlaylists from '@/components/library/LibraryPlaylists.vue'
 import TrackItem from '@/components/TrackItem.vue'
-import SearchBar from '@/components/ui/SearchBar.vue'
+import ExpandableSearch from '@/components/ui/ExpandableSearch.vue'
 import { 
   Play, 
   Music, 
@@ -364,6 +374,12 @@ const searchPlaceholder = computed(() => currentTab.value.placeholder)
 
 // Debounced search using composable
 const { query: searchQuery, debouncedQuery, search: debouncedSearch, clear: clearSearch, setQuery } = useDebouncedSearch()
+
+const isOverviewSearchOpen = ref(false)
+
+const handleSubtabSearch = (query) => {
+  setQuery(query)
+}
 
 // Overview Data State
 const loadingPlaylists = ref(false)
@@ -615,13 +631,64 @@ onUnmounted(() => {
   margin: 0 auto;
 }
 
-.search-section {
-  margin-bottom: 12px;
+/* ─── Overview Toolbar & Tab Pills ─── */
+.library-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+  min-height: 40px;
 }
 
-/* ─── Subtab Navigation ─── */
-.subtab-header {
-  margin-bottom: 16px;
+.library-toolbar.search-active {
+  justify-content: stretch;
+}
+
+.library-tabs-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 0;
+}
+
+.library-tabs-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.library-tab-pill {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--c-text-2, rgba(255, 255, 255, 0.75));
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.library-tab-pill:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--c-text-1, #fff);
+  transform: translateY(-1px);
+}
+
+.library-tab-pill:active {
+  transform: scale(0.96);
+}
+
+.library-tab-pill.active {
+  background: var(--c-accent, #1db954);
+  color: #000;
+  border-color: var(--c-accent, #1db954);
+  font-weight: 700;
+  box-shadow: 0 2px 12px rgba(29, 185, 84, 0.35);
 }
 
 .subtab-back-btn {

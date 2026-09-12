@@ -32,13 +32,13 @@
       </div>
     </div>
 
-    <!-- Unified Actions -->
-    <div class="hero-actions">
-      <div class="action-buttons">
-        <button class="action-btn play-btn" @click="playAll" :disabled="!playlist.tracks?.length" title="Слушать все">
+    <!-- Unified Actions with Expandable Search -->
+    <div class="hero-actions" :class="{ 'search-active': isSearchOpen }">
+      <div class="action-buttons" v-if="!isSearchOpen">
+        <button class="action-btn play-btn" @click="playAll" :disabled="!filteredTracks?.length" title="Слушать все">
           <Play :size="20" fill="currentColor" />
         </button>
-        <button class="action-btn shuffle-btn" @click="shufflePlay" :disabled="isShuffling" title="Перемешать">
+        <button class="action-btn shuffle-btn" @click="shufflePlay" :disabled="isShuffling || !filteredTracks?.length" title="Перемешать">
           <Shuffle :size="18" />
         </button>
         <!-- Edit button for owner -->
@@ -62,12 +62,20 @@
           <Share2 :size="18" />
         </button>
       </div>
+
+      <ExpandableSearch
+        v-if="playlist.tracks?.length > 5"
+        v-model="searchQuery"
+        v-model:open="isSearchOpen"
+        placeholder="Поиск по плейлисту..."
+        title="Поиск по плейлисту"
+      />
     </div>
 
     <!-- Track list -->
-    <div class="track-list" v-if="playlist.tracks?.length">
+    <div class="track-list" v-if="filteredTracks.length">
       <TrackItem
-        v-for="(track, index) in playlist.tracks"
+        v-for="(track, index) in filteredTracks"
         :key="track.id"
         :track="track"
         :isPlaying="playerStore.currentTrack?.id === track.id"
@@ -80,7 +88,17 @@
       />
     </div>
 
-    <!-- Empty state -->
+    <!-- Empty search inside playlist -->
+    <div v-else-if="searchQuery" class="empty-state search-empty">
+      <span class="empty-icon"><Search :size="48" /></span>
+      <p>Ничего не найдено по запросу «{{ searchQuery }}»</p>
+      <button type="button" class="btn-global-search" @click="goToGlobalSearch">
+        <Search :size="16" />
+        <span>Искать в глобальном поиске</span>
+      </button>
+    </div>
+
+    <!-- Empty playlist -->
     <div v-else class="empty-state">
       <span class="empty-icon"><Music :size="48" /></span>
       <p>Плейлист пуст</p>
@@ -119,8 +137,9 @@ import { useTrackActions, usePlaybackActions, useTrackSync, useShare } from '@/c
 import TrackItem from '@/components/TrackItem.vue'
 import TagChips from '@/components/TagChips.vue'
 import EditPlaylistModal from '@/components/EditPlaylistModal.vue'
+import ExpandableSearch from '@/components/ui/ExpandableSearch.vue'
 import api from '@/api/client'
-import { Music, Check, Plus, Globe, Play, Shuffle, Edit3, Share2 } from 'lucide-vue-next'
+import { Music, Check, Plus, Globe, Play, Shuffle, Edit3, Share2, Search } from 'lucide-vue-next'
 import { getCoverUrl, CoverSize } from '@/utils'
 
 // Universal context menu
@@ -159,6 +178,26 @@ const goToOwner = () => {
 // State
 const playlist = ref(null)
 const loading = ref(true)
+const searchQuery = ref('')
+const isSearchOpen = ref(false)
+
+const goToGlobalSearch = () => {
+  const q = searchQuery.value.trim()
+  if (q) {
+    router.push({ path: '/search', query: { q } })
+  }
+}
+
+const filteredTracks = computed(() => {
+  const list = playlist.value?.tracks || []
+  if (!searchQuery.value.trim()) return list
+  const q = searchQuery.value.trim().toLowerCase().replace(/^#/, '')
+  return list.filter(t => 
+    t.title?.toLowerCase().includes(q) || 
+    t.artist?.toLowerCase().includes(q) ||
+    (t.tags && t.tags.some(tag => (typeof tag === 'string' ? tag : tag?.tag)?.toLowerCase().includes(q)))
+  )
+})
 
 // Sync playlist tracks with global track events
 useTrackSync(() => playlist.value?.tracks)
@@ -344,6 +383,19 @@ watch(
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+  min-height: 44px;
+}
+
+.hero-actions.search-active {
+  justify-content: stretch;
 }
 
 .play-btn svg {

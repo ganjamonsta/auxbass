@@ -1,21 +1,46 @@
 <template>
   <div class="library-tracks">
-    <!-- Sort options -->
-    <div class="sort-options">
-      <button class="shuffle-all-btn" @click="shuffleAll" :disabled="!total || shuffling">
-        <div v-if="shuffling" class="spinner small"></div>
-        <Shuffle v-else :size="16" class="shuffle-icon" />
-        <span class="shuffle-text">
-          <template v-if="shuffling">Загрузка...</template>
-          <template v-else-if="total > 0">Перемешать ({{ total }})</template>
-          <template v-else>Перемешать</template>
-        </span>
+    <!-- Unified Toolbar: Back button + Controls + Expandable Search -->
+    <div class="library-toolbar" :class="{ 'search-active': isSearchOpen }">
+      <!-- Back button (hidden when search is open) -->
+      <button 
+        v-if="showBack && !isSearchOpen" 
+        type="button"
+        class="subtab-back-btn" 
+        @click="$emit('back')"
+        title="Все разделы"
+      >
+        <ChevronLeft :size="18" />
+        <span>Все разделы</span>
       </button>
-      <SortChips
-        :currentOption="currentOption"
-        :sortOrder="sortOrder"
-        @next="onNextSort"
-        @toggle-order="onToggleOrder"
+
+      <!-- Action controls (hidden when search is open) -->
+      <div v-if="!isSearchOpen" class="toolbar-controls">
+        <button class="shuffle-all-btn" @click="shuffleAll" :disabled="!total || shuffling">
+          <div v-if="shuffling" class="spinner small"></div>
+          <Shuffle v-else :size="16" class="shuffle-icon" />
+          <span class="shuffle-text">
+            <template v-if="shuffling">Загрузка...</template>
+            <template v-else-if="total > 0">Перемешать ({{ total }})</template>
+            <template v-else>Перемешать</template>
+          </span>
+        </button>
+        <SortChips
+          :currentOption="currentOption"
+          :sortOrder="sortOrder"
+          @next="onNextSort"
+          @toggle-order="onToggleOrder"
+        />
+      </div>
+
+      <!-- Expandable Search -->
+      <ExpandableSearch
+        v-model="localQuery"
+        v-model:open="isSearchOpen"
+        placeholder="Название или исполнитель..."
+        title="Поиск по трекам"
+        @input="onSearchInput"
+        @clear="onSearchClear"
       />
     </div>
 
@@ -178,6 +203,16 @@
         <div v-if="!tracks.length && !friendsTracks.length && !globalTracks.length && !loading && !friendsLoading && !globalLoading" class="empty-state">
           <span class="empty-icon"><Music :size="48" /></span>
           <h3>Ничего не найдено</h3>
+          <p class="empty-subtext" v-if="localQuery || searchQuery">По запросу «{{ localQuery || searchQuery }}» в медиатеке нет треков</p>
+          <button 
+            v-if="localQuery || searchQuery" 
+            type="button" 
+            class="btn-global-search" 
+            @click="goToGlobalSearch"
+          >
+            <Search :size="16" />
+            <span>Искать в глобальном поиске</span>
+          </button>
         </div>
       </template>
     </div>
@@ -198,9 +233,10 @@ import VirtualTrackList from '@/components/VirtualTrackList.vue'
 import TrackItem from '@/components/TrackItem.vue'
 import TrackSkeleton from '@/components/TrackSkeleton.vue'
 import SortChips from '@/components/SortChips.vue'
+import ExpandableSearch from '@/components/ui/ExpandableSearch.vue'
 import api from '@/api/client'
 import { getAllCachedTracks } from '@/utils/audioCacheDb'
-import { Users, Music, Globe, Shuffle } from 'lucide-vue-next'
+import { Users, Music, Globe, Shuffle, ChevronLeft, Search } from 'lucide-vue-next'
 
 // Universal context menu
 const { openMenu } = useContextMenu()
@@ -212,8 +248,45 @@ const props = defineProps({
   searchQuery: {
     type: String,
     default: ''
+  },
+  showBack: {
+    type: Boolean,
+    default: true
   }
 })
+
+const emit = defineEmits(['back', 'update:searchQuery'])
+
+const localQuery = ref(props.searchQuery || '')
+const isSearchOpen = ref(Boolean(props.searchQuery?.trim()))
+
+watch(() => props.searchQuery, (val) => {
+  localQuery.value = val || ''
+  if (val) {
+    isSearchOpen.value = true
+  }
+})
+
+let searchDebounceTimer = null
+const onSearchInput = () => {
+  clearTimeout(searchDebounceTimer)
+  searchDebounceTimer = setTimeout(() => {
+    emit('update:searchQuery', localQuery.value)
+  }, 250)
+}
+
+const onSearchClear = () => {
+  clearTimeout(searchDebounceTimer)
+  localQuery.value = ''
+  emit('update:searchQuery', '')
+}
+
+const goToGlobalSearch = () => {
+  const q = (localQuery.value || props.searchQuery || '').trim()
+  if (q) {
+    router.push({ path: '/search', query: { q } })
+  }
+}
 
 const router = useRouter()
 const libraryStore = useLibraryStore()
@@ -537,12 +610,68 @@ onUnmounted(() => {
   gap: 2px;
 }
 
-.sort-options {
+.library-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 16px;
+  min-height: 40px;
+}
+
+.library-toolbar.search-active {
+  justify-content: stretch;
+}
+
+.subtab-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  height: 38px;
+  padding: 0 14px 0 10px;
+  color: var(--c-text-2, rgba(255, 255, 255, 0.75));
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.subtab-back-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--c-text-1, #fff);
+  transform: translateY(-1px);
+}
+
+.subtab-back-btn:active {
+  transform: scale(0.96);
+}
+
+.toolbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .subtab-back-btn span {
+    display: none;
+  }
+  .subtab-back-btn {
+    width: 38px;
+    padding: 0;
+    justify-content: center;
+  }
+  .shuffle-all-btn {
+    min-width: auto;
+    padding: 0 12px;
+  }
 }
 
 .shuffle-all-btn {

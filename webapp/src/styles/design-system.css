@@ -1793,3 +1793,34 @@
 .no-channel-prompt .setup-btn:active {
   transform: scale(0.98);
 }
+
+/* ─── Global Search Shortcut Button (for Empty States) ─── */
+.btn-global-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px 20px;
+  border-radius: 20px;
+  background: rgba(29, 185, 84, 0.15);
+  border: 1px solid rgba(29, 185, 84, 0.35);
+  color: var(--c-accent, #1db954);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  box-shadow: 0 4px 14px rgba(29, 185, 84, 0.15);
+  user-select: none;
+}
+
+.btn-global-search:hover {
+  background: var(--c-accent, #1db954);
+  color: #000;
+  border-color: var(--c-accent, #1db954);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(29, 185, 84, 0.35);
+}
+
+.btn-global-search:active {
+  transform: scale(0.97);
+}

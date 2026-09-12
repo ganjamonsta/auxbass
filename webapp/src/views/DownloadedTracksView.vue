@@ -11,9 +11,9 @@
       </div>
     </div>
 
-    <!-- Unified Actions -->
-    <div class="hero-actions" v-if="tracks.length">
-      <div class="action-buttons">
+    <!-- Unified Actions with Expandable Search in one row -->
+    <div class="hero-actions" :class="{ 'search-active': isSearchOpen }" v-if="tracks.length">
+      <div class="action-buttons" v-if="!isSearchOpen">
         <button class="action-btn play-btn" @click="playAll" title="Слушать все">
           <Play :size="20" fill="currentColor" />
         </button>
@@ -21,13 +21,13 @@
           <Shuffle :size="18" />
         </button>
       </div>
-    </div>
 
-    <!-- Search bar (when tracks exist) -->
-    <div class="search-section" v-if="tracks.length > 5">
-      <SearchBar
+      <ExpandableSearch
+        v-if="tracks.length > 5"
         v-model="searchQuery"
+        v-model:open="isSearchOpen"
         placeholder="Поиск по скачанным..."
+        title="Поиск по скачанным"
       />
     </div>
 
@@ -37,7 +37,7 @@
     </div>
 
     <!-- Track list -->
-    <div class="track-list" v-else-if="tracks.length">
+    <div class="track-list" v-else-if="sortedTracks.length">
       <TrackItem
         v-for="(track, index) in sortedTracks"
         :key="track.id"
@@ -50,6 +50,18 @@
         @download="handleDirectDownload(track)"
         @hdNotice="handleHdNotice"
       />
+    </div>
+
+    <!-- Empty search state -->
+    <div v-else-if="searchQuery" class="empty-state search-empty">
+      <div class="empty-icon">
+        <Search :size="48" />
+      </div>
+      <p>Ничего не найдено по запросу «{{ searchQuery }}»</p>
+      <button type="button" class="btn-global-search" @click="goToGlobalSearch">
+        <Search :size="16" />
+        <span>Искать в глобальном поиске</span>
+      </button>
     </div>
 
     <!-- Empty state -->
@@ -72,8 +84,8 @@ import { useContextMenu } from '@/composables/useContextMenu'
 import { useTrackActions, usePlaybackActions, useTrackSync } from '@/composables'
 import { getAllCachedTracks } from '@/utils/audioCacheDb'
 import TrackItem from '@/components/TrackItem.vue'
-import SearchBar from '@/components/ui/SearchBar.vue'
-import { HardDrive, Play, Shuffle } from 'lucide-vue-next'
+import ExpandableSearch from '@/components/ui/ExpandableSearch.vue'
+import { HardDrive, Play, Shuffle, Search } from 'lucide-vue-next'
 
 // Universal context menu
 const { openMenu } = useContextMenu()
@@ -88,6 +100,14 @@ const libraryStore = useLibraryStore()
 const rawTracks = ref([])
 const loading = ref(true)
 const searchQuery = ref('')
+const isSearchOpen = ref(false)
+
+const goToGlobalSearch = () => {
+  const q = searchQuery.value.trim()
+  if (q) {
+    router.push({ path: '/search', query: { q } })
+  }
+}
 
 const tracks = computed(() => rawTracks.value)
 
@@ -147,8 +167,17 @@ onUnmounted(() => {
   padding: 16px;
 }
 
-.search-section {
+.hero-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 16px;
+  min-height: 44px;
+}
+
+.hero-actions.search-active {
+  justify-content: stretch;
 }
 
 .downloaded-cover {
