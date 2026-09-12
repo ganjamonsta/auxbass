@@ -429,21 +429,28 @@ onMounted(() => {
 
 /* Greeting */
 .home-greeting {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .greeting-title {
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 800;
   color: var(--c-text-1, #fff);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
   margin: 0;
+}
+
+@media (min-width: 1024px) {
+  .greeting-title {
+    font-size: 32px;
+  }
 }
 
 .greeting-subtitle {
   font-size: 14px;
   color: var(--c-text-3, rgba(255, 255, 255, 0.5));
   margin-top: 4px;
+  font-weight: 500;
 }
 
 /* Quick Access Grid (Spotify style) */
@@ -458,15 +465,16 @@ onMounted(() => {
   .quick-access-grid {
     grid-template-columns: repeat(3, 1fr);
     gap: 12px;
+    margin-bottom: 36px;
   }
 }
 
 .quick-card {
   display: flex;
   align-items: center;
-  gap: 10px;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: 8px;
   overflow: hidden;
   height: 56px;
@@ -474,11 +482,18 @@ onMounted(() => {
   position: relative;
   transition: all 0.2s ease;
   user-select: none;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
+}
+
+@media (min-width: 1024px) {
+  .quick-card {
+    height: 64px;
+  }
 }
 
 .quick-card:hover {
-  background: rgba(255, 255, 255, 0.13);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.08);
   transform: translateY(-1px);
 }
 
@@ -498,6 +513,13 @@ onMounted(() => {
   overflow: hidden;
 }
 
+@media (min-width: 1024px) {
+  .quick-card-cover {
+    width: 64px;
+    height: 64px;
+  }
+}
+
 .quick-card-cover img {
   width: 100%;
   height: 100%;
@@ -505,9 +527,9 @@ onMounted(() => {
 }
 
 .liked-cover-gradient {
-  background: linear-gradient(135deg, #450af5 0%, #8b5cf6 50%, #c084fc 100%);
+  background: linear-gradient(135deg, #581c87 0%, #7e22ce 50%, #9333ea 100%);
   color: #fff;
-  box-shadow: inset 0 0 12px rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 0 16px rgba(255, 255, 255, 0.25);
 }
 
 .create-cover {
@@ -525,7 +547,7 @@ onMounted(() => {
 }
 
 .quick-card-title {
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 700;
   color: var(--c-text-1, #fff);
   white-space: nowrap;
@@ -533,10 +555,23 @@ onMounted(() => {
   text-overflow: ellipsis;
 }
 
+@media (min-width: 1024px) {
+  .quick-card-title {
+    font-size: 14.5px;
+  }
+}
+
 .quick-card-meta {
   font-size: 11px;
   color: var(--c-text-3, rgba(255, 255, 255, 0.45));
   margin-top: 2px;
+  font-weight: 500;
+}
+
+@media (min-width: 1024px) {
+  .quick-card-meta {
+    font-size: 12px;
+  }
 }
 
 .quick-play-btn {
@@ -629,16 +664,22 @@ onMounted(() => {
 
 /* Feed Cards */
 .feed-card {
-  width: 128px;
+  width: 132px;
   flex-shrink: 0;
   cursor: pointer;
   display: flex;
   flex-direction: column;
 }
 
+@media (min-width: 1024px) {
+  .feed-card {
+    width: 160px;
+  }
+}
+
 .feed-card-cover {
-  width: 128px;
-  height: 128px;
+  width: 132px;
+  height: 132px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.05);
   overflow: hidden;
@@ -648,6 +689,21 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease;
+}
+
+@media (min-width: 1024px) {
+  .feed-card-cover {
+    width: 160px;
+    height: 160px;
+    border-radius: 12px;
+    margin-bottom: 10px;
+  }
+
+  .feed-card:hover .feed-card-cover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+  }
 }
 
 .feed-card-cover img {
@@ -679,7 +735,16 @@ onMounted(() => {
   pointer-events: none;
   transform: translateY(6px);
   transition: all 0.2s ease;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5);
+}
+
+@media (min-width: 1024px) {
+  .feed-card .play-overlay {
+    width: 42px;
+    height: 42px;
+    bottom: 10px;
+    right: 10px;
+  }
 }
 
 .feed-card:hover .play-overlay {
@@ -690,12 +755,19 @@ onMounted(() => {
 
 .feed-card-title {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--c-text-1, #fff);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   margin-bottom: 2px;
+}
+
+@media (min-width: 1024px) {
+  .feed-card-title {
+    font-size: 14px;
+    margin-top: 2px;
+  }
 }
 
 .feed-card-subtitle {
@@ -704,6 +776,13 @@ onMounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+@media (min-width: 1024px) {
+  .feed-card-subtitle {
+    font-size: 12.5px;
+  }
 }
 
 /* Discovery Banner */

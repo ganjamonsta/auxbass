@@ -224,6 +224,7 @@
             <div class="queue-item-title">{{ getDisplayTitle(queueTrack) }}</div>
             <div class="queue-item-artist">{{ getDisplayArtist(queueTrack) }}</div>
           </div>
+          <span v-if="queueTrack.duration && index > 0" class="queue-item-duration">{{ formatDuration(queueTrack.duration) }}</span>
           <button 
             v-if="index > 0"
             class="queue-item-remove"
@@ -867,6 +868,15 @@ const handleToggleLike = async () => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.queue-item-duration {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.4);
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+  padding-left: 6px;
+  flex-shrink: 0;
 }
 
 .queue-item-remove {

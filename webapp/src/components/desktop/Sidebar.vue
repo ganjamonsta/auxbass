@@ -3,55 +3,65 @@
     <!-- Logo -->
     <div class="sidebar-logo">
       <div class="logo-icon">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
         </svg>
       </div>
-      <span class="logo-text">{{ authStore.appName }}</span>
+      <span class="logo-text">{{ authStore.appName || 'auxbassbot' }}</span>
+      <div 
+        v-if="authStore.user" 
+        class="header-avatar clickable" 
+        @click="goToMyProfile"
+        title="Мой профиль"
+      >
+        <span class="header-avatar-badge">{{ userInitials }}</span>
+      </div>
     </div>
 
     <!-- Main Navigation -->
     <nav class="sidebar-nav">
       <router-link to="/" class="nav-item" :class="{ active: isActiveExact('/') }">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
           <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
         </svg>
         <span>Главная</span>
       </router-link>
 
-      <router-link to="/search" class="nav-item" :class="{ active: isActive('/search') }">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </svg>
-        <span>Поиск</span>
-      </router-link>
-
-      <router-link to="/library" class="nav-item" :class="{ active: isActive('/library') }">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <router-link to="/library" class="nav-item" :class="{ active: isActive('/library') && route.query.tab !== 'playlists' }">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="m16 6 4 14M12 6v14M8 8v12M4 4v16"></path>
         </svg>
-        <span>Медиатека</span>
+        <span>Библиотека</span>
       </router-link>
 
-      <router-link 
-        to="/liked" 
-        class="nav-item" 
-        :class="{ active: isActive('/liked') }"
-        @contextmenu.prevent="openMenu('liked', { name: 'Понравившиеся', track_count: likedCount }, 'sidebar', $event)"
+      <div 
+        class="nav-item clickable" 
+        :class="{ active: route.name === 'library' && route.query.tab === 'playlists' }"
+        @click="goToPersonalPlaylists"
       >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
         </svg>
-        <span>Любимое</span>
-        <span v-if="likedCount" class="nav-count">{{ formatCount(likedCount) }}</span>
-      </router-link>
+        <span>Плейлисты</span>
+      </div>
 
       <router-link to="/friends" class="nav-item" :class="{ active: isActive('/friends') }">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
           <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
         </svg>
-        <span>Кенты</span>
+        <span>Друзья (Кенты)</span>
+      </router-link>
+
+      <!-- Offline / Cached tracks standout card -->
+      <router-link 
+        to="/downloaded" 
+        class="nav-item offline-highlight-item" 
+        :class="{ active: isActive('/downloaded') }"
+        title="Кэшированные и скачанные треки"
+      >
+        <FolderDown :size="20" class="offline-icon" />
+        <span>Offline</span>
+        <span v-if="cachedTracksCount > 0" class="nav-count offline-count">{{ cachedTracksCount }}</span>
       </router-link>
     </nav>
 
@@ -143,7 +153,8 @@ import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import { getCoverUrl, CoverSize, getPlaylistCoverStyle } from '@/utils'
-import { Download } from 'lucide-vue-next'
+import { Download, FolderDown } from 'lucide-vue-next'
+import { getCacheStats } from '@/utils/audioCacheDb'
 import ProfileMenu from '@/components/layout/ProfileMenu.vue'
 
 const route = useRoute()
@@ -153,6 +164,14 @@ const authStore = useAuthStore()
 const uiStore = useUIStore()
 const pwaInstall = usePwaInstall()
 const showProfileMenu = ref(false)
+const cachedTracksCount = ref(0)
+
+const updateCachedStats = async () => {
+  try {
+    const stats = await getCacheStats()
+    cachedTracksCount.value = stats?.trackCount || 0
+  } catch (_) {}
+}
 
 // Universal context menu
 const { openMenu } = useContextMenu()
@@ -239,10 +258,13 @@ const onPlaylistChanged = () => {
 
 onMounted(() => {
   window.addEventListener('playlist:changed', onPlaylistChanged)
+  window.addEventListener('cache-updated', updateCachedStats)
+  updateCachedStats()
 })
 
 onUnmounted(() => {
   window.removeEventListener('playlist:changed', onPlaylistChanged)
+  window.removeEventListener('cache-updated', updateCachedStats)
 })
 </script>
 
@@ -275,24 +297,50 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 20px 16px;
+  padding: 20px 16px 16px;
+}
+
+.header-avatar {
+  margin-left: auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #333 0%, #222 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.header-avatar:hover {
+  transform: scale(1.06);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.header-avatar-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
 }
 
 .logo-icon {
-  width: 40px;
-  height: 40px;
-  background: linear-gradient(135deg, var(--c-accent), var(--c-accent-light));
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--c-accent, #1db954), var(--c-accent-light, #1ed760));
   border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: #000;
 }
 
 .logo-text {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 18px;
+  font-weight: 800;
   color: white;
+  letter-spacing: -0.02em;
 }
 
 .sidebar-nav {
@@ -305,7 +353,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   width: 100%;
-  padding: 12px 16px;
+  padding: 10px 14px;
   background: transparent;
   border: none;
   border-radius: 8px;
@@ -319,17 +367,45 @@ onUnmounted(() => {
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
   color: white;
 }
 
 .nav-item.active {
-  background: rgba(29, 185, 84, 0.2);
-  color: var(--c-accent);
+  background: rgba(29, 185, 84, 0.12);
+  color: var(--c-accent, #1db954);
+  font-weight: 600;
 }
 
 .nav-item.active svg {
-  color: var(--c-accent);
+  color: var(--c-accent, #1db954);
+  opacity: 1;
+}
+
+.offline-highlight-item {
+  margin-top: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 11px 14px;
+}
+
+.offline-highlight-item:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.offline-highlight-item.active {
+  background: rgba(29, 185, 84, 0.15);
+  border-color: rgba(29, 185, 84, 0.4);
+  color: var(--c-accent, #1db954);
+}
+
+.offline-highlight-item .offline-count {
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
 }
 
 .nav-item svg {
