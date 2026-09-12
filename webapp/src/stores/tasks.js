@@ -28,6 +28,176 @@ export const useTasksStore = defineStore('tasks', () => {
   // Polling timers map
   const pollTimers = new Map()
 
+  // ══════════════════════════════════════════════════════════════════════
+  // Quick Download Queue (Single / Multi-Track Add from Search & Likes)
+  // ══════════════════════════════════════════════════════════════════════
+  const downloadQueue = ref([])
+  const isQueueProcessing = ref(false)
+  const currentQueueTrack = ref(null)
+  const queueTotalBatch = ref(0)
+  const queueCompletedBatch = ref(0)
+  const queueFailedBatch = ref(0)
+  const trackStatusMap = ref(new Map())
+  const queueVisible = ref(false)
+  let queueDismissTimer = null
+
+  const isTrackQueued = (url) => {
+    if (!url) return false
+    return trackStatusMap.value.get(url) === 'queued'
+  }
+
+  const isTrackDownloading = (url) => {
+    if (!url) return false
+    return trackStatusMap.value.get(url) === 'downloading'
+  }
+
+  const isTrackCompleted = (url) => {
+    if (!url) return false
+    return trackStatusMap.value.get(url) === 'completed'
+  }
+
+  const enqueueTrack = (track, source = 'soundcloud') => {
+    if (!track || !track.url) return
+
+    const currentStatus = trackStatusMap.value.get(track.url)
+    if (currentStatus === 'queued' || currentStatus === 'downloading') {
+      uiStore.toast?.info('Уже в очереди', `${track.artist || ''} — ${track.title || ''}`)
+      return
+    }
+
+    if (queueDismissTimer) {
+      clearTimeout(queueDismissTimer)
+      queueDismissTimer = null
+    }
+
+    // If queue was idle, reset batch counters
+    if (!isQueueProcessing.value && downloadQueue.value.length === 0) {
+      queueTotalBatch.value = 0
+      queueCompletedBatch.value = 0
+      queueFailedBatch.value = 0
+    }
+
+    queueTotalBatch.value++
+    queueVisible.value = true
+
+    const queueItem = {
+      url: track.url,
+      title: track.title || 'Трек',
+      artist: track.artist || 'Неизвестный исполнитель',
+      duration: track.duration,
+      cover_url: track.cover_url,
+      source: source || 'soundcloud',
+      rawTrack: track,
+    }
+
+    const nextMap = new Map(trackStatusMap.value)
+    nextMap.set(track.url, 'queued')
+    trackStatusMap.value = nextMap
+
+    downloadQueue.value.push(queueItem)
+
+    // UI feedback toast
+    if (downloadQueue.value.length === 1 && !isQueueProcessing.value) {
+      uiStore.toast?.info('Загрузка начата', `${queueItem.artist} — ${queueItem.title}`)
+    } else {
+      uiStore.toast?.info(
+        'Добавлено в очередь',
+        `${queueItem.artist} — ${queueItem.title} (${downloadQueue.value.length} в очереди)`
+      )
+    }
+
+    if (!isQueueProcessing.value) {
+      processNextQueueItem()
+    }
+  }
+
+  const processNextQueueItem = async () => {
+    if (downloadQueue.value.length === 0) {
+      isQueueProcessing.value = false
+      currentQueueTrack.value = null
+
+      if (queueCompletedBatch.value > 1) {
+        uiStore.toast?.success(
+          'Очередь завершена',
+          `Успешно добавлено ${queueCompletedBatch.value} треков в медиатеку`
+        )
+      }
+
+      // Auto-hide widget after 5 seconds
+      queueDismissTimer = setTimeout(() => {
+        queueVisible.value = false
+      }, 5000)
+      return
+    }
+
+    isQueueProcessing.value = true
+    const item = downloadQueue.value[0]
+    currentQueueTrack.value = item
+
+    const nextMap = new Map(trackStatusMap.value)
+    nextMap.set(item.url, 'downloading')
+    trackStatusMap.value = nextMap
+
+    try {
+      const res = await ingestionApi.quickImport({
+        url: item.url,
+        title: item.title,
+        artist: item.artist,
+        duration: item.duration,
+        cover_url: item.cover_url,
+        add_to_library: true,
+      })
+
+      const trackObj = res.data?.track
+      if (trackObj && item.rawTrack) {
+        item.rawTrack.in_library = true
+        item.rawTrack.already_in_tg = true
+        item.rawTrack.track_id = trackObj.id
+      }
+
+      queueCompletedBatch.value++
+      const mapDone = new Map(trackStatusMap.value)
+      mapDone.set(item.url, 'completed')
+      trackStatusMap.value = mapDone
+
+      libraryStore.fetchTracks({ refresh: true })
+    } catch (err) {
+      console.error('[TasksStore] Quick import queue error:', err)
+      queueFailedBatch.value++
+      const mapFail = new Map(trackStatusMap.value)
+      mapFail.set(item.url, 'failed')
+      trackStatusMap.value = mapFail
+
+      const errorMsg = err.response?.data?.detail || err.message || 'Ошибка загрузки'
+      uiStore.toast?.error('Ошибка импорта', `${item.title}: ${errorMsg}`)
+    } finally {
+      // Remove finished item from queue
+      downloadQueue.value.shift()
+      currentQueueTrack.value = null
+
+      // Delay 300ms before next item
+      setTimeout(() => {
+        processNextQueueItem()
+      }, 300)
+    }
+  }
+
+  const cancelQueue = () => {
+    downloadQueue.value = []
+    currentQueueTrack.value = null
+    isQueueProcessing.value = false
+    queueVisible.value = false
+    if (queueDismissTimer) {
+      clearTimeout(queueDismissTimer)
+      queueDismissTimer = null
+    }
+    uiStore.toast?.info('Очередь отменена', 'Оставшиеся загрузки отменены')
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Long-Running Ingestion Jobs (Spotify Exportify & SoundCloud Full)
+  // ══════════════════════════════════════════════════════════════════════
+
   /**
    * Register a new job and begin background polling
    */
@@ -152,6 +322,14 @@ export const useTasksStore = defineStore('tasks', () => {
   const restoreJob = (jobId) => {
     if (!jobId) return
 
+    if (jobId === 'quick-download-queue') {
+      uiStore.toast?.info(
+        'Очередь добавления',
+        `В очереди: ${downloadQueue.value.length} треков. Загрузка продолжается в фоне.`
+      )
+      return
+    }
+
     const nextMin = new Set(minimizedJobIds.value)
     nextMin.delete(jobId)
     minimizedJobIds.value = nextMin
@@ -173,6 +351,12 @@ export const useTasksStore = defineStore('tasks', () => {
    */
   const cancelJob = async (jobId) => {
     if (!jobId) return
+
+    if (jobId === 'quick-download-queue') {
+      cancelQueue()
+      return
+    }
+
     try {
       await ingestionApi.cancelJob(jobId)
       stopPolling(jobId)
@@ -225,10 +409,12 @@ export const useTasksStore = defineStore('tasks', () => {
   }
 
   /**
-   * List of all currently minimized active tasks
+   * List of all currently minimized active tasks (modal jobs + quick queue)
    */
   const activeMinimizedJobs = computed(() => {
     const list = []
+
+    // 1. Minimized modal jobs
     for (const jobId of minimizedJobIds.value) {
       const job = jobs.value.get(jobId)
       const meta = jobMetas.value.get(jobId)
@@ -236,6 +422,49 @@ export const useTasksStore = defineStore('tasks', () => {
         list.push({ job, meta })
       }
     }
+
+    // 2. Live quick-download queue
+    if (queueVisible.value) {
+      const total = Math.max(queueTotalBatch.value, queueCompletedBatch.value + queueFailedBatch.value)
+      const done = queueCompletedBatch.value + queueFailedBatch.value
+      const isFinished = !isQueueProcessing.value && downloadQueue.value.length === 0
+      const pct = total > 0 ? Math.round((done / total) * 100) : 100
+      const cur = currentQueueTrack.value
+
+      let stepText = ''
+      let currentTrackName = ''
+      if (isFinished) {
+        stepText = `Все треки успешно добавлены (${queueCompletedBatch.value})`
+      } else if (cur) {
+        currentTrackName = `${cur.artist} — ${cur.title}`
+        const pendingCount = downloadQueue.value.length - 1
+        stepText = pendingCount > 0
+          ? `Скачивание аудио • ещё ${pendingCount} в очереди`
+          : 'Скачивание и добавление в Telegram...'
+      } else {
+        stepText = 'Обработка очереди...'
+      }
+
+      list.push({
+        job: {
+          id: 'quick-download-queue',
+          title: total > 1 ? `Добавление треков (${done}/${total})` : 'Добавление в медиатеку',
+          status: isFinished ? 'completed' : 'in_progress',
+          processed_tracks: done,
+          total_tracks: total,
+          progress_percent: pct,
+          current_track_title: currentTrackName,
+          current_step: stepText,
+          download_percent: null,
+        },
+        meta: {
+          type: cur?.source === 'spotify' ? 'exportify' : 'import',
+          title: 'Очередь загрузки',
+          isQueue: true,
+        },
+      })
+    }
+
     return list
   })
 
@@ -248,6 +477,11 @@ export const useTasksStore = defineStore('tasks', () => {
     currentExportifyJob,
     currentImportJob,
     activeMinimizedJobs,
+    downloadQueue,
+    isQueueProcessing,
+    currentQueueTrack,
+    queueTotalBatch,
+    queueCompletedBatch,
     registerJob,
     minimizeJob,
     restoreJob,
@@ -256,5 +490,10 @@ export const useTasksStore = defineStore('tasks', () => {
     closeExportifyModal,
     openImportModal,
     closeImportModal,
+    enqueueTrack,
+    cancelQueue,
+    isTrackQueued,
+    isTrackDownloading,
+    isTrackCompleted,
   }
 })

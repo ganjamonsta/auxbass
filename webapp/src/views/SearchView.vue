@@ -113,13 +113,23 @@
                 <div class="sc-track-actions">
                   <span v-if="item.duration" class="sc-track-duration">{{ formatDuration(item.duration) }}</span>
                   <button 
+                    v-if="!isTrackInLibrary(item)"
                     class="sc-add-btn" 
-                    :disabled="importingTrackUrl === item.url"
+                    :class="{ 
+                      loading: tasksStore.isTrackDownloading(item.url),
+                      queued: tasksStore.isTrackQueued(item.url)
+                    }"
+                    :disabled="tasksStore.isTrackDownloading(item.url) || tasksStore.isTrackQueued(item.url)"
                     @click.stop="handleQuickAddSoundCloud(item)"
-                    title="Добавить в медиатеку"
+                    :title="tasksStore.isTrackDownloading(item.url) ? 'Загружается...' : tasksStore.isTrackQueued(item.url) ? 'В очереди на добавление' : 'Добавить в медиатеку'"
                   >
-                    <Plus :size="16" />
+                    <div v-if="tasksStore.isTrackDownloading(item.url)" class="spinner micro"></div>
+                    <Clock v-else-if="tasksStore.isTrackQueued(item.url)" :size="14" />
+                    <Plus v-else :size="16" />
                   </button>
+                  <span v-else class="sc-added-indicator" title="Уже в медиатеке">
+                    <Check :size="16" />
+                  </span>
                 </div>
               </div>
             </div>
@@ -167,13 +177,23 @@
                 <div class="sc-track-actions">
                   <span v-if="item.duration" class="sc-track-duration">{{ formatDuration(item.duration) }}</span>
                   <button 
+                    v-if="!isTrackInLibrary(item)"
                     class="sc-add-btn sp-add" 
-                    :disabled="importingTrackUrl === item.url"
+                    :class="{ 
+                      loading: tasksStore.isTrackDownloading(item.url),
+                      queued: tasksStore.isTrackQueued(item.url)
+                    }"
+                    :disabled="tasksStore.isTrackDownloading(item.url) || tasksStore.isTrackQueued(item.url)"
                     @click.stop="handleQuickAddSpotify(item)"
-                    title="Добавить в медиатеку"
+                    :title="tasksStore.isTrackDownloading(item.url) ? 'Загружается...' : tasksStore.isTrackQueued(item.url) ? 'В очереди на добавление' : 'Добавить в медиатеку'"
                   >
-                    <Plus :size="16" />
+                    <div v-if="tasksStore.isTrackDownloading(item.url)" class="spinner micro"></div>
+                    <Clock v-else-if="tasksStore.isTrackQueued(item.url)" :size="14" />
+                    <Plus v-else :size="16" />
                   </button>
+                  <span v-else class="sc-added-indicator" title="Уже в медиатеке">
+                    <Check :size="16" />
+                  </span>
                 </div>
               </div>
             </div>
@@ -585,13 +605,19 @@
                 <div class="sc-track-actions">
                   <span v-if="item.duration" class="sc-track-duration">{{ formatDuration(item.duration) }}</span>
                   <button 
-                    v-if="!item.in_library"
+                    v-if="!isTrackInLibrary(item)"
                     class="sc-add-btn" 
-                    :disabled="importingTrackUrl === item.url"
+                    :class="{ 
+                      loading: tasksStore.isTrackDownloading(item.url),
+                      queued: tasksStore.isTrackQueued(item.url)
+                    }"
+                    :disabled="tasksStore.isTrackDownloading(item.url) || tasksStore.isTrackQueued(item.url)"
                     @click.stop="handleQuickAddSoundCloud(item)"
-                    title="Добавить в медиатеку"
+                    :title="tasksStore.isTrackDownloading(item.url) ? 'Загружается...' : tasksStore.isTrackQueued(item.url) ? 'В очереди на добавление' : 'Добавить в медиатеку'"
                   >
-                    <Plus :size="16" />
+                    <div v-if="tasksStore.isTrackDownloading(item.url)" class="spinner micro"></div>
+                    <Clock v-else-if="tasksStore.isTrackQueued(item.url)" :size="14" />
+                    <Plus v-else :size="16" />
                   </button>
                   <span v-else class="sc-added-indicator" title="Уже в медиатеке">
                     <Check :size="16" />
@@ -733,13 +759,19 @@
                 <div class="sc-track-actions">
                   <span v-if="item.duration" class="sc-track-duration">{{ formatDuration(item.duration) }}</span>
                   <button 
-                    v-if="!item.in_library"
+                    v-if="!isTrackInLibrary(item)"
                     class="sc-add-btn" 
-                    :disabled="importingTrackUrl === item.url"
+                    :class="{ 
+                      loading: tasksStore.isTrackDownloading(item.url),
+                      queued: tasksStore.isTrackQueued(item.url)
+                    }"
+                    :disabled="tasksStore.isTrackDownloading(item.url) || tasksStore.isTrackQueued(item.url)"
                     @click.stop="handleQuickAddSoundCloud(item)"
-                    title="Добавить в медиатеку и канал"
+                    :title="tasksStore.isTrackDownloading(item.url) ? 'Загружается...' : tasksStore.isTrackQueued(item.url) ? 'В очереди на добавление' : 'Добавить в медиатеку и канал'"
                   >
-                    <Plus :size="16" />
+                    <div v-if="tasksStore.isTrackDownloading(item.url)" class="spinner micro"></div>
+                    <Clock v-else-if="tasksStore.isTrackQueued(item.url)" :size="14" />
+                    <Plus v-else :size="16" />
                   </button>
                   <span v-else class="sc-added-indicator" title="Уже в медиатеке">
                     <Check :size="16" />
@@ -895,13 +927,19 @@
                 <div class="sc-track-actions">
                   <span v-if="item.duration" class="sc-track-duration">{{ formatDuration(item.duration) }}</span>
                   <button 
-                    v-if="!item.in_library"
+                    v-if="!isTrackInLibrary(item)"
                     class="sc-add-btn sp-add" 
-                    :disabled="importingTrackUrl === item.url"
+                    :class="{ 
+                      loading: tasksStore.isTrackDownloading(item.url),
+                      queued: tasksStore.isTrackQueued(item.url)
+                    }"
+                    :disabled="tasksStore.isTrackDownloading(item.url) || tasksStore.isTrackQueued(item.url)"
                     @click.stop="handleQuickAddSpotify(item)"
-                    title="Добавить в медиатеку"
+                    :title="tasksStore.isTrackDownloading(item.url) ? 'Загружается...' : tasksStore.isTrackQueued(item.url) ? 'В очереди на добавление' : 'Добавить в медиатеку'"
                   >
-                    <Plus :size="16" />
+                    <div v-if="tasksStore.isTrackDownloading(item.url)" class="spinner micro"></div>
+                    <Clock v-else-if="tasksStore.isTrackQueued(item.url)" :size="14" />
+                    <Plus v-else :size="16" />
                   </button>
                   <span v-else class="sc-added-indicator" title="Уже в медиатеке">
                     <Check :size="16" />
@@ -1171,7 +1209,8 @@ import {
   Radio,
   Settings,
   FileSpreadsheet,
-  Upload
+  Upload,
+  Clock
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -1495,35 +1534,13 @@ const handleQuickPlaySoundCloud = async (scTrack) => {
   }
 }
 
-const handleQuickAddSoundCloud = async (scTrack) => {
-  if (importingTrackUrl.value) return
-  importingTrackUrl.value = scTrack.url
+const isTrackInLibrary = (item) => {
+  if (!item) return false
+  return item.in_library || tasksStore.isTrackCompleted(item.url)
+}
 
-  try {
-    const res = await ingestionApi.quickImport({
-      url: scTrack.url,
-      title: scTrack.title,
-      artist: scTrack.artist,
-      duration: scTrack.duration,
-      cover_url: scTrack.cover_url,
-      add_to_library: true,
-    })
-
-    const track = res.data?.track
-    if (track) {
-      scTrack.in_library = true
-      scTrack.already_in_tg = true
-      scTrack.track_id = track.id
-      libraryStore.fetchTracks({ refresh: true })
-      uiStore.toast?.success('В медиатеке', `${track.artist} — ${track.title}`)
-    }
-  } catch (e) {
-    console.error('Failed to quick add track:', e)
-    const errorMsg = e.response?.data?.detail || 'Не удалось добавить трек'
-    uiStore.toast?.error('Ошибка импорта', errorMsg)
-  } finally {
-    importingTrackUrl.value = null
-  }
+const handleQuickAddSoundCloud = (scTrack) => {
+  tasksStore.enqueueTrack(scTrack, 'soundcloud')
 }
 
 // ─── Spotify External Search & Likes State ───
@@ -1705,35 +1722,8 @@ const handleQuickPlaySpotify = async (spTrack) => {
   }
 }
 
-const handleQuickAddSpotify = async (spTrack) => {
-  if (importingTrackUrl.value) return
-  importingTrackUrl.value = spTrack.url
-
-  try {
-    const res = await ingestionApi.quickImport({
-      url: spTrack.url,
-      title: spTrack.title,
-      artist: spTrack.artist,
-      duration: spTrack.duration,
-      cover_url: spTrack.cover_url,
-      add_to_library: true,
-    })
-
-    const track = res.data?.track
-    if (track) {
-      spTrack.in_library = true
-      spTrack.already_in_tg = true
-      spTrack.track_id = track.id
-      libraryStore.fetchTracks({ refresh: true })
-      uiStore.toast?.success('В медиатеке', `${track.artist} — ${track.title}`)
-    }
-  } catch (e) {
-    console.error('Failed to quick add Spotify track:', e)
-    const errorMsg = e.response?.data?.detail || 'Не удалось добавить трек'
-    uiStore.toast?.error('Ошибка импорта', errorMsg)
-  } finally {
-    importingTrackUrl.value = null
-  }
+const handleQuickAddSpotify = (spTrack) => {
+  tasksStore.enqueueTrack(spTrack, 'spotify')
 }
 
 // Local database search loading state (fast, < 150ms)
@@ -2954,8 +2944,39 @@ onUnmounted(() => {
 }
 
 .sc-add-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.7;
   cursor: not-allowed;
+}
+
+.sc-add-btn.loading {
+  background: rgba(255, 85, 0, 0.18);
+  border-color: rgba(255, 85, 0, 0.45);
+  cursor: wait;
+}
+
+.sc-add-btn.queued {
+  background: rgba(56, 189, 248, 0.16);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+  cursor: default;
+}
+
+.sc-add-btn.sp-add:hover:not(:disabled) {
+  background: #1db954;
+  border-color: #1db954;
+}
+
+.sc-add-btn.sp-add.loading {
+  background: rgba(29, 185, 84, 0.18);
+  border-color: rgba(29, 185, 84, 0.45);
+  cursor: wait;
+}
+
+.sc-add-btn.sp-add.queued {
+  background: rgba(56, 189, 248, 0.16);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+  cursor: default;
 }
 
 .sc-load-more-wrap {
