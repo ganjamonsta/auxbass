@@ -50,7 +50,7 @@
       </button>
     </div>
 
-    <!-- Center - LCD Display -->
+    <!-- Center - Neon Waveform Display -->
     <div class="lcd-panel">
       <div class="lcd-frame">
         <div class="lcd-screen" @click="handleLcdClick">
@@ -80,27 +80,59 @@
             </div>
           </div>
 
-          <!-- Progress row -->
-          <div class="lcd-progress-row">
-            <span class="lcd-status" style="margin-right: 4px; display: flex; align-items: center;"><Play v-if="isPlaying" :size="10" fill="currentColor" /><Square v-else :size="10" fill="currentColor" /></span>
-            <span class="lcd-time">{{ formatTime(progress) }}</span>
-            <div class="lcd-progress" @click="handleProgressClick" @mousedown="startSeek">
-              <div class="progress-bar">
-                <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
-                <div class="progress-buffered" :style="{ width: bufferedPercent + '%' }"></div>
+          <!-- Waveform & Progress row -->
+          <div class="lcd-waveform-row">
+            <div class="lcd-time-col left">
+              <span class="lcd-status" style="margin-right: 4px; display: flex; align-items: center;">
+                <Play v-if="isPlaying" :size="10" fill="currentColor" />
+                <Square v-else :size="10" fill="currentColor" />
+              </span>
+              <span class="lcd-time">{{ formatTime(progress) }}</span>
+            </div>
+
+            <!-- Interactive Neon Waveform Scrubber -->
+            <div 
+              class="waveform-container" 
+              ref="waveformContainer"
+              @click="handleWaveformClick"
+              @mousedown="startSeek"
+              @mousemove="handleWaveformHover"
+              @mouseleave="handleWaveformLeave"
+              title="Перемотка трека"
+            >
+              <canvas ref="waveformCanvas" class="waveform-canvas"></canvas>
+              
+              <!-- Hover line and tooltip -->
+              <div 
+                v-if="hoverPercent !== null" 
+                class="waveform-hover-marker"
+                :style="{ left: (hoverPercent * 100) + '%' }"
+              >
+                <div class="waveform-hover-tip">
+                  {{ formatTime(hoverPercent * duration) }}
+                </div>
               </div>
             </div>
-            <span class="lcd-time">{{ formatTime(duration) }}</span>
+
+            <div class="lcd-time-col right">
+              <span class="lcd-time">{{ formatTime(duration) }}</span>
+            </div>
           </div>
 
-          <!-- Equalizer -->
-          <div class="lcd-eq">
-            <div 
-              v-for="i in 16" 
-              :key="i" 
-              class="eq-bar"
-              :style="{ height: getEqHeight(i) + '%' }"
-            ></div>
+          <!-- Bottom: Equalizer + Audio Format badge -->
+          <div class="lcd-bottom-row">
+            <div class="lcd-eq">
+              <div 
+                v-for="i in 18" 
+                :key="i" 
+                class="eq-bar"
+                :style="{ height: getEqHeight(i) + '%' }"
+              ></div>
+            </div>
+            <div class="lcd-format-badge">
+              <span v-if="playerStore.hdTrackInfo" class="badge-hd">HD 24-BIT</span>
+              <span v-else class="badge-std">STEREO AUDIO</span>
+            </div>
           </div>
         </div>
       </div>
@@ -205,10 +237,9 @@ const isLiked = computed(() => {
   return track.value.is_liked === true
 })
 
-// Handle LCD click - open full player (but not on progress bar)
+// Handle LCD click - open full player (but not on waveform)
 const handleLcdClick = (e) => {
-  // Don't trigger if clicking on progress bar
-  if (e.target.closest('.lcd-progress') || e.target.closest('.lcd-progress-row')) {
+  if (isSeeking.value || e.target.closest('.waveform-container')) {
     return
   }
   emit('expand')
@@ -275,47 +306,186 @@ const checkTextOverflow = () => {
   shouldScroll.value = textWidth > containerWidth
 }
 
-// Progress
-const progressPercent = computed(() => {
-  if (!duration.value) return 0
-  return (progress.value / duration.value) * 100
-})
+// Deterministic hash-based waveform peak generator
+// Generates musical amplitude peaks (0.15 - 0.98) with zero network traffic & zero latency
+const peaksCache = new Map()
 
-const bufferedPercent = computed(() => {
-  if (!duration.value) return 0
-  return (buffered.value / duration.value) * 100
-})
+const getWaveformPeaks = (trackId, title, count = 120) => {
+  const cacheKey = `${trackId || title || 'default'}_${count}`
+  if (peaksCache.has(cacheKey)) {
+    return peaksCache.get(cacheKey)
+  }
 
-// Seek
-const handleProgressClick = (e) => {
-  const rect = e.currentTarget.getBoundingClientRect()
-  const percent = (e.clientX - rect.left) / rect.width
-  const seekTime = percent * duration.value
-  playerStore.seek(seekTime)
+  // Hash seed from track id / title
+  const seedStr = `${trackId || ''}_${title || 'tg_player'}`
+  let seed = 0
+  for (let i = 0; i < seedStr.length; i++) {
+    seed = (seed * 31 + seedStr.charCodeAt(i)) >>> 0
+  }
+
+  let state = seed || 123456789
+  const rng = () => {
+    state ^= state << 13
+    state ^= state >>> 17
+    state ^= state << 5
+    return ((state >>> 0) % 10000) / 10000
+  }
+
+  const peaks = []
+  const freq1 = 2 + (seed % 4)
+  const freq2 = 5 + ((seed >> 2) % 6)
+  const freq3 = 11 + ((seed >> 4) % 8)
+
+  for (let i = 0; i < count; i++) {
+    const t = i / count
+
+    // Musical envelope: rising intro (8%), stable dynamic body, tapering outro (8%)
+    let envelope = 1
+    if (t < 0.08) {
+      envelope = 0.35 + 0.65 * (t / 0.08)
+    } else if (t > 0.92) {
+      envelope = 0.35 + 0.65 * ((1 - t) / 0.08)
+    }
+
+    const wave = 
+      0.35 * Math.sin(t * Math.PI * freq1) +
+      0.25 * Math.sin(t * Math.PI * freq2 + 1.2) +
+      0.15 * Math.sin(t * Math.PI * freq3 + 2.4)
+
+    const jitter = (rng() - 0.5) * 0.22
+    let val = (0.55 + wave * 0.35 + jitter) * envelope
+    val = Math.max(0.16, Math.min(0.96, val))
+    peaks.push(val)
+  }
+
+  peaksCache.set(cacheKey, peaks)
+  return peaks
 }
 
+const waveformCanvas = ref(null)
+const waveformContainer = ref(null)
+const hoverPercent = ref(null)
 const isSeeking = ref(false)
+
+const drawWaveform = () => {
+  const canvas = waveformCanvas.value
+  const container = waveformContainer.value
+  if (!canvas || !container) return
+
+  const rect = container.getBoundingClientRect()
+  if (rect.width <= 0 || rect.height <= 0) return
+
+  const dpr = window.devicePixelRatio || 1
+  canvas.width = rect.width * dpr
+  canvas.height = rect.height * dpr
+  const ctx = canvas.getContext('2d')
+  ctx.scale(dpr, dpr)
+
+  const w = rect.width
+  const h = rect.height
+
+  ctx.clearRect(0, 0, w, h)
+
+  const barWidth = 2.5
+  const barGap = 1.5
+  const step = barWidth + barGap
+  const numBars = Math.floor(w / step)
+  if (numBars <= 0) return
+
+  const peaks = getWaveformPeaks(track.value?.id, track.value?.title, numBars)
+  const currentP = Math.max(0, Math.min(1, progress.value / (duration.value || 1)))
+  const hoverP = hoverPercent.value
+  const cy = h / 2
+
+  for (let i = 0; i < numBars; i++) {
+    const x = i * step + barWidth / 2
+    const barProgress = x / w
+    const barH = Math.max(3, peaks[i] * (h * 0.88))
+    const top = cy - barH / 2
+    const isPlayed = barProgress <= currentP
+    const isHovered = hoverP !== null && barProgress <= hoverP
+
+    const gradient = ctx.createLinearGradient(0, top, 0, top + barH)
+    if (isPlayed) {
+      gradient.addColorStop(0, '#00f0ff')
+      gradient.addColorStop(0.5, '#38bdf8')
+      gradient.addColorStop(1, '#0284c7')
+      ctx.fillStyle = gradient
+      ctx.shadowColor = 'rgba(0, 240, 255, 0.45)'
+      ctx.shadowBlur = 4
+    } else if (isHovered) {
+      gradient.addColorStop(0, 'rgba(0, 240, 255, 0.65)')
+      gradient.addColorStop(1, 'rgba(56, 189, 248, 0.45)')
+      ctx.fillStyle = gradient
+      ctx.shadowBlur = 0
+    } else {
+      gradient.addColorStop(0, 'rgba(0, 240, 255, 0.24)')
+      gradient.addColorStop(1, 'rgba(0, 180, 216, 0.12)')
+      ctx.fillStyle = gradient
+      ctx.shadowBlur = 0
+    }
+
+    ctx.beginPath()
+    if (ctx.roundRect) {
+      ctx.roundRect(i * step, top, barWidth, barH, 1.2)
+    } else {
+      ctx.rect(i * step, top, barWidth, barH)
+    }
+    ctx.fill()
+  }
+}
+
+// Waveform seeking and hover interactions
+const handleWaveformClick = (e) => {
+  const container = waveformContainer.value
+  if (!container || !duration.value) return
+  const rect = container.getBoundingClientRect()
+  const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+  playerStore.seek(percent * duration.value)
+}
+
+const handleWaveformHover = (e) => {
+  const container = waveformContainer.value
+  if (!container || isSeeking.value) return
+  const rect = container.getBoundingClientRect()
+  hoverPercent.value = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+  drawWaveform()
+}
+
+const handleWaveformLeave = () => {
+  if (isSeeking.value) return
+  hoverPercent.value = null
+  drawWaveform()
+}
 
 const startSeek = (e) => {
   isSeeking.value = true
+  handleProgressSeek(e)
   document.addEventListener('mousemove', onSeekMove)
   document.addEventListener('mouseup', stopSeek)
 }
 
+const handleProgressSeek = (e) => {
+  const container = waveformContainer.value
+  if (!container || !duration.value) return
+  const rect = container.getBoundingClientRect()
+  const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+  hoverPercent.value = percent
+  playerStore.seek(percent * duration.value)
+  drawWaveform()
+}
+
 const onSeekMove = (e) => {
   if (!isSeeking.value) return
-  const progressEl = document.querySelector('.lcd-progress')
-  if (!progressEl) return
-  const rect = progressEl.getBoundingClientRect()
-  const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-  const seekTime = percent * duration.value
-  playerStore.seek(seekTime)
+  handleProgressSeek(e)
 }
 
 const stopSeek = () => {
   isSeeking.value = false
+  hoverPercent.value = null
   document.removeEventListener('mousemove', onSeekMove)
   document.removeEventListener('mouseup', stopSeek)
+  drawWaveform()
 }
 
 // Cover
@@ -346,17 +516,17 @@ const formatTime = (seconds) => {
 }
 
 // Equalizer animation
-const eqValues = ref(Array(16).fill(20))
+const eqValues = ref(Array(18).fill(20))
 
 const getEqHeight = (index) => {
-  return eqValues.value[index - 1]
+  return eqValues.value[index - 1] || 15
 }
 
 let eqInterval = null
 
 const animateEq = () => {
   if (isPlaying.value) {
-    eqValues.value = eqValues.value.map(() => Math.random() * 60 + 20)
+    eqValues.value = eqValues.value.map(() => Math.random() * 65 + 15)
   } else {
     eqValues.value = eqValues.value.map(() => 15)
   }
@@ -370,25 +540,38 @@ const handleToggleLike = async () => {
   }
 }
 
-// Watch for track changes and check text overflow
-watch([track, displayText], () => {
+// Watch for progress changes to redraw waveform
+watch(() => playerStore.progress, () => {
+  if (!isSeeking.value) {
+    drawWaveform()
+  }
+})
+
+// Watch for track changes and check text overflow & redraw waveform
+watch([track, displayText, duration], () => {
   nextTick(() => {
     checkTextOverflow()
+    drawWaveform()
   })
 })
+
+const handleResize = () => {
+  checkTextOverflow()
+  drawWaveform()
+}
 
 onMounted(() => {
   eqInterval = setInterval(animateEq, 100)
   nextTick(() => {
     checkTextOverflow()
+    drawWaveform()
   })
-  // Also check on window resize
-  window.addEventListener('resize', checkTextOverflow)
+  window.addEventListener('resize', handleResize)
 })
 
 onUnmounted(() => {
   clearInterval(eqInterval)
-  window.removeEventListener('resize', checkTextOverflow)
+  window.removeEventListener('resize', handleResize)
   document.removeEventListener('mousemove', onVolumeMove)
   document.removeEventListener('mouseup', stopVolumeAdjust)
   document.removeEventListener('mousemove', onSeekMove)
@@ -518,15 +701,17 @@ onUnmounted(() => {
 }
 
 .lcd-screen {
-  background: linear-gradient(180deg, #0a1520 0%, #051015 50%, #0a1520 100%);
-  border-radius: 2px;
-  padding: 6px 12px;
-  height: 70px;
+  background: linear-gradient(180deg, #071018 0%, #03080e 50%, #071018 100%);
+  border: 1px solid rgba(0, 240, 255, 0.15);
+  border-radius: 4px;
+  padding: 6px 14px 4px;
+  height: 74px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   cursor: pointer;
   overflow: hidden;
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 240, 255, 0.05);
 }
 
 .lcd-title-row {
@@ -534,8 +719,8 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  flex: 1;
   min-width: 0;
+  height: 16px;
 }
 
 .lcd-net-icon {
@@ -553,20 +738,6 @@ onUnmounted(() => {
 @keyframes desktop-net-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
-}
-
-.lcd-progress-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.lcd-status {
-  color: #4DC3FF;
-  font-size: 14px;
-  text-shadow: 0 0 8px rgba(77, 195, 255, 0.6);
-  flex-shrink: 0;
 }
 
 .lcd-text-container {
@@ -593,98 +764,140 @@ onUnmounted(() => {
 
 .segment-text {
   font-family: 'Courier New', monospace;
-  font-size: 14px;
-  font-weight: bold;
-  color: #4DC3FF;
+  font-size: 13px;
+  font-weight: 800;
+  color: #00f0ff;
   text-shadow: 
-    0 0 5px #4DC3FF,
-    0 0 10px rgba(77, 195, 255, 0.6),
-    0 0 20px rgba(0, 188, 212, 0.4);
-  letter-spacing: 1px;
+    0 0 6px rgba(0, 240, 255, 0.8),
+    0 0 14px rgba(56, 189, 248, 0.4);
+  letter-spacing: 0.8px;
 }
 
 .lcd-text.scrolling .segment-text {
   padding-right: 50px;
 }
 
-.lcd-time {
-  font-family: 'Courier New', monospace;
-  font-size: 10px;
-  color: #7DD3FC;
-  text-shadow: 0 0 5px rgba(77, 195, 255, 0.6);
-  min-width: 32px;
+/* Waveform Row */
+.lcd-waveform-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  height: 32px;
+  position: relative;
+}
+
+.lcd-time-col {
+  display: flex;
+  align-items: center;
   flex-shrink: 0;
 }
 
-.lcd-progress {
-  flex: 2;
-  min-width: 100px;
-  cursor: pointer;
-  padding: 4px 0;
+.lcd-status {
+  color: #00f0ff;
+  font-size: 11px;
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.8);
+  flex-shrink: 0;
 }
 
-.progress-bar {
-  height: 4px;
-  background: rgba(77, 195, 255, 0.15);
-  border-radius: 2px;
+.lcd-time {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: #7dd3fc;
+  text-shadow: 0 0 5px rgba(0, 240, 255, 0.6);
+  min-width: 32px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.waveform-container {
+  flex: 1;
+  height: 30px;
   position: relative;
-  overflow: visible;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
 }
 
-.lcd-progress:hover .progress-bar {
-  height: 6px;
-}
-
-.lcd-progress:hover .progress-fill::after {
-  content: '';
-  position: absolute;
-  right: -4px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 8px;
-  height: 8px;
-  background: #4DC3FF;
-  border-radius: 50%;
-  box-shadow: 0 0 6px rgba(77, 195, 255, 0.8);
-}
-
-.progress-fill {
-  position: absolute;
-  left: 0;
-  top: 0;
+.waveform-canvas {
+  width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, #00BCD4, #4DC3FF);
-  box-shadow: 0 0 8px rgba(77, 195, 255, 0.6);
-  border-radius: 2px;
-  transition: width 0.1s linear;
+  display: block;
 }
 
-.progress-buffered {
+.waveform-hover-marker {
   position: absolute;
-  left: 0;
   top: 0;
-  height: 100%;
-  background: rgba(77, 195, 255, 0.2);
-  border-radius: 2px;
-  z-index: -1;
+  bottom: 0;
+  width: 1.5px;
+  background: #ffffff;
+  pointer-events: none;
+  transform: translateX(-50%);
+  box-shadow: 0 0 8px #00f0ff, 0 0 14px #38bdf8;
+  z-index: 2;
 }
 
-/* Equalizer */
+.waveform-hover-tip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 3px;
+  padding: 2px 6px;
+  font-family: 'Courier New', monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(4, 12, 20, 0.95);
+  border: 1px solid #00f0ff;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.8), 0 0 6px rgba(0, 240, 255, 0.4);
+  white-space: nowrap;
+}
+
+/* Bottom Row */
+.lcd-bottom-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  height: 12px;
+}
+
 .lcd-eq {
   display: flex;
   align-items: flex-end;
   justify-content: center;
   gap: 2px;
-  height: 16px;
+  height: 12px;
 }
 
 .eq-bar {
-  width: 6px;
+  width: 3px;
   min-height: 2px;
-  background: linear-gradient(180deg, #4DC3FF, #00BCD4);
+  background: linear-gradient(180deg, #00f0ff, #0284c7);
   border-radius: 1px;
-  box-shadow: 0 0 4px rgba(77, 195, 255, 0.6);
+  box-shadow: 0 0 4px rgba(0, 240, 255, 0.7);
   transition: height 0.1s ease;
+}
+
+.lcd-format-badge {
+  position: absolute;
+  right: 0;
+  font-family: 'Courier New', monospace;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.badge-hd {
+  color: #00f0ff;
+  text-shadow: 0 0 6px rgba(0, 240, 255, 0.7);
+}
+
+.badge-std {
+  color: rgba(0, 240, 255, 0.35);
 }
 
 /* Control Buttons */

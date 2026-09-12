@@ -41,6 +41,20 @@ def _get_bot_username(bot: Bot) -> str:
     return settings.bot_username or "tg_player_bot"
 
 
+def _normalize_thumb_url(url: Union[str, None]) -> Union[str, None]:
+    """Ensure thumbnail URL is a valid absolute http/https URL as required by Telegram Bot API"""
+    if not url or not isinstance(url, str):
+        return None
+    cleaned = url.strip()
+    if cleaned.startswith("http://") or cleaned.startswith("https://"):
+        return cleaned
+    if cleaned.startswith("/"):
+        base = (settings.api_url or "").rstrip("/")
+        if base.startswith("http://") or base.startswith("https://"):
+            return f"{base}{cleaned}"
+    return None
+
+
 def _format_playlist_card(playlist: Playlist, tracks: list, bot_username: str) -> tuple[str, InlineKeyboardMarkup]:
     """Format HTML card and keyboard for a playlist"""
     total_sec = sum(t.duration or 0 for t in tracks)
@@ -125,7 +139,7 @@ async def handle_inline_query(query: InlineQuery, bot: Bot):
                 pl_result = await session.execute(
                     select(Playlist)
                     .options(
-                        selectinload(Playlist.tracks).selectinload(PlaylistTrack.track),
+                        selectinload(Playlist.tracks).selectinload(PlaylistTrack.track).selectinload(Track.enrichment),
                         selectinload(Playlist.owner)
                     )
                     .where(Playlist.id == pl_id)
@@ -134,14 +148,14 @@ async def handle_inline_query(query: InlineQuery, bot: Bot):
                 if playlist:
                     tracks = [pt.track for pt in playlist.tracks if pt.track]
                     card_text, card_markup = _format_playlist_card(playlist, tracks, bot_username)
-                    thumb_url = playlist.custom_cover_url or (tracks[0].cover_url if tracks and tracks[0].cover_url else None)
+                    raw_thumb = playlist.custom_cover_url or (tracks[0].cover_url if tracks and tracks[0].cover_url else None)
 
                     results.append(
                         InlineQueryResultArticle(
                             id=f"pl_{playlist.id}",
                             title=f"📁 Плейлист: {playlist.name}",
                             description=f"{len(tracks)} треков • Открыть в плеере / Скачать",
-                            thumbnail_url=thumb_url,
+                            thumbnail_url=_normalize_thumb_url(raw_thumb),
                             input_message_content=InputTextMessageContent(
                                 message_text=card_text,
                                 parse_mode=ParseMode.HTML
@@ -157,11 +171,15 @@ async def handle_inline_query(query: InlineQuery, bot: Bot):
             tr_match = re.match(r'^(?:track|tr)[:_](\d+)$', raw_query, re.IGNORECASE)
             if tr_match:
                 tr_id = int(tr_match.group(1))
-                track = await session.scalar(select(Track).where(Track.id == tr_id))
+                track = await session.scalar(
+                    select(Track)
+                    .options(selectinload(Track.enrichment))
+                    .where(Track.id == tr_id)
+                )
                 if track and track.file_id:
                     caption = f"🎧 <b>{track.artist or 'Неизвестен'} — {track.title or 'Без названия'}</b>"
-                    if track.album_name:
-                        caption += f"\n💿 <i>{track.album_name}</i>"
+                    if track.album:
+                        caption += f"\n💿 <i>{track.album}</i>"
                     caption += "\n\n🎵 <i>TG Player</i>"
 
                     markup = InlineKeyboardMarkup(inline_keyboard=[
@@ -192,7 +210,7 @@ async def handle_inline_query(query: InlineQuery, bot: Bot):
                 al_id = int(al_match.group(1))
                 al_res = await session.execute(
                     select(Album)
-                    .options(selectinload(Album.tracks).selectinload(AlbumTrack.track))
+                    .options(selectinload(Album.tracks).selectinload(AlbumTrack.track).selectinload(Track.enrichment))
                     .where(Album.id == al_id)
                 )
                 album = al_res.scalar()
@@ -204,7 +222,7 @@ async def handle_inline_query(query: InlineQuery, bot: Bot):
                             id=f"album_{album.id}",
                             title=f"💿 Альбом: {album.name}",
                             description=f"{album.artist or 'Артист'} • {len(tracks)} треков",
-                            thumbnail_url=album.cover_url,
+                            thumbnail_url=_normalize_thumb_url(album.cover_url),
                             input_message_content=InputTextMessageContent(
                                 message_text=card_text,
                                 parse_mode=ParseMode.HTML
@@ -223,6 +241,7 @@ async def handle_inline_query(query: InlineQuery, bot: Bot):
                 # Search tracks
                 tracks_query = (
                     select(Track)
+                    .options(selectinload(Track.enrichment))
                     .where(
                         Track.file_id.is_not(None),
                         or_(
@@ -239,8 +258,8 @@ async def handle_inline_query(query: InlineQuery, bot: Bot):
 
                 for t in found_tracks:
                     caption = f"🎧 <b>{t.artist or 'Неизвестен'} — {t.title or 'Без названия'}</b>"
-                    if t.album_name:
-                        caption += f"\n💿 <i>{t.album_name}</i>"
+                    if t.album:
+                        caption += f"\n💿 <i>{t.album}</i>"
                     caption += "\n\n🎵 <i>TG Player</i>"
 
                     markup = InlineKeyboardMarkup(inline_keyboard=[
@@ -266,7 +285,7 @@ async def handle_inline_query(query: InlineQuery, bot: Bot):
                 playlists_query = (
                     select(Playlist)
                     .options(
-                        selectinload(Playlist.tracks).selectinload(PlaylistTrack.track),
+                        selectinload(Playlist.tracks).selectinload(PlaylistTrack.track).selectinload(Track.enrichment),
                         selectinload(Playlist.owner)
                     )
                     .where(
@@ -281,14 +300,14 @@ async def handle_inline_query(query: InlineQuery, bot: Bot):
                 for pl in found_playlists:
                     tracks = [pt.track for pt in pl.tracks if pt.track]
                     card_text, card_markup = _format_playlist_card(pl, tracks, bot_username)
-                    thumb_url = pl.custom_cover_url or (tracks[0].cover_url if tracks and tracks[0].cover_url else None)
+                    raw_thumb = pl.custom_cover_url or (tracks[0].cover_url if tracks and tracks[0].cover_url else None)
 
                     results.append(
                         InlineQueryResultArticle(
                             id=f"pl_s_{pl.id}",
                             title=f"📁 Плейлист: {pl.name}",
                             description=f"{len(tracks)} треков",
-                            thumbnail_url=thumb_url,
+                            thumbnail_url=_normalize_thumb_url(raw_thumb),
                             input_message_content=InputTextMessageContent(
                                 message_text=card_text,
                                 parse_mode=ParseMode.HTML
@@ -303,7 +322,7 @@ async def handle_inline_query(query: InlineQuery, bot: Bot):
                 pl_query = (
                     select(Playlist)
                     .options(
-                        selectinload(Playlist.tracks).selectinload(PlaylistTrack.track),
+                        selectinload(Playlist.tracks).selectinload(PlaylistTrack.track).selectinload(Track.enrichment),
                         selectinload(Playlist.owner)
                     )
                     .where(or_(Playlist.owner_id == user_id, Playlist.is_public == True))
@@ -314,14 +333,14 @@ async def handle_inline_query(query: InlineQuery, bot: Bot):
                 for pl in pl_res.scalars().all():
                     tracks = [pt.track for pt in pl.tracks if pt.track]
                     card_text, card_markup = _format_playlist_card(pl, tracks, bot_username)
-                    thumb_url = pl.custom_cover_url or (tracks[0].cover_url if tracks and tracks[0].cover_url else None)
+                    raw_thumb = pl.custom_cover_url or (tracks[0].cover_url if tracks and tracks[0].cover_url else None)
 
                     results.append(
                         InlineQueryResultArticle(
                             id=f"pl_top_{pl.id}",
                             title=f"📁 Плейлист: {pl.name}",
                             description=f"{len(tracks)} треков • Нажмите для отправки",
-                            thumbnail_url=thumb_url,
+                            thumbnail_url=_normalize_thumb_url(raw_thumb),
                             input_message_content=InputTextMessageContent(
                                 message_text=card_text,
                                 parse_mode=ParseMode.HTML
@@ -333,6 +352,7 @@ async def handle_inline_query(query: InlineQuery, bot: Bot):
                 # 2. Recent tracks
                 tracks_query = (
                     select(Track)
+                    .options(selectinload(Track.enrichment))
                     .where(Track.file_id.is_not(None))
                     .order_by(desc(Track.id))
                     .limit(15)
@@ -340,8 +360,8 @@ async def handle_inline_query(query: InlineQuery, bot: Bot):
                 tr_res = await session.execute(tracks_query)
                 for t in tr_res.scalars().all():
                     caption = f"🎧 <b>{t.artist or 'Неизвестен'} — {t.title or 'Без названия'}</b>"
-                    if t.album_name:
-                        caption += f"\n💿 <i>{t.album_name}</i>"
+                    if t.album:
+                        caption += f"\n💿 <i>{t.album}</i>"
                     caption += "\n\n🎵 <i>TG Player</i>"
 
                     markup = InlineKeyboardMarkup(inline_keyboard=[
