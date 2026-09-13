@@ -68,17 +68,6 @@
 
         <div 
           class="nav-subitem clickable" 
-          :class="{ active: route.name === 'library' && route.query.tab === 'playlists' }"
-          @click="goToLibraryTab('playlists')"
-          title="Мои плейлисты"
-        >
-          <ListMusic :size="15" />
-          <span>Плейлисты</span>
-          <span v-if="userPlaylists.length" class="sub-count">{{ userPlaylists.length }}</span>
-        </div>
-
-        <div 
-          class="nav-subitem clickable" 
           :class="{ active: route.name === 'library' && route.query.tab === 'artists' }"
           @click="goToLibraryTab('artists')"
           title="Исполнители"
