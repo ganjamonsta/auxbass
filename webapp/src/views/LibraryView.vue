@@ -236,7 +236,7 @@
               Исполнители
             </h2>
             <div class="section-actions">
-              <button class="section-link" @click="setTab('artists')">Все {{ overviewArtists.length }}</button>
+              <button class="section-link" @click="setTab('artists')">Все {{ artistsTotal || overviewArtists.length }}</button>
               <button 
                 class="scroll-arrow-btn" 
                 :disabled="!artistsScroll.canScrollLeft.value"
@@ -543,6 +543,7 @@ const artistsScroll = useHorizontalScroll()
 
 const allPlaylists = computed(() => libraryStore.playlists || [])
 const overviewArtists = computed(() => libraryStore.artists || [])
+const artistsTotal = computed(() => libraryStore.artistsTotal || overviewArtists.value.length)
 const overviewTracks = computed(() => libraryStore.tracks || [])
 const totalTracksCount = computed(() => libraryStore.total || overviewTracks.value.length)
 
@@ -668,9 +669,9 @@ const loadOverviewData = async (force = false) => {
     loadingTracks.value = false
   })
 
-  // 4. Artists
-  loadingArtists.value = !libraryStore.artists?.length
-  libraryStore.fetchArtists().finally(() => {
+  // 4. Artists (Preview for overview: only first 10)
+  loadingArtists.value = !overviewArtists.value?.length
+  libraryStore.fetchArtists({ limit: 10, bypassCache: force }).finally(() => {
     loadingArtists.value = false
   })
 

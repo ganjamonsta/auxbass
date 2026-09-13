@@ -463,6 +463,12 @@ const handleSyncAllTracks = async () => {
     }))
     const res = await ingestionApi.start(urls[0], urls, tracks, `SoundCloud Tracks (${toImport.length})`)
     const jobId = res.data?.id
+    if (res.data) {
+      tasksStore.registerJob(res.data, {
+        type: 'import',
+        title: `SoundCloud Tracks (${toImport.length})`,
+      })
+    }
     uiStore.toast?.success('Синхронизация', `Запущен импорт ${urls.length} треков в медиатеку и Telegram-канал`)
 
     const pollInterval = setInterval(async () => {
@@ -587,6 +593,12 @@ const handleSyncPlaylist = async (playlist) => {
       playlist.title   // playlist_name
     )
     const jobId = res.data?.id
+    if (res.data) {
+      tasksStore.registerJob(res.data, {
+        type: 'import',
+        title: `Плейлист: ${playlist.title}`,
+      })
+    }
     uiStore.toast?.success('Синхронизация', `Запущен импорт плейлиста «${playlist.title}» (${urls.length} треков)`)
 
     const pollInterval = setInterval(async () => {
@@ -726,6 +738,12 @@ const handleSyncAllLikes = async () => {
     }))
     const res = await ingestionApi.start(urls[0], urls, tracks, `SoundCloud Likes (${toImport.length})`)
     const jobId = res.data?.id
+    if (res.data) {
+      tasksStore.registerJob(res.data, {
+        type: 'import',
+        title: `SoundCloud Likes (${toImport.length})`,
+      })
+    }
     uiStore.toast?.success('Синхронизация', `Запущен импорт ${urls.length} треков в медиатеку и Telegram-канал`)
 
     const pollInterval = setInterval(async () => {

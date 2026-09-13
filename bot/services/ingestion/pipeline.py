@@ -321,15 +321,11 @@ class IngestionPipeline:
 
             # Filter tracks if user made a selective import
             if job.selected_urls:
-                selected_set = set(job.selected_urls)
-                tracks_meta = [t for t in tracks_meta if t.url in selected_set]
-                if not tracks_meta:
-                    job.status = JobStatus.FAILED
-                    job.error_message = "No matching selected tracks found"
-                    job.updated_at = datetime.now(timezone.utc)
-                    if progress_callback:
-                        await progress_callback(job)
-                    return
+                selected_set = {u.strip().rstrip("/") for u in job.selected_urls}
+                if not getattr(job, "custom_tracks", None) or len(selected_set) < len(tracks_meta):
+                    filtered = [t for t in tracks_meta if (t.url and t.url.strip().rstrip("/")) in selected_set]
+                    if filtered:
+                        tracks_meta = filtered
 
             job.total_tracks = len(tracks_meta)
             job.updated_at = datetime.now(timezone.utc)
@@ -343,7 +339,7 @@ class IngestionPipeline:
                         owner_id=job.user_id,
                         name=job.title,
                         description=f"Imported from {job.provider_name.title()}: {job.url}",
-                        cover_url=job.cover_url,
+                        custom_cover_url=job.cover_url,
                         is_public=False,
                     )
                     session.add(playlist)

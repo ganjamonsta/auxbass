@@ -394,12 +394,24 @@ async def start_import(
 
     await _ensure_user_in_db(user)
 
+    entity = None
     try:
         entity = await provider.resolve_entity(url)
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Failed to inspect URL: {str(e)}",
+        if not custom_tracks:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Failed to inspect URL: {str(e)}",
+            )
+        # Fallback to constructing SourceEntity from custom_tracks if resolve fails
+        entity = SourceEntity(
+            provider_name=provider.name,
+            entity_type=EntityType.PLAYLIST if (req.create_playlist or len(custom_tracks) > 1) else EntityType.TRACK,
+            url=url,
+            title=req.title or (custom_tracks[0].get("title") if custom_tracks else "Music Import"),
+            author=custom_tracks[0].get("artist") if custom_tracks else "Artist",
+            cover_url=custom_tracks[0].get("cover_url") if custom_tracks else None,
+            track_count=len(custom_tracks),
         )
 
     selected_urls = req.selected_urls
@@ -409,13 +421,13 @@ async def start_import(
 
     playlist_id = None
     if req.create_playlist:
-        p_name = req.playlist_name or req.title or entity.title or "SoundCloud Playlist"
+        p_name = req.playlist_name or req.title or entity.title or f"{provider.name.title()} Playlist"
         cover = entity.cover_url or (custom_tracks[0].get("cover_url") if custom_tracks and custom_tracks[0].get("cover_url") else None)
         new_pl = Playlist(
             owner_id=user.id,
             name=p_name,
-            description=f"Синхронизировано из SoundCloud ({url})",
-            cover_url=cover,
+            description=f"Синхронизировано из {provider.name.title()} ({url})",
+            custom_cover_url=cover,
             is_public=False,
         )
         db.add(new_pl)
@@ -1594,7 +1606,7 @@ async def start_exportify_import(
             owner_id=user.id,
             name=p_name,
             description="Imported from Spotify via Exportify",
-            cover_url=cover,
+            custom_cover_url=cover,
             is_public=False,
         )
         db.add(new_pl)

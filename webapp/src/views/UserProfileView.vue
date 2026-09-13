@@ -1129,7 +1129,7 @@ const openScPlaylist = async (pl) => {
   scPlaylistTracks.value = []
   loadingScPlaylistTracks.value = true
   try {
-    const res = await socialApi.getUserExternalPlaylistTracks(userId.value, 'soundcloud', pl.id)
+    const res = await socialApi.getUserExternalPlaylistTracks(userId.value, pl.id)
     scPlaylistTracks.value = res.data?.tracks || []
   } catch (err) {
     console.error('Failed to load SC playlist tracks:', err)

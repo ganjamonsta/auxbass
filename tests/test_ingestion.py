@@ -724,6 +724,39 @@ async def test_user_import_file_model():
         assert res.channel_id == -100123456789
 
 
+@pytest.mark.asyncio
+async def test_playlist_custom_cover_url_creation():
+    """Verify that Playlist model correctly accepts custom_cover_url and not cover_url."""
+    from shared.models import Playlist, User
+    from shared.database import init_db, get_session
+    from sqlalchemy import select
+
+    await init_db()
+    async with get_session() as session:
+        user = await session.get(User, 888888)
+        if not user:
+            user = User(id=888888, username="test_sc_playlist_user")
+            session.add(user)
+            await session.commit()
+
+        # Instantiating with custom_cover_url must succeed without TypeError
+        pl = Playlist(
+            owner_id=888888,
+            name="SoundCloud Test Playlist",
+            description="Синхронизировано из SoundCloud",
+            custom_cover_url="https://i1.sndcdn.com/artworks-123456-t500x500.jpg",
+            is_public=False,
+        )
+        session.add(pl)
+        await session.commit()
+        await session.refresh(pl)
+
+        assert pl.id is not None
+        assert pl.custom_cover_url == "https://i1.sndcdn.com/artworks-123456-t500x500.jpg"
+        assert pl.name == "SoundCloud Test Playlist"
+
+
+
 
 
 

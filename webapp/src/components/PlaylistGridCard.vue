@@ -18,6 +18,8 @@
           v-for="(cover, i) in playlist.covers.slice(0, 4)"
           :key="`${i}-${cover}`"
           :src="getCoverUrl(cover, playlist.covers?.length === 1 ? CoverSize.MEDIUM : CoverSize.SMALL)"
+          loading="lazy"
+          alt=""
         />
       </div>
       <div v-else class="cover-placeholder"><Music :size="24" /></div>

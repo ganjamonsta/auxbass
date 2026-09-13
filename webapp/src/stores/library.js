@@ -42,42 +42,10 @@ export const useLibraryStore = defineStore('library', () => {
   const tracks = ref([])
   const playlists = ref(loadFromStorage(CACHE_KEY_PLAYLISTS, []))
   const artists = ref([])
+  const artistsTotal = ref(0)
   const globalArtists = ref([])  // All artists from global library
   const artistScope = ref('library')  // 'library' or 'global'
-  // LocalStorage key and TTL for artist images cache
-  const ARTIST_IMAGES_CACHE_KEY = 'tg_player_artist_images'
-  const ARTIST_IMAGES_CACHE_TTL = 24 * 60 * 60 * 1000 // 24 hours
-  
-  // Load artist images from localStorage
-  const loadArtistImagesFromCache = () => {
-    try {
-      const cached = localStorage.getItem(ARTIST_IMAGES_CACHE_KEY)
-      if (cached) {
-        const { data, timestamp } = JSON.parse(cached)
-        // Check if cache is still valid
-        if (Date.now() - timestamp < ARTIST_IMAGES_CACHE_TTL) {
-          return data
-        }
-      }
-    } catch (e) {
-      // Ignore cache errors
-    }
-    return {}
-  }
-  
-  // Save artist images to localStorage
-  const saveArtistImagesToCache = (images) => {
-    try {
-      localStorage.setItem(ARTIST_IMAGES_CACHE_KEY, JSON.stringify({
-        data: images,
-        timestamp: Date.now()
-      }))
-    } catch (e) {
-      // Ignore cache errors (e.g., quota exceeded)
-    }
-  }
-  
-  const artistImages = ref(loadArtistImagesFromCache())  // Cache for artist images with persistence
+  const artistImages = ref({})  // In-memory cache for artist images
   const genres = ref([])
   const history = ref(loadFromStorage(CACHE_KEY_HISTORY, []))
   const likedTracks = ref(loadFromStorage(CACHE_KEY_LIKED, []))  // Liked tracks
@@ -250,38 +218,32 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
-  // Fetch artists (with scope: 'library' or 'global')
-  const fetchArtists = async (scope = 'library') => {
+  // Fetch artists (with scope: 'library' or 'global', paginated)
+  const fetchArtists = async (params = {}) => {
     try {
+      const { limit = 20, offset = 0, scope = artistScope.value, bypassCache = false, ...rest } = params
       artistScope.value = scope
       
-      let artistList = []
-      const limit = 100 // API max limit per page
-      let offset = 0
-      let total = limit // Initialize with limit to enter loop
+      const requestParams = { offset, limit, ...rest }
+      const options = bypassCache ? { bypassCache: true } : {}
       
-      // Fetch all pages
-      while (offset < total) {
-        const response = scope === 'global'
-          ? await artistsApi.getGlobal({ offset, limit })
-          : await artistsApi.getAll({ offset, limit })
-        
-        const pageItems = response.data?.items || response.data?.items || []
-        artistList = [...artistList, ...pageItems]
-        total = response.data?.total || total
-        offset += limit
-      }
+      const response = scope === 'global'
+        ? await artistsApi.getGlobal(requestParams, options)
+        : await artistsApi.getAll(requestParams, options)
+      
+      const pageItems = response.data?.items || []
+      const totalCount = response.data?.total ?? pageItems.length
       
       if (scope === 'global') {
-        globalArtists.value = artistList
+        globalArtists.value = pageItems
       } else {
-        artists.value = artistList
+        artists.value = pageItems
       }
-      
-      // Fetch images for ALL artists in background
-      fetchArtistImages(artistList)
+      artistsTotal.value = totalCount
+      return response.data
     } catch (error) {
       console.error('Failed to fetch artists:', error)
+      return { items: [], total: 0 }
     }
   }
   
@@ -326,65 +288,14 @@ export const useLibraryStore = defineStore('library', () => {
     currentArtist.value = artist
   }
 
-  // Fetch artist images from Last.fm (in batches to not overload)
-  const fetchArtistImages = async (artistList) => {
-    const BATCH_SIZE = 5  // Load 5 at a time
-    const DELAY_MS = 100  // Small delay between batches
-    let hasNewImages = false
-    
-    // Filter out artists we already have cached (including null = no image)
-    // Support both {artist: "..."} and {name: "..."} formats
-    const uncachedArtists = artistList.filter(artist => {
-      const artistName = artist.artist || artist.name
-      return artistName && artistImages.value[artistName] === undefined
-    })
-    
-    if (uncachedArtists.length === 0) return  // All cached, skip API calls
-    
-    for (let i = 0; i < uncachedArtists.length; i += BATCH_SIZE) {
-      const batch = uncachedArtists.slice(i, i + BATCH_SIZE)
-      
-      // Process batch in parallel
-      await Promise.all(batch.map(async (artist) => {
-        const name = artist.artist || artist.name
-        if (!name) return  // Skip if no name
-        
-        try {
-          const response = await tracksApi.getArtistImage(name)
-          if (response.data.image_url) {
-            artistImages.value[name] = response.data.image_url
-            hasNewImages = true
-          } else {
-            // Cache null result to avoid re-fetching
-            artistImages.value[name] = null
-            hasNewImages = true
-          }
-        } catch (error) {
-          // Ignore errors, just skip this artist
-        }
-      }))
-      
-      // Small delay to not overload API
-      if (i + BATCH_SIZE < uncachedArtists.length) {
-        await new Promise(resolve => setTimeout(resolve, DELAY_MS))
-      }
-    }
-    
-    // Persist to localStorage after batch fetch
-    if (hasNewImages) {
-      saveArtistImagesToCache(artistImages.value)
-    }
-  }
-
-  // Get artist image (from cache or placeholder)
+  // Get artist image (from in-memory cache or null)
   const getArtistImage = (artistName) => {
     return artistImages.value[artistName] || null
   }
   
-  // Clear artist images cache (for forced refresh)
+  // Clear artist images cache
   const clearArtistImagesCache = () => {
     artistImages.value = {}
-    localStorage.removeItem(ARTIST_IMAGES_CACHE_KEY)
   }
 
   // Fetch genres
@@ -1064,6 +975,7 @@ export const useLibraryStore = defineStore('library', () => {
     tracks,
     playlists,
     artists,
+    artistsTotal,
     globalArtists,
     artistScope,
     artistImages,

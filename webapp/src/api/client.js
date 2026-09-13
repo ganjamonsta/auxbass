@@ -336,7 +336,15 @@ export const socialApi = {
   getUserExternalAccounts: (userId) => api.get(`/social/user/${userId}/external`, { bypassCache: true }),
   getUserExternalPlaylists: (userId, provider, params = {}) => api.get(`/social/user/${userId}/external/${provider}/playlists`, { params }),
   getUserExternalTracks: (userId, provider, params = {}) => api.get(`/social/user/${userId}/external/${provider}/tracks`, { params }),
-  getUserExternalPlaylistTracks: (userId, playlistId, params = {}) => api.get(`/social/user/${userId}/external/soundcloud/playlists/${playlistId}/tracks`, { params }),
+  getUserExternalPlaylistTracks: (userId, providerOrPlaylistId, playlistIdOrParams = {}, params = {}) => {
+    let playlistId = providerOrPlaylistId
+    let actualParams = playlistIdOrParams
+    if (typeof playlistIdOrParams === 'string' || typeof playlistIdOrParams === 'number') {
+      playlistId = playlistIdOrParams
+      actualParams = params
+    }
+    return api.get(`/social/user/${userId}/external/soundcloud/playlists/${playlistId}/tracks`, { params: actualParams })
+  },
 }
 
 // Ingestion (External imports from SoundCloud, Spotify, etc.)
