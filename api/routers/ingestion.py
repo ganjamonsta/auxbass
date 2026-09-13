@@ -109,6 +109,11 @@ class SoundCloudLikeItem(BaseModel):
     already_in_tg: bool = False
     track_id: Optional[int] = None
     liked_at: Optional[str] = None
+    created_at: Optional[str] = None
+    track_number: Optional[int] = None
+
+
+SoundCloudTrackItem = SoundCloudLikeItem
 
 
 class UserLikesResponse(BaseModel):
@@ -117,6 +122,44 @@ class UserLikesResponse(BaseModel):
     total_likes: int
     items: List[SoundCloudLikeItem]
     next_cursor: Optional[str] = None
+
+
+class UserTracksResponse(BaseModel):
+    provider: str
+    account: ExternalAccountResponse
+    total_tracks: int
+    items: List[SoundCloudTrackItem]
+    next_cursor: Optional[str] = None
+
+
+class SoundCloudPlaylistItem(BaseModel):
+    id: str
+    title: str
+    permalink_url: str
+    artwork_url: Optional[str] = None
+    track_count: int = 0
+    duration: Optional[int] = None
+    author: str
+    author_avatar: Optional[str] = None
+    description: Optional[str] = None
+    is_public: bool = True
+    is_liked: bool = False
+    created_at: Optional[str] = None
+
+
+class UserPlaylistsResponse(BaseModel):
+    provider: str
+    account: ExternalAccountResponse
+    total_playlists: int
+    items: List[SoundCloudPlaylistItem]
+    next_cursor: Optional[str] = None
+
+
+class PlaylistTracksResponse(BaseModel):
+    provider: str
+    playlist: SoundCloudPlaylistItem
+    total_tracks: int
+    tracks: List[SoundCloudTrackItem]
 
 
 
@@ -186,6 +229,8 @@ class StartImportRequest(BaseModel):
     title: Optional[str] = None
     selected_urls: Optional[List[str]] = None
     tracks: Optional[List[Dict[str, Any]]] = None
+    create_playlist: bool = False
+    playlist_name: Optional[str] = None
 
 
 class JobResponse(BaseModel):
@@ -332,6 +377,22 @@ async def start_import(
     total_tracks = len(custom_tracks) if custom_tracks else (len(selected_urls) if selected_urls else entity.track_count)
     job_title = req.title or (f"SoundCloud Likes ({total_tracks})" if (selected_urls and len(selected_urls) > 1 and entity.entity_type == EntityType.TRACK) else entity.title)
 
+    playlist_id = None
+    if req.create_playlist:
+        p_name = req.playlist_name or req.title or entity.title or "SoundCloud Playlist"
+        cover = entity.cover_url or (custom_tracks[0].get("cover_url") if custom_tracks and custom_tracks[0].get("cover_url") else None)
+        new_pl = Playlist(
+            owner_id=user.id,
+            name=p_name,
+            description=f"Синхронизировано из SoundCloud ({url})",
+            cover_url=cover,
+            is_public=False,
+        )
+        db.add(new_pl)
+        await db.commit()
+        await db.refresh(new_pl)
+        playlist_id = new_pl.id
+
     job = await job_manager.create_job(
         user_id=user.id,
         url=url,
@@ -344,6 +405,8 @@ async def start_import(
         selected_urls=selected_urls,
         custom_tracks=custom_tracks,
     )
+    if playlist_id:
+        job.playlist_id = playlist_id
 
     bot = _get_active_bot()
     pipeline = IngestionPipeline(bot)
@@ -810,9 +873,10 @@ async def get_soundcloud_likes(
     )
     user_channel_track_ids = set((await db.scalars(user_ch_q)).all())
 
+    existing_tracks = await _find_existing_tracks_batch(tracks_meta, session=db)
+
     items: List[SoundCloudLikeItem] = []
-    for t in tracks_meta:
-        existing = await _find_existing_track(t.title, t.artist, t.duration, session=db)
+    for t, existing in zip(tracks_meta, existing_tracks):
         already_in_tg = existing is not None
         in_lib = (existing.id in user_lib_track_ids) if existing else False
         in_chan = (existing.id in user_channel_track_ids) if existing else False
@@ -853,6 +917,238 @@ async def get_soundcloud_likes(
         total_likes=account.likes_count,
         items=items,
         next_cursor=next_cursor,
+    )
+
+
+@router.get("/account/soundcloud/tracks", response_model=UserTracksResponse)
+async def get_soundcloud_tracks(
+    limit: int = Query(40, ge=1, le=100),
+    cursor: Optional[str] = None,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Fetch user's uploaded tracks from SoundCloud with local library & channel backup status."""
+    account = await db.scalar(
+        select(UserExternalAccount)
+        .where(UserExternalAccount.user_id == user.id, UserExternalAccount.provider == "soundcloud")
+    )
+    if not account:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="SoundCloud аккаунт не подключен. Перейдите в настройки для подключения.",
+        )
+
+    sc_provider = provider_registry.get_provider("soundcloud")
+    if not sc_provider:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="SoundCloud provider unavailable",
+        )
+
+    try:
+        ident = account.external_id or account.username
+        tracks_meta, next_cursor = await sc_provider.fetch_user_tracks(
+            ident, limit=limit, next_href=cursor, auth_token=account.auth_token
+        )
+    except Exception as e:
+        logger.error(f"Failed to fetch SoundCloud user tracks for {account.username}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Не удалось получить треки с SoundCloud: {str(e)}",
+        )
+
+    # Preload user's library and channel backup status in batch
+    user_lib_q = select(UserLibrary.track_id).where(UserLibrary.user_id == user.id)
+    user_lib_track_ids = set((await db.scalars(user_lib_q)).all())
+
+    user_ch_q = (
+        select(ChannelMessage.track_id)
+        .join(UserChannel, ChannelMessage.channel_id == UserChannel.id)
+        .where(UserChannel.user_id == user.id, ChannelMessage.status == ChannelMessageStatus.SENT)
+    )
+    user_channel_track_ids = set((await db.scalars(user_ch_q)).all())
+
+    existing_tracks = await _find_existing_tracks_batch(tracks_meta, session=db)
+
+    items: List[SoundCloudTrackItem] = []
+    for t, existing in zip(tracks_meta, existing_tracks):
+        already_in_tg = existing is not None
+        in_lib = (existing.id in user_lib_track_ids) if existing else False
+        in_chan = (existing.id in user_channel_track_ids) if existing else False
+        existing_id = existing.id if existing else None
+
+        items.append(
+            SoundCloudTrackItem(
+                url=t.url,
+                title=t.title,
+                artist=t.artist,
+                duration=t.duration,
+                cover_url=t.cover_url,
+                genre=t.extra.get("genre") if t.extra else None,
+                tags=t.extra.get("tags") if t.extra else None,
+                in_library=in_lib,
+                in_channel=in_chan,
+                already_in_tg=already_in_tg,
+                track_id=existing_id,
+                created_at=t.extra.get("created_at") if t.extra else None,
+            )
+        )
+
+    account_resp = ExternalAccountResponse(
+        provider=account.provider,
+        username=account.username,
+        display_name=account.display_name,
+        profile_url=account.profile_url,
+        avatar_url=account.avatar_url,
+        likes_count=account.likes_count,
+        tracks_count=account.tracks_count,
+        connected=True,
+        last_synced_at=account.last_synced_at.isoformat() if account.last_synced_at else None,
+    )
+
+    return UserTracksResponse(
+        provider="soundcloud",
+        account=account_resp,
+        total_tracks=account.tracks_count or len(items),
+        items=items,
+        next_cursor=next_cursor,
+    )
+
+
+@router.get("/account/soundcloud/playlists", response_model=UserPlaylistsResponse)
+async def get_soundcloud_playlists(
+    playlist_type: str = Query("all", pattern="^(all|created|liked)$"),
+    limit: int = Query(50, ge=1, le=100),
+    cursor: Optional[str] = None,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Fetch user's playlists (created & liked) from SoundCloud."""
+    account = await db.scalar(
+        select(UserExternalAccount)
+        .where(UserExternalAccount.user_id == user.id, UserExternalAccount.provider == "soundcloud")
+    )
+    if not account:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="SoundCloud аккаунт не подключен. Перейдите в настройки для подключения.",
+        )
+
+    sc_provider = provider_registry.get_provider("soundcloud")
+    if not sc_provider:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="SoundCloud provider unavailable",
+        )
+
+    try:
+        ident = account.external_id or account.username
+        playlists_raw, next_cursor = await sc_provider.fetch_user_playlists(
+            ident, limit=limit, next_href=cursor, auth_token=account.auth_token, playlist_type=playlist_type
+        )
+    except Exception as e:
+        logger.error(f"Failed to fetch SoundCloud playlists for {account.username}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Не удалось получить плейлисты с SoundCloud: {str(e)}",
+        )
+
+    items = [SoundCloudPlaylistItem(**p) for p in playlists_raw]
+
+    account_resp = ExternalAccountResponse(
+        provider=account.provider,
+        username=account.username,
+        display_name=account.display_name,
+        profile_url=account.profile_url,
+        avatar_url=account.avatar_url,
+        likes_count=account.likes_count,
+        tracks_count=account.tracks_count,
+        connected=True,
+        last_synced_at=account.last_synced_at.isoformat() if account.last_synced_at else None,
+    )
+
+    return UserPlaylistsResponse(
+        provider="soundcloud",
+        account=account_resp,
+        total_playlists=len(items),
+        items=items,
+        next_cursor=next_cursor,
+    )
+
+
+@router.get("/account/soundcloud/playlists/{playlist_id}/tracks", response_model=PlaylistTracksResponse)
+async def get_soundcloud_playlist_tracks(
+    playlist_id: str,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Fetch all tracks for a SoundCloud playlist with local library & channel backup status."""
+    account = await db.scalar(
+        select(UserExternalAccount)
+        .where(UserExternalAccount.user_id == user.id, UserExternalAccount.provider == "soundcloud")
+    )
+
+    sc_provider = provider_registry.get_provider("soundcloud")
+    if not sc_provider:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="SoundCloud provider unavailable",
+        )
+
+    auth_token = account.auth_token if account else None
+
+    try:
+        playlist_info, tracks_meta = await sc_provider.fetch_playlist_tracks(
+            playlist_id, auth_token=auth_token
+        )
+    except Exception as e:
+        logger.error(f"Failed to fetch SoundCloud playlist {playlist_id} tracks: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Не удалось получить треки плейлиста: {str(e)}",
+        )
+
+    user_lib_q = select(UserLibrary.track_id).where(UserLibrary.user_id == user.id)
+    user_lib_track_ids = set((await db.scalars(user_lib_q)).all())
+
+    user_ch_q = (
+        select(ChannelMessage.track_id)
+        .join(UserChannel, ChannelMessage.channel_id == UserChannel.id)
+        .where(UserChannel.user_id == user.id, ChannelMessage.status == ChannelMessageStatus.SENT)
+    )
+    user_channel_track_ids = set((await db.scalars(user_ch_q)).all())
+
+    existing_tracks = await _find_existing_tracks_batch(tracks_meta, session=db)
+
+    items: List[SoundCloudTrackItem] = []
+    for t, existing in zip(tracks_meta, existing_tracks):
+        already_in_tg = existing is not None
+        in_lib = (existing.id in user_lib_track_ids) if existing else False
+        in_chan = (existing.id in user_channel_track_ids) if existing else False
+        existing_id = existing.id if existing else None
+
+        items.append(
+            SoundCloudTrackItem(
+                url=t.url,
+                title=t.title,
+                artist=t.artist,
+                duration=t.duration,
+                cover_url=t.cover_url,
+                genre=t.extra.get("genre") if t.extra else None,
+                tags=t.extra.get("tags") if t.extra else None,
+                in_library=in_lib,
+                in_channel=in_chan,
+                already_in_tg=already_in_tg,
+                track_id=existing_id,
+                track_number=t.track_number,
+            )
+        )
+
+    return PlaylistTracksResponse(
+        provider="soundcloud",
+        playlist=SoundCloudPlaylistItem(**playlist_info),
+        total_tracks=len(items),
+        tracks=items,
     )
 
 

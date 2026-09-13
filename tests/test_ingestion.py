@@ -278,6 +278,9 @@ async def test_soundcloud_drm_protection_handling(monkeypatch):
         def download(self, urls):
             import yt_dlp
             raise yt_dlp.utils.DownloadError("\x1b[0;31mERROR:\x1b[0m [soundcloud] 1236088255: This video is DRM protected")
+        def extract_info(self, url, download=True):
+            import yt_dlp
+            raise yt_dlp.utils.DownloadError("\x1b[0;31mERROR:\x1b[0m [soundcloud] 1236088255: This video is DRM protected")
 
     import yt_dlp
     monkeypatch.setattr(yt_dlp, "YoutubeDL", MockYDL)
@@ -419,13 +422,16 @@ async def test_soundcloud_drm_fallback_to_audio_resolver(monkeypatch):
         def download(self, urls):
             import yt_dlp
             raise yt_dlp.utils.DownloadError("ERROR: [soundcloud] 1236088255: This video is DRM protected")
+        def extract_info(self, url, download=True):
+            import yt_dlp
+            raise yt_dlp.utils.DownloadError("ERROR: [soundcloud] 1236088255: This video is DRM protected")
 
     import yt_dlp
     monkeypatch.setattr(yt_dlp, "YoutubeDL", MockYDLDRM)
 
     # Mock audio_resolver.resolve_and_download to return valid audio
     called = {}
-    async def mock_resolve_and_download(track_meta, temp_dir, exclude_urls=None):
+    async def mock_resolve_and_download(track_meta, temp_dir, exclude_urls=None, progress_hook=None):
         called["resolved"] = True
         called["exclude_urls"] = exclude_urls
         return DownloadedAudio(
@@ -601,6 +607,82 @@ def test_ingestion_job_upload_tracking():
     job.uploaded_message_id = 789
     assert job.uploaded_chat_id == 456
     assert job.uploaded_message_id == 789
+
+
+def test_soundcloud_tracks_and_playlists_schemas():
+    from api.routers.ingestion import (
+        SoundCloudPlaylistItem,
+        UserPlaylistsResponse,
+        PlaylistTracksResponse,
+        UserTracksResponse,
+        SoundCloudTrackItem,
+        ExternalAccountResponse,
+        StartImportRequest
+    )
+
+    acc = ExternalAccountResponse(
+        provider="soundcloud",
+        username="hartracer",
+        display_name="hartracer",
+        profile_url="https://soundcloud.com/hartracer",
+        avatar_url=None,
+        likes_count=430,
+        tracks_count=33,
+        connected=True,
+    )
+
+    tr = SoundCloudTrackItem(
+        url="https://soundcloud.com/hartracer/track1",
+        title="Test Track 1",
+        artist="hartracer",
+        duration=180,
+        in_library=True,
+        already_in_tg=True,
+        track_id=1,
+    )
+    user_tracks_resp = UserTracksResponse(
+        provider="soundcloud",
+        account=acc,
+        total_tracks=33,
+        items=[tr],
+    )
+    assert len(user_tracks_resp.items) == 1
+    assert user_tracks_resp.items[0].in_library is True
+
+    pl = SoundCloudPlaylistItem(
+        id="12345",
+        title="Test Playlist",
+        permalink_url="https://soundcloud.com/hartracer/sets/test",
+        track_count=10,
+        duration=1200,
+        author="hartracer",
+        is_liked=False,
+    )
+    user_pl_resp = UserPlaylistsResponse(
+        provider="soundcloud",
+        account=acc,
+        total_playlists=1,
+        items=[pl],
+    )
+    assert user_pl_resp.total_playlists == 1
+    assert user_pl_resp.items[0].title == "Test Playlist"
+
+    pl_tracks_resp = PlaylistTracksResponse(
+        provider="soundcloud",
+        playlist=pl,
+        total_tracks=1,
+        tracks=[tr],
+    )
+    assert pl_tracks_resp.total_tracks == 1
+
+    req = StartImportRequest(
+        url="https://soundcloud.com/hartracer/sets/test",
+        create_playlist=True,
+        playlist_name="My Synced Playlist"
+    )
+    assert req.create_playlist is True
+    assert req.playlist_name == "My Synced Playlist"
+
 
 
 

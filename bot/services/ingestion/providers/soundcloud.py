@@ -681,3 +681,340 @@ class SoundCloudProvider(BaseMusicProvider):
 
         return tracks, next_url
 
+    async def fetch_user_tracks(
+        self,
+        external_id_or_username: str,
+        limit: int = 50,
+        next_href: Optional[str] = None,
+        auth_token: Optional[str] = None,
+    ) -> tuple[List[TrackMetadata], Optional[str]]:
+        """
+        Fetch uploaded tracks for a SoundCloud user.
+        Returns (list_of_tracks, next_cursor_href).
+        """
+        client_id = await self.get_client_id()
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+        }
+        if auth_token:
+            headers["Authorization"] = f"OAuth {auth_token.strip()}"
+
+        if next_href:
+            req_url = next_href
+            if "client_id=" not in req_url:
+                delim = "&" if "?" in req_url else "?"
+                req_url = f"{req_url}{delim}client_id={client_id}"
+        else:
+            user_id = str(external_id_or_username).strip()
+            if not user_id.isdigit():
+                profile = await self.resolve_user_profile(user_id, auth_token=auth_token)
+                user_id = profile["external_id"]
+
+            req_url = f"https://api-v2.soundcloud.com/users/{user_id}/tracks?limit={limit}&client_id={client_id}"
+
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.get(req_url) as resp:
+                if resp.status != 200:
+                    text = await resp.text()
+                    raise ValueError(f"SoundCloud user tracks error ({resp.status}): {text[:100]}")
+                data = await resp.json()
+
+        collection = data.get("collection") or []
+        next_url = data.get("next_href")
+
+        tracks: List[TrackMetadata] = []
+        for item in collection:
+            if not isinstance(item, dict):
+                continue
+            tr = item.get("track") or item
+            if not isinstance(tr, dict) or not tr.get("title"):
+                continue
+
+            raw_title = tr.get("title") or "SoundCloud Track"
+            user_obj = tr.get("user") or {}
+            uploader = user_obj.get("username") or "SoundCloud"
+            artist, title = _parse_artist_and_title(raw_title, uploader)
+
+            track_url = tr.get("permalink_url") or ""
+            if not track_url and tr.get("permalink"):
+                track_url = f"https://soundcloud.com/{user_obj.get('permalink', 'artist')}/{tr.get('permalink')}"
+            if not track_url:
+                continue
+
+            dur_raw = tr.get("duration") or 0
+            duration = int(dur_raw / 1000) if dur_raw > 1000 else int(dur_raw) or None
+            cover = _improve_sc_thumbnail(tr.get("artwork_url") or user_obj.get("avatar_url"))
+
+            sc_genre = tr.get("genre") if isinstance(tr.get("genre"), str) else None
+            sc_tags = _extract_sc_tags(
+                tag_list=tr.get("tag_list"),
+                description=tr.get("description"),
+            )
+            extra_data = {
+                "uploader": uploader,
+                "created_at": tr.get("created_at"),
+                "is_soundcloud": True,
+            }
+            if sc_genre and sc_genre.strip():
+                extra_data["genre"] = sc_genre.strip()
+            if sc_tags:
+                extra_data["tags"] = sc_tags
+
+            tracks.append(
+                TrackMetadata(
+                    provider_name=self.name,
+                    url=track_url,
+                    title=title,
+                    artist=artist,
+                    duration=duration,
+                    cover_url=cover,
+                    external_id=str(tr.get("id") or ""),
+                    extra=extra_data,
+                )
+            )
+
+        return tracks, next_url
+
+    async def fetch_user_playlists(
+        self,
+        external_id_or_username: str,
+        limit: int = 50,
+        next_href: Optional[str] = None,
+        auth_token: Optional[str] = None,
+        playlist_type: str = "all",  # "all", "created", "liked"
+    ) -> tuple[List[dict], Optional[str]]:
+        """
+        Fetch created and/or liked playlists for a SoundCloud user.
+        Returns (list_of_playlist_dicts, next_cursor_href).
+        """
+        client_id = await self.get_client_id()
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+        }
+        if auth_token:
+            headers["Authorization"] = f"OAuth {auth_token.strip()}"
+
+        user_id = str(external_id_or_username).strip()
+        if not user_id.isdigit():
+            profile = await self.resolve_user_profile(user_id, auth_token=auth_token)
+            user_id = profile["external_id"]
+
+        playlists: List[dict] = []
+        next_cursor = None
+
+        def _format_playlist(p: dict, is_liked: bool) -> Optional[dict]:
+            if not isinstance(p, dict) or not p.get("title"):
+                return None
+            p_user = p.get("user") or {}
+            author = p_user.get("username") or p_user.get("permalink") or "SoundCloud"
+            dur_ms = p.get("duration") or 0
+            duration_sec = int(dur_ms / 1000) if dur_ms > 1000 else int(dur_ms)
+            
+            # Extract artwork
+            raw_art = p.get("artwork_url")
+            if not raw_art and p.get("tracks") and isinstance(p["tracks"], list) and len(p["tracks"]) > 0:
+                first_tr = p["tracks"][0]
+                if isinstance(first_tr, dict):
+                    raw_art = first_tr.get("artwork_url")
+            if not raw_art:
+                raw_art = p_user.get("avatar_url")
+            artwork = _improve_sc_thumbnail(raw_art)
+
+            return {
+                "id": str(p.get("id")),
+                "title": p.get("title") or "SoundCloud Playlist",
+                "permalink_url": p.get("permalink_url") or "",
+                "artwork_url": artwork,
+                "track_count": int(p.get("track_count") or len(p.get("tracks", [])) or 0),
+                "duration": duration_sec,
+                "author": author,
+                "author_avatar": _improve_sc_thumbnail(p_user.get("avatar_url")),
+                "description": p.get("description"),
+                "is_public": bool(p.get("public", True)),
+                "is_liked": is_liked,
+                "created_at": p.get("created_at"),
+            }
+
+        async with aiohttp.ClientSession(headers=headers) as session:
+            # 1. Created playlists
+            if playlist_type in ("all", "created"):
+                created_url = f"https://api-v2.soundcloud.com/users/{user_id}/playlists?limit={limit}&client_id={client_id}"
+                try:
+                    async with session.get(created_url) as resp:
+                        if resp.status == 200:
+                            c_data = await resp.json()
+                            for item in c_data.get("collection") or []:
+                                formatted = _format_playlist(item, is_liked=False)
+                                if formatted:
+                                    playlists.append(formatted)
+                except Exception as e:
+                    logger.warning(f"Failed to fetch created playlists for user {user_id}: {e}")
+
+            # 2. Liked playlists
+            if playlist_type in ("all", "liked"):
+                liked_url = next_href or f"https://api-v2.soundcloud.com/users/{user_id}/playlist_likes?limit={limit}&client_id={client_id}"
+                try:
+                    async with session.get(liked_url) as resp:
+                        if resp.status == 200:
+                            l_data = await resp.json()
+                            next_cursor = l_data.get("next_href")
+                            for item in l_data.get("collection") or []:
+                                p_obj = item.get("playlist") or item
+                                formatted = _format_playlist(p_obj, is_liked=True)
+                                if formatted:
+                                    # Deduplicate if somehow already added
+                                    if not any(pl["id"] == formatted["id"] for pl in playlists):
+                                        playlists.append(formatted)
+                except Exception as e:
+                    logger.warning(f"Failed to fetch liked playlists for user {user_id}: {e}")
+
+        return playlists, next_cursor
+
+    async def fetch_playlist_tracks(
+        self,
+        playlist_id_or_url: str,
+        auth_token: Optional[str] = None,
+    ) -> tuple[dict, List[TrackMetadata]]:
+        """
+        Fetch full playlist info and all its tracks.
+        Handles resolving track stub IDs via tracks?ids=... in batches of 50.
+        Returns (playlist_dict, list_of_tracks).
+        """
+        client_id = await self.get_client_id()
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+        }
+        if auth_token:
+            headers["Authorization"] = f"OAuth {auth_token.strip()}"
+
+        raw_target = str(playlist_id_or_url).strip()
+
+        async with aiohttp.ClientSession(headers=headers) as session:
+            if raw_target.startswith("http"):
+                # Resolve URL
+                resolve_url = f"https://api-v2.soundcloud.com/resolve?url={raw_target}&client_id={client_id}"
+                async with session.get(resolve_url) as resp:
+                    if resp.status != 200:
+                        raise ValueError(f"Failed to resolve playlist URL ({resp.status})")
+                    playlist_data = await resp.json()
+            else:
+                # Direct playlist ID
+                pl_url = f"https://api-v2.soundcloud.com/playlists/{raw_target}?client_id={client_id}"
+                async with session.get(pl_url) as resp:
+                    if resp.status != 200:
+                        raise ValueError(f"Failed to fetch playlist {raw_target} ({resp.status})")
+                    playlist_data = await resp.json()
+
+            p_user = playlist_data.get("user") or {}
+            author = p_user.get("username") or p_user.get("permalink") or "SoundCloud"
+            dur_ms = playlist_data.get("duration") or 0
+            duration_sec = int(dur_ms / 1000) if dur_ms > 1000 else int(dur_ms)
+            artwork = _improve_sc_thumbnail(playlist_data.get("artwork_url") or p_user.get("avatar_url"))
+
+            playlist_info = {
+                "id": str(playlist_data.get("id")),
+                "title": playlist_data.get("title") or "SoundCloud Playlist",
+                "permalink_url": playlist_data.get("permalink_url") or "",
+                "artwork_url": artwork,
+                "track_count": int(playlist_data.get("track_count") or len(playlist_data.get("tracks", [])) or 0),
+                "duration": duration_sec,
+                "author": author,
+                "author_avatar": _improve_sc_thumbnail(p_user.get("avatar_url")),
+                "description": playlist_data.get("description"),
+                "is_public": bool(playlist_data.get("public", True)),
+                "created_at": playlist_data.get("created_at"),
+            }
+
+            raw_tracks = playlist_data.get("tracks") or []
+            resolved_dict: Dict[int, dict] = {}
+            stubs_to_fetch: List[int] = []
+
+            for t in raw_tracks:
+                if not isinstance(t, dict):
+                    continue
+                t_id = t.get("id")
+                if not t_id:
+                    continue
+                if t.get("permalink_url") and t.get("title"):
+                    resolved_dict[t_id] = t
+                else:
+                    stubs_to_fetch.append(t_id)
+
+            # Batch fetch missing track stubs in chunks of 50
+            if stubs_to_fetch:
+                for i in range(0, len(stubs_to_fetch), 50):
+                    chunk_ids = stubs_to_fetch[i : i + 50]
+                    ids_str = "%2C".join(str(cid) for cid in chunk_ids)
+                    batch_url = f"https://api-v2.soundcloud.com/tracks?ids={ids_str}&client_id={client_id}"
+                    try:
+                        async with session.get(batch_url) as b_resp:
+                            if b_resp.status == 200:
+                                b_data = await b_resp.json()
+                                for bt in b_data:
+                                    if isinstance(bt, dict) and bt.get("id"):
+                                        resolved_dict[bt["id"]] = bt
+                    except Exception as b_err:
+                        logger.warning(f"Failed to batch resolve playlist tracks: {b_err}")
+
+            # Assemble TrackMetadata list in original order
+            tracks: List[TrackMetadata] = []
+            for idx, item in enumerate(raw_tracks, start=1):
+                if not isinstance(item, dict):
+                    continue
+                t_id = item.get("id")
+                full_t = resolved_dict.get(t_id) or item
+                if not full_t.get("title") and not full_t.get("permalink_url"):
+                    continue
+
+                raw_title = full_t.get("title") or f"Track {idx}"
+                t_user = full_t.get("user") or {}
+                uploader = t_user.get("username") or author
+                artist, title = _parse_artist_and_title(raw_title, uploader)
+
+                track_url = full_t.get("permalink_url") or ""
+                if not track_url and full_t.get("permalink"):
+                    track_url = f"https://soundcloud.com/{t_user.get('permalink', 'artist')}/{full_t.get('permalink')}"
+                if not track_url:
+                    continue
+
+                t_dur = full_t.get("duration") or 0
+                track_duration = int(t_dur / 1000) if t_dur > 1000 else int(t_dur) or None
+                cover = _improve_sc_thumbnail(full_t.get("artwork_url") or artwork)
+
+                sc_genre = full_t.get("genre") if isinstance(full_t.get("genre"), str) else None
+                sc_tags = _extract_sc_tags(
+                    tag_list=full_t.get("tag_list"),
+                    description=full_t.get("description"),
+                )
+
+                extra_data = {
+                    "uploader": uploader,
+                    "is_soundcloud": True,
+                    "playlist_title": playlist_info["title"],
+                }
+                if sc_genre and sc_genre.strip():
+                    extra_data["genre"] = sc_genre.strip()
+                if sc_tags:
+                    extra_data["tags"] = sc_tags
+
+                tracks.append(
+                    TrackMetadata(
+                        provider_name=self.name,
+                        url=track_url,
+                        title=title,
+                        artist=artist,
+                        album=playlist_info["title"],
+                        duration=track_duration,
+                        cover_url=cover,
+                        track_number=idx,
+                        external_id=str(full_t.get("id") or ""),
+                        extra=extra_data,
+                    )
+                )
+
+            return playlist_info, tracks
+
+

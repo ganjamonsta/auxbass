@@ -117,6 +117,21 @@
           :isSyncingAllLikes="isSyncingAllLikes"
           :syncJobProgress="syncJobProgress"
           :unimportedLikesCount="unimportedLikesCount"
+
+          :scTracks="scTracks"
+          :scTracksCursor="scTracksCursor"
+          :isScTracksLoading="isScTracksLoading"
+          :isLoadingMoreScTracks="isLoadingMoreScTracks"
+          :isSyncingAllTracks="isSyncingAllTracks"
+          :unimportedTracksCount="unimportedTracksCount"
+
+          :scPlaylists="scPlaylists"
+          :isScPlaylistsLoading="isScPlaylistsLoading"
+          :selectedScPlaylist="selectedScPlaylist"
+          :scPlaylistTracks="scPlaylistTracks"
+          :isScPlaylistTracksLoading="isScPlaylistTracksLoading"
+          :isSyncingPlaylist="isSyncingPlaylist"
+
           @resetToAllSearch="resetToAllSearch"
           @setScSubTab="setScSubTab"
           @loadMoreSoundCloud="loadMoreSoundCloud"
@@ -128,6 +143,14 @@
           @loadAllLikesUntilMatch="loadAllLikesUntilMatch"
           @loadMoreScLikes="loadMoreScLikes"
           @goToSettings="router.push('/settings')"
+
+          @fetchScTracks="fetchScTracks"
+          @loadMoreScTracks="loadMoreScTracks"
+          @handleSyncAllTracks="handleSyncAllTracks"
+          @fetchScPlaylists="fetchScPlaylists"
+          @selectScPlaylist="handleSelectScPlaylist"
+          @clearSelectedScPlaylist="handleClearSelectedScPlaylist"
+          @handleSyncPlaylist="handleSyncPlaylist"
         />
 
         <!-- ==================== TAB: SPOTIFY ==================== -->
@@ -361,9 +384,238 @@ const loadMoreScLikes = async () => {
 }
 
 const switchToLikesTab = () => {
-  scSubTab.value = 'likes'
-  if (scLikes.value.length === 0 && scAccount.value?.connected) {
-    fetchScLikes(true)
+  setScSubTab('likes')
+}
+
+// ─── SoundCloud User Tracks State ───
+const scTracks = ref([])
+const isScTracksLoading = ref(false)
+const scTracksCursor = ref(null)
+const isLoadingMoreScTracks = ref(false)
+const isSyncingAllTracks = ref(false)
+
+const unimportedTracksCount = computed(() => {
+  return scTracks.value.filter(t => !t.in_library).length
+})
+
+const fetchScTracks = async (reset = true) => {
+  if (isScTracksLoading.value) return
+  isScTracksLoading.value = true
+  try {
+    if (reset) {
+      scTracksCursor.value = null
+    }
+    const res = await ingestionApi.getSoundCloudTracks({ limit: 40 })
+    scTracks.value = res.data?.items || []
+    scTracksCursor.value = res.data?.next_cursor || null
+    if (res.data?.account) {
+      externalAccountsStore.setSoundCloudAccount(res.data.account)
+    }
+  } catch (e) {
+    console.error('Failed to fetch SC tracks:', e)
+    if (e.response?.status !== 404) {
+      uiStore.toast?.error('Ошибка', e.response?.data?.detail || 'Не удалось загрузить треки')
+    }
+  } finally {
+    isScTracksLoading.value = false
+  }
+}
+
+const loadMoreScTracks = async () => {
+  if (!scTracksCursor.value || isLoadingMoreScTracks.value) return
+  isLoadingMoreScTracks.value = true
+  try {
+    const res = await ingestionApi.getSoundCloudTracks({ cursor: scTracksCursor.value, limit: 40 })
+    const more = res.data?.items || []
+    scTracks.value = [...scTracks.value, ...more]
+    scTracksCursor.value = res.data?.next_cursor || null
+  } catch (e) {
+    console.error('Failed to load more SC tracks:', e)
+  } finally {
+    isLoadingMoreScTracks.value = false
+  }
+}
+
+const handleSyncAllTracks = async () => {
+  if (isSyncingAllTracks.value) return
+  const toImport = scTracks.value.filter(t => !t.in_library)
+  if (toImport.length === 0) {
+    uiStore.toast?.info('Синхронизация', 'Все ваши авторские треки уже в медиатеке!')
+    return
+  }
+
+  isSyncingAllTracks.value = true
+  try {
+    const urls = toImport.map(t => t.url)
+    const tracks = toImport.map(t => ({
+      url: t.url,
+      title: t.title,
+      artist: t.artist,
+      duration: t.duration,
+      cover_url: t.cover_url,
+      genre: t.genre,
+      tags: t.tags,
+      extra: {
+        is_soundcloud: true,
+        genre: t.genre,
+        tags: t.tags,
+      }
+    }))
+    const res = await ingestionApi.start(urls[0], urls, tracks, `SoundCloud Tracks (${toImport.length})`)
+    const jobId = res.data?.id
+    uiStore.toast?.success('Синхронизация', `Запущен импорт ${urls.length} треков в медиатеку и Telegram-канал`)
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const jobRes = await ingestionApi.getJob(jobId)
+        const job = jobRes.data
+        syncJobProgress.value = job
+        if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
+          clearInterval(pollInterval)
+          isSyncingAllTracks.value = false
+          syncJobProgress.value = null
+          await fetchScTracks(true)
+          libraryStore.fetchTracks({ refresh: true })
+          if (job.status === 'completed') {
+            uiStore.toast?.success('Готово', `Синхронизировано треков: ${job.processed_tracks}`)
+          }
+        }
+      } catch (err) {
+        clearInterval(pollInterval)
+        isSyncingAllTracks.value = false
+        syncJobProgress.value = null
+      }
+    }, 2000)
+  } catch (e) {
+    console.error('Failed to start sync job:', e)
+    uiStore.toast?.error('Ошибка', 'Не удалось запустить синхронизацию')
+    isSyncingAllTracks.value = false
+  }
+}
+
+// ─── SoundCloud Playlists State ───
+const scPlaylists = ref([])
+const isScPlaylistsLoading = ref(false)
+const selectedScPlaylist = ref(null)
+const scPlaylistTracks = ref([])
+const isScPlaylistTracksLoading = ref(false)
+const isSyncingPlaylist = ref(false)
+
+const fetchScPlaylists = async (type = 'all') => {
+  if (isScPlaylistsLoading.value) return
+  isScPlaylistsLoading.value = true
+  try {
+    const res = await ingestionApi.getSoundCloudPlaylists({ playlist_type: type })
+    scPlaylists.value = res.data?.items || []
+    if (res.data?.account) {
+      externalAccountsStore.setSoundCloudAccount(res.data.account)
+    }
+  } catch (e) {
+    console.error('Failed to fetch SC playlists:', e)
+    if (e.response?.status !== 404) {
+      uiStore.toast?.error('Ошибка', e.response?.data?.detail || 'Не удалось загрузить плейлисты')
+    }
+  } finally {
+    isScPlaylistsLoading.value = false
+  }
+}
+
+const handleSelectScPlaylist = async (pl) => {
+  selectedScPlaylist.value = pl
+  scPlaylistTracks.value = []
+  isScPlaylistTracksLoading.value = true
+  try {
+    const res = await ingestionApi.getSoundCloudPlaylistTracks(pl.id)
+    scPlaylistTracks.value = res.data?.tracks || []
+  } catch (e) {
+    console.error('Failed to fetch playlist tracks:', e)
+    uiStore.toast?.error('Ошибка', 'Не удалось загрузить треки плейлиста')
+  } finally {
+    isScPlaylistTracksLoading.value = false
+  }
+}
+
+const handleClearSelectedScPlaylist = () => {
+  selectedScPlaylist.value = null
+  scPlaylistTracks.value = []
+}
+
+const handleSyncPlaylist = async (playlist) => {
+  if (isSyncingPlaylist.value) return
+
+  // If tracks are not loaded yet, fetch them first
+  let tracksToSync = scPlaylistTracks.value
+  if (!tracksToSync || tracksToSync.length === 0) {
+    try {
+      const res = await ingestionApi.getSoundCloudPlaylistTracks(playlist.id)
+      tracksToSync = res.data?.tracks || []
+      scPlaylistTracks.value = tracksToSync
+    } catch (e) {
+      uiStore.toast?.error('Ошибка', 'Не удалось получить список треков для синхронизации')
+      return
+    }
+  }
+
+  if (tracksToSync.length === 0) {
+    uiStore.toast?.info('Синхронизация', 'В этом плейлисте нет треков для синхронизации')
+    return
+  }
+
+  isSyncingPlaylist.value = true
+  try {
+    const urls = tracksToSync.map(t => t.url)
+    const tracksPayload = tracksToSync.map(t => ({
+      url: t.url,
+      title: t.title,
+      artist: t.artist,
+      duration: t.duration,
+      cover_url: t.cover_url || playlist.artwork_url,
+      genre: t.genre,
+      tags: t.tags,
+      extra: {
+        is_soundcloud: true,
+        playlist_title: playlist.title,
+      }
+    }))
+
+    const res = await ingestionApi.start(
+      playlist.permalink_url || urls[0],
+      urls,
+      tracksPayload,
+      playlist.title,
+      true,            // create_playlist = true
+      playlist.title   // playlist_name
+    )
+    const jobId = res.data?.id
+    uiStore.toast?.success('Синхронизация', `Запущен импорт плейлиста «${playlist.title}» (${urls.length} треков)`)
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const jobRes = await ingestionApi.getJob(jobId)
+        const job = jobRes.data
+        syncJobProgress.value = job
+        if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
+          clearInterval(pollInterval)
+          isSyncingPlaylist.value = false
+          syncJobProgress.value = null
+          if (selectedScPlaylist.value?.id === playlist.id) {
+            await handleSelectScPlaylist(playlist)
+          }
+          libraryStore.fetchTracks({ refresh: true })
+          if (job.status === 'completed') {
+            uiStore.toast?.success('Готово', `Плейлист «${playlist.title}» успешно синхронизирован!`)
+          }
+        }
+      } catch (err) {
+        clearInterval(pollInterval)
+        isSyncingPlaylist.value = false
+        syncJobProgress.value = null
+      }
+    }, 2000)
+  } catch (e) {
+    console.error('Failed to sync playlist:', e)
+    uiStore.toast?.error('Ошибка', 'Не удалось запустить синхронизацию плейлиста')
+    isSyncingPlaylist.value = false
   }
 }
 
@@ -814,6 +1066,12 @@ const getChipBadge = (chipId) => {
       }
       return scLikes.value.length > 0 ? scLikes.value.length : (scAccount.value?.likes_count || null)
     }
+    if (scSubTab.value === 'tracks') {
+      return scTracks.value.length > 0 ? scTracks.value.length : (scAccount.value?.tracks_count || null)
+    }
+    if (scSubTab.value === 'playlists') {
+      return scPlaylists.value.length > 0 ? scPlaylists.value.length : null
+    }
     return soundcloudResults.value.length > 0 ? soundcloudResults.value.length : (scAccount.value?.connected ? '★' : null)
   }
   if (chipId === 'spotify') {
@@ -1180,7 +1438,17 @@ const resetToAllSearch = () => {
 const setScSubTab = (mode) => {
   scSubTab.value = mode
   if (mode === 'likes') {
-    switchToLikesTab()
+    if (scLikes.value.length === 0 && scAccount.value?.connected) {
+      fetchScLikes(true)
+    }
+  } else if (mode === 'tracks') {
+    if (scTracks.value.length === 0 && scAccount.value?.connected) {
+      fetchScTracks(true)
+    }
+  } else if (mode === 'playlists') {
+    if (scPlaylists.value.length === 0 && scAccount.value?.connected) {
+      fetchScPlaylists()
+    }
   }
   const newQuery = { ...route.query, tab: 'soundcloud', mode }
   router.replace({ path: '/search', query: newQuery })
@@ -1199,10 +1467,11 @@ const applyRouteQuery = () => {
   if (route.query.tab === 'soundcloud') {
     activeFilter.value = 'soundcloud'
     if (route.query.mode === 'likes') {
-      scSubTab.value = 'likes'
-      if (scLikes.value.length === 0) {
-        fetchScLikes()
-      }
+      setScSubTab('likes')
+    } else if (route.query.mode === 'tracks') {
+      setScSubTab('tracks')
+    } else if (route.query.mode === 'playlists') {
+      setScSubTab('playlists')
     } else {
       scSubTab.value = 'search'
     }

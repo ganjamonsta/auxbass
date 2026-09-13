@@ -117,16 +117,30 @@
                 @{{ scAccount.username }} <ExternalLink :size="12" />
               </a>
             </div>
-            <div class="sc-likes-badge" title="Количество лайков на SoundCloud">
-              <span class="sc-likes-num">{{ scAccount.likes_count || 0 }}</span>
-              <span class="sc-likes-label">лайков</span>
+            <div class="sc-stats-badges-box">
+              <div class="sc-likes-badge" title="Количество лайков на SoundCloud">
+                <span class="sc-likes-num">{{ scAccount.likes_count || 0 }}</span>
+                <span class="sc-likes-label">лайков</span>
+              </div>
+              <div class="sc-likes-badge" title="Количество авторских треков на SoundCloud">
+                <span class="sc-likes-num">{{ scAccount.tracks_count || 0 }}</span>
+                <span class="sc-likes-label">треков</span>
+              </div>
             </div>
           </div>
 
-          <div class="service-actions-grid">
+          <div class="service-actions-grid sc-actions-grid">
             <button class="action-btn primary sc-primary-btn" @click="goToSoundCloudLikes">
               <Heart :size="15" />
-              <span>Мои лайки SoundCloud</span>
+              <span>Лайки</span>
+            </button>
+            <button class="action-btn sc-secondary-btn" @click="goToSoundCloudTracks">
+              <Music :size="15" />
+              <span>Мои треки</span>
+            </button>
+            <button class="action-btn sc-secondary-btn" @click="goToSoundCloudPlaylists">
+              <Folder :size="15" />
+              <span>Плейлисты</span>
             </button>
             <button class="action-btn danger-ghost" :disabled="isDisconnectingSc" @click="handleDisconnectSc">
               <Unlink :size="15" />
@@ -856,7 +870,7 @@ import {
   User, Bell, Sliders, Headphones, Smartphone, Download, HardDrive, 
   Trash2, ChevronRight, ExternalLink, Unlink, Key, ChevronDown, 
   AlertCircle, Radio, FileSpreadsheet, Upload, LogOut, Library,
-  Camera, EyeOff, X, RotateCcw
+  Camera, EyeOff, X, RotateCcw, Music
 } from 'lucide-vue-next'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import { getCacheStats, getCachedAudioStats } from '@/utils/audioCacheDb'
@@ -1029,6 +1043,14 @@ const handleDisconnectSc = async () => {
 
 const goToSoundCloudLikes = () => {
   router.push({ path: '/search', query: { tab: 'soundcloud', mode: 'likes' } })
+}
+
+const goToSoundCloudTracks = () => {
+  router.push({ path: '/search', query: { tab: 'soundcloud', mode: 'tracks' } })
+}
+
+const goToSoundCloudPlaylists = () => {
+  router.push({ path: '/search', query: { tab: 'soundcloud', mode: 'playlists' } })
 }
 
 // ─── Spotify Integration State ───
@@ -2119,6 +2141,12 @@ const handleResetState = (event) => {
   color: #ff6600;
 }
 
+.sc-stats-badges-box {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .sc-likes-badge {
   display: flex;
   flex-direction: column;
@@ -2129,6 +2157,24 @@ const handleResetState = (event) => {
   border-radius: var(--r-sm);
   border: 1px solid rgba(255, 255, 255, 0.06);
   flex-shrink: 0;
+}
+
+.sc-actions-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sc-secondary-btn {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: var(--c-text-1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.sc-secondary-btn:hover {
+  background: rgba(255, 85, 0, 0.15) !important;
+  border-color: rgba(255, 85, 0, 0.3) !important;
+  color: #ffaa77 !important;
 }
 
 .sc-likes-num {
