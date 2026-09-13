@@ -728,11 +728,14 @@ onMounted(async () => {
     await authStore.initialize()
   }
 
-  // Preload external accounts and last import for sidebar shortcuts
+  // Preload external accounts, last import, and active background jobs
   if (authStore.isAuthenticated) {
     externalAccountsStore.fetchSoundCloud()
     externalAccountsStore.fetchLastSpotifyImport()
+    tasksStore.checkRecentJobs()
   }
+
+  window.addEventListener('focus', handleWindowFocus)
 
   // Restore player state if available (persisted queue, track, position) without blocking UI
   if (playerStore.hasSavedState() && !playerStore.currentTrack && !playerStore.isPlaying) {
@@ -779,6 +782,12 @@ onMounted(async () => {
   })
 })
 
+const handleWindowFocus = () => {
+  if (authStore.isAuthenticated) {
+    tasksStore.checkRecentJobs()
+  }
+}
+
 // Watch auth state to load external accounts & last import when user logs in
 watch(
   () => authStore.isAuthenticated,
@@ -786,11 +795,13 @@ watch(
     if (isAuth) {
       externalAccountsStore.fetchSoundCloud()
       externalAccountsStore.fetchLastSpotifyImport()
+      tasksStore.checkRecentJobs()
     }
   }
 )
 
 onUnmounted(() => {
+  window.removeEventListener('focus', handleWindowFocus)
   window.removeEventListener('resize', updateLayoutState)
   window.removeEventListener('keydown', handleGlobalKeyDown)
   window.removeEventListener('auth:logout', handleAuthLogout)

@@ -488,6 +488,10 @@ const pwaInstall = usePwaInstall()
 const showProfileMenu = ref(false)
 const cachedTracksCount = ref(0)
 
+onMounted(() => {
+  tasksStore.checkRecentJobs()
+})
+
 const handleRailToggleClick = () => {
   uiStore.setSidebarCollapsed(false, true)
 }

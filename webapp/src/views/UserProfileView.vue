@@ -168,6 +168,96 @@
         </div>
       </div>
 
+      <!-- Active Background Imports / Ingestion Panel for Profile (when viewing self) -->
+      <div v-if="isSelf && tasksStore.hasActiveImports" class="profile-active-imports-panel">
+        <div class="panel-section-header">
+          <div class="panel-section-title">
+            <CloudDownload :size="15" class="section-icon-pulse" />
+            <span>Импорт медиатеки</span>
+            <span class="panel-section-count">{{ tasksStore.activeMinimizedJobs.length }}</span>
+          </div>
+          <span class="panel-overall-progress">Общий прогресс: {{ tasksStore.overallProgress }}%</span>
+        </div>
+
+        <div class="panel-import-cards">
+          <div
+            v-for="item in tasksStore.activeMinimizedJobs"
+            :key="item.job.id"
+            class="profile-import-card"
+            :class="[item.meta?.type || 'generic', item.job.status, { 'is-queue': item.meta?.isQueue }]"
+            @click="handleRestoreJob(item.job.id)"
+            :title="item.meta?.isQueue ? 'Очередь загрузки треков' : 'Нажмите, чтобы развернуть окно импорта'"
+          >
+            <!-- Top row: icon + title + progress + actions -->
+            <div class="import-card-top">
+              <div class="import-icon-badge">
+                <div v-if="item.job.status === 'in_progress'" class="import-spinner"></div>
+                <Check v-else-if="item.job.status === 'completed'" :size="14" class="import-status-glyph success" />
+                <AlertCircle v-else :size="14" class="import-status-glyph error" />
+
+                <Music2 v-if="item.meta?.type === 'exportify'" :size="13" class="import-type-glyph" />
+                <CloudDownload v-else :size="13" class="import-type-glyph" />
+              </div>
+
+              <div class="import-main-info">
+                <div class="import-name-row">
+                  <span class="import-name" :title="item.job.title">{{ item.job.title }}</span>
+                  <span class="import-pct-badge">
+                    {{ item.job.progress_percent }}%
+                  </span>
+                </div>
+                <div class="import-stats-row">
+                  <span class="import-tracks-count">
+                    {{ item.job.processed_tracks }} / {{ item.job.total_tracks }} треков
+                  </span>
+                </div>
+              </div>
+
+              <div class="import-actions" @click.stop>
+                <button
+                  v-if="!item.meta?.isQueue"
+                  class="import-action-btn restore"
+                  @click="handleRestoreJob(item.job.id)"
+                  title="Развернуть"
+                >
+                  <Maximize2 :size="13" />
+                </button>
+                <button
+                  v-if="item.job.status === 'in_progress'"
+                  class="import-action-btn cancel"
+                  @click="handleCancelJob(item.job.id)"
+                  :title="item.meta?.isQueue ? 'Отменить очередь' : 'Отменить импорт'"
+                >
+                  <X :size="13" />
+                </button>
+              </div>
+            </div>
+
+            <!-- Subtext row -->
+            <div class="import-subtext" :title="subtextFor(item.job)">
+              {{ subtextFor(item.job) }}
+            </div>
+
+            <!-- Mini download bar if currently downloading audio file -->
+            <div 
+              v-if="item.job.download_percent !== null && item.job.download_percent !== undefined && item.job.status === 'in_progress'"
+              class="import-download-bar"
+            >
+              <div class="import-download-fill" :style="{ width: `${item.job.download_percent}%` }"></div>
+            </div>
+
+            <!-- Overall progress line -->
+            <div class="import-progress-bar">
+              <div 
+                class="import-progress-fill"
+                :style="{ width: `${item.job.progress_percent}%` }"
+                :class="{ completed: item.job.status === 'completed' }"
+              ></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Modern Single-Line Tab Bar -->
       <div class="user-tabs-bar">
         <button
@@ -612,6 +702,18 @@
                     <ExternalLink :size="12" />
                   </a>
                 </div>
+                <div v-if="isSelf" class="sc-detail-actions-row">
+                  <button 
+                    class="sc-sync-btn"
+                    :disabled="isSyncingScPlaylist || loadingScPlaylistTracks || scPlaylistTracks.length === 0"
+                    @click="handleSyncScPlaylist(selectedScPlaylist)"
+                    title="Создать плейлист в TG Player и загрузить треки в Telegram-канал"
+                  >
+                    <div v-if="isSyncingScPlaylist" class="spinner small"></div>
+                    <CloudDownload v-else :size="15" />
+                    <span>{{ isSyncingScPlaylist ? 'Синхронизация плейлиста...' : `Синхронизировать в TG Player (${scPlaylistTracks.length || selectedScPlaylist.track_count})` }}</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -960,6 +1062,10 @@ import {
   ExternalLink,
   ArrowLeft,
   FileSpreadsheet,
+  CloudDownload,
+  AlertCircle,
+  Maximize2,
+  Music2,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -1180,6 +1286,115 @@ const handleQuickPlayExternalTrack = async (item) => {
 
 const handleQuickAddExternalTrack = (item) => {
   tasksStore.enqueueTrack(item, 'soundcloud')
+}
+
+// ─── Import & Ingestion Task Handlers ───
+const isSyncingScPlaylist = ref(false)
+
+const subtextFor = (job) => {
+  if (!job) return ''
+  if (job.status === 'completed') return job.current_step || 'Импорт завершён'
+  if (job.status === 'failed') return job.error_message || 'Ошибка'
+  if (job.status === 'cancelled') return 'Отменено'
+
+  if (job.current_step && job.current_track_title) {
+    return `${job.current_track_title} • ${job.current_step}`
+  }
+  if (job.current_track_title) {
+    return job.current_track_title
+  }
+  return job.current_step || 'Синхронизация...'
+}
+
+const handleRestoreJob = (jobId) => {
+  tasksStore.restoreJob(jobId)
+}
+
+const handleCancelJob = (jobId) => {
+  tasksStore.cancelJob(jobId)
+}
+
+const handleSyncScPlaylist = async (playlist) => {
+  if (isSyncingScPlaylist.value) return
+
+  let tracksToSync = scPlaylistTracks.value
+  if (!tracksToSync || tracksToSync.length === 0) {
+    try {
+      loadingScPlaylistTracks.value = true
+      const res = await socialApi.getUserExternalPlaylistTracks(userId.value, playlist.id)
+      tracksToSync = res.data?.tracks || []
+      scPlaylistTracks.value = tracksToSync
+    } catch (e) {
+      uiStore.toast?.error('Ошибка', 'Не удалось получить треки плейлиста')
+      return
+    } finally {
+      loadingScPlaylistTracks.value = false
+    }
+  }
+
+  if (tracksToSync.length === 0) {
+    uiStore.toast?.info('Синхронизация', 'В этом плейлисте нет треков для синхронизации')
+    return
+  }
+
+  isSyncingScPlaylist.value = true
+  try {
+    const urls = tracksToSync.map(t => t.url)
+    const tracksPayload = tracksToSync.map(t => ({
+      url: t.url,
+      title: t.title,
+      artist: t.artist,
+      duration: t.duration,
+      cover_url: t.cover_url || playlist.artwork_url,
+      genre: t.genre,
+      tags: t.tags,
+      extra: {
+        is_soundcloud: true,
+        playlist_title: playlist.title,
+      }
+    }))
+
+    const res = await ingestionApi.start(
+      playlist.permalink_url || urls[0],
+      urls,
+      tracksPayload,
+      playlist.title,
+      true,
+      playlist.title
+    )
+
+    if (res.data) {
+      tasksStore.registerJob(res.data, {
+        type: 'import',
+        title: `Плейлист: ${playlist.title}`,
+      })
+    }
+    uiStore.toast?.success('Синхронизация', `Запущен импорт плейлиста «${playlist.title}» (${urls.length} треков)`)
+
+    const jobId = res.data?.id
+    const pollInterval = setInterval(async () => {
+      try {
+        const jobRes = await ingestionApi.getJob(jobId)
+        const job = jobRes.data
+        if (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') {
+          clearInterval(pollInterval)
+          isSyncingScPlaylist.value = false
+          if (job.status === 'completed') {
+            uiStore.toast?.success('Готово', `Плейлист «${playlist.title}» успешно синхронизирован!`)
+            libraryStore.fetchTracks({ refresh: true })
+            loadOverviewData(userId.value)
+          }
+        }
+      } catch (err) {
+        clearInterval(pollInterval)
+        isSyncingScPlaylist.value = false
+      }
+    }, 2000)
+  } catch (e) {
+    console.error('Failed to sync SC playlist from profile:', e)
+    uiStore.toast?.error('Ошибка', 'Не удалось запустить синхронизацию плейлиста')
+    isSyncingScPlaylist.value = false
+  }
 }
 
 // Refs
@@ -1656,8 +1871,17 @@ watch(
   { deep: true }
 )
 
+watch(isSelf, (self) => {
+  if (self) {
+    tasksStore.checkRecentJobs()
+  }
+})
+
 onMounted(() => {
   loadUserProfile(true)
+  if (isSelf.value) {
+    tasksStore.checkRecentJobs()
+  }
 })
 </script>
 
@@ -3277,5 +3501,311 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   margin-top: 20px;
+}
+
+/* ─── Profile Active Ingestion / Imports Panel ─── */
+.profile-active-imports-panel {
+  background: rgba(20, 24, 33, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(16px);
+  border-radius: 16px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  animation: panelFadeIn 0.3s ease;
+}
+
+@keyframes panelFadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.panel-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.panel-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--c-text-1, #fff);
+}
+
+.section-icon-pulse {
+  color: #ff6600;
+  animation: iconPulse 2s infinite ease-in-out;
+}
+
+@keyframes iconPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.75; }
+}
+
+.panel-section-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 1px 7px;
+  border-radius: 12px;
+}
+
+.panel-overall-progress {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-accent, #1db954);
+}
+
+.panel-import-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-import-card {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px 14px 14px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.profile-import-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.profile-import-card.exportify {
+  border-color: rgba(29, 185, 84, 0.3);
+  background: rgba(29, 185, 84, 0.06);
+}
+
+.profile-import-card.import {
+  border-color: rgba(255, 85, 0, 0.3);
+  background: rgba(255, 85, 0, 0.06);
+}
+
+.profile-import-card.completed {
+  border-color: rgba(34, 197, 94, 0.3);
+  background: rgba(16, 28, 22, 0.6);
+}
+
+.import-card-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.import-icon-badge {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.profile-import-card.exportify .import-icon-badge {
+  background: linear-gradient(135deg, #1db954 0%, #15883e 100%);
+}
+
+.profile-import-card.import .import-icon-badge {
+  background: linear-gradient(135deg, #ff6600 0%, #cc4400 100%);
+}
+
+.import-spinner {
+  position: absolute;
+  inset: -2px;
+  border: 2px solid transparent;
+  border-top-color: #fff;
+  border-radius: 11px;
+  animation: spin 0.9s linear infinite;
+}
+
+.import-status-glyph.success {
+  color: #22c55e;
+}
+
+.import-status-glyph.error {
+  color: #ef4444;
+}
+
+.import-main-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.import-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.import-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text-1, #fff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.import-pct-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 6px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.import-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.import-tracks-count {
+  font-size: 11px;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
+}
+
+.import-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.import-action-btn {
+  background: transparent;
+  border: none;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
+  padding: 5px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.import-action-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--c-text-1, #fff);
+}
+
+.import-action-btn.cancel:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.import-subtext {
+  font-size: 11px;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.55));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 8px;
+  margin-bottom: 6px;
+}
+
+.import-download-bar {
+  height: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.import-download-fill {
+  height: 100%;
+  background: #3b82f6;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.import-progress-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.import-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff6600, #ff8533);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.profile-import-card.exportify .import-progress-fill {
+  background: linear-gradient(90deg, #1db954, #1ed760);
+}
+
+.import-progress-fill.completed {
+  background: #22c55e;
+}
+
+/* ─── SC Playlist Detail Sync Action ─── */
+.sc-detail-actions-row {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sc-sync-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #ff5500 0%, #cc4400 100%);
+  color: #fff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(255, 85, 0, 0.35);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sc-sync-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ff6600 0%, #dd4400 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(255, 85, 0, 0.45);
+}
+
+.sc-sync-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.sc-sync-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 </style>

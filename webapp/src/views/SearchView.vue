@@ -930,6 +930,12 @@ const handleSyncAllSpLikes = async () => {
     const urls = toImport.map(t => t.url)
     const res = await ingestionApi.start(urls[0], urls)
     const jobId = res.data?.id
+    if (res.data) {
+      tasksStore.registerJob(res.data, {
+        type: 'exportify',
+        title: `Spotify Likes (${toImport.length})`,
+      })
+    }
     uiStore.toast?.success('Синхронизация', `Запущен импорт ${urls.length} треков Spotify в медиатеку и Telegram-канал`)
 
     const pollInterval = setInterval(async () => {

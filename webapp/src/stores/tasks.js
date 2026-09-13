@@ -229,6 +229,12 @@ export const useTasksStore = defineStore('tasks', () => {
     })
     jobMetas.value = nextMetas
 
+    if (!showImportModal.value && !showExportifyModal.value) {
+      const nextMin = new Set(minimizedJobIds.value)
+      nextMin.add(job.id)
+      minimizedJobIds.value = nextMin
+    }
+
     if (meta.type === 'exportify') {
       currentExportifyJob.value = job
     } else if (meta.type === 'import') {
@@ -269,26 +275,25 @@ export const useTasksStore = defineStore('tasks', () => {
             libraryStore.fetchTracks({ refresh: true, bypassCache: true })
             libraryStore.fetchPlaylists(true)
 
-            if (minimizedJobIds.value.has(jobId)) {
-              uiStore.toast?.success(
-                'Импорт завершён!',
-                `Успешно обработано треков: ${updated.processed_tracks}`
-              )
-            }
+            uiStore.toast?.success(
+              'Импорт завершён!',
+              `Успешно обработано треков: ${updated.processed_tracks}`
+            )
           } else if (updated.status === 'failed') {
-            if (minimizedJobIds.value.has(jobId)) {
-              uiStore.toast?.error('Ошибка импорта', updated.error_message || 'Не удалось завершить задачу')
-            }
+            uiStore.toast?.error('Ошибка импорта', updated.error_message || 'Не удалось завершить задачу')
           }
 
-          // Auto-remove finished job from minimized widget after 4 seconds
+          // Auto-remove finished job from minimized widget after 6 seconds
           setTimeout(() => {
-            if (minimizedJobIds.value.has(jobId)) {
-              const nextMin = new Set(minimizedJobIds.value)
+            const nextMin = new Set(minimizedJobIds.value)
+            if (nextMin.has(jobId)) {
               nextMin.delete(jobId)
               minimizedJobIds.value = nextMin
             }
-          }, 4000)
+            const nextJobs = new Map(jobs.value)
+            nextJobs.delete(jobId)
+            jobs.value = nextJobs
+          }, 6000)
         }
       } catch (err) {
         console.error(`[TasksStore] Polling error for job ${jobId}:`, err)
@@ -438,14 +443,34 @@ export const useTasksStore = defineStore('tasks', () => {
   /**
    * List of all currently minimized active tasks (modal jobs + quick queue)
    */
+  /**
+   * List of all currently minimized active tasks (modal jobs + quick queue)
+   */
   const activeMinimizedJobs = computed(() => {
     const list = []
+    const processedIds = new Set()
 
-    // 1. Minimized modal jobs
-    for (const jobId of minimizedJobIds.value) {
-      const job = jobs.value.get(jobId)
-      const meta = jobMetas.value.get(jobId)
-      if (job) {
+    // 1. Minimized modal jobs + active background jobs
+    for (const [jobId, job] of jobs.value.entries()) {
+      if (processedIds.has(jobId)) continue
+
+      const isExportifyModalOpen = showExportifyModal.value && currentExportifyJob.value?.id === jobId
+      const isImportModalOpen = showImportModal.value && currentImportJob.value?.id === jobId
+
+      // If the modal is currently open in foreground, don't show as a minimized card in floating widget
+      if (isExportifyModalOpen || isImportModalOpen) {
+        continue
+      }
+
+      const isMinimized = minimizedJobIds.value.has(jobId)
+      const isActive = job.status === 'in_progress' || job.status === 'pending'
+
+      if (isMinimized || isActive) {
+        processedIds.add(jobId)
+        const meta = jobMetas.value.get(jobId) || {
+          type: job.provider_name === 'spotify' ? 'exportify' : 'import',
+          title: job.title || 'Импорт музыки',
+        }
         list.push({ job, meta })
       }
     }
@@ -510,6 +535,32 @@ export const useTasksStore = defineStore('tasks', () => {
     return Math.min(100, Math.max(0, Math.round(total / list.length)))
   })
 
+  /**
+   * Check for any active import jobs on the server
+   */
+  const checkRecentJobs = async () => {
+    try {
+      const res = await ingestionApi.getRecent()
+      const recentList = res.data || []
+      for (const job of recentList) {
+        if (job.status === 'in_progress' || job.status === 'pending') {
+          if (!jobs.value.has(job.id) || !pollTimers.has(job.id)) {
+            registerJob(job, {
+              type: job.provider_name === 'spotify' ? 'exportify' : 'import',
+              title: job.title || 'Импорт музыки',
+            })
+          } else {
+            const nextJobs = new Map(jobs.value)
+            nextJobs.set(job.id, job)
+            jobs.value = nextJobs
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore network errors
+    }
+  }
+
   return {
     jobs,
     jobMetas,
@@ -541,5 +592,6 @@ export const useTasksStore = defineStore('tasks', () => {
     isTrackQueued,
     isTrackDownloading,
     isTrackCompleted,
+    checkRecentJobs,
   }
 })
