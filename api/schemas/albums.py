@@ -49,3 +49,10 @@ class AlbumDetailResponse(AlbumResponse):
     """Album with tracks and full tracklist for missing track display"""
     tracks: List[TrackResponse]  # Tracks in user's library
     full_tracklist: Optional[List[AlbumTracklistItem]] = None  # Complete album tracklist
+
+
+class AlbumResolveResponse(BaseModel):
+    """Response when resolving an album for a track or by name"""
+    album_id: int
+    name: str
+    artist: str

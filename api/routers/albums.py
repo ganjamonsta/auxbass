@@ -17,7 +17,10 @@ from shared.database import get_db
 from shared.models import (
     Track, Album, AlbumTrack, UserLibrary, TrackTag, TrackEnrichment
 )
-from shared.matching import normalize_artist, normalize_title, fuzzy_match_title
+from shared.matching import (
+    normalize_artist, normalize_title, fuzzy_match_title,
+    normalize_album, fuzzy_match_artist, ARTIST_MATCH_THRESHOLD
+)
 
 from api.routers.auth import get_current_user
 from api.utils.responses import streamable_track_filter, album_to_response, track_to_response
@@ -26,8 +29,10 @@ from api.schemas.albums import (
     AlbumDetailResponse,
     AlbumsListResponse,
     AlbumTracklistItem,
+    AlbumResolveResponse,
 )
 from api.schemas.common import TelegramUser
+from bot.services.albums import album_service
 
 
 router = APIRouter(tags=["Albums"])
@@ -323,6 +328,107 @@ async def get_global_albums(
         offset=offset,
         limit=limit,
     )
+
+
+@router.get("/resolve", response_model=AlbumResolveResponse)
+async def resolve_album(
+    track_id: Optional[int] = Query(None, description="Track ID to resolve album for"),
+    album_name: Optional[str] = Query(None, description="Album name"),
+    artist: Optional[str] = Query(None, description="Artist name"),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Resolve or dynamically create an album for a track or by album name/artist.
+    Ensures album navigation always succeeds even if the album was not pre-created or linked.
+    """
+    if not isinstance(track_id, int):
+        track_id = None
+    if not isinstance(album_name, str):
+        album_name = None
+    if not isinstance(artist, str):
+        artist = None
+
+    target_track = None
+    if track_id:
+        # 1. Check if track is already linked to an album
+        res = await db.execute(
+            select(AlbumTrack.album_id, Album.name, Album.artist)
+            .join(Album, Album.id == AlbumTrack.album_id)
+            .where(AlbumTrack.track_id == track_id)
+        )
+        row = res.first()
+        if row:
+            return AlbumResolveResponse(album_id=row[0], name=row[1], artist=row[2])
+
+        # 2. Try auto_assign_album_from_enrichment
+        target_track = await db.scalar(
+            select(Track)
+            .options(selectinload(Track.enrichment))
+            .where(Track.id == track_id)
+        )
+        if target_track:
+            assigned_id = await album_service.auto_assign_album_from_enrichment(track_id)
+            if assigned_id:
+                album = await db.get(Album, assigned_id)
+                if album:
+                    return AlbumResolveResponse(album_id=album.id, name=album.name, artist=album.artist)
+
+            if not album_name and target_track.enrichment and target_track.enrichment.album_name:
+                album_name = target_track.enrichment.album_name
+            if not artist:
+                artist = target_track.artist
+
+    if not album_name or not album_name.strip():
+        raise HTTPException(status_code=404, detail="Album name not specified or found")
+
+    album_name = album_name.strip()
+    norm_album = normalize_album(album_name)
+
+    # 3. Look up existing album by Deezer album ID if available on track
+    if target_track and target_track.enrichment and target_track.enrichment.deezer_album_id:
+        album_by_dz = await db.scalar(
+            select(Album).where(Album.deezer_album_id == target_track.enrichment.deezer_album_id)
+        )
+        if album_by_dz:
+            if track_id:
+                await album_service.assign_track_to_album(track_id, album_by_dz.id)
+            return AlbumResolveResponse(album_id=album_by_dz.id, name=album_by_dz.name, artist=album_by_dz.artist)
+
+    # 4. Search existing album by normalized name and artist
+    query = select(Album).where(Album.normalized_name == norm_album)
+    if artist:
+        norm_artist = normalize_artist(artist)
+        query = query.where(Album.normalized_artist == norm_artist)
+
+    matched_album = await db.scalar(query)
+
+    # 5. If not exact match, try fuzzy matching artist among albums with same normalized_name
+    if not matched_album and artist:
+        cands = (await db.scalars(select(Album).where(Album.normalized_name == norm_album))).all()
+        for cand in cands:
+            if fuzzy_match_artist(artist, cand.artist) >= ARTIST_MATCH_THRESHOLD:
+                matched_album = cand
+                break
+
+    if matched_album:
+        if track_id:
+            await album_service.assign_track_to_album(track_id, matched_album.id)
+        return AlbumResolveResponse(album_id=matched_album.id, name=matched_album.name, artist=matched_album.artist)
+
+    # 6. Create album via album_service
+    created_id = await album_service.find_or_create_album(
+        album_name=album_name,
+        artist_name=artist or "Неизвестный исполнитель"
+    )
+    if created_id:
+        if track_id:
+            await album_service.assign_track_to_album(track_id, created_id)
+        created_album = await db.get(Album, created_id)
+        if created_album:
+            return AlbumResolveResponse(album_id=created_album.id, name=created_album.name, artist=created_album.artist)
+
+    raise HTTPException(status_code=404, detail="Album could not be resolved or created")
 
 
 @router.get("/{album_id}", response_model=AlbumDetailResponse)

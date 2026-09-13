@@ -205,7 +205,9 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
+import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
+import { albumsApi } from '@/api/client'
 import { getCoverUrl, CoverSize } from '@/utils'
 import { ListMusic, History, Mic2, User, Cpu } from 'lucide-vue-next'
 
@@ -252,6 +254,7 @@ const emit = defineEmits([
 
 const router = useRouter()
 const playerStore = usePlayerStore()
+const uiStore = useUIStore()
 const { openMenu } = useContextMenu()
 
 // Dedicated Channel on Deck B: 'queue' | 'history' | 'lyrics' | 'artist' | 'stats'
@@ -329,11 +332,33 @@ const handlePlayArtistTrack = (track) => {
   playerStore.playTrack(track, { type: 'artist', artist: props.track.artist })
 }
 
-const handleGoToAlbum = () => {
+const handleGoToAlbum = async () => {
   const albumId = props.track?.album?.id || props.track?.album_id
-  if (!albumId) return
-  emit('close')
-  router.push(`/album/${albumId}`)
+  if (albumId) {
+    emit('close')
+    router.push(`/album/${albumId}`)
+    return
+  }
+  const t = props.track
+  const albumName = t?.album?.name || t?.album_name || (typeof t?.album === 'string' ? t.album : null)
+  if (t?.id || albumName) {
+    emit('close')
+    try {
+      const res = await albumsApi.resolve({
+        track_id: t?.id,
+        album_name: albumName,
+        artist: t?.artist
+      })
+      if (res?.data?.album_id) {
+        router.push(`/album/${res.data.album_id}`)
+      } else {
+        uiStore.toast.info('Альбом', 'Альбом не найден')
+      }
+    } catch (err) {
+      console.error('Failed to resolve album:', err)
+      uiStore.toast.error('Ошибка', 'Не удалось открыть альбом')
+    }
+  }
 }
 
 const handleGoToArtist = (artistName) => {

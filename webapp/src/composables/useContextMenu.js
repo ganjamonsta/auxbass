@@ -149,12 +149,32 @@ export function useContextMenu() {
       }
     },
 
-    goToAlbum: (track) => {
+    goToAlbum: async (track) => {
       closeMenu()
       closeFullPlayer() // Close full player if open
       const albumId = track?.album_id || track?.album?.id
       if (albumId) {
         router.push(`/album/${albumId}`)
+        return
+      }
+
+      const albumName = track?.album?.name || track?.album_name || (typeof track?.album === 'string' ? track.album : null)
+      if (track?.id || albumName) {
+        try {
+          const res = await albumsApi.resolve({
+            track_id: track?.id,
+            album_name: albumName,
+            artist: track?.artist
+          })
+          if (res?.data?.album_id) {
+            router.push(`/album/${res.data.album_id}`)
+          } else {
+            uiStore.toast.info('Альбом', 'Альбом не найден')
+          }
+        } catch (err) {
+          console.error('Failed to resolve album:', err)
+          uiStore.toast.error('Ошибка', 'Не удалось открыть альбом')
+        }
       }
     },
 

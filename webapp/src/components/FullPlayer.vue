@@ -330,6 +330,7 @@ import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useAuthStore } from '@/stores/auth'
 import { useShare } from '@/composables/useShare'
+import { albumsApi } from '@/api/client'
 
 const props = defineProps({
   track: Object,
@@ -453,14 +454,42 @@ const trackAlbum = computed(() => {
       name: t.album_name || t.album_title
     }
   }
+  if (t.album_name || t.album?.name || (typeof t.album === 'string' && t.album.trim())) {
+    return {
+      id: null,
+      name: t.album_name || t.album?.name || t.album
+    }
+  }
   return null
 })
 
 // Navigate to album page
-const goToAlbum = () => {
+const goToAlbum = async () => {
   if (trackAlbum.value?.id) {
     router.push(`/album/${trackAlbum.value.id}`)
     emit('close')
+    return
+  }
+
+  const t = props.track
+  const albumName = trackAlbum.value?.name || t?.album_name || (typeof t?.album === 'string' ? t.album : null)
+  if (t?.id || albumName) {
+    emit('close')
+    try {
+      const res = await albumsApi.resolve({
+        track_id: t?.id,
+        album_name: albumName,
+        artist: t?.artist
+      })
+      if (res?.data?.album_id) {
+        router.push(`/album/${res.data.album_id}`)
+      } else {
+        uiStore.toast.info('Альбом', 'Альбом не найден')
+      }
+    } catch (err) {
+      console.error('Failed to resolve album:', err)
+      uiStore.toast.error('Ошибка', 'Не удалось открыть альбом')
+    }
   }
 }
 

@@ -262,6 +262,7 @@ import { PanelRightClose } from 'lucide-vue-next'
 const uiStore = useUIStore()
 import { Play } from 'lucide-vue-next'
 import LyricsViewer from '@/components/LyricsViewer.vue'
+import { albumsApi } from '@/api/client'
 
 const emit = defineEmits(['goToUser'])
 
@@ -363,10 +364,30 @@ const goToArtistByName = (artistName) => {
   }
 }
 
-const goToAlbum = () => {
+const goToAlbum = async () => {
   const albumId = track.value?.album?.id || track.value?.album_id
   if (albumId) {
     router.push(`/album/${albumId}`)
+    return
+  }
+  const t = track.value
+  const albumName = t?.album?.name || t?.album_name || (typeof t?.album === 'string' ? t.album : null)
+  if (t?.id || albumName) {
+    try {
+      const res = await albumsApi.resolve({
+        track_id: t?.id,
+        album_name: albumName,
+        artist: t?.artist
+      })
+      if (res?.data?.album_id) {
+        router.push(`/album/${res.data.album_id}`)
+      } else {
+        uiStore.toast.info('Альбом', 'Альбом не найден')
+      }
+    } catch (err) {
+      console.error('Failed to resolve album:', err)
+      uiStore.toast.error('Ошибка', 'Не удалось открыть альбом')
+    }
   }
 }
 

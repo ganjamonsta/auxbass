@@ -11,12 +11,14 @@
  *   const { handleDirectDownload, handleHdNotice, handleLikeTrack, handleAddToLibrary } = useTrackActions()
  *   <TrackItem @download="handleDirectDownload(track)" @hdNotice="handleHdNotice" ... />
  */
+import { useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
-import { playerApi } from '@/api/client'
+import { playerApi, albumsApi } from '@/api/client'
 
 export function useTrackActions() {
+  const router = useRouter()
   const libraryStore = useLibraryStore()
   const uiStore = useUIStore()
   const authStore = useAuthStore()
@@ -94,11 +96,44 @@ export function useTrackActions() {
     return success
   }
 
+  /**
+   * Navigate to album page, resolving or creating the album if needed
+   * @param {Object} track - Track object
+   */
+  const goToTrackAlbum = async (track) => {
+    if (!track) return
+    const albumId = track.album_id || track.album?.id
+    if (albumId) {
+      router.push(`/album/${albumId}`)
+      return
+    }
+
+    const albumName = track.album?.name || track.album_name || (typeof track.album === 'string' ? track.album : null)
+    if (track.id || albumName) {
+      try {
+        const res = await albumsApi.resolve({
+          track_id: track.id,
+          album_name: albumName,
+          artist: track.artist
+        })
+        if (res?.data?.album_id) {
+          router.push(`/album/${res.data.album_id}`)
+        } else {
+          uiStore.toast.info('Альбом', 'Альбом не найден')
+        }
+      } catch (err) {
+        console.error('Failed to resolve album:', err)
+        uiStore.toast.error('Ошибка', 'Не удалось открыть альбом')
+      }
+    }
+  }
+
   return {
     handleDirectDownload,
     handleHdNotice,
     handleLikeTrack,
     handleAddToLibrary,
+    goToTrackAlbum,
   }
 }
 
