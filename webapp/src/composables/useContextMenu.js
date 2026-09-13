@@ -19,6 +19,7 @@ import { useModals } from '@/composables/useModals'
 import { playerApi, playlistsApi, albumsApi, tracksApi } from '@/api/client'
 import { getAllTrackArtists } from '@/utils/formatters'
 import { useShare } from '@/composables/useShare'
+import { suppressNextClick, suppressNextContextMenu } from '@/utils/touch'
 
 // Singleton state - shared across all components
 const isOpen = ref(false)
@@ -96,6 +97,20 @@ export function useContextMenu() {
       menuPosition.value = { x: 0, y: 0 }
     }
     
+    // Suppress trailing synthetic click and native contextmenu if opened by a touch interaction
+    const isTouchInteraction = Boolean(
+      event?.touches?.length || 
+      event?.changedTouches?.length || 
+      (event?.pointerType && event.pointerType !== 'mouse') ||
+      (event?.type === 'contextmenu' && event.button === 0) ||
+      (!event && ('ontouchstart' in window))
+    )
+
+    if (isTouchInteraction) {
+      suppressNextClick()
+      suppressNextContextMenu()
+    }
+
     isOpen.value = true
   }
 

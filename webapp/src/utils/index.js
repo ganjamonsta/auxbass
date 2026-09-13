@@ -6,4 +6,5 @@
 export * from './formatters'
 export * from './styles'
 export * from './lrcParser'
+export * from './touch'
 

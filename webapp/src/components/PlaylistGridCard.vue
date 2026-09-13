@@ -50,7 +50,7 @@
 
 <script setup>
 import { Music, Globe, Crown, UserPlus, Play, Heart } from 'lucide-vue-next'
-import { getCoverUrl, CoverSize } from '@/utils'
+import { getCoverUrl, CoverSize, triggerHaptic, suppressNextClick, suppressNextContextMenu } from '@/utils'
 
 const props = defineProps({
   playlist: {
@@ -76,6 +76,9 @@ const handleTouchStart = (e) => {
     longPressTimer = setTimeout(() => {
       if (!touchMoved) {
         isLongPressTriggered = true
+        triggerHaptic()
+        suppressNextClick()
+        suppressNextContextMenu()
         emit('contextmenu', e)
       }
     }, 450)

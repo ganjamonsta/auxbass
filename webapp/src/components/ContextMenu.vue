@@ -5,8 +5,9 @@
         v-if="isOpen" 
         class="menu-overlay" 
         :class="{ desktop: isDesktop }" 
-        @click="closeMenu"
-        @contextmenu.prevent="closeMenu"
+        @click="handleOverlayClick"
+        @touchstart.passive="handleOverlayTouchStart"
+        @contextmenu.prevent="handleOverlayContextMenu"
       >
         <Transition :name="isDesktop ? 'scale' : 'slide-up'">
           <div 
@@ -16,6 +17,7 @@
             :class="{ desktop: isDesktop }"
             :style="isDesktop && adjustedPosition.x ? { left: adjustedPosition.x + 'px', top: adjustedPosition.y + 'px' } : {}"
             @click.stop
+            @contextmenu.stop.prevent
           >
             <!-- Header -->
             <div class="menu-header">
@@ -372,6 +374,38 @@ const checkDesktop = () => {
   isDesktop.value = window.innerWidth >= 768 && !('ontouchstart' in window)
 }
 
+let overlayTouchStarted = false
+let menuOpenTimestamp = 0
+
+const handleOverlayTouchStart = (e) => {
+  if (e.target === e.currentTarget) {
+    overlayTouchStarted = true
+  }
+}
+
+const handleOverlayContextMenu = (e) => {
+  e.preventDefault()
+  if (isDesktop.value) {
+    closeMenu()
+  }
+}
+
+const handleOverlayClick = () => {
+  if (isDesktop.value) {
+    closeMenu()
+    return
+  }
+  // Ignore clicks that occur immediately after opening (e.g. synthetic click on finger release after long-press)
+  if (Date.now() - menuOpenTimestamp < 350) {
+    return
+  }
+  // On mobile touch, only close if the touch gesture actually began on the overlay itself
+  if (overlayTouchStarted) {
+    overlayTouchStarted = false
+    closeMenu()
+  }
+}
+
 // Handle keyboard events
 const handleKeyDown = (e) => {
   if (e.key === 'Escape') {
@@ -432,10 +466,14 @@ watch(showCreatePlaylist, (show) => {
   }
 })
 
-// Reset submenu state when menu closes
+// Reset submenu state and track open timestamp
 watch(isOpen, (open) => {
-  if (!open) {
+  if (open) {
+    menuOpenTimestamp = Date.now()
+    overlayTouchStarted = false
+  } else {
     showArtistSubmenu.value = false
+    overlayTouchStarted = false
   }
 })
 

@@ -14,15 +14,7 @@
  *   v-longpress="{ handler: handleLongPress, delay: 450 }"
  */
 
-function triggerHaptic() {
-  try {
-    if (window.Telegram?.WebApp?.HapticFeedback) {
-      window.Telegram.WebApp.HapticFeedback.impactOccurred('medium')
-    } else if (navigator?.vibrate) {
-      navigator.vibrate(35)
-    }
-  } catch (_) {}
-}
+import { triggerHaptic, suppressNextClick, suppressNextContextMenu } from '@/utils/touch'
 
 export const longpress = {
   mounted(el, binding) {
@@ -60,6 +52,8 @@ export const longpress = {
         if (!state.moved) {
           state.triggered = true
           triggerHaptic()
+          suppressNextClick()
+          suppressNextContextMenu()
           handler(e)
         }
       }, delay)

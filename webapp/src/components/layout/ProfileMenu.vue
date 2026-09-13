@@ -5,7 +5,9 @@
         v-if="modelValue" 
         class="profile-menu-backdrop" 
         :class="{ 'is-mobile': isMobile, 'is-desktop': !isMobile }"
-        @click="close"
+        @click="handleBackdropClick"
+        @touchstart.passive="handleBackdropTouchStart"
+        @contextmenu.prevent="handleBackdropContextMenu"
         @keydown.esc="close"
         tabindex="-1"
       >
@@ -14,6 +16,7 @@
           :class="{ 'is-mobile': isMobile, 'is-desktop': !isMobile }"
           :style="!isMobile ? desktopStyle : {}"
           @click.stop
+          @contextmenu.stop.prevent
         >
           <!-- Mobile drag handle -->
           <div v-if="isMobile" class="sheet-handle-bar" @click="close">
@@ -383,9 +386,46 @@ const handleCancelJob = (jobId) => {
   tasksStore.cancelJob(jobId)
 }
 
+let backdropTouchStarted = false
+let menuOpenTimestamp = 0
+
+const handleBackdropTouchStart = (e) => {
+  if (e.target === e.currentTarget) {
+    backdropTouchStarted = true
+  }
+}
+
+const handleBackdropContextMenu = (e) => {
+  e.preventDefault()
+  if (!isMobile.value) {
+    close()
+  }
+}
+
+const handleBackdropClick = () => {
+  if (!isMobile.value) {
+    close()
+    return
+  }
+  // Ignore clicks that occur immediately after opening (synthetic click from long-press gesture)
+  if (Date.now() - menuOpenTimestamp < 350) {
+    return
+  }
+  if (backdropTouchStarted) {
+    backdropTouchStarted = false
+    close()
+  }
+}
+
 watch(() => props.modelValue, (isOpen) => {
-  if (isOpen && !isMobile.value) {
-    nextTick(updateDesktopPosition)
+  if (isOpen) {
+    menuOpenTimestamp = Date.now()
+    backdropTouchStarted = false
+    if (!isMobile.value) {
+      nextTick(updateDesktopPosition)
+    }
+  } else {
+    backdropTouchStarted = false
   }
 })
 

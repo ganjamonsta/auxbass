@@ -320,7 +320,7 @@
 import { ref, computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { Disc3, Share2 } from 'lucide-vue-next'
-import { getTrackCoverStyle, getTrackInitials, splitArtists, getDisplayTitle, getDisplayArtist, getAllTrackArtists, getCoverUrl, CoverSize } from '@/utils'
+import { getTrackCoverStyle, getTrackInitials, splitArtists, getDisplayTitle, getDisplayArtist, getAllTrackArtists, getCoverUrl, CoverSize, suppressNextClick, suppressNextContextMenu } from '@/utils'
 import TagChips from '@/components/TagChips.vue'
 import TrackTags from '@/components/TrackTags.vue'
 import LyricsViewer from '@/components/LyricsViewer.vue'
@@ -514,6 +514,8 @@ const onTouchStart = (e) => {
   coverLongPressTimer = setTimeout(() => {
     if (!coverTouchMoved) {
       telegram?.HapticFeedback?.impactOccurred?.('heavy')
+      suppressNextClick()
+      suppressNextContextMenu()
       openTrackContextMenu()
     }
   }, 500)

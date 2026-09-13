@@ -117,7 +117,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { formatDuration, getTrackCoverStyle, getTrackInitials, getDisplayTitle, getDisplayArtist, getCoverUrl, CoverSize } from '@/utils'
+import { formatDuration, getTrackCoverStyle, getTrackInitials, getDisplayTitle, getDisplayArtist, getCoverUrl, CoverSize, triggerHaptic, suppressNextClick, suppressNextContextMenu } from '@/utils'
 import { X, Check, ThumbsDown } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -183,6 +183,9 @@ const handleTouchStart = (e) => {
     longPressTimer = setTimeout(() => {
       if (!touchMoved) {
         isLongPressTriggered = true
+        triggerHaptic()
+        suppressNextClick()
+        suppressNextContextMenu()
         emit('menu', e)
       }
     }, 450)
