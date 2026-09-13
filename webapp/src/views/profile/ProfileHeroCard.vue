@@ -409,9 +409,9 @@ const getSpotifyUrl = (acc) => {
   inset: 0;
   background-repeat: repeat;
   background-size: 160px 160px;
-  background-position: 0 0;
-  filter: brightness(0.5) saturate(1.15);
-  opacity: 0.85;
+  background-position: center center;
+  filter: brightness(0.72) saturate(1.15);
+  opacity: 0.95;
 }
 
 .hero-tiled-overlay {
@@ -419,14 +419,17 @@ const getSpotifyUrl = (acc) => {
   inset: 0;
   background: 
     radial-gradient(
-      ellipse at center,
-      rgba(15, 15, 20, 0.35) 0%,
-      rgba(15, 15, 20, 0.65) 100%
+      ellipse 70% 70% at center,
+      rgba(15, 15, 20, 0.06) 0%,
+      rgba(15, 15, 20, 0.32) 50%,
+      rgba(15, 15, 20, 0.8) 100%
     ),
     linear-gradient(
       180deg,
-      rgba(18, 18, 24, 0.25) 0%,
-      rgba(18, 18, 24, 0.55) 100%
+      rgba(18, 18, 24, 0.1) 0%,
+      transparent 35%,
+      transparent 65%,
+      rgba(18, 18, 24, 0.45) 100%
     );
 }
 
@@ -675,7 +678,7 @@ const getSpotifyUrl = (acc) => {
   overflow: hidden;
   text-overflow: ellipsis;
   letter-spacing: -0.025em;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.95), 0 0 24px rgba(0, 0, 0, 0.85);
 }
 
 .hero-subline {
@@ -684,7 +687,8 @@ const getSpotifyUrl = (acc) => {
   gap: 8px;
   flex-wrap: wrap;
   font-size: 13.5px;
-  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+  color: var(--c-text-2, rgba(255, 255, 255, 0.85));
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.95), 0 0 16px rgba(0, 0, 0, 0.85);
 }
 
 .hero-handle {
