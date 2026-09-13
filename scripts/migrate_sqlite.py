@@ -107,8 +107,18 @@ def migrate_sqlite_db(db_path: str):
             ("auto_sync", "INTEGER DEFAULT 1"),
         ],
         "playlists": [
+            ("custom_cover_url", "TEXT"),
             ("pending_cover_url", "TEXT"),
             ("pending_cover_expires_at", "TIMESTAMP"),
+        ],
+        "user_library": [
+            ("is_disliked", "INTEGER DEFAULT 0"),
+            ("disliked_at", "TIMESTAMP"),
+        ],
+        "user_external_accounts": [
+            ("show_on_profile", "INTEGER DEFAULT 1"),
+            ("show_playlists", "INTEGER DEFAULT 1"),
+            ("show_tracks", "INTEGER DEFAULT 1"),
         ],
     }
 
@@ -138,6 +148,9 @@ def migrate_sqlite_db(db_path: str):
         ("idx_channel_message_track", "CREATE INDEX IF NOT EXISTS idx_channel_message_track ON channel_messages(track_id);"),
         ("idx_channel_message_status", "CREATE INDEX IF NOT EXISTS idx_channel_message_status ON channel_messages(channel_id, status);"),
         ("idx_tracks_normalized_artist", "CREATE INDEX IF NOT EXISTS idx_tracks_normalized_artist ON tracks(normalized_artist);"),
+        ("idx_album_tracks_track_id", "CREATE INDEX IF NOT EXISTS idx_album_tracks_track_id ON album_tracks(track_id);"),
+        ("idx_user_library_disliked", "CREATE INDEX IF NOT EXISTS idx_user_library_disliked ON user_library(user_id, is_disliked);"),
+        ("idx_tracks_public", "CREATE INDEX IF NOT EXISTS idx_tracks_public ON tracks(is_public);"),
     ]
     for idx_name, idx_sql in indexes:
         try:

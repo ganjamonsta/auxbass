@@ -219,6 +219,9 @@ async def _ensure_sqlite_columns(conn):
         await conn.exec_driver_sql(
             "CREATE INDEX IF NOT EXISTS idx_user_library_disliked ON user_library(user_id, is_disliked);"
         )
+        await conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS idx_tracks_public ON tracks(is_public);"
+        )
     except Exception:
         pass
 
