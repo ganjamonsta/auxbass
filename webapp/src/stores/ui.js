@@ -55,53 +55,20 @@ export const useUIStore = defineStore('ui', () => {
     info: (title, message) => showToast({ type: 'info', title, message }),
   }
 
-  // Sidebar collapse & overlay drawer state
+  // Sidebar collapse state
   const isSidebarCollapsed = ref(false)
-  const isSidebarOverlayOpen = ref(false)
   const isAutoCollapsed = ref(false)
   const userCollapsedPreference = ref(null) // null = auto, true/false = explicit user choice
-
-  const openSidebarOverlay = () => {
-    isSidebarOverlayOpen.value = true
-  }
-
-  const closeSidebarOverlay = () => {
-    isSidebarOverlayOpen.value = false
-  }
-
-  const toggleSidebarOverlay = () => {
-    isSidebarOverlayOpen.value = !isSidebarOverlayOpen.value
-  }
 
   const setSidebarCollapsed = (collapsed, manual = false) => {
     isSidebarCollapsed.value = collapsed
     if (manual) {
       userCollapsedPreference.value = collapsed
     }
-    if (!collapsed) {
-      isSidebarOverlayOpen.value = false
-    }
   }
 
   const toggleSidebarCollapse = () => {
-    if (isSidebarCollapsed.value) {
-      if (!isAutoCollapsed.value) {
-        setSidebarCollapsed(false, true)
-      } else {
-        toggleSidebarOverlay()
-      }
-    } else {
-      setSidebarCollapsed(true, true)
-    }
-  }
-
-  const pinSidebar = () => {
-    isSidebarOverlayOpen.value = false
-    setSidebarCollapsed(false, true)
-  }
-
-  const unpinSidebar = () => {
-    setSidebarCollapsed(true, true)
+    setSidebarCollapsed(!isSidebarCollapsed.value, true)
   }
 
   // Right NowPlayingSidebar visibility state
@@ -137,14 +104,8 @@ export const useUIStore = defineStore('ui', () => {
     setLibraryTab,
     // Left Sidebar state
     isSidebarCollapsed,
-    isSidebarOverlayOpen,
     isAutoCollapsed,
     userCollapsedPreference,
-    openSidebarOverlay,
-    closeSidebarOverlay,
-    toggleSidebarOverlay,
-    pinSidebar,
-    unpinSidebar,
     setSidebarCollapsed,
     toggleSidebarCollapse,
     // Right NowPlaying Sidebar state

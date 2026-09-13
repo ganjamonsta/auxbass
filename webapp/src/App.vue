@@ -305,7 +305,6 @@ const updateLayoutState = () => {
   isDesktop.value = width >= 768
 
   if (!isDesktop.value) {
-    uiStore.closeSidebarOverlay()
     return
   }
 
@@ -330,14 +329,11 @@ const updateLayoutState = () => {
 
   uiStore.isAutoCollapsed = isTightLeft
 
-  // If user hasn't explicitly chosen, auto-collapse based on available space
+  // Auto-collapse based on available space
   if (uiStore.userCollapsedPreference === null) {
     uiStore.setSidebarCollapsed(isTightLeft)
-  } else if (uiStore.userCollapsedPreference === false) {
-    // User explicitly pinned sidebar to layout: keep it pinned in desktop mode!
-    uiStore.setSidebarCollapsed(false)
   } else {
-    // User had collapsed it, but when window is stretched wide, allow it to adapt!
+    // When window is stretched wide, allow it to adapt!
     if (!isTightLeft) {
       uiStore.userCollapsedPreference = null
       uiStore.setSidebarCollapsed(false)
@@ -354,18 +350,8 @@ watch(() => playerStore.currentTrack, () => {
   }
 })
 
-// Auto-close overlay drawer on route change
-watch(() => route.path, () => {
-  if (uiStore.isSidebarOverlayOpen) {
-    uiStore.closeSidebarOverlay()
-  }
-})
-
-// Keyboard shortcuts: Esc to close overlay, Ctrl+B / Cmd+B to toggle left sidebar, Ctrl+J to toggle right sidebar
+// Keyboard shortcuts: Ctrl+B / Cmd+B to toggle left sidebar, Ctrl+J to toggle right sidebar
 const handleGlobalKeyDown = (e) => {
-  if (e.key === 'Escape' && uiStore.isSidebarOverlayOpen) {
-    uiStore.closeSidebarOverlay()
-  }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b' && isDesktop.value) {
     e.preventDefault()
     uiStore.toggleSidebarCollapse()
@@ -385,8 +371,7 @@ const appClasses = computed(() => ({
   'has-player': !!playerStore.currentTrack,
   'desktop-layout': isDesktop.value && authStore.isAuthenticated,
   'has-now-playing': isNowPlayingActive.value,
-  'sidebar-collapsed': isDesktop.value && authStore.isAuthenticated && uiStore.isSidebarCollapsed,
-  'sidebar-overlay-open': isDesktop.value && authStore.isAuthenticated && uiStore.isSidebarOverlayOpen
+  'sidebar-collapsed': isDesktop.value && authStore.isAuthenticated && uiStore.isSidebarCollapsed
 }))
 
 // Computed property for like state based on libraryStore.likedTracks + currentTrack
