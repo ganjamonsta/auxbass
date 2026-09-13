@@ -58,6 +58,27 @@ export function resumeAudioContext() {
   }
 }
 
+let analyserNode = null
+
+/**
+ * Get or create a lightweight WebAudio AnalyserNode for spectrum visualization.
+ * fftSize = 64 produces 32 frequency bins with virtually zero CPU overhead.
+ */
+export function getAudioAnalyser() {
+  if (!audioCtx || !masterGainNode) return null
+  if (!analyserNode) {
+    try {
+      analyserNode = audioCtx.createAnalyser()
+      analyserNode.fftSize = 64
+      analyserNode.smoothingTimeConstant = 0.8
+      masterGainNode.connect(analyserNode)
+    } catch (e) {
+      console.warn('[Audio Enhancer] Could not create analyser', e)
+    }
+  }
+  return analyserNode
+}
+
 /**
  * Connect (or re-connect) the given HTMLAudioElement to the processing graph.
  * Handles the one-source-per-element restriction via element tagging.

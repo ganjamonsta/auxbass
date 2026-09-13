@@ -486,36 +486,38 @@ const getSpotifyUrl = (acc) => {
 .hero-monolith-tabs {
   position: relative;
   z-index: 2;
-  width: 220px;
+  width: 215px;
   flex-shrink: 0;
   align-self: stretch;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  background: rgba(12, 12, 16, 0.74);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(10, 10, 14, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-radius: var(--r-xl, 24px) 0 0 var(--r-xl, 24px);
   border: none;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 16px 12px 16px 0;
-  gap: 6px;
+  border-right: 1px solid rgba(255, 255, 255, 0.09);
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
   box-shadow: 
-    4px 0 16px rgba(0, 0, 0, 0.35),
-    inset 1px 1px 2px rgba(255, 255, 255, 0.04);
+    6px 0 20px rgba(0, 0, 0, 0.4),
+    inset -1px 0 0 rgba(255, 255, 255, 0.03);
 }
 
 .monolith-tab-btn {
   display: flex;
   align-items: center;
+  flex: 1;
   width: 100%;
-  height: 40px;
-  padding: 0 14px 0 14px;
-  border-radius: 0 var(--r-md, 12px) var(--r-md, 12px) 0;
+  min-height: 40px;
+  padding: 0 16px 0 14px;
+  border-radius: 0;
   background: transparent;
-  border: 1px solid transparent;
-  border-left: 3.5px solid transparent;
-  color: var(--c-text-2, #b0b0b0);
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 4px solid transparent;
+  color: var(--c-text-2, #aaa);
   font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
@@ -525,44 +527,46 @@ const getSpotifyUrl = (acc) => {
   position: relative;
 }
 
+.monolith-tab-btn:last-child {
+  border-bottom: none;
+}
+
 .monolith-tab-btn:hover:not(.active) {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--c-text-1, #ffffff);
-  border-color: rgba(255, 255, 255, 0.08);
-  border-left-color: rgba(255, 255, 255, 0.25);
+  border-left-color: rgba(255, 255, 255, 0.3);
 }
 
 .monolith-tab-btn.active {
-  background: linear-gradient(135deg, rgba(28, 28, 35, 0.95) 0%, rgba(18, 18, 22, 0.95) 100%);
-  border-color: var(--c-accent, #1db954);
-  border-left: 3.5px solid var(--c-accent, #1db954);
+  background: linear-gradient(90deg, rgba(29, 185, 84, 0.16) 0%, rgba(24, 24, 30, 0.85) 50%, rgba(14, 14, 18, 0.85) 100%);
+  border-left: 4px solid var(--c-accent, #1db954);
   color: #ffffff;
   font-weight: 700;
   box-shadow: 
-    0 0 14px var(--c-accent-glow, rgba(29, 185, 84, 0.35)),
-    inset 0 1px 1px rgba(255, 255, 255, 0.1),
-    inset 1px 1px 3px var(--sh-inset-dark, rgba(0, 0, 0, 0.5));
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
 }
 
 .tab-edge-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
-  color: var(--c-text-2, #b0b0b0);
-  transition: color 0.15s;
+  color: var(--c-text-3, #888);
+  transition: color 0.15s, transform 0.15s;
 }
 
 .monolith-tab-btn.active .tab-edge-icon {
   color: var(--c-accent, #1db954);
+  transform: scale(1.05);
 }
 
 .tab-edge-divider {
   width: 1px;
   height: 16px;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
   margin: 0 10px;
   flex-shrink: 0;
   transition: background 0.15s, box-shadow 0.15s;
@@ -584,27 +588,28 @@ const getSpotifyUrl = (acc) => {
 .tab-edge-badge {
   font-size: 11px;
   font-weight: 700;
-  padding: 1px 7px;
+  padding: 1.5px 7px;
   border-radius: var(--r-full, 9999px);
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--c-text-2, #b0b0b0);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--c-text-3, #999);
   margin-left: 6px;
   flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .monolith-tab-btn.active .tab-edge-badge {
-  background: rgba(29, 185, 84, 0.2);
+  background: rgba(29, 185, 84, 0.18);
   color: var(--c-accent, #1db954);
+  border-color: rgba(29, 185, 84, 0.35);
 }
 
 /* SoundCloud Tab Accent */
 .monolith-tab-btn.sc-tab.active {
-  border-color: #ff5500;
+  background: linear-gradient(90deg, rgba(255, 85, 0, 0.18) 0%, rgba(28, 22, 22, 0.85) 50%, rgba(14, 14, 18, 0.85) 100%);
   border-left-color: #ff5500;
   box-shadow: 
-    0 0 14px rgba(255, 85, 0, 0.4),
-    inset 0 1px 1px rgba(255, 255, 255, 0.1),
-    inset 1px 1px 3px var(--sh-inset-dark, rgba(0, 0, 0, 0.5));
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
 }
 
 .monolith-tab-btn.sc-tab.active .tab-edge-divider {
@@ -619,6 +624,7 @@ const getSpotifyUrl = (acc) => {
 .monolith-tab-btn.sc-tab.active .tab-edge-badge {
   background: rgba(255, 85, 0, 0.2);
   color: #ff5500;
+  border-color: rgba(255, 85, 0, 0.4);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1077,26 +1083,35 @@ const getSpotifyUrl = (acc) => {
     border: none;
     border-right: 1px solid rgba(255, 255, 255, 0.08);
     border-bottom: none;
-    padding: 14px 4px 12px 0;
-    gap: 4px;
-    justify-content: flex-start;
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
   }
 
   .monolith-tab-btn {
+    flex: 1;
     width: 100%;
-    height: 38px;
+    min-height: 38px;
     padding: 0;
     justify-content: center;
-    border-radius: 0 var(--r-sm, 8px) var(--r-sm, 8px) 0;
-    border-left: 3px solid transparent;
+    border-radius: 0;
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-left: 3.5px solid transparent;
+  }
+
+  .monolith-tab-btn:last-child {
+    border-bottom: none;
   }
 
   .monolith-tab-btn.active {
-    border-left: 3px solid var(--c-accent, #1db954);
+    border-left: 3.5px solid var(--c-accent, #1db954);
+    background: linear-gradient(90deg, rgba(29, 185, 84, 0.2) 0%, rgba(24, 24, 30, 0.8) 100%);
   }
 
   .monolith-tab-btn.sc-tab.active {
     border-left-color: #ff5500;
+    background: linear-gradient(90deg, rgba(255, 85, 0, 0.22) 0%, rgba(28, 22, 22, 0.8) 100%);
   }
 
   .tab-edge-divider,

@@ -174,13 +174,11 @@
               </button>
             </div>
 
-            <div class="lcd-eq">
-              <div 
-                v-for="i in 18" 
-                :key="i" 
-                class="eq-bar"
-                :style="{ height: getEqHeight(i) + '%' }"
-              ></div>
+            <!-- Wide Stereo VFD Equalizer (CH-L / CH-R) -->
+            <div class="lcd-stereo-container" ref="eqContainer">
+              <span class="lcd-ch-tag left">L</span>
+              <canvas ref="eqCanvas" class="lcd-stereo-canvas"></canvas>
+              <span class="lcd-ch-tag right">R</span>
             </div>
             <div class="lcd-format-badge">
               <span v-if="playerStore.hdTrackInfo" class="badge-hd">HD 24-BIT</span>
@@ -260,6 +258,7 @@ import { getCoverUrl, CoverSize } from '@/utils'
 import { Play, Square, Pause, Volume2, VolumeX, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Share2, PanelRightClose, PanelRight } from 'lucide-vue-next'
 import { useNetworkMonitor } from '@/composables/useNetworkMonitor'
 import { useShare } from '@/composables/useShare'
+import { getAudioAnalyser } from '@/stores/playerEnhancer'
 import VfdSegmentDisplay from './VfdSegmentDisplay.vue'
 
 const playerStore = usePlayerStore()
@@ -577,21 +576,252 @@ const formatTime = (seconds) => {
   return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 
-// Equalizer animation
-const eqValues = ref(Array(18).fill(20))
+// Stereo VFD Spectrum Analyzer (Canvas)
+const eqCanvas = ref(null)
+const eqContainer = ref(null)
+let eqResizeObserver = null
+let eqAnimationId = null
+let isEqLoopRunning = false
 
-const getEqHeight = (index) => {
-  return eqValues.value[index - 1] || 15
+// Peak hold arrays and frequency buffer
+const freqBuffer = new Uint8Array(32)
+let peakHoldL = []
+let peakHoldR = []
+let peakAgeL = []
+let peakAgeR = []
+
+const PEAK_DECAY = 0.038
+const PEAK_HOLD_TICKS = 14
+
+const drawStereoEq = () => {
+  const canvas = eqCanvas.value
+  const container = eqContainer.value
+  if (!canvas || !container) return
+
+  const rect = canvas.getBoundingClientRect()
+  if (rect.width <= 0 || rect.height <= 0) return
+
+  const dpr = window.devicePixelRatio || 1
+  const displayW = Math.floor(rect.width)
+  const displayH = Math.floor(rect.height)
+
+  if (canvas.width !== displayW * dpr || canvas.height !== displayH * dpr) {
+    canvas.width = displayW * dpr
+    canvas.height = displayH * dpr
+  }
+
+  const ctx = canvas.getContext('2d')
+  ctx.save()
+  ctx.scale(dpr, dpr)
+  ctx.clearRect(0, 0, displayW, displayH)
+
+  // Layout parameters
+  const centerX = displayW / 2
+  const centerGap = 14 // Center divider gap
+  const channelWidth = Math.max(10, (displayW - centerGap) / 2)
+
+  const barWidth = 2.5
+  const barGap = 1.5
+  const step = barWidth + barGap
+  const numBars = Math.max(4, Math.min(32, Math.floor(channelWidth / step)))
+
+  // Ensure peak arrays match bar count
+  if (peakHoldL.length !== numBars) {
+    peakHoldL = new Array(numBars).fill(0)
+    peakHoldR = new Array(numBars).fill(0)
+    peakAgeL = new Array(numBars).fill(0)
+    peakAgeR = new Array(numBars).fill(0)
+  }
+
+  // Draw subtle center divider
+  ctx.fillStyle = 'rgba(0, 240, 255, 0.28)'
+  ctx.fillRect(centerX - 0.5, 2, 1, displayH - 4)
+
+  // Top and bottom filament dots on divider
+  ctx.fillStyle = 'rgba(0, 240, 255, 0.55)'
+  ctx.fillRect(centerX - 1, 0.5, 2, 1)
+  ctx.fillRect(centerX - 1, displayH - 1.5, 2, 1)
+
+  // Query audio levels
+  const { leftLevels, rightLevels } = getChannelLevels(numBars)
+
+  // VFD Segments config (4 segments per bar in 12px height)
+  const numSegments = 4
+  const segH = 1.8
+  const segGap = 1.0
+
+  // Draw Channel helper: bass near center, highs outward
+  const drawChannel = (isLeft) => {
+    const levels = isLeft ? leftLevels : rightLevels
+    const peakHold = isLeft ? peakHoldL : peakHoldR
+    const peakAge = isLeft ? peakAgeL : peakAgeR
+
+    for (let i = 0; i < numBars; i++) {
+      // i=0 is bass near center divider, increasing i spreads outward towards labels
+      const barX = isLeft
+        ? centerX - (centerGap / 2) - ((i + 1) * step) + barGap
+        : centerX + (centerGap / 2) + i * step
+
+      const rawVal = levels[i] || 0.05
+
+      // Update peak hold
+      if (rawVal >= peakHold[i]) {
+        peakHold[i] = rawVal
+        peakAge[i] = 0
+      } else {
+        peakAge[i]++
+        if (peakAge[i] > PEAK_HOLD_TICKS) {
+          peakHold[i] = Math.max(0, peakHold[i] - PEAK_DECAY)
+        }
+      }
+
+      const activeSegs = Math.round(rawVal * numSegments)
+      const peakSeg = Math.min(numSegments - 1, Math.floor(peakHold[i] * numSegments))
+
+      for (let s = 0; s < numSegments; s++) {
+        const segY = (displayH - 1) - (s + 1) * (segH + segGap) + segGap
+        const isLit = s < activeSegs
+        const isPeak = s === peakSeg && peakHold[i] > 0.12 && peakSeg >= activeSegs
+
+        if (isPeak) {
+          // Peak hold dot - bright electric cyan/white
+          ctx.fillStyle = '#ffffff'
+          ctx.shadowColor = '#00f0ff'
+          ctx.shadowBlur = 4
+          ctx.fillRect(barX, segY, barWidth, segH)
+          ctx.shadowBlur = 0
+        } else if (isLit) {
+          if (s === 0) ctx.fillStyle = '#0284c7'
+          else if (s === 1) ctx.fillStyle = '#0ea5e9'
+          else if (s === 2) ctx.fillStyle = '#38bdf8'
+          else ctx.fillStyle = '#00f0ff'
+          ctx.shadowColor = 'rgba(0, 240, 255, 0.45)'
+          ctx.shadowBlur = 2
+          ctx.fillRect(barX, segY, barWidth, segH)
+          ctx.shadowBlur = 0
+        } else {
+          // Unlit VFD segment mesh
+          ctx.fillStyle = 'rgba(0, 240, 255, 0.07)'
+          ctx.shadowBlur = 0
+          ctx.fillRect(barX, segY, barWidth, segH)
+        }
+      }
+    }
+  }
+
+  // Render both channels
+  drawChannel(true)
+  drawChannel(false)
+
+  ctx.restore()
 }
 
-let eqInterval = null
+// Audio frequency retriever with smooth realistic fallback
+const getChannelLevels = (numBars) => {
+  const left = new Float32Array(numBars)
+  const right = new Float32Array(numBars)
 
-const animateEq = () => {
-  if (isPlaying.value) {
-    eqValues.value = eqValues.value.map(() => Math.random() * 65 + 15)
-  } else {
-    eqValues.value = eqValues.value.map(() => 15)
+  if (!isPlaying.value) {
+    for (let i = 0; i < numBars; i++) {
+      left[i] = 0.04
+      right[i] = 0.04
+    }
+    return { leftLevels: left, rightLevels: right }
   }
+
+  const analyser = getAudioAnalyser()
+  let hasRealAudio = false
+
+  if (analyser) {
+    try {
+      analyser.getByteFrequencyData(freqBuffer)
+      let sum = 0
+      for (let i = 0; i < freqBuffer.length; i++) sum += freqBuffer[i]
+      if (sum > 60) hasRealAudio = true
+    } catch (_) {
+      hasRealAudio = false
+    }
+  }
+
+  const now = performance.now() / 1000
+
+  if (hasRealAudio) {
+    for (let i = 0; i < numBars; i++) {
+      const binIdx = Math.min(31, Math.floor((i / numBars) * 28))
+      const raw = freqBuffer[binIdx] / 255.0
+      const freqBoost = 1.0 + (i / numBars) * 0.9 // Treble compensation
+      const base = Math.min(0.98, raw * freqBoost)
+
+      // Stereo micro-variance between L & R
+      const varL = Math.sin(now * 3.5 + i * 0.7) * 0.07
+      const varR = Math.cos(now * 3.8 + i * 0.7) * 0.07
+
+      left[i] = Math.max(0.08, Math.min(0.98, base + varL))
+      right[i] = Math.max(0.08, Math.min(0.98, base + varR))
+    }
+  } else {
+    // Procedural rhythm synthesis: punchy kick + hi-hat shimmer + panning
+    const bpm = 126
+    const beat = (now * (bpm / 60)) % 1
+    const kick = Math.pow(Math.max(0, 1 - beat * 2.2), 3) // punchy bass transient
+    const snare = Math.pow(Math.max(0, 1 - ((beat + 0.5) % 1) * 2.5), 2)
+
+    for (let i = 0; i < numBars; i++) {
+      const freqRatio = i / numBars
+      let amp = 0.12
+
+      if (freqRatio < 0.28) {
+        // Sub/Bass
+        amp += kick * 0.72 + Math.sin(now * 5.0 + i) * 0.12
+      } else if (freqRatio < 0.65) {
+        // Mid
+        amp += snare * 0.48 + Math.sin(now * 8.5 + i * 1.4) * 0.18
+      } else {
+        // Highs
+        amp += Math.sin(now * 14.0 + i * 2.0) * 0.25 + (Math.sin(now * 30.0 + i * 3.0) * 0.15)
+      }
+
+      const pan = Math.sin(now * 2.2 + i * 0.5) * 0.14
+      left[i] = Math.max(0.08, Math.min(0.96, amp + pan))
+      right[i] = Math.max(0.08, Math.min(0.96, amp - pan))
+    }
+  }
+
+  return { leftLevels: left, rightLevels: right }
+}
+
+const startEqLoop = () => {
+  if (isEqLoopRunning) return
+  isEqLoopRunning = true
+  let lastTime = 0
+  const targetFpsInterval = 1000 / 45 // 45 FPS: smooth & ultra lightweight
+
+  const frame = (timestamp) => {
+    if (!isEqLoopRunning) return
+
+    if (timestamp - lastTime >= targetFpsInterval) {
+      lastTime = timestamp
+      drawStereoEq()
+    }
+
+    if (isPlaying.value) {
+      eqAnimationId = requestAnimationFrame(frame)
+    } else {
+      isEqLoopRunning = false
+      drawStereoEq()
+    }
+  }
+
+  eqAnimationId = requestAnimationFrame(frame)
+}
+
+const stopEqLoop = () => {
+  isEqLoopRunning = false
+  if (eqAnimationId) {
+    cancelAnimationFrame(eqAnimationId)
+    eqAnimationId = null
+  }
+  drawStereoEq()
 }
 
 // Like handler
@@ -601,6 +831,15 @@ const handleToggleLike = async () => {
     await libraryStore.toggleLike(track.value.id, current)
   }
 }
+
+// Watch playback state to start/stop visualizer loop
+watch(isPlaying, (playing) => {
+  if (playing) {
+    startEqLoop()
+  } else {
+    stopEqLoop()
+  }
+})
 
 // Watch for progress changes to redraw waveform
 watch(() => playerStore.progress, () => {
@@ -618,30 +857,47 @@ watch([track, duration], () => {
 
 const handleResize = () => {
   drawWaveform()
+  drawStereoEq()
 }
 
 let waveformResizeObserver = null
 
 onMounted(() => {
-  eqInterval = setInterval(animateEq, 100)
   nextTick(() => {
     drawWaveform()
+    drawStereoEq()
+
+    if (isPlaying.value) {
+      startEqLoop()
+    }
+
     if (waveformContainer.value && typeof ResizeObserver !== 'undefined') {
       waveformResizeObserver = new ResizeObserver(() => {
         drawWaveform()
       })
       waveformResizeObserver.observe(waveformContainer.value)
     }
+
+    if (eqContainer.value && typeof ResizeObserver !== 'undefined') {
+      eqResizeObserver = new ResizeObserver(() => {
+        drawStereoEq()
+      })
+      eqResizeObserver.observe(eqContainer.value)
+    }
   })
   window.addEventListener('resize', handleResize)
 })
 
 onUnmounted(() => {
+  stopEqLoop()
+  if (eqResizeObserver) {
+    eqResizeObserver.disconnect()
+    eqResizeObserver = null
+  }
   if (waveformResizeObserver) {
     waveformResizeObserver.disconnect()
     waveformResizeObserver = null
   }
-  clearInterval(eqInterval)
   window.removeEventListener('resize', handleResize)
   document.removeEventListener('mousemove', onVolumeMove)
   document.removeEventListener('mouseup', stopVolumeAdjust)
@@ -958,21 +1214,35 @@ onUnmounted(() => {
   height: 12px;
 }
 
-.lcd-eq {
+.lcd-stereo-container {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 5px;
   height: 12px;
+  flex: 1;
+  margin: 0 84px;
+  min-width: 0;
+  pointer-events: none;
 }
 
-.eq-bar {
-  width: 3px;
-  min-height: 2px;
-  background: linear-gradient(180deg, #00f0ff, #0284c7);
-  border-radius: 1px;
-  box-shadow: 0 0 4px rgba(0, 240, 255, 0.7);
-  transition: height 0.1s ease;
+.lcd-ch-tag {
+  font-family: 'Courier New', monospace;
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: rgba(0, 240, 255, 0.5);
+  text-shadow: 0 0 4px rgba(0, 240, 255, 0.4);
+  user-select: none;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.lcd-stereo-canvas {
+  flex: 1;
+  height: 12px;
+  min-width: 60px;
+  display: block;
 }
 
 .lcd-format-badge {
@@ -1408,9 +1678,9 @@ onUnmounted(() => {
     min-width: 28px;
   }
 
-  /* Reduce EQ bars to fit alongside mode chips and format badge */
-  .lcd-eq .eq-bar:nth-child(n+13) {
-    display: none;
+  /* Adjust stereo equalizer on compact widths */
+  .lcd-stereo-container {
+    margin: 0 6px 0 74px; /* Expand when format badge is hidden */
   }
 
   .lcd-format-badge {

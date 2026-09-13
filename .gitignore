@@ -127,3 +127,4 @@ tg_player.db.bak
 tg_player.db-shm
 .gitignore
 tg_player.db-wal
+webapp/src/stores/playerEnhancer.js
