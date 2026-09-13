@@ -56,6 +56,16 @@
       <div class="sidebar-subnav">
         <div 
           class="nav-subitem clickable" 
+          :class="{ active: route.name === 'library' && (!route.query.tab || route.query.tab === 'overview') }"
+          @click="goToLibraryTab('overview')"
+          title="Обзор медиатеки"
+        >
+          <LayoutGrid :size="15" />
+          <span>Обзор</span>
+        </div>
+
+        <div 
+          class="nav-subitem clickable" 
           :class="{ active: route.name === 'library' && route.query.tab === 'tracks' }"
           @click="goToLibraryTab('tracks')"
           title="Все треки медиатеки"
@@ -96,6 +106,18 @@
           <span>Альбомы</span>
         </div>
       </div>
+
+      <!-- Liked Tracks / Любимые треки -->
+      <router-link 
+        to="/liked" 
+        class="nav-item liked-highlight-item" 
+        :class="{ active: isActive('/liked') }"
+        title="Любимые треки"
+      >
+        <Heart :size="20" :fill="isActive('/liked') ? 'currentColor' : 'none'" />
+        <span>Любимые треки</span>
+        <span v-if="likedCount > 0" class="nav-count">{{ likedCount }}</span>
+      </router-link>
 
       <router-link to="/friends" class="nav-item" :class="{ active: isActive('/friends') }">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
@@ -227,7 +249,7 @@ import { useTasksStore } from '@/stores/tasks'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import { getCoverUrl, CoverSize, getPlaylistCoverStyle } from '@/utils'
-import { Download, FolderDown, Upload, Music, ListMusic, Mic2, Disc3, Search } from 'lucide-vue-next'
+import { Download, FolderDown, Upload, Music, ListMusic, Mic2, Disc3, Search, Heart, LayoutGrid } from 'lucide-vue-next'
 import { getCacheStats } from '@/utils/audioCacheDb'
 import ProfileMenu from '@/components/layout/ProfileMenu.vue'
 
@@ -350,6 +372,9 @@ onMounted(() => {
   window.addEventListener('playlist:changed', onPlaylistChanged)
   window.addEventListener('cache-updated', updateCachedStats)
   updateCachedStats()
+  if (!libraryStore.likedTracks?.length) {
+    libraryStore.fetchLikedTracks()
+  }
 })
 
 onUnmounted(() => {

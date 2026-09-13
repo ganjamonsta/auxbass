@@ -14,6 +14,12 @@
     <template v-else>
       <!-- Persistent Library Tabs Navigation (always visible across all tabs) -->
       <div class="library-persistent-nav" :class="{ 'search-active': isOverviewSearchOpen }">
+        <!-- Desktop Section Title -->
+        <h1 v-if="!isOverviewSearchOpen" class="library-desktop-title">
+          {{ currentTabTitle }}
+        </h1>
+
+        <!-- Mobile Tabs Navigation Pills -->
         <div v-if="!isOverviewSearchOpen" class="library-tabs-pills">
           <button 
             v-for="t in tabs" 
@@ -363,6 +369,23 @@ const applyRouteTab = () => {
 
 const currentTab = computed(() => tabs.find(t => t.id === currentTabId.value) || tabs[0])
 
+// Desktop section title
+const currentTabTitle = computed(() => {
+  switch (currentTabId.value) {
+    case 'tracks':
+      return 'Все треки'
+    case 'playlists':
+      return 'Плейлисты'
+    case 'albums':
+      return 'Альбомы'
+    case 'artists':
+      return 'Артисты'
+    case 'overview':
+    default:
+      return 'Библиотека'
+  }
+})
+
 const currentTabComponent = computed(() => {
   if (currentTabId.value === 'overview') {
     // If user is searching while on overview, render LibraryTracks with the query
@@ -651,6 +674,10 @@ onUnmounted(() => {
   justify-content: stretch;
 }
 
+.library-desktop-title {
+  display: none;
+}
+
 .library-tabs-pills {
   display: flex;
   align-items: center;
@@ -663,6 +690,26 @@ onUnmounted(() => {
 
 .library-tabs-pills::-webkit-scrollbar {
   display: none;
+}
+
+@media (min-width: 1024px) {
+  .library-tabs-pills {
+    display: none;
+  }
+
+  .library-desktop-title {
+    display: block;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--c-text-1, #fff);
+    margin: 0;
+    line-height: 1.2;
+  }
+
+  .subtab-header {
+    display: none;
+  }
 }
 
 .library-tab-pill {
