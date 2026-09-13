@@ -2,44 +2,108 @@
   <div class="profile-hero-card" :class="{ 'has-avatar-backdrop': !!userAvatar }">
     <div class="hero-ambient-glow" :style="ambientGlowStyle"></div>
 
-    <!-- Mobile Backdrop: Large Avatar in the background -->
+    <!-- Desktop Background: Left Avatar Backdrop with smooth gradient fade into card -->
+    <div class="hero-avatar-backdrop-left">
+      <img v-if="userAvatar" :src="userAvatar" alt="" class="backdrop-left-img" />
+      <div v-else class="backdrop-left-fallback" :style="avatarGradientStyle">
+        <span class="backdrop-left-initials">{{ initials }}</span>
+      </div>
+      <div class="backdrop-left-mask"></div>
+    </div>
+
+    <!-- Mobile Full Backdrop (on small screens) -->
     <div v-if="userAvatar" class="hero-mobile-backdrop">
       <img :src="userAvatar" alt="" class="hero-backdrop-img" />
       <div class="hero-backdrop-overlay"></div>
     </div>
 
-    <!-- Top-left camera button on mobile if self -->
+    <!-- Top-left camera button if self -->
     <button 
       v-if="isSelf" 
       class="hero-edit-corner-btn" 
       @click="$emit('edit')" 
       title="Изменить фото профиля"
     >
-      <Camera :size="17" />
+      <Camera :size="16" />
     </button>
 
-    <!-- Left: Full-Height Avatar -->
-    <div 
-      class="hero-avatar" 
-      :class="{ 'is-clickable': isSelf }"
-      :style="avatarGradientStyle"
-      @click="isSelf && $emit('edit')"
-      :title="isSelf ? 'Нажмите, чтобы изменить аватарку' : ''"
-    >
-      <img 
-        v-if="userAvatar" 
-        :src="userAvatar" 
-        alt="Avatar" 
-        class="hero-avatar-img" 
-      />
-      <span v-else class="hero-avatar-initials">{{ initials }}</span>
-      <div v-if="isSelf" class="hero-avatar-edit-overlay">
-        <Camera :size="26" />
-        <span class="edit-avatar-text">Изменить</span>
-      </div>
-    </div>
+    <!-- Top-right absolute share button -->
+    <button class="hero-share-corner-btn" @click="$emit('share')" title="Поделиться профилем">
+      <Share2 :size="18" />
+    </button>
 
-    <!-- Right: Info, Nickname, Stats, Actions -->
+    <!-- ═══ 1. LEFT COLUMN: Integrated Vertical Tabs ═══ -->
+    <nav class="hero-edge-tabs" aria-label="Разделы профиля">
+      <!-- Overview -->
+      <button
+        class="hero-edge-tab-btn"
+        :class="{ active: activeTab === 'overview' }"
+        @click="$emit('selectTab', 'overview')"
+        title="Обзор медиатеки"
+      >
+        <span class="tab-edge-icon"><Sparkles :size="16" /></span>
+        <span class="tab-edge-divider"></span>
+        <span class="tab-edge-label">Обзор</span>
+      </button>
+
+      <!-- Tracks -->
+      <button
+        class="hero-edge-tab-btn"
+        :class="{ active: activeTab === 'tracks' }"
+        @click="$emit('selectTab', 'tracks')"
+        title="Треки"
+      >
+        <span class="tab-edge-icon"><Music :size="16" /></span>
+        <span class="tab-edge-divider"></span>
+        <span class="tab-edge-label">Треки</span>
+        <span v-if="user.track_count > 0" class="tab-edge-badge">{{ user.track_count }}</span>
+      </button>
+
+      <!-- Playlists -->
+      <button
+        class="hero-edge-tab-btn"
+        :class="{ active: activeTab === 'playlists' }"
+        @click="$emit('selectTab', 'playlists')"
+        title="Плейлисты"
+      >
+        <span class="tab-edge-icon"><Folder :size="16" /></span>
+        <span class="tab-edge-divider"></span>
+        <span class="tab-edge-label">Плейлисты</span>
+        <span v-if="user.playlist_count > 0" class="tab-edge-badge">{{ user.playlist_count }}</span>
+      </button>
+
+      <!-- Albums -->
+      <button
+        v-if="overviewAlbumsCount > 0 || activeTab === 'albums'"
+        class="hero-edge-tab-btn"
+        :class="{ active: activeTab === 'albums' }"
+        @click="$emit('selectTab', 'albums')"
+        title="Альбомы"
+      >
+        <span class="tab-edge-icon"><Disc3 :size="16" /></span>
+        <span class="tab-edge-divider"></span>
+        <span class="tab-edge-label">Альбомы</span>
+        <span v-if="overviewAlbumsCount > 0" class="tab-edge-badge">{{ overviewAlbumsCount }}</span>
+      </button>
+
+      <!-- SoundCloud Tab -->
+      <button
+        v-if="scAccount && (scAccount.show_playlists || scAccount.show_tracks || isSelf)"
+        class="hero-edge-tab-btn sc-tab"
+        :class="{ active: activeTab === 'soundcloud' }"
+        @click="$emit('selectTab', 'soundcloud')"
+        title="SoundCloud"
+      >
+        <span class="tab-edge-icon sc-badge-inline">SC</span>
+        <span class="tab-edge-divider"></span>
+        <span class="tab-edge-label">SoundCloud</span>
+        <span v-if="scPlaylistsCount + scTracksCount > 0" class="tab-edge-badge sc-badge-num">
+          {{ scPlaylistsCount + scTracksCount }}
+        </span>
+      </button>
+    </nav>
+
+    <!-- ═══ 2. CENTER COLUMN: User Identity & Actions ═══ -->
     <div class="hero-body">
       <div class="hero-meta-top">
         <span class="hero-type-label">ПРОФИЛЬ</span>
@@ -53,31 +117,10 @@
 
       <div class="hero-subline">
         <span v-if="user.username" class="hero-handle">@{{ user.username }}</span>
-        <span v-if="user.username" class="stat-separator">•</span>
-        <!-- Stats -->
-        <button class="hero-stat-pill" @click="$emit('selectTab', 'tracks')" title="Смотреть треки">
-          <span class="stat-num">{{ user.track_count }}</span>
-          <span class="stat-label">{{ getTracksWord(user.track_count) }}</span>
-        </button>
-        <span class="stat-separator">•</span>
-        <button class="hero-stat-pill" @click="$emit('selectTab', 'playlists')" title="Смотреть плейлисты">
-          <span class="stat-num">{{ user.playlist_count }}</span>
-          <span class="stat-label">{{ getPlaylistsWord(user.playlist_count) }}</span>
-        </button>
-        <span class="stat-separator">•</span>
-        <div 
-          class="hero-stat-pill"
-          :class="{ 'clickable-stat': isSelf }"
-          @click="isSelf && $router.push('/friends')"
-          :title="isSelf ? 'Перейти к кентам' : ''"
-        >
-          <span class="stat-num">{{ user.followers_count }}</span>
-          <span class="stat-label">подписчиков</span>
-        </div>
+        <span v-if="user.username && (scAccount || spAccount)" class="stat-separator">•</span>
 
         <!-- External Connected Accounts Badges -->
         <template v-if="scAccount && (isSelf || scAccount.show_on_profile !== false)">
-          <span class="stat-separator">•</span>
           <a 
             class="hero-ext-badge sc-badge" 
             :href="getSoundCloudUrl(scAccount)" 
@@ -92,7 +135,7 @@
         </template>
 
         <template v-if="spAccount && (isSelf || spAccount.show_on_profile !== false)">
-          <span class="stat-separator">•</span>
+          <span v-if="scAccount && (isSelf || scAccount.show_on_profile !== false)" class="stat-separator">•</span>
           <a 
             class="hero-ext-badge sp-badge" 
             :href="getSpotifyUrl(spAccount)" 
@@ -106,11 +149,6 @@
           </a>
         </template>
       </div>
-
-      <!-- Top-right absolute share button -->
-      <button class="hero-share-corner-btn" @click="$emit('share')" title="Поделиться профилем">
-        <Share2 :size="18" />
-      </button>
 
       <!-- Action Buttons Bar -->
       <div class="hero-actions-bar">
@@ -167,6 +205,119 @@
         </button>
       </div>
     </div>
+
+    <!-- ═══ 3. RIGHT COLUMN: Informative Tab Details Panel ═══ -->
+    <aside class="hero-tab-details-panel" aria-label="Детали раздела">
+      <!-- Overview Tab Details -->
+      <div v-if="activeTab === 'overview'" class="tab-panel-inner tab-panel-overview">
+        <div class="panel-header">
+          <Sparkles :size="13" class="panel-header-icon" />
+          <span class="panel-header-title">Сводка медиатеки</span>
+        </div>
+        <div class="panel-stats-grid">
+          <button class="panel-stat-cell" @click="$emit('selectTab', 'tracks')" title="Смотреть треки">
+            <span class="panel-stat-num">{{ user.track_count }}</span>
+            <span class="panel-stat-lbl">{{ getTracksWord(user.track_count) }}</span>
+          </button>
+          <button class="panel-stat-cell" @click="$emit('selectTab', 'playlists')" title="Смотреть плейлисты">
+            <span class="panel-stat-num">{{ user.playlist_count }}</span>
+            <span class="panel-stat-lbl">{{ getPlaylistsWord(user.playlist_count) }}</span>
+          </button>
+          <button v-if="overviewAlbumsCount > 0" class="panel-stat-cell" @click="$emit('selectTab', 'albums')" title="Смотреть альбомы">
+            <span class="panel-stat-num">{{ overviewAlbumsCount }}</span>
+            <span class="panel-stat-lbl">альбомов</span>
+          </button>
+          <div 
+            class="panel-stat-cell" 
+            :class="{ 'is-clickable': isSelf }"
+            @click="isSelf && $router.push('/friends')"
+            :title="isSelf ? 'Перейти к кентам' : ''"
+          >
+            <span class="panel-stat-num">{{ user.followers_count }}</span>
+            <span class="panel-stat-lbl">подписчиков</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tracks Tab Details -->
+      <div v-else-if="activeTab === 'tracks'" class="tab-panel-inner tab-panel-tracks">
+        <div class="panel-header">
+          <Music :size="13" class="panel-header-icon" />
+          <span class="panel-header-title">Медиатека треков</span>
+        </div>
+        <div class="panel-highlight-row">
+          <span class="panel-big-num">{{ user.track_count }}</span>
+          <span class="panel-big-lbl">{{ getTracksWord(user.track_count) }} в базе</span>
+        </div>
+        <div class="panel-quick-actions" v-if="user.track_count > 0">
+          <button class="panel-action-btn primary" @click="$emit('play')" title="Слушать с начала">
+            <Play :size="13" fill="currentColor" />
+            <span>Слушать</span>
+          </button>
+          <button v-if="user.track_count > 1" class="panel-action-btn" @click="$emit('shuffle')" title="Перемешать">
+            <Shuffle :size="13" />
+            <span>Микс</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Playlists Tab Details -->
+      <div v-else-if="activeTab === 'playlists'" class="tab-panel-inner tab-panel-playlists">
+        <div class="panel-header">
+          <Folder :size="13" class="panel-header-icon" />
+          <span class="panel-header-title">Плейлисты</span>
+        </div>
+        <div class="panel-highlight-row">
+          <span class="panel-big-num">{{ user.playlist_count }}</span>
+          <span class="panel-big-lbl">{{ getPlaylistsWord(user.playlist_count) }} профиля</span>
+        </div>
+        <div class="panel-sub-desc">
+          <span>Персональные и публичные подборки треков</span>
+        </div>
+      </div>
+
+      <!-- Albums Tab Details -->
+      <div v-else-if="activeTab === 'albums'" class="tab-panel-inner tab-panel-albums">
+        <div class="panel-header">
+          <Disc3 :size="13" class="panel-header-icon" />
+          <span class="panel-header-title">Альбомы</span>
+        </div>
+        <div class="panel-highlight-row">
+          <span class="panel-big-num">{{ overviewAlbumsCount }}</span>
+          <span class="panel-big-lbl">сохраненных релизов</span>
+        </div>
+        <div class="panel-sub-desc">
+          <span>Дискография и релизы исполнителей</span>
+        </div>
+      </div>
+
+      <!-- SoundCloud Tab Details -->
+      <div v-else-if="activeTab === 'soundcloud'" class="tab-panel-inner tab-panel-sc">
+        <div class="panel-header sc-color">
+          <span class="sc-badge-inline">SC</span>
+          <span class="panel-header-title">SoundCloud</span>
+        </div>
+        <div class="panel-highlight-row" v-if="scAccount">
+          <span class="panel-sc-user">@{{ scAccount.username }}</span>
+        </div>
+        <div class="panel-sc-counts">
+          <span>{{ scTracksCount }} треков</span>
+          <span class="stat-separator">•</span>
+          <span>{{ scPlaylistsCount }} плейлистов</span>
+        </div>
+        <a 
+          v-if="scAccount" 
+          :href="getSoundCloudUrl(scAccount)" 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          class="panel-sc-link-btn"
+          title="Открыть профиль SoundCloud"
+        >
+          <span>В SoundCloud</span>
+          <ExternalLink :size="11" />
+        </a>
+      </div>
+    </aside>
   </div>
 </template>
 
@@ -184,6 +335,10 @@ import {
   Edit3,
   Radio,
   ExternalLink,
+  Sparkles,
+  Music,
+  Folder,
+  Disc3,
 } from 'lucide-vue-next'
 
 defineProps({
@@ -197,6 +352,10 @@ defineProps({
   ambientGlowStyle: { type: Object, default: () => ({}) },
   scAccount: { type: Object, default: null },
   spAccount: { type: Object, default: null },
+  activeTab: { type: String, default: 'overview' },
+  overviewAlbumsCount: { type: Number, default: 0 },
+  scPlaylistsCount: { type: Number, default: 0 },
+  scTracksCount: { type: Number, default: 0 },
 })
 
 defineEmits(['play', 'shuffle', 'follow', 'edit', 'share', 'selectTab'])
@@ -221,21 +380,23 @@ const getSpotifyUrl = (acc) => {
 </script>
 
 <style scoped>
-/* Modern Profile Hero Card */
+/* ─── Profile Hero Card Container ─── */
 .profile-hero-card {
   position: relative;
   overflow: hidden;
-  border-radius: 24px;
+  border-radius: var(--r-xl, 24px);
   background: var(--c-bg-2, #181818);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 28px 32px;
-  margin-bottom: 28px;
+  padding: 24px 28px;
+  margin-bottom: 24px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
   display: flex;
   align-items: center;
-  gap: 32px;
+  justify-content: space-between;
+  gap: 24px;
 }
 
+/* Ambient glow */
 .hero-ambient-glow {
   position: absolute;
   top: -60px;
@@ -247,80 +408,258 @@ const getSpotifyUrl = (acc) => {
   filter: blur(28px);
 }
 
-.hero-avatar {
-  position: relative;
-  width: 176px;
-  height: 176px;
-  min-width: 176px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 56px;
-  font-weight: 800;
-  color: #fff;
-  flex-shrink: 0;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  border: 3px solid rgba(255, 255, 255, 0.14);
+/* ─── Background Avatar on the Left Edge ─── */
+.hero-avatar-backdrop-left {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 440px;
+  pointer-events: none;
+  z-index: 0;
   overflow: hidden;
-  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
-  z-index: 1;
 }
 
-.hero-avatar.is-clickable {
-  cursor: pointer;
-}
-
-.hero-avatar.is-clickable:hover {
-  transform: scale(1.02);
-  border-color: var(--c-accent, #1db954);
-  box-shadow: 0 12px 36px rgba(29, 185, 84, 0.3);
-}
-
-.hero-avatar-img {
+.backdrop-left-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 50%;
+  object-position: center;
+  filter: brightness(0.55) saturate(1.15);
 }
 
-.hero-avatar-initials {
+.backdrop-left-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.45;
+}
+
+.backdrop-left-initials {
+  font-size: 88px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.12);
   user-select: none;
 }
 
-.hero-avatar-edit-overlay {
+.backdrop-left-mask {
   position: absolute;
   inset: 0;
+  background: 
+    linear-gradient(
+      90deg, 
+      rgba(24, 24, 24, 0.4) 0%, 
+      rgba(24, 24, 24, 0.75) 52%, 
+      var(--c-bg-2, #181818) 100%
+    ),
+    linear-gradient(
+      180deg, 
+      rgba(24, 24, 24, 0.2) 0%, 
+      rgba(24, 24, 24, 0.6) 100%
+    );
+}
+
+/* Edit corner button (top-left) */
+.hero-edit-corner-btn {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(2px);
+  background: rgba(22, 22, 26, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--c-text-2, #aaa);
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  cursor: pointer;
+  z-index: 4;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.hero-edit-corner-btn:hover {
   color: #fff;
-  opacity: 0;
-  transition: opacity 0.2s ease;
+  background: rgba(40, 40, 48, 0.9);
+  border-color: var(--c-accent, #1db954);
+  transform: scale(1.06);
 }
 
-.edit-avatar-text {
-  font-size: 12px;
+/* Top-right share button */
+.hero-share-corner-btn {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(22, 22, 26, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--c-text-2, #aaa);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 4;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.hero-share-corner-btn:hover {
+  color: #fff;
+  background: rgba(40, 40, 48, 0.85);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: scale(1.06);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   1. LEFT COLUMN: Integrated Edge Vertical Tabs
+   ═══════════════════════════════════════════════════════════ */
+.hero-edge-tabs {
+  position: relative;
+  z-index: 2;
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+.hero-edge-tab-btn {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 38px;
+  padding: 0 12px 0 10px;
+  border-radius: var(--r-md, 12px);
+  background: rgba(20, 20, 24, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: var(--c-text-2, #b0b0b0);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  user-select: none;
+  box-shadow: 2px 2px 5px var(--sh-dark, rgba(0, 0, 0, 0.5)), -1px -1px 2px var(--sh-light, rgba(255, 255, 255, 0.03));
+  transition: all 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.hero-edge-tab-btn:hover {
+  background: rgba(36, 36, 42, 0.85);
+  color: var(--c-text-1, #ffffff);
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: translateX(2px);
+}
+
+.hero-edge-tab-btn.active {
+  background: var(--c-bg-0, #0d0d0d);
+  border-color: var(--c-accent, #1db954);
+  color: #ffffff;
   font-weight: 700;
+  box-shadow: 
+    inset 2px 2px 4px var(--sh-inset-dark, rgba(0, 0, 0, 0.6)),
+    inset -1px -1px 2px var(--sh-inset-light, rgba(255, 255, 255, 0.03)),
+    0 0 10px var(--c-accent-glow, rgba(29, 185, 84, 0.35));
 }
 
-.hero-avatar.is-clickable:hover .hero-avatar-edit-overlay {
-  opacity: 1;
+.tab-edge-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  color: var(--c-text-2, #b0b0b0);
+  transition: color 0.15s;
 }
 
+.hero-edge-tab-btn.active .tab-edge-icon {
+  color: var(--c-accent, #1db954);
+}
+
+.tab-edge-divider {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 10px;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.hero-edge-tab-btn.active .tab-edge-divider {
+  background: var(--c-accent, #1db954);
+  box-shadow: 0 0 6px var(--c-accent-glow, rgba(29, 185, 84, 0.5));
+}
+
+.tab-edge-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tab-edge-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: var(--r-full, 9999px);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--c-text-2, #b0b0b0);
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+
+.hero-edge-tab-btn.active .tab-edge-badge {
+  background: rgba(29, 185, 84, 0.2);
+  color: var(--c-accent, #1db954);
+}
+
+/* SoundCloud Tab Accent */
+.hero-edge-tab-btn.sc-tab.active {
+  border-color: #ff5500;
+  box-shadow: 
+    inset 2px 2px 4px var(--sh-inset-dark, rgba(0, 0, 0, 0.6)),
+    inset -1px -1px 2px var(--sh-inset-light, rgba(255, 255, 255, 0.03)),
+    0 0 12px rgba(255, 85, 0, 0.4);
+}
+
+.hero-edge-tab-btn.sc-tab.active .tab-edge-divider {
+  background: #ff5500;
+  box-shadow: 0 0 6px rgba(255, 85, 0, 0.6);
+}
+
+.hero-edge-tab-btn.sc-tab.active .tab-edge-icon {
+  color: #ff5500;
+}
+
+.hero-edge-tab-btn.sc-tab.active .tab-edge-badge {
+  background: rgba(255, 85, 0, 0.2);
+  color: #ff5500;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   2. CENTER COLUMN: User Info, Links & Controls
+   ═══════════════════════════════════════════════════════════ */
 .hero-body {
+  position: relative;
+  z-index: 2;
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 12px;
-  z-index: 1;
+  gap: 10px;
 }
 
 .hero-meta-top {
@@ -360,7 +699,7 @@ const getSpotifyUrl = (acc) => {
 }
 
 .hero-name {
-  font-size: 38px;
+  font-size: 34px;
   font-weight: 800;
   color: var(--c-text-1, #fff);
   margin: 0;
@@ -387,108 +726,9 @@ const getSpotifyUrl = (acc) => {
   font-weight: 600;
 }
 
-.hero-stat-pill {
-  background: none;
-  border: none;
-  padding: 0;
-  display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
-  font-size: 13.5px;
-  color: var(--c-text-2, rgba(255, 255, 255, 0.75));
-  cursor: pointer;
-  transition: color 0.15s ease;
-}
-
-.hero-stat-pill:hover {
-  color: var(--c-accent, #1db954);
-}
-
-.stat-num {
-  font-weight: 700;
-  color: var(--c-text-1, #fff);
-  font-size: 14px;
-}
-
 .stat-separator {
   color: rgba(255, 255, 255, 0.25);
   font-size: 11px;
-}
-
-.hero-actions-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 4px;
-}
-
-.hero-share-corner-btn {
-  position: absolute;
-  top: 24px;
-  right: 24px;
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: var(--c-text-1, #fff);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 5;
-  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-}
-
-.hero-share-corner-btn:hover {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.25);
-  transform: scale(1.06);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
-}
-
-.hero-share-corner-btn:active {
-  transform: scale(0.96);
-}
-
-.hero-play-capsule {
-  flex-shrink: 0;
-}
-
-.hero-pill-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: var(--c-text-1, #fff);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  flex-shrink: 0;
-  padding: 0;
-}
-
-.hero-pill-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.22);
-  transform: scale(1.06);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
-}
-
-.hero-pill-btn:active:not(:disabled) {
-  transform: scale(0.96);
-}
-
-.hero-pill-btn.follow-btn.is-following {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--c-accent, #1db954);
-  border-color: rgba(29, 185, 84, 0.3);
 }
 
 /* External Account Badges */
@@ -580,28 +820,282 @@ const getSpotifyUrl = (acc) => {
   transform: scale(1.18);
 }
 
-/* Mobile backdrop & edit button base */
+/* Action Buttons Bar */
+.hero-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.hero-play-capsule {
+  flex-shrink: 0;
+}
+
+.hero-pill-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--c-text-1, #fff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.hero-pill-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.22);
+  transform: scale(1.06);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+.hero-pill-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.hero-pill-btn.follow-btn.is-following {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--c-accent, #1db954);
+  border-color: rgba(29, 185, 84, 0.3);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   3. RIGHT COLUMN: Informative Tab Details Panel
+   ═══════════════════════════════════════════════════════════ */
+.hero-tab-details-panel {
+  position: relative;
+  z-index: 2;
+  width: 250px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: rgba(18, 18, 22, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--r-lg, 16px);
+  padding: 14px 16px;
+  box-shadow: 
+    inset 1px 1px 3px var(--sh-inset-dark, rgba(0, 0, 0, 0.5)), 
+    inset -1px -1px 2px var(--sh-inset-light, rgba(255, 255, 255, 0.03));
+}
+
+.tab-panel-inner {
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--c-text-3, #777);
+  margin-bottom: 8px;
+}
+
+.panel-header-icon {
+  color: var(--c-accent, #1db954);
+  flex-shrink: 0;
+}
+
+.panel-header.sc-color .panel-header-icon {
+  color: #ff5500;
+}
+
+.panel-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.panel-stat-cell {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: var(--r-sm, 8px);
+  padding: 5px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  transition: all 0.15s ease;
+}
+
+.panel-stat-cell:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.panel-stat-num {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--c-text-1, #fff);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.panel-stat-lbl {
+  font-size: 10.5px;
+  color: var(--c-text-3, #888);
+  margin-top: 1px;
+}
+
+.panel-highlight-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.panel-big-num {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--c-text-1, #fff);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.panel-big-lbl {
+  font-size: 12.5px;
+  color: var(--c-text-2, #aaa);
+}
+
+.panel-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.panel-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--r-full, 9999px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--c-text-1, #fff);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.panel-action-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.panel-action-btn.primary {
+  background: var(--c-accent, #1db954);
+  color: #000;
+  border-color: var(--c-accent, #1db954);
+  font-weight: 700;
+}
+
+.panel-action-btn.primary:hover {
+  background: var(--c-accent-light, #1ed760);
+  box-shadow: 0 2px 10px var(--c-accent-glow, rgba(29, 185, 84, 0.4));
+}
+
+.panel-sub-desc {
+  font-size: 12px;
+  color: var(--c-text-3, #777);
+  margin-top: 6px;
+  line-height: 1.35;
+}
+
+.panel-sc-user {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ff5500;
+}
+
+.panel-sc-counts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--c-text-2, #aaa);
+  margin-top: 4px;
+}
+
+.panel-sc-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--r-full, 9999px);
+  background: #ff5500;
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-decoration: none;
+  margin-top: 10px;
+  transition: all 0.15s ease;
+  width: fit-content;
+}
+
+.panel-sc-link-btn:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+  color: #fff;
+}
+
+/* Mobile backdrop styles */
 .hero-mobile-backdrop {
   display: none;
 }
 
-.hero-edit-corner-btn {
-  display: none;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  .profile-hero-card {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    padding: 24px 20px;
-    gap: 18px;
-    max-width: 100%;
-    box-sizing: border-box;
+/* ═══════════════════════════════════════════════════════════
+   RESPONSIVE LAYOUT
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 1080px) {
+  .hero-tab-details-panel {
+    width: 220px;
+    padding: 12px 14px;
   }
 
-  /* Backdrop: Large avatar on mobile */
+  .hero-edge-tabs {
+    width: 175px;
+  }
+
+  .hero-name {
+    font-size: 28px;
+  }
+}
+
+@media (max-width: 860px) {
+  .profile-hero-card {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 22px 18px 18px;
+    gap: 16px;
+  }
+
+  .hero-avatar-backdrop-left {
+    display: none;
+  }
+
   .hero-mobile-backdrop {
     display: block;
     position: absolute;
@@ -616,177 +1110,85 @@ const getSpotifyUrl = (acc) => {
     height: 100%;
     object-fit: cover;
     object-position: center 20%;
-    filter: brightness(0.55) saturate(1.15);
+    filter: brightness(0.45) saturate(1.15);
     transform: scale(1.04);
   }
 
   .hero-backdrop-overlay {
     position: absolute;
     inset: 0;
-    background: 
-      linear-gradient(
-        180deg,
-        rgba(10, 14, 20, 0.3) 0%,
-        rgba(10, 14, 20, 0.65) 45%,
-        rgba(10, 14, 20, 0.92) 80%,
-        var(--c-bg-2, #181818) 100%
-      ),
-      radial-gradient(
-        ellipse at top,
-        rgba(0, 0, 0, 0.1) 0%,
-        rgba(0, 0, 0, 0.55) 100%
-      );
-  }
-
-  /* Corner edit button for mobile when isSelf */
-  .hero-edit-corner-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: absolute;
-    top: 24px;
-    left: 24px;
-    width: 42px;
-    height: 42px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: var(--c-text-1, #fff);
-    cursor: pointer;
-    z-index: 5;
-    transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-  }
-
-  .hero-edit-corner-btn:hover {
-    background: rgba(255, 255, 255, 0.16);
-    border-color: rgba(255, 255, 255, 0.25);
-    transform: scale(1.06);
-  }
-
-  .hero-edit-corner-btn:active {
-    transform: scale(0.96);
-  }
-
-  /* When avatar is in the background, hide duplicate circle avatar & elevate card layout */
-  .profile-hero-card.has-avatar-backdrop {
-    padding: 36px 20px 24px;
-    min-height: 230px;
-    justify-content: flex-end;
-  }
-
-  .profile-hero-card.has-avatar-backdrop .hero-avatar {
-    display: none;
-  }
-
-  .profile-hero-card.has-avatar-backdrop .hero-name {
-    font-size: 28px;
-    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.9);
-  }
-
-  .profile-hero-card.has-avatar-backdrop .hero-meta-top,
-  .profile-hero-card.has-avatar-backdrop .hero-subline,
-  .profile-hero-card.has-avatar-backdrop .hero-stat-pill {
-    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.95);
-  }
-
-  .profile-hero-card.has-avatar-backdrop .hero-ambient-glow {
-    opacity: 0.35;
-  }
-
-  .hero-avatar {
-    width: 110px;
-    height: 110px;
-    min-width: 110px;
-    font-size: 38px;
+    background: linear-gradient(
+      180deg,
+      rgba(10, 14, 20, 0.3) 0%,
+      rgba(10, 14, 20, 0.7) 45%,
+      rgba(10, 14, 20, 0.94) 85%,
+      var(--c-bg-2, #181818) 100%
+    );
   }
 
   .hero-body {
     align-items: center;
+    text-align: center;
     width: 100%;
-    max-width: 100%;
   }
 
-  .hero-meta-top {
-    justify-content: center;
-  }
-
-  .hero-name {
-    font-size: 26px;
-    max-width: 100%;
-  }
-
-  .hero-subline {
-    justify-content: center;
-    max-width: 100%;
-  }
-
+  .hero-meta-top,
+  .hero-subline,
   .hero-actions-bar {
     justify-content: center;
+  }
+
+  .hero-edge-tabs {
+    flex-direction: row;
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    gap: 8px;
+  }
+
+  .hero-edge-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hero-edge-tab-btn {
+    width: auto;
+    flex-shrink: 0;
+    padding: 0 14px 0 12px;
+  }
+
+  .hero-tab-details-panel {
+    width: 100%;
   }
 }
 
 @media (max-width: 600px) {
   .profile-hero-card {
-    padding: 18px 16px;
+    padding: 18px 14px 14px;
   }
 
-  .profile-hero-card.has-avatar-backdrop {
-    padding: 28px 16px 20px;
-    min-height: 210px;
+  .hero-name {
+    font-size: 24px;
   }
 
   .hero-edit-corner-btn,
   .hero-share-corner-btn {
-    top: 16px;
-    width: 38px;
-    height: 38px;
+    top: 14px;
+    width: 34px;
+    height: 34px;
   }
 
   .hero-edit-corner-btn {
-    left: 16px;
+    left: 14px;
   }
 
   .hero-share-corner-btn {
-    right: 16px;
-  }
-
-  .hero-avatar {
-    width: 72px;
-    height: 72px;
-    min-width: 72px;
-    font-size: 26px;
-  }
-
-  .hero-name {
-    font-size: 22px;
-  }
-
-  .profile-hero-card.has-avatar-backdrop .hero-name {
-    font-size: 24px;
+    right: 14px;
   }
 
   .hero-actions-bar {
     gap: 8px;
-  }
-}
-
-@media (max-width: 480px) {
-  .profile-hero-card.has-avatar-backdrop {
-    padding: 24px 14px 18px;
-  }
-
-  .profile-hero-card.has-avatar-backdrop .hero-name {
-    font-size: 23px;
-  }
-
-  .hero-avatar {
-    width: 64px;
-    height: 64px;
-    min-width: 64px;
-    font-size: 24px;
   }
 }
 </style>

@@ -27,7 +27,7 @@
 
     <!-- Normal Profile View -->
     <template v-else>
-      <!-- Hero Card -->
+      <!-- Hero Card with integrated edge tabs & details panel -->
       <ProfileHeroCard
         :user="user"
         :isSelf="isSelf"
@@ -39,6 +39,10 @@
         :ambientGlowStyle="ambientGlowStyle"
         :scAccount="scAccount"
         :spAccount="spAccount"
+        :activeTab="activeTab"
+        :overviewAlbumsCount="overviewAlbums.length"
+        :scPlaylistsCount="scPlaylists.length"
+        :scTracksCount="scTracks.length"
         @play="handlePlayUserLibrary"
         @shuffle="handleShuffleUserLibrary"
         @follow="toggleFollow"
@@ -53,63 +57,6 @@
         @restore="handleRestoreJob"
         @cancel="handleCancelJob"
       />
-
-      <!-- Modern Single-Line Tab Bar -->
-      <div class="user-tabs-bar">
-        <button
-          class="user-tab-btn"
-          :class="{ active: activeTab === 'overview' }"
-          @click="selectTab('overview')"
-        >
-          <Sparkles :size="16" />
-          <span>Обзор</span>
-        </button>
-
-        <button
-          class="user-tab-btn"
-          :class="{ active: activeTab === 'tracks' }"
-          @click="selectTab('tracks')"
-        >
-          <Music :size="16" />
-          <span>Треки</span>
-          <span v-if="user.track_count > 0" class="user-tab-badge">{{ user.track_count }}</span>
-        </button>
-
-        <button
-          class="user-tab-btn"
-          :class="{ active: activeTab === 'playlists' }"
-          @click="selectTab('playlists')"
-        >
-          <Folder :size="16" />
-          <span>Плейлисты</span>
-          <span v-if="user.playlist_count > 0" class="user-tab-badge">{{ user.playlist_count }}</span>
-        </button>
-
-        <button
-          v-if="overviewAlbums.length > 0 || activeTab === 'albums'"
-          class="user-tab-btn"
-          :class="{ active: activeTab === 'albums' }"
-          @click="selectTab('albums')"
-        >
-          <Disc3 :size="16" />
-          <span>Альбомы</span>
-          <span v-if="overviewAlbums.length > 0" class="user-tab-badge">{{ overviewAlbums.length }}</span>
-        </button>
-
-        <!-- SoundCloud Tab -->
-        <button
-          v-if="scAccount && (scAccount.show_playlists || scAccount.show_tracks || isSelf)"
-          class="user-tab-btn sc-tab-btn"
-          :class="{ active: activeTab === 'soundcloud' }"
-          @click="selectTab('soundcloud')"
-        >
-          <span class="sc-badge-inline">SC</span>
-          <span>SoundCloud</span>
-          <span v-if="scPlaylists.length + scTracks.length > 0" class="user-tab-badge sc-badge-num">
-            {{ scPlaylists.length + scTracks.length }}
-          </span>
-        </button>
-      </div>
 
       <!-- Overview Tab Content -->
       <div v-show="activeTab === 'overview'" class="tab-pane">
