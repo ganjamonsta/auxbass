@@ -11,10 +11,12 @@ from urllib.parse import parse_qsl, unquote
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 
+import logging
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Header, Depends, Response, UploadFile, File
 from pydantic import BaseModel
 import jwt
+from aiogram.types import BufferedInputFile
 
 from shared.config import get_settings
 from shared.database import get_session, get_db
@@ -26,6 +28,8 @@ from api.schemas.auth import (
     CodeVerify,
     CodeGenerated,
 )
+
+logger = logging.getLogger(__name__)
 
 AVATARS_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "avatars"
 AVATARS_DIR.mkdir(parents=True, exist_ok=True)
@@ -629,12 +633,52 @@ async def upload_avatar(
             except OSError:
                 pass
 
-    filename = f"avatar_{user.id}_{int(datetime.now(timezone.utc).timestamp())}.{ext}"
-    filepath = AVATARS_DIR / filename
-    with open(filepath, "wb") as f:
-        f.write(content)
+    avatar_url = None
 
-    avatar_url = f"/api/avatars/{filename}"
+    # Upload directly to user's Telegram channel or PM (same as playlist covers)
+    if settings.bot_token and settings.bot_token != "dummy":
+        user_channel = await db.scalar(
+            select(UserChannel).where(UserChannel.user_id == user.id, UserChannel.is_active == True)
+        )
+        target_chat_id = user_channel.channel_id if user_channel else user.id
+        caption = f"👤 <b>Аватар профиля</b>: {db_user.display_name}\n\n#profile #avatar"
+
+        try:
+            from api.routers.images import _get_bot
+            bot = _get_bot()
+            sent_msg = None
+            try:
+                sent_msg = await bot.send_photo(
+                    chat_id=target_chat_id,
+                    photo=BufferedInputFile(file=content, filename=file.filename or f"avatar.{ext}"),
+                    caption=caption,
+                )
+            except Exception as e:
+                logger.warning(f"Failed to upload avatar to target channel {target_chat_id}: {e}")
+                if user_channel and target_chat_id != user.id:
+                    sent_msg = await bot.send_photo(
+                        chat_id=user.id,
+                        photo=BufferedInputFile(file=content, filename=file.filename or f"avatar.{ext}"),
+                        caption=caption,
+                    )
+                else:
+                    raise
+
+            photos = sent_msg.photo or [] if sent_msg else []
+            if photos:
+                file_id = photos[-1].file_id
+                avatar_url = f"/api/images/{file_id}"
+        except Exception as e:
+            logger.warning(f"Failed to upload avatar to Telegram: {e}. Falling back to local storage.")
+
+    # Fallback to local storage if Telegram upload was not available or failed
+    if not avatar_url:
+        filename = f"avatar_{user.id}_{int(datetime.now(timezone.utc).timestamp())}.{ext}"
+        filepath = AVATARS_DIR / filename
+        with open(filepath, "wb") as f:
+            f.write(content)
+        avatar_url = f"/api/avatars/{filename}"
+
     db_user.custom_avatar_url = avatar_url
     await db.commit()
     await db.refresh(db_user)
