@@ -44,8 +44,21 @@ export const useAuthStore = defineStore('auth', () => {
     
     try {
       // Validate existing auth
+      const prevUser = authStorage.getUser()
       const response = await authApi.validate()
       if (response.data?.user) {
+        if (prevUser && prevUser.id !== response.data.user.id) {
+          // Different user logged in - wipe stale cache
+          try {
+            apiCache.clear()
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+              const k = localStorage.key(i)
+              if (k && (k.startsWith('tg_player_cached_') || k.startsWith('library-') || k.startsWith('global-'))) {
+                localStorage.removeItem(k)
+              }
+            }
+          } catch (_) {}
+        }
         user.value = response.data.user
         authStorage.setUser(response.data.user)
       }
@@ -142,6 +155,18 @@ export const useAuthStore = defineStore('auth', () => {
         authStorage.setToken(response.data.token)
       }
       if (response.data?.user) {
+        const prevUser = authStorage.getUser()
+        if (prevUser && prevUser.id !== response.data.user.id) {
+          try {
+            apiCache.clear()
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+              const k = localStorage.key(i)
+              if (k && (k.startsWith('tg_player_cached_') || k.startsWith('library-') || k.startsWith('global-'))) {
+                localStorage.removeItem(k)
+              }
+            }
+          } catch (_) {}
+        }
         user.value = response.data.user
         authStorage.setUser(response.data.user)
       }
@@ -165,6 +190,16 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     initialized.value = false
     error.value = null
+    try {
+      localStorage.removeItem(CHANNEL_STATUS_KEY)
+      apiCache.clear()
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i)
+        if (k && (k.startsWith('tg_player_cached_') || k.startsWith('library-') || k.startsWith('global-'))) {
+          localStorage.removeItem(k)
+        }
+      }
+    } catch (_) {}
   }
 
   async function refreshUser() {

@@ -141,7 +141,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { useAuthStore } from '@/stores/auth'
@@ -451,6 +451,11 @@ const onPlaylistChanged = () => {
 onMounted(() => {
   loadLikedCount()
   window.addEventListener('playlist:changed', onPlaylistChanged)
+})
+
+onActivated(() => {
+  loadLikedCount()
+  virtualGridRef.value?.reset()
 })
 
 onUnmounted(() => {

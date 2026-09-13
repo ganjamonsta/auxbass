@@ -5,14 +5,26 @@ import apiCache from '../utils/apiCache'
 import { getAllCachedTracks } from '../utils/audioCacheDb'
 
 export const useLibraryStore = defineStore('library', () => {
-  // LocalStorage keys for instant hydration (SWR)
+  // LocalStorage keys for instant hydration (SWR) - scoped by user ID to prevent cross-account leakage
   const CACHE_KEY_PLAYLISTS = 'tg_player_cached_playlists'
   const CACHE_KEY_LIKED = 'tg_player_cached_liked'
   const CACHE_KEY_HISTORY = 'tg_player_cached_history'
 
+  const getCacheKey = (baseKey) => {
+    try {
+      const raw = localStorage.getItem('tg_player_user')
+      if (raw) {
+        const u = JSON.parse(raw)
+        if (u?.id) return `${baseKey}_${u.id}`
+      }
+    } catch (_) {}
+    return baseKey
+  }
+
   const loadFromStorage = (key, defaultVal) => {
     try {
-      const raw = localStorage.getItem(key)
+      const realKey = getCacheKey(key)
+      const raw = localStorage.getItem(realKey)
       return raw ? JSON.parse(raw) : defaultVal
     } catch {
       return defaultVal
@@ -21,7 +33,8 @@ export const useLibraryStore = defineStore('library', () => {
 
   const saveToStorage = (key, val) => {
     try {
-      localStorage.setItem(key, JSON.stringify(val))
+      const realKey = getCacheKey(key)
+      localStorage.setItem(realKey, JSON.stringify(val))
     } catch (_) {}
   }
 

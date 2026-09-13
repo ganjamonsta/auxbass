@@ -607,7 +607,7 @@ const handleResetState = (event) => {
 onMounted(() => {
   applyRouteTab()
   applyRouteSearch()
-  loadOverviewData()
+  loadOverviewData(true)
   window.addEventListener('reset-view-state', handleResetState)
   window.addEventListener('app-search', handleAppSearch)
   window.addEventListener('playlist:changed', onPlaylistChanged)
@@ -620,7 +620,7 @@ const onPlaylistChanged = () => {
 onActivated(() => {
   applyRouteTab()
   applyRouteSearch()
-  loadOverviewData()
+  loadOverviewData(true)
 })
 
 onUnmounted(() => {

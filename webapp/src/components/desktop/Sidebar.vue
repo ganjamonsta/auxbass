@@ -343,7 +343,7 @@ const goToMyProfile = () => {
 }
 
 const onPlaylistChanged = () => {
-  libraryStore.fetchPlaylists()
+  libraryStore.fetchPlaylists(true)
 }
 
 onMounted(() => {
