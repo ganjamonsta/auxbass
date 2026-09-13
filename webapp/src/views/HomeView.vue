@@ -720,7 +720,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
-  max-width: var(--content-max-width, 1400px);
+  width: 100%;
   padding-right: var(--content-padding, 16px);
   box-sizing: border-box;
 }

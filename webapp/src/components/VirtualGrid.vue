@@ -170,7 +170,6 @@ const colCount = computed(() => {
 
 watch(total, (newTotal) => {
   emit('update:total', newTotal)
-  emit('update:items', getLoadedItems())
 })
 
 // Event handlers
@@ -198,6 +197,7 @@ defineExpose({
 .virtual-grid-canvas {
   position: relative;
   width: 100%;
+  contain: layout paint;
 }
 
 .virtual-grid-window {
@@ -207,6 +207,7 @@ defineExpose({
   right: 0;
   width: 100%;
   will-change: transform;
+  contain: layout;
 }
 
 .media-grid {

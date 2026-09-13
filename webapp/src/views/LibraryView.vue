@@ -764,9 +764,16 @@ onUnmounted(() => {
 
 <style scoped>
 .library-view {
-  padding: var(--content-padding, 16px) var(--content-padding, 16px) 32px;
-  max-width: var(--content-max-width, 1400px);
-  margin: 0 auto;
+  padding: var(--content-padding, 16px) 0 32px var(--content-padding, 16px);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .library-view {
+    padding: var(--content-padding, 24px) 0 32px var(--content-padding, 24px);
+  }
 }
 
 /* ─── Persistent Library Tabs Navigation ─── */
@@ -777,6 +784,14 @@ onUnmounted(() => {
   gap: 12px;
   margin-bottom: 20px;
   min-height: 40px;
+  padding-right: var(--content-padding, 16px);
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .library-persistent-nav {
+    padding-right: var(--content-padding, 24px);
+  }
 }
 
 .library-persistent-nav.search-active {
@@ -864,6 +879,33 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
+  width: 100%;
+  padding-right: var(--content-padding, 16px);
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .section-header {
+    padding-right: var(--content-padding, 24px);
+  }
+}
+
+.tracks-overview-section .section-header {
+  padding-right: 0;
+}
+
+.tracks-overview-section,
+.library-content {
+  padding-right: var(--content-padding, 16px);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .tracks-overview-section,
+  .library-content {
+    padding-right: var(--content-padding, 24px);
+  }
 }
 
 .section-title {
@@ -952,10 +994,19 @@ onUnmounted(() => {
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 8px;
+  padding-right: var(--content-padding, 16px);
+  width: 100%;
+  box-sizing: border-box;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
   transition: scrollbar-color 0.2s ease;
+}
+
+@media (min-width: 768px) {
+  .horizontal-scroll {
+    padding-right: var(--content-padding, 24px);
+  }
 }
 
 .horizontal-scroll:hover {

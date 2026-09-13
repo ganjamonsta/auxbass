@@ -29,7 +29,8 @@ export function useVirtualScroll(options = {}) {
     overscan = 10,
     columns = 1,
     immediate = true,
-    scrollContainer = null
+    scrollContainer = null,
+    maxCachedPages = 8
   } = options
 
   // State
@@ -141,6 +142,51 @@ export function useVirtualScroll(options = {}) {
   // Maximum concurrent page requests
   const MAX_CONCURRENT_PAGES = 2
 
+  // Evict pages that are furthest from current visible window to free memory
+  const evictDistantPages = () => {
+    if (loadedPages.size <= maxCachedPages) return
+
+    const start = startIndex.value
+    const end = endIndex.value
+    // Safe buffer zone around visible range: visible ± (overscan * colCount + pageSize * 2)
+    const buffer = Math.max(pageSize * 2, overscan * colCount.value + pageSize)
+    const minSafeIndex = Math.max(0, start - buffer)
+    const maxSafeIndex = end + buffer
+
+    // Find candidates for eviction (pages completely outside safe range)
+    const candidates = []
+    const center = (start + end) / 2
+
+    for (const pageOffset of loadedPages) {
+      const pageEnd = pageOffset + pageSize
+      // Check if page falls completely outside safe range
+      if (pageEnd <= minSafeIndex || pageOffset >= maxSafeIndex) {
+        const pageCenter = pageOffset + pageSize / 2
+        const distance = Math.abs(pageCenter - center)
+        candidates.push({ pageOffset, distance })
+      }
+    }
+
+    // Sort by distance descending (furthest first)
+    candidates.sort((a, b) => b.distance - a.distance)
+
+    // How many pages to evict
+    const countToEvict = loadedPages.size - maxCachedPages
+    if (countToEvict <= 0 || candidates.length === 0) return
+
+    const pagesToEvict = candidates.slice(0, countToEvict).map(c => c.pageOffset)
+    if (pagesToEvict.length === 0) return
+
+    const updated = new Map(itemsMap.value)
+    for (const offset of pagesToEvict) {
+      for (let i = 0; i < pageSize; i++) {
+        updated.delete(offset + i)
+      }
+      loadedPages.delete(offset)
+    }
+    itemsMap.value = updated
+  }
+
   // Fetch a specific page/chunk by offset
   const fetchPage = async (pageOffset) => {
     if (loadedPages.has(pageOffset) || pendingPages.has(pageOffset)) return
@@ -172,6 +218,9 @@ export function useVirtualScroll(options = {}) {
         }
         itemsMap.value = updated
         loadedPages.add(pageOffset)
+
+        // Evict distant pages if cache exceeded
+        evictDistantPages()
       }
     } catch (err) {
       error.value = err
@@ -291,15 +340,11 @@ export function useVirtualScroll(options = {}) {
     initialized.value = false
   }
 
-  // Array of all loaded items in order (for player queue, etc.)
+  // Array of currently cached items in index order (for player queue, etc.)
   const getLoadedItems = () => {
-    const result = []
-    for (let i = 0; i < total.value; i++) {
-      if (itemsMap.value.has(i)) {
-        result.push(itemsMap.value.get(i))
-      }
-    }
-    return result
+    return Array.from(itemsMap.value.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(entry => entry[1])
   }
 
   // Patch item by id or predicate
@@ -347,22 +392,21 @@ export function useVirtualScroll(options = {}) {
     }
   }
 
-  // Watch startIndex / endIndex to fetch missing chunks
+  // Watch startIndex / endIndex to fetch missing chunks and evict distant pages
   watch([startIndex, endIndex, total], () => {
     checkNeededPages()
+    evictDistantPages()
   })
 
   onMounted(async () => {
     await nextTick()
     detectedScrollContainer = findScrollContainer(containerRef.value)
     
-    if (detectedScrollContainer === window) {
-      window.addEventListener('scroll', handleScroll, { passive: true })
-      window.addEventListener('resize', handleScroll, { passive: true })
-    } else if (detectedScrollContainer) {
+    if (detectedScrollContainer && detectedScrollContainer !== window) {
       detectedScrollContainer.addEventListener('scroll', handleScroll, { passive: true })
-      window.addEventListener('resize', handleScroll, { passive: true })
     }
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    window.addEventListener('resize', handleScroll, { passive: true })
 
     if (containerRef.value) {
       containerWidth.value = containerRef.value.clientWidth
@@ -383,17 +427,16 @@ export function useVirtualScroll(options = {}) {
   })
 
   onUnmounted(() => {
-    if (detectedScrollContainer === window) {
-      window.removeEventListener('scroll', handleScroll)
-      window.removeEventListener('resize', handleScroll)
-    } else if (detectedScrollContainer) {
+    if (detectedScrollContainer && detectedScrollContainer !== window) {
       detectedScrollContainer.removeEventListener('scroll', handleScroll)
-      window.removeEventListener('resize', handleScroll)
     }
+    window.removeEventListener('scroll', handleScroll)
+    window.removeEventListener('resize', handleScroll)
     if (resizeObserver) {
       resizeObserver.disconnect()
       resizeObserver = null
     }
+    clear()
   })
 
   return {

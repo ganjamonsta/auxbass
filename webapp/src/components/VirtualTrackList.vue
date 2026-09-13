@@ -151,7 +151,6 @@ const {
 // Emit updates when total changes
 watch(total, (newTotal) => {
   emit('update:total', newTotal)
-  emit('update:items', getLoadedItems())
 })
 
 // Event handlers
@@ -247,6 +246,7 @@ defineExpose({
 .virtual-track-list-canvas {
   position: relative;
   width: 100%;
+  contain: layout paint;
 }
 
 .virtual-track-list-window {
@@ -256,6 +256,7 @@ defineExpose({
   right: 0;
   width: 100%;
   will-change: transform;
+  contain: layout;
 }
 
 .track-list {
