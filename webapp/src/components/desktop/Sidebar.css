@@ -559,6 +559,51 @@
   border-radius: 8px;
 }
 
+.import-file-subitem {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.import-file-subitem .subitem-icon {
+  flex-shrink: 0;
+}
+
+.import-file-subitem .file-name-subitem {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.subitem-delete-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-left: 2px;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.import-file-subitem:hover .subitem-delete-btn {
+  display: flex;
+}
+
+.subitem-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
 .offline-highlight-item {
   margin-top: 8px;
   background: rgba(255, 255, 255, 0.06);

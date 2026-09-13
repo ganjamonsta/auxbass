@@ -107,7 +107,7 @@ const tasksStore = useTasksStore()
 
 const openSpotifyImport = (pl) => {
   if (props.isSelf) {
-    tasksStore.openExportifyModal()
+    tasksStore.openExportifyModal({ fileId: pl.file_id, loadLastSaved: true })
   }
 }
 </script>

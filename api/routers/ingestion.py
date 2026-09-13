@@ -152,6 +152,8 @@ class ExportifyPreviewResponse(BaseModel):
     in_channel_count: int
     already_in_tg_count: int
     tracks: List[ExportifyTrackItem]
+    file_id: Optional[str] = None
+    import_file_id: Optional[int] = None
 
 
 class ExportifyStartRequest(BaseModel):
@@ -159,6 +161,7 @@ class ExportifyStartRequest(BaseModel):
     tracks: List[ExportifyTrackItem]
     create_playlist: bool = False
     playlist_name: Optional[str] = None
+    target_playlist_id: Optional[int] = None
 
 
 class PreviewRequest(BaseModel):
@@ -1398,6 +1401,9 @@ async def preview_exportify_csv(
                 )
                 db.add(import_file)
                 await db.commit()
+                await db.refresh(import_file)
+                preview_res.file_id = import_file.file_id
+                preview_res.import_file_id = import_file.id
                 logger.info(f"Saved Exportify CSV '{filename}' to Telegram channel/user {target_chat_id} (file_id: {sent_msg.document.file_id})")
         except Exception as e:
             logger.warning(f"Could not backup Exportify CSV to Telegram: {e}")
@@ -1415,7 +1421,7 @@ async def get_last_spotify_import(
         select(UserImportFile)
         .where(UserImportFile.user_id == user.id, UserImportFile.provider == "spotify")
         .order_by(UserImportFile.id.desc())
-        .limit(3)
+        .limit(20)
     )
     all_recent = (await db.scalars(recent_q)).all()
     if not all_recent:
@@ -1429,6 +1435,14 @@ async def get_last_spotify_import(
             summary = json.loads(import_file.summary_json)
         except Exception:
             pass
+
+    def _parse_summary(item):
+        if not item.summary_json:
+            return {}
+        try:
+            return json.loads(item.summary_json)
+        except Exception:
+            return {}
 
     return {
         "found": True,
@@ -1450,6 +1464,7 @@ async def get_last_spotify_import(
                 "file_size": f.file_size,
                 "total_tracks": f.total_tracks,
                 "created_at": f.created_at.isoformat() if f.created_at else None,
+                "summary": _parse_summary(f),
             }
             for f in all_recent
         ],
@@ -1498,8 +1513,45 @@ async def preview_last_spotify_import(
     except UnicodeDecodeError:
         raw_content = content_bytes.decode("latin-1", errors="replace")
 
-    return await _parse_exportify_csv_content(raw_content, import_file.filename, user.id, db)
+    preview_res = await _parse_exportify_csv_content(raw_content, import_file.filename, user.id, db)
+    preview_res.file_id = import_file.file_id
+    preview_res.import_file_id = import_file.id
+    return preview_res
 
+
+@router.delete("/spotify/import-file/{file_id_or_id}")
+async def delete_spotify_import_file(
+    file_id_or_id: str,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a saved Spotify import file record."""
+    q = select(UserImportFile).where(
+        UserImportFile.user_id == user.id,
+        UserImportFile.provider == "spotify"
+    )
+    if file_id_or_id.isdigit():
+        q = q.where(
+            (UserImportFile.id == int(file_id_or_id)) | (UserImportFile.file_id == file_id_or_id)
+        )
+    else:
+        q = q.where(UserImportFile.file_id == file_id_or_id)
+
+    import_file = await db.scalar(q)
+    if not import_file:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Файл импорта не найден.")
+
+    # Try deleting message from telegram channel/chat if bot has permissions
+    if import_file.channel_id and import_file.message_id:
+        try:
+            bot = _get_active_bot()
+            await bot.delete_message(chat_id=import_file.channel_id, message_id=import_file.message_id)
+        except Exception as e:
+            logger.warning(f"Could not delete message {import_file.message_id} from channel {import_file.channel_id}: {e}")
+
+    await db.delete(import_file)
+    await db.commit()
+    return {"ok": True, "message": "Файл импорта успешно удалён."}
 
 
 @router.post("/spotify/exportify/start", response_model=JobResponse)
@@ -1522,7 +1574,17 @@ async def start_exportify_import(
     await _ensure_user_in_db(user)
 
     playlist_id = None
-    if req.create_playlist:
+    target_title = req.title or "Spotify Import"
+
+    if req.target_playlist_id:
+        target_pl = await db.scalar(
+            select(Playlist).where(Playlist.id == req.target_playlist_id, Playlist.owner_id == user.id)
+        )
+        if not target_pl:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Выбранный плейлист не найден.")
+        playlist_id = target_pl.id
+        target_title = target_pl.name
+    elif req.create_playlist:
         p_name = req.playlist_name or req.title or "Spotify Playlist"
         cover = req.tracks[0].cover_url if req.tracks and req.tracks[0].cover_url else None
         new_pl = Playlist(
@@ -1536,6 +1598,7 @@ async def start_exportify_import(
         await db.commit()
         await db.refresh(new_pl)
         playlist_id = new_pl.id
+        target_title = new_pl.name
 
     custom_tracks_data = [t.model_dump() for t in req.tracks]
 
@@ -1544,7 +1607,7 @@ async def start_exportify_import(
         url="https://exportify.app",
         provider_name="spotify",
         entity_type=EntityType.PLAYLIST.value if playlist_id else EntityType.TRACKS.value,
-        title=req.playlist_name or req.title or "Spotify Import",
+        title=target_title,
         total_tracks=len(req.tracks),
         cover_url=req.tracks[0].cover_url if req.tracks else None,
         custom_tracks=custom_tracks_data,

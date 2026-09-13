@@ -151,38 +151,60 @@
                 </div>
               </div>
 
-              <!-- Saved Import Card from Telegram Channel -->
-              <div v-if="externalAccountsStore.hasLastSpotifyImport" class="saved-channel-file-card">
-                <div class="saved-file-badge">
-                  <span class="pulse-dot"></span>
-                  <span>Сохранено в Telegram-канале</span>
+              <!-- Saved Imports List from Telegram Channel -->
+              <div v-if="externalAccountsStore.recentSpotifyImports.length > 0" class="saved-channel-files-section">
+                <div class="saved-section-header">
+                  <div class="saved-file-badge">
+                    <span class="pulse-dot"></span>
+                    <span>Сохранённые импорты в Telegram ({{ externalAccountsStore.recentSpotifyImports.length }})</span>
+                  </div>
                 </div>
-                <div class="saved-file-main">
-                  <div class="saved-file-icon">
-                    <FileSpreadsheet :size="22" />
-                  </div>
-                  <div class="saved-file-meta">
-                    <span class="saved-file-name" :title="externalAccountsStore.lastSpotifyImport.filename">
-                      {{ externalAccountsStore.lastSpotifyImport.filename }}
-                    </span>
-                    <span class="saved-file-sub">
-                      {{ externalAccountsStore.lastSpotifyImport.total_tracks }} треков
-                      <template v-if="externalAccountsStore.lastSpotifyImport.summary?.new_tracks_count">
-                        • {{ externalAccountsStore.lastSpotifyImport.summary.new_tracks_count }} новых
-                      </template>
-                    </span>
-                  </div>
-                  <button 
-                    class="action-btn primary saved-file-btn"
-                    :disabled="isParsing"
-                    @click.stop="loadLastSavedImport"
+                <div class="saved-files-grid">
+                  <div 
+                    v-for="file in externalAccountsStore.recentSpotifyImports" 
+                    :key="file.file_id || file.id"
+                    class="saved-file-item"
+                    :class="{ 'is-loading': loadingFileId === file.file_id }"
                   >
-                    <div v-if="loadingSavedFile" class="spinner small"></div>
-                    <template v-else>
-                      <FolderOpen :size="14" />
-                      <span>Открыть треклист</span>
-                    </template>
-                  </button>
+                    <div class="saved-file-icon">
+                      <FileSpreadsheet :size="20" />
+                    </div>
+                    <div class="saved-file-meta" @click="loadLastSavedImport(file.file_id)">
+                      <span class="saved-file-name" :title="file.filename">
+                        {{ formatImportFilename(file.filename) }}
+                      </span>
+                      <span class="saved-file-sub">
+                        {{ file.total_tracks }} треков
+                        <template v-if="file.summary?.new_tracks_count">
+                          • {{ file.summary.new_tracks_count }} новых
+                        </template>
+                        <template v-if="file.created_at">
+                          • {{ new Date(file.created_at).toLocaleDateString() }}
+                        </template>
+                      </span>
+                    </div>
+                    <div class="saved-file-actions">
+                      <button 
+                        class="action-btn primary small saved-file-btn"
+                        :disabled="isParsing"
+                        @click.stop="loadLastSavedImport(file.file_id)"
+                        title="Открыть треклист"
+                      >
+                        <div v-if="loadingFileId === file.file_id" class="spinner micro"></div>
+                        <template v-else>
+                          <FolderOpen :size="13" />
+                          <span>Открыть</span>
+                        </template>
+                      </button>
+                      <button 
+                        class="action-btn danger-icon small"
+                        @click.stop="confirmDeleteFile(file)"
+                        title="Удалить файл из истории"
+                      >
+                        <Trash2 :size="14" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -211,7 +233,7 @@
                   <div class="dropzone-icon-wrap">
                     <FileSpreadsheet :size="36" class="dropzone-icon" />
                   </div>
-                  <h4 class="dropzone-title">Перетащите файл .csv сюда</h4>
+                  <h4 class="dropzone-title">Перетащите новый файл .csv сюда</h4>
                   <p class="dropzone-hint">или нажмите для выбора файла на устройстве</p>
                   <span class="dropzone-btn">
                     <Upload :size="14" />
@@ -234,17 +256,59 @@
                 <div class="summary-file-row">
                   <div class="summary-file-name">
                     <FileSpreadsheet :size="16" />
-                    <span>{{ previewData.filename }}</span>
+                    <span class="summary-filename-text" :title="previewData.filename">
+                      {{ formatImportFilename(previewData.filename) }}
+                    </span>
+                    <span class="file-ext-tag">CSV</span>
                   </div>
-                  <button class="reset-file-btn" @click="resetPreview" title="Выбрать другой файл">
-                    <RefreshCw :size="12" />
-                    <span>Сменить файл</span>
-                  </button>
+                  <div class="summary-file-actions">
+                    <!-- File switcher dropdown -->
+                    <div v-if="externalAccountsStore.recentSpotifyImports.length > 1" class="file-switcher-dropdown-wrap">
+                      <button 
+                        class="file-switcher-btn" 
+                        @click="showFileSwitcher = !showFileSwitcher"
+                        title="Выбрать другой сохранённый файл"
+                      >
+                        <ListFilter :size="13" />
+                        <span>Выбрать плейлист</span>
+                        <ChevronDown :size="13" class="switcher-chevron" :class="{ 'rotate-180': showFileSwitcher }" />
+                      </button>
+                      <div v-if="showFileSwitcher" class="file-switcher-dropdown">
+                        <div class="file-switcher-header">Сохранённые импорты:</div>
+                        <div 
+                          v-for="f in externalAccountsStore.recentSpotifyImports" 
+                          :key="f.file_id || f.id"
+                          class="file-switcher-item"
+                          :class="{ active: currentActiveFileId === f.file_id }"
+                          @click="switchToFile(f)"
+                        >
+                          <FileSpreadsheet :size="14" />
+                          <span class="switcher-item-name">{{ formatImportFilename(f.filename) }}</span>
+                          <span class="switcher-item-count">{{ f.total_tracks }} треков</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button class="reset-file-btn" @click="resetPreview" title="Загрузить другой файл">
+                      <Upload :size="12" />
+                      <span>Новый файл</span>
+                    </button>
+
+                    <button 
+                      v-if="currentActiveFileId" 
+                      class="delete-active-file-btn" 
+                      @click="confirmDeleteCurrentFile" 
+                      title="Удалить этот файл импорта из истории"
+                    >
+                      <Trash2 :size="13" />
+                      <span>Удалить файл</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div class="stats-pills-row">
                   <div class="stat-pill total">
-                    <span class="stat-pill-label">Всего в CSV:</span>
+                    <span class="stat-pill-label">Всего:</span>
                     <span class="stat-pill-val">{{ previewData.total_tracks }}</span>
                   </div>
                   <div class="stat-pill new">
@@ -266,12 +330,91 @@
                 </div>
               </div>
 
+              <!-- Search & Filter Controls -->
+              <div class="search-filter-section">
+                <div class="search-input-wrap">
+                  <Search :size="15" class="search-icon" />
+                  <input 
+                    v-model="searchQuery" 
+                    type="text" 
+                    placeholder="Поиск по названию трека, исполнителю или альбому..." 
+                    class="search-input"
+                  />
+                  <button v-if="searchQuery" class="clear-search-btn" @click="searchQuery = ''" title="Очистить поиск">
+                    <X :size="13" />
+                  </button>
+                </div>
+
+                <div class="filter-chips-row">
+                  <button 
+                    class="filter-chip" 
+                    :class="{ active: activeFilter === 'all' }"
+                    @click="activeFilter = 'all'"
+                  >
+                    Все ({{ previewData.total_tracks }})
+                  </button>
+                  <button 
+                    class="filter-chip new" 
+                    :class="{ active: activeFilter === 'new' }"
+                    @click="activeFilter = 'new'"
+                  >
+                    <Sparkles :size="11" />
+                    <span>Новые ({{ previewData.new_tracks_count }})</span>
+                  </button>
+                  <button 
+                    v-if="previewData.in_library_count > 0"
+                    class="filter-chip in-lib" 
+                    :class="{ active: activeFilter === 'in_library' }"
+                    @click="activeFilter = 'in_library'"
+                  >
+                    <Check :size="11" />
+                    <span>В медиатеке ({{ previewData.in_library_count }})</span>
+                  </button>
+                  <button 
+                    v-if="previewData.already_in_tg_count > 0 || previewData.in_channel_count > 0"
+                    class="filter-chip in-tg" 
+                    :class="{ active: activeFilter === 'in_tg' }"
+                    @click="activeFilter = 'in_tg'"
+                  >
+                    <Zap :size="11" />
+                    <span>В Telegram ({{ previewData.already_in_tg_count + previewData.in_channel_count }})</span>
+                  </button>
+                  <button 
+                    class="filter-chip selected" 
+                    :class="{ active: activeFilter === 'selected' }"
+                    @click="activeFilter = 'selected'"
+                  >
+                    <span>Выбранные ({{ selectedUrls.size }})</span>
+                  </button>
+                </div>
+              </div>
+
               <!-- Selection Controls Toolbar -->
               <div class="selection-toolbar">
                 <div class="selection-count-text">
                   Выбрано: <strong>{{ selectedUrls.size }}</strong> из {{ previewData.tracks.length }}
+                  <span v-if="searchQuery.trim() || activeFilter !== 'all'" class="filtered-hint">
+                    (в фильтре: {{ filteredTracks.length }})
+                  </span>
                 </div>
                 <div class="selection-buttons">
+                  <button 
+                    v-if="searchQuery.trim() || activeFilter !== 'all'"
+                    class="sel-btn highlight"
+                    @click="selectFiltered"
+                    title="Выбрать все треки в текущем фильтре"
+                  >
+                    <CheckCheck :size="13" />
+                    <span>Выбрать показанные</span>
+                  </button>
+                  <button 
+                    v-if="searchQuery.trim() || activeFilter !== 'all'"
+                    class="sel-btn"
+                    @click="deselectFiltered"
+                    title="Снять выбор с показанных треков"
+                  >
+                    <span>Снять показанные</span>
+                  </button>
                   <button 
                     class="sel-btn highlight"
                     :class="{ active: isOnlyNewSelected }"
@@ -279,32 +422,77 @@
                     title="Выбрать только треки, которых ещё нет в вашей медиатеке"
                   >
                     <Sparkles :size="13" />
-                    <span>Только новые ({{ previewData.new_tracks_count }})</span>
+                    <span>Только новые</span>
                   </button>
                   <button class="sel-btn" @click="selectAll">Все</button>
                   <button class="sel-btn" @click="deselectAll">Снять</button>
                 </div>
               </div>
 
-              <!-- Options -->
-              <div class="options-bar">
-                <label class="checkbox-label">
-                  <input type="checkbox" v-model="createPlaylist" />
-                  <span>Создать отдельный плейлист в AuxBass</span>
-                </label>
-                <input 
-                  v-if="createPlaylist"
-                  v-model="playlistName"
-                  type="text" 
-                  placeholder="Название плейлиста" 
-                  class="playlist-name-input"
-                />
+              <!-- Destination Options (Playlist Selection) -->
+              <div class="destination-section">
+                <div class="destination-label">Куда сохранить треки:</div>
+                <div class="destination-modes">
+                  <label class="destination-chip" :class="{ active: destinationMode === 'none' }">
+                    <input type="radio" value="none" v-model="destinationMode" />
+                    <Library :size="13" />
+                    <span>Только в медиатеку</span>
+                  </label>
+                  <label class="destination-chip" :class="{ active: destinationMode === 'new' }">
+                    <input type="radio" value="new" v-model="destinationMode" />
+                    <Plus :size="13" />
+                    <span>Создать новый плейлист</span>
+                  </label>
+                  <label 
+                    class="destination-chip" 
+                    :class="{ active: destinationMode === 'existing', disabled: !userPlaylists.length }"
+                  >
+                    <input type="radio" value="existing" v-model="destinationMode" :disabled="!userPlaylists.length" />
+                    <FolderPlus :size="13" />
+                    <span>В существующий плейлист</span>
+                  </label>
+                </div>
+
+                <!-- If creating new playlist -->
+                <div v-if="destinationMode === 'new'" class="destination-input-wrap">
+                  <input 
+                    v-model="playlistName"
+                    type="text" 
+                    placeholder="Название нового плейлиста" 
+                    class="playlist-name-input"
+                  />
+                </div>
+
+                <!-- If selecting existing playlist -->
+                <div v-if="destinationMode === 'existing'" class="destination-select-wrap">
+                  <div class="custom-select-wrapper">
+                    <select v-model="selectedExistingPlaylistId" class="playlist-dropdown">
+                      <option :value="null" disabled>-- Выберите плейлист из вашей медиатеки --</option>
+                      <option 
+                        v-for="pl in userPlaylists" 
+                        :key="pl.id" 
+                        :value="pl.id"
+                      >
+                        {{ pl.name }} ({{ pl.track_count || 0 }} треков)
+                      </option>
+                    </select>
+                  </div>
+                  <span v-if="selectedPlaylistSummary" class="destination-summary-hint">
+                    Треки будут добавлены в конец плейлиста «{{ selectedPlaylistSummary.name }}»
+                  </span>
+                </div>
               </div>
 
-              <!-- Tracklist -->
-              <div class="tracklist-box">
+              <!-- Tracklist (Progressive Rendering with Scroll to prevent lag) -->
+              <div class="tracklist-box" @scroll="handleTracklistScroll">
+                <div v-if="filteredTracks.length === 0" class="no-tracks-found">
+                  <Search :size="28" />
+                  <span>Ничего не найдено по вашему запросу</span>
+                  <button class="reset-filter-btn" @click="resetFilters">Сбросить поиск и фильтры</button>
+                </div>
+
                 <div 
-                  v-for="(track, idx) in previewData.tracks" 
+                  v-for="(track, idx) in visibleTracks" 
                   :key="track.url || idx"
                   class="track-row"
                   :class="{ 
@@ -378,6 +566,10 @@
                     <span class="track-duration">{{ formatDuration(track.duration) }}</span>
                   </div>
                 </div>
+
+                <div v-if="visibleTracks.length < filteredTracks.length" class="scroll-more-indicator">
+                  <span>Показано {{ visibleTracks.length }} из {{ filteredTracks.length }} (прокрутите для отображения остальных)</span>
+                </div>
               </div>
 
               <!-- Bottom Action Bar -->
@@ -387,13 +579,13 @@
                 </button>
                 <button 
                   class="action-btn primary"
-                  :disabled="selectedUrls.size === 0 || isStartingImport"
+                  :disabled="selectedUrls.size === 0 || isStartingImport || (destinationMode === 'existing' && !selectedExistingPlaylistId)"
                   @click="handleStartImport"
                 >
                   <div v-if="isStartingImport" class="spinner small"></div>
                   <CloudDownload v-else :size="16" />
                   <span>
-                    {{ isStartingImport ? 'Запуск...' : `Импортировать ${selectedUrls.size} треков` }}
+                    {{ isStartingImport ? 'Запуск...' : actionButtonLabel }}
                   </span>
                 </button>
               </div>
@@ -410,6 +602,7 @@ import { ref, computed, watch, nextTick } from 'vue'
 import {
   X,
   Check,
+  CheckCheck,
   Upload,
   FileSpreadsheet,
   AlertCircle,
@@ -425,6 +618,13 @@ import {
   Volume2,
   Minus,
   FolderOpen,
+  Trash2,
+  Search,
+  ChevronDown,
+  ListFilter,
+  Library,
+  Plus,
+  FolderPlus,
 } from 'lucide-vue-next'
 import { ingestionApi } from '@/api/client'
 import { useUIStore } from '@/stores/ui'
@@ -456,16 +656,68 @@ const fileInputRef = ref(null)
 const isDragging = ref(false)
 const isParsing = ref(false)
 const loadingSavedFile = ref(false)
+const loadingFileId = ref(null)
 const parseError = ref(null)
 
 const previewData = ref(null)
+const currentActiveFileId = ref(null)
+const showFileSwitcher = ref(false)
 const selectedUrls = ref(new Set())
-const createPlaylist = ref(false)
-const playlistName = ref('')
-const isStartingImport = ref(false)
 
+// Search & filter
+const searchQuery = ref('')
+const activeFilter = ref('all') // 'all' | 'new' | 'in_library' | 'in_tg' | 'selected'
+const displayLimit = ref(60)
+
+// Destination
+const destinationMode = ref('new') // 'none' | 'new' | 'existing'
+const playlistName = ref('')
+const selectedExistingPlaylistId = ref(null)
+
+const isStartingImport = ref(false)
 const activeJob = ref(null)
 let pollTimer = null
+
+const userPlaylists = computed(() => libraryStore.playlists || [])
+
+const selectedPlaylistSummary = computed(() => {
+  if (!selectedExistingPlaylistId.value) return null
+  return userPlaylists.value.find(p => p.id === selectedExistingPlaylistId.value) || null
+})
+
+const formatImportFilename = (name) => {
+  if (!name) return 'Spotify CSV'
+  return name.replace(/\.csv$/i, '').replace(/[_-]/g, ' ')
+}
+
+const filteredTracks = computed(() => {
+  if (!previewData.value?.tracks) return []
+  let list = previewData.value.tracks
+
+  if (activeFilter.value === 'new') {
+    list = list.filter(t => !t.in_library)
+  } else if (activeFilter.value === 'in_library') {
+    list = list.filter(t => t.in_library)
+  } else if (activeFilter.value === 'in_tg') {
+    list = list.filter(t => t.already_in_tg || t.in_channel)
+  } else if (activeFilter.value === 'selected') {
+    list = list.filter(t => selectedUrls.value.has(t.url))
+  }
+
+  const q = searchQuery.value.trim().toLowerCase()
+  if (q) {
+    list = list.filter(t => 
+      (t.title && t.title.toLowerCase().includes(q)) ||
+      (t.artist && t.artist.toLowerCase().includes(q)) ||
+      (t.album && t.album.toLowerCase().includes(q))
+    )
+  }
+  return list
+})
+
+const visibleTracks = computed(() => {
+  return filteredTracks.value.slice(0, displayLimit.value)
+})
 
 const isOnlyNewSelected = computed(() => {
   if (!previewData.value || previewData.value.tracks.length === 0) return false
@@ -473,6 +725,18 @@ const isOnlyNewSelected = computed(() => {
   if (newTracks.length === 0) return false
   if (selectedUrls.value.size !== newTracks.length) return false
   return newTracks.every(t => selectedUrls.value.has(t.url))
+})
+
+const actionButtonLabel = computed(() => {
+  const count = selectedUrls.value.size
+  if (destinationMode.value === 'existing') {
+    const plName = selectedPlaylistSummary.value?.name
+    return plName ? `Добавить в «${plName}» (${count})` : `Добавить в плейлист (${count})`
+  }
+  if (destinationMode.value === 'new') {
+    return `Создать плейлист и импортировать (${count})`
+  }
+  return `Импортировать ${count} треков`
 })
 
 const statusText = computed(() => {
@@ -490,7 +754,6 @@ const statusText = computed(() => {
       return 'Ожидание...'
   }
 })
-
 
 const triggerFileInput = () => {
   if (fileInputRef.value) {
@@ -522,6 +785,7 @@ const processFile = async (file) => {
 
   isParsing.value = true
   parseError.value = null
+  resetFilters()
 
   try {
     const formData = new FormData()
@@ -529,6 +793,7 @@ const processFile = async (file) => {
 
     const res = await ingestionApi.previewExportifyCsv(formData)
     previewData.value = res.data
+    currentActiveFileId.value = res.data.file_id || null
 
     // Set default playlist name based on file name
     const cleanName = file.name.replace(/\.csv$/i, '').replace(/[_-]/g, ' ')
@@ -546,15 +811,21 @@ const processFile = async (file) => {
 }
 
 const loadLastSavedImport = async (fileId = null) => {
+  // Clear any existing previewData immediately so we don't display the previous file's tracks
+  previewData.value = null
+  selectedUrls.value = new Set()
+  resetFilters()
+
   isParsing.value = true
   loadingSavedFile.value = true
-  parseError.value = null
-
   const targetFileId = fileId || tasksStore.exportifyModalOptions?.fileId || null
+  loadingFileId.value = targetFileId
+  parseError.value = null
 
   try {
     const res = await ingestionApi.previewLastSpotifyImport(targetFileId ? { file_id: targetFileId } : undefined)
     previewData.value = res.data
+    currentActiveFileId.value = res.data.file_id || targetFileId
 
     const cleanName = (res.data.filename || 'Spotify Playlist').replace(/\.csv$/i, '').replace(/[_-]/g, ' ')
     playlistName.value = cleanName.charAt(0).toUpperCase() + cleanName.slice(1)
@@ -566,6 +837,43 @@ const loadLastSavedImport = async (fileId = null) => {
   } finally {
     isParsing.value = false
     loadingSavedFile.value = false
+    loadingFileId.value = null
+  }
+}
+
+const switchToFile = (file) => {
+  showFileSwitcher.value = false
+  loadLastSavedImport(file.file_id)
+}
+
+const confirmDeleteFile = async (file) => {
+  const name = formatImportFilename(file.filename)
+  if (confirm(`Удалить сохранённый файл импорта «${name}» из истории?`)) {
+    try {
+      await externalAccountsStore.deleteSpotifyImport(file.file_id || file.id)
+      uiStore.toast?.success('Удалено', `Файл импорта «${name}» удалён`)
+      if (currentActiveFileId.value === file.file_id) {
+        resetPreview()
+      }
+    } catch (err) {
+      console.error('Failed to delete import file:', err)
+      uiStore.toast?.error('Ошибка', 'Не удалось удалить файл')
+    }
+  }
+}
+
+const confirmDeleteCurrentFile = async () => {
+  if (!currentActiveFileId.value) return
+  const name = formatImportFilename(previewData.value?.filename || 'файл')
+  if (confirm(`Удалить файл импорта «${name}» из истории?`)) {
+    try {
+      await externalAccountsStore.deleteSpotifyImport(currentActiveFileId.value)
+      uiStore.toast?.success('Удалено', `Файл импорта «${name}» удалён`)
+      resetPreview()
+    } catch (err) {
+      console.error('Failed to delete import file:', err)
+      uiStore.toast?.error('Ошибка', 'Не удалось удалить файл')
+    }
   }
 }
 
@@ -577,7 +885,6 @@ const selectOnlyNew = () => {
       newUrls.add(t.url)
     }
   }
-  // If all tracks are already in library, select all so user can choose
   if (newUrls.size === 0) {
     selectAll()
     return
@@ -596,6 +903,37 @@ const selectAll = () => {
 
 const deselectAll = () => {
   selectedUrls.value = new Set()
+}
+
+const selectFiltered = () => {
+  const next = new Set(selectedUrls.value)
+  for (const t of filteredTracks.value) {
+    next.add(t.url)
+  }
+  selectedUrls.value = next
+}
+
+const deselectFiltered = () => {
+  const next = new Set(selectedUrls.value)
+  for (const t of filteredTracks.value) {
+    next.delete(t.url)
+  }
+  selectedUrls.value = next
+}
+
+const resetFilters = () => {
+  searchQuery.value = ''
+  activeFilter.value = 'all'
+  displayLimit.value = 60
+}
+
+const handleTracklistScroll = (e) => {
+  const el = e.target
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 300) {
+    if (displayLimit.value < filteredTracks.value.length) {
+      displayLimit.value = Math.min(displayLimit.value + 60, filteredTracks.value.length)
+    }
+  }
 }
 
 const toggleTrack = (url) => {
@@ -619,13 +957,11 @@ const handlePreviewTrack = async (track, event) => {
     event.stopPropagation()
   }
 
-  // If already playing this track, toggle play/pause
   if (isTrackPlaying(track)) {
     playerStore.togglePlay()
     return
   }
 
-  // If already in player as current track, just resume
   if (
     (track.track_id && playerStore.currentTrack?.id === track.track_id) ||
     playingTrackUrl.value === track.url
@@ -665,28 +1001,38 @@ const handlePreviewTrack = async (track, event) => {
 
 const resetPreview = () => {
   previewData.value = null
+  currentActiveFileId.value = null
   selectedUrls.value = new Set()
   parseError.value = null
+  showFileSwitcher.value = false
+  resetFilters()
 }
 
 const handleStartImport = async () => {
   if (!previewData.value || selectedUrls.value.size === 0 || isStartingImport.value) return
+  if (destinationMode.value === 'existing' && !selectedExistingPlaylistId.value) {
+    uiStore.toast?.warning('Выберите плейлист', 'Пожалуйста, выберите существующий плейлист из списка')
+    return
+  }
 
   isStartingImport.value = true
   try {
     const chosenTracks = previewData.value.tracks.filter(t => selectedUrls.value.has(t.url))
     const payload = {
-      title: playlistName.value || 'Импорт Spotify',
+      title: destinationMode.value === 'existing'
+        ? (selectedPlaylistSummary.value?.name || 'Spotify Import')
+        : (playlistName.value || 'Импорт Spotify'),
       tracks: chosenTracks,
-      create_playlist: createPlaylist.value,
-      playlist_name: createPlaylist.value ? playlistName.value : null,
+      create_playlist: destinationMode.value === 'new',
+      playlist_name: destinationMode.value === 'new' ? (playlistName.value || 'Spotify Playlist') : null,
+      target_playlist_id: destinationMode.value === 'existing' ? selectedExistingPlaylistId.value : null,
     }
 
     const res = await ingestionApi.startExportifyImport(payload)
     activeJob.value = res.data
     tasksStore.registerJob(res.data, {
       type: 'exportify',
-      title: playlistName.value || 'Импорт Spotify',
+      title: payload.title,
     })
     uiStore.toast?.success('Импорт запущен', `Загрузка ${chosenTracks.length} треков в медиатеку и Telegram-канал`)
 
@@ -708,6 +1054,7 @@ const startPollingJob = (jobId) => {
       if (['completed', 'failed', 'cancelled'].includes(res.data.status)) {
         stopPollingJob()
         libraryStore.fetchTracks({ refresh: true })
+        libraryStore.fetchPlaylists(true)
         if (res.data.status === 'completed') {
           uiStore.toast?.success('Импорт завершен', `Успешно обработано треков: ${res.data.processed_tracks}`)
           emit('imported')
@@ -772,6 +1119,23 @@ watch(
 )
 
 watch(
+  () => tasksStore.exportifyModalOptions,
+  (opts) => {
+    if (props.show && opts?.loadLastSaved) {
+      loadLastSavedImport(opts.fileId)
+    }
+  },
+  { deep: true }
+)
+
+watch(
+  [searchQuery, activeFilter],
+  () => {
+    displayLimit.value = 60
+  }
+)
+
+watch(
   () => props.show,
   (val) => {
     if (val) {
@@ -784,6 +1148,9 @@ watch(
         loadLastSavedImport(tasksStore.exportifyModalOptions?.fileId)
       } else {
         externalAccountsStore.fetchLastSpotifyImport()
+      }
+      if (!libraryStore.playlists || libraryStore.playlists.length === 0) {
+        libraryStore.fetchPlaylists()
       }
     } else {
       if (!activeJob.value || activeJob.value.status !== 'in_progress') {
@@ -913,22 +1280,17 @@ watch(
   flex: 1;
 }
 
-/* Saved Channel File Card */
-.saved-channel-file-card {
-  background: rgba(29, 185, 84, 0.08);
-  border: 1px solid rgba(29, 185, 84, 0.28);
-  border-radius: 14px;
+/* Saved Channel Files Section */
+.saved-channel-files-section {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
   padding: 14px 16px;
   margin-bottom: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  transition: all 0.2s ease;
 }
 
-.saved-channel-file-card:hover {
-  background: rgba(29, 185, 84, 0.12);
-  border-color: rgba(29, 185, 84, 0.45);
+.saved-section-header {
+  margin-bottom: 10px;
 }
 
 .saved-file-badge {
@@ -957,15 +1319,34 @@ watch(
   100% { transform: scale(0.95); opacity: 0.8; }
 }
 
-.saved-file-main {
+.saved-files-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.saved-file-item {
   display: flex;
   align-items: center;
   gap: 12px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.saved-file-item:hover {
+  background: rgba(29, 185, 84, 0.08);
+  border-color: rgba(29, 185, 84, 0.3);
 }
 
 .saved-file-icon {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 10px;
   background: rgba(29, 185, 84, 0.16);
   color: var(--c-accent, #1db954);
@@ -981,10 +1362,11 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 2px;
+  cursor: pointer;
 }
 
 .saved-file-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: #ffffff;
   white-space: nowrap;
@@ -993,15 +1375,43 @@ watch(
 }
 
 .saved-file-sub {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.saved-file-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .saved-file-btn {
-  padding: 8px 14px;
-  font-size: 13px;
-  gap: 6px;
-  flex-shrink: 0;
+  padding: 6px 12px;
+  font-size: 12px;
+  gap: 5px;
+  border-radius: 8px;
+}
+
+.action-btn.danger-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-btn.danger-icon:hover {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: #ef4444;
+  color: #fff;
 }
 
 /* Guide Card */
@@ -1164,7 +1574,9 @@ watch(
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   margin-bottom: 12px;
+  flex-wrap: wrap;
 }
 
 .summary-file-name {
@@ -1174,6 +1586,123 @@ watch(
   font-size: 14px;
   font-weight: 600;
   color: #f1f3f5;
+  min-width: 0;
+  flex: 1;
+}
+
+.summary-filename-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-ext-tag {
+  font-size: 10px;
+  font-weight: 700;
+  background: rgba(29, 185, 84, 0.15);
+  color: #1ed760;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid rgba(29, 185, 84, 0.3);
+}
+
+.summary-file-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* File switcher */
+.file-switcher-dropdown-wrap {
+  position: relative;
+}
+
+.file-switcher-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(29, 185, 84, 0.12);
+  border: 1px solid rgba(29, 185, 84, 0.3);
+  color: #1ed760;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.file-switcher-btn:hover {
+  background: rgba(29, 185, 84, 0.2);
+  border-color: #1ed760;
+}
+
+.switcher-chevron {
+  transition: transform 0.2s ease;
+}
+
+.switcher-chevron.rotate-180 {
+  transform: rotate(180deg);
+}
+
+.file-switcher-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 100;
+  background: #181b20;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 6px;
+  width: 240px;
+  max-height: 240px;
+  overflow-y: auto;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+}
+
+.file-switcher-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  padding: 6px 8px 4px 8px;
+}
+
+.file-switcher-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.file-switcher-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.file-switcher-item.active {
+  background: rgba(29, 185, 84, 0.15);
+  color: #1ed760;
+  font-weight: 600;
+}
+
+.switcher-item-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.switcher-item-count {
+  font-size: 11px;
+  color: #64748b;
 }
 
 .reset-file-btn {
@@ -1183,15 +1712,35 @@ watch(
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #8b929a;
-  padding: 4px 10px;
+  padding: 5px 10px;
   border-radius: 8px;
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .reset-file-btn:hover {
   background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.delete-active-file-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #f87171;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.delete-active-file-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
   color: #fff;
 }
 
@@ -1237,92 +1786,266 @@ watch(
   font-weight: 700;
 }
 
-/* Selection Toolbar */
-.selection-toolbar {
+/* Search & Filter Bar */
+.search-filter-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.search-input-wrap {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-  padding: 0 4px;
 }
 
-.selection-count-text {
-  font-size: 13px;
-  color: #94a3b8;
+.search-input-wrap .search-icon {
+  position: absolute;
+  left: 12px;
+  color: #64748b;
+  pointer-events: none;
 }
 
-.selection-buttons {
-  display: flex;
-  gap: 8px;
-}
-
-.sel-btn {
-  background: rgba(255, 255, 255, 0.06);
+.search-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #cbd5e1;
-  padding: 5px 12px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
+  color: #fff;
+  border-radius: 10px;
+  padding: 9px 36px 9px 36px;
+  font-size: 13px;
+  outline: none;
   transition: all 0.2s;
+}
+
+.search-input:focus {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(29, 185, 84, 0.5);
+  box-shadow: 0 0 12px rgba(29, 185, 84, 0.15);
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 10px;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 50%;
+}
+
+.clear-search-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.filter-chips-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.filter-chip {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
 }
 
-.sel-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+.filter-chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+}
+
+.filter-chip.active {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.25);
   color: #fff;
-}
-
-.sel-btn.highlight {
-  background: rgba(29, 185, 84, 0.18);
-  border-color: rgba(29, 185, 84, 0.4);
-  color: #1ed760;
-}
-
-.sel-btn.highlight.active {
-  background: #1db954;
-  color: #000;
   font-weight: 600;
 }
 
-/* Options Bar */
-.options-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 10px;
-  padding: 10px 14px;
-  margin-bottom: 14px;
+.filter-chip.new.active {
+  background: rgba(29, 185, 84, 0.2);
+  border-color: #1ed760;
+  color: #1ed760;
 }
 
-.checkbox-label {
+.filter-chip.in-lib.active {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: #60a5fa;
+  color: #93c5fd;
+}
+
+.filter-chip.in-tg.active {
+  background: rgba(168, 85, 247, 0.2);
+  border-color: #c084fc;
+  color: #d8b4fe;
+}
+
+.filter-chip.selected.active {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: #fbbf24;
+  color: #fcd34d;
+}
+
+.filtered-hint {
+  color: #64748b;
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+/* Destination Section */
+.destination-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.destination-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+.destination-modes {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
-  color: #cbd5e1;
+  flex-wrap: wrap;
+}
+
+.destination-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
   cursor: pointer;
+  transition: all 0.15s;
   user-select: none;
 }
 
-.playlist-name-input {
-  flex: 1;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #fff;
-  border-radius: 8px;
-  padding: 6px 12px;
-  font-size: 13px;
-  outline: none;
+.destination-chip input[type="radio"] {
+  display: none;
 }
 
-.playlist-name-input:focus {
+.destination-chip:hover:not(.disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.destination-chip.active {
+  background: rgba(29, 185, 84, 0.15);
+  border-color: rgba(29, 185, 84, 0.4);
+  color: #1ed760;
+  font-weight: 600;
+}
+
+.destination-chip.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.destination-input-wrap, .destination-select-wrap {
+  margin-top: 4px;
+}
+
+.custom-select-wrapper {
+  position: relative;
+}
+
+.playlist-dropdown {
+  width: 100%;
+  background: #181b20;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+}
+
+.playlist-dropdown:focus {
   border-color: #1db954;
+}
+
+.playlist-dropdown option {
+  background: #181b20;
+  color: #fff;
+}
+
+.destination-summary-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.scroll-more-indicator {
+  padding: 12px;
+  text-align: center;
+  font-size: 11px;
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+  margin-top: 6px;
+}
+
+.no-tracks-found {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 16px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.reset-filter-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.reset-filter-btn:hover {
+  background: rgba(29, 185, 84, 0.2);
+  border-color: #1ed760;
+  color: #1ed760;
 }
 
 /* Tracklist */

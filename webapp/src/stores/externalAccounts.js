@@ -30,7 +30,7 @@ export const useExternalAccountsStore = defineStore('externalAccounts', () => {
   const recentSpotifyImports = computed(() => {
     if (!lastSpotifyImport.value) return []
     if (Array.isArray(lastSpotifyImport.value.recent_files) && lastSpotifyImport.value.recent_files.length > 0) {
-      return lastSpotifyImport.value.recent_files.slice(0, 3)
+      return lastSpotifyImport.value.recent_files
     }
     if (lastSpotifyImport.value.file_id) {
       return [lastSpotifyImport.value]
@@ -178,6 +178,11 @@ export const useExternalAccountsStore = defineStore('externalAccounts', () => {
     return res.data
   }
 
+  async function deleteSpotifyImport(fileId) {
+    await ingestionApi.deleteSpotifyImportFile(fileId)
+    await fetchLastSpotifyImport(true)
+  }
+
   function reset() {
     scAccount.value = null
     spAccount.value = null
@@ -209,6 +214,7 @@ export const useExternalAccountsStore = defineStore('externalAccounts', () => {
     disconnectSpotify,
     updatePrivacy,
     fetchLastSpotifyImport,
+    deleteSpotifyImport,
     setLastSpotifyImport,
     setSoundCloudAccount,
     setSpotifyAccount,

@@ -108,12 +108,14 @@
           <div class="rail-active-indicator"></div>
         </div>
 
-        <!-- Spotify Last Import Rail Item -->
+        <!-- Spotify Last / Recent Imports Rail Item -->
         <div 
-          v-if="externalAccountsStore.hasLastSpotifyImport"
+          v-for="file in externalAccountsStore.recentSpotifyImports.slice(0, 2)"
+          :key="`rail-${file.file_id || file.id}`"
           class="rail-nav-item clickable"
-          @click="openLastSpotifyImport"
-          :title="`Импорт Spotify: ${externalAccountsStore.lastSpotifyImport.filename}`"
+          :class="{ active: isFileImportActive(file) }"
+          @click="openSpotifyImportFile(file)"
+          :title="`Импорт Spotify: ${file.filename} (${file.total_tracks} треков)`"
         >
           <FileSpreadsheet :size="20" />
           <div class="rail-active-indicator"></div>
@@ -341,13 +343,22 @@
           <div 
             v-for="file in externalAccountsStore.recentSpotifyImports" 
             :key="file.file_id || file.id"
-            class="nav-subitem clickable" 
+            class="nav-subitem import-file-subitem clickable" 
+            :class="{ active: isFileImportActive(file) }"
             @click="openSpotifyImportFile(file)"
             :title="`Открыть импорт: ${file.filename} (${file.total_tracks} треков)`"
           >
-            <FileSpreadsheet :size="15" />
+            <FileSpreadsheet :size="15" class="subitem-icon" />
             <span class="file-name-subitem">{{ formatImportFilename(file.filename) }}</span>
             <span v-if="file.total_tracks" class="sub-count" title="Количество треков">{{ file.total_tracks }}</span>
+            <button 
+              class="subitem-delete-btn"
+              @click.stop="promptDeleteImportFile(file)"
+              title="Удалить файл импорта"
+              aria-label="Удалить файл импорта"
+            >
+              <Trash2 :size="12" />
+            </button>
           </div>
         </div>
       </nav>
@@ -470,7 +481,8 @@ import {
   LogOut,
   FileSpreadsheet,
   Cloud,
-  Radio
+  Radio,
+  Trash2
 } from 'lucide-vue-next'
 import { getCacheStats } from '@/utils/audioCacheDb'
 import { useExternalAccountsStore } from '@/stores/externalAccounts'
@@ -639,7 +651,30 @@ const formatImportFilename = (name) => {
 }
 
 const openSpotifyImportFile = (file) => {
-  tasksStore.openExportifyModal({ fileId: file.file_id, loadLastSaved: true })
+  tasksStore.openExportifyModal({ fileId: file.file_id, filename: file.filename, loadLastSaved: true })
+}
+
+const isFileImportActive = (file) => {
+  if (!tasksStore.showExportifyModal) return false
+  const activeFileId = tasksStore.exportifyModalOptions?.fileId
+  if (activeFileId) return activeFileId === file.file_id
+  return externalAccountsStore.lastSpotifyImport?.file_id === file.file_id
+}
+
+const promptDeleteImportFile = async (file) => {
+  const name = formatImportFilename(file.filename)
+  if (confirm(`Удалить файл импорта «${name}» из истории?`)) {
+    try {
+      await externalAccountsStore.deleteSpotifyImport(file.file_id || file.id)
+      uiStore.toast?.success('Удалено', `Файл импорта «${name}» удалён`)
+      if (tasksStore.showExportifyModal && tasksStore.exportifyModalOptions?.fileId === file.file_id) {
+        tasksStore.closeExportifyModal()
+      }
+    } catch (err) {
+      console.error('Failed to delete import file:', err)
+      uiStore.toast?.error('Ошибка', 'Не удалось удалить файл импорта')
+    }
+  }
 }
 
 const openLastSpotifyImport = () => {

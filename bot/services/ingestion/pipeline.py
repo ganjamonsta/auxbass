@@ -14,7 +14,7 @@ from typing import Optional, Callable, Any, List, Dict
 from aiogram import Bot
 from aiogram.types import FSInputFile
 from aiogram.exceptions import TelegramRetryAfter, TelegramBadRequest
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_, or_, func
 
 from shared.config import get_settings
 from shared.database import get_session
@@ -570,23 +570,26 @@ class IngestionPipeline:
                 await progress_callback(job)
 
     async def _add_track_to_playlist(self, playlist_id: int, track_id: int, position: int):
-        """Associate imported track with the created playlist."""
+        """Associate imported track with the created or target playlist."""
         try:
             async with get_session() as session:
                 # Ensure it's not already in playlist
-                existing = await session.execute(
+                existing = await session.scalar(
                     select(PlaylistTrack).where(
-                        and_(
-                            PlaylistTrack.playlist_id == playlist_id,
-                            PlaylistTrack.track_id == track_id,
-                        )
+                        PlaylistTrack.playlist_id == playlist_id,
+                        PlaylistTrack.track_id == track_id,
                     )
                 )
-                if not existing.scalar():
+                if not existing:
+                    max_pos = await session.scalar(
+                        select(func.coalesce(func.max(PlaylistTrack.position), 0)).where(
+                            PlaylistTrack.playlist_id == playlist_id
+                        )
+                    )
                     pt = PlaylistTrack(
                         playlist_id=playlist_id,
                         track_id=track_id,
-                        position=position,
+                        position=(max_pos or 0) + 1,
                     )
                     session.add(pt)
                     await session.commit()
