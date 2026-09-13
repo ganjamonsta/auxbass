@@ -80,7 +80,7 @@
         <div class="setting-row mini-setting-row">
           <div class="setting-info">
             <span class="setting-name">Показывать Spotify в профиле</span>
-            <span class="setting-desc">Отображать бейдж профиля Spotify и вкладку</span>
+            <span class="setting-desc">Отображать ссылку на профиль Spotify в шапке</span>
           </div>
           <label class="toggle">
             <input 

@@ -109,20 +109,6 @@
             {{ scPlaylists.length + scTracks.length }}
           </span>
         </button>
-
-        <!-- Spotify Tab -->
-        <button
-          v-if="spAccount && (spAccount.show_playlists || isSelf)"
-          class="user-tab-btn sp-tab-btn"
-          :class="{ active: activeTab === 'spotify' }"
-          @click="selectTab('spotify')"
-        >
-          <Radio :size="16" />
-          <span>Spotify</span>
-          <span v-if="spPlaylists.length > 0" class="user-tab-badge sp-badge-num">
-            {{ spPlaylists.length }}
-          </span>
-        </button>
       </div>
 
       <!-- Overview Tab Content -->
@@ -135,10 +121,8 @@
           :overviewPlaylists="overviewPlaylists"
           :overviewAlbums="overviewAlbums"
           :scAccount="scAccount"
-          :spAccount="spAccount"
           :scPlaylists="scPlaylists"
           :scTracks="scTracks"
-          :spPlaylists="spPlaylists"
           :importingTrackUrl="importingTrackUrl"
           @selectTab="selectTab"
           @openScPlaylist="handleOpenScPlaylist"
@@ -236,17 +220,6 @@
           @quickAdd="handleQuickAddExternalTrack"
         />
       </div>
-
-      <!-- Spotify Tab Content -->
-      <div v-show="activeTab === 'spotify'" class="tab-pane">
-        <ProfileTabSpotify
-          v-if="hasOpenedSpotify || activeTab === 'spotify'"
-          :spAccount="spAccount"
-          :spPlaylists="spPlaylists"
-          :loadingSpPlaylists="loadingSpPlaylists"
-          :isSelf="isSelf"
-        />
-      </div>
     </template>
 
     <!-- Edit Profile Modal -->
@@ -282,7 +255,6 @@ import ProfileHeroCard from './profile/ProfileHeroCard.vue'
 import ProfileActiveImports from './profile/ProfileActiveImports.vue'
 import ProfileTabsOverview from './profile/ProfileTabsOverview.vue'
 import ProfileTabSoundCloud from './profile/ProfileTabSoundCloud.vue'
-import ProfileTabSpotify from './profile/ProfileTabSpotify.vue'
 import ProfileEditModal from './profile/ProfileEditModal.vue'
 
 import {
@@ -292,7 +264,6 @@ import {
   Folder,
   Disc3,
   Sparkles,
-  Radio,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -331,7 +302,6 @@ const hasOpenedTracks = ref(false)
 const hasOpenedPlaylists = ref(false)
 const hasOpenedAlbums = ref(false)
 const hasOpenedSoundCloud = ref(false)
-const hasOpenedSpotify = ref(false)
 const showEditProfileModal = ref(false)
 
 const markTabOpened = (tabKey) => {
@@ -339,7 +309,6 @@ const markTabOpened = (tabKey) => {
   if (tabKey === 'playlists') hasOpenedPlaylists.value = true
   if (tabKey === 'albums') hasOpenedAlbums.value = true
   if (tabKey === 'soundcloud') hasOpenedSoundCloud.value = true
-  if (tabKey === 'spotify') hasOpenedSpotify.value = true
 }
 
 // ─── Overview Data ───
@@ -373,8 +342,6 @@ const scTracks = ref([])
 const loadingScTracks = ref(false)
 const scTracksCursor = ref(null)
 const loadingMoreScTracks = ref(false)
-const spPlaylists = ref([])
-const loadingSpPlaylists = ref(false)
 const importingTrackUrl = ref(null)
 const isSyncingScPlaylist = ref(false)
 
@@ -476,11 +443,6 @@ const loadExternalAccounts = async (id) => {
       if (sc.show_playlists || isSelf.value) loadScPlaylists(id)
       if (sc.show_tracks || isSelf.value) loadScTracks(id, true)
     }
-
-    const sp = accounts.find(a => a.provider === 'spotify') || (isSelf.value && externalAccountsStore.isSpConnected ? externalAccountsStore.spAccount : null)
-    if (sp) {
-      if (sp.show_playlists || isSelf.value) loadSpPlaylists(id)
-    }
   } catch (err) {
     console.error('Failed to load user external accounts:', err)
   }
@@ -529,19 +491,6 @@ const loadMoreScTracks = async () => {
     console.error('Failed to load more SC tracks:', err)
   } finally {
     loadingMoreScTracks.value = false
-  }
-}
-
-const loadSpPlaylists = async (id) => {
-  loadingSpPlaylists.value = true
-  try {
-    const res = await socialApi.getUserExternalPlaylists(id, 'spotify')
-    spPlaylists.value = res.data?.items || []
-  } catch (err) {
-    console.error('Failed to load Spotify playlists:', err)
-    spPlaylists.value = []
-  } finally {
-    loadingSpPlaylists.value = false
   }
 }
 
@@ -882,11 +831,9 @@ watch(
       hasOpenedPlaylists.value = false
       hasOpenedAlbums.value = false
       hasOpenedSoundCloud.value = false
-      hasOpenedSpotify.value = false
       externalAccounts.value = []
       scPlaylists.value = []
       scTracks.value = []
-      spPlaylists.value = []
       resetScrollToTop()
       loadUserProfile(true)
     }
@@ -1088,17 +1035,6 @@ onMounted(() => {
   color: #fff;
   border-color: #ff5500;
   box-shadow: 0 4px 16px rgba(255, 85, 0, 0.4);
-}
-
-.user-tab-btn.sp-tab-btn {
-  border-color: rgba(29, 185, 84, 0.25);
-}
-
-.user-tab-btn.sp-tab-btn.active {
-  background: #1db954;
-  color: #000;
-  border-color: #1db954;
-  box-shadow: 0 4px 16px rgba(29, 185, 84, 0.4);
 }
 
 .sc-badge-num {

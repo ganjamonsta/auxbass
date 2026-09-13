@@ -190,36 +190,9 @@
         </div>
       </section>
 
-      <!-- Section 6: Spotify Playlists (Overview preview) -->
-      <section v-if="spPlaylists.length > 0" class="profile-section sp-section">
-        <div class="section-header">
-          <div class="section-title-with-badge clickable" @click="$emit('selectTab', 'spotify')" title="Перейти в Spotify">
-            <Radio :size="16" class="sp-icon-title" />
-            <h2 class="section-title">Плейлисты Spotify</h2>
-          </div>
-          <button class="section-link" @click="$emit('selectTab', 'spotify')">Все {{ spPlaylists.length }}</button>
-        </div>
-        <div class="overview-grid">
-          <div 
-            v-for="pl in spPlaylists.slice(0, 6)" 
-            :key="pl.id" 
-            class="feed-card ext-card sp-card"
-            @click="$emit('selectTab', 'spotify')"
-          >
-            <div class="feed-card-cover sp-cover-box">
-              <FileSpreadsheet :size="36" class="sp-card-icon" />
-            </div>
-            <div class="feed-card-info">
-              <div class="feed-card-title">{{ pl.title }}</div>
-              <div class="feed-card-subtitle">{{ pl.track_count }} {{ getTracksWord(pl.track_count) }}</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <!-- Empty State if user has no public content -->
       <div 
-        v-if="overviewPlaylists.length === 0 && overviewTracks.length === 0 && overviewAlbums.length === 0 && scPlaylists.length === 0 && scTracks.length === 0 && spPlaylists.length === 0" 
+        v-if="overviewPlaylists.length === 0 && overviewTracks.length === 0 && overviewAlbums.length === 0 && scPlaylists.length === 0 && scTracks.length === 0" 
         class="empty-state"
       >
         <div class="empty-icon"><Music :size="48" /></div>
@@ -247,8 +220,6 @@ import {
   Disc3,
   Play,
   ChevronRight,
-  Radio,
-  FileSpreadsheet,
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -259,10 +230,8 @@ const props = defineProps({
   overviewPlaylists: { type: Array, default: () => [] },
   overviewAlbums: { type: Array, default: () => [] },
   scAccount: { type: Object, default: null },
-  spAccount: { type: Object, default: null },
   scPlaylists: { type: Array, default: () => [] },
   scTracks: { type: Array, default: () => [] },
-  spPlaylists: { type: Array, default: () => [] },
   importingTrackUrl: { type: String, default: null },
 })
 
@@ -539,18 +508,6 @@ const handleAlbumContextMenu = (album, event) => {
 /* SC/SP Cover variants */
 .sc-cover-box {
   background: linear-gradient(135deg, rgba(255, 85, 0, 0.2) 0%, rgba(20, 20, 20, 0.8) 100%) !important;
-}
-
-.sp-cover-box {
-  background: linear-gradient(135deg, rgba(29, 185, 84, 0.2) 0%, rgba(20, 20, 20, 0.8) 100%) !important;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.sp-card-icon {
-  color: #1db954;
-  opacity: 0.8;
 }
 
 .sc-badge-inline {

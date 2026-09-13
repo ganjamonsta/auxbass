@@ -78,48 +78,32 @@
         <!-- External Connected Accounts Badges -->
         <template v-if="scAccount && (isSelf || scAccount.show_on_profile !== false)">
           <span class="stat-separator">•</span>
-          <button 
+          <a 
             class="hero-ext-badge sc-badge" 
-            @click="$emit('selectTab', 'soundcloud')" 
+            :href="getSoundCloudUrl(scAccount)" 
+            target="_blank" 
+            rel="noopener noreferrer" 
             :title="`SoundCloud: @${scAccount.username}${scAccount.likes_count ? ' • ' + scAccount.likes_count + ' лайков' : ''}`"
           >
             <span class="sc-badge-inline">SC</span>
             <span class="ext-badge-name">{{ scAccount.username }}</span>
-            <a 
-              v-if="scAccount.profile_url || scAccount.permalink_url" 
-              :href="scAccount.profile_url || scAccount.permalink_url" 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              class="ext-badge-direct-link" 
-              @click.stop
-              title="Открыть профиль на SoundCloud"
-            >
-              <ExternalLink :size="10" />
-            </a>
-          </button>
+            <ExternalLink :size="10" class="ext-badge-direct-link" />
+          </a>
         </template>
 
         <template v-if="spAccount && (isSelf || spAccount.show_on_profile !== false)">
           <span class="stat-separator">•</span>
-          <button 
+          <a 
             class="hero-ext-badge sp-badge" 
-            @click="$emit('selectTab', 'spotify')" 
-            :title="`Spotify: ${spAccount.display_name || spAccount.username}`"
+            :href="getSpotifyUrl(spAccount)" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            title="Открыть профиль на Spotify"
           >
             <Radio :size="12" class="sp-icon-inline" />
-            <span class="ext-badge-name">{{ spAccount.display_name || spAccount.username }}</span>
-            <a 
-              v-if="spAccount.profile_url || spAccount.permalink_url" 
-              :href="spAccount.profile_url || spAccount.permalink_url" 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              class="ext-badge-direct-link" 
-              @click.stop
-              title="Открыть профиль на Spotify"
-            >
-              <ExternalLink :size="10" />
-            </a>
-          </button>
+            <span class="ext-badge-name">Spotify</span>
+            <ExternalLink :size="10" class="ext-badge-direct-link" />
+          </a>
         </template>
       </div>
 
@@ -216,6 +200,24 @@ defineProps({
 })
 
 defineEmits(['play', 'shuffle', 'follow', 'edit', 'share', 'selectTab'])
+
+const ensureAbsoluteUrl = (url, fallback) => {
+  if (!url) return fallback
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  return `https://${url}`
+}
+
+const getSoundCloudUrl = (acc) => {
+  if (!acc) return '#'
+  const raw = acc.profile_url || acc.permalink_url || (acc.username ? `https://soundcloud.com/${acc.username}` : 'https://soundcloud.com')
+  return ensureAbsoluteUrl(raw, 'https://soundcloud.com')
+}
+
+const getSpotifyUrl = (acc) => {
+  if (!acc) return '#'
+  const raw = acc.profile_url || acc.permalink_url || (acc.username ? `https://open.spotify.com/user/${acc.username}` : 'https://open.spotify.com')
+  return ensureAbsoluteUrl(raw, 'https://open.spotify.com')
+}
 </script>
 
 <style scoped>
@@ -504,11 +506,18 @@ defineEmits(['play', 'shuffle', 'follow', 'edit', 'share', 'selectTab'])
   font-weight: 600;
   transition: all 0.2s ease;
   flex-shrink: 0;
+  text-decoration: none;
+}
+
+.hero-ext-badge:visited {
+  color: var(--c-text-1, #fff);
 }
 
 .hero-ext-badge:hover {
   background: rgba(255, 255, 255, 0.14);
   transform: translateY(-1px);
+  color: var(--c-text-1, #fff);
+  text-decoration: none;
 }
 
 .hero-ext-badge.sc-badge {
@@ -565,7 +574,8 @@ defineEmits(['play', 'shuffle', 'follow', 'edit', 'share', 'selectTab'])
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-.ext-badge-direct-link:hover {
+.ext-badge-direct-link:hover,
+.hero-ext-badge:hover .ext-badge-direct-link {
   opacity: 1;
   transform: scale(1.18);
 }
