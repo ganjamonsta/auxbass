@@ -527,6 +527,13 @@ const getSpotifyUrl = (acc) => {
   user-select: none;
   transition: all 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
   position: relative;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.monolith-tab-btn:focus,
+.monolith-tab-btn:focus-visible {
+  outline: none;
 }
 
 .monolith-tab-btn:last-child {
@@ -1086,7 +1093,10 @@ const getSpotifyUrl = (acc) => {
 
   .hero-monolith-tabs {
     grid-area: tabs;
-    width: 48px;
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    flex: 0 0 48px !important;
     height: 100%;
     align-self: stretch;
     border-radius: var(--r-xl, 24px) 0 0 0;
@@ -1124,6 +1134,16 @@ const getSpotifyUrl = (acc) => {
     background: linear-gradient(90deg, rgba(255, 85, 0, 0.22) 0%, rgba(28, 22, 22, 0.8) 100%);
   }
 
+  .monolith-tab-btn.sc-tab .tab-edge-icon {
+    width: auto;
+    height: auto;
+  }
+
+  .monolith-tab-btn.sc-tab .sc-badge-inline {
+    padding: 1px 4px;
+    font-size: 9px;
+  }
+
   .tab-edge-divider,
   .tab-edge-label,
   .tab-edge-badge {
@@ -1158,7 +1178,10 @@ const getSpotifyUrl = (acc) => {
   /* Mobile details overlay - uniform seamless bottom panel */
   .hero-tab-details-panel {
     grid-area: details;
-    width: 100%;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    flex: none !important;
     margin: 0;
     border: none;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -1169,6 +1192,11 @@ const getSpotifyUrl = (acc) => {
     box-shadow: none;
     padding: 14px 18px;
     align-self: stretch;
+  }
+
+  .hero-tab-details-panel .panel-stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
   }
 
   .hero-tab-details-panel .panel-highlight-row {
@@ -1203,20 +1231,30 @@ const getSpotifyUrl = (acc) => {
   }
 }
 
+@media (max-width: 540px) {
+  .hero-tab-details-panel .panel-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+}
+
 @media (max-width: 480px) {
   .profile-hero-card {
     grid-template-columns: 44px 1fr;
   }
 
   .hero-monolith-tabs {
-    width: 44px;
-    padding: 12px 3px 10px 0;
-    gap: 3px;
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    flex: 0 0 44px !important;
+    padding: 0;
+    gap: 0;
   }
 
   .monolith-tab-btn {
-    height: 36px;
-    border-radius: 0 7px 7px 0;
+    min-height: 36px;
+    border-radius: 0;
   }
 
   .hero-name {
