@@ -54,15 +54,6 @@
 
       <!-- Library Sub-links -->
       <div class="sidebar-subnav">
-        <div 
-          class="nav-subitem clickable" 
-          :class="{ active: route.name === 'library' && (!route.query.tab || route.query.tab === 'overview') }"
-          @click="goToLibraryTab('overview')"
-          title="Обзор медиатеки"
-        >
-          <LayoutGrid :size="15" />
-          <span>Обзор</span>
-        </div>
 
         <div 
           class="nav-subitem clickable" 
