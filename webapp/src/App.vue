@@ -330,14 +330,15 @@ const updateLayoutState = () => {
 
   uiStore.isAutoCollapsed = isTightLeft
 
-  // If user hasn't explicitly overridden during session, auto-collapse when tight and expand when spacious
+  // If user hasn't explicitly chosen, auto-collapse based on available space
   if (uiStore.userCollapsedPreference === null) {
     uiStore.setSidebarCollapsed(isTightLeft)
+  } else if (uiStore.userCollapsedPreference === false) {
+    // User explicitly pinned sidebar to layout: keep it pinned in desktop mode!
+    uiStore.setSidebarCollapsed(false)
   } else {
-    // If it is tight, auto-collapse takes priority to prevent broken UI
-    if (isTightLeft && !uiStore.isSidebarCollapsed) {
-      uiStore.setSidebarCollapsed(true)
-    }
+    // User explicitly collapsed sidebar to icons
+    uiStore.setSidebarCollapsed(true)
   }
 }
 

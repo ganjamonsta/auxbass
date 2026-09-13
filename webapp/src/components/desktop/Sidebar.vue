@@ -147,7 +147,7 @@
   <!-- 2. Full Sidebar (Shown in grid when isSidebarCollapsed is false) -->
   <aside v-else class="sidebar sidebar-wrapper full-mode">
     <div class="sidebar-scroll">
-      <!-- Logo -->
+      <!-- Logo & Header Actions -->
       <div class="sidebar-logo">
         <div class="logo-icon">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
@@ -156,16 +156,28 @@
         </div>
         <span class="logo-text">{{ authStore.appName || 'auxbassbot' }}</span>
 
-        <div 
-          v-if="authStore.user" 
-          class="header-avatar clickable" 
-          @click="goToMyProfile"
-          title="Мой профиль"
-        >
-          <span class="header-avatar-badge">
-            <img v-if="authStore.userAvatarUrl" :src="authStore.userAvatarUrl" class="sidebar-avatar-img" />
-            <template v-else>{{ userInitials }}</template>
-          </span>
+        <div class="sidebar-header-actions">
+          <button 
+            class="sidebar-pin-btn pinned" 
+            @click="uiStore.unpinSidebar" 
+            title="Открепить сайдбар (свернуть до иконок)"
+            aria-label="Открепить сайдбар"
+          >
+            <PinOff :size="13" />
+            <span class="pin-btn-text">Открепить</span>
+          </button>
+
+          <div 
+            v-if="authStore.user" 
+            class="header-avatar clickable" 
+            @click="goToMyProfile"
+            title="Мой профиль"
+          >
+            <span class="header-avatar-badge">
+              <img v-if="authStore.userAvatarUrl" :src="authStore.userAvatarUrl" class="sidebar-avatar-img" />
+              <template v-else>{{ userInitials }}</template>
+            </span>
+          </div>
         </div>
       </div>
 
@@ -390,7 +402,7 @@
           @click.stop
         >
           <div class="sidebar-scroll">
-            <!-- Logo -->
+            <!-- Logo & Header Actions -->
             <div class="sidebar-logo">
               <div class="logo-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
@@ -399,16 +411,28 @@
               </div>
               <span class="logo-text">{{ authStore.appName || 'auxbassbot' }}</span>
 
-              <div 
-                v-if="authStore.user" 
-                class="header-avatar clickable" 
-                @click="goToMyProfileAndClose"
-                title="Мой профиль"
-              >
-                <span class="header-avatar-badge">
-                  <img v-if="authStore.userAvatarUrl" :src="authStore.userAvatarUrl" class="sidebar-avatar-img" />
-                  <template v-else>{{ userInitials }}</template>
-                </span>
+              <div class="sidebar-header-actions">
+                <button 
+                  class="sidebar-pin-btn" 
+                  @click="uiStore.pinSidebar" 
+                  title="Закрепить в интерфейсе (сделать частью лейаута)"
+                  aria-label="Закрепить сайдбар"
+                >
+                  <Pin :size="13" />
+                  <span class="pin-btn-text">Закрепить</span>
+                </button>
+
+                <div 
+                  v-if="authStore.user" 
+                  class="header-avatar clickable" 
+                  @click="goToMyProfileAndClose"
+                  title="Мой профиль"
+                >
+                  <span class="header-avatar-badge">
+                    <img v-if="authStore.userAvatarUrl" :src="authStore.userAvatarUrl" class="sidebar-avatar-img" />
+                    <template v-else>{{ userInitials }}</template>
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -642,6 +666,8 @@ import {
   Heart, 
   ChevronRight, 
   ChevronLeft, 
+  Pin,
+  PinOff,
   Settings, 
   LogOut 
 } from 'lucide-vue-next'
@@ -1110,8 +1136,67 @@ onUnmounted(() => {
 .sidebar-logo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   padding: 20px 16px 16px;
+}
+
+.sidebar-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.sidebar-header-actions .header-avatar {
+  margin-left: 0;
+}
+
+.sidebar-pin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.sidebar-pin-btn:hover {
+  background: rgba(29, 185, 84, 0.18);
+  border-color: rgba(29, 185, 84, 0.45);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.sidebar-pin-btn:active {
+  transform: translateY(0);
+}
+
+.sidebar-pin-btn.pinned {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.sidebar-pin-btn.pinned:hover {
+  background: rgba(255, 107, 107, 0.12);
+  border-color: rgba(255, 107, 107, 0.3);
+  color: #ff8585;
+}
+
+.pin-btn-text {
+  font-size: 11.5px;
+  line-height: 1;
 }
 
 .header-avatar {

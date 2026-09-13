@@ -93,6 +93,15 @@ export const useUIStore = defineStore('ui', () => {
     }
   }
 
+  const pinSidebar = () => {
+    isSidebarOverlayOpen.value = false
+    setSidebarCollapsed(false, true)
+  }
+
+  const unpinSidebar = () => {
+    setSidebarCollapsed(true, true)
+  }
+
   // Right NowPlayingSidebar visibility state
   const isNowPlayingSidebarVisible = ref(true)
   const userNowPlayingPreference = ref(null) // null = auto, boolean = explicit user choice
@@ -132,6 +141,8 @@ export const useUIStore = defineStore('ui', () => {
     openSidebarOverlay,
     closeSidebarOverlay,
     toggleSidebarOverlay,
+    pinSidebar,
+    unpinSidebar,
     setSidebarCollapsed,
     toggleSidebarCollapse,
     // Right NowPlaying Sidebar state
@@ -148,3 +159,4 @@ export const useUIStore = defineStore('ui', () => {
     toast
   }
 })
+
