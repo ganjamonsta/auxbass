@@ -381,7 +381,12 @@ export const useTasksStore = defineStore('tasks', () => {
   /**
    * Modal opening shortcuts
    */
-  const openExportifyModal = () => {
+  const openExportifyModal = async () => {
+    const { useAuthStore } = await import('./auth')
+    const authStore = useAuthStore()
+    if (!authStore.requireChannel('импорта музыки')) {
+      return
+    }
     showExportifyModal.value = true
   }
 
@@ -395,7 +400,12 @@ export const useTasksStore = defineStore('tasks', () => {
     currentExportifyJob.value = null
   }
 
-  const openImportModal = () => {
+  const openImportModal = async () => {
+    const { useAuthStore } = await import('./auth')
+    const authStore = useAuthStore()
+    if (!authStore.requireChannel('импорта музыки')) {
+      return
+    }
     showImportModal.value = true
   }
 

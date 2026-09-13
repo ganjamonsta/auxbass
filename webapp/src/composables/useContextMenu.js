@@ -13,6 +13,7 @@ import { ref, inject, markRaw } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
+import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import { useModals } from '@/composables/useModals'
 import { playerApi, playlistsApi, albumsApi, tracksApi } from '@/api/client'
@@ -160,6 +161,10 @@ export function useContextMenu() {
 
     addToPlaylist: (track) => {
       closeMenu()
+      const authStore = useAuthStore()
+      if (!authStore.requireChannel('добавления в плейлист')) {
+        return
+      }
       editingItem.value = track
       showPlaylistPicker.value = true
     },
@@ -244,10 +249,17 @@ export function useContextMenu() {
 
     addToLibrary: async (track) => {
       if (!track?.id) return closeMenu()
+      const authStore = useAuthStore()
+      if (!authStore.requireChannel('добавления в медиатеку')) {
+        closeMenu()
+        return
+      }
       
       try {
-        await libraryStore.addToLibrary(track.id)
-        uiStore.toast.success('Добавлено', 'Трек добавлен в библиотеку')
+        const success = await libraryStore.addToLibrary(track.id)
+        if (success) {
+          uiStore.toast.success('Добавлено', 'Трек добавлен в библиотеку')
+        }
       } catch (error) {
         console.error('Failed to add to library:', error)
         uiStore.toast.error('Ошибка', 'Не удалось добавить трек')
@@ -614,6 +626,11 @@ export function useContextMenu() {
   }
 
   const openCreatePlaylist = () => {
+    const authStore = useAuthStore()
+    if (!authStore.requireChannel('создания плейлиста')) {
+      showPlaylistPicker.value = false
+      return
+    }
     showPlaylistPicker.value = false
     newPlaylistName.value = ''
     showCreatePlaylist.value = true

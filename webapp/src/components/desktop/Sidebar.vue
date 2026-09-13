@@ -316,6 +316,9 @@ const isActiveExact = (path) => {
 
 // Actions
 const createPlaylist = async () => {
+  if (!authStore.requireChannel('создания плейлиста')) {
+    return
+  }
   try {
     const name = prompt('Название плейлиста:')
     if (!name) return

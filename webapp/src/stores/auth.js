@@ -105,8 +105,25 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
   
-  function promptChannelSetup() {
+  function promptChannelSetup(actionTitle = '') {
     showChannelBanner.value = true
+    import('./ui').then(({ useUIStore }) => {
+      const uiStore = useUIStore()
+      if (uiStore?.toast) {
+        uiStore.toast.info(
+          'Требуется Telegram-канал',
+          actionTitle ? `Для ${actionTitle} подключите канал в настройках` : 'Подключите Telegram-канал для сохранения треков и плейлистов'
+        )
+      }
+    }).catch(() => {})
+  }
+
+  function requireChannel(actionTitle = '') {
+    if (!hasChannel.value) {
+      promptChannelSetup(actionTitle)
+      return false
+    }
+    return true
   }
   
   function dismissChannelBanner() {
@@ -229,6 +246,7 @@ export const useAuthStore = defineStore('auth', () => {
     fetchStatus,
     fetchConfig,
     promptChannelSetup,
+    requireChannel,
     dismissChannelBanner
   }
 })

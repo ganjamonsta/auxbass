@@ -13,11 +13,13 @@
  */
 import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
+import { useAuthStore } from '@/stores/auth'
 import { playerApi } from '@/api/client'
 
 export function useTrackActions() {
   const libraryStore = useLibraryStore()
   const uiStore = useUIStore()
+  const authStore = useAuthStore()
 
   /**
    * Handle direct download for large/HD files
@@ -59,6 +61,10 @@ export function useTrackActions() {
   const handleLikeTrack = async (track) => {
     if (!track?.id) return false
     
+    if (!authStore.requireChannel('сохранения в любимые треки')) {
+      return track.is_liked === true
+    }
+
     const current = track.is_liked === true
     track.is_liked = !current
     const newLikedState = await libraryStore.toggleLike(track.id, current)
@@ -77,6 +83,10 @@ export function useTrackActions() {
   const handleAddToLibrary = async (track) => {
     if (!track?.id) return false
     
+    if (!authStore.requireChannel('добавления в медиатеку')) {
+      return false
+    }
+
     const success = await libraryStore.addToLibrary(track.id)
     if (success && track && typeof track === 'object') {
       track.in_library = true

@@ -44,7 +44,7 @@
               </div>
               <p class="empty-title">Нет плейлистов</p>
               <p class="empty-desc">Создайте свой первый плейлист и сохраняйте любимую музыку</p>
-              <button class="create-first-btn" @click="$emit('createNew')">
+              <button class="create-first-btn" @click="handleCreateNew">
                 <Plus :size="16" />
                 <span>Создать плейлист</span>
               </button>
@@ -52,7 +52,7 @@
 
             <template v-else>
               <!-- "New Playlist" Option -->
-              <button class="playlist-option create-option" @click="$emit('createNew')">
+              <button class="playlist-option create-option" @click="handleCreateNew">
                 <div class="playlist-avatar create-avatar">
                   <Plus :size="20" />
                 </div>
@@ -128,6 +128,7 @@
 <script setup>
 import { ref, computed, watch, inject } from 'vue'
 import { useLibraryStore } from '@/stores/library'
+import { useAuthStore } from '@/stores/auth'
 import {
   getCoverUrl,
   CoverSize,
@@ -147,6 +148,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'createNew', 'added'])
 
 const library = useLibraryStore()
+const authStore = useAuthStore()
 const telegram = inject('telegram', null)
 
 const searchQuery = ref('')
@@ -177,8 +179,21 @@ watch(() => props.show, async (isOpen) => {
   }
 })
 
+const handleCreateNew = () => {
+  if (!authStore.requireChannel('создания плейлиста')) {
+    emit('close')
+    return
+  }
+  emit('createNew')
+}
+
 const handleSelect = async (playlist) => {
   if (!props.track || addingId.value) return
+
+  if (!authStore.requireChannel('добавления трека в плейлист')) {
+    emit('close')
+    return
+  }
 
   addingId.value = playlist.id
   telegram?.HapticFeedback?.impactOccurred?.('light')

@@ -379,12 +379,21 @@ export const useLibraryStore = defineStore('library', () => {
 
   // Create playlist
   const createPlaylist = async (name, description = '', isPublic = false) => {
+    const { useAuthStore } = await import('./auth')
+    const authStore = useAuthStore()
+    if (!authStore.requireChannel('создания плейлиста')) {
+      return null
+    }
+
     try {
       const response = await playlistsApi.create({ name, description, is_public: isPublic })
       await notifyPlaylistChange(response.data.id)
       return response.data
     } catch (error) {
       console.error('Failed to create playlist:', error)
+      if (error.response?.status === 403) {
+        authStore.promptChannelSetup('создания плейлиста')
+      }
       return null
     }
   }
@@ -535,12 +544,21 @@ export const useLibraryStore = defineStore('library', () => {
 
   // Add track to playlist
   const addTrackToPlaylist = async (playlistId, trackId) => {
+    const { useAuthStore } = await import('./auth')
+    const authStore = useAuthStore()
+    if (!authStore.requireChannel('добавления трека в плейлист')) {
+      return false
+    }
+
     try {
       await playlistsApi.addTrack(playlistId, trackId)
       await notifyPlaylistChange(playlistId)
       return true
     } catch (error) {
       console.error('Failed to add track to playlist:', error)
+      if (error.response?.status === 403) {
+        authStore.promptChannelSetup('добавления трека в плейлист')
+      }
       return false
     }
   }
@@ -666,6 +684,12 @@ export const useLibraryStore = defineStore('library', () => {
   const toggleLike = async (trackId, currentLikedState = null) => {
     if (!trackId) return false
 
+    const { useAuthStore } = await import('./auth')
+    const authStore = useAuthStore()
+    if (!authStore.requireChannel('сохранения в любимые треки')) {
+      return currentLikedState !== null ? currentLikedState : false
+    }
+
     // Determine current liked status:
     // 1. Explicitly passed parameter
     // 2. isTrackLiked() check across all known collections
@@ -700,10 +724,7 @@ export const useLibraryStore = defineStore('library', () => {
       console.error('Failed to toggle like:', error)
       // Handle 403 - show channel banner
       if (error.response?.status === 403) {
-        // Import auth store dynamically to avoid circular dependency
-        const { useAuthStore } = await import('./auth')
-        const authStore = useAuthStore()
-        authStore.promptChannelSetup()
+        authStore.promptChannelSetup('сохранения в любимые треки')
       }
       return isLiked
     }
@@ -838,6 +859,12 @@ export const useLibraryStore = defineStore('library', () => {
   
   // Add track to my library from global
   const addToLibrary = async (trackId) => {
+    const { useAuthStore } = await import('./auth')
+    const authStore = useAuthStore()
+    if (!authStore.requireChannel('добавления в медиатеку')) {
+      return false
+    }
+
     try {
       await tracksApi.addToLibrary(trackId)
       apiCache.invalidateRelated('track', trackId)
@@ -869,9 +896,7 @@ export const useLibraryStore = defineStore('library', () => {
       console.error('Failed to add to library:', error)
       // Handle 403 - show channel banner
       if (error.response?.status === 403) {
-        const { useAuthStore } = await import('./auth')
-        const authStore = useAuthStore()
-        authStore.promptChannelSetup()
+        authStore.promptChannelSetup('добавления в медиатеку')
       }
       return false
     }

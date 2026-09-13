@@ -131,15 +131,10 @@ const sortedTracks = computed(() => {
 const { playAll, shufflePlay, playTrack } = usePlaybackActions(sortedTracks)
 
 const handleToggleLike = async (track) => {
-  try {
-    if (track.is_liked) {
-      await libraryStore.unlikeTrack(track.id)
-      track.is_liked = false
-    } else {
-      await libraryStore.likeTrack(track.id)
-      track.is_liked = true
-    }
-  } catch (_) {}
+  if (!track?.id) return
+  const current = track.is_liked === true
+  const res = await libraryStore.toggleLike(track.id, current)
+  track.is_liked = res
 }
 
 const loadCachedTracks = async () => {

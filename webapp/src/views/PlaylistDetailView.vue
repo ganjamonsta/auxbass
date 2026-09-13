@@ -300,6 +300,9 @@ const deletePlaylist = async () => {
 // Subscription
 const toggleSubscription = async () => {
   if (subscribing.value) return
+  if (!playlist.value?.is_subscribed && !authStore.requireChannel('подписки на плейлист')) {
+    return
+  }
   subscribing.value = true
   
   try {

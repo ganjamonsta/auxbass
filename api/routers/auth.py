@@ -308,9 +308,14 @@ async def require_premium(
     db: AsyncSession = Depends(get_db),
 ) -> TelegramUser:
     """
-    Dependency that previously required connected channel.
-    Now allows all users to access library features to comply with TPA terms.
+    Dependency that requires user to have connected channel (premium).
+    Used for endpoints that modify library: add tracks, create playlists, like, follow, etc.
     """
+    if not await has_channel_connected(user.id, db):
+        raise HTTPException(
+            status_code=403,
+            detail="Подключите канал для доступа к этой функции. Перейдите в бота и используйте команду /channel"
+        )
     return user
 
 
