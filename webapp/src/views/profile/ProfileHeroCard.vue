@@ -1099,6 +1099,9 @@ const getSpotifyUrl = (acc) => {
     flex: 0 0 48px !important;
     height: 100%;
     align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
     border-radius: var(--r-xl, 24px) 0 0 0;
     border: none;
     border-right: 1px solid rgba(255, 255, 255, 0.08);
@@ -1109,15 +1112,19 @@ const getSpotifyUrl = (acc) => {
   }
 
   .monolith-tab-btn {
-    flex: 1;
-    width: 100%;
-    min-height: 38px;
-    padding: 0;
+    flex: 0 0 42px !important;
+    width: 100% !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
+    padding: 0 !important;
     justify-content: center;
+    align-items: center;
     border-radius: 0;
     border: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     border-left: 3.5px solid transparent;
+    box-sizing: border-box;
   }
 
   .monolith-tab-btn:last-child {
@@ -1190,13 +1197,43 @@ const getSpotifyUrl = (acc) => {
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     box-shadow: none;
-    padding: 14px 18px;
+    padding: 12px 16px;
     align-self: stretch;
+    min-height: 84px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .hero-tab-details-panel .tab-panel-inner {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .hero-tab-details-panel .panel-header {
+    margin-bottom: 6px;
   }
 
   .hero-tab-details-panel .panel-stats-grid {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 6px;
+  }
+
+  .hero-tab-details-panel .panel-stat-cell {
+    padding: 4px 6px;
+    align-items: center;
+    text-align: center;
+  }
+
+  .hero-tab-details-panel .panel-stat-num {
+    font-size: 14px;
+  }
+
+  .hero-tab-details-panel .panel-stat-lbl {
+    font-size: 10px;
   }
 
   .hero-tab-details-panel .panel-highlight-row {
@@ -1219,6 +1256,29 @@ const getSpotifyUrl = (acc) => {
     font-size: 11.5px;
   }
 
+  .hero-tab-details-panel .panel-quick-actions {
+    margin-top: 6px;
+    gap: 6px;
+  }
+
+  .hero-tab-details-panel .panel-action-btn {
+    height: 26px;
+    padding: 0 10px;
+    font-size: 11.5px;
+  }
+
+  .hero-tab-details-panel .tab-panel-sc .panel-sc-counts {
+    margin-top: 2px;
+  }
+
+  .hero-tab-details-panel .panel-sc-link-btn {
+    align-self: flex-start;
+    height: 26px;
+    padding: 0 10px;
+    font-size: 11px;
+    margin-top: 4px;
+  }
+
   .hero-share-corner-btn {
     top: 14px;
     right: 14px;
@@ -1228,13 +1288,6 @@ const getSpotifyUrl = (acc) => {
 
   .hero-actions-bar {
     gap: 8px;
-  }
-}
-
-@media (max-width: 540px) {
-  .hero-tab-details-panel .panel-stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 6px;
   }
 }
 
@@ -1253,7 +1306,10 @@ const getSpotifyUrl = (acc) => {
   }
 
   .monolith-tab-btn {
-    min-height: 36px;
+    flex: 0 0 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
     border-radius: 0;
   }
 
@@ -1267,7 +1323,25 @@ const getSpotifyUrl = (acc) => {
   }
 
   .hero-tab-details-panel {
-    padding: 12px 14px;
+    padding: 10px 12px;
+    min-height: 80px;
+  }
+
+  .hero-tab-details-panel .panel-stats-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 4px;
+  }
+
+  .hero-tab-details-panel .panel-stat-cell {
+    padding: 3px 4px;
+  }
+
+  .hero-tab-details-panel .panel-stat-num {
+    font-size: 13px;
+  }
+
+  .hero-tab-details-panel .panel-stat-lbl {
+    font-size: 9.5px;
   }
 }
 </style>
