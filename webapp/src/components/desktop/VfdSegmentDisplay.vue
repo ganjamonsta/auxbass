@@ -2,7 +2,7 @@
   <div 
     class="vfd-display" 
     ref="displayRef"
-    @click="cycleMode"
+    @click="advanceSlide"
     @mouseenter="onHover(true)"
     @mouseleave="onHover(false)"
     :title="modeTooltip"
@@ -17,7 +17,7 @@
 
     <!-- Active Mode Indicator Badge (Car Stereo style DISP) -->
     <div class="vfd-status-bar">
-      <span class="vfd-disp-badge" :class="{ active: isUserModeActive }">
+      <span class="vfd-disp-badge" :class="{ active: isPlaying || !!track }">
         {{ currentModeBadge }}
       </span>
       <span v-if="isPlaying" class="vfd-play-indicator">
@@ -36,10 +36,8 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { 
   SEGMENTS, 
-  getCharMask, 
   encodeString, 
   DISC_FRAMES, 
-  getLarsonMasks, 
   getRandomGlitchMask 
 } from '@/utils/segmentFont16'
 
@@ -48,9 +46,17 @@ const props = defineProps({
     type: Object,
     default: null
   },
-  displayText: {
-    type: String,
-    default: ''
+  nextTrack: {
+    type: Object,
+    default: null
+  },
+  queueIndex: {
+    type: Number,
+    default: 0
+  },
+  queueLength: {
+    type: Number,
+    default: 0
   },
   isPlaying: {
     type: Boolean,
@@ -59,14 +65,8 @@ const props = defineProps({
   volume: {
     type: Number,
     default: 1
-  },
-  hdTrackInfo: {
-    type: Object,
-    default: null
   }
 })
-
-const emit = defineEmits(['click'])
 
 // 16-Segment Vector Path coordinates (viewBox 0 0 16 22)
 const SEGMENT_PATHS = {
@@ -102,30 +102,19 @@ const initPathObjects = () => {
   ALL_SEG_ENTRIES = [...SEG_ENTRIES, [SEGMENTS.DP, dp]]
 }
 
-// Display Modes: 'auto', 'clock', 'specs', 'viz'
-const userMode = ref('auto')
+// DOM & Canvas elements
 const displayRef = ref(null)
 const canvasRef = ref(null)
 const discCanvas = ref(null)
 const cellCount = ref(24)
 const isHovered = ref(false)
 
-// Marquee state
-const marqueeIndex = ref(0)
-const marqueeDwell = ref(0)
-const isGlitching = ref(false)
-const glitchMasks = ref([])
-const glitchProgress = ref(0)
-
 // Disc spin animation
 const discFrame = ref(0)
 const discFrameMask = computed(() => DISC_FRAMES[discFrame.value % DISC_FRAMES.length])
 
-// Idle animation state
-const idleMode = ref(0)
-const larsonPos = ref(0)
-const larsonDir = ref(1)
-const idleTimer = ref(0)
+// Audio-reactive pulse
+const isBeatPulse = ref(false)
 
 // Clock state
 const currentTimeStr = ref('')
@@ -142,41 +131,162 @@ const updateClock = () => {
   currentTimeStr.value = `[ ${hh}:${mm}:${ss} ]  ${day} ${date} ${mon}`
 }
 
-// Audio-reactive pulse
-const isBeatPulse = ref(false)
-
-// Badges & tooltips
-const currentModeBadge = computed(() => {
-  if (userMode.value === 'clock') return 'CLK'
-  if (userMode.value === 'specs') return 'DSP'
-  if (userMode.value === 'viz') return 'VIZ'
-  if (!props.track) return 'IDLE'
-  return 'TRK'
-})
-
-const isUserModeActive = computed(() => userMode.value !== 'auto')
-
-const modeTooltip = computed(() => {
-  return 'VFD Режим: ' + currentModeBadge.value + ' (Нажмите для переключения: Трек / Часы / Спецификации / Спектр)'
-})
-
-const onHover = (hovering) => {
-  isHovered.value = hovering
-  scheduleDraw()
+// Helper: Extract release year from dates (YYYY, YYYY-MM-DD, ISO string, etc.)
+const extractYear = (val) => {
+  if (!val) return ''
+  const str = String(val).trim()
+  const match = str.match(/\b(19\d\d|20\d\d)\b/)
+  if (match) return match[1]
+  const d = new Date(val)
+  return isNaN(d.getFullYear()) ? '' : String(d.getFullYear())
 }
 
-const cycleMode = () => {
-  if (userMode.value === 'auto') {
-    userMode.value = 'clock'
-  } else if (userMode.value === 'clock') {
-    userMode.value = 'specs'
-  } else if (userMode.value === 'specs') {
-    userMode.value = 'viz'
-  } else {
-    userMode.value = 'auto'
+// Track Slides Generator — only includes fields that exist
+const trackSlides = computed(() => {
+  const t = props.track
+  if (!t) return []
+
+  const slides = []
+
+  // 1. Track Title
+  const title = (t.title || t.file_name || 'UNTITLED').trim()
+  slides.push({
+    badge: 'TRK',
+    text: title.toUpperCase()
+  })
+
+  // 2. Artist / Authors
+  const artist = (t.artist || 'UNKNOWN ARTIST').trim()
+  slides.push({
+    badge: 'ART',
+    text: artist.toUpperCase()
+  })
+
+  // 3. Album (if present)
+  const albumTitle = (t.album?.title || t.album_name || '').trim()
+  if (albumTitle) {
+    slides.push({
+      badge: 'ALB',
+      text: albumTitle.toUpperCase()
+    })
   }
-  triggerGlitch()
-  checkVizLoop()
+
+  // 4. Release Date / Year (if present)
+  const rawDate = t.release_date || t.album?.release_date
+  const year = extractYear(rawDate)
+  if (year) {
+    slides.push({
+      badge: 'YEAR',
+      text: `RELEASED ${year}`
+    })
+  }
+
+  // 5. Next Track in Queue (if present)
+  if (props.nextTrack) {
+    const nextArt = (props.nextTrack.artist || '').trim()
+    const nextTitle = (props.nextTrack.title || props.nextTrack.file_name || '').trim()
+    const nextStr = nextArt && nextTitle ? `${nextArt} - ${nextTitle}` : (nextTitle || nextArt)
+    if (nextStr) {
+      slides.push({
+        badge: 'NEXT',
+        text: `NEXT: ${nextStr.toUpperCase()}`
+      })
+    }
+  }
+
+  // 6. Genre / Style (if present)
+  const genre = (t.genre || (Array.isArray(t.tags) && t.tags[0]) || '').trim()
+  if (genre) {
+    slides.push({
+      badge: 'GEN',
+      text: `GENRE: ${genre.toUpperCase()}`
+    })
+  }
+
+  // 7. Position in Queue (if queue length > 1)
+  if (props.queueLength > 1 && props.queueIndex >= 0) {
+    slides.push({
+      badge: 'POS',
+      text: `TRACK ${props.queueIndex + 1} OF ${props.queueLength}`
+    })
+  }
+
+  return slides
+})
+
+// Idle Slides (when no track is playing)
+const IDLE_SLIDES = computed(() => [
+  { badge: 'TG', text: 'TG PLAYER REFERENCE STEREO' },
+  { badge: 'CLK', text: currentTimeStr.value },
+  { badge: 'IDLE', text: 'NO DISC  -  INSERT MEDIA' }
+])
+
+// Current active slide index
+const currentSlideIndex = ref(0)
+const slideTicks = ref(0)
+
+const activeSlide = computed(() => {
+  if (props.track) {
+    const list = trackSlides.value
+    if (list.length === 0) return { badge: 'TRK', text: 'NO MEDIA' }
+    const idx = currentSlideIndex.value % list.length
+    return list[idx]
+  }
+  const idleList = IDLE_SLIDES.value
+  const idx = currentSlideIndex.value % idleList.length
+  return idleList[idx]
+})
+
+const currentModeBadge = computed(() => activeSlide.value.badge)
+const activeString = computed(() => activeSlide.value.text)
+
+const modeTooltip = computed(() => {
+  if (props.track) {
+    return `VFD [${currentModeBadge.value}]: ${activeString.value} (кликните для следующего слайда)`
+  }
+  return 'TG Player Reference Stereo'
+})
+
+// Marquee & Glitch Animation state
+const marqueeIndex = ref(0)
+const marqueeDwell = ref(14)
+const isGlitching = ref(false)
+const glitchMasks = ref([])
+const glitchProgress = ref(0)
+
+// Glitch loop for authentic VFD segment decrypt/decode transition
+let glitchAnimId = null
+let lastGlitchTime = 0
+
+const stepGlitch = (now) => {
+  if (!isGlitching.value) {
+    glitchAnimId = null
+    return
+  }
+  if (now - lastGlitchTime >= 35) {
+    lastGlitchTime = now
+    glitchProgress.value += 16
+    for (let i = 0; i < glitchMasks.value.length; i++) {
+      if (Math.random() > 0.35) {
+        glitchMasks.value[i] = getRandomGlitchMask()
+      }
+    }
+    if (glitchProgress.value >= 100) {
+      isGlitching.value = false
+      glitchAnimId = null
+      scheduleDraw()
+      return
+    }
+    scheduleDraw()
+  }
+  glitchAnimId = requestAnimationFrame(stepGlitch)
+}
+
+const startGlitchLoop = () => {
+  lastGlitchTime = performance.now()
+  if (!glitchAnimId) {
+    glitchAnimId = requestAnimationFrame(stepGlitch)
+  }
 }
 
 const triggerGlitch = () => {
@@ -187,44 +297,27 @@ const triggerGlitch = () => {
   startGlitchLoop()
 }
 
-const getSpecsString = () => {
-  const isHd = !!props.hdTrackInfo
-  const volPct = Math.round((props.volume || 1) * 100)
-  const format = isHd ? '24-BIT 96kHz HI-RES' : 'STEREO 16-BIT 44.1kHz'
-  return `${format}  *  VOL ${volPct}%  *  DIRECT DSP`
+// Advance slide method (called automatically or on user click)
+const advanceSlide = () => {
+  const list = props.track ? trackSlides.value : IDLE_SLIDES.value
+  if (list.length <= 1) return
+  currentSlideIndex.value = (currentSlideIndex.value + 1) % list.length
+  marqueeIndex.value = 0
+  marqueeDwell.value = 14
+  slideTicks.value = 0
+  triggerGlitch()
+  scheduleDraw()
 }
 
-const IDLE_DEMO_TEXTS = [
-  'AUX BASS HIGH END REFERENCE STEREO',
-  '24-BIT 96kHz DIRECT D/A CONVERTER',
-  'DSP MASTER EQUALIZER ENGAGED',
-  'NO DISC  -  INSERT AUDIO MEDIA'
-]
+const onHover = (hovering) => {
+  isHovered.value = hovering
+  scheduleDraw()
+}
 
-const activeString = computed(() => {
-  if (userMode.value === 'clock') return currentTimeStr.value
-  if (userMode.value === 'specs') return getSpecsString()
-  if (userMode.value === 'viz') return ''
-
-  if (props.track) {
-    const artist = props.track.artist || 'UNKNOWN ARTIST'
-    const title = props.track.title || props.track.file_name || 'UNTITLED'
-    return `${artist} - ${title}`.toUpperCase()
-  }
-
-  if (idleMode.value === 0) return IDLE_DEMO_TEXTS[0]
-  if (idleMode.value === 1) return currentTimeStr.value
-  if (idleMode.value === 2) return ''
-  return IDLE_DEMO_TEXTS[3]
-})
-
+// Rendered segment masks
 const renderedMasks = computed(() => {
   const count = cellCount.value
   const fullText = activeString.value
-
-  if (userMode.value === 'viz' || (!props.track && idleMode.value === 2)) {
-    return getLarsonMasks(count, larsonPos.value)
-  }
 
   let displayedText = fullText
   if (!fullText) return new Array(count).fill(0)
@@ -426,85 +519,12 @@ const drawDisc = () => {
   ctx.restore()
 }
 
-// Glitch loop (runs ONLY while isGlitching is true)
-let glitchAnimId = null
-let lastGlitchTime = 0
-
-const stepGlitch = (now) => {
-  if (!isGlitching.value) {
-    glitchAnimId = null
-    return
-  }
-  if (now - lastGlitchTime >= 45) {
-    lastGlitchTime = now
-    glitchProgress.value += 16
-    for (let i = 0; i < glitchMasks.value.length; i++) {
-      if (Math.random() > 0.4) {
-        glitchMasks.value[i] = getRandomGlitchMask()
-      }
-    }
-    if (glitchProgress.value >= 100) {
-      isGlitching.value = false
-      glitchAnimId = null
-      scheduleDraw()
-      return
-    }
-    scheduleDraw()
-  }
-  glitchAnimId = requestAnimationFrame(stepGlitch)
-}
-
-const startGlitchLoop = () => {
-  lastGlitchTime = performance.now()
-  if (!glitchAnimId) {
-    glitchAnimId = requestAnimationFrame(stepGlitch)
-  }
-}
-
-// Viz / Larson Scanner loop (runs ONLY when in viz mode or idle mode 2)
-let vizAnimId = null
-let lastVizTime = 0
-
-const stepViz = (now) => {
-  const isVizActive = userMode.value === 'viz' || (!props.track && idleMode.value === 2)
-  if (!isVizActive) {
-    vizAnimId = null
-    return
-  }
-  if (now - lastVizTime >= 50) {
-    lastVizTime = now
-    const count = cellCount.value
-    larsonPos.value += larsonDir.value
-    if (larsonPos.value >= count - 1) {
-      larsonPos.value = count - 1
-      larsonDir.value = -1
-    } else if (larsonPos.value <= 0) {
-      larsonPos.value = 0
-      larsonDir.value = 1
-    }
-    scheduleDraw()
-  }
-  vizAnimId = requestAnimationFrame(stepViz)
-}
-
-const checkVizLoop = () => {
-  const isVizActive = userMode.value === 'viz' || (!props.track && idleMode.value === 2)
-  if (isVizActive && !vizAnimId) {
-    lastVizTime = performance.now()
-    vizAnimId = requestAnimationFrame(stepViz)
-  }
-}
-
 // Watchers
-watch(() => props.displayText, () => {
-  marqueeIndex.value = 0
-  marqueeDwell.value = 14
-  triggerGlitch()
-})
-
 watch(() => props.track?.id, () => {
+  currentSlideIndex.value = 0
   marqueeIndex.value = 0
   marqueeDwell.value = 14
+  slideTicks.value = 0
   triggerGlitch()
 })
 
@@ -520,7 +540,7 @@ watch(() => renderedMasks.value, () => {
 })
 
 let resizeObserver = null
-let marqueeTimer = null
+let tickerTimer = null
 let clockTimer = null
 
 onMounted(() => {
@@ -542,20 +562,31 @@ onMounted(() => {
     drawDisc()
   }
 
-  // Marquee ticker (every 200ms) - extremely lightweight canvas redraw
-  marqueeTimer = setInterval(() => {
+  // Unified Ticker (every 200ms) - handles marquee, dwell, and slide advancement
+  tickerTimer = setInterval(() => {
     const fullText = activeString.value
     const count = cellCount.value
+    const isLongText = fullText && fullText.length > count
 
-    if (marqueeDwell.value > 0) {
-      marqueeDwell.value--
-    } else {
-      if (fullText && fullText.length > count) {
-        marqueeIndex.value++
-        const loopLen = fullText.length + 9
-        if (marqueeIndex.value >= loopLen) {
-          marqueeIndex.value = 0
-          marqueeDwell.value = 12
+    if (!isHovered.value) {
+      slideTicks.value++
+
+      if (isLongText) {
+        if (marqueeDwell.value > 0) {
+          marqueeDwell.value--
+        } else {
+          marqueeIndex.value++
+          const loopLen = fullText.length + 9
+          if (marqueeIndex.value >= loopLen) {
+            advanceSlide()
+            return
+          }
+        }
+      } else {
+        // Short text: stays for 22 ticks (~4.4s) before advancing to next slide
+        if (slideTicks.value >= 22) {
+          advanceSlide()
+          return
         }
       }
     }
@@ -566,23 +597,13 @@ onMounted(() => {
       drawDisc()
     }
 
-    if (!props.track && userMode.value === 'auto') {
-      idleTimer.value++
-      if (idleTimer.value > 30) {
-        idleTimer.value = 0
-        idleMode.value = (idleMode.value + 1) % 4
-        triggerGlitch()
-        checkVizLoop()
-      }
-    }
-
     scheduleDraw()
   }, 200)
 
-  // Clock ticker (1 second) - only redraws if clock mode is visible
+  // Clock ticker (1 second) - updates clock string
   clockTimer = setInterval(() => {
     updateClock()
-    if (userMode.value === 'clock' || (!props.track && idleMode.value === 1)) {
+    if (!props.track) {
       scheduleDraw()
     }
   }, 1000)
@@ -590,10 +611,9 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (resizeObserver) resizeObserver.disconnect()
-  if (marqueeTimer) clearInterval(marqueeTimer)
+  if (tickerTimer) clearInterval(tickerTimer)
   if (clockTimer) clearInterval(clockTimer)
   if (glitchAnimId) cancelAnimationFrame(glitchAnimId)
-  if (vizAnimId) cancelAnimationFrame(vizAnimId)
 })
 </script>
 
@@ -683,21 +703,21 @@ onUnmounted(() => {
   font-family: 'Courier New', monospace;
   font-size: 7.5px;
   font-weight: 800;
-  color: rgba(0, 240, 255, 0.4);
+  color: rgba(0, 240, 255, 0.65);
   letter-spacing: 0.5px;
   padding: 1px 3px;
   border-radius: 2px;
-  background: rgba(0, 240, 255, 0.05);
-  border: 1px solid rgba(0, 240, 255, 0.15);
-  transition: all 0.2s ease;
+  background: rgba(0, 240, 255, 0.07);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  transition: all 0.25s ease;
 }
 
 .vfd-disp-badge.active,
 .vfd-display:hover .vfd-disp-badge {
   color: #00f0ff;
-  border-color: rgba(0, 240, 255, 0.6);
-  box-shadow: 0 0 6px rgba(0, 240, 255, 0.5);
-  background: rgba(0, 240, 255, 0.12);
+  border-color: rgba(0, 240, 255, 0.7);
+  box-shadow: 0 0 6px rgba(0, 240, 255, 0.45);
+  background: rgba(0, 240, 255, 0.14);
 }
 
 .vfd-play-indicator {

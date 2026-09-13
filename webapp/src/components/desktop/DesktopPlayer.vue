@@ -102,10 +102,11 @@
             </span>
             <VfdSegmentDisplay 
               :track="track"
-              :displayText="displayText"
+              :nextTrack="nextTrack"
+              :queueIndex="playerStore.queueIndex"
+              :queueLength="playerStore.queue.length"
               :isPlaying="isPlaying"
               :volume="volume"
-              :hdTrackInfo="playerStore.hdTrackInfo"
             />
           </div>
 
@@ -331,12 +332,15 @@ const handleVolumeWheel = (e) => {
   playerStore.setVolume(newVolume)
 }
 
-// Display text
-const displayText = computed(() => {
-  if (!track.value) return 'NO DISC'
-  const artist = track.value.artist || 'UNKNOWN'
-  const title = track.value.title || 'UNTITLED'
-  return `${artist} - ${title}`.toUpperCase()
+// Next track in queue for display
+const nextTrack = computed(() => {
+  if (!playerStore.queue || playerStore.queue.length === 0) return null
+  if (playerStore.shuffle) {
+    const nextIdx = playerStore.shuffleOrder[playerStore.shuffleIndex + 1]
+    return nextIdx !== undefined ? playerStore.queue[nextIdx] : null
+  }
+  const nextIdx = playerStore.queueIndex + 1
+  return nextIdx < playerStore.queue.length ? playerStore.queue[nextIdx] : null
 })
 
 
@@ -583,7 +587,7 @@ watch(() => playerStore.progress, () => {
 })
 
 // Watch for track changes and redraw waveform
-watch([track, displayText, duration], () => {
+watch([track, duration], () => {
   nextTick(() => {
     drawWaveform()
   })
