@@ -68,10 +68,14 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         
         forwarded = request.headers.get("X-Forwarded-For")
-        if forwarded:
+        real_ip = request.client.host if request.client else "unknown"
+        
+        # Only trust X-Forwarded-For if request comes from a local/private proxy
+        # (e.g. nginx on same machine or docker network)
+        if forwarded and real_ip in ("127.0.0.1", "::1", "localhost"):
             client_ip = forwarded.split(",")[0].strip()
         else:
-            client_ip = request.client.host if request.client else "unknown"
+            client_ip = real_ip
         
         now = time.time()
         minute_ago = now - 60

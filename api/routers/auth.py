@@ -5,7 +5,7 @@ Supports Telegram Mini App initData and code-based browser auth
 import hmac
 import hashlib
 import json
-import random
+import secrets
 import string
 from urllib.parse import parse_qsl, unquote
 from typing import Optional
@@ -41,6 +41,80 @@ settings = get_settings()
 # ============== In-Memory Auth Code Storage ==============
 # Format: {code: {"user_id": int, "user_data": dict, "expires": datetime}}
 auth_codes: dict = {}
+
+# ============== Brute-Force Protection ==============
+# {ip: {"attempts": int, "locked_until": datetime | None}}
+_verify_attempts: dict[str, dict] = {}
+VERIFY_MAX_ATTEMPTS = 5
+VERIFY_LOCKOUT_SECONDS = 300  # 5 minutes lockout after max attempts
+
+# ============== Image Validation ==============
+IMAGE_MAGIC_BYTES = {
+    b'\xff\xd8\xff': 'jpg',     # JPEG
+    b'\x89PNG': 'png',          # PNG
+    b'GIF87a': 'gif',           # GIF87a
+    b'GIF89a': 'gif',           # GIF89a
+    b'RIFF': 'webp',            # WebP (need to also check for WEBP marker)
+}
+ALLOWED_AVATAR_URL_PREFIXES = ('/api/images/', '/api/avatars/')
+
+
+def _validate_image_magic(content: bytes) -> str:
+    """Validate image by magic bytes. Returns detected extension or raises."""
+    if len(content) < 12:
+        raise HTTPException(status_code=400, detail="File too small to be a valid image")
+    header = content[:12]
+    for magic, ext in IMAGE_MAGIC_BYTES.items():
+        if header.startswith(magic):
+            # Extra check for WebP: RIFF....WEBP
+            if magic == b'RIFF' and header[8:12] != b'WEBP':
+                continue
+            return ext
+    raise HTTPException(status_code=400, detail="Invalid image file. Only JPEG, PNG, GIF, WebP are allowed.")
+
+
+def _safe_resolve_avatar_path(base_dir: 'Path', url: str, prefix: str) -> 'Optional[Path]':
+    """Safely resolve a file path within base_dir, preventing path traversal."""
+    import os
+    relative = url.replace(prefix, "")
+    safe_name = os.path.basename(relative)
+    if not safe_name or safe_name in ('.', '..'):
+        return None
+    resolved = (base_dir / safe_name).resolve()
+    if not str(resolved).startswith(str(base_dir.resolve())):
+        return None
+    return resolved
+
+
+def _check_brute_force(client_ip: str):
+    """Check and enforce brute-force lockout for verify-code attempts."""
+    now = datetime.now(timezone.utc)
+    entry = _verify_attempts.get(client_ip)
+    if entry:
+        if entry.get("locked_until") and now < entry["locked_until"]:
+            remaining = int((entry["locked_until"] - now).total_seconds())
+            raise HTTPException(
+                status_code=429,
+                detail=f"Слишком много попыток. Повторите через {remaining} сек."
+            )
+        # Reset if lockout expired
+        if entry.get("locked_until") and now >= entry["locked_until"]:
+            _verify_attempts[client_ip] = {"attempts": 0, "locked_until": None}
+
+
+def _record_failed_attempt(client_ip: str):
+    """Record a failed verify-code attempt and lock out if threshold exceeded."""
+    now = datetime.now(timezone.utc)
+    entry = _verify_attempts.setdefault(client_ip, {"attempts": 0, "locked_until": None})
+    entry["attempts"] += 1
+    if entry["attempts"] >= VERIFY_MAX_ATTEMPTS:
+        entry["locked_until"] = now + timedelta(seconds=VERIFY_LOCKOUT_SECONDS)
+        logger.warning(f"Brute-force lockout triggered for IP {client_ip}")
+
+
+def _clear_attempts(client_ip: str):
+    """Clear brute-force attempts on successful verification."""
+    _verify_attempts.pop(client_ip, None)
 
 
 # ============== JWT Functions ==============
@@ -138,8 +212,8 @@ def parse_user_from_init_data(parsed_data: dict) -> Optional[TelegramUser]:
 # ============== Code-Based Auth ==============
 
 def generate_auth_code() -> str:
-    """Generate 6-digit auth code"""
-    return ''.join(random.choices(string.digits, k=6))
+    """Generate 8-digit auth code using cryptographic RNG"""
+    return ''.join(secrets.choice(string.digits) for _ in range(8))
 
 
 def cleanup_expired_codes():
@@ -500,17 +574,27 @@ async def generate_code_for_user(
 
 
 @router.post("/verify-code", response_model=AuthResult)
-async def verify_auth_code(data: CodeVerify):
+async def verify_auth_code(data: CodeVerify, request: 'Request'):
     """
     Verify auth code and return JWT token.
     Used for browser authentication.
+    Protected against brute-force with IP-based lockout.
     """
+    from fastapi import Request
+    
+    # Get client IP for brute-force tracking
+    client_ip = request.client.host if request.client else "unknown"
+    
+    # Check brute-force lockout
+    _check_brute_force(client_ip)
+    
     # Cleanup expired codes
     cleanup_expired_codes()
     
     code = data.code.strip()
     
     if code not in auth_codes:
+        _record_failed_attempt(client_ip)
         raise HTTPException(status_code=401, detail="Неверный или истёкший код")
     
     code_data = auth_codes[code]
@@ -518,6 +602,7 @@ async def verify_auth_code(data: CodeVerify):
     # Check expiration
     if datetime.now(timezone.utc) > code_data["expires"]:
         del auth_codes[code]
+        _record_failed_attempt(client_ip)
         raise HTTPException(status_code=401, detail="Код истёк")
     
     # Create user object
@@ -535,8 +620,9 @@ async def verify_auth_code(data: CodeVerify):
     # Create JWT token
     token = create_jwt_token(user)
     
-    # Remove used code
+    # Remove used code and clear brute-force counter
     del auth_codes[code]
+    _clear_attempts(client_ip)
     
     return AuthResult(valid=True, user=user, token=token)
 
@@ -652,15 +738,18 @@ async def update_profile(
 
     if profile_data.clear_avatar:
         if db_user.custom_avatar_url and db_user.custom_avatar_url.startswith("/api/avatars/"):
-            old_file = AVATARS_DIR / db_user.custom_avatar_url.replace("/api/avatars/", "")
-            if old_file.exists() and old_file.is_file():
+            old_file = _safe_resolve_avatar_path(AVATARS_DIR, db_user.custom_avatar_url, "/api/avatars/")
+            if old_file and old_file.exists() and old_file.is_file():
                 try:
                     old_file.unlink()
                 except OSError:
                     pass
         db_user.custom_avatar_url = None
     elif profile_data.custom_avatar_url is not None:
-        db_user.custom_avatar_url = profile_data.custom_avatar_url.strip() or None
+        url_val = profile_data.custom_avatar_url.strip()
+        if url_val and not url_val.startswith(ALLOWED_AVATAR_URL_PREFIXES):
+            raise HTTPException(status_code=400, detail="Invalid avatar URL. Must be an uploaded image.")
+        db_user.custom_avatar_url = url_val or None
 
     await db.commit()
     await db.refresh(db_user)
@@ -683,73 +772,69 @@ async def upload_avatar(
         raise HTTPException(status_code=404, detail="User not found")
 
     content_type = file.content_type or ""
-    if not (content_type.startswith("image/") or content_type in ["application/octet-stream"]):
+    if not content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Only image files are allowed")
 
     content = await file.read()
     if len(content) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Image size exceeds 10MB limit")
 
-    ext = "jpg"
-    if file.filename and "." in file.filename:
-        ext = file.filename.rsplit(".", 1)[1].lower()
-        if ext not in ["jpg", "jpeg", "png", "webp", "gif"]:
-            ext = "jpg"
+    # Validate actual image content by magic bytes (prevents disguised files)
+    ext = _validate_image_magic(content)
+
+    # Sanitize filename for Telegram upload
+    import os
+    safe_filename = f"avatar_{user.id}.{ext}"
 
     # Remove old avatar file if local
     if db_user.custom_avatar_url and db_user.custom_avatar_url.startswith("/api/avatars/"):
-        old_file = AVATARS_DIR / db_user.custom_avatar_url.replace("/api/avatars/", "")
-        if old_file.exists() and old_file.is_file():
+        old_file = _safe_resolve_avatar_path(AVATARS_DIR, db_user.custom_avatar_url, "/api/avatars/")
+        if old_file and old_file.exists() and old_file.is_file():
             try:
                 old_file.unlink()
             except OSError:
                 pass
 
-    avatar_url = None
-
     # Upload directly to user's Telegram channel or PM (same as playlist covers)
-    if settings.bot_token and settings.bot_token != "dummy":
-        user_channel = await db.scalar(
-            select(UserChannel).where(UserChannel.user_id == user.id, UserChannel.is_active == True)
-        )
-        target_chat_id = user_channel.channel_id if user_channel else user.id
-        caption = f"👤 <b>Аватар профиля</b>: {db_user.display_name}\n\n#profile #avatar"
+    if not (settings.bot_token and settings.bot_token != "dummy"):
+        raise HTTPException(status_code=503, detail="Сервис загрузки аватаров недоступен. Попробуйте позже.")
 
-        try:
-            from api.routers.images import _get_bot
-            bot = _get_bot()
-            sent_msg = None
+    user_channel = await db.scalar(
+        select(UserChannel).where(UserChannel.user_id == user.id, UserChannel.is_active == True)
+    )
+    target_chat_id = user_channel.channel_id if user_channel else user.id
+    caption = f"👤 <b>Аватар профиля</b>: {db_user.display_name}\n\n#profile #avatar"
+
+    from api.routers.images import _get_bot
+    bot = _get_bot()
+    sent_msg = None
+    try:
+        sent_msg = await bot.send_photo(
+            chat_id=target_chat_id,
+            photo=BufferedInputFile(file=content, filename=safe_filename),
+            caption=caption,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to upload avatar to target channel {target_chat_id}: {e}")
+        if user_channel and target_chat_id != user.id:
             try:
                 sent_msg = await bot.send_photo(
-                    chat_id=target_chat_id,
-                    photo=BufferedInputFile(file=content, filename=file.filename or f"avatar.{ext}"),
+                    chat_id=user.id,
+                    photo=BufferedInputFile(file=content, filename=safe_filename),
                     caption=caption,
                 )
-            except Exception as e:
-                logger.warning(f"Failed to upload avatar to target channel {target_chat_id}: {e}")
-                if user_channel and target_chat_id != user.id:
-                    sent_msg = await bot.send_photo(
-                        chat_id=user.id,
-                        photo=BufferedInputFile(file=content, filename=file.filename or f"avatar.{ext}"),
-                        caption=caption,
-                    )
-                else:
-                    raise
+            except Exception as err:
+                logger.error(f"Failed to upload avatar to user PM fallback: {err}")
+                raise HTTPException(status_code=502, detail="Не удалось загрузить аватар в Telegram")
+        else:
+            raise HTTPException(status_code=502, detail="Не удалось загрузить аватар в Telegram")
 
-            photos = sent_msg.photo or [] if sent_msg else []
-            if photos:
-                file_id = photos[-1].file_id
-                avatar_url = f"/api/images/{file_id}"
-        except Exception as e:
-            logger.warning(f"Failed to upload avatar to Telegram: {e}. Falling back to local storage.")
+    photos = sent_msg.photo or [] if sent_msg else []
+    if not photos:
+        raise HTTPException(status_code=502, detail="Telegram не вернул файл аватара")
 
-    # Fallback to local storage if Telegram upload was not available or failed
-    if not avatar_url:
-        filename = f"avatar_{user.id}_{int(datetime.now(timezone.utc).timestamp())}.{ext}"
-        filepath = AVATARS_DIR / filename
-        with open(filepath, "wb") as f:
-            f.write(content)
-        avatar_url = f"/api/avatars/{filename}"
+    file_id = photos[-1].file_id
+    avatar_url = f"/api/images/{file_id}"
 
     db_user.custom_avatar_url = avatar_url
     await db.commit()
@@ -776,8 +861,8 @@ async def delete_avatar(
         raise HTTPException(status_code=404, detail="User not found")
 
     if db_user.custom_avatar_url and db_user.custom_avatar_url.startswith("/api/avatars/"):
-        old_file = AVATARS_DIR / db_user.custom_avatar_url.replace("/api/avatars/", "")
-        if old_file.exists() and old_file.is_file():
+        old_file = _safe_resolve_avatar_path(AVATARS_DIR, db_user.custom_avatar_url, "/api/avatars/")
+        if old_file and old_file.exists() and old_file.is_file():
             try:
                 old_file.unlink()
             except OSError:

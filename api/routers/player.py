@@ -91,9 +91,9 @@ def generate_stream_token(track_id: int, user_id: int, file_path: str) -> str:
     expires = time.time() + STREAM_TOKEN_TTL
     _stream_tokens[token] = (track_id, user_id, file_path, expires)
     
-    # Cleanup old tokens (limit cleanup to avoid O(n) on every call)
+    # Cleanup old tokens periodically (limit cleanup to avoid O(n) on every call)
     now = time.time()
-    if len(_stream_tokens) > 1000:
+    if len(_stream_tokens) > 500:
         expired = [k for k, v in _stream_tokens.items() if v[3] < now]
         for k in expired:
             del _stream_tokens[k]
@@ -374,6 +374,14 @@ async def get_telegram_file_path(file_id: str) -> Optional[str]:
             
             # Cache the file path
             _file_path_cache[file_id] = (file_path, time.time() + FILE_PATH_CACHE_TTL)
+            
+            # Periodic cleanup of file path cache
+            if len(_file_path_cache) > 5000:
+                now = time.time()
+                expired = [k for k, (_, exp) in _file_path_cache.items() if exp < now]
+                for k in expired:
+                    del _file_path_cache[k]
+            
             logger.info(f"Got file path: {file_path}")
             
             return file_path
@@ -795,15 +803,11 @@ async def stream_audio(
         finally:
             await telegram_response.release()
     
-    # Build response headers
+    # Build response headers (CORS handled by middleware — no manual override)
     response_headers = {
         "Accept-Ranges": "bytes",
         "Content-Disposition": f'inline; filename="{safe_title}.mp3"',
         "Cache-Control": "private, max-age=3600",  # Cache 1 hour
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-        "Access-Control-Allow-Headers": "*",
-        "Access-Control-Expose-Headers": "Content-Range, Content-Length, Accept-Ranges",
     }
     
     # If Telegram returned 206 Partial Content, pass it through

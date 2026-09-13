@@ -29,6 +29,28 @@ logger = logging.getLogger(__name__)
 
 COVERS_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "covers"
 
+# Image magic bytes for validation
+_COVER_MAGIC_BYTES = {
+    b'\xff\xd8\xff': 'jpg',
+    b'\x89PNG': 'png',
+    b'GIF87a': 'gif',
+    b'GIF89a': 'gif',
+    b'RIFF': 'webp',
+}
+
+
+def _safe_cover_path(url: str) -> 'Optional[Path]':
+    """Safely resolve cover file path, preventing path traversal."""
+    import os
+    relative = url.replace("/api/covers/", "")
+    safe_name = os.path.basename(relative)
+    if not safe_name or safe_name in ('.', '..'):
+        return None
+    resolved = (COVERS_DIR / safe_name).resolve()
+    if not str(resolved).startswith(str(COVERS_DIR.resolve())):
+        return None
+    return resolved
+
 
 from api.routers.auth import get_current_user, require_premium
 from api.routers.library import track_to_response, streamable_track_filter
@@ -777,6 +799,22 @@ async def upload_playlist_cover(
     if len(content) > 10 * 1024 * 1024:  # 10MB limit
         raise HTTPException(status_code=400, detail="Image size exceeds 10MB limit")
     
+    # Validate actual image content by magic bytes
+    if len(content) < 12:
+        raise HTTPException(status_code=400, detail="File too small to be a valid image")
+    header = content[:12]
+    detected_ext = None
+    for magic, ext in _COVER_MAGIC_BYTES.items():
+        if header.startswith(magic):
+            if magic == b'RIFF' and header[8:12] != b'WEBP':
+                continue
+            detected_ext = ext
+            break
+    if not detected_ext:
+        raise HTTPException(status_code=400, detail="Invalid image file. Only JPEG, PNG, GIF, WebP are allowed.")
+    
+    safe_filename = f"cover_{playlist_id}.{detected_ext}"
+    
     bot = _get_bot()
     caption = f"🖼 <b>Обложка плейлиста</b>: {playlist.name}\n\n#playlist_{playlist.id} #cover"
     
@@ -789,7 +827,7 @@ async def upload_playlist_cover(
     try:
         sent_msg = await bot.send_photo(
             chat_id=target_chat_id,
-            photo=BufferedInputFile(file=content, filename=file.filename or "cover.jpg"),
+            photo=BufferedInputFile(file=content, filename=safe_filename),
             caption=caption,
         )
     except Exception as e:
@@ -799,7 +837,7 @@ async def upload_playlist_cover(
             try:
                 sent_msg = await bot.send_photo(
                     chat_id=user.id,
-                    photo=BufferedInputFile(file=content, filename=file.filename or "cover.jpg"),
+                    photo=BufferedInputFile(file=content, filename=safe_filename),
                     caption=caption,
                 )
             except Exception as err:
@@ -816,9 +854,8 @@ async def upload_playlist_cover(
 
     # Clean up old local custom cover file if one existed
     if playlist.custom_cover_url and playlist.custom_cover_url.startswith("/api/covers/"):
-        old_filename = playlist.custom_cover_url.replace("/api/covers/", "")
-        old_path = COVERS_DIR / old_filename
-        if old_path.exists() and old_path.is_file():
+        old_path = _safe_cover_path(playlist.custom_cover_url)
+        if old_path and old_path.exists() and old_path.is_file():
             try:
                 old_path.unlink()
             except OSError:
@@ -848,9 +885,8 @@ async def delete_playlist_cover(
         raise HTTPException(status_code=404, detail="Playlist not found")
         
     if playlist.custom_cover_url and playlist.custom_cover_url.startswith("/api/covers/"):
-        old_filename = playlist.custom_cover_url.replace("/api/covers/", "")
-        old_path = COVERS_DIR / old_filename
-        if old_path.exists() and old_path.is_file():
+        old_path = _safe_cover_path(playlist.custom_cover_url)
+        if old_path and old_path.exists() and old_path.is_file():
             try:
                 old_path.unlink()
             except OSError:

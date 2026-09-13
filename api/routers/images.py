@@ -43,6 +43,14 @@ async def close_image_bot():
 @router.get("/images/{file_id}")
 async def get_image(file_id: str):
     """Proxy image from Telegram"""
+    # Validate file_id format (Telegram file_ids are base64-like strings, 30-200 chars)
+    if not file_id or len(file_id) < 20 or len(file_id) > 200:
+        raise HTTPException(status_code=400, detail="Invalid file ID")
+    # Reject obviously invalid characters (Telegram file_ids are alphanumeric + - _ )
+    import re
+    if not re.match(r'^[A-Za-z0-9_\-]+$', file_id):
+        raise HTTPException(status_code=400, detail="Invalid file ID format")
+    
     bot = _get_bot()
     
     try:
@@ -78,5 +86,5 @@ async def get_image(file_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to proxy image {file_id}: {e}")
-        raise HTTPException(status_code=404, detail=str(e))
+        logger.error(f"Failed to proxy image {file_id[:30]}...: {e}")
+        raise HTTPException(status_code=404, detail="Image not found")
