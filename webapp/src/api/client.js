@@ -333,6 +333,10 @@ export const socialApi = {
   getUserAlbums: (userId, params = {}) => api.get(`/social/user/${userId}/albums`, { params }),
   getUser: (userId, params = {}, options = {}) => api.get(`/social/user/${userId}`, { params, ...options }),
   getFeed: (scope = 'following', page = 1, perPage = 30) => api.get('/social/feed', { params: { scope, page, per_page: perPage } }),
+  getUserExternalAccounts: (userId) => api.get(`/social/user/${userId}/external`, { bypassCache: true }),
+  getUserExternalPlaylists: (userId, provider, params = {}) => api.get(`/social/user/${userId}/external/${provider}/playlists`, { params }),
+  getUserExternalTracks: (userId, provider, params = {}) => api.get(`/social/user/${userId}/external/${provider}/tracks`, { params }),
+  getUserExternalPlaylistTracks: (userId, playlistId, params = {}) => api.get(`/social/user/${userId}/external/soundcloud/playlists/${playlistId}/tracks`, { params }),
 }
 
 // Ingestion (External imports from SoundCloud, Spotify, etc.)
@@ -361,6 +365,7 @@ export const ingestionApi = {
   getSpotifyAccount: () => api.get('/ingestion/account/spotify', { bypassCache: true }),
   connectSpotifyAccount: nonCacheable((data) => api.post('/ingestion/account/spotify/connect', data), 'externalAccount'),
   disconnectSpotifyAccount: nonCacheable(() => api.delete('/ingestion/account/spotify'), 'externalAccount'),
+  updateAccountPrivacy: nonCacheable((provider, data) => api.patch(`/ingestion/account/${provider}/privacy`, data), 'externalAccount'),
   getSpotifyLikes: (params = {}) => api.get('/ingestion/account/spotify/likes', { params }),
   previewExportifyCsv: (formData) => api.post('/ingestion/spotify/exportify/preview', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }

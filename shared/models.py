@@ -824,6 +824,11 @@ class UserExternalAccount(Base):
     likes_count: Mapped[int] = mapped_column(Integer, default=0)
     tracks_count: Mapped[int] = mapped_column(Integer, default=0)
 
+    # Privacy configuration for public profile
+    show_on_profile: Mapped[bool] = mapped_column(Boolean, default=True)
+    show_playlists: Mapped[bool] = mapped_column(Boolean, default=True)
+    show_tracks: Mapped[bool] = mapped_column(Boolean, default=True)
+
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)

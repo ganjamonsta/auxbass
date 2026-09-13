@@ -7,6 +7,7 @@ import logging
 from typing import Optional, List
 from datetime import datetime
 
+import json
 import aiohttp
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy import select, func, delete, or_, desc
@@ -18,7 +19,8 @@ from shared.config import get_settings
 from shared.database import get_db
 from shared.models import (
     User, UserFollow, UserLibrary, Track, TrackEnrichment,
-    Playlist, PlaylistTrack, Album, AlbumTrack
+    Playlist, PlaylistTrack, Album, AlbumTrack,
+    UserExternalAccount, UserImportFile, UserChannel, ChannelMessage, ChannelMessageStatus
 )
 
 from api.routers.auth import get_current_user, require_premium
@@ -27,6 +29,8 @@ logger = logging.getLogger(__name__)
 from api.routers.library import track_to_response, build_track_search_filter
 from api.schemas.common import TelegramUser, PaginatedResponse
 from api.schemas.tracks import TrackResponse
+from bot.services.ingestion.pipeline import provider_registry, _find_existing_tracks_batch
+from api.routers.ingestion import SoundCloudTrackItem, SoundCloudPlaylistItem
 
 
 router = APIRouter(tags=["Social"])
@@ -65,6 +69,19 @@ class FriendLibraryResponse(BaseModel):
     user: UserProfileResponse
     recent_tracks: List[TrackResponse]
     public_playlists: List[dict]
+
+
+class UserExternalAccountPublicResponse(BaseModel):
+    provider: str
+    username: str
+    display_name: Optional[str] = None
+    profile_url: Optional[str] = None
+    avatar_url: Optional[str] = None
+    likes_count: int = 0
+    tracks_count: int = 0
+    show_on_profile: bool = True
+    show_playlists: bool = True
+    show_tracks: bool = True
 
 
 # ============== Helper Functions ==============
@@ -782,3 +799,342 @@ async def search_users(
         page=page,
         per_page=per_page,
     )
+
+
+# ============== External Profile Integrations (SoundCloud & Spotify) ==============
+
+@router.get("/user/{user_id}/external", response_model=List[UserExternalAccountPublicResponse])
+async def get_user_external_accounts(
+    user_id: int,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get connected external accounts for a user profile with privacy filtering."""
+    target = await db.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if target.hide_profile and user_id != user.id:
+        raise HTTPException(status_code=403, detail="Пользователь скрыл свой профиль")
+
+    accounts = (
+        await db.scalars(
+            select(UserExternalAccount)
+            .where(UserExternalAccount.user_id == user_id)
+            .order_by(UserExternalAccount.id.asc())
+        )
+    ).all()
+
+    items = []
+    is_self = (user.id == user_id)
+    for acc in accounts:
+        # If not self, hide accounts with show_on_profile == False
+        if not is_self and not getattr(acc, "show_on_profile", True):
+            continue
+
+        items.append(
+            UserExternalAccountPublicResponse(
+                provider=acc.provider,
+                username=acc.username,
+                display_name=acc.display_name,
+                profile_url=acc.profile_url,
+                avatar_url=acc.avatar_url,
+                likes_count=acc.likes_count or 0,
+                tracks_count=acc.tracks_count or 0,
+                show_on_profile=getattr(acc, "show_on_profile", True) if getattr(acc, "show_on_profile", None) is not None else True,
+                show_playlists=getattr(acc, "show_playlists", True) if getattr(acc, "show_playlists", None) is not None else True,
+                show_tracks=getattr(acc, "show_tracks", True) if getattr(acc, "show_tracks", None) is not None else True,
+            )
+        )
+
+    return items
+
+
+@router.get("/user/{user_id}/external/{provider}/playlists")
+async def get_user_external_playlists(
+    user_id: int,
+    provider: str,
+    cursor: Optional[str] = None,
+    limit: int = Query(50, ge=1, le=100),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get external playlists (SoundCloud user playlists or Spotify import files) respecting privacy."""
+    limit = limit if isinstance(limit, int) else 50
+    cursor = cursor if isinstance(cursor, str) else None
+
+    if provider not in ("soundcloud", "spotify"):
+        raise HTTPException(status_code=400, detail="Unsupported provider")
+
+    target = await db.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if target.hide_profile and user_id != user.id:
+        raise HTTPException(status_code=403, detail="Пользователь скрыл свой профиль")
+
+    account = await db.scalar(
+        select(UserExternalAccount)
+        .where(UserExternalAccount.user_id == user_id, UserExternalAccount.provider == provider)
+    )
+    if not account:
+        return {"provider": provider, "total": 0, "items": []}
+
+    is_self = (user.id == user_id)
+    if not is_self:
+        if not getattr(account, "show_on_profile", True) or not getattr(account, "show_playlists", True):
+            return {"provider": provider, "total": 0, "items": []}
+
+    if provider == "soundcloud":
+        sc_provider = provider_registry.get_provider("soundcloud")
+        if not sc_provider:
+            raise HTTPException(status_code=500, detail="SoundCloud provider unavailable")
+
+        ident = account.external_id or account.username
+        try:
+            playlists_raw, next_cursor = await sc_provider.fetch_user_playlists(
+                ident, limit=limit, next_href=cursor, auth_token=account.auth_token if is_self else None, playlist_type="all"
+            )
+        except Exception as e:
+            logger.error(f"Failed to fetch SoundCloud playlists for user {user_id}: {e}")
+            return {"provider": "soundcloud", "total": 0, "items": []}
+
+        items = [SoundCloudPlaylistItem(**p).model_dump() for p in playlists_raw]
+        return {
+            "provider": "soundcloud",
+            "account": {
+                "username": account.username,
+                "display_name": account.display_name,
+                "avatar_url": account.avatar_url,
+                "profile_url": account.profile_url,
+            },
+            "total": len(items),
+            "items": items,
+            "next_cursor": next_cursor,
+        }
+
+    elif provider == "spotify":
+        # For Spotify, fetch user's saved/backed up import playlists
+        q = (
+            select(UserImportFile)
+            .where(UserImportFile.user_id == user_id, UserImportFile.provider == "spotify")
+            .order_by(UserImportFile.id.desc())
+            .limit(limit)
+        )
+        files = (await db.scalars(q)).all()
+        items = []
+        for f in files:
+            summary = {}
+            if f.summary_json:
+                try:
+                    summary = json.loads(f.summary_json)
+                except Exception:
+                    pass
+
+            clean_name = f.filename.replace(".csv", "").replace("_", " ").title()
+            items.append({
+                "id": f.id,
+                "title": clean_name,
+                "filename": f.filename,
+                "file_id": f.file_id,
+                "track_count": f.total_tracks,
+                "created_at": f.created_at.isoformat() if f.created_at else None,
+                "summary": summary,
+            })
+
+        return {
+            "provider": "spotify",
+            "account": {
+                "username": account.username,
+                "display_name": account.display_name,
+                "avatar_url": account.avatar_url,
+                "profile_url": account.profile_url,
+            },
+            "total": len(items),
+            "items": items,
+        }
+
+
+@router.get("/user/{user_id}/external/{provider}/tracks")
+async def get_user_external_tracks(
+    user_id: int,
+    provider: str,
+    cursor: Optional[str] = None,
+    limit: int = Query(40, ge=1, le=100),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get external uploaded tracks/releases (SoundCloud) respecting privacy."""
+    limit = limit if isinstance(limit, int) else 40
+    cursor = cursor if isinstance(cursor, str) else None
+
+    if provider not in ("soundcloud", "spotify"):
+        raise HTTPException(status_code=400, detail="Unsupported provider")
+
+    target = await db.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if target.hide_profile and user_id != user.id:
+        raise HTTPException(status_code=403, detail="Пользователь скрыл свой профиль")
+
+    account = await db.scalar(
+        select(UserExternalAccount)
+        .where(UserExternalAccount.user_id == user_id, UserExternalAccount.provider == provider)
+    )
+    if not account:
+        return {"provider": provider, "total": 0, "items": []}
+
+    is_self = (user.id == user_id)
+    if not is_self:
+        if not getattr(account, "show_on_profile", True) or not getattr(account, "show_tracks", True):
+            return {"provider": provider, "total": 0, "items": []}
+
+    if provider == "soundcloud":
+        sc_provider = provider_registry.get_provider("soundcloud")
+        if not sc_provider:
+            raise HTTPException(status_code=500, detail="SoundCloud provider unavailable")
+
+        ident = account.external_id or account.username
+        try:
+            tracks_meta, next_cursor = await sc_provider.fetch_user_tracks(
+                ident, limit=limit, next_href=cursor, auth_token=account.auth_token if is_self else None
+            )
+        except Exception as e:
+            logger.error(f"Failed to fetch SoundCloud user tracks for {account.username}: {e}")
+            return {"provider": "soundcloud", "total": 0, "items": []}
+
+        # Check against viewer library and viewer channel backup status
+        user_lib_q = select(UserLibrary.track_id).where(UserLibrary.user_id == user.id)
+        user_lib_track_ids = set((await db.scalars(user_lib_q)).all())
+
+        user_ch_q = (
+            select(ChannelMessage.track_id)
+            .join(UserChannel, ChannelMessage.channel_id == UserChannel.id)
+            .where(UserChannel.user_id == user.id, ChannelMessage.status == ChannelMessageStatus.SENT)
+        )
+        user_channel_track_ids = set((await db.scalars(user_ch_q)).all())
+
+        existing_tracks = await _find_existing_tracks_batch(tracks_meta, session=db)
+
+        items: List[SoundCloudTrackItem] = []
+        for t, existing in zip(tracks_meta, existing_tracks):
+            already_in_tg = existing is not None
+            in_lib = (existing.id in user_lib_track_ids) if existing else False
+            in_chan = (existing.id in user_channel_track_ids) if existing else False
+            existing_id = existing.id if existing else None
+
+            items.append(
+                SoundCloudTrackItem(
+                    url=t.url,
+                    title=t.title,
+                    artist=t.artist,
+                    duration=t.duration,
+                    cover_url=t.cover_url,
+                    genre=t.extra.get("genre") if t.extra else None,
+                    tags=t.extra.get("tags") if t.extra else None,
+                    in_library=in_lib,
+                    in_channel=in_chan,
+                    already_in_tg=already_in_tg,
+                    track_id=existing_id,
+                    created_at=t.extra.get("created_at") if t.extra else None,
+                )
+            )
+
+        return {
+            "provider": "soundcloud",
+            "account": {
+                "username": account.username,
+                "display_name": account.display_name,
+                "avatar_url": account.avatar_url,
+                "profile_url": account.profile_url,
+            },
+            "total_tracks": account.tracks_count or len(items),
+            "items": [it.model_dump() for it in items],
+            "next_cursor": next_cursor,
+        }
+
+    return {"provider": "spotify", "total_tracks": 0, "items": []}
+
+
+@router.get("/user/{user_id}/external/soundcloud/playlists/{playlist_id}/tracks")
+async def get_user_external_soundcloud_playlist_tracks(
+    user_id: int,
+    playlist_id: str,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Fetch tracks of a user's SoundCloud playlist with viewer library & backup status."""
+    target = await db.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if target.hide_profile and user_id != user.id:
+        raise HTTPException(status_code=403, detail="Пользователь скрыл свой профиль")
+
+    account = await db.scalar(
+        select(UserExternalAccount)
+        .where(UserExternalAccount.user_id == user_id, UserExternalAccount.provider == "soundcloud")
+    )
+    if not account:
+        raise HTTPException(status_code=404, detail="SoundCloud аккаунт не найден")
+
+    is_self = (user.id == user_id)
+    if not is_self:
+        if not getattr(account, "show_on_profile", True) or not getattr(account, "show_playlists", True):
+            raise HTTPException(status_code=403, detail="Плейлисты SoundCloud скрыты пользователем")
+
+    sc_provider = provider_registry.get_provider("soundcloud")
+    if not sc_provider:
+        raise HTTPException(status_code=500, detail="SoundCloud provider unavailable")
+
+    try:
+        playlist_info, tracks_meta = await sc_provider.fetch_playlist_tracks(
+            playlist_id, auth_token=account.auth_token if is_self else None
+        )
+    except Exception as e:
+        logger.error(f"Failed to fetch SoundCloud playlist tracks for user {user_id}: {e}")
+        raise HTTPException(status_code=502, detail=f"Не удалось получить треки плейлиста: {str(e)}")
+
+    user_lib_q = select(UserLibrary.track_id).where(UserLibrary.user_id == user.id)
+    user_lib_track_ids = set((await db.scalars(user_lib_q)).all())
+
+    user_ch_q = (
+        select(ChannelMessage.track_id)
+        .join(UserChannel, ChannelMessage.channel_id == UserChannel.id)
+        .where(UserChannel.user_id == user.id, ChannelMessage.status == ChannelMessageStatus.SENT)
+    )
+    user_channel_track_ids = set((await db.scalars(user_ch_q)).all())
+
+    existing_tracks = await _find_existing_tracks_batch(tracks_meta, session=db)
+
+    items: List[SoundCloudTrackItem] = []
+    for t, existing in zip(tracks_meta, existing_tracks):
+        already_in_tg = existing is not None
+        in_lib = (existing.id in user_lib_track_ids) if existing else False
+        in_chan = (existing.id in user_channel_track_ids) if existing else False
+        existing_id = existing.id if existing else None
+
+        items.append(
+            SoundCloudTrackItem(
+                url=t.url,
+                title=t.title,
+                artist=t.artist,
+                duration=t.duration,
+                cover_url=t.cover_url,
+                genre=t.extra.get("genre") if t.extra else None,
+                tags=t.extra.get("tags") if t.extra else None,
+                in_library=in_lib,
+                in_channel=in_chan,
+                already_in_tg=already_in_tg,
+                track_id=existing_id,
+                track_number=t.track_number,
+            )
+        )
+
+    return {
+        "provider": "soundcloud",
+        "playlist": SoundCloudPlaylistItem(**playlist_info).model_dump(),
+        "total_tracks": len(items),
+        "tracks": [it.model_dump() for it in items],
+    }

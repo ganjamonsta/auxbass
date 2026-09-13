@@ -176,6 +176,11 @@ async def _ensure_sqlite_columns(conn):
             ("is_disliked", "INTEGER DEFAULT 0"),
             ("disliked_at", "TIMESTAMP"),
         ],
+        "user_external_accounts": [
+            ("show_on_profile", "INTEGER DEFAULT 1"),
+            ("show_playlists", "INTEGER DEFAULT 1"),
+            ("show_tracks", "INTEGER DEFAULT 1"),
+        ],
     }
     
     for table_name, columns in schema_definitions.items():

@@ -91,6 +91,33 @@ class ExternalAccountResponse(BaseModel):
     tracks_count: int = 0
     connected: bool = True
     last_synced_at: Optional[str] = None
+    show_on_profile: bool = True
+    show_playlists: bool = True
+    show_tracks: bool = True
+
+
+class ExternalAccountPrivacyUpdate(BaseModel):
+    show_on_profile: Optional[bool] = None
+    show_playlists: Optional[bool] = None
+    show_tracks: Optional[bool] = None
+
+
+def _account_to_response(account: UserExternalAccount) -> ExternalAccountResponse:
+    """Format UserExternalAccount DB model into ExternalAccountResponse with privacy settings."""
+    return ExternalAccountResponse(
+        provider=account.provider,
+        username=account.username,
+        display_name=account.display_name,
+        profile_url=account.profile_url,
+        avatar_url=account.avatar_url,
+        likes_count=account.likes_count,
+        tracks_count=account.tracks_count,
+        connected=True,
+        last_synced_at=account.last_synced_at.isoformat() if account.last_synced_at else None,
+        show_on_profile=getattr(account, "show_on_profile", True) if getattr(account, "show_on_profile", None) is not None else True,
+        show_playlists=getattr(account, "show_playlists", True) if getattr(account, "show_playlists", None) is not None else True,
+        show_tracks=getattr(account, "show_tracks", True) if getattr(account, "show_tracks", None) is not None else True,
+    )
 
 
 class ConnectAccountRequest(BaseModel):
@@ -726,17 +753,7 @@ async def get_soundcloud_account(
     if not account:
         return {"connected": False}
 
-    return ExternalAccountResponse(
-        provider=account.provider,
-        username=account.username,
-        display_name=account.display_name,
-        profile_url=account.profile_url,
-        avatar_url=account.avatar_url,
-        likes_count=account.likes_count,
-        tracks_count=account.tracks_count,
-        connected=True,
-        last_synced_at=account.last_synced_at.isoformat() if account.last_synced_at else None,
-    )
+    return _account_to_response(account)
 
 
 @router.post("/account/soundcloud/connect", response_model=ExternalAccountResponse)
@@ -799,17 +816,7 @@ async def connect_soundcloud_account(
     await db.commit()
     await db.refresh(account)
 
-    return ExternalAccountResponse(
-        provider=account.provider,
-        username=account.username,
-        display_name=account.display_name,
-        profile_url=account.profile_url,
-        avatar_url=account.avatar_url,
-        likes_count=account.likes_count,
-        tracks_count=account.tracks_count,
-        connected=True,
-        last_synced_at=account.last_synced_at.isoformat() if account.last_synced_at else None,
-    )
+    return _account_to_response(account)
 
 
 @router.delete("/account/soundcloud")
@@ -902,17 +909,7 @@ async def get_soundcloud_likes(
             )
         )
 
-    account_resp = ExternalAccountResponse(
-        provider=account.provider,
-        username=account.username,
-        display_name=account.display_name,
-        profile_url=account.profile_url,
-        avatar_url=account.avatar_url,
-        likes_count=account.likes_count,
-        tracks_count=account.tracks_count,
-        connected=True,
-        last_synced_at=account.last_synced_at.isoformat() if account.last_synced_at else None,
-    )
+    account_resp = _account_to_response(account)
 
     return UserLikesResponse(
         provider="soundcloud",
@@ -997,17 +994,7 @@ async def get_soundcloud_tracks(
             )
         )
 
-    account_resp = ExternalAccountResponse(
-        provider=account.provider,
-        username=account.username,
-        display_name=account.display_name,
-        profile_url=account.profile_url,
-        avatar_url=account.avatar_url,
-        likes_count=account.likes_count,
-        tracks_count=account.tracks_count,
-        connected=True,
-        last_synced_at=account.last_synced_at.isoformat() if account.last_synced_at else None,
-    )
+    account_resp = _account_to_response(account)
 
     return UserTracksResponse(
         provider="soundcloud",
@@ -1058,17 +1045,7 @@ async def get_soundcloud_playlists(
 
     items = [SoundCloudPlaylistItem(**p) for p in playlists_raw]
 
-    account_resp = ExternalAccountResponse(
-        provider=account.provider,
-        username=account.username,
-        display_name=account.display_name,
-        profile_url=account.profile_url,
-        avatar_url=account.avatar_url,
-        likes_count=account.likes_count,
-        tracks_count=account.tracks_count,
-        connected=True,
-        last_synced_at=account.last_synced_at.isoformat() if account.last_synced_at else None,
-    )
+    account_resp = _account_to_response(account)
 
     return UserPlaylistsResponse(
         provider="soundcloud",
@@ -1170,17 +1147,7 @@ async def get_spotify_account(
     if not account:
         return {"connected": False}
 
-    return ExternalAccountResponse(
-        provider=account.provider,
-        username=account.username,
-        display_name=account.display_name,
-        profile_url=account.profile_url,
-        avatar_url=account.avatar_url,
-        likes_count=account.likes_count,
-        tracks_count=account.tracks_count,
-        connected=True,
-        last_synced_at=account.last_synced_at.isoformat() if account.last_synced_at else None,
-    )
+    return _account_to_response(account)
 
 
 @router.post("/account/spotify/connect", response_model=ExternalAccountResponse)
@@ -1242,17 +1209,37 @@ async def connect_spotify_account(
     await db.commit()
     await db.refresh(account)
 
-    return ExternalAccountResponse(
-        provider=account.provider,
-        username=account.username,
-        display_name=account.display_name,
-        profile_url=account.profile_url,
-        avatar_url=account.avatar_url,
-        likes_count=account.likes_count,
-        tracks_count=account.tracks_count,
-        connected=True,
-        last_synced_at=account.last_synced_at.isoformat() if account.last_synced_at else None,
+    return _account_to_response(account)
+
+
+@router.patch("/account/{provider}/privacy", response_model=ExternalAccountResponse)
+async def update_account_privacy(
+    provider: str,
+    req: ExternalAccountPrivacyUpdate,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update privacy settings for connected external account (SoundCloud / Spotify)."""
+    if provider not in ("soundcloud", "spotify"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported provider")
+
+    account = await db.scalar(
+        select(UserExternalAccount)
+        .where(UserExternalAccount.user_id == user.id, UserExternalAccount.provider == provider)
     )
+    if not account:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Аккаунт не подключен")
+
+    if req.show_on_profile is not None:
+        account.show_on_profile = req.show_on_profile
+    if req.show_playlists is not None:
+        account.show_playlists = req.show_playlists
+    if req.show_tracks is not None:
+        account.show_tracks = req.show_tracks
+
+    await db.commit()
+    await db.refresh(account)
+    return _account_to_response(account)
 
 
 @router.delete("/account/spotify")

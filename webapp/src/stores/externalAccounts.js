@@ -162,6 +162,22 @@ export const useExternalAccountsStore = defineStore('externalAccounts', () => {
     }
   }
 
+  async function updatePrivacy(provider, privacyData) {
+    const res = await ingestionApi.updateAccountPrivacy(provider, privacyData)
+    if (provider === 'soundcloud') {
+      scAccount.value = res.data
+      try {
+        localStorage.setItem(SC_ACCOUNT_STORAGE_KEY, JSON.stringify(res.data))
+      } catch (_) {}
+    } else if (provider === 'spotify') {
+      spAccount.value = res.data
+      try {
+        localStorage.setItem(SP_ACCOUNT_STORAGE_KEY, JSON.stringify(res.data))
+      } catch (_) {}
+    }
+    return res.data
+  }
+
   function reset() {
     scAccount.value = null
     spAccount.value = null
@@ -191,6 +207,7 @@ export const useExternalAccountsStore = defineStore('externalAccounts', () => {
     fetchSpotify,
     connectSpotify,
     disconnectSpotify,
+    updatePrivacy,
     fetchLastSpotifyImport,
     setLastSpotifyImport,
     setSoundCloudAccount,

@@ -147,6 +147,59 @@
               <span>Отвязать</span>
             </button>
           </div>
+
+          <!-- SoundCloud Privacy Settings -->
+          <div class="service-privacy-box">
+            <div class="service-privacy-header">
+              <Lock :size="13" />
+              <span>Приватность в профиле</span>
+            </div>
+            
+            <div class="setting-row mini-setting-row">
+              <div class="setting-info">
+                <span class="setting-name">Показывать SoundCloud в профиле</span>
+                <span class="setting-desc">Отображать бейдж аккаунта и вкладку SoundCloud</span>
+              </div>
+              <label class="toggle">
+                <input 
+                  type="checkbox" 
+                  :checked="scAccount.show_on_profile !== false" 
+                  @change="handleUpdateScPrivacy('show_on_profile', $event.target.checked)"
+                />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-row mini-setting-row" v-if="scAccount.show_on_profile !== false">
+              <div class="setting-info">
+                <span class="setting-name">Показывать плейлисты</span>
+                <span class="setting-desc">Другие пользователи смогут видеть и слушать ваши плейлисты</span>
+              </div>
+              <label class="toggle">
+                <input 
+                  type="checkbox" 
+                  :checked="scAccount.show_playlists !== false" 
+                  @change="handleUpdateScPrivacy('show_playlists', $event.target.checked)"
+                />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-row mini-setting-row" v-if="scAccount.show_on_profile !== false">
+              <div class="setting-info">
+                <span class="setting-name">Показывать авторские треки и релизы</span>
+                <span class="setting-desc">Ваши загруженные треки будут видны во вкладке профиля</span>
+              </div>
+              <label class="toggle">
+                <input 
+                  type="checkbox" 
+                  :checked="scAccount.show_tracks !== false" 
+                  @change="handleUpdateScPrivacy('show_tracks', $event.target.checked)"
+                />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
         </template>
 
         <!-- Not Connected State -->
@@ -273,6 +326,44 @@
             <Unlink :size="14" />
             <span>Отвязать профиль</span>
           </button>
+        </div>
+
+        <!-- Spotify Privacy Settings -->
+        <div v-if="spAccount?.connected" class="service-privacy-box sp-privacy-box">
+          <div class="service-privacy-header">
+            <Lock :size="13" />
+            <span>Приватность в профиле</span>
+          </div>
+          
+          <div class="setting-row mini-setting-row">
+            <div class="setting-info">
+              <span class="setting-name">Показывать Spotify в профиле</span>
+              <span class="setting-desc">Отображать бейдж профиля Spotify и вкладку</span>
+            </div>
+            <label class="toggle">
+              <input 
+                type="checkbox" 
+                :checked="spAccount.show_on_profile !== false" 
+                @change="handleUpdateSpPrivacy('show_on_profile', $event.target.checked)"
+              />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <div class="setting-row mini-setting-row" v-if="spAccount.show_on_profile !== false">
+            <div class="setting-info">
+              <span class="setting-name">Показывать сохранённые плейлисты</span>
+              <span class="setting-desc">Другие пользователи смогут видеть импортированные плейлисты Spotify</span>
+            </div>
+            <label class="toggle">
+              <input 
+                type="checkbox" 
+                :checked="spAccount.show_playlists !== false" 
+                @change="handleUpdateSpPrivacy('show_playlists', $event.target.checked)"
+              />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
         </div>
 
         <div v-else class="service-input-block sp-input-block">
@@ -1084,6 +1175,16 @@ const handleDisconnectSc = async () => {
   }
 }
 
+const handleUpdateScPrivacy = async (field, value) => {
+  try {
+    await externalAccountsStore.updatePrivacy('soundcloud', { [field]: value })
+    uiStore.toast?.success('Настройки сохранены', 'Приватность SoundCloud обновлена')
+  } catch (err) {
+    console.error('Failed to update SoundCloud privacy:', err)
+    uiStore.toast?.error('Ошибка', 'Не удалось обновить настройки приватности')
+  }
+}
+
 const goToSoundCloudLikes = () => {
   router.push({ path: '/search', query: { tab: 'soundcloud', mode: 'likes' } })
 }
@@ -1144,6 +1245,16 @@ const handleDisconnectSp = async () => {
     console.error('Failed to disconnect Spotify:', e)
   } finally {
     isDisconnectingSp.value = false
+  }
+}
+
+const handleUpdateSpPrivacy = async (field, value) => {
+  try {
+    await externalAccountsStore.updatePrivacy('spotify', { [field]: value })
+    uiStore.toast?.success('Настройки сохранены', 'Приватность Spotify обновлена')
+  } catch (err) {
+    console.error('Failed to update Spotify privacy:', err)
+    uiStore.toast?.error('Ошибка', 'Не удалось обновить настройки приватности')
   }
 }
 
@@ -2384,6 +2495,47 @@ const handleResetState = (event) => {
 
 .sp-input-block {
   margin-top: 12px;
+}
+
+/* Service Privacy Box */
+.service-privacy-box {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--r-md);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sp-privacy-box {
+  border-color: rgba(29, 185, 84, 0.15);
+  background: rgba(29, 185, 84, 0.03);
+}
+
+.service-privacy-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--c-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.mini-setting-row {
+  padding: 4px 0;
+}
+
+.mini-setting-row .setting-name {
+  font-size: 13px;
+}
+
+.mini-setting-row .setting-desc {
+  font-size: 11px;
 }
 
 /* ═══════════════════════════════════════════════
