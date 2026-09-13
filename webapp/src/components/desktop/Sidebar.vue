@@ -136,7 +136,7 @@
     <!-- Edge Toggle Button (Centered on the right border line, pointing right) -->
     <button 
       class="sidebar-edge-toggle rail-edge-toggle" 
-      @click="uiStore.openSidebarOverlay" 
+      @click="handleRailToggleClick" 
       title="Развернуть меню (Ctrl+B)"
       aria-label="Развернуть сайдбар"
     >
@@ -684,6 +684,14 @@ const tasksStore = useTasksStore()
 const pwaInstall = usePwaInstall()
 const showProfileMenu = ref(false)
 const cachedTracksCount = ref(0)
+
+const handleRailToggleClick = () => {
+  if (!uiStore.isAutoCollapsed) {
+    uiStore.setSidebarCollapsed(false, true)
+  } else {
+    uiStore.openSidebarOverlay()
+  }
+}
 
 const handleNavClick = () => {
   if (uiStore.isSidebarOverlayOpen) {
@@ -1657,6 +1665,20 @@ onUnmounted(() => {
 /* =========================================================
    3. Overlay Backdrop & Drawer ("бургер меню поверх среднего экрана")
    ========================================================= */
+.sidebar-overlay-portal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1050;
+  pointer-events: none;
+}
+
+.sidebar-overlay-portal > * {
+  pointer-events: auto;
+}
+
 .sidebar-overlay-backdrop {
   position: fixed;
   top: 0;
@@ -1666,31 +1688,40 @@ onUnmounted(() => {
   background: rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  z-index: 1040;
+  z-index: 1051;
   cursor: pointer;
+  pointer-events: auto;
 }
 
 .sidebar-overlay-backdrop.has-bottom-player {
   bottom: var(--desktop-player-height, 100px);
 }
 
-.sidebar-overlay-drawer {
-  position: fixed;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: 280px;
-  z-index: 1050;
-  background: #0d0d0d;
-  border-right: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 18px 0 45px rgba(0, 0, 0, 0.85), 6px 0 16px rgba(0, 0, 0, 0.6);
-  display: flex;
-  flex-direction: column;
-  overflow: visible;
+.sidebar.sidebar-wrapper.sidebar-overlay-drawer {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  bottom: 0 !important;
+  width: 280px !important;
+  height: 100vh !important;
+  z-index: 1052 !important;
+  background: #0d0d0d !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 18px 0 45px rgba(0, 0, 0, 0.85), 6px 0 16px rgba(0, 0, 0, 0.6) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: visible !important;
+  pointer-events: auto !important;
 }
 
-.sidebar-overlay-drawer.has-bottom-player {
-  bottom: var(--desktop-player-height, 100px);
+.sidebar.sidebar-wrapper.sidebar-overlay-drawer.has-bottom-player {
+  bottom: var(--desktop-player-height, 100px) !important;
+  height: calc(100vh - var(--desktop-player-height, 100px)) !important;
+}
+
+.drawer-edge-toggle {
+  z-index: 1060;
+  pointer-events: auto;
 }
 
 /* Overlay Transitions */

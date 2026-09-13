@@ -325,8 +325,8 @@ const updateLayoutState = () => {
   const hasNowPlaying = !!(playerStore.currentTrack && authStore.isAuthenticated && uiStore.isNowPlayingSidebarVisible)
   const occupiedSidebars = 280 + (hasNowPlaying ? 320 : 0)
   const centerSpace = width - occupiedSidebars
-  // Tight if center space < 780px or screen width < 1250px
-  const isTightLeft = centerSpace < 780 || width < 1250
+  // Tight if center space < 520px or screen width < 1000px
+  const isTightLeft = centerSpace < 520 || width < 1000
 
   uiStore.isAutoCollapsed = isTightLeft
 
@@ -337,8 +337,13 @@ const updateLayoutState = () => {
     // User explicitly pinned sidebar to layout: keep it pinned in desktop mode!
     uiStore.setSidebarCollapsed(false)
   } else {
-    // User explicitly collapsed sidebar to icons
-    uiStore.setSidebarCollapsed(true)
+    // User had collapsed it, but when window is stretched wide, allow it to adapt!
+    if (!isTightLeft) {
+      uiStore.userCollapsedPreference = null
+      uiStore.setSidebarCollapsed(false)
+    } else {
+      uiStore.setSidebarCollapsed(true)
+    }
   }
 }
 

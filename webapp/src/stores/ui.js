@@ -85,10 +85,12 @@ export const useUIStore = defineStore('ui', () => {
 
   const toggleSidebarCollapse = () => {
     if (isSidebarCollapsed.value) {
-      // If already collapsed to icons, clicking burger button toggles the overlay drawer
-      toggleSidebarOverlay()
+      if (!isAutoCollapsed.value) {
+        setSidebarCollapsed(false, true)
+      } else {
+        toggleSidebarOverlay()
+      }
     } else {
-      // If expanded in normal desktop grid, collapse to icons
       setSidebarCollapsed(true, true)
     }
   }
