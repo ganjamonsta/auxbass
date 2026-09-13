@@ -21,6 +21,7 @@ export const useTasksStore = defineStore('tasks', () => {
   // Modal visibility states
   const showExportifyModal = ref(false)
   const showImportModal = ref(false)
+  const exportifyModalOptions = ref({})
 
   // Current active job for modals
   const currentExportifyJob = ref(null)
@@ -395,12 +396,13 @@ export const useTasksStore = defineStore('tasks', () => {
   /**
    * Modal opening shortcuts
    */
-  const openExportifyModal = async () => {
+  const openExportifyModal = async (options = {}) => {
     const { useAuthStore } = await import('./auth')
     const authStore = useAuthStore()
     if (!authStore.requireChannel('импорта музыки')) {
       return
     }
+    exportifyModalOptions.value = options || {}
     showExportifyModal.value = true
   }
 
@@ -411,6 +413,7 @@ export const useTasksStore = defineStore('tasks', () => {
       return
     }
     showExportifyModal.value = false
+    exportifyModalOptions.value = {}
     currentExportifyJob.value = null
   }
 
@@ -512,6 +515,7 @@ export const useTasksStore = defineStore('tasks', () => {
     jobMetas,
     minimizedJobIds,
     showExportifyModal,
+    exportifyModalOptions,
     showImportModal,
     currentExportifyJob,
     currentImportJob,

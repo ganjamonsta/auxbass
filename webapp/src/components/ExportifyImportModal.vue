@@ -151,6 +151,41 @@
                 </div>
               </div>
 
+              <!-- Saved Import Card from Telegram Channel -->
+              <div v-if="externalAccountsStore.hasLastSpotifyImport" class="saved-channel-file-card">
+                <div class="saved-file-badge">
+                  <span class="pulse-dot"></span>
+                  <span>Сохранено в Telegram-канале</span>
+                </div>
+                <div class="saved-file-main">
+                  <div class="saved-file-icon">
+                    <FileSpreadsheet :size="22" />
+                  </div>
+                  <div class="saved-file-meta">
+                    <span class="saved-file-name" :title="externalAccountsStore.lastSpotifyImport.filename">
+                      {{ externalAccountsStore.lastSpotifyImport.filename }}
+                    </span>
+                    <span class="saved-file-sub">
+                      {{ externalAccountsStore.lastSpotifyImport.total_tracks }} треков
+                      <template v-if="externalAccountsStore.lastSpotifyImport.summary?.new_tracks_count">
+                        • {{ externalAccountsStore.lastSpotifyImport.summary.new_tracks_count }} новых
+                      </template>
+                    </span>
+                  </div>
+                  <button 
+                    class="action-btn primary saved-file-btn"
+                    :disabled="isParsing"
+                    @click.stop="loadLastSavedImport"
+                  >
+                    <div v-if="loadingSavedFile" class="spinner small"></div>
+                    <template v-else>
+                      <FolderOpen :size="14" />
+                      <span>Открыть треклист</span>
+                    </template>
+                  </button>
+                </div>
+              </div>
+
               <!-- Dropzone -->
               <div 
                 class="dropzone"
@@ -389,12 +424,14 @@ import {
   Pause,
   Volume2,
   Minus,
+  FolderOpen,
 } from 'lucide-vue-next'
 import { ingestionApi } from '@/api/client'
 import { useUIStore } from '@/stores/ui'
 import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { useTasksStore } from '@/stores/tasks'
+import { useExternalAccountsStore } from '@/stores/externalAccounts'
 import { formatDuration } from '@/utils'
 
 const props = defineProps({
@@ -410,6 +447,7 @@ const uiStore = useUIStore()
 const libraryStore = useLibraryStore()
 const playerStore = usePlayerStore()
 const tasksStore = useTasksStore()
+const externalAccountsStore = useExternalAccountsStore()
 
 const playingTrackUrl = ref(null)
 const previewLoadingUrl = ref(null)
@@ -417,6 +455,7 @@ const previewLoadingUrl = ref(null)
 const fileInputRef = ref(null)
 const isDragging = ref(false)
 const isParsing = ref(false)
+const loadingSavedFile = ref(false)
 const parseError = ref(null)
 
 const previewData = ref(null)
@@ -497,11 +536,34 @@ const processFile = async (file) => {
 
     // Select only new tracks by default!
     selectOnlyNew()
+    externalAccountsStore.fetchLastSpotifyImport(true)
   } catch (err) {
     console.error('Failed to parse Exportify CSV:', err)
     parseError.value = err.response?.data?.detail || 'Не удалось проанализировать CSV файл. Убедитесь, что это файл из Exportify.'
   } finally {
     isParsing.value = false
+  }
+}
+
+const loadLastSavedImport = async () => {
+  isParsing.value = true
+  loadingSavedFile.value = true
+  parseError.value = null
+
+  try {
+    const res = await ingestionApi.previewLastSpotifyImport()
+    previewData.value = res.data
+
+    const cleanName = (res.data.filename || 'Spotify Playlist').replace(/\.csv$/i, '').replace(/[_-]/g, ' ')
+    playlistName.value = cleanName.charAt(0).toUpperCase() + cleanName.slice(1)
+
+    selectOnlyNew()
+  } catch (err) {
+    console.error('Failed to load saved Spotify import from Telegram:', err)
+    parseError.value = err.response?.data?.detail || 'Не удалось загрузить сохранённый файл из Telegram.'
+  } finally {
+    isParsing.value = false
+    loadingSavedFile.value = false
   }
 }
 
@@ -716,6 +778,10 @@ watch(
         if (activeJob.value.status === 'in_progress') {
           startPollingJob(activeJob.value.id)
         }
+      } else if (tasksStore.exportifyModalOptions?.loadLastSaved) {
+        loadLastSavedImport()
+      } else {
+        externalAccountsStore.fetchLastSpotifyImport()
       }
     } else {
       if (!activeJob.value || activeJob.value.status !== 'in_progress') {
@@ -843,6 +909,97 @@ watch(
   padding: 20px;
   overflow-y: auto;
   flex: 1;
+}
+
+/* Saved Channel File Card */
+.saved-channel-file-card {
+  background: rgba(29, 185, 84, 0.08);
+  border: 1px solid rgba(29, 185, 84, 0.28);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.2s ease;
+}
+
+.saved-channel-file-card:hover {
+  background: rgba(29, 185, 84, 0.12);
+  border-color: rgba(29, 185, 84, 0.45);
+}
+
+.saved-file-badge {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--c-accent, #1db954);
+}
+
+.pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--c-accent, #1db954);
+  box-shadow: 0 0 8px rgba(29, 185, 84, 0.8);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+.saved-file-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.saved-file-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(29, 185, 84, 0.16);
+  color: var(--c-accent, #1db954);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.saved-file-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.saved-file-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.saved-file-sub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.saved-file-btn {
+  padding: 8px 14px;
+  font-size: 13px;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 /* Guide Card */

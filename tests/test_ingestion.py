@@ -684,6 +684,46 @@ def test_soundcloud_tracks_and_playlists_schemas():
     assert req.playlist_name == "My Synced Playlist"
 
 
+@pytest.mark.asyncio
+async def test_user_import_file_model():
+    from shared.models import User, UserImportFile
+    from shared.database import init_db, get_session
+    from sqlalchemy import select
+
+    await init_db()
+    async with get_session() as session:
+        user = await session.get(User, 999999)
+        if not user:
+            user = User(id=999999, username="test_import_user")
+            session.add(user)
+            await session.commit()
+
+        import_file = UserImportFile(
+            user_id=999999,
+            provider="spotify",
+            filename="Liked Songs.csv",
+            file_id="tg_doc_file_id_123",
+            file_size=45000,
+            total_tracks=150,
+            channel_id=-100123456789,
+            message_id=42,
+            summary_json='{"total_tracks": 150, "new_tracks_count": 120}',
+        )
+        session.add(import_file)
+        await session.commit()
+
+        res = await session.scalar(
+            select(UserImportFile)
+            .where(UserImportFile.user_id == 999999, UserImportFile.provider == "spotify")
+            .order_by(UserImportFile.id.desc())
+        )
+        assert res is not None
+        assert res.filename == "Liked Songs.csv"
+        assert res.total_tracks == 150
+        assert res.file_id == "tg_doc_file_id_123"
+        assert res.channel_id == -100123456789
+
+
 
 
 

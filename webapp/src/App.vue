@@ -255,6 +255,7 @@ import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
 import { useTasksStore } from '@/stores/tasks'
+import { useExternalAccountsStore } from '@/stores/externalAccounts'
 import { useModals } from '@/composables/useModals'
 import PageHeader from '@/components/PageHeader.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
@@ -292,6 +293,7 @@ const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
 const uiStore = useUIStore()
 const tasksStore = useTasksStore()
+const externalAccountsStore = useExternalAccountsStore()
 const telegram = inject('telegram')
 const networkMonitor = useNetworkMonitor()
 const pwaInstall = usePwaInstall()
@@ -726,6 +728,12 @@ onMounted(async () => {
     await authStore.initialize()
   }
 
+  // Preload external accounts and last import for sidebar shortcuts
+  if (authStore.isAuthenticated) {
+    externalAccountsStore.fetchSoundCloud()
+    externalAccountsStore.fetchLastSpotifyImport()
+  }
+
   // Restore player state if available (persisted queue, track, position) without blocking UI
   if (playerStore.hasSavedState() && !playerStore.currentTrack && !playerStore.isPlaying) {
     playerStore.restoreState()
@@ -770,6 +778,17 @@ onMounted(async () => {
     }
   })
 })
+
+// Watch auth state to load external accounts & last import when user logs in
+watch(
+  () => authStore.isAuthenticated,
+  (isAuth) => {
+    if (isAuth) {
+      externalAccountsStore.fetchSoundCloud()
+      externalAccountsStore.fetchLastSpotifyImport()
+    }
+  }
+)
 
 onUnmounted(() => {
   window.removeEventListener('resize', updateLayoutState)
