@@ -149,8 +149,31 @@
             </div>
           </div>
 
-          <!-- Bottom: Equalizer + Audio Format badge -->
+          <!-- Bottom: Equalizer + Audio Format badge + Screen Mode Toggles -->
           <div class="lcd-bottom-row">
+            <!-- Screen Mode Toggles (Shuffle & Repeat) -->
+            <div class="lcd-mode-chips">
+              <button 
+                class="lcd-chip" 
+                :class="{ active: shuffle }" 
+                @click.stop="playerStore.toggleShuffle()" 
+                :title="shuffle ? 'Случайно: включено' : 'Случайно: выключено'"
+              >
+                <Shuffle :size="9" class="lcd-chip-icon" />
+                <span>SHUF</span>
+              </button>
+              <button 
+                class="lcd-chip" 
+                :class="{ active: repeat !== 'none' }" 
+                @click.stop="playerStore.toggleRepeat()" 
+                :title="repeatTitle"
+              >
+                <Repeat1 v-if="repeat === 'one'" :size="9" class="lcd-chip-icon" />
+                <Repeat v-else :size="9" class="lcd-chip-icon" />
+                <span>{{ repeat === 'one' ? 'RPT 1' : 'RPT' }}</span>
+              </button>
+            </div>
+
             <div class="lcd-eq">
               <div 
                 v-for="i in 18" 
@@ -282,9 +305,9 @@ const isLiked = computed(() => {
   return track.value.is_liked === true
 })
 
-// Handle LCD click - open full player (but not on waveform or VFD display)
+// Handle LCD click - open full player (but not on waveform, mode buttons, or VFD display)
 const handleLcdClick = (e) => {
-  if (isSeeking.value || e.target.closest('.waveform-container') || e.target.closest('.vfd-display')) {
+  if (isSeeking.value || e.target.closest('.waveform-container') || e.target.closest('.vfd-display') || e.target.closest('.lcd-mode-chips')) {
     return
   }
   emit('expand')
@@ -597,15 +620,27 @@ const handleResize = () => {
   drawWaveform()
 }
 
+let waveformResizeObserver = null
+
 onMounted(() => {
   eqInterval = setInterval(animateEq, 100)
   nextTick(() => {
     drawWaveform()
+    if (waveformContainer.value && typeof ResizeObserver !== 'undefined') {
+      waveformResizeObserver = new ResizeObserver(() => {
+        drawWaveform()
+      })
+      waveformResizeObserver.observe(waveformContainer.value)
+    }
   })
   window.addEventListener('resize', handleResize)
 })
 
 onUnmounted(() => {
+  if (waveformResizeObserver) {
+    waveformResizeObserver.disconnect()
+    waveformResizeObserver = null
+  }
   clearInterval(eqInterval)
   window.removeEventListener('resize', handleResize)
   document.removeEventListener('mousemove', onVolumeMove)
@@ -1198,5 +1233,188 @@ onUnmounted(() => {
     inset 2px 2px 6px rgba(0, 0, 0, 0.8),
     inset -1px -1px 3px rgba(255, 255, 255, 0.05),
     0 0 20px rgba(77, 195, 255, 0.25);
+}
+
+/* Mode chips inside LCD screen */
+.lcd-mode-chips {
+  position: absolute;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  z-index: 2;
+}
+
+.lcd-chip {
+  background: transparent;
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  border-radius: 2px;
+  padding: 0 4px;
+  height: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-family: 'Courier New', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: rgba(0, 240, 255, 0.35);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  line-height: 1;
+}
+
+.lcd-chip:hover {
+  border-color: rgba(0, 240, 255, 0.5);
+  color: rgba(0, 240, 255, 0.75);
+  background: rgba(0, 240, 255, 0.06);
+}
+
+.lcd-chip.active {
+  color: #00f0ff;
+  border-color: #00f0ff;
+  background: rgba(0, 240, 255, 0.15);
+  text-shadow: 0 0 6px rgba(0, 240, 255, 0.8);
+  box-shadow: 0 0 6px rgba(0, 240, 255, 0.3);
+}
+
+.lcd-chip-icon {
+  flex-shrink: 0;
+}
+
+/* =========================================================
+   Responsive Breakpoints for Desktop Player (768px - 1100px)
+   ========================================================= */
+
+/* Stage 1: Compact desktop width (<= 1100px) */
+@media (max-width: 1100px) {
+  .desktop-player {
+    padding: 0 12px;
+    gap: 12px;
+  }
+
+  /* Hide physical Shuffle & Repeat from controls bar, freeing ~75px */
+  .player-controls .ctrl-btn.mode {
+    display: none;
+  }
+
+  .player-controls {
+    gap: 4px;
+  }
+
+  .ctrl-btn {
+    padding: 7px 9px;
+  }
+
+  .ctrl-btn.play-btn {
+    padding: 7px 12px;
+  }
+
+  /* Compact cover & right controls */
+  .player-right {
+    gap: 6px;
+  }
+
+  .share-ctrl-btn {
+    display: none; /* Hide secondary share button */
+  }
+
+  .cover-display {
+    width: 50px;
+    height: 50px;
+  }
+
+  .vinyl-disc {
+    width: 42px;
+    height: 42px;
+    right: -12px;
+  }
+
+  .like-btn, 
+  .mute-btn, 
+  .sidebar-ctrl-btn {
+    padding: 6px;
+  }
+
+  /* Slightly more compact volume knob */
+  .volume-knob {
+    width: 44px;
+    height: 44px;
+  }
+
+  .volume-arc-svg {
+    width: 50px;
+    height: 50px;
+    top: -3px;
+    left: -3px;
+  }
+
+  .knob-outer {
+    width: 44px;
+    height: 44px;
+  }
+
+  .knob-inner {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* Stage 2: Ultra-compact desktop width (<= 880px, down to 768px) */
+@media (max-width: 880px) {
+  .desktop-player {
+    padding: 0 8px;
+    gap: 8px;
+  }
+
+  .player-controls {
+    gap: 3px;
+  }
+
+  .ctrl-btn {
+    padding: 6px 7px;
+  }
+
+  .ctrl-btn.play-btn {
+    padding: 6px 10px;
+  }
+
+  .player-right {
+    gap: 4px;
+  }
+
+  .cover-display {
+    width: 42px;
+    height: 42px;
+  }
+
+  /* Hide vinyl disc overhang to save space */
+  .vinyl-disc {
+    display: none;
+  }
+
+  .lcd-screen {
+    padding: 5px 8px 4px;
+  }
+
+  .lcd-waveform-row {
+    gap: 6px;
+  }
+
+  .lcd-time {
+    font-size: 10px;
+    min-width: 28px;
+  }
+
+  /* Reduce EQ bars to fit alongside mode chips and format badge */
+  .lcd-eq .eq-bar:nth-child(n+13) {
+    display: none;
+  }
+
+  .lcd-format-badge {
+    display: none; /* Give mode chips and eq full space */
+  }
 }
 </style>
