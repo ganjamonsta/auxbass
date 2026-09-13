@@ -1045,56 +1045,67 @@ const getSpotifyUrl = (acc) => {
 
 @media (max-width: 860px) {
   .profile-hero-card {
+    display: grid;
+    grid-template-columns: 46px 1fr;
+    grid-template-areas:
+      "tabs body"
+      "details details";
+    gap: 16px 12px;
+    padding: 16px 14px 14px;
+    align-items: start;
+  }
+
+  .hero-monolith-tabs {
+    grid-area: tabs;
+    width: 46px;
     flex-direction: column;
-    align-items: stretch;
-    padding: 22px 18px 18px;
-    gap: 16px;
+    padding: 3px;
+    gap: 3px;
+    border-radius: var(--r-md, 12px);
+  }
+
+  .monolith-tab-btn {
+    width: 100%;
+    height: 38px;
+    padding: 0;
+    justify-content: center;
+    border-radius: var(--r-sm, 8px);
+  }
+
+  .tab-edge-divider,
+  .tab-edge-label,
+  .tab-edge-badge {
+    display: none !important;
+  }
+
+  .tab-edge-icon {
+    width: 20px;
+    height: 20px;
+    margin: 0;
   }
 
   .hero-body {
-    align-items: center;
-    text-align: center;
-    width: 100%;
+    grid-area: body;
+    min-width: 0;
+    align-items: flex-start;
+    text-align: left;
+    padding-right: 38px; /* space for share corner button */
+    gap: 8px;
   }
 
   .hero-meta-top,
   .hero-subline,
   .hero-actions-bar {
-    justify-content: center;
-  }
-
-  .hero-monolith-tabs {
-    flex-direction: row;
-    width: 100%;
-    overflow-x: auto;
-    padding: 4px;
-    gap: 4px;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .hero-monolith-tabs::-webkit-scrollbar {
-    display: none;
-  }
-
-  .monolith-tab-btn {
-    width: auto;
-    flex-shrink: 0;
-    padding: 0 14px 0 10px;
-  }
-
-  .hero-tab-details-panel {
-    width: 100%;
-  }
-}
-
-@media (max-width: 600px) {
-  .profile-hero-card {
-    padding: 18px 14px 14px;
+    justify-content: flex-start;
   }
 
   .hero-name {
     font-size: 24px;
+  }
+
+  .hero-tab-details-panel {
+    grid-area: details;
+    width: 100%;
   }
 
   .hero-share-corner-btn {
@@ -1106,6 +1117,28 @@ const getSpotifyUrl = (acc) => {
 
   .hero-actions-bar {
     gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .profile-hero-card {
+    padding: 14px 12px 12px;
+    gap: 14px 10px;
+    grid-template-columns: 42px 1fr;
+  }
+
+  .hero-monolith-tabs {
+    width: 42px;
+    padding: 2px;
+    gap: 2px;
+  }
+
+  .monolith-tab-btn {
+    height: 36px;
+  }
+
+  .hero-name {
+    font-size: 22px;
   }
 }
 </style>
