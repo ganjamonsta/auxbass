@@ -693,11 +693,18 @@ const formatTime = (seconds) => {
   flex-direction: column;
   z-index: var(--z-player, 1000);
   padding: 10px 20px;
-  padding-bottom: max(20px, env(safe-area-inset-bottom, 20px));
+  padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
   touch-action: pan-y;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.85);
   border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.full-player::-webkit-scrollbar {
+  display: none;
 }
 
 /* ─── Swipe Indicator ─── */
@@ -810,20 +817,23 @@ const formatTime = (seconds) => {
 
 /* ─── Cover Art ─── */
 .player-cover {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  min-height: 0;
-  margin-bottom: 20px;
+  min-height: 50px;
+  margin-bottom: 14px;
+  overflow: hidden;
 }
 
 .cover-image {
-  width: 100%;
-  max-width: min(310px, 38vh);
-  aspect-ratio: 1;
-  border-radius: 22px;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  max-height: 310px;
+  aspect-ratio: 1 / 1;
+  border-radius: clamp(14px, 3.5vh, 22px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -842,7 +852,7 @@ const formatTime = (seconds) => {
 }
 
 .cover-text {
-  font-size: 72px;
+  font-size: clamp(28px, 10vmin, 72px);
   font-weight: 700;
   color: rgba(255, 255, 255, 0.7);
   text-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
@@ -888,8 +898,10 @@ const formatTime = (seconds) => {
 /* ─── Track Info ─── */
 .player-info {
   text-align: center;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   flex-shrink: 0;
+  min-width: 0;
+  width: 100%;
 }
 
 .track-info-row {
@@ -897,17 +909,20 @@ const formatTime = (seconds) => {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .track-title {
-  font-size: 22px;
+  font-size: clamp(16px, 4.5vw, 22px);
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--c-text-1);
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  min-width: 0;
 }
 
 .like-btn {
@@ -1014,8 +1029,25 @@ const formatTime = (seconds) => {
 
 /* ─── Tags ─── */
 .player-tags {
+  display: flex;
   justify-content: center;
-  margin-top: 8px;
+  margin-top: 6px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.player-tags :deep(.tags-list) {
+  justify-content: center;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  max-width: 100%;
+  padding: 2px 4px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.player-tags :deep(.tags-list::-webkit-scrollbar) {
+  display: none;
 }
 
 /* ─── Progress Bar ─── */
@@ -1571,5 +1603,367 @@ const formatTime = (seconds) => {
 .slide-up-queue-enter-from,
 .slide-up-queue-leave-to {
   transform: translateY(100%);
+}
+
+/* ─── Global SVG Scalability for Controls ─── */
+.close-btn svg,
+.header-actions .menu-btn svg,
+.header-actions .share-header-btn :deep(svg),
+.like-btn svg,
+.volume-btn svg,
+.lyrics-toggle-btn svg,
+.queue-toggle-btn svg {
+  width: 22px;
+  height: 22px;
+  transition: width 0.15s ease, height 0.15s ease;
+}
+
+.control-btn svg {
+  width: 28px;
+  height: 28px;
+  transition: width 0.15s ease, height 0.15s ease;
+}
+
+.play-btn svg {
+  width: 32px;
+  height: 32px;
+  transition: width 0.15s ease, height 0.15s ease;
+}
+
+.control-btn.secondary svg {
+  width: 20px;
+  height: 20px;
+  transition: width 0.15s ease, height 0.15s ease;
+}
+
+/* ─── Responsive Adjustments for Compact & Desktop Screens ─── */
+@media (max-height: 720px) {
+  .full-player {
+    padding: 8px 16px 14px;
+  }
+  
+  .swipe-indicator {
+    margin: 2px auto 8px;
+  }
+  
+  .player-header {
+    margin-bottom: 10px;
+  }
+  
+  .close-btn,
+  .header-actions .menu-btn,
+  .header-actions .share-header-btn {
+    width: 38px;
+    height: 38px;
+  }
+  
+  .player-cover {
+    margin-bottom: 12px;
+  }
+  
+  .player-info {
+    margin-bottom: 10px;
+  }
+  
+  .track-title {
+    font-size: 19px;
+  }
+  
+  .like-btn {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+  }
+  
+  .track-artist {
+    font-size: 13px;
+  }
+  
+  .progress-container {
+    margin-bottom: 10px;
+  }
+  
+  .player-controls {
+    margin-bottom: 10px;
+    gap: 14px;
+  }
+  
+  .play-btn {
+    width: 64px;
+    height: 64px;
+  }
+  
+  .play-btn svg {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .control-btn {
+    width: 48px;
+    height: 48px;
+  }
+  
+  .control-btn svg {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .control-btn.secondary {
+    width: 38px;
+    height: 38px;
+  }
+  
+  .lyrics-toggle-btn,
+  .queue-toggle-btn {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+@media (max-height: 620px) {
+  .full-player {
+    padding: 6px 14px 10px;
+  }
+  
+  .swipe-indicator {
+    margin: 0 auto 6px;
+    height: 4px;
+  }
+  
+  .player-header {
+    margin-bottom: 6px;
+  }
+  
+  .close-btn,
+  .header-actions .menu-btn,
+  .header-actions .share-header-btn {
+    width: 34px;
+    height: 34px;
+  }
+  
+  .close-btn svg,
+  .header-actions .menu-btn svg,
+  .header-actions .share-header-btn :deep(svg),
+  .volume-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .player-title {
+    font-size: 11px;
+    letter-spacing: 1.5px;
+  }
+  
+  .player-cover {
+    margin-bottom: 8px;
+    min-height: 50px;
+  }
+  
+  .cover-image {
+    border-radius: 14px;
+  }
+  
+  .player-info {
+    margin-bottom: 6px;
+  }
+  
+  .track-info-row {
+    margin-bottom: 2px;
+    gap: 8px;
+  }
+  
+  .track-title {
+    font-size: 16px;
+  }
+  
+  .like-btn {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+  }
+  
+  .like-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .track-artist {
+    font-size: 12px;
+  }
+  
+  .track-album-subtitle {
+    font-size: 11px;
+    margin-top: 2px;
+    padding: 1px 6px;
+  }
+  
+  .player-tags {
+    margin-top: 3px;
+  }
+  
+  .progress-container {
+    margin-bottom: 6px;
+  }
+  
+  .progress-times {
+    margin-top: 3px;
+    font-size: 10px;
+  }
+  
+  .player-controls {
+    margin-bottom: 6px;
+    gap: 10px;
+  }
+  
+  .play-btn {
+    width: 52px;
+    height: 52px;
+  }
+  
+  .play-btn svg {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .control-btn {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .control-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+  
+  .control-btn.secondary {
+    width: 34px;
+    height: 34px;
+  }
+  
+  .control-btn.secondary svg {
+    width: 16px;
+    height: 16px;
+  }
+  
+  .bottom-controls {
+    gap: 8px;
+  }
+  
+  .volume-btn {
+    width: 30px;
+    height: 30px;
+  }
+  
+  .lyrics-toggle-btn,
+  .queue-toggle-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+  }
+  
+  .lyrics-toggle-btn svg,
+  .queue-toggle-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .mini-queue {
+    max-height: 75%;
+    padding: 14px 14px 18px;
+  }
+}
+
+@media (max-height: 520px) {
+  .full-player {
+    padding: 4px 10px 6px;
+  }
+  
+  .swipe-indicator {
+    display: none;
+  }
+  
+  .player-header {
+    margin-bottom: 4px;
+  }
+  
+  .player-title {
+    display: none;
+  }
+  
+  .player-cover {
+    margin-bottom: 4px;
+    min-height: 40px;
+  }
+  
+  .cover-image {
+    border-radius: 10px;
+  }
+  
+  .player-info {
+    margin-bottom: 4px;
+  }
+  
+  .track-album-subtitle {
+    display: none;
+  }
+  
+  .track-title {
+    font-size: 15px;
+  }
+  
+  .like-btn {
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+  }
+  
+  .play-btn {
+    width: 44px;
+    height: 44px;
+  }
+  
+  .play-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+  
+  .control-btn {
+    width: 34px;
+    height: 34px;
+  }
+  
+  .control-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .control-btn.secondary {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .control-btn.secondary svg {
+    width: 14px;
+    height: 14px;
+  }
+  
+  .player-controls {
+    margin-bottom: 4px;
+    gap: 8px;
+  }
+  
+  .progress-container {
+    margin-bottom: 4px;
+  }
+  
+  .lyrics-toggle-btn,
+  .queue-toggle-btn {
+    width: 30px;
+    height: 30px;
+  }
+  
+  .volume-container {
+    gap: 6px;
+  }
 }
 </style>
