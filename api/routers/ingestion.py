@@ -352,6 +352,7 @@ async def preview_url(
 async def start_import(
     req: StartImportRequest,
     user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """Start an asynchronous background import of a track or playlist."""
     url = req.url.strip()
