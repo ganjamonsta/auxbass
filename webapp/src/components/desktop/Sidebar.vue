@@ -2,13 +2,21 @@
   <!-- 1. Collapsed Rail Sidebar (Shown in grid when isSidebarCollapsed is true) -->
   <aside v-if="uiStore.isSidebarCollapsed" class="sidebar sidebar-wrapper rail-mode">
     <div class="sidebar-scroll">
-      <!-- App logo at top -->
+      <!-- App logo / Expand button at top -->
       <div class="rail-header">
-        <div class="rail-logo-icon" :title="authStore.appName || 'auxbassbot'">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-          </svg>
-        </div>
+        <button 
+          class="rail-logo-btn" 
+          @click="handleRailToggleClick" 
+          :title="uiStore.isAutoCollapsed ? 'Открыть меню (Ctrl+B)' : 'Развернуть сайдбар (Ctrl+B)'"
+          aria-label="Развернуть сайдбар"
+        >
+          <div class="rail-logo-icon">
+            <svg class="rail-logo-note" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+            </svg>
+            <ChevronRight class="rail-logo-chevron" :size="20" stroke-width="2.5" />
+          </div>
+        </button>
       </div>
 
       <!-- Main Navigation Icons -->
@@ -132,16 +140,6 @@
         </button>
       </div>
     </div>
-
-    <!-- Edge Toggle Button (Centered on the right border line, pointing right) -->
-    <button 
-      class="sidebar-edge-toggle rail-edge-toggle" 
-      @click="handleRailToggleClick" 
-      title="Развернуть меню (Ctrl+B)"
-      aria-label="Развернуть сайдбар"
-    >
-      <ChevronRight :size="15" stroke-width="2.5" />
-    </button>
   </aside>
 
   <!-- 2. Full Sidebar (Shown in grid when isSidebarCollapsed is false) -->
@@ -149,12 +147,26 @@
     <div class="sidebar-scroll">
       <!-- Logo & Header Actions -->
       <div class="sidebar-logo">
-        <div class="logo-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-          </svg>
-        </div>
-        <span class="logo-text">{{ authStore.appName || 'auxbassbot' }}</span>
+        <button 
+          class="sidebar-logo-btn" 
+          @click="uiStore.setSidebarCollapsed(true, true)" 
+          title="Свернуть сайдбар (Ctrl+B)"
+          aria-label="Свернуть сайдбар"
+        >
+          <div class="logo-icon">
+            <svg class="logo-note" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+            </svg>
+            <ChevronLeft class="logo-chevron" :size="20" stroke-width="2.5" />
+          </div>
+        </button>
+        <span 
+          class="logo-text clickable-title" 
+          @click="uiStore.setSidebarCollapsed(true, true)" 
+          title="Свернуть сайдбар (Ctrl+B)"
+        >
+          {{ authStore.appName || 'auxbassbot' }}
+        </span>
 
         <div class="sidebar-header-actions">
           <button 
@@ -163,8 +175,7 @@
             title="Открепить сайдбар (свернуть до иконок)"
             aria-label="Открепить сайдбар"
           >
-            <PinOff :size="13" />
-            <span class="pin-btn-text">Открепить</span>
+            <PinOff :size="16" />
           </button>
 
           <div 
@@ -369,15 +380,6 @@
       </div>
     </div>
 
-    <!-- Edge Toggle Button on the full sidebar (pointing left to collapse) -->
-    <button 
-      class="sidebar-edge-toggle full-edge-toggle" 
-      @click="uiStore.setSidebarCollapsed(true, true)" 
-      title="Свернуть меню (Ctrl+B)"
-      aria-label="Свернуть сайдбар"
-    >
-      <ChevronLeft :size="15" stroke-width="2.5" />
-    </button>
   </aside>
 
   <!-- 3. Overlay Drawer & Backdrop (Teleported to body when in collapsed mode) -->
@@ -404,22 +406,35 @@
           <div class="sidebar-scroll">
             <!-- Logo & Header Actions -->
             <div class="sidebar-logo">
-              <div class="logo-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-                </svg>
-              </div>
-              <span class="logo-text">{{ authStore.appName || 'auxbassbot' }}</span>
+              <button 
+                class="sidebar-logo-btn" 
+                @click="uiStore.closeSidebarOverlay" 
+                title="Свернуть меню (Ctrl+B)"
+                aria-label="Свернуть сайдбар"
+              >
+                <div class="logo-icon">
+                  <svg class="logo-note" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                  </svg>
+                  <ChevronLeft class="logo-chevron" :size="20" stroke-width="2.5" />
+                </div>
+              </button>
+              <span 
+                class="logo-text clickable-title" 
+                @click="uiStore.closeSidebarOverlay" 
+                title="Свернуть меню (Ctrl+B)"
+              >
+                {{ authStore.appName || 'auxbassbot' }}
+              </span>
 
               <div class="sidebar-header-actions">
                 <button 
                   class="sidebar-pin-btn" 
                   @click="uiStore.pinSidebar" 
-                  title="Закрепить в интерфейсе (сделать частью лейаута)"
+                  title="Закрепить сайдбар в лейауте"
                   aria-label="Закрепить сайдбар"
                 >
-                  <Pin :size="13" />
-                  <span class="pin-btn-text">Закрепить</span>
+                  <Pin :size="16" />
                 </button>
 
                 <div 
@@ -626,15 +641,6 @@
             </div>
           </div>
 
-          <!-- Edge Toggle Button on the drawer (pointing left to close) -->
-          <button 
-            class="sidebar-edge-toggle drawer-edge-toggle" 
-            @click="uiStore.closeSidebarOverlay" 
-            title="Свернуть меню (Ctrl+B)"
-            aria-label="Свернуть сайдбар"
-          >
-            <ChevronLeft :size="15" stroke-width="2.5" />
-          </button>
         </aside>
       </Transition>
     </div>
@@ -919,6 +925,16 @@ onUnmounted(() => {
   width: 100%;
 }
 
+.rail-logo-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 12px;
+  outline: none;
+  display: flex;
+}
+
 .rail-logo-icon {
   width: 40px;
   height: 40px;
@@ -929,11 +945,26 @@ onUnmounted(() => {
   justify-content: center;
   color: #000;
   box-shadow: 0 4px 12px rgba(29, 185, 84, 0.25);
-  transition: transform 0.18s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
 }
 
-.rail-logo-icon:hover {
-  transform: scale(1.05);
+.rail-logo-chevron {
+  display: none;
+  position: absolute;
+}
+
+.rail-logo-btn:hover .rail-logo-icon {
+  transform: scale(1.08);
+  box-shadow: 0 0 16px rgba(29, 185, 84, 0.55);
+}
+
+.rail-logo-btn:hover .rail-logo-note {
+  display: none;
+}
+
+.rail-logo-btn:hover .rail-logo-chevron {
+  display: block;
 }
 
 .rail-nav {
@@ -1148,6 +1179,46 @@ onUnmounted(() => {
   padding: 20px 16px 16px;
 }
 
+.sidebar-logo-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 10px;
+  outline: none;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.sidebar-logo-btn:hover .logo-icon {
+  transform: scale(1.06);
+  box-shadow: 0 0 14px rgba(29, 185, 84, 0.45);
+}
+
+.logo-chevron {
+  display: none;
+  position: absolute;
+}
+
+.sidebar-logo-btn:hover .logo-note {
+  display: none;
+}
+
+.sidebar-logo-btn:hover .logo-chevron {
+  display: block;
+}
+
+.clickable-title {
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 0.15s ease;
+}
+
+.clickable-title:hover {
+  opacity: 0.85;
+}
+
 .sidebar-header-actions {
   display: flex;
   align-items: center;
@@ -1163,31 +1234,30 @@ onUnmounted(() => {
 .sidebar-pin-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 8px;
-  height: 28px;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 6px;
+  border-radius: 8px;
   color: rgba(255, 255, 255, 0.85);
-  font-size: 11.5px;
-  font-weight: 600;
   cursor: pointer;
-  white-space: nowrap;
   transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
+  padding: 0;
+  flex-shrink: 0;
 }
 
 .sidebar-pin-btn:hover {
-  background: rgba(29, 185, 84, 0.18);
-  border-color: rgba(29, 185, 84, 0.45);
+  background: rgba(29, 185, 84, 0.2);
+  border-color: rgba(29, 185, 84, 0.5);
   color: #fff;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  transform: scale(1.06);
+  box-shadow: 0 0 10px rgba(29, 185, 84, 0.35);
 }
 
 .sidebar-pin-btn:active {
-  transform: translateY(0);
+  transform: scale(0.96);
 }
 
 .sidebar-pin-btn.pinned {
@@ -1197,14 +1267,10 @@ onUnmounted(() => {
 }
 
 .sidebar-pin-btn.pinned:hover {
-  background: rgba(255, 107, 107, 0.12);
-  border-color: rgba(255, 107, 107, 0.3);
-  color: #ff8585;
-}
-
-.pin-btn-text {
-  font-size: 11.5px;
-  line-height: 1;
+  background: rgba(255, 107, 107, 0.15);
+  border-color: rgba(255, 107, 107, 0.4);
+  color: #ff7575;
+  transform: scale(1.06);
 }
 
 .header-avatar {
@@ -1685,9 +1751,9 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   z-index: 1051;
   cursor: pointer;
   pointer-events: auto;
