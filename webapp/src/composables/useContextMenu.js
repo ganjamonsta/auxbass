@@ -401,6 +401,25 @@ export function useContextMenu() {
         coverUrl: playlist.custom_cover_url || '',
       })
     },
+
+    toggleSubscription: async (playlist) => {
+      if (!playlist?.id) return closeMenu()
+      closeMenu()
+      try {
+        if (playlist.is_subscribed) {
+          await libraryStore.unsubscribePlaylist(playlist.id)
+          playlist.is_subscribed = false
+          uiStore.toast.success('Удалено', 'Плейлист убран из медиатеки')
+        } else {
+          await libraryStore.subscribePlaylist(playlist.id)
+          playlist.is_subscribed = true
+          uiStore.toast.success('Добавлено', 'Плейлист добавлен в медиатеку')
+        }
+      } catch (error) {
+        const msg = error.response?.data?.detail || 'Не удалось обновить подписку'
+        uiStore.toast.error('Ошибка', msg)
+      }
+    },
   }
 
   // ═══════════════════════════════════════════════════════════

@@ -179,6 +179,15 @@
                     <span>Удалить плейлист</span>
                   </button>
                 </template>
+                <!-- For public playlists from other users: subscribe/unsubscribe -->
+                <template v-else-if="menuData?.is_public">
+                  <div class="menu-divider" />
+                  <button class="menu-item" @click="exec('toggleSubscription')">
+                    <Check v-if="menuData?.is_subscribed" :size="18" />
+                    <Plus v-else :size="18" />
+                    <span>{{ menuData?.is_subscribed ? 'Убрать из медиатеки' : 'Добавить в медиатеку' }}</span>
+                  </button>
+                </template>
               </template>
 
               <!-- ═══ LIKED / FAVORITES MENU ═══ -->
@@ -332,7 +341,7 @@ import PlaylistPicker from '@/components/PlaylistPicker.vue'
 import EditTrackModal from '@/components/EditTrackModal.vue'
 import TagChips from '@/components/TagChips.vue'
 import { 
-  X, User, Disc3, Play, ListMusic, Plus, Minus, Pencil, 
+  X, User, Disc3, Play, ListMusic, Plus, Minus, Pencil, Check,
   Trash2, FolderOpen, Shuffle, Music, Mic2, ChevronRight, ChevronDown,
   ThumbsDown, Heart, Share2
 } from 'lucide-vue-next'

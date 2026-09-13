@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import api, { authStorage, authApi } from '@/api/client'
+import apiCache from '@/utils/apiCache'
 
 const CHANNEL_STATUS_KEY = 'tg_player_channel_status'
 
@@ -182,6 +183,7 @@ export const useAuthStore = defineStore('auth', () => {
     const response = await authApi.updateProfile(data)
     user.value = response.data
     authStorage.setUser(response.data)
+    apiCache.invalidateRelated('user', user.value?.id)
     return response.data
   }
 
@@ -196,6 +198,7 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = { ...user.value, custom_avatar_url: response.data.avatar_url }
       authStorage.setUser(user.value)
     }
+    apiCache.invalidateRelated('user', user.value?.id)
     return response.data
   }
 
@@ -203,6 +206,7 @@ export const useAuthStore = defineStore('auth', () => {
     const response = await authApi.deleteAvatar()
     user.value = response.data
     authStorage.setUser(response.data)
+    apiCache.invalidateRelated('user', user.value?.id)
     return response.data
   }
 
@@ -216,7 +220,7 @@ export const useAuthStore = defineStore('auth', () => {
     return u.username || `Пользователь #${u.id}`
   })
 
-  const userAvatarUrl = computed(() => user.value?.custom_avatar_url || null)
+  const userAvatarUrl = computed(() => user.value?.custom_avatar_url || user.value?.photo_url || null)
 
   return {
     // State

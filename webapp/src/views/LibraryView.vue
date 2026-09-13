@@ -506,17 +506,20 @@ const getArtistCoverStyle = (artist) => {
 }
 
 // Fetch Overview Data
-const loadOverviewData = async () => {
+const loadOverviewData = async (force = false) => {
   // 1. Playlists
-  if (!libraryStore.playlists?.length) {
-    loadingPlaylists.value = true
-    libraryStore.fetchPlaylists().finally(() => {
+  if (!libraryStore.playlists?.length || force) {
+    loadingPlaylists.value = !libraryStore.playlists?.length
+    libraryStore.fetchPlaylists(force).finally(() => {
       loadingPlaylists.value = false
     })
+  } else {
+    // Background refresh
+    libraryStore.fetchPlaylists()
   }
 
   // 2. Liked
-  if (!libraryStore.likedTracks?.length) {
+  if (!libraryStore.likedTracks?.length || force) {
     libraryStore.fetchLikedTracks()
   }
 
@@ -618,7 +621,12 @@ onMounted(() => {
   loadOverviewData()
   window.addEventListener('reset-view-state', handleResetState)
   window.addEventListener('app-search', handleAppSearch)
+  window.addEventListener('playlist:changed', onPlaylistChanged)
 })
+
+const onPlaylistChanged = () => {
+  loadOverviewData(true)
+}
 
 onActivated(() => {
   applyRouteTab()
@@ -629,6 +637,7 @@ onActivated(() => {
 onUnmounted(() => {
   window.removeEventListener('reset-view-state', handleResetState)
   window.removeEventListener('app-search', handleAppSearch)
+  window.removeEventListener('playlist:changed', onPlaylistChanged)
 })
 </script>
 

@@ -83,7 +83,7 @@
             @click="viewUserProfile(user)"
           >
             <div class="user-avatar">
-              <img v-if="user.avatar_url" :src="user.avatar_url" class="card-avatar-img" />
+              <img v-if="getUserAvatar(user)" :src="getUserAvatar(user)" class="card-avatar-img" />
               <template v-else>{{ getInitials(user) }}</template>
             </div>
             <div class="user-info">
@@ -121,7 +121,7 @@
             @click="viewUserProfile(user)"
           >
             <div class="user-avatar">
-              <img v-if="user.avatar_url" :src="user.avatar_url" class="card-avatar-img" />
+              <img v-if="getUserAvatar(user)" :src="getUserAvatar(user)" class="card-avatar-img" />
               <template v-else>{{ getInitials(user) }}</template>
             </div>
             <div class="user-info">
@@ -175,7 +175,7 @@
             @click="viewUserProfile(user)"
           >
             <div class="user-avatar">
-              <img v-if="user.avatar_url" :src="user.avatar_url" class="card-avatar-img" />
+              <img v-if="getUserAvatar(user)" :src="getUserAvatar(user)" class="card-avatar-img" />
               <template v-else>{{ getInitials(user) }}</template>
             </div>
             <div class="user-info">
@@ -213,7 +213,7 @@
         <div class="profile-modal">
           <div class="profile-header">
             <div class="profile-avatar">
-              <img v-if="selectedUser.avatar_url" :src="selectedUser.avatar_url" class="card-avatar-img" />
+              <img v-if="getUserAvatar(selectedUser)" :src="getUserAvatar(selectedUser)" class="card-avatar-img" />
               <template v-else>{{ getInitials(selectedUser) }}</template>
             </div>
             <div class="profile-info">
@@ -405,7 +405,18 @@ const userAlbums = ref([])
 // Debounce timer
 let searchTimer = null
 
+const getUserAvatar = (user) => {
+  if (!user) return null
+  if (user.id === authStore.user?.id && authStore.userAvatarUrl) {
+    return authStore.userAvatarUrl
+  }
+  return user.avatar_url || user.custom_avatar_url || user.photo_url || null
+}
+
 const getInitials = (user) => {
+  if (user?.id === authStore.user?.id && authStore.userDisplayName) {
+    return authStore.userDisplayName.charAt(0).toUpperCase()
+  }
   if (!user) return '?'
   if (user.custom_nickname) {
     return user.custom_nickname.charAt(0).toUpperCase()

@@ -222,6 +222,20 @@ class ApiCache {
         this.invalidatePattern('/library/stats')
         this.invalidatePattern('/tracks/global/stats')
         break
+
+      case 'user':
+        this.invalidatePattern('/social/user')
+        this.invalidatePattern('/social/friends')
+        this.invalidatePattern('/social/following')
+        this.invalidatePattern('/social/followers')
+        this.invalidatePattern('/social/search')
+        this.invalidatePattern('/playlists/user')
+        this.invalidatePattern('/auth')
+        if (id) {
+          this.invalidatePattern(`/social/user/${id}`)
+          this.invalidatePattern(`/playlists/user/${id}`)
+        }
+        break
     }
   }
 

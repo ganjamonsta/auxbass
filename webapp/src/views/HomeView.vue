@@ -268,7 +268,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useLibraryStore } from '@/stores/library'
@@ -381,7 +381,16 @@ const getPlaylistCoverStyle = (playlist) => {
   }
 }
 
+const onPlaylistChanged = () => {
+  libraryStore.fetchPlaylists(true).finally(() => {
+    loadingPlaylists.value = false
+    loadingQuickAccess.value = false
+  })
+}
+
 onMounted(() => {
+  window.addEventListener('playlist:changed', onPlaylistChanged)
+
   // 1. Playlists (Quick access + Your Playlists)
   if (!libraryStore.playlists?.length) {
     libraryStore.fetchPlaylists().finally(() => {
@@ -391,6 +400,8 @@ onMounted(() => {
   } else {
     loadingPlaylists.value = false
     loadingQuickAccess.value = false
+    // Background refresh to guarantee freshness
+    libraryStore.fetchPlaylists()
   }
 
   // 2. Liked tracks
@@ -417,6 +428,14 @@ onMounted(() => {
   } else {
     loadingUploads.value = false
   }
+})
+
+onActivated(() => {
+  libraryStore.fetchPlaylists()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('playlist:changed', onPlaylistChanged)
 })
 </script>
 

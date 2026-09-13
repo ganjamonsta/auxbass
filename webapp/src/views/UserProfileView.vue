@@ -41,8 +41,8 @@
             :title="isSelf ? 'Нажмите, чтобы изменить аватарку' : ''"
           >
             <img 
-              v-if="user.avatar_url" 
-              :src="user.avatar_url" 
+              v-if="userAvatar" 
+              :src="userAvatar" 
               alt="Avatar" 
               class="hero-avatar-img" 
             />
@@ -503,6 +503,7 @@ import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useTrackActions, useShare } from '@/composables'
 import { socialApi, playlistsApi, authApi } from '@/api/client'
+import apiCache from '@/utils/apiCache'
 import { getCoverUrl, CoverSize } from '@/utils'
 import TrackItem from '@/components/TrackItem.vue'
 import VirtualTrackList from '@/components/VirtualTrackList.vue'
@@ -570,6 +571,13 @@ const virtualTrackListRef = ref(null)
 const playlistsGridRef = ref(null)
 const albumsGridRef = ref(null)
 
+const userAvatar = computed(() => {
+  if (isSelf.value && authStore.userAvatarUrl) {
+    return authStore.userAvatarUrl
+  }
+  return user.value?.avatar_url || user.value?.custom_avatar_url || user.value?.photo_url || null
+})
+
 // ─── Edit Profile Modal State ───
 const showEditProfileModal = ref(false)
 const editNickname = ref('')
@@ -580,9 +588,9 @@ const modalFileInputRef = ref(null)
 const pendingAvatarFile = ref(null)
 
 const openEditProfileModal = () => {
-  editNickname.value = user.value?.custom_nickname || ''
-  editAvatarUrl.value = user.value?.avatar_url || null
-  editHideTelegramId.value = user.value?.hide_telegram_id || false
+  editNickname.value = user.value?.custom_nickname || (isSelf.value ? authStore.user?.custom_nickname : '') || ''
+  editAvatarUrl.value = userAvatar.value || null
+  editHideTelegramId.value = user.value?.hide_telegram_id ?? (isSelf.value ? authStore.user?.hide_telegram_id : false) ?? false
   pendingAvatarFile.value = null
   showEditProfileModal.value = true
 }
@@ -628,7 +636,9 @@ const saveProfileModal = async () => {
       }
     }
 
-    await loadUserProfile()
+    // Invalidate caches & force reload user profile
+    apiCache.invalidateRelated('user', userId.value)
+    await loadUserProfile(true)
     closeEditProfileModal()
     uiStore.showToast('Профиль успешно обновлен', 'success')
   } catch (err) {
@@ -640,7 +650,11 @@ const saveProfileModal = async () => {
 }
 
 const getInitials = (u) => {
+  if (isSelf.value && authStore.userDisplayName) {
+    return authStore.userDisplayName.charAt(0).toUpperCase()
+  }
   if (!u) return '?'
+  if (u.custom_nickname) return u.custom_nickname.charAt(0).toUpperCase()
   if (u.first_name) return u.first_name.charAt(0).toUpperCase()
   if (u.display_name) return u.display_name.charAt(0).toUpperCase()
   if (u.username) return u.username.charAt(0).toUpperCase()
@@ -734,7 +748,7 @@ const loadOverviewData = async (id) => {
 }
 
 // Fetch user profile
-const loadUserProfile = async () => {
+const loadUserProfile = async (bypassCache = false) => {
   const id = userId.value
   if (!id) {
     if (authStore.loading || !authStore.initialized) return
@@ -742,12 +756,15 @@ const loadUserProfile = async () => {
     loading.value = false
     return
   }
-  loading.value = true
+  if (!user.value) {
+    loading.value = true
+  }
   error.value = null
   isForbidden.value = false
 
   try {
-    const res = await socialApi.getUser(id)
+    const shouldBypass = bypassCache || isSelf.value
+    const res = await socialApi.getUser(id, {}, { bypassCache: shouldBypass })
     user.value = res.data
     isFollowing.value = !!res.data.is_following
     loadOverviewData(id)
@@ -953,7 +970,7 @@ watch(
   () => route.params.id,
   (newId) => {
     if (newId && route.name === 'user-profile') {
-      loadUserProfile()
+      loadUserProfile(true)
     }
   }
 )
@@ -961,14 +978,22 @@ watch(
 watch(
   () => authStore.user,
   (newUser) => {
-    if (newUser && (!user.value || isSelf.value)) {
-      loadUserProfile()
+    if (newUser && isSelf.value) {
+      if (user.value) {
+        user.value.custom_nickname = newUser.custom_nickname
+        user.value.custom_avatar_url = newUser.custom_avatar_url
+        user.value.avatar_url = newUser.custom_avatar_url || newUser.photo_url || user.value.avatar_url
+        user.value.display_name = authStore.userDisplayName
+        user.value.hide_telegram_id = newUser.hide_telegram_id
+      }
+      loadUserProfile(true)
     }
-  }
+  },
+  { deep: true }
 )
 
 onMounted(() => {
-  loadUserProfile()
+  loadUserProfile(true)
 })
 </script>
 

@@ -79,6 +79,7 @@ def build_user_profile_response(
     is_self = (u.id == viewer_id)
     show_tg = is_self or not getattr(u, 'hide_telegram_id', False)
     
+    avatar = getattr(u, 'custom_avatar_url', None) or getattr(u, 'photo_url', None)
     return UserProfileResponse(
         id=u.id,
         username=u.username if show_tg else None,
@@ -86,7 +87,7 @@ def build_user_profile_response(
         last_name=u.last_name if show_tg else None,
         display_name=u.display_name,
         custom_nickname=getattr(u, 'custom_nickname', None),
-        avatar_url=getattr(u, 'custom_avatar_url', None),
+        avatar_url=avatar,
         hide_telegram_id=getattr(u, 'hide_telegram_id', False) or False,
         is_following=is_following,
         **stats,
@@ -427,7 +428,7 @@ async def search_friends_libraries(
         track_data_dict['owner'] = {
             'id': owner.id,
             'display_name': owner.display_name,
-            'avatar_url': getattr(owner, 'custom_avatar_url', None),
+            'avatar_url': getattr(owner, 'custom_avatar_url', None) or getattr(owner, 'photo_url', None),
             'username': owner.username if owner_show_tg else None,
         }
         track_data_dict['in_library'] = viewer_entry is not None
@@ -522,7 +523,7 @@ async def get_user_library(
         "user": {
             "id": target.id,
             "display_name": target.display_name,
-            "avatar_url": getattr(target, 'custom_avatar_url', None),
+            "avatar_url": getattr(target, 'custom_avatar_url', None) or getattr(target, 'photo_url', None),
             "username": target.username if (user.id == target.id or not getattr(target, 'hide_telegram_id', False)) else None,
         }
     }
@@ -594,7 +595,7 @@ async def get_user_albums(
         "user": {
             "id": target.id,
             "display_name": target.display_name,
-            "avatar_url": getattr(target, 'custom_avatar_url', None),
+            "avatar_url": getattr(target, 'custom_avatar_url', None) or getattr(target, 'photo_url', None),
             "username": target.username if (user.id == target.id or not getattr(target, 'hide_telegram_id', False)) else None,
         }
     }

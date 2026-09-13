@@ -138,7 +138,8 @@ import TrackItem from '@/components/TrackItem.vue'
 import TagChips from '@/components/TagChips.vue'
 import EditPlaylistModal from '@/components/EditPlaylistModal.vue'
 import ExpandableSearch from '@/components/ui/ExpandableSearch.vue'
-import api from '@/api/client'
+import api, { playlistsApi } from '@/api/client'
+import apiCache from '@/utils/apiCache'
 import { Music, Check, Plus, Globe, Play, Shuffle, Edit3, Share2, Search } from 'lucide-vue-next'
 import { getCoverUrl, CoverSize } from '@/utils'
 
@@ -243,11 +244,14 @@ const coverImages = computed(() => {
 })
 
 // Data loading
-const loadPlaylist = async () => {
+const loadPlaylist = async (force = false) => {
   if (!route.params.id) return
   loading.value = true
   try {
-    const response = await api.get(`/playlists/${route.params.id}`)
+    const response = await api.get(`/playlists/${route.params.id}`, {
+      params: force ? { _t: Date.now() } : {},
+      bypassCache: force
+    })
     playlist.value = response.data
   } catch (error) {
     console.error('Failed to load playlist:', error)
@@ -299,32 +303,46 @@ const deletePlaylist = async () => {
 
 // Subscription
 const toggleSubscription = async () => {
-  if (subscribing.value) return
-  if (!playlist.value?.is_subscribed && !authStore.requireChannel('подписки на плейлист')) {
+  if (subscribing.value || !playlist.value) return
+  if (!playlist.value.is_subscribed && !authStore.requireChannel('подписки на плейлист')) {
     return
   }
   subscribing.value = true
-  
+  const prevSubscribed = !!playlist.value.is_subscribed
+  const targetSubscribed = !prevSubscribed
+
+  // 1. Optimistic update: instantly flip button state in UI
+  playlist.value.is_subscribed = targetSubscribed
+
   try {
-    if (playlist.value.is_subscribed) {
+    if (prevSubscribed) {
       // Unsubscribe
-      await api.delete(`/playlists/${playlist.value.id}/subscribe`)
-      playlist.value.is_subscribed = false
+      await playlistsApi.unsubscribe(playlist.value.id)
       uiStore.toast.success('Удалено', 'Плейлист убран из медиатеки')
     } else {
       // Subscribe
-      await api.post(`/playlists/${playlist.value.id}/subscribe`)
-      playlist.value.is_subscribed = true
+      await playlistsApi.subscribe(playlist.value.id)
       uiStore.toast.success('Добавлено', 'Плейлист добавлен в медиатеку')
     }
-    // Notify entire app about subscription change
-    await libraryStore.notifyPlaylistChange(playlist.value.id)
   } catch (error) {
-    console.error('Failed to toggle subscription:', error)
-    const errorMsg = error.response?.data?.detail || 'Ошибка'
-    uiStore.toast.error('Ошибка', errorMsg)
+    const errorMsg = error.response?.data?.detail || ''
+    if (errorMsg.includes('Already subscribed')) {
+      playlist.value.is_subscribed = true
+      uiStore.toast.info('В медиатеке', 'Плейлист уже добавлен')
+    } else if (errorMsg.includes('Not subscribed')) {
+      playlist.value.is_subscribed = false
+      uiStore.toast.info('Удалено', 'Плейлист не в медиатеке')
+    } else {
+      // Revert optimistic update on unexpected error
+      playlist.value.is_subscribed = prevSubscribed
+      console.error('Failed to toggle subscription:', error)
+      uiStore.toast.error('Ошибка', errorMsg || 'Не удалось обновить статус подписки')
+    }
   } finally {
     subscribing.value = false
+    // Explicitly invalidate cache and notify the whole app
+    apiCache.delete(`/playlists/${playlist.value.id}`)
+    await libraryStore.notifyPlaylistChange(playlist.value.id)
   }
 }
 
@@ -339,13 +357,13 @@ const onPlaylistChanged = (e) => {
   if (showEditModal.value) return // Prevent clobbering active modal editing state
   const changedId = e?.detail?.playlistId
   if (!changedId || String(changedId) === String(route.params.id) || (playlist.value && String(changedId) === String(playlist.value.id))) {
-    loadPlaylist()
+    loadPlaylist(true)
   }
 }
 
 // Load on mount & listen for global changes
 onMounted(() => {
-  loadPlaylist()
+  loadPlaylist(true)
   window.addEventListener('playlist:changed', onPlaylistChanged)
 })
 

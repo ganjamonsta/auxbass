@@ -171,13 +171,13 @@ export const authApi = {
   getConfig: () => api.get('/auth/config'),
   verifyCode: (data) => api.post('/auth/verify-code', data),
   refresh: () => api.post('/auth/refresh'),
-  updateProfile: (data) => api.put('/auth/profile', data),
-  uploadAvatar: (formData) => api.post('/auth/profile/avatar', formData, {
+  updateProfile: nonCacheable((data) => api.put('/auth/profile', data), 'user'),
+  uploadAvatar: nonCacheable((formData) => api.post('/auth/profile/avatar', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
-  }),
-  deleteAvatar: () => api.delete('/auth/profile/avatar'),
+  }), 'user'),
+  deleteAvatar: nonCacheable(() => api.delete('/auth/profile/avatar'), 'user'),
   getPrivacy: () => api.get('/auth/privacy'),
-  updatePrivacy: (data) => api.put('/auth/privacy', data),
+  updatePrivacy: nonCacheable((data) => api.put('/auth/privacy', data), 'user'),
 }
 
 // Tracks
@@ -250,7 +250,7 @@ export const playlistsApi = {
   getAll: cacheable((params = {}) => api.get('/playlists', { params })),
   getGlobal: cacheable((params = {}) => api.get('/playlists/global', { params })),
   getManageAll: cacheable(() => api.get('/playlists/manage/all')),
-  getOne: cacheable((id) => api.get(`/playlists/${id}`)),
+  getOne: cacheable((id, params = {}, options = {}) => api.get(`/playlists/${id}`, { params, ...options })),
   // Bypass cache when shuffle is requested to get fresh random order
   // Add timestamp to ensure truly random results on every call
   getIds: (id, params = {}) => api.get(`/playlists/${id}/ids`, { 
@@ -262,6 +262,8 @@ export const playlistsApi = {
   create: nonCacheable((data) => api.post('/playlists', data), 'playlist'),
   update: nonCacheable((id, data) => api.put(`/playlists/${id}`, data), 'playlist'),
   delete: nonCacheable((id) => api.delete(`/playlists/${id}`), 'playlist'),
+  subscribe: nonCacheable((id) => api.post(`/playlists/${id}/subscribe`), 'playlist'),
+  unsubscribe: nonCacheable((id) => api.delete(`/playlists/${id}/subscribe`), 'playlist'),
   addTrack: nonCacheable((playlistId, trackId) => api.post(`/playlists/${playlistId}/tracks`, { track_id: trackId }), 'playlist'),
   removeTrack: nonCacheable((playlistId, trackId) => api.delete(`/playlists/${playlistId}/tracks/${trackId}`), 'playlist'),
   reorder: nonCacheable((id, trackIds) => api.put(`/playlists/${id}/reorder`, { track_ids: trackIds }), 'playlist'),
@@ -321,7 +323,7 @@ export const socialApi = {
   unfollow: (userId) => api.post('/social/unfollow', { user_id: userId }),
   getUserLibrary: (userId, params = {}) => api.get(`/social/user/${userId}/library`, { params }),
   getUserAlbums: (userId, params = {}) => api.get(`/social/user/${userId}/albums`, { params }),
-  getUser: (userId) => api.get(`/social/user/${userId}`),
+  getUser: (userId, params = {}, options = {}) => api.get(`/social/user/${userId}`, { params, ...options }),
 }
 
 // Ingestion (External imports from SoundCloud, Spotify, etc.)

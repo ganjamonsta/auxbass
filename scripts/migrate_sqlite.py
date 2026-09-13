@@ -95,6 +95,7 @@ def migrate_sqlite_db(db_path: str):
             ("uploader_id", "INTEGER"),
         ],
         "users": [
+            ("photo_url", "TEXT"),
             ("custom_nickname", "TEXT"),
             ("custom_avatar_url", "TEXT"),
             ("hide_from_search", "INTEGER DEFAULT 0"),

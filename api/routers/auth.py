@@ -240,6 +240,7 @@ async def ensure_user_in_db(user: TelegramUser):
                 first_name=user.first_name,
                 last_name=user.last_name,
                 is_premium=user.is_premium or False,
+                photo_url=user.photo_url,
             )
             session.add(db_user)
             await session.commit()
@@ -255,11 +256,15 @@ async def ensure_user_in_db(user: TelegramUser):
             if user.last_name and db_user.last_name != user.last_name:
                 db_user.last_name = user.last_name
                 changed = True
+            if user.photo_url and getattr(db_user, 'photo_url', None) != user.photo_url:
+                db_user.photo_url = user.photo_url
+                changed = True
             if changed:
                 await session.commit()
 
         user.custom_nickname = db_user.custom_nickname
         user.custom_avatar_url = db_user.custom_avatar_url
+        user.photo_url = getattr(db_user, 'photo_url', None) or user.photo_url
         user.hide_telegram_id = db_user.hide_telegram_id or False
         return db_user
 

@@ -1179,7 +1179,7 @@ async def subscribe_to_playlist(
     if playlist.owner_id == user.id:
         raise HTTPException(status_code=400, detail="Cannot subscribe to your own playlist")
     
-    # Check if already subscribed
+    # Check if already subscribed (idempotent)
     existing = await db.scalar(
         select(PlaylistSubscription)
         .where(
@@ -1188,7 +1188,12 @@ async def subscribe_to_playlist(
         )
     )
     if existing:
-        raise HTTPException(status_code=400, detail="Already subscribed to this playlist")
+        return {
+            "status": "already_subscribed",
+            "playlist_id": playlist_id,
+            "playlist_name": playlist.name,
+            "owner_name": owner.display_name,
+        }
     
     # Create subscription
     subscription = PlaylistSubscription(
@@ -1222,7 +1227,8 @@ async def unsubscribe_from_playlist(
     )
     
     if result.rowcount == 0:
-        raise HTTPException(status_code=404, detail="Not subscribed to this playlist")
+        # Already unsubscribed / not subscribed - idempotent success
+        return {"status": "not_subscribed", "playlist_id": playlist_id}
     
     await db.commit()
     

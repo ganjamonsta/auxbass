@@ -105,6 +105,7 @@ class User(Base):
     is_premium: Mapped[bool] = mapped_column(Boolean, default=False)
     
     # Profile customization
+    photo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     custom_nickname: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     custom_avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 

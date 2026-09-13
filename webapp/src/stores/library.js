@@ -195,9 +195,9 @@ export const useLibraryStore = defineStore('library', () => {
   }
 
   // Fetch playlists
-  const fetchPlaylists = async () => {
+  const fetchPlaylists = async (force = false) => {
     try {
-      const response = await playlistsApi.getAll()
+      const response = await playlistsApi.getAll(force ? { _t: Date.now() } : {})
       const raw = response.data?.items || response.data || []
 
       // Cache-bust covers so UI reloads fresh images after updates
@@ -220,9 +220,9 @@ export const useLibraryStore = defineStore('library', () => {
   }
 
   // Fetch single playlist with tracks
-  const fetchPlaylist = async (id) => {
+  const fetchPlaylist = async (id, force = false) => {
     try {
-      const response = await playlistsApi.getOne(id)
+      const response = await playlistsApi.getOne(id, force ? { _t: Date.now() } : {}, { bypassCache: force })
       return response.data
     } catch (error) {
       console.error('Failed to fetch playlist:', error)
@@ -432,10 +432,37 @@ export const useLibraryStore = defineStore('library', () => {
    */
   const notifyPlaylistChange = async (playlistId = null) => {
     apiCache.invalidateRelated('playlist', playlistId)
-    await fetchPlaylists()
+    if (playlistId) {
+      apiCache.delete(`/playlists/${playlistId}`)
+    }
+    await fetchPlaylists(true)
     window.dispatchEvent(new CustomEvent('playlist:changed', {
       detail: { playlistId }
     }))
+  }
+
+  // Subscribe to public playlist
+  const subscribePlaylist = async (id) => {
+    try {
+      const res = await playlistsApi.subscribe(id)
+      await notifyPlaylistChange(id)
+      return res.data
+    } catch (error) {
+      console.error('Failed to subscribe to playlist:', error)
+      throw error
+    }
+  }
+
+  // Unsubscribe from public playlist
+  const unsubscribePlaylist = async (id) => {
+    try {
+      const res = await playlistsApi.unsubscribe(id)
+      await notifyPlaylistChange(id)
+      return res.data
+    } catch (error) {
+      console.error('Failed to unsubscribe from playlist:', error)
+      throw error
+    }
   }
 
   /**
@@ -1047,6 +1074,8 @@ export const useLibraryStore = defineStore('library', () => {
     createPlaylist,
     updatePlaylist,
     deletePlaylist,
+    subscribePlaylist,
+    unsubscribePlaylist,
     addTrackToPlaylist,
     removeTrackFromPlaylist,
     notifyPlaylistChange,
