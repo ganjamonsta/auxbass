@@ -1,364 +1,371 @@
 <template>
   <!-- 1. Collapsed Rail Sidebar (Shown in grid when isSidebarCollapsed is true) -->
-  <aside v-if="uiStore.isSidebarCollapsed" class="sidebar rail-sidebar">
-    <!-- Burger toggle button + App logo -->
-    <div class="rail-header">
-      <button 
-        class="rail-burger-btn" 
-        @click="uiStore.openSidebarOverlay" 
-        title="Развернуть меню (Ctrl+B)"
-      >
-        <Menu :size="20" />
-      </button>
-
-      <div class="rail-logo-icon" :title="authStore.appName || 'auxbassbot'">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-        </svg>
-      </div>
-    </div>
-
-    <!-- Main Navigation Icons -->
-    <nav class="rail-nav">
-      <router-link to="/" class="rail-nav-item" :class="{ active: isActiveExact('/') }" title="Главная">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-        </svg>
-        <div class="rail-active-indicator"></div>
-      </router-link>
-
-      <router-link 
-        to="/search" 
-        class="rail-nav-item" 
-        :class="{ active: isActive('/search') }"
-        @click="onSearchClick"
-        title="Поиск"
-      >
-        <Search :size="22" />
-        <div class="rail-active-indicator"></div>
-      </router-link>
-
-      <div 
-        class="rail-nav-item clickable" 
-        :class="{ active: route.name === 'library' }"
-        @click="goToLibraryTab('overview')"
-        title="Медиатека"
-      >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="m16 6 4 14M12 6v14M8 8v12M4 4v16"></path>
-        </svg>
-        <div class="rail-active-indicator"></div>
-      </div>
-
-      <router-link 
-        to="/liked" 
-        class="rail-nav-item liked-rail-item" 
-        :class="{ active: isActive('/liked') }"
-        title="Любимые треки"
-      >
-        <Heart :size="20" :fill="isActive('/liked') ? 'currentColor' : 'none'" />
-        <span v-if="likedCount > 0" class="rail-badge">{{ formatRailCount(likedCount) }}</span>
-        <div class="rail-active-indicator"></div>
-      </router-link>
-
-      <router-link 
-        to="/friends" 
-        class="rail-nav-item" 
-        :class="{ active: isActive('/friends') }"
-        title="Подписки"
-      >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
-        </svg>
-        <div class="rail-active-indicator"></div>
-      </router-link>
-
-      <router-link 
-        to="/downloaded" 
-        class="rail-nav-item offline-rail-item" 
-        :class="{ active: isActive('/downloaded') }"
-        title="Кэшированные и скачанные треки"
-      >
-        <FolderDown :size="20" />
-        <span v-if="cachedTracksCount > 0" class="rail-badge offline-badge">{{ formatRailCount(cachedTracksCount) }}</span>
-        <div class="rail-active-indicator"></div>
-      </router-link>
-
-      <router-link 
-        to="/settings" 
-        class="rail-nav-item import-rail-item" 
-        :class="{ active: route.path === '/settings' }"
-        title="Импорт и настройки"
-      >
-        <Upload :size="20" />
-        <div class="rail-active-indicator"></div>
-      </router-link>
-    </nav>
-
-    <!-- Divider -->
-    <div class="rail-divider"></div>
-
-    <!-- Playlists Mini Section -->
-    <div v-if="displayedPlaylists.length > 0" class="rail-playlists">
-      <div 
-        v-for="playlist in displayedPlaylists.slice(0, 4)" 
-        :key="playlist.id"
-        class="rail-playlist-thumb"
-        :class="{ active: $route.params.id == playlist.id && $route.name === 'playlist-detail' }"
-        @click="$router.push(`/playlist/${playlist.id}`)"
-        @contextmenu.prevent="openMenu('playlist', playlist, 'sidebar', $event)"
-        :title="playlist.name"
-      >
-        <img v-if="playlist.covers?.length" :key="playlist.covers[0]" :src="getCoverUrl(playlist.covers[0], CoverSize.SMALL)" alt="" />
-        <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
-        </svg>
-      </div>
-    </div>
-
-    <!-- Rail Footer -->
-    <div class="rail-footer">
-      <div 
-        v-if="authStore.user" 
-        class="rail-avatar clickable" 
-        :class="{ active: showProfileMenu, 'has-active-imports': tasksStore.hasActiveImports }"
-        @click="showProfileMenu = !showProfileMenu"
-        @contextmenu.prevent="showProfileMenu = true"
-        v-longpress="() => { showProfileMenu = true }"
-        title="Мой профиль"
-      >
-        <img v-if="authStore.userAvatarUrl" :src="authStore.userAvatarUrl" class="sidebar-avatar-img" />
-        <template v-else>{{ userInitials }}</template>
-        <div v-if="tasksStore.hasActiveImports" class="rail-import-ring"></div>
-      </div>
-      <router-link to="/settings" class="rail-footer-btn" title="Настройки">
-        <Settings :size="18" />
-      </router-link>
-      <button class="rail-footer-btn logout-btn" @click="logout" title="Выйти">
-        <LogOut :size="18" />
-      </button>
-    </div>
-  </aside>
-
-  <!-- 2. Full Sidebar (Shown in grid when isSidebarCollapsed is false) -->
-  <aside v-else class="sidebar full-sidebar">
-    <!-- Logo with Collapse Toggle Button -->
-    <div class="sidebar-logo">
-      <div class="logo-icon">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-        </svg>
-      </div>
-      <span class="logo-text">{{ authStore.appName || 'auxbassbot' }}</span>
-
-      <!-- Collapse to icons button -->
-      <button 
-        class="sidebar-toggle-btn collapse-toggle-btn" 
-        @click="uiStore.setSidebarCollapsed(true, true)" 
-        title="Свернуть до иконок"
-      >
-        <PanelLeftClose :size="18" />
-      </button>
-
-      <div 
-        v-if="authStore.user" 
-        class="header-avatar clickable" 
-        @click="goToMyProfile"
-        title="Мой профиль"
-      >
-        <span class="header-avatar-badge">
-          <img v-if="authStore.userAvatarUrl" :src="authStore.userAvatarUrl" class="sidebar-avatar-img" />
-          <template v-else>{{ userInitials }}</template>
-        </span>
-      </div>
-    </div>
-
-    <!-- Main Navigation -->
-    <nav class="sidebar-nav">
-      <router-link to="/" class="nav-item" :class="{ active: isActiveExact('/') }">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-        </svg>
-        <span>Главная</span>
-      </router-link>
-
-      <router-link 
-        to="/search" 
-        class="nav-item" 
-        :class="{ active: isActive('/search') }"
-        @click="onSearchClick"
-      >
-        <Search :size="22" />
-        <span>Поиск</span>
-      </router-link>
-
-      <!-- Library Root -->
-      <div 
-        class="nav-item clickable" 
-        :class="{ active: route.name === 'library' && (!route.query.tab || route.query.tab === 'overview') }"
-        @click="goToLibraryTab('overview')"
-      >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="m16 6 4 14M12 6v14M8 8v12M4 4v16"></path>
-        </svg>
-        <span>Библиотека</span>
-      </div>
-
-      <!-- Library Sub-links -->
-      <div class="sidebar-subnav">
-        <div 
-          class="nav-subitem clickable" 
-          :class="{ active: route.name === 'library' && route.query.tab === 'tracks' }"
-          @click="goToLibraryTab('tracks')"
-          title="Все треки медиатеки"
-        >
-          <Music :size="15" />
-          <span>Все треки</span>
-          <span v-if="libraryStore.tracks?.length" class="sub-count">{{ libraryStore.tracks.length }}</span>
-        </div>
-
-        <div 
-          class="nav-subitem clickable" 
-          :class="{ active: route.name === 'library' && route.query.tab === 'artists' }"
-          @click="goToLibraryTab('artists')"
-          title="Исполнители"
-        >
-          <Mic2 :size="15" />
-          <span>Артисты</span>
-        </div>
-
-        <div 
-          class="nav-subitem clickable" 
-          :class="{ active: route.name === 'library' && route.query.tab === 'albums' }"
-          @click="goToLibraryTab('albums')"
-          title="Альбомы"
-        >
-          <Disc3 :size="15" />
-          <span>Альбомы</span>
+  <aside v-if="uiStore.isSidebarCollapsed" class="sidebar sidebar-wrapper rail-mode">
+    <div class="sidebar-scroll">
+      <!-- App logo at top -->
+      <div class="rail-header">
+        <div class="rail-logo-icon" :title="authStore.appName || 'auxbassbot'">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+          </svg>
         </div>
       </div>
 
-      <!-- Liked Tracks / Любимые треки -->
-      <router-link 
-        to="/liked" 
-        class="nav-item liked-highlight-item" 
-        :class="{ active: isActive('/liked') }"
-        title="Любимые треки"
-      >
-        <Heart :size="20" :fill="isActive('/liked') ? 'currentColor' : 'none'" />
-        <span>Любимые треки</span>
-        <span v-if="likedCount > 0" class="nav-count">{{ likedCount }}</span>
-      </router-link>
+      <!-- Main Navigation Icons -->
+      <nav class="rail-nav">
+        <router-link to="/" class="rail-nav-item" :class="{ active: isActiveExact('/') }" title="Главная">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+          </svg>
+          <div class="rail-active-indicator"></div>
+        </router-link>
 
-      <router-link to="/friends" class="nav-item" :class="{ active: isActive('/friends') }">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
-        </svg>
-        <span>Подписки</span>
-      </router-link>
+        <router-link 
+          to="/search" 
+          class="rail-nav-item" 
+          :class="{ active: isActive('/search') }"
+          @click="onSearchClick"
+          title="Поиск"
+        >
+          <Search :size="22" />
+          <div class="rail-active-indicator"></div>
+        </router-link>
 
-      <!-- Offline / Cached tracks standout card -->
-      <router-link 
-        to="/downloaded" 
-        class="nav-item offline-highlight-item" 
-        :class="{ active: isActive('/downloaded') }"
-        title="Кэшированные и скачанные треки"
-      >
-        <FolderDown :size="20" class="offline-icon" />
-        <span>Offline</span>
-        <span v-if="cachedTracksCount > 0" class="nav-count offline-count">{{ cachedTracksCount }}</span>
-      </router-link>
-
-      <!-- Import Section link -->
-      <router-link 
-        to="/settings" 
-        class="nav-item import-highlight-item" 
-        :class="{ active: route.path === '/settings' }"
-        title="Импорт и настройки"
-      >
-        <Upload :size="20" class="import-icon" />
-        <span>Импорт</span>
-      </router-link>
-    </nav>
-
-    <!-- Playlists Section -->
-    <div v-if="displayedPlaylists.length > 0" class="sidebar-section playlists-section">
-      <div class="section-header clickable" @click="goToPersonalPlaylists">
-        <span>Плейлисты</span>
-        <span class="section-count">{{ userPlaylists.length }}</span>
-      </div>
-
-      <div class="playlists-list">
         <div 
-          v-for="playlist in displayedPlaylists" 
+          class="rail-nav-item clickable" 
+          :class="{ active: route.name === 'library' }"
+          @click="goToLibraryTab('overview')"
+          title="Медиатека"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="m16 6 4 14M12 6v14M8 8v12M4 4v16"></path>
+          </svg>
+          <div class="rail-active-indicator"></div>
+        </div>
+
+        <router-link 
+          to="/liked" 
+          class="rail-nav-item liked-rail-item" 
+          :class="{ active: isActive('/liked') }"
+          title="Любимые треки"
+        >
+          <Heart :size="20" :fill="isActive('/liked') ? 'currentColor' : 'none'" />
+          <span v-if="likedCount > 0" class="rail-badge">{{ formatRailCount(likedCount) }}</span>
+          <div class="rail-active-indicator"></div>
+        </router-link>
+
+        <router-link 
+          to="/friends" 
+          class="rail-nav-item" 
+          :class="{ active: isActive('/friends') }"
+          title="Подписки"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+          </svg>
+          <div class="rail-active-indicator"></div>
+        </router-link>
+
+        <router-link 
+          to="/downloaded" 
+          class="rail-nav-item offline-rail-item" 
+          :class="{ active: isActive('/downloaded') }"
+          title="Кэшированные и скачанные треки"
+        >
+          <FolderDown :size="20" />
+          <span v-if="cachedTracksCount > 0" class="rail-badge offline-badge">{{ formatRailCount(cachedTracksCount) }}</span>
+          <div class="rail-active-indicator"></div>
+        </router-link>
+
+        <router-link 
+          to="/settings" 
+          class="rail-nav-item import-rail-item" 
+          :class="{ active: route.path === '/settings' }"
+          title="Импорт и настройки"
+        >
+          <Upload :size="20" />
+          <div class="rail-active-indicator"></div>
+        </router-link>
+      </nav>
+
+      <!-- Divider -->
+      <div class="rail-divider"></div>
+
+      <!-- Playlists Mini Section -->
+      <div v-if="displayedPlaylists.length > 0" class="rail-playlists">
+        <div 
+          v-for="playlist in displayedPlaylists.slice(0, 4)" 
           :key="playlist.id"
-          class="nav-item playlist-item"
+          class="rail-playlist-thumb"
           :class="{ active: $route.params.id == playlist.id && $route.name === 'playlist-detail' }"
           @click="$router.push(`/playlist/${playlist.id}`)"
           @contextmenu.prevent="openMenu('playlist', playlist, 'sidebar', $event)"
+          :title="playlist.name"
         >
-          <div class="playlist-cover" :style="getPlaylistCoverStyle(playlist)">
-            <img v-if="playlist.covers?.length" :key="playlist.covers[0]" :src="getCoverUrl(playlist.covers[0], CoverSize.SMALL)" alt="" />
-            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
-            </svg>
-          </div>
-          <div class="playlist-info">
-            <span class="playlist-name">{{ playlist.name }}</span>
-          </div>
-          <span class="nav-count">{{ playlist.track_count }}</span>
+          <img v-if="playlist.covers?.length" :key="playlist.covers[0]" :src="getCoverUrl(playlist.covers[0], CoverSize.SMALL)" alt="" />
+          <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
+          </svg>
         </div>
-        
+      </div>
+
+      <!-- Rail Footer -->
+      <div class="rail-footer">
         <div 
-          v-if="hasMorePlaylists"
-          class="nav-item show-more-btn"
-          @click="goToPersonalPlaylists"
+          v-if="authStore.user" 
+          class="rail-avatar clickable" 
+          :class="{ active: showProfileMenu, 'has-active-imports': tasksStore.hasActiveImports }"
+          @click="showProfileMenu = !showProfileMenu"
+          @contextmenu.prevent="showProfileMenu = true"
+          v-longpress="() => { showProfileMenu = true }"
+          title="Мой профиль"
         >
-          <span class="show-more-text">Показать все {{ userPlaylists.length }}</span>
+          <img v-if="authStore.userAvatarUrl" :src="authStore.userAvatarUrl" class="sidebar-avatar-img" />
+          <template v-else>{{ userInitials }}</template>
+          <div v-if="tasksStore.hasActiveImports" class="rail-import-ring"></div>
         </div>
+        <router-link to="/settings" class="rail-footer-btn" title="Настройки">
+          <Settings :size="18" />
+        </router-link>
+        <button class="rail-footer-btn logout-btn" @click="logout" title="Выйти">
+          <LogOut :size="18" />
+        </button>
       </div>
     </div>
 
-    <!-- User Section (bottom) -->
-    <div class="sidebar-footer">
-      <div 
-        class="user-info clickable" 
-        :class="{ active: showProfileMenu, 'has-active-imports': tasksStore.hasActiveImports }"
-        @click="showProfileMenu = !showProfileMenu" 
-        @contextmenu.prevent="showProfileMenu = true"
-        v-longpress="() => { showProfileMenu = true }"
-        :title="tasksStore.hasActiveImports ? `Импорт: ${tasksStore.overallProgress}% (открыть меню профиля)` : 'Меню профиля'"
-      >
-        <div class="user-avatar-wrap">
-          <div class="user-avatar" :class="{ 'importing': tasksStore.hasActiveImports }">
+    <!-- Edge Toggle Button (Centered on the right border line, pointing right) -->
+    <button 
+      class="sidebar-edge-toggle rail-edge-toggle" 
+      @click="uiStore.openSidebarOverlay" 
+      title="Развернуть меню (Ctrl+B)"
+      aria-label="Развернуть сайдбар"
+    >
+      <ChevronRight :size="15" stroke-width="2.5" />
+    </button>
+  </aside>
+
+  <!-- 2. Full Sidebar (Shown in grid when isSidebarCollapsed is false) -->
+  <aside v-else class="sidebar sidebar-wrapper full-mode">
+    <div class="sidebar-scroll">
+      <!-- Logo -->
+      <div class="sidebar-logo">
+        <div class="logo-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+          </svg>
+        </div>
+        <span class="logo-text">{{ authStore.appName || 'auxbassbot' }}</span>
+
+        <div 
+          v-if="authStore.user" 
+          class="header-avatar clickable" 
+          @click="goToMyProfile"
+          title="Мой профиль"
+        >
+          <span class="header-avatar-badge">
             <img v-if="authStore.userAvatarUrl" :src="authStore.userAvatarUrl" class="sidebar-avatar-img" />
             <template v-else>{{ userInitials }}</template>
-          </div>
-          <div v-if="tasksStore.hasActiveImports" class="avatar-import-ring"></div>
-        </div>
-        <div class="user-info-text">
-          <span class="user-name">{{ userName }}</span>
-          <span v-if="tasksStore.hasActiveImports" class="user-import-indicator">
-            <span class="import-pulsing-dot"></span>
-            <span class="import-label">Импорт {{ tasksStore.overallProgress }}%</span>
           </span>
         </div>
       </div>
-      <button 
-        v-if="!pwaInstall.isInstalled" 
-        class="footer-btn install-btn" 
-        @click="pwaInstall.promptInstall()" 
-        title="Установить приложение"
-      >
-        <Download :size="20" />
-      </button>
-      <router-link to="/settings" class="footer-btn settings-btn" title="Настройки">
-        <Settings :size="18" />
-      </router-link>
-      <button class="footer-btn logout-btn" @click="logout" title="Выйти">
-        <LogOut :size="18" />
-      </button>
+
+      <!-- Main Navigation -->
+      <nav class="sidebar-nav">
+        <router-link to="/" class="nav-item" :class="{ active: isActiveExact('/') }">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+          </svg>
+          <span>Главная</span>
+        </router-link>
+
+        <router-link 
+          to="/search" 
+          class="nav-item" 
+          :class="{ active: isActive('/search') }"
+          @click="onSearchClick"
+        >
+          <Search :size="22" />
+          <span>Поиск</span>
+        </router-link>
+
+        <!-- Library Root -->
+        <div 
+          class="nav-item clickable" 
+          :class="{ active: route.name === 'library' && (!route.query.tab || route.query.tab === 'overview') }"
+          @click="goToLibraryTab('overview')"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="m16 6 4 14M12 6v14M8 8v12M4 4v16"></path>
+          </svg>
+          <span>Библиотека</span>
+        </div>
+
+        <!-- Library Sub-links -->
+        <div class="sidebar-subnav">
+          <div 
+            class="nav-subitem clickable" 
+            :class="{ active: route.name === 'library' && route.query.tab === 'tracks' }"
+            @click="goToLibraryTab('tracks')"
+            title="Все треки медиатеки"
+          >
+            <Music :size="15" />
+            <span>Все треки</span>
+            <span v-if="libraryStore.tracks?.length" class="sub-count">{{ libraryStore.tracks.length }}</span>
+          </div>
+
+          <div 
+            class="nav-subitem clickable" 
+            :class="{ active: route.name === 'library' && route.query.tab === 'artists' }"
+            @click="goToLibraryTab('artists')"
+            title="Исполнители"
+          >
+            <Mic2 :size="15" />
+            <span>Артисты</span>
+          </div>
+
+          <div 
+            class="nav-subitem clickable" 
+            :class="{ active: route.name === 'library' && route.query.tab === 'albums' }"
+            @click="goToLibraryTab('albums')"
+            title="Альбомы"
+          >
+            <Disc3 :size="15" />
+            <span>Альбомы</span>
+          </div>
+        </div>
+
+        <!-- Liked Tracks / Любимые треки -->
+        <router-link 
+          to="/liked" 
+          class="nav-item liked-highlight-item" 
+          :class="{ active: isActive('/liked') }"
+          title="Любимые треки"
+        >
+          <Heart :size="20" :fill="isActive('/liked') ? 'currentColor' : 'none'" />
+          <span>Любимые треки</span>
+          <span v-if="likedCount > 0" class="nav-count">{{ likedCount }}</span>
+        </router-link>
+
+        <router-link to="/friends" class="nav-item" :class="{ active: isActive('/friends') }">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+          </svg>
+          <span>Подписки</span>
+        </router-link>
+
+        <!-- Offline / Cached tracks standout card -->
+        <router-link 
+          to="/downloaded" 
+          class="nav-item offline-highlight-item" 
+          :class="{ active: isActive('/downloaded') }"
+          title="Кэшированные и скачанные треки"
+        >
+          <FolderDown :size="20" class="offline-icon" />
+          <span>Offline</span>
+          <span v-if="cachedTracksCount > 0" class="nav-count offline-count">{{ cachedTracksCount }}</span>
+        </router-link>
+
+        <!-- Import Section link -->
+        <router-link 
+          to="/settings" 
+          class="nav-item import-highlight-item" 
+          :class="{ active: route.path === '/settings' }"
+          title="Импорт и настройки"
+        >
+          <Upload :size="20" class="import-icon" />
+          <span>Импорт</span>
+        </router-link>
+      </nav>
+
+      <!-- Playlists Section -->
+      <div v-if="displayedPlaylists.length > 0" class="sidebar-section playlists-section">
+        <div class="section-header clickable" @click="goToPersonalPlaylists">
+          <span>Плейлисты</span>
+          <span class="section-count">{{ userPlaylists.length }}</span>
+        </div>
+
+        <div class="playlists-list">
+          <div 
+            v-for="playlist in displayedPlaylists" 
+            :key="playlist.id"
+            class="nav-item playlist-item"
+            :class="{ active: $route.params.id == playlist.id && $route.name === 'playlist-detail' }"
+            @click="$router.push(`/playlist/${playlist.id}`)"
+            @contextmenu.prevent="openMenu('playlist', playlist, 'sidebar', $event)"
+          >
+            <div class="playlist-cover" :style="getPlaylistCoverStyle(playlist)">
+              <img v-if="playlist.covers?.length" :key="playlist.covers[0]" :src="getCoverUrl(playlist.covers[0], CoverSize.SMALL)" alt="" />
+              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
+              </svg>
+            </div>
+            <div class="playlist-info">
+              <span class="playlist-name">{{ playlist.name }}</span>
+            </div>
+            <span class="nav-count">{{ playlist.track_count }}</span>
+          </div>
+          
+          <div 
+            v-if="hasMorePlaylists"
+            class="nav-item show-more-btn"
+            @click="goToPersonalPlaylists"
+          >
+            <span class="show-more-text">Показать все {{ userPlaylists.length }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- User Section (bottom) -->
+      <div class="sidebar-footer">
+        <div 
+          class="user-info clickable" 
+          :class="{ active: showProfileMenu, 'has-active-imports': tasksStore.hasActiveImports }"
+          @click="showProfileMenu = !showProfileMenu" 
+          @contextmenu.prevent="showProfileMenu = true"
+          v-longpress="() => { showProfileMenu = true }"
+          :title="tasksStore.hasActiveImports ? `Импорт: ${tasksStore.overallProgress}% (открыть меню профиля)` : 'Меню профиля'"
+        >
+          <div class="user-avatar-wrap">
+            <div class="user-avatar" :class="{ 'importing': tasksStore.hasActiveImports }">
+              <img v-if="authStore.userAvatarUrl" :src="authStore.userAvatarUrl" class="sidebar-avatar-img" />
+              <template v-else>{{ userInitials }}</template>
+            </div>
+            <div v-if="tasksStore.hasActiveImports" class="avatar-import-ring"></div>
+          </div>
+          <div class="user-info-text">
+            <span class="user-name">{{ userName }}</span>
+            <span v-if="tasksStore.hasActiveImports" class="user-import-indicator">
+              <span class="import-pulsing-dot"></span>
+              <span class="import-label">Импорт {{ tasksStore.overallProgress }}%</span>
+            </span>
+          </div>
+        </div>
+        <button 
+          v-if="!pwaInstall.isInstalled" 
+          class="footer-btn install-btn" 
+          @click="pwaInstall.promptInstall()" 
+          title="Установить приложение"
+        >
+          <Download :size="20" />
+        </button>
+        <router-link to="/settings" class="footer-btn settings-btn" title="Настройки">
+          <Settings :size="18" />
+        </router-link>
+        <button class="footer-btn logout-btn" @click="logout" title="Выйти">
+          <LogOut :size="18" />
+        </button>
+      </div>
     </div>
+
+    <!-- Edge Toggle Button on the full sidebar (pointing left to collapse) -->
+    <button 
+      class="sidebar-edge-toggle full-edge-toggle" 
+      @click="uiStore.setSidebarCollapsed(true, true)" 
+      title="Свернуть меню (Ctrl+B)"
+      aria-label="Свернуть сайдбар"
+    >
+      <ChevronLeft :size="15" stroke-width="2.5" />
+    </button>
   </aside>
 
   <!-- 3. Overlay Drawer & Backdrop (Teleported to body when in collapsed mode) -->
@@ -378,229 +385,232 @@
       <Transition name="overlay-drawer">
         <aside 
           v-if="uiStore.isSidebarOverlayOpen" 
-          class="sidebar sidebar-overlay-drawer"
+          class="sidebar sidebar-wrapper sidebar-overlay-drawer"
           :class="{ 'has-bottom-player': !!playerStore.currentTrack }"
           @click.stop
         >
-          <!-- Logo and Close Button -->
-          <div class="sidebar-logo">
-            <div class="logo-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-              </svg>
-            </div>
-            <span class="logo-text">{{ authStore.appName || 'auxbassbot' }}</span>
-
-            <!-- Close overlay button -->
-            <button 
-              class="sidebar-toggle-btn close-drawer-btn" 
-              @click="uiStore.closeSidebarOverlay"
-              title="Свернуть меню"
-            >
-              <PanelLeftClose :size="18" />
-            </button>
-
-            <div 
-              v-if="authStore.user" 
-              class="header-avatar clickable" 
-              @click="goToMyProfileAndClose"
-              title="Мой профиль"
-            >
-              <span class="header-avatar-badge">
-                <img v-if="authStore.userAvatarUrl" :src="authStore.userAvatarUrl" class="sidebar-avatar-img" />
-                <template v-else>{{ userInitials }}</template>
-              </span>
-            </div>
-          </div>
-
-          <!-- Main Navigation (closes drawer on click) -->
-          <nav class="sidebar-nav">
-            <router-link to="/" class="nav-item" :class="{ active: isActiveExact('/') }" @click="handleNavClick">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-              </svg>
-              <span>Главная</span>
-            </router-link>
-
-            <router-link 
-              to="/search" 
-              class="nav-item" 
-              :class="{ active: isActive('/search') }"
-              @click="onSearchClick"
-            >
-              <Search :size="22" />
-              <span>Поиск</span>
-            </router-link>
-
-            <div 
-              class="nav-item clickable" 
-              :class="{ active: route.name === 'library' && (!route.query.tab || route.query.tab === 'overview') }"
-              @click="goToLibraryTabAndClose('overview')"
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="m16 6 4 14M12 6v14M8 8v12M4 4v16"></path>
-              </svg>
-              <span>Библиотека</span>
-            </div>
-
-            <!-- Library Sub-links -->
-            <div class="sidebar-subnav">
-              <div 
-                class="nav-subitem clickable" 
-                :class="{ active: route.name === 'library' && route.query.tab === 'tracks' }"
-                @click="goToLibraryTabAndClose('tracks')"
-                title="Все треки медиатеки"
-              >
-                <Music :size="15" />
-                <span>Все треки</span>
-                <span v-if="libraryStore.tracks?.length" class="sub-count">{{ libraryStore.tracks.length }}</span>
+          <div class="sidebar-scroll">
+            <!-- Logo -->
+            <div class="sidebar-logo">
+              <div class="logo-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                </svg>
               </div>
+              <span class="logo-text">{{ authStore.appName || 'auxbassbot' }}</span>
 
               <div 
-                class="nav-subitem clickable" 
-                :class="{ active: route.name === 'library' && route.query.tab === 'artists' }"
-                @click="goToLibraryTabAndClose('artists')"
-                title="Исполнители"
+                v-if="authStore.user" 
+                class="header-avatar clickable" 
+                @click="goToMyProfileAndClose"
+                title="Мой профиль"
               >
-                <Mic2 :size="15" />
-                <span>Артисты</span>
-              </div>
-
-              <div 
-                class="nav-subitem clickable" 
-                :class="{ active: route.name === 'library' && route.query.tab === 'albums' }"
-                @click="goToLibraryTabAndClose('albums')"
-                title="Альбомы"
-              >
-                <Disc3 :size="15" />
-                <span>Альбомы</span>
-              </div>
-            </div>
-
-            <!-- Liked Tracks -->
-            <router-link 
-              to="/liked" 
-              class="nav-item liked-highlight-item" 
-              :class="{ active: isActive('/liked') }"
-              @click="handleNavClick"
-              title="Любимые треки"
-            >
-              <Heart :size="20" :fill="isActive('/liked') ? 'currentColor' : 'none'" />
-              <span>Любимые треки</span>
-              <span v-if="likedCount > 0" class="nav-count">{{ likedCount }}</span>
-            </router-link>
-
-            <router-link to="/friends" class="nav-item" :class="{ active: isActive('/friends') }" @click="handleNavClick">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
-              </svg>
-              <span>Подписки</span>
-            </router-link>
-
-            <!-- Offline -->
-            <router-link 
-              to="/downloaded" 
-              class="nav-item offline-highlight-item" 
-              :class="{ active: isActive('/downloaded') }"
-              @click="handleNavClick"
-              title="Кэшированные и скачанные треки"
-            >
-              <FolderDown :size="20" class="offline-icon" />
-              <span>Offline</span>
-              <span v-if="cachedTracksCount > 0" class="nav-count offline-count">{{ cachedTracksCount }}</span>
-            </router-link>
-
-            <!-- Import -->
-            <router-link 
-              to="/settings" 
-              class="nav-item import-highlight-item" 
-              :class="{ active: route.path === '/settings' }"
-              @click="handleNavClick"
-              title="Импорт и настройки"
-            >
-              <Upload :size="20" class="import-icon" />
-              <span>Импорт</span>
-            </router-link>
-          </nav>
-
-          <!-- Playlists Section -->
-          <div v-if="displayedPlaylists.length > 0" class="sidebar-section playlists-section">
-            <div class="section-header clickable" @click="goToPersonalPlaylistsAndClose">
-              <span>Плейлисты</span>
-              <span class="section-count">{{ userPlaylists.length }}</span>
-            </div>
-
-            <div class="playlists-list">
-              <div 
-                v-for="playlist in displayedPlaylists" 
-                :key="playlist.id"
-                class="nav-item playlist-item"
-                :class="{ active: $route.params.id == playlist.id && $route.name === 'playlist-detail' }"
-                @click="goToPlaylistAndClose(playlist.id)"
-                @contextmenu.prevent="openMenu('playlist', playlist, 'sidebar', $event)"
-              >
-                <div class="playlist-cover" :style="getPlaylistCoverStyle(playlist)">
-                  <img v-if="playlist.covers?.length" :key="playlist.covers[0]" :src="getCoverUrl(playlist.covers[0], CoverSize.SMALL)" alt="" />
-                  <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
-                  </svg>
-                </div>
-                <div class="playlist-info">
-                  <span class="playlist-name">{{ playlist.name }}</span>
-                </div>
-                <span class="nav-count">{{ playlist.track_count }}</span>
-              </div>
-              
-              <div 
-                v-if="hasMorePlaylists"
-                class="nav-item show-more-btn"
-                @click="goToPersonalPlaylistsAndClose"
-              >
-                <span class="show-more-text">Показать все {{ userPlaylists.length }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- User Section (bottom) -->
-          <div class="sidebar-footer">
-            <div 
-              class="user-info clickable" 
-              :class="{ active: showProfileMenu, 'has-active-imports': tasksStore.hasActiveImports }"
-              @click="showProfileMenu = !showProfileMenu" 
-              @contextmenu.prevent="showProfileMenu = true"
-              v-longpress="() => { showProfileMenu = true }"
-              :title="tasksStore.hasActiveImports ? `Импорт: ${tasksStore.overallProgress}% (открыть меню профиля)` : 'Меню профиля'"
-            >
-              <div class="user-avatar-wrap">
-                <div class="user-avatar" :class="{ 'importing': tasksStore.hasActiveImports }">
+                <span class="header-avatar-badge">
                   <img v-if="authStore.userAvatarUrl" :src="authStore.userAvatarUrl" class="sidebar-avatar-img" />
                   <template v-else>{{ userInitials }}</template>
-                </div>
-                <div v-if="tasksStore.hasActiveImports" class="avatar-import-ring"></div>
-              </div>
-              <div class="user-info-text">
-                <span class="user-name">{{ userName }}</span>
-                <span v-if="tasksStore.hasActiveImports" class="user-import-indicator">
-                  <span class="import-pulsing-dot"></span>
-                  <span class="import-label">Импорт {{ tasksStore.overallProgress }}%</span>
                 </span>
               </div>
             </div>
-            <button 
-              v-if="!pwaInstall.isInstalled" 
-              class="footer-btn install-btn" 
-              @click="pwaInstall.promptInstall()" 
-              title="Установить приложение"
-            >
-              <Download :size="20" />
-            </button>
-            <router-link to="/settings" class="footer-btn settings-btn" @click="handleNavClick" title="Настройки">
-              <Settings :size="18" />
-            </router-link>
-            <button class="footer-btn logout-btn" @click="logout" title="Выйти">
-              <LogOut :size="18" />
-            </button>
+
+            <!-- Main Navigation (closes drawer on click) -->
+            <nav class="sidebar-nav">
+              <router-link to="/" class="nav-item" :class="{ active: isActiveExact('/') }" @click="handleNavClick">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+                </svg>
+                <span>Главная</span>
+              </router-link>
+
+              <router-link 
+                to="/search" 
+                class="nav-item" 
+                :class="{ active: isActive('/search') }"
+                @click="onSearchClick"
+              >
+                <Search :size="22" />
+                <span>Поиск</span>
+              </router-link>
+
+              <div 
+                class="nav-item clickable" 
+                :class="{ active: route.name === 'library' && (!route.query.tab || route.query.tab === 'overview') }"
+                @click="goToLibraryTabAndClose('overview')"
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="m16 6 4 14M12 6v14M8 8v12M4 4v16"></path>
+                </svg>
+                <span>Библиотека</span>
+              </div>
+
+              <!-- Library Sub-links -->
+              <div class="sidebar-subnav">
+                <div 
+                  class="nav-subitem clickable" 
+                  :class="{ active: route.name === 'library' && route.query.tab === 'tracks' }"
+                  @click="goToLibraryTabAndClose('tracks')"
+                  title="Все треки медиатеки"
+                >
+                  <Music :size="15" />
+                  <span>Все треки</span>
+                  <span v-if="libraryStore.tracks?.length" class="sub-count">{{ libraryStore.tracks.length }}</span>
+                </div>
+
+                <div 
+                  class="nav-subitem clickable" 
+                  :class="{ active: route.name === 'library' && route.query.tab === 'artists' }"
+                  @click="goToLibraryTabAndClose('artists')"
+                  title="Исполнители"
+                >
+                  <Mic2 :size="15" />
+                  <span>Артисты</span>
+                </div>
+
+                <div 
+                  class="nav-subitem clickable" 
+                  :class="{ active: route.name === 'library' && route.query.tab === 'albums' }"
+                  @click="goToLibraryTabAndClose('albums')"
+                  title="Альбомы"
+                >
+                  <Disc3 :size="15" />
+                  <span>Альбомы</span>
+                </div>
+              </div>
+
+              <!-- Liked Tracks -->
+              <router-link 
+                to="/liked" 
+                class="nav-item liked-highlight-item" 
+                :class="{ active: isActive('/liked') }"
+                @click="handleNavClick"
+                title="Любимые треки"
+              >
+                <Heart :size="20" :fill="isActive('/liked') ? 'currentColor' : 'none'" />
+                <span>Любимые треки</span>
+                <span v-if="likedCount > 0" class="nav-count">{{ likedCount }}</span>
+              </router-link>
+
+              <router-link to="/friends" class="nav-item" :class="{ active: isActive('/friends') }" @click="handleNavClick">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+                </svg>
+                <span>Подписки</span>
+              </router-link>
+
+              <!-- Offline -->
+              <router-link 
+                to="/downloaded" 
+                class="nav-item offline-highlight-item" 
+                :class="{ active: isActive('/downloaded') }"
+                @click="handleNavClick"
+                title="Кэшированные и скачанные треки"
+              >
+                <FolderDown :size="20" class="offline-icon" />
+                <span>Offline</span>
+                <span v-if="cachedTracksCount > 0" class="nav-count offline-count">{{ cachedTracksCount }}</span>
+              </router-link>
+
+              <!-- Import -->
+              <router-link 
+                to="/settings" 
+                class="nav-item import-highlight-item" 
+                :class="{ active: route.path === '/settings' }"
+                @click="handleNavClick"
+                title="Импорт и настройки"
+              >
+                <Upload :size="20" class="import-icon" />
+                <span>Импорт</span>
+              </router-link>
+            </nav>
+
+            <!-- Playlists Section -->
+            <div v-if="displayedPlaylists.length > 0" class="sidebar-section playlists-section">
+              <div class="section-header clickable" @click="goToPersonalPlaylistsAndClose">
+                <span>Плейлисты</span>
+                <span class="section-count">{{ userPlaylists.length }}</span>
+              </div>
+
+              <div class="playlists-list">
+                <div 
+                  v-for="playlist in displayedPlaylists" 
+                  :key="playlist.id"
+                  class="nav-item playlist-item"
+                  :class="{ active: $route.params.id == playlist.id && $route.name === 'playlist-detail' }"
+                  @click="goToPlaylistAndClose(playlist.id)"
+                  @contextmenu.prevent="openMenu('playlist', playlist, 'sidebar', $event)"
+                >
+                  <div class="playlist-cover" :style="getPlaylistCoverStyle(playlist)">
+                    <img v-if="playlist.covers?.length" :key="playlist.covers[0]" :src="getCoverUrl(playlist.covers[0], CoverSize.SMALL)" alt="" />
+                    <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
+                    </svg>
+                  </div>
+                  <div class="playlist-info">
+                    <span class="playlist-name">{{ playlist.name }}</span>
+                  </div>
+                  <span class="nav-count">{{ playlist.track_count }}</span>
+                </div>
+                
+                <div 
+                  v-if="hasMorePlaylists"
+                  class="nav-item show-more-btn"
+                  @click="goToPersonalPlaylistsAndClose"
+                >
+                  <span class="show-more-text">Показать все {{ userPlaylists.length }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- User Section (bottom) -->
+            <div class="sidebar-footer">
+              <div 
+                class="user-info clickable" 
+                :class="{ active: showProfileMenu, 'has-active-imports': tasksStore.hasActiveImports }"
+                @click="showProfileMenu = !showProfileMenu" 
+                @contextmenu.prevent="showProfileMenu = true"
+                v-longpress="() => { showProfileMenu = true }"
+                :title="tasksStore.hasActiveImports ? `Импорт: ${tasksStore.overallProgress}% (открыть меню профиля)` : 'Меню профиля'"
+              >
+                <div class="user-avatar-wrap">
+                  <div class="user-avatar" :class="{ 'importing': tasksStore.hasActiveImports }">
+                    <img v-if="authStore.userAvatarUrl" :src="authStore.userAvatarUrl" class="sidebar-avatar-img" />
+                    <template v-else>{{ userInitials }}</template>
+                  </div>
+                  <div v-if="tasksStore.hasActiveImports" class="avatar-import-ring"></div>
+                </div>
+                <div class="user-info-text">
+                  <span class="user-name">{{ userName }}</span>
+                  <span v-if="tasksStore.hasActiveImports" class="user-import-indicator">
+                    <span class="import-pulsing-dot"></span>
+                    <span class="import-label">Импорт {{ tasksStore.overallProgress }}%</span>
+                  </span>
+                </div>
+              </div>
+              <button 
+                v-if="!pwaInstall.isInstalled" 
+                class="footer-btn install-btn" 
+                @click="pwaInstall.promptInstall()" 
+                title="Установить приложение"
+              >
+                <Download :size="20" />
+              </button>
+              <router-link to="/settings" class="footer-btn settings-btn" @click="handleNavClick" title="Настройки">
+                <Settings :size="18" />
+              </router-link>
+              <button class="footer-btn logout-btn" @click="logout" title="Выйти">
+                <LogOut :size="18" />
+              </button>
+            </div>
           </div>
+
+          <!-- Edge Toggle Button on the drawer (pointing left to close) -->
+          <button 
+            class="sidebar-edge-toggle drawer-edge-toggle" 
+            @click="uiStore.closeSidebarOverlay" 
+            title="Свернуть меню (Ctrl+B)"
+            aria-label="Свернуть сайдбар"
+          >
+            <ChevronLeft :size="15" stroke-width="2.5" />
+          </button>
         </aside>
       </Transition>
     </div>
@@ -630,8 +640,8 @@ import {
   Disc3, 
   Search, 
   Heart, 
-  Menu, 
-  PanelLeftClose, 
+  ChevronRight, 
+  ChevronLeft, 
   Settings, 
   LogOut 
 } from 'lucide-vue-next'
@@ -782,92 +792,114 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* Base Sidebar */
-.sidebar {
-  width: 280px;
+/* =========================================================
+   Base Sidebar Wrapper & Scrolling Container
+   ========================================================= */
+.sidebar.sidebar-wrapper {
+  position: relative;
   height: 100%;
-  background: #0a0a0a;
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: visible;
+  user-select: none;
 }
 
-.sidebar::-webkit-scrollbar {
+.sidebar-scroll {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
   width: 6px;
 }
 
-.sidebar::-webkit-scrollbar-track {
+.sidebar-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.sidebar::-webkit-scrollbar-thumb {
+.sidebar-scroll::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
   border-radius: 3px;
 }
 
 /* =========================================================
+   Edge Toggle Button (Floats right on the border line)
+   ========================================================= */
+.sidebar-edge-toggle {
+  position: absolute;
+  top: 260px;
+  right: -13px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #18181b;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.65), 0 1px 3px rgba(0, 0, 0, 0.5);
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 0;
+}
+
+.sidebar-edge-toggle:hover {
+  background: var(--c-accent, #1db954);
+  border-color: var(--c-accent, #1db954);
+  color: #000;
+  transform: scale(1.15);
+  box-shadow: 0 0 16px rgba(29, 185, 84, 0.55), 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.sidebar-edge-toggle:active {
+  transform: scale(0.95);
+}
+
+.drawer-edge-toggle {
+  z-index: 1060;
+}
+
+/* =========================================================
    1. Compact Rail Sidebar (72px)
    ========================================================= */
-.sidebar.rail-sidebar {
+.sidebar.rail-mode {
   width: var(--sidebar-collapsed-width, 72px);
-  height: 100%;
   background: #0a0a0a;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
-  display: flex;
-  flex-direction: column;
+}
+
+.sidebar.rail-mode .sidebar-scroll {
   align-items: center;
-  padding: 14px 0 16px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  user-select: none;
+  padding: 16px 0 16px;
 }
 
 .rail-header {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   width: 100%;
 }
 
-.rail-burger-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.85);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.rail-burger-btn:hover {
-  background: rgba(29, 185, 84, 0.16);
-  border-color: rgba(29, 185, 84, 0.45);
-  color: var(--c-accent, #1db954);
-  transform: scale(1.06);
-}
-
-.rail-burger-btn:active {
-  transform: scale(0.96);
-}
-
 .rail-logo-icon {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   background: linear-gradient(135deg, var(--c-accent, #1db954), var(--c-accent-light, #1ed760));
-  border-radius: 10px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #000;
   box-shadow: 0 4px 12px rgba(29, 185, 84, 0.25);
+  transition: transform 0.18s ease;
+}
+
+.rail-logo-icon:hover {
+  transform: scale(1.05);
 }
 
 .rail-nav {
@@ -1067,8 +1099,14 @@ onUnmounted(() => {
 }
 
 /* =========================================================
-   2. Full Sidebar & Overlay Drawer
+   2. Full Sidebar Mode
    ========================================================= */
+.sidebar.full-mode {
+  width: var(--sidebar-width, 280px);
+  background: #0a0a0a;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 .sidebar-logo {
   display: flex;
   align-items: center;
@@ -1076,34 +1114,8 @@ onUnmounted(() => {
   padding: 20px 16px 16px;
 }
 
-.sidebar-toggle-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.65);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-  margin-left: auto;
-  margin-right: 4px;
-  flex-shrink: 0;
-}
-
-.sidebar-toggle-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
-  transform: scale(1.05);
-}
-
-.sidebar-toggle-btn:active {
-  transform: scale(0.95);
-}
-
 .header-avatar {
+  margin-left: auto;
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -1585,12 +1597,11 @@ onUnmounted(() => {
   width: 280px;
   z-index: 1050;
   background: #0d0d0d;
-  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  border-right: 1px solid rgba(255, 255, 255, 0.14);
   box-shadow: 18px 0 45px rgba(0, 0, 0, 0.85), 6px 0 16px rgba(0, 0, 0, 0.6);
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: visible;
 }
 
 .sidebar-overlay-drawer.has-bottom-player {
