@@ -193,7 +193,7 @@
       </div>
     </div>
 
-    <!-- ═══ 3. RIGHT COLUMN: Informative Tab Details Panel ═══ -->
+    <!-- ═══ 3. RIGHT COLUMN: Informative Tab Details Panel (Unified Footer) ═══ -->
     <aside class="hero-tab-details-panel" aria-label="Детали раздела">
       <!-- Overview Tab Details -->
       <div v-if="activeTab === 'overview'" class="tab-panel-inner tab-panel-overview">
@@ -210,7 +210,7 @@
             <span class="panel-stat-num">{{ user.playlist_count }}</span>
             <span class="panel-stat-lbl">{{ getPlaylistsWord(user.playlist_count) }}</span>
           </button>
-          <button v-if="overviewAlbumsCount > 0" class="panel-stat-cell" @click="$emit('selectTab', 'albums')" title="Смотреть альбомы">
+          <button class="panel-stat-cell" @click="$emit('selectTab', 'albums')" title="Смотреть альбомы">
             <span class="panel-stat-num">{{ overviewAlbumsCount }}</span>
             <span class="panel-stat-lbl">альбомов</span>
           </button>
@@ -232,19 +232,28 @@
           <Music :size="13" class="panel-header-icon" />
           <span class="panel-header-title">Медиатека треков</span>
         </div>
-        <div class="panel-highlight-row">
-          <span class="panel-big-num">{{ user.track_count }}</span>
-          <span class="panel-big-lbl">{{ getTracksWord(user.track_count) }} в базе</span>
-        </div>
-        <div class="panel-quick-actions" v-if="user.track_count > 0">
-          <button class="panel-action-btn primary" @click="$emit('play')" title="Слушать с начала">
-            <Play :size="13" fill="currentColor" />
-            <span>Слушать</span>
+        <div class="panel-stats-grid">
+          <button class="panel-stat-cell active-metric" @click="$emit('play')" title="Слушать все треки">
+            <span class="panel-stat-num">{{ user.track_count }}</span>
+            <span class="panel-stat-lbl">в базе</span>
           </button>
-          <button v-if="user.track_count > 1" class="panel-action-btn" @click="$emit('shuffle')" title="Перемешать">
-            <Shuffle :size="13" />
-            <span>Микс</span>
+          <button class="panel-stat-cell" @click="$emit('selectTab', 'playlists')" title="Смотреть плейлисты">
+            <span class="panel-stat-num">{{ user.playlist_count }}</span>
+            <span class="panel-stat-lbl">{{ getPlaylistsWord(user.playlist_count) }}</span>
           </button>
+          <button class="panel-stat-cell" @click="$emit('selectTab', 'albums')" title="Смотреть альбомы">
+            <span class="panel-stat-num">{{ overviewAlbumsCount }}</span>
+            <span class="panel-stat-lbl">альбомов</span>
+          </button>
+          <div 
+            class="panel-stat-cell" 
+            :class="{ 'is-clickable': isSelf }"
+            @click="isSelf && $router.push('/friends')"
+            :title="isSelf ? 'Перейти к кентам' : ''"
+          >
+            <span class="panel-stat-num">{{ user.followers_count }}</span>
+            <span class="panel-stat-lbl">слушателей</span>
+          </div>
         </div>
       </div>
 
@@ -254,12 +263,28 @@
           <Folder :size="13" class="panel-header-icon" />
           <span class="panel-header-title">Плейлисты</span>
         </div>
-        <div class="panel-highlight-row">
-          <span class="panel-big-num">{{ user.playlist_count }}</span>
-          <span class="panel-big-lbl">{{ getPlaylistsWord(user.playlist_count) }} профиля</span>
-        </div>
-        <div class="panel-sub-desc">
-          <span>Персональные и публичные подборки треков</span>
+        <div class="panel-stats-grid">
+          <button class="panel-stat-cell active-metric" title="Плейлисты профиля">
+            <span class="panel-stat-num">{{ user.playlist_count }}</span>
+            <span class="panel-stat-lbl">подборок</span>
+          </button>
+          <button class="panel-stat-cell" @click="$emit('selectTab', 'tracks')" title="Смотреть треки">
+            <span class="panel-stat-num">{{ user.track_count }}</span>
+            <span class="panel-stat-lbl">{{ getTracksWord(user.track_count) }}</span>
+          </button>
+          <button class="panel-stat-cell" @click="$emit('selectTab', 'albums')" title="Смотреть альбомы">
+            <span class="panel-stat-num">{{ overviewAlbumsCount }}</span>
+            <span class="panel-stat-lbl">альбомов</span>
+          </button>
+          <div 
+            class="panel-stat-cell" 
+            :class="{ 'is-clickable': isSelf }"
+            @click="isSelf && $router.push('/friends')"
+            :title="isSelf ? 'Перейти к кентам' : ''"
+          >
+            <span class="panel-stat-num">{{ user.followers_count }}</span>
+            <span class="panel-stat-lbl">подписчиков</span>
+          </div>
         </div>
       </div>
 
@@ -269,12 +294,28 @@
           <Disc3 :size="13" class="panel-header-icon" />
           <span class="panel-header-title">Альбомы</span>
         </div>
-        <div class="panel-highlight-row">
-          <span class="panel-big-num">{{ overviewAlbumsCount }}</span>
-          <span class="panel-big-lbl">сохраненных релизов</span>
-        </div>
-        <div class="panel-sub-desc">
-          <span>Дискография и релизы исполнителей</span>
+        <div class="panel-stats-grid">
+          <button class="panel-stat-cell active-metric" title="Сохраненные альбомы">
+            <span class="panel-stat-num">{{ overviewAlbumsCount }}</span>
+            <span class="panel-stat-lbl">сохранено</span>
+          </button>
+          <button class="panel-stat-cell" @click="$emit('selectTab', 'tracks')" title="Смотреть треки">
+            <span class="panel-stat-num">{{ user.track_count }}</span>
+            <span class="panel-stat-lbl">{{ getTracksWord(user.track_count) }}</span>
+          </button>
+          <button class="panel-stat-cell" @click="$emit('selectTab', 'playlists')" title="Смотреть плейлисты">
+            <span class="panel-stat-num">{{ user.playlist_count }}</span>
+            <span class="panel-stat-lbl">{{ getPlaylistsWord(user.playlist_count) }}</span>
+          </button>
+          <div 
+            class="panel-stat-cell" 
+            :class="{ 'is-clickable': isSelf }"
+            @click="isSelf && $router.push('/friends')"
+            :title="isSelf ? 'Перейти к кентам' : ''"
+          >
+            <span class="panel-stat-num">{{ user.followers_count }}</span>
+            <span class="panel-stat-lbl">подписчиков</span>
+          </div>
         </div>
       </div>
 
@@ -284,25 +325,35 @@
           <span class="sc-badge-inline">SC</span>
           <span class="panel-header-title">SoundCloud</span>
         </div>
-        <div class="panel-highlight-row" v-if="scAccount">
-          <span class="panel-sc-user">@{{ scAccount.username }}</span>
+        <div class="panel-stats-grid">
+          <div class="panel-stat-cell active-metric sc-metric" title="Треков в SoundCloud">
+            <span class="panel-stat-num">{{ scTracksCount }}</span>
+            <span class="panel-stat-lbl">треков SC</span>
+          </div>
+          <div class="panel-stat-cell active-metric sc-metric" title="Плейлистов в SoundCloud">
+            <span class="panel-stat-num">{{ scPlaylistsCount }}</span>
+            <span class="panel-stat-lbl">плейлистов</span>
+          </div>
+          <div class="panel-stat-cell" title="Лайков в SoundCloud">
+            <span class="panel-stat-num">{{ (scAccount && scAccount.likes_count) || 0 }}</span>
+            <span class="panel-stat-lbl">лайков</span>
+          </div>
+          <a 
+            v-if="scAccount" 
+            :href="getSoundCloudUrl(scAccount)" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            class="panel-stat-cell panel-stat-link"
+            title="Открыть профиль SoundCloud"
+          >
+            <span class="panel-stat-num link-text">В SC ↗</span>
+            <span class="panel-stat-lbl">@{{ scAccount.username }}</span>
+          </a>
+          <div v-else class="panel-stat-cell">
+            <span class="panel-stat-num">—</span>
+            <span class="panel-stat-lbl">профиль</span>
+          </div>
         </div>
-        <div class="panel-sc-counts">
-          <span>{{ scTracksCount }} треков</span>
-          <span class="stat-separator">•</span>
-          <span>{{ scPlaylistsCount }} плейлистов</span>
-        </div>
-        <a 
-          v-if="scAccount" 
-          :href="getSoundCloudUrl(scAccount)" 
-          target="_blank" 
-          rel="noopener noreferrer" 
-          class="panel-sc-link-btn"
-          title="Открыть профиль SoundCloud"
-        >
-          <span>В SoundCloud</span>
-          <ExternalLink :size="11" />
-        </a>
       </div>
     </aside>
   </div>
@@ -919,7 +970,7 @@ const getSpotifyUrl = (acc) => {
 
 .panel-stat-cell {
   background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: var(--r-sm, 8px);
   padding: 5px 8px;
   display: flex;
@@ -929,12 +980,50 @@ const getSpotifyUrl = (acc) => {
   cursor: pointer;
   color: inherit;
   transition: all 0.15s ease;
+  text-decoration: none;
+  font-family: inherit;
+  box-sizing: border-box;
 }
 
 .panel-stat-cell:hover {
   background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.14);
   transform: translateY(-1px);
+}
+
+.panel-stat-cell.active-metric {
+  background: rgba(29, 185, 84, 0.08);
+  border-color: rgba(29, 185, 84, 0.24);
+}
+
+.panel-stat-cell.active-metric .panel-stat-num {
+  color: var(--c-accent-light, #1ed760);
+}
+
+.panel-stat-cell.sc-metric {
+  background: rgba(255, 85, 0, 0.08);
+  border-color: rgba(255, 85, 0, 0.24);
+}
+
+.panel-stat-cell.sc-metric .panel-stat-num {
+  color: #ff7733;
+}
+
+.panel-stat-cell .link-text {
+  color: #ff7733;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+div.panel-stat-cell:not(.is-clickable) {
+  cursor: default;
+}
+
+div.panel-stat-cell:not(.is-clickable):hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.05);
+  transform: none;
 }
 
 .panel-stat-num {
@@ -949,120 +1038,20 @@ const getSpotifyUrl = (acc) => {
   font-size: 10.5px;
   color: var(--c-text-3, #888);
   margin-top: 1px;
-}
-
-.panel-highlight-row {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.panel-big-num {
-  font-size: 26px;
-  font-weight: 800;
-  color: var(--c-text-1, #fff);
-  line-height: 1.1;
-  font-variant-numeric: tabular-nums;
-}
-
-.panel-big-lbl {
-  font-size: 12.5px;
-  color: var(--c-text-2, #aaa);
-}
-
-.panel-quick-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.panel-action-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 30px;
-  padding: 0 12px;
-  border-radius: var(--r-full, 9999px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--c-text-1, #fff);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.panel-action-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-1px);
-}
-
-.panel-action-btn.primary {
-  background: var(--c-accent, #1db954);
-  color: #000;
-  border-color: var(--c-accent, #1db954);
-  font-weight: 700;
-}
-
-.panel-action-btn.primary:hover {
-  background: var(--c-accent-light, #1ed760);
-  box-shadow: 0 2px 10px var(--c-accent-glow, rgba(29, 185, 84, 0.4));
-}
-
-.panel-sub-desc {
-  font-size: 12px;
-  color: var(--c-text-3, #777);
-  margin-top: 6px;
-  line-height: 1.35;
-}
-
-.panel-sc-user {
-  font-size: 15px;
-  font-weight: 700;
-  color: #ff5500;
-}
-
-.panel-sc-counts {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--c-text-2, #aaa);
-  margin-top: 4px;
-}
-
-.panel-sc-link-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 12px;
-  border-radius: var(--r-full, 9999px);
-  background: #ff5500;
-  color: #fff;
-  font-size: 11.5px;
-  font-weight: 700;
-  text-decoration: none;
-  margin-top: 10px;
-  transition: all 0.15s ease;
-  width: fit-content;
-}
-
-.panel-sc-link-btn:hover {
-  opacity: 0.92;
-  transform: translateY(-1px);
-  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 /* ═══════════════════════════════════════════════════════════
-   RESPONSIVE LAYOUT (Container Query + Media Query Fallback)
+   RESPONSIVE LAYOUT
+   1. Media Queries (Standard Fallback)
+   2. Container Queries (Takes precedence in modern browsers)
    ═══════════════════════════════════════════════════════════ */
 
-/* ─── TIER 1: Medium Width (Right sidebar open or window < 1200px) ─── */
-@container userprofile (max-width: 980px) {
+/* ─── 1. MEDIA QUERY FALLBACKS ─── */
+@media (max-width: 1200px) and (min-width: 769px) {
   .profile-hero-card {
     display: grid;
     grid-template-columns: 205px 1fr;
@@ -1090,6 +1079,23 @@ const getSpotifyUrl = (acc) => {
     gap: 0;
   }
 
+  .monolith-tab-btn {
+    padding: 0 12px 0 10px !important;
+    justify-content: flex-start !important;
+  }
+
+  .tab-edge-divider {
+    display: block !important;
+  }
+
+  .tab-edge-label {
+    display: block !important;
+  }
+
+  .tab-edge-badge {
+    display: inline-flex !important;
+  }
+
   .hero-body {
     grid-area: body;
     min-width: 0;
@@ -1099,17 +1105,10 @@ const getSpotifyUrl = (acc) => {
     gap: 8px;
   }
 
-  .hero-meta-top,
-  .hero-subline,
-  .hero-actions-bar {
-    justify-content: flex-start;
-  }
-
   .hero-name {
     font-size: 26px;
   }
 
-  /* Seamless bottom details overlay */
   .hero-tab-details-panel {
     grid-area: details;
     width: 100% !important;
@@ -1140,10 +1139,6 @@ const getSpotifyUrl = (acc) => {
     width: 100%;
   }
 
-  .hero-tab-details-panel .panel-header {
-    margin-bottom: 6px;
-  }
-
   .hero-tab-details-panel .panel-stats-grid {
     grid-template-columns: repeat(4, 1fr) !important;
     gap: 8px;
@@ -1162,63 +1157,37 @@ const getSpotifyUrl = (acc) => {
   .hero-tab-details-panel .panel-stat-lbl {
     font-size: 10.5px;
   }
-
-  .hero-tab-details-panel .panel-highlight-row {
-    flex-direction: row;
-    align-items: baseline;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  .hero-tab-details-panel .panel-big-num {
-    font-size: 22px;
-  }
-
-  .hero-tab-details-panel .panel-big-lbl {
-    font-size: 13px;
-  }
-
-  .hero-tab-details-panel .panel-sub-desc {
-    margin-top: 3px;
-    font-size: 12px;
-  }
-
-  .hero-tab-details-panel .panel-quick-actions {
-    margin-top: 6px;
-    gap: 6px;
-  }
-
-  .hero-tab-details-panel .panel-action-btn {
-    height: 26px;
-    padding: 0 10px;
-    font-size: 11.5px;
-  }
-
-  .hero-tab-details-panel .tab-panel-sc .panel-sc-counts {
-    margin-top: 2px;
-  }
-
-  .hero-tab-details-panel .panel-sc-link-btn {
-    align-self: flex-start;
-    height: 26px;
-    padding: 0 10px;
-    font-size: 11px;
-    margin-top: 4px;
-  }
 }
 
-/* ─── TIER 2: Mobile / Compact (< 720px) ─── */
-@container userprofile (max-width: 720px) {
+@media (max-width: 768px) {
   .profile-hero-card {
-    grid-template-columns: 48px 1fr;
+    display: grid;
+    grid-template-columns: 48px 1fr !important;
+    grid-template-areas:
+      "tabs body"
+      "details details";
+    gap: 0;
+    padding: 0;
+    align-items: stretch;
   }
 
   .hero-monolith-tabs {
+    grid-area: tabs;
     width: 48px !important;
     min-width: 48px !important;
     max-width: 48px !important;
     flex: 0 0 48px !important;
+    height: 100%;
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
     justify-content: flex-start;
+    border-radius: var(--r-xl, 24px) 0 0 0;
+    border: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: none;
+    padding: 0;
+    gap: 0;
     overflow: hidden;
   }
 
@@ -1229,8 +1198,8 @@ const getSpotifyUrl = (acc) => {
     min-height: 42px !important;
     max-height: 42px !important;
     padding: 0 !important;
-    justify-content: center;
-    align-items: center;
+    justify-content: center !important;
+    align-items: center !important;
     border-radius: 0;
     border: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
@@ -1266,298 +1235,6 @@ const getSpotifyUrl = (acc) => {
   }
 
   .hero-body {
-    padding: 16px 44px 16px 14px;
-    gap: 8px;
-  }
-
-  .hero-name {
-    font-size: 24px;
-  }
-
-  .hero-tab-details-panel {
-    padding: 12px 16px;
-  }
-
-  .hero-tab-details-panel .panel-stats-grid {
-    gap: 6px;
-  }
-
-  .hero-tab-details-panel .panel-stat-cell {
-    padding: 4px 6px;
-  }
-
-  .hero-tab-details-panel .panel-stat-num {
-    font-size: 14px;
-  }
-
-  .hero-tab-details-panel .panel-stat-lbl {
-    font-size: 10px;
-  }
-}
-
-/* ─── TIER 3: Extra Small Mobile (< 480px) ─── */
-@container userprofile (max-width: 480px) {
-  .profile-hero-card {
-    grid-template-columns: 44px 1fr;
-  }
-
-  .hero-monolith-tabs {
-    width: 44px !important;
-    min-width: 44px !important;
-    max-width: 44px !important;
-    flex: 0 0 44px !important;
-  }
-
-  .monolith-tab-btn {
-    flex: 0 0 40px !important;
-    height: 40px !important;
-    min-height: 40px !important;
-    max-height: 40px !important;
-  }
-
-  .hero-name {
-    font-size: 22px;
-  }
-
-  .hero-body {
-    padding: 14px 40px 14px 10px;
-    gap: 6px;
-  }
-
-  .hero-tab-details-panel {
-    padding: 10px 12px;
-    min-height: 80px;
-  }
-
-  .hero-tab-details-panel .panel-stats-grid {
-    gap: 4px;
-  }
-
-  .hero-tab-details-panel .panel-stat-cell {
-    padding: 3px 4px;
-  }
-
-  .hero-tab-details-panel .panel-stat-num {
-    font-size: 13px;
-  }
-
-  .hero-tab-details-panel .panel-stat-lbl {
-    font-size: 9.5px;
-  }
-}
-
-/* ═══════════════════════════════════════════════════════════
-   MEDIA QUERY FALLBACKS (for browsers or contexts without CQ)
-   ═══════════════════════════════════════════════════════════ */
-@media (max-width: 1200px) and (min-width: 769px) {
-  .profile-hero-card {
-    display: grid;
-    grid-template-columns: 205px 1fr;
-    grid-template-areas:
-      "tabs body"
-      "details details";
-    gap: 0;
-    padding: 0;
-    align-items: stretch;
-  }
-
-  .hero-monolith-tabs {
-    grid-area: tabs;
-    width: 205px !important;
-    min-width: 205px !important;
-    max-width: 205px !important;
-    flex: 0 0 205px !important;
-    height: 100%;
-    align-self: stretch;
-    border-radius: var(--r-xl, 24px) 0 0 0;
-    border: none;
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
-    border-bottom: none;
-    padding: 0;
-    gap: 0;
-  }
-
-  .hero-body {
-    grid-area: body;
-    min-width: 0;
-    align-items: flex-start;
-    text-align: left;
-    padding: 20px 48px 20px 20px;
-    gap: 8px;
-  }
-
-  .hero-name {
-    font-size: 26px;
-  }
-
-  .hero-tab-details-panel {
-    grid-area: details;
-    width: 100% !important;
-    min-width: 0 !important;
-    max-width: 100% !important;
-    flex: none !important;
-    margin: 0;
-    border: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 0 0 var(--r-xl, 24px) var(--r-xl, 24px);
-    background: linear-gradient(180deg, rgba(14, 14, 18, 0.82) 0%, rgba(10, 10, 14, 0.94) 100%);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    box-shadow: none;
-    padding: 12px 20px;
-    align-self: stretch;
-    min-height: 84px;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-  }
-
-  .hero-tab-details-panel .tab-panel-inner {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    width: 100%;
-  }
-
-  .hero-tab-details-panel .panel-stats-grid {
-    grid-template-columns: repeat(4, 1fr) !important;
-    gap: 8px;
-  }
-
-  .hero-tab-details-panel .panel-stat-cell {
-    padding: 4px 8px;
-    align-items: center;
-    text-align: center;
-  }
-
-  .hero-tab-details-panel .panel-stat-num {
-    font-size: 15px;
-  }
-
-  .hero-tab-details-panel .panel-stat-lbl {
-    font-size: 10.5px;
-  }
-
-  .hero-tab-details-panel .panel-highlight-row {
-    flex-direction: row;
-    align-items: baseline;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  .hero-tab-details-panel .panel-big-num {
-    font-size: 22px;
-  }
-
-  .hero-tab-details-panel .panel-big-lbl {
-    font-size: 13px;
-  }
-
-  .hero-tab-details-panel .panel-sub-desc {
-    margin-top: 3px;
-    font-size: 12px;
-  }
-
-  .hero-tab-details-panel .panel-quick-actions {
-    margin-top: 6px;
-    gap: 6px;
-  }
-
-  .hero-tab-details-panel .panel-action-btn {
-    height: 26px;
-    padding: 0 10px;
-    font-size: 11.5px;
-  }
-
-  .hero-tab-details-panel .tab-panel-sc .panel-sc-counts {
-    margin-top: 2px;
-  }
-
-  .hero-tab-details-panel .panel-sc-link-btn {
-    align-self: flex-start;
-    height: 26px;
-    padding: 0 10px;
-    font-size: 11px;
-    margin-top: 4px;
-  }
-}
-
-@media (max-width: 768px) {
-  .profile-hero-card {
-    display: grid;
-    grid-template-columns: 48px 1fr;
-    grid-template-areas:
-      "tabs body"
-      "details details";
-    gap: 0;
-    padding: 0;
-    align-items: stretch;
-  }
-
-  .hero-monolith-tabs {
-    grid-area: tabs;
-    width: 48px !important;
-    min-width: 48px !important;
-    max-width: 48px !important;
-    flex: 0 0 48px !important;
-    height: 100%;
-    align-self: stretch;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    border-radius: var(--r-xl, 24px) 0 0 0;
-    border: none;
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
-    border-bottom: none;
-    padding: 0;
-    gap: 0;
-    overflow: hidden;
-  }
-
-  .monolith-tab-btn {
-    flex: 0 0 42px !important;
-    width: 100% !important;
-    height: 42px !important;
-    min-height: 42px !important;
-    max-height: 42px !important;
-    padding: 0 !important;
-    justify-content: center;
-    align-items: center;
-    border-radius: 0;
-    border: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    border-left: 3.5px solid transparent;
-    box-sizing: border-box;
-  }
-
-  .monolith-tab-btn.active {
-    border-left: 3.5px solid var(--c-accent, #1db954);
-    background: linear-gradient(90deg, rgba(29, 185, 84, 0.2) 0%, rgba(24, 24, 30, 0.8) 100%);
-  }
-
-  .monolith-tab-btn.sc-tab.active {
-    border-left-color: #ff5500;
-    background: linear-gradient(90deg, rgba(255, 85, 0, 0.22) 0%, rgba(28, 22, 22, 0.8) 100%);
-  }
-
-  .tab-edge-divider,
-  .tab-edge-label,
-  .tab-edge-badge {
-    display: none !important;
-  }
-
-  .tab-edge-icon {
-    width: 20px;
-    height: 20px;
-    margin: 0;
-  }
-
-  .hero-body {
-    grid-area: body;
-    min-width: 0;
-    align-items: flex-start;
-    text-align: left;
     padding: 16px 44px 16px 14px;
     gap: 8px;
   }
@@ -1618,7 +1295,7 @@ const getSpotifyUrl = (acc) => {
 
 @media (max-width: 480px) {
   .profile-hero-card {
-    grid-template-columns: 44px 1fr;
+    grid-template-columns: 44px 1fr !important;
   }
 
   .hero-monolith-tabs {
@@ -1633,7 +1310,6 @@ const getSpotifyUrl = (acc) => {
     height: 40px !important;
     min-height: 40px !important;
     max-height: 40px !important;
-    border-radius: 0;
   }
 
   .hero-name {
@@ -1652,6 +1328,251 @@ const getSpotifyUrl = (acc) => {
 
   .hero-tab-details-panel .panel-stats-grid {
     grid-template-columns: repeat(4, 1fr) !important;
+    gap: 4px;
+  }
+
+  .hero-tab-details-panel .panel-stat-cell {
+    padding: 3px 4px;
+  }
+
+  .hero-tab-details-panel .panel-stat-num {
+    font-size: 13px;
+  }
+
+  .hero-tab-details-panel .panel-stat-lbl {
+    font-size: 9.5px;
+  }
+}
+
+/* ─── 2. CONTAINER QUERIES (Takes precedence in modern browsers) ─── */
+/* Tier 1: Medium width (980px down to 701px) - 2 rows, full 205px tabs with visible text */
+@container userprofile (max-width: 980px) {
+  .profile-hero-card {
+    display: grid;
+    grid-template-columns: 205px 1fr !important;
+    grid-template-areas:
+      "tabs body"
+      "details details";
+    gap: 0;
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .hero-monolith-tabs {
+    grid-area: tabs;
+    width: 205px !important;
+    min-width: 205px !important;
+    max-width: 205px !important;
+    flex: 0 0 205px !important;
+    height: 100%;
+    align-self: stretch;
+    border-radius: var(--r-xl, 24px) 0 0 0;
+    border: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: none;
+    padding: 0;
+    gap: 0;
+  }
+
+  .monolith-tab-btn {
+    flex: 1 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 40px !important;
+    max-height: none !important;
+    padding: 0 12px 0 10px !important;
+    justify-content: flex-start !important;
+  }
+
+  .tab-edge-divider {
+    display: block !important;
+  }
+
+  .tab-edge-label {
+    display: block !important;
+  }
+
+  .tab-edge-badge {
+    display: inline-flex !important;
+  }
+
+  .hero-body {
+    grid-area: body;
+    min-width: 0;
+    align-items: flex-start;
+    text-align: left;
+    padding: 20px 48px 20px 20px;
+    gap: 8px;
+  }
+
+  .hero-meta-top,
+  .hero-subline,
+  .hero-actions-bar {
+    justify-content: flex-start;
+  }
+
+  .hero-name {
+    font-size: 26px;
+  }
+
+  .hero-tab-details-panel {
+    grid-area: details;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    flex: none !important;
+    margin: 0;
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0 0 var(--r-xl, 24px) var(--r-xl, 24px);
+    background: linear-gradient(180deg, rgba(14, 14, 18, 0.82) 0%, rgba(10, 10, 14, 0.94) 100%);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: none;
+    padding: 12px 20px;
+    align-self: stretch;
+    min-height: 84px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .hero-tab-details-panel .tab-panel-inner {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .hero-tab-details-panel .panel-stats-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 8px;
+  }
+
+  .hero-tab-details-panel .panel-stat-cell {
+    padding: 4px 8px;
+    align-items: center;
+    text-align: center;
+  }
+
+  .hero-tab-details-panel .panel-stat-num {
+    font-size: 15px;
+  }
+
+  .hero-tab-details-panel .panel-stat-lbl {
+    font-size: 10.5px;
+  }
+}
+
+/* Tier 2: Compact / Mobile (<= 700px) - EXACT SAME THRESHOLD FOR WIDTH & TEXT HIDING */
+@container userprofile (max-width: 700px) {
+  .profile-hero-card {
+    grid-template-columns: 48px 1fr !important;
+  }
+
+  .hero-monolith-tabs {
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    flex: 0 0 48px !important;
+    justify-content: flex-start;
+    overflow: hidden;
+  }
+
+  .monolith-tab-btn {
+    flex: 0 0 42px !important;
+    width: 100% !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
+    padding: 0 !important;
+    justify-content: center !important;
+    align-items: center !important;
+    border-radius: 0;
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-left: 3.5px solid transparent;
+    box-sizing: border-box;
+  }
+
+  .tab-edge-divider,
+  .tab-edge-label,
+  .tab-edge-badge {
+    display: none !important;
+  }
+
+  .tab-edge-icon {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+  }
+
+  .hero-body {
+    padding: 16px 44px 16px 14px;
+    gap: 8px;
+  }
+
+  .hero-name {
+    font-size: 24px;
+  }
+
+  .hero-tab-details-panel {
+    padding: 12px 16px;
+  }
+
+  .hero-tab-details-panel .panel-stats-grid {
+    gap: 6px;
+  }
+
+  .hero-tab-details-panel .panel-stat-cell {
+    padding: 4px 6px;
+  }
+
+  .hero-tab-details-panel .panel-stat-num {
+    font-size: 14px;
+  }
+
+  .hero-tab-details-panel .panel-stat-lbl {
+    font-size: 10px;
+  }
+}
+
+/* Tier 3: Extra Small Mobile (<= 480px) */
+@container userprofile (max-width: 480px) {
+  .profile-hero-card {
+    grid-template-columns: 44px 1fr !important;
+  }
+
+  .hero-monolith-tabs {
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    flex: 0 0 44px !important;
+  }
+
+  .monolith-tab-btn {
+    flex: 0 0 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+  }
+
+  .hero-name {
+    font-size: 22px;
+  }
+
+  .hero-body {
+    padding: 14px 40px 14px 10px;
+    gap: 6px;
+  }
+
+  .hero-tab-details-panel {
+    padding: 10px 12px;
+    min-height: 80px;
+  }
+
+  .hero-tab-details-panel .panel-stats-grid {
     gap: 4px;
   }
 
