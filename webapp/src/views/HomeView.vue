@@ -139,7 +139,6 @@
       <div 
         class="horizontal-scroll"
         :ref="historyScroll.containerRef"
-        @wheel="historyScroll.onWheel"
       >
         <div 
           v-for="track in recentHistoryTracks" 
@@ -187,7 +186,13 @@
     <!-- Real Playlists Section -->
     <section v-else-if="allPlaylists.length > 0" class="home-section">
       <div class="section-header">
-        <h2 class="section-title">Ваши плейлисты</h2>
+        <h2 
+          class="section-title clickable" 
+          @click="goToLibraryPlaylists"
+          title="Перейти в плейлисты"
+        >
+          Ваши плейлисты
+        </h2>
         <div class="section-actions">
           <button class="section-link" @click="goToLibraryPlaylists">Все</button>
           <button 
@@ -213,7 +218,6 @@
       <div 
         class="horizontal-scroll"
         :ref="playlistsScroll.containerRef"
-        @wheel="playlistsScroll.onWheel"
       >
         <div 
           v-for="pl in allPlaylists.slice(0, 10)" 
@@ -289,7 +293,6 @@
       <div 
         class="horizontal-scroll"
         :ref="uploadsScroll.containerRef"
-        @wheel="uploadsScroll.onWheel"
       >
         <div 
           v-for="track in recentUploads.slice(0, 12)" 
@@ -733,6 +736,16 @@ onUnmounted(() => {
   font-weight: 700;
   color: var(--c-text-1, #fff);
   letter-spacing: -0.01em;
+}
+
+.section-title.clickable {
+  cursor: pointer;
+  transition: color 0.15s ease;
+  user-select: none;
+}
+
+.section-title.clickable:hover {
+  color: var(--c-accent, #1db954);
 }
 
 .section-actions {

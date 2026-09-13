@@ -106,7 +106,10 @@ export function useVirtualScroll(options = {}) {
   })
 
   const endRow = computed(() => {
-    return Math.min(totalRows.value, Math.ceil((scrollTop.value + viewportHeight.value) / effectiveRowHeight.value) + overscan)
+    const minVisibleRows = Math.ceil(viewportHeight.value / effectiveRowHeight.value)
+    const calculatedEnd = Math.ceil((scrollTop.value + viewportHeight.value) / effectiveRowHeight.value) + overscan
+    // Guarantee window is always at least minVisibleRows + overscan tall
+    return Math.min(totalRows.value, Math.max(startRow.value + minVisibleRows + overscan, calculatedEnd))
   })
 
   const startIndex = computed(() => startRow.value * colCount.value)
@@ -234,8 +237,7 @@ export function useVirtualScroll(options = {}) {
       const listTop = containerRect.top
       scrollTop.value = Math.max(0, -listTop)
     } else if (sc) {
-      // Bounded viewport: can never exceed browser window height
-      viewportHeight.value = Math.min(sc.clientHeight || window.innerHeight, window.innerHeight || 800)
+      viewportHeight.value = sc.clientHeight || window.innerHeight || 800
       const scRect = sc.getBoundingClientRect()
       const relativeTop = containerRect.top - scRect.top
       scrollTop.value = Math.max(0, -relativeTop)

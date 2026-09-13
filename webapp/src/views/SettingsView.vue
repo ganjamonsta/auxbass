@@ -278,7 +278,7 @@
     </section>
 
     <!-- 4. Profile & Privacy Section -->
-    <section class="settings-section">
+    <section id="profile" ref="profileSectionRef" class="settings-section">
       <div class="section-header">
         <h2>
           <User :size="18" />
@@ -494,7 +494,7 @@
     </section>
 
     <!-- 5. Library Stats -->
-    <section class="settings-section">
+    <section id="stats" class="settings-section">
       <div class="section-header">
         <h2>
           <Library :size="18" />
@@ -531,7 +531,7 @@
     </section>
 
     <!-- 7. Notification settings -->
-    <section class="settings-section">
+    <section id="notifications" class="settings-section">
       <div class="section-header">
         <h2>
           <Bell :size="18" />
@@ -558,7 +558,7 @@
     </section>
 
     <!-- 8. Interface Section -->
-    <section class="settings-section">
+    <section id="interface" class="settings-section">
       <div class="section-header">
         <h2>
           <Sliders :size="18" />
@@ -611,7 +611,7 @@
     </section>
 
     <!-- 9. Audio (Enhancer) Section -->
-    <section class="settings-section">
+    <section id="playback" class="settings-section">
       <div class="section-header">
         <h2>
           <Headphones :size="18" />
@@ -692,7 +692,7 @@
     </section>
 
     <!-- 10. App (PWA) Section -->
-    <section class="settings-section">
+    <section id="storage" class="settings-section">
       <div class="section-header">
         <h2>
           <Smartphone :size="18" />
@@ -723,7 +723,7 @@
     </section>
 
     <!-- 11. Cache & Storage Section -->
-    <section class="settings-section">
+    <section id="cache" class="settings-section">
       <div class="section-header">
         <h2>
           <HardDrive :size="18" />
@@ -820,7 +820,7 @@
     </section>
 
     <!-- 12. About Section -->
-    <section class="settings-section about-section">
+    <section id="about" class="settings-section about-section">
       <div class="settings-card about-card">
         <h3 class="about-title">{{ authStore.appName }} <span class="about-ver">v2.0</span></h3>
         <p class="about-desc">Музыкальный плеер с хранением и стримингом в Telegram</p>
@@ -1254,38 +1254,141 @@ onMounted(() => {
         const el = document.getElementById(target)
         if (el) {
           el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-          el.classList.add('section-highlight')
-          setTimeout(() => el.classList.remove('section-highlight'), 2200)
+          if (target !== 'profile') {
+            el.classList.add('section-highlight')
+            setTimeout(() => el.classList.remove('section-highlight'), 2200)
+          }
         }
       }, 150)
     } else {
-      window.scrollTo({ top: 0, behavior: 'instant' })
+      const container = detectedScrollContainer || findScrollContainer(document.querySelector('.settings-view'))
+      if (container && container !== window) {
+        container.scrollTo({ top: 0, behavior: 'instant' })
+      } else {
+        window.scrollTo({ top: 0, behavior: 'instant' })
+      }
     }
   }
 
   scrollToTargetSection()
   
   window.addEventListener('cache-updated', refreshCacheStats)
-  
-  // Слушаем событие сброса состояния
   window.addEventListener('reset-view-state', handleResetState)
+
+  nextTick(() => {
+    checkSectionFromHash()
+    const targetEl = profileSectionRef.value || document.getElementById('profile') || document.querySelector('.settings-view')
+    detectedScrollContainer = findScrollContainer(targetEl)
+    if (detectedScrollContainer && detectedScrollContainer !== window) {
+      detectedScrollContainer.addEventListener('scroll', onScroll, { passive: true })
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll, { passive: true })
+
+    setTimeout(() => {
+      updateActiveSectionOnScroll()
+    }, 200)
+  })
 })
 
+const profileSectionRef = ref(null)
+let detectedScrollContainer = null
+let scrollTicking = false
+
+const findScrollContainer = (el) => {
+  let parent = el?.parentElement
+  while (parent) {
+    const style = window.getComputedStyle(parent)
+    if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+      return parent
+    }
+    parent = parent.parentElement
+  }
+  return window
+}
+
+const checkSectionFromHash = () => {
+  const hash = route.hash ? route.hash.replace('#', '') : (route.query.section || '')
+  if (['profile', 'stats', 'notifications', 'interface', 'playback', 'storage', 'cache', 'about'].includes(hash)) {
+    uiStore.setSettingsSection('settings')
+  } else if (['channel', 'soundcloud', 'import'].includes(hash)) {
+    uiStore.setSettingsSection('import')
+  }
+}
+
+const updateActiveSectionOnScroll = () => {
+  const profileEl = profileSectionRef.value || document.getElementById('profile')
+  if (!profileEl) return
+
+  if (!detectedScrollContainer) {
+    detectedScrollContainer = findScrollContainer(profileEl)
+  }
+
+  const isWindow = detectedScrollContainer === window || !detectedScrollContainer
+  const containerTop = isWindow ? 0 : detectedScrollContainer.getBoundingClientRect().top
+  const containerHeight = isWindow ? window.innerHeight : detectedScrollContainer.clientHeight
+  const currentScrollTop = isWindow 
+    ? (window.scrollY || document.documentElement.scrollTop) 
+    : detectedScrollContainer.scrollTop
+
+  // If near the very top of the page, import/integrations section is always active
+  if (currentScrollTop < 60) {
+    uiStore.setSettingsSection('import')
+    return
+  }
+
+  const profileRect = profileEl.getBoundingClientRect()
+  const profileTopRelativeToContainer = profileRect.top - containerTop
+
+  // Threshold: when profile section reaches the upper portion of the viewport (<= 220px from container top or 35% of container height)
+  const threshold = Math.min(220, containerHeight * 0.35)
+
+  if (profileTopRelativeToContainer <= threshold) {
+    uiStore.setSettingsSection('settings')
+  } else {
+    uiStore.setSettingsSection('import')
+  }
+}
+
+const onScroll = () => {
+  if (!scrollTicking) {
+    requestAnimationFrame(() => {
+      updateActiveSectionOnScroll()
+      scrollTicking = false
+    })
+    scrollTicking = true
+  }
+}
+
 watch([() => route.hash, () => route.query.section], () => {
+  checkSectionFromHash()
   const target = route.query.section || (route.hash ? route.hash.replace('#', '') : null)
   if (target) {
     const el = document.getElementById(target)
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      el.classList.add('section-highlight')
-      setTimeout(() => el.classList.remove('section-highlight'), 2200)
+      if (target !== 'profile') {
+        el.classList.add('section-highlight')
+        setTimeout(() => el.classList.remove('section-highlight'), 2200)
+      }
     }
   } else {
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    const container = detectedScrollContainer || findScrollContainer(document.querySelector('.settings-view'))
+    if (container && container !== window) {
+      container.scrollTo({ top: 0, behavior: 'smooth' })
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
   }
+  setTimeout(updateActiveSectionOnScroll, 300)
 })
 
 onUnmounted(() => {
+  if (detectedScrollContainer && detectedScrollContainer !== window) {
+    detectedScrollContainer.removeEventListener('scroll', onScroll)
+  }
+  window.removeEventListener('scroll', onScroll)
+  window.removeEventListener('resize', onScroll)
   window.removeEventListener('cache-updated', refreshCacheStats)
   window.removeEventListener('reset-view-state', handleResetState)
 })
@@ -1293,8 +1396,13 @@ onUnmounted(() => {
 // Обработчик сброса состояния
 const handleResetState = (event) => {
   if (event.detail.route === '/settings') {
-    // Прокручиваем наверх
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    const container = detectedScrollContainer || findScrollContainer(document.querySelector('.settings-view'))
+    if (container && container !== window) {
+      container.scrollTo({ top: 0, behavior: 'smooth' })
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+    uiStore.setSettingsSection('import')
   }
 }
 </script>

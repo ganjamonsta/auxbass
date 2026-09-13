@@ -99,9 +99,21 @@ export const useUIStore = defineStore('ui', () => {
     }
   }
 
+  // Settings view active section: 'import' or 'settings'
+  const settingsSection = ref('import')
+
+  const setSettingsSection = (section) => {
+    if (settingsSection.value !== section) {
+      settingsSection.value = section
+    }
+  }
+
   return {
     libraryTab,
     setLibraryTab,
+    // Settings view active section
+    settingsSection,
+    setSettingsSection,
     // Left Sidebar state
     isSidebarCollapsed,
     isAutoCollapsed,

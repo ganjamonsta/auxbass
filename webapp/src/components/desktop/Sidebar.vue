@@ -86,10 +86,11 @@
         </router-link>
 
         <router-link 
-          to="/settings" 
+          to="/settings#import" 
           class="rail-nav-item import-rail-item" 
-          :class="{ active: route.path === '/settings' }"
-          title="Импорт и настройки"
+          :class="{ active: isImportActive }"
+          @click="handleImportClick"
+          title="Импорт"
         >
           <Upload :size="20" />
           <div class="rail-active-indicator"></div>
@@ -132,8 +133,15 @@
           <template v-else>{{ userInitials }}</template>
           <div v-if="tasksStore.hasActiveImports" class="rail-import-ring"></div>
         </div>
-        <router-link to="/settings" class="rail-footer-btn" title="Настройки">
+        <router-link 
+          to="/settings#profile" 
+          class="rail-footer-btn" 
+          :class="{ active: isSettingsActive }"
+          @click="handleSettingsClick"
+          title="Настройки"
+        >
           <Settings :size="18" />
+          <div class="rail-active-indicator"></div>
         </router-link>
         <button class="rail-footer-btn logout-btn" @click="logout" title="Выйти">
           <LogOut :size="18" />
@@ -279,10 +287,11 @@
 
         <!-- Import Section link -->
         <router-link 
-          to="/settings" 
+          to="/settings#import" 
           class="nav-item import-highlight-item" 
-          :class="{ active: route.path === '/settings' }"
-          title="Импорт и настройки"
+          :class="{ active: isImportActive }"
+          @click="handleImportClick"
+          title="Импорт"
         >
           <Upload :size="20" class="import-icon" />
           <span>Импорт</span>
@@ -360,7 +369,13 @@
         >
           <Download :size="20" />
         </button>
-        <router-link to="/settings" class="footer-btn settings-btn" title="Настройки">
+        <router-link 
+          to="/settings#profile" 
+          class="footer-btn settings-btn" 
+          :class="{ active: isSettingsActive }"
+          @click="handleSettingsClick"
+          title="Настройки"
+        >
           <Settings :size="18" />
         </router-link>
         <button class="footer-btn logout-btn" @click="logout" title="Выйти">
@@ -488,6 +503,41 @@ const isActive = (path) => {
 
 const isActiveExact = (path) => {
   return route.path === path
+}
+
+// Settings vs Import active section matching
+const isImportActive = computed(() => {
+  return route.path === '/settings' && uiStore.settingsSection === 'import'
+})
+
+const isSettingsActive = computed(() => {
+  return route.path === '/settings' && uiStore.settingsSection === 'settings'
+})
+
+const handleImportClick = (e) => {
+  if (route.path === '/settings') {
+    e.preventDefault()
+    const el = document.getElementById('import') || document.querySelector('.settings-view')
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    if (route.hash !== '#import') {
+      router.replace({ path: '/settings', hash: '#import' })
+    }
+  }
+}
+
+const handleSettingsClick = (e) => {
+  if (route.path === '/settings') {
+    e.preventDefault()
+    const el = document.getElementById('profile')
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    if (route.hash !== '#profile') {
+      router.replace({ path: '/settings', hash: '#profile' })
+    }
+  }
 }
 
 const logout = async () => {
@@ -827,6 +877,7 @@ onUnmounted(() => {
 }
 
 .rail-footer-btn {
+  position: relative;
   width: 36px;
   height: 36px;
   border-radius: 10px;
@@ -844,6 +895,31 @@ onUnmounted(() => {
 .rail-footer-btn:hover {
   color: #fff;
   background: rgba(255, 255, 255, 0.08);
+}
+
+.rail-footer-btn.active {
+  background: rgba(29, 185, 84, 0.14);
+  color: var(--c-accent, #1db954);
+}
+
+.rail-footer-btn.active svg {
+  color: var(--c-accent, #1db954);
+}
+
+.rail-footer-btn .rail-active-indicator {
+  position: absolute;
+  left: -12px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 4px 4px 0;
+  background: var(--c-accent, #1db954);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.rail-footer-btn.active .rail-active-indicator {
+  opacity: 1;
 }
 
 .rail-footer-btn.logout-btn:hover {
@@ -1383,6 +1459,11 @@ onUnmounted(() => {
 .settings-btn:hover {
   color: white;
   background: rgba(255, 255, 255, 0.1);
+}
+
+.settings-btn.active {
+  color: var(--c-accent, #1db954);
+  background: rgba(29, 185, 84, 0.15);
 }
 
 .logout-btn:hover {

@@ -183,6 +183,7 @@ const handleClick = (e) => {
   font-weight: 600;
   color: var(--c-text-1);
   font-size: 13px;
+  line-height: 16px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -190,6 +191,7 @@ const handleClick = (e) => {
 
 .album-artist {
   font-size: 11px;
+  line-height: 14px;
   color: var(--c-text-2);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -198,6 +200,10 @@ const handleClick = (e) => {
 
 .track-count {
   font-size: 11px;
+  line-height: 14px;
   color: var(--c-text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

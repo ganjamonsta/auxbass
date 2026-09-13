@@ -161,6 +161,7 @@ const handleClick = (e) => {
 .playlist-name {
   font-weight: 600;
   font-size: 14px;
+  line-height: 18px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -170,10 +171,14 @@ const handleClick = (e) => {
 
 .playlist-meta {
   font-size: 12px;
+  line-height: 15px;
   color: var(--c-text-2);
   display: flex;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .public-badge {

@@ -216,7 +216,7 @@
           <!-- Section 1: Playlists Grid -->
           <section v-if="overviewPlaylists.length > 0" class="profile-section">
             <div class="section-header">
-              <h2 class="section-title">Плейлисты</h2>
+              <h2 class="section-title clickable" @click="selectTab('playlists')" title="Перейти в плейлисты">Плейлисты</h2>
               <button class="section-link" @click="selectTab('playlists')">Все {{ user.playlist_count || overviewPlaylists.length }}</button>
             </div>
             <div class="overview-grid">
@@ -256,7 +256,7 @@
           <!-- Section 2: Albums Grid -->
           <section v-if="overviewAlbums.length > 0" class="profile-section">
             <div class="section-header">
-              <h2 class="section-title">Альбомы</h2>
+              <h2 class="section-title clickable" @click="selectTab('albums')" title="Перейти в альбомы">Альбомы</h2>
               <button class="section-link" @click="selectTab('albums')">Все {{ overviewAlbums.length }}</button>
             </div>
             <div class="overview-grid">
@@ -295,7 +295,7 @@
           <!-- Section 3: Popular / Top Tracks -->
           <section v-if="overviewTracks.length > 0" class="profile-section">
             <div class="section-header">
-              <h2 class="section-title">Треки</h2>
+              <h2 class="section-title clickable" @click="selectTab('tracks')" title="Перейти в треки">Треки</h2>
               <button class="section-link" @click="selectTab('tracks')">Все {{ user.track_count || overviewTracks.length }}</button>
             </div>
             <div class="profile-tracks-list">
@@ -1455,6 +1455,16 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.section-title.clickable {
+  cursor: pointer;
+  transition: color 0.15s ease;
+  user-select: none;
+}
+
+.section-title.clickable:hover {
+  color: var(--c-accent, #1db954);
 }
 
 .section-link {

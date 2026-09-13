@@ -115,6 +115,7 @@ const handleClick = (e) => {
   color: var(--c-text-1);
   font-weight: 600;
   font-size: 13px;
+  line-height: 16px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -124,6 +125,9 @@ const handleClick = (e) => {
 .artist-meta {
   color: var(--c-text-3);
   font-size: 11px;
-  line-height: 1.3;
+  line-height: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

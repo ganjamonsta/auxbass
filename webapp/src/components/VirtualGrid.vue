@@ -112,6 +112,7 @@ const getMinColWidth = (width, type) => {
     if (width >= 500) return 130
     return 110
   }
+  if (width >= 700) return 140
   return 130
 }
 
@@ -128,9 +129,12 @@ const calcRowHeight = (width, type) => {
   const gap = props.gap
   const colWidth = Math.max(80, (w - (cols - 1) * gap) / cols)
   if (type === 'artist') {
-    return colWidth + 38 // Round avatar + name
+    return colWidth + 40 // Round avatar + margin + name + meta
   }
-  return colWidth + 62 // Square cover + margin + name + artist/meta
+  if (type === 'album') {
+    return colWidth + 56 // Square cover + margin + name + artist + track-count
+  }
+  return colWidth + 45 // Playlist: Square cover + margin + name + meta
 }
 
 // Initialize virtual scroll engine
@@ -155,7 +159,7 @@ const {
   columns: (w) => calcColumns(w, props.type),
   itemHeight: (w) => calcRowHeight(w, props.type),
   gap: props.gap,
-  overscan: 2, // 2 rows above and below
+  overscan: 5, // 5 rows buffer above and below viewport (~1000-1200px)
   immediate: true
 })
 
@@ -226,7 +230,9 @@ defineExpose({
 }
 
 @media (min-width: 700px) {
-  .media-grid.type-artist {
+  .media-grid.type-artist,
+  .media-grid.type-album,
+  .media-grid.type-playlist {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   }
 }

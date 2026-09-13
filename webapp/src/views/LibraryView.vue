@@ -61,10 +61,39 @@
 
         <section v-else-if="allPlaylists.length > 0" class="library-section">
           <div class="section-header">
-            <h2 class="section-title">Плейлисты</h2>
-            <button class="section-link" @click="setTab('playlists')">Все {{ allPlaylists.length }}</button>
+            <h2 
+              class="section-title clickable" 
+              @click="setTab('playlists')"
+              title="Перейти в плейлисты"
+            >
+              Плейлисты
+            </h2>
+            <div class="section-actions">
+              <button class="section-link" @click="setTab('playlists')">Все {{ allPlaylists.length }}</button>
+              <button 
+                class="scroll-arrow-btn" 
+                :disabled="!playlistsScroll.canScrollLeft.value"
+                @click="playlistsScroll.scroll('left')"
+                title="Назад"
+                aria-label="Назад"
+              >
+                <ChevronLeft :size="16" />
+              </button>
+              <button 
+                class="scroll-arrow-btn" 
+                :disabled="!playlistsScroll.canScrollRight.value"
+                @click="playlistsScroll.scroll('right')"
+                title="Вперед"
+                aria-label="Вперед"
+              >
+                <ChevronRight :size="16" />
+              </button>
+            </div>
           </div>
-          <div class="horizontal-scroll">
+          <div 
+            class="horizontal-scroll"
+            :ref="playlistsScroll.containerRef"
+          >
             <div 
               v-for="pl in allPlaylists.slice(0, 10)" 
               :key="pl.id" 
@@ -112,10 +141,39 @@
 
         <section v-else-if="overviewAlbums.length > 0" class="library-section">
           <div class="section-header">
-            <h2 class="section-title">Альбомы</h2>
-            <button class="section-link" @click="setTab('albums')">Все {{ albumsTotal || overviewAlbums.length }}</button>
+            <h2 
+              class="section-title clickable" 
+              @click="setTab('albums')"
+              title="Перейти в альбомы"
+            >
+              Альбомы
+            </h2>
+            <div class="section-actions">
+              <button class="section-link" @click="setTab('albums')">Все {{ albumsTotal || overviewAlbums.length }}</button>
+              <button 
+                class="scroll-arrow-btn" 
+                :disabled="!albumsScroll.canScrollLeft.value"
+                @click="albumsScroll.scroll('left')"
+                title="Назад"
+                aria-label="Назад"
+              >
+                <ChevronLeft :size="16" />
+              </button>
+              <button 
+                class="scroll-arrow-btn" 
+                :disabled="!albumsScroll.canScrollRight.value"
+                @click="albumsScroll.scroll('right')"
+                title="Вперед"
+                aria-label="Вперед"
+              >
+                <ChevronRight :size="16" />
+              </button>
+            </div>
           </div>
-          <div class="horizontal-scroll">
+          <div 
+            class="horizontal-scroll"
+            :ref="albumsScroll.containerRef"
+          >
             <div 
               v-for="album in overviewAlbums.slice(0, 10)" 
               :key="album.id" 
@@ -161,10 +219,39 @@
 
         <section v-else-if="overviewArtists.length > 0" class="library-section">
           <div class="section-header">
-            <h2 class="section-title">Исполнители</h2>
-            <button class="section-link" @click="setTab('artists')">Все {{ overviewArtists.length }}</button>
+            <h2 
+              class="section-title clickable" 
+              @click="setTab('artists')"
+              title="Перейти к артистам"
+            >
+              Исполнители
+            </h2>
+            <div class="section-actions">
+              <button class="section-link" @click="setTab('artists')">Все {{ overviewArtists.length }}</button>
+              <button 
+                class="scroll-arrow-btn" 
+                :disabled="!artistsScroll.canScrollLeft.value"
+                @click="artistsScroll.scroll('left')"
+                title="Назад"
+                aria-label="Назад"
+              >
+                <ChevronLeft :size="16" />
+              </button>
+              <button 
+                class="scroll-arrow-btn" 
+                :disabled="!artistsScroll.canScrollRight.value"
+                @click="artistsScroll.scroll('right')"
+                title="Вперед"
+                aria-label="Вперед"
+              >
+                <ChevronRight :size="16" />
+              </button>
+            </div>
           </div>
-          <div class="horizontal-scroll">
+          <div 
+            class="horizontal-scroll"
+            :ref="artistsScroll.containerRef"
+          >
             <div 
               v-for="artist in overviewArtists.slice(0, 10)" 
               :key="artist.name" 
@@ -191,7 +278,13 @@
         <!-- Section: Треки (With Shuffle Button and TrackItems) -->
         <section class="library-section tracks-overview-section">
           <div class="section-header">
-            <h2 class="section-title">Треки</h2>
+            <h2 
+              class="section-title clickable" 
+              @click="setTab('tracks')"
+              title="Перейти во все треки"
+            >
+              Треки
+            </h2>
             <button class="section-link" @click="setTab('tracks')">
               Все {{ totalTracksCount }}
             </button>
@@ -308,6 +401,7 @@ import {
   ChevronLeft,
   CloudDownload 
 } from 'lucide-vue-next'
+import { useHorizontalScroll } from '@/composables/useHorizontalScroll'
 
 const router = useRouter()
 const route = useRoute()
@@ -345,10 +439,18 @@ const currentTabId = computed({
   set: (val) => uiStore.setLibraryTab(val)
 })
 
+const resetScrollToTop = () => {
+  const mainContent = document.querySelector('.main-content')
+  if (mainContent) {
+    mainContent.scrollTop = 0
+  }
+}
+
 const setTab = (tabId) => {
   if (currentTabId.value !== tabId) {
     handleClearSearch()
     isOverviewSearchOpen.value = false
+    resetScrollToTop()
   }
   currentTabId.value = tabId
   const query = { ...route.query }
@@ -417,6 +519,11 @@ const shuffling = ref(false)
 
 const overviewAlbums = ref([])
 const albumsTotal = ref(0)
+
+// Horizontal scroll managers for carousels
+const playlistsScroll = useHorizontalScroll()
+const albumsScroll = useHorizontalScroll()
+const artistsScroll = useHorizontalScroll()
 
 const allPlaylists = computed(() => libraryStore.playlists || [])
 const overviewArtists = computed(() => libraryStore.artists || [])
@@ -609,11 +716,13 @@ watch(
       if (currentTabId.value !== newTab) {
         handleClearSearch()
         isOverviewSearchOpen.value = false
+        resetScrollToTop()
         currentTabId.value = newTab
       }
     } else if (!newTab && currentTabId.value !== 'overview') {
       handleClearSearch()
       isOverviewSearchOpen.value = false
+      resetScrollToTop()
       currentTabId.value = 'overview'
     }
   }
@@ -765,6 +874,61 @@ onUnmounted(() => {
   margin: 0;
 }
 
+.section-title.clickable {
+  cursor: pointer;
+  transition: color 0.15s ease;
+  user-select: none;
+}
+
+.section-title.clickable:hover {
+  color: var(--c-accent, #1db954);
+}
+
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scroll-arrow-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--c-text-1, #fff);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  padding: 0;
+  user-select: none;
+}
+
+.scroll-arrow-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: scale(1.06);
+}
+
+.scroll-arrow-btn:active:not(:disabled) {
+  transform: scale(0.94);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.scroll-arrow-btn:disabled {
+  opacity: 0.2;
+  cursor: default;
+  pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  .scroll-arrow-btn {
+    display: none;
+  }
+}
+
 .section-link {
   font-size: 13px;
   font-weight: 600;
@@ -788,13 +952,36 @@ onUnmounted(() => {
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 8px;
-  scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.2s ease;
+}
+
+.horizontal-scroll:hover {
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
 
 .horizontal-scroll::-webkit-scrollbar {
-  display: none;
+  height: 5px;
+}
+
+.horizontal-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.horizontal-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.horizontal-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.horizontal-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.38);
 }
 
 .feed-card {

@@ -5,7 +5,6 @@ import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
  * Provides:
  * - Reactive canScrollLeft / canScrollRight state for arrow buttons
  * - Smooth scrollLeft / scrollRight actions
- * - Mouse wheel vertical-to-horizontal conversion with boundary pass-through
  * - Auto-updates on resize, scroll, and content changes
  */
 export function useHorizontalScroll() {
@@ -14,6 +13,7 @@ export function useHorizontalScroll() {
   const canScrollRight = ref(false)
 
   let resizeObserver = null
+  let mutationObserver = null
 
   const updateScrollState = () => {
     const el = containerRef.value
@@ -49,32 +49,6 @@ export function useHorizontalScroll() {
     setTimeout(updateScrollState, 350)
   }
 
-  const onWheel = (e) => {
-    const el = containerRef.value
-    if (!el) return
-
-    // Only intercept when vertical wheel is dominant and Shift is not held
-    if (!e.shiftKey && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-      const scrollLeft = el.scrollLeft
-      const maxScroll = el.scrollWidth - el.clientWidth
-
-      if (maxScroll <= 2) return // Content doesn't overflow horizontally
-
-      const atStart = scrollLeft <= 2
-      const atEnd = scrollLeft >= maxScroll - 2
-
-      // If scrolling right and we have room, OR scrolling left and we have room:
-      if ((e.deltaY > 0 && !atEnd) || (e.deltaY < 0 && !atStart)) {
-        e.preventDefault()
-        el.scrollBy({
-          left: e.deltaY * 1.3,
-          behavior: 'auto'
-        })
-        updateScrollState()
-      }
-    }
-  }
-
   const attachListeners = (el) => {
     if (!el) return
     el.addEventListener('scroll', updateScrollState, { passive: true })
@@ -84,10 +58,13 @@ export function useHorizontalScroll() {
         updateScrollState()
       })
       resizeObserver.observe(el)
-      // Also observe first child if present to detect content loads
-      if (el.firstElementChild) {
-        resizeObserver.observe(el.firstElementChild)
-      }
+    }
+
+    if (typeof MutationObserver !== 'undefined') {
+      mutationObserver = new MutationObserver(() => {
+        updateScrollState()
+      })
+      mutationObserver.observe(el, { childList: true, subtree: true })
     }
 
     nextTick(() => {
@@ -102,6 +79,10 @@ export function useHorizontalScroll() {
     if (resizeObserver) {
       resizeObserver.disconnect()
       resizeObserver = null
+    }
+    if (mutationObserver) {
+      mutationObserver.disconnect()
+      mutationObserver = null
     }
   }
 
@@ -127,7 +108,6 @@ export function useHorizontalScroll() {
     canScrollLeft,
     canScrollRight,
     updateScrollState,
-    scroll,
-    onWheel
+    scroll
   }
 }

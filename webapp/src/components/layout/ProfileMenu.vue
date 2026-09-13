@@ -138,7 +138,7 @@
               <span v-if="friendsCount" class="item-badge">{{ friendsCount }}</span>
             </button>
 
-            <button class="profile-menu-item" @click="navigate('/settings')">
+            <button class="profile-menu-item" @click="navigate('/settings#profile')">
               <div class="item-icon-box">
                 <Settings :size="18" />
               </div>
