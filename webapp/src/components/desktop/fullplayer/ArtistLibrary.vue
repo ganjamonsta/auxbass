@@ -396,18 +396,7 @@ const formatTime = (seconds) => {
   font-size: 13px;
 }
 
-.spinner {
-  width: 28px;
-  height: 28px;
-  border: 2px solid var(--c-bg-3);
-  border-top-color: var(--c-accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
 
 .empty-icon {
   opacity: 0.3;

@@ -813,6 +813,7 @@ import {
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import { getCacheStats, getCachedAudioStats } from '@/utils/audioCacheDb'
 import { clearAudioCache } from '@/stores/playerCache'
+import { formatDurationLong as formatDuration } from '@/utils'
 
 const router = useRouter()
 const route = useRoute()
@@ -1105,15 +1106,6 @@ const updatePrivacy = async (field, value) => {
   }
 }
 
-const formatDuration = (seconds) => {
-  if (!seconds) return '0:00'
-  const hours = Math.floor(seconds / 3600)
-  const mins = Math.floor((seconds % 3600) / 60)
-  if (hours > 0) {
-    return `${hours}ч ${mins}м`
-  }
-  return `${mins}м`
-}
 
 const toggleRepeat = () => {
   const modes = ['none', 'all', 'one']

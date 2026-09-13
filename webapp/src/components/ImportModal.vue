@@ -330,6 +330,7 @@ import { ingestionApi } from '../api/client'
 import { useRouter } from 'vue-router'
 import { useTasksStore } from '@/stores/tasks'
 import { useExternalAccountsStore } from '@/stores/externalAccounts'
+import { formatDuration } from '@/utils'
 
 const props = defineProps({
   show: {
@@ -436,12 +437,6 @@ const deselectAll = () => {
   selectedUrls.value = new Set()
 }
 
-const formatDuration = (seconds) => {
-  if (!seconds) return '--:--'
-  const m = Math.floor(seconds / 60)
-  const s = Math.floor(seconds % 60)
-  return `${m}:${s.toString().padStart(2, '0')}`
-}
 
 const statusDescription = computed(() => {
   if (!activeJob.value) return ''
@@ -1408,23 +1403,6 @@ onUnmounted(() => {
   cursor: not-allowed;
 }
 
-.spinner {
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-.spinner.small {
-  width: 14px;
-  height: 14px;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 
 .sc-quick-actions-bar {
   margin-top: 8px;

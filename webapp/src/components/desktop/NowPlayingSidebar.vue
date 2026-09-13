@@ -247,7 +247,7 @@ import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useContextMenu } from '@/composables/useContextMenu'
-import { splitArtists, getDisplayTitle, getDisplayArtist, getAllTrackArtists, getCoverUrl, CoverSize } from '@/utils/formatters'
+import { splitArtists, getDisplayTitle, getDisplayArtist, getAllTrackArtists, getCoverUrl, CoverSize, formatDuration } from '@/utils/formatters'
 import { Play } from 'lucide-vue-next'
 import LyricsViewer from '@/components/LyricsViewer.vue'
 
@@ -329,12 +329,6 @@ const forwardSourceUrl = computed(() => {
 })
 
 // Formatters
-const formatDuration = (seconds) => {
-  if (!seconds) return '0:00'
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  return `${mins}:${secs.toString().padStart(2, '0')}`
-}
 
 const formatPlayCount = (count) => {
   if (!count) return '0'

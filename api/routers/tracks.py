@@ -38,6 +38,7 @@ from api.schemas.tracks import (
     TrackLyricsOffsetUpdate,
 )
 from api.schemas.common import TelegramUser
+from api.utils import raise_not_found
 
 
 logger = logging.getLogger(__name__)
@@ -781,7 +782,7 @@ async def get_track(
     row = result.unique().first()
     
     if not row:
-        raise HTTPException(status_code=404, detail="Track not found")
+        raise_not_found("Track not found")
     
     track, lib_entry = row
     return track_to_response(track, lib_entry)
@@ -807,7 +808,7 @@ async def update_track(
     track = result.scalar_one_or_none()
     
     if not track:
-        raise HTTPException(status_code=404, detail="Track not found or not owned")
+        raise_not_found("Track not found or not owned")
     
     # Validate and update metadata
     changed = False
@@ -879,7 +880,7 @@ async def delete_track(
     entry = result.scalar_one_or_none()
     
     if not entry:
-        raise HTTPException(status_code=404, detail="Track not found in your library")
+        raise_not_found("Track not found in your library")
     
     await db.delete(entry)
     await db.commit()
@@ -918,7 +919,7 @@ async def like_track(
             select(Track).where(Track.id == track_id, Track.is_public == True)
         )
         if not track:
-            raise HTTPException(status_code=404, detail="Track not found")
+            raise_not_found("Track not found")
         
         # Auto-add to library
         entry = UserLibrary(
@@ -976,7 +977,7 @@ async def unlike_track(
     entry = result.scalar_one_or_none()
     
     if not entry:
-        raise HTTPException(status_code=404, detail="Track not found in your library")
+        raise_not_found("Track not found in your library")
     
     entry.is_liked = False
     entry.liked_at = None
@@ -1014,7 +1015,7 @@ async def dislike_track(
     if not entry:
         track = await db.get(Track, track_id)
         if not track:
-            raise HTTPException(status_code=404, detail="Track not found")
+            raise_not_found("Track not found")
         
         entry = UserLibrary(
             user_id=user.id,
@@ -1057,7 +1058,7 @@ async def undislike_track(
     entry = result.scalar_one_or_none()
     
     if not entry:
-        raise HTTPException(status_code=404, detail="Track not found in your library")
+        raise_not_found("Track not found in your library")
     
     entry.is_disliked = False
     entry.disliked_at = None
@@ -1082,7 +1083,7 @@ async def normalize_track_metadata(
     """
     track = await db.get(Track, track_id)
     if not track:
-        raise HTTPException(status_code=404, detail="Track not found")
+        raise_not_found("Track not found")
         
     from shared.matching import clean_track_metadata, normalize_artist
     from bot.services.enrichment.processor import enrichment_processor
@@ -1136,7 +1137,7 @@ async def mark_unavailable(
     track = result.scalar_one_or_none()
     
     if not track:
-        raise HTTPException(status_code=404, detail="Track not found")
+        raise_not_found("Track not found")
     
     # Do not mark tracks > 20MB as unavailable — they are valid files that cannot
     # be streamed via standard Telegram Bot API getFile, but are available for download.
@@ -1167,7 +1168,7 @@ async def add_to_library(
     track = result.scalar_one_or_none()
     
     if not track:
-        raise HTTPException(status_code=404, detail="Track not found or not public")
+        raise_not_found("Track not found or not public")
     
     # Check if already in library
     result = await db.execute(
@@ -1215,7 +1216,7 @@ async def remove_from_library(
     entry = result.scalar_one_or_none()
     
     if not entry:
-        raise HTTPException(status_code=404, detail="Track not found in your library")
+        raise_not_found("Track not found in your library")
     
     await db.delete(entry)
     await db.commit()
@@ -1322,7 +1323,7 @@ async def get_track_lyrics(
     )
     track = result.scalar_one_or_none()
     if not track:
-        raise HTTPException(status_code=404, detail="Track not found")
+        raise_not_found("Track not found")
     
     # If cached and not forcing refresh, return cached
     if track.lyrics and not force_refresh:
@@ -1389,7 +1390,7 @@ async def update_track_lyrics(
     )
     track = result.scalar_one_or_none()
     if not track:
-        raise HTTPException(status_code=404, detail="Track not found")
+        raise_not_found("Track not found")
     
     synced = update_data.synced_lyrics
     plain = update_data.plain_lyrics
@@ -1439,7 +1440,7 @@ async def update_lyrics_offset(
     )
     track = result.scalar_one_or_none()
     if not track:
-        raise HTTPException(status_code=404, detail="Track not found")
+        raise_not_found("Track not found")
     
     if not track.lyrics:
         track.lyrics = TrackLyrics(

@@ -395,6 +395,7 @@ import { useUIStore } from '@/stores/ui'
 import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { useTasksStore } from '@/stores/tasks'
+import { formatDuration } from '@/utils'
 
 const props = defineProps({
   show: {
@@ -451,12 +452,6 @@ const statusText = computed(() => {
   }
 })
 
-const formatDuration = (seconds) => {
-  if (!seconds) return '--:--'
-  const m = Math.floor(seconds / 60)
-  const s = Math.floor(seconds % 60)
-  return `${m}:${s < 10 ? '0' : ''}${s}`
-}
 
 const triggerFileInput = () => {
   if (fileInputRef.value) {
@@ -1625,25 +1620,7 @@ watch(
   color: #fff;
 }
 
-/* Spinner */
-.spinner {
-  border: 2px solid rgba(255, 255, 255, 0.15);
-  border-top-color: currentColor;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-.spinner.small {
-  width: 14px;
-  height: 14px;
-}
-.spinner.large {
-  width: 32px;
-  height: 32px;
-}
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
 
 .modal-fade-enter-active, .modal-fade-leave-active {
   transition: opacity 0.2s ease;

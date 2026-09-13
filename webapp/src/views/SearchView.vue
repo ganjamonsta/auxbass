@@ -90,48 +90,18 @@
             </div>
             
             <div class="sc-results-list">
-              <div
+              <ExternalTrackItem
                 v-for="item in soundcloudResults.slice(0, 5)"
                 :key="item.url"
-                class="sc-track-item"
-                @click="handleQuickPlaySoundCloud(item)"
-              >
-                <div class="sc-track-cover">
-                  <img v-if="item.cover_url" :src="item.cover_url" alt="" loading="lazy" referrerpolicy="no-referrer" />
-                  <Music v-else :size="20" />
-                  <div v-if="importingTrackUrl === item.url" class="sc-track-loading">
-                    <div class="spinner small"></div>
-                  </div>
-                  <div v-else class="sc-track-play">
-                    <Play :size="14" fill="currentColor" />
-                  </div>
-                </div>
-                <div class="sc-track-info">
-                  <div class="sc-track-title" :title="item.title">{{ item.title }}</div>
-                  <div class="sc-track-artist">{{ item.artist }}</div>
-                </div>
-                <div class="sc-track-actions">
-                  <span v-if="item.duration" class="sc-track-duration">{{ formatDuration(item.duration) }}</span>
-                  <button 
-                    v-if="!isTrackInLibrary(item)"
-                    class="sc-add-btn" 
-                    :class="{ 
-                      loading: tasksStore.isTrackDownloading(item.url),
-                      queued: tasksStore.isTrackQueued(item.url)
-                    }"
-                    :disabled="tasksStore.isTrackDownloading(item.url) || tasksStore.isTrackQueued(item.url)"
-                    @click.stop="handleQuickAddSoundCloud(item)"
-                    :title="tasksStore.isTrackDownloading(item.url) ? 'Загружается...' : tasksStore.isTrackQueued(item.url) ? 'В очереди на добавление' : 'Добавить в медиатеку'"
-                  >
-                    <div v-if="tasksStore.isTrackDownloading(item.url)" class="spinner micro"></div>
-                    <Clock v-else-if="tasksStore.isTrackQueued(item.url)" :size="14" />
-                    <Plus v-else :size="16" />
-                  </button>
-                  <span v-else class="sc-added-indicator" title="Уже в медиатеке">
-                    <Check :size="16" />
-                  </span>
-                </div>
-              </div>
+                :item="item"
+                variant="soundcloud"
+                :is-importing="importingTrackUrl === item.url"
+                :is-downloading="tasksStore.isTrackDownloading(item.url)"
+                :is-queued="tasksStore.isTrackQueued(item.url)"
+                :is-in-library="isTrackInLibrary(item)"
+                @play="handleQuickPlaySoundCloud"
+                @add="handleQuickAddSoundCloud"
+              />
             </div>
           </section>
 
@@ -154,48 +124,18 @@
             </div>
             
             <div class="sc-results-list">
-              <div
+              <ExternalTrackItem
                 v-for="item in spotifyResults.slice(0, 5)"
                 :key="item.url"
-                class="sc-track-item sp-item"
-                @click="handleQuickPlaySpotify(item)"
-              >
-                <div class="sc-track-cover sp-cover">
-                  <img v-if="item.cover_url" :src="item.cover_url" alt="" loading="lazy" referrerpolicy="no-referrer" />
-                  <Music v-else :size="20" />
-                  <div v-if="importingTrackUrl === item.url" class="sc-track-loading">
-                    <div class="spinner small"></div>
-                  </div>
-                  <div v-else class="sc-track-play">
-                    <Play :size="14" fill="currentColor" />
-                  </div>
-                </div>
-                <div class="sc-track-info">
-                  <div class="sc-track-title" :title="item.title">{{ item.title }}</div>
-                  <div class="sc-track-artist">{{ item.artist }}</div>
-                </div>
-                <div class="sc-track-actions">
-                  <span v-if="item.duration" class="sc-track-duration">{{ formatDuration(item.duration) }}</span>
-                  <button 
-                    v-if="!isTrackInLibrary(item)"
-                    class="sc-add-btn sp-add" 
-                    :class="{ 
-                      loading: tasksStore.isTrackDownloading(item.url),
-                      queued: tasksStore.isTrackQueued(item.url)
-                    }"
-                    :disabled="tasksStore.isTrackDownloading(item.url) || tasksStore.isTrackQueued(item.url)"
-                    @click.stop="handleQuickAddSpotify(item)"
-                    :title="tasksStore.isTrackDownloading(item.url) ? 'Загружается...' : tasksStore.isTrackQueued(item.url) ? 'В очереди на добавление' : 'Добавить в медиатеку'"
-                  >
-                    <div v-if="tasksStore.isTrackDownloading(item.url)" class="spinner micro"></div>
-                    <Clock v-else-if="tasksStore.isTrackQueued(item.url)" :size="14" />
-                    <Plus v-else :size="16" />
-                  </button>
-                  <span v-else class="sc-added-indicator" title="Уже в медиатеке">
-                    <Check :size="16" />
-                  </span>
-                </div>
-              </div>
+                :item="item"
+                variant="spotify"
+                :is-importing="importingTrackUrl === item.url"
+                :is-downloading="tasksStore.isTrackDownloading(item.url)"
+                :is-queued="tasksStore.isTrackQueued(item.url)"
+                :is-in-library="isTrackInLibrary(item)"
+                @play="handleQuickPlaySpotify"
+                @add="handleQuickAddSpotify"
+              />
             </div>
           </section>
 
@@ -341,10 +281,7 @@
           </div>
 
           <!-- Empty state when all track sources are exhausted -->
-          <div v-else-if="!isTracksSearching && !isFriendsLoading && !isGlobalLoading && allTracksList.length === 0" class="no-results-box">
-            <p class="no-results-text">Треки не найдены</p>
-            <p class="no-results-hint">Попробуйте изменить поисковый запрос или выбрать другой тег</p>
-          </div>
+          <NoResultsBox v-else-if="!isTracksSearching && !isFriendsLoading && !isGlobalLoading && allTracksList.length === 0" text="Треки не найдены" hint="Попробуйте изменить поисковый запрос или выбрать другой тег" />
 
           <template v-else>
             <!-- 1. My Library Tracks -->
@@ -510,10 +447,7 @@
               </div>
             </div>
           </div>
-          <div v-else-if="!isArtistsSearching" class="no-results-box">
-            <p class="no-results-text">Артисты не найдены</p>
-            <p class="no-results-hint">Попробуйте изменить поисковый запрос</p>
-          </div>
+          <NoResultsBox v-else-if="!isArtistsSearching" text="Артисты не найдены" hint="Попробуйте изменить поисковый запрос" />
         </div>
 
         <!-- ==================== TAB: SOUNDCLOUD ==================== -->
@@ -568,62 +502,19 @@
             </div>
 
             <div v-else-if="soundcloudResults.length > 0" class="sc-results-list full-list">
-              <div
+              <ExternalTrackItem
                 v-for="item in soundcloudResults"
                 :key="item.url"
-                class="sc-track-item"
-                @click="handleQuickPlaySoundCloud(item)"
-              >
-                <div class="sc-track-cover">
-                  <img v-if="item.cover_url" :src="item.cover_url" alt="" loading="lazy" referrerpolicy="no-referrer" />
-                  <Music v-else :size="20" />
-                  <div v-if="importingTrackUrl === item.url" class="sc-track-loading">
-                    <div class="spinner small"></div>
-                  </div>
-                  <div v-else class="sc-track-play">
-                    <Play :size="14" fill="currentColor" />
-                  </div>
-                </div>
-                <div class="sc-track-info">
-                  <div class="sc-track-title" :title="item.title">{{ item.title }}</div>
-                  <div class="sc-track-artist-row">
-                    <span class="sc-track-artist">{{ item.artist }}</span>
-                    <!-- Badges -->
-                    <div v-if="item.in_library || item.in_channel || item.already_in_tg" class="sc-track-badges">
-                      <span v-if="item.in_library" class="sc-badge-pill in-lib" title="Уже в вашей медиатеке">
-                        <Check :size="10" /> В медиатеке
-                      </span>
-                      <span v-if="item.in_channel" class="sc-badge-pill in-chan" title="Забэкаплен в Telegram-канал">
-                        <CloudDownload :size="10" /> В канале
-                      </span>
-                      <span v-else-if="item.already_in_tg" class="sc-badge-pill in-tg" title="Уже есть на сервере Telegram">
-                        В базе TG
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div class="sc-track-actions">
-                  <span v-if="item.duration" class="sc-track-duration">{{ formatDuration(item.duration) }}</span>
-                  <button 
-                    v-if="!isTrackInLibrary(item)"
-                    class="sc-add-btn" 
-                    :class="{ 
-                      loading: tasksStore.isTrackDownloading(item.url),
-                      queued: tasksStore.isTrackQueued(item.url)
-                    }"
-                    :disabled="tasksStore.isTrackDownloading(item.url) || tasksStore.isTrackQueued(item.url)"
-                    @click.stop="handleQuickAddSoundCloud(item)"
-                    :title="tasksStore.isTrackDownloading(item.url) ? 'Загружается...' : tasksStore.isTrackQueued(item.url) ? 'В очереди на добавление' : 'Добавить в медиатеку'"
-                  >
-                    <div v-if="tasksStore.isTrackDownloading(item.url)" class="spinner micro"></div>
-                    <Clock v-else-if="tasksStore.isTrackQueued(item.url)" :size="14" />
-                    <Plus v-else :size="16" />
-                  </button>
-                  <span v-else class="sc-added-indicator" title="Уже в медиатеке">
-                    <Check :size="16" />
-                  </span>
-                </div>
-              </div>
+                :item="item"
+                variant="soundcloud"
+                :show-badges="true"
+                :is-importing="importingTrackUrl === item.url"
+                :is-downloading="tasksStore.isTrackDownloading(item.url)"
+                :is-queued="tasksStore.isTrackQueued(item.url)"
+                :is-in-library="isTrackInLibrary(item)"
+                @play="handleQuickPlaySoundCloud"
+                @add="handleQuickAddSoundCloud"
+              />
 
               <!-- Load More SoundCloud Button -->
               <div class="sc-load-more-wrap">
@@ -640,11 +531,7 @@
               </div>
             </div>
 
-            <div v-else-if="!isSoundCloudSearching" class="no-results-box">
-              <p class="no-results-text">
-                {{ searchQuery.trim() ? 'На SoundCloud ничего не найдено' : 'Введите поисковый запрос выше для поиска треков на SoundCloud' }}
-              </p>
-            </div>
+            <NoResultsBox v-else-if="!isSoundCloudSearching" :text="searchQuery.trim() ? 'На SoundCloud ничего не найдено' : 'Введите поисковый запрос выше для поиска треков на SoundCloud'" />
           </template>
 
           <!-- 2. LIKES MODE -->
@@ -720,64 +607,19 @@
 
             <!-- Likes Track List -->
             <div v-if="filteredScLikes.length > 0" class="sc-results-list full-list">
-              <div
+              <ExternalTrackItem
                 v-for="item in filteredScLikes"
                 :key="item.url"
-                class="sc-track-item"
-                @click="handleQuickPlaySoundCloud(item)"
-              >
-                <div class="sc-track-cover">
-                  <img v-if="item.cover_url" :src="item.cover_url" alt="" loading="lazy" referrerpolicy="no-referrer" />
-                  <Music v-else :size="20" />
-                  <div v-if="importingTrackUrl === item.url" class="sc-track-loading">
-                    <div class="spinner small"></div>
-                  </div>
-                  <div v-else class="sc-track-play">
-                    <Play :size="14" fill="currentColor" />
-                  </div>
-                </div>
-
-                <div class="sc-track-info">
-                  <div class="sc-track-title" :title="item.title">{{ item.title }}</div>
-                  <div class="sc-track-artist-row">
-                    <span class="sc-track-artist">{{ item.artist }}</span>
-                    <!-- Badges -->
-                    <div class="sc-track-badges">
-                      <span v-if="item.in_library" class="sc-badge-pill in-lib" title="Уже в вашей медиатеке">
-                        <Check :size="10" /> В медиатеке
-                      </span>
-                      <span v-if="item.in_channel" class="sc-badge-pill in-chan" title="Забэкаплен в Telegram-канал">
-                        <CloudDownload :size="10" /> В канале
-                      </span>
-                      <span v-else-if="item.already_in_tg" class="sc-badge-pill in-tg" title="Уже есть на сервере Telegram">
-                        В базе TG
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="sc-track-actions">
-                  <span v-if="item.duration" class="sc-track-duration">{{ formatDuration(item.duration) }}</span>
-                  <button 
-                    v-if="!isTrackInLibrary(item)"
-                    class="sc-add-btn" 
-                    :class="{ 
-                      loading: tasksStore.isTrackDownloading(item.url),
-                      queued: tasksStore.isTrackQueued(item.url)
-                    }"
-                    :disabled="tasksStore.isTrackDownloading(item.url) || tasksStore.isTrackQueued(item.url)"
-                    @click.stop="handleQuickAddSoundCloud(item)"
-                    :title="tasksStore.isTrackDownloading(item.url) ? 'Загружается...' : tasksStore.isTrackQueued(item.url) ? 'В очереди на добавление' : 'Добавить в медиатеку и канал'"
-                  >
-                    <div v-if="tasksStore.isTrackDownloading(item.url)" class="spinner micro"></div>
-                    <Clock v-else-if="tasksStore.isTrackQueued(item.url)" :size="14" />
-                    <Plus v-else :size="16" />
-                  </button>
-                  <span v-else class="sc-added-indicator" title="Уже в медиатеке">
-                    <Check :size="16" />
-                  </span>
-                </div>
-              </div>
+                :item="item"
+                variant="soundcloud"
+                :show-badges="true"
+                :is-importing="importingTrackUrl === item.url"
+                :is-downloading="tasksStore.isTrackDownloading(item.url)"
+                :is-queued="tasksStore.isTrackQueued(item.url)"
+                :is-in-library="isTrackInLibrary(item)"
+                @play="handleQuickPlaySoundCloud"
+                @add="handleQuickAddSoundCloud"
+              />
 
               <!-- Load more likes button -->
               <div v-if="scLikesCursor" class="sc-load-more-wrap">
@@ -795,11 +637,7 @@
             </div>
 
             <!-- No results in likes matching query -->
-            <div v-else-if="searchQuery.trim() && scLikes.length > 0 && !isScLikesLoading" class="no-results-box">
-              <p class="no-results-text">В загруженных лайках нет треков по запросу «{{ searchQuery }}»</p>
-              <p class="no-results-hint">
-                Проверено {{ scLikes.length }} из {{ scAccount?.likes_count || scLikes.length }} лайков вашего профиля.
-              </p>
+            <NoResultsBox v-else-if="searchQuery.trim() && scLikes.length > 0 && !isScLikesLoading" :text="`В загруженных лайках нет треков по запросу «${searchQuery}»`" :hint="`Проверено ${scLikes.length} из ${scAccount?.likes_count || scLikes.length} лайков вашего профиля.`">
               <div class="sc-no-results-actions">
                 <button 
                   v-if="scLikesCursor"
@@ -815,7 +653,7 @@
                   <span>Искать во всём каталоге SoundCloud</span>
                 </button>
               </div>
-            </div>
+            </NoResultsBox>
 
             <!-- Not Connected Prompt -->
             <div v-else-if="!scAccount?.connected && !isScLikesLoading" class="sc-not-connected-banner">
@@ -833,10 +671,7 @@
             </div>
 
             <!-- Empty likes -->
-            <div v-else-if="!isScLikesLoading" class="no-results-box">
-              <p class="no-results-text">Лайков на SoundCloud пока нет</p>
-              <p class="no-results-hint">Поставьте лайки на SoundCloud и нажмите «Обновить»</p>
-            </div>
+            <NoResultsBox v-else-if="!isScLikesLoading" text="Лайков на SoundCloud пока нет" hint="Поставьте лайки на SoundCloud и нажмите «Обновить»" />
           </template>
         </div>
 
@@ -890,62 +725,19 @@
             </div>
 
             <div v-else-if="spotifyResults.length > 0" class="sc-results-list full-list">
-              <div
+              <ExternalTrackItem
                 v-for="item in spotifyResults"
                 :key="item.url"
-                class="sc-track-item sp-item"
-                @click="handleQuickPlaySpotify(item)"
-              >
-                <div class="sc-track-cover sp-cover">
-                  <img v-if="item.cover_url" :src="item.cover_url" alt="" loading="lazy" referrerpolicy="no-referrer" />
-                  <Music v-else :size="20" />
-                  <div v-if="importingTrackUrl === item.url" class="sc-track-loading">
-                    <div class="spinner small"></div>
-                  </div>
-                  <div v-else class="sc-track-play">
-                    <Play :size="14" fill="currentColor" />
-                  </div>
-                </div>
-                <div class="sc-track-info">
-                  <div class="sc-track-title" :title="item.title">{{ item.title }}</div>
-                  <div class="sc-track-artist-row">
-                    <span class="sc-track-artist">{{ item.artist }}</span>
-                    <!-- Badges -->
-                    <div v-if="item.in_library || item.in_channel || item.already_in_tg" class="sc-track-badges">
-                      <span v-if="item.in_library" class="sc-badge-pill in-lib" title="Уже в вашей медиатеке">
-                        <Check :size="10" /> В медиатеке
-                      </span>
-                      <span v-if="item.in_channel" class="sc-badge-pill in-chan" title="Забэкаплен в Telegram-канал">
-                        <CloudDownload :size="10" /> В канале
-                      </span>
-                      <span v-else-if="item.already_in_tg" class="sc-badge-pill in-tg" title="Уже есть на сервере Telegram">
-                        В базе TG
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div class="sc-track-actions">
-                  <span v-if="item.duration" class="sc-track-duration">{{ formatDuration(item.duration) }}</span>
-                  <button 
-                    v-if="!isTrackInLibrary(item)"
-                    class="sc-add-btn sp-add" 
-                    :class="{ 
-                      loading: tasksStore.isTrackDownloading(item.url),
-                      queued: tasksStore.isTrackQueued(item.url)
-                    }"
-                    :disabled="tasksStore.isTrackDownloading(item.url) || tasksStore.isTrackQueued(item.url)"
-                    @click.stop="handleQuickAddSpotify(item)"
-                    :title="tasksStore.isTrackDownloading(item.url) ? 'Загружается...' : tasksStore.isTrackQueued(item.url) ? 'В очереди на добавление' : 'Добавить в медиатеку'"
-                  >
-                    <div v-if="tasksStore.isTrackDownloading(item.url)" class="spinner micro"></div>
-                    <Clock v-else-if="tasksStore.isTrackQueued(item.url)" :size="14" />
-                    <Plus v-else :size="16" />
-                  </button>
-                  <span v-else class="sc-added-indicator" title="Уже в медиатеке">
-                    <Check :size="16" />
-                  </span>
-                </div>
-              </div>
+                :item="item"
+                variant="spotify"
+                :show-badges="true"
+                :is-importing="importingTrackUrl === item.url"
+                :is-downloading="tasksStore.isTrackDownloading(item.url)"
+                :is-queued="tasksStore.isTrackQueued(item.url)"
+                :is-in-library="isTrackInLibrary(item)"
+                @play="handleQuickPlaySpotify"
+                @add="handleQuickAddSpotify"
+              />
 
               <!-- Load More Spotify Button -->
               <div class="sc-load-more-wrap">
@@ -962,11 +754,7 @@
               </div>
             </div>
 
-            <div v-else-if="!isSpotifySearching" class="no-results-box">
-              <p class="no-results-text">
-                {{ searchQuery.trim() ? 'В каталоге ничего не найдено' : 'Введите поисковый запрос выше для поиска треков в каталоге Spotify' }}
-              </p>
-            </div>
+            <NoResultsBox v-else-if="!isSpotifySearching" :text="searchQuery.trim() ? 'В каталоге ничего не найдено' : 'Введите поисковый запрос выше для поиска треков в каталоге Spotify'" />
           </template>
 
           <!-- 2. EXPORTIFY CSV MODE -->
@@ -1045,10 +833,7 @@
               </div>
             </div>
           </div>
-          <div v-else-if="!isAlbumsSearching" class="no-results-box">
-            <p class="no-results-text">Альбомы не найдены</p>
-            <p class="no-results-hint">Попробуйте изменить поисковый запрос</p>
-          </div>
+          <NoResultsBox v-else-if="!isAlbumsSearching" text="Альбомы не найдены" hint="Попробуйте изменить поисковый запрос" />
         </div>
 
         <!-- ==================== TAB: PLAYLISTS ==================== -->
@@ -1083,17 +868,11 @@
               </div>
             </div>
           </div>
-          <div v-else-if="!isPlaylistsSearching" class="no-results-box">
-            <p class="no-results-text">Плейлисты не найдены</p>
-            <p class="no-results-hint">Попробуйте изменить поисковый запрос</p>
-          </div>
+          <NoResultsBox v-else-if="!isPlaylistsSearching" text="Плейлисты не найдены" hint="Попробуйте изменить поисковый запрос" />
         </div>
 
         <!-- Global Empty Results (All categories empty) -->
-        <div v-if="noResults" class="no-results-box">
-          <p class="no-results-text">Ничего не найдено по запросу «{{ searchQuery }}»</p>
-          <p class="no-results-hint">Попробуйте ввести другой тег, название трека, исполнителя или плейлиста</p>
-        </div>
+        <NoResultsBox v-if="noResults" :text="`Ничего не найдено по запросу «${searchQuery}»`" hint="Попробуйте ввести другой тег, название трека, исполнителя или плейлиста" />
       </template>
     </div>
 
@@ -1189,7 +968,9 @@ import {
 import api, { tracksApi, artistsApi, albumsApi, playlistsApi, ingestionApi } from '@/api/client'
 import SearchBar from '@/components/ui/SearchBar.vue'
 import TrackItem from '@/components/TrackItem.vue'
+import ExternalTrackItem from '@/components/ExternalTrackItem.vue'
 import TrackSkeleton from '@/components/TrackSkeleton.vue'
+import NoResultsBox from '@/components/NoResultsBox.vue'
 import { getCoverUrl, CoverSize, formatDuration } from '@/utils'
 import { 
   Music, 

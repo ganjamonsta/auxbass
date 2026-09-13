@@ -145,7 +145,7 @@ import VirtualTrackList from '@/components/VirtualTrackList.vue'
 import TagChips from '@/components/TagChips.vue'
 import api, { playerApi } from '@/api/client'
 import { User, Disc3, Globe, Music, Play, Shuffle } from 'lucide-vue-next'
-import { getCoverUrl, CoverSize } from '@/utils'
+import { getCoverUrl, CoverSize, formatDuration } from '@/utils'
 
 // Universal context menu
 const { openMenu } = useContextMenu()
@@ -264,12 +264,6 @@ const handleTagClick = (tag) => {
 // Track actions (handleLikeTrack, handleAddToLibrary, handleDirectDownload, handleHdNotice) 
 // are provided by useTrackActions composable above
 
-const formatDuration = (seconds) => {
-  if (!seconds) return '--:--'
-  const mins = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return `${mins}:${secs.toString().padStart(2, '0')}`
-}
 
 const formatYear = (date) => {
   if (!date) return ''

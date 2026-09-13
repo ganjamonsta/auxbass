@@ -213,7 +213,7 @@ import TrackItem from '@/components/TrackItem.vue'
 import TagChips from '@/components/TagChips.vue'
 import api from '@/api/client'
 import { Disc3, Check, Music, X, Play, Shuffle, Plus, Users, Share2 } from 'lucide-vue-next'
-import { splitArtists, getCoverUrl, CoverSize } from '@/utils/formatters'
+import { splitArtists, getCoverUrl, CoverSize, formatDuration } from '@/utils/formatters'
 import { useShare } from '@/composables/useShare'
 
 // Universal context menu
@@ -432,12 +432,6 @@ const handleTagClick = (tag) => {
   router.push({ path: '/search', query: { tag: cleanTag } })
 }
 
-const formatDuration = (seconds) => {
-  if (!seconds) return '--:--'
-  const mins = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return `${mins}:${secs.toString().padStart(2, '0')}`
-}
 
 const formatYear = (date) => {
   if (!date) return ''
