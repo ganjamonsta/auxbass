@@ -32,11 +32,11 @@
       <Share2 :size="18" />
     </button>
 
-    <!-- ═══ 1. LEFT COLUMN: Integrated Vertical Tabs ═══ -->
-    <nav class="hero-edge-tabs" aria-label="Разделы профиля">
+    <!-- ═══ 1. LEFT COLUMN: Monolithic Unified Tabs Unit ═══ -->
+    <nav class="hero-monolith-tabs" aria-label="Разделы профиля">
       <!-- Overview -->
       <button
-        class="hero-edge-tab-btn"
+        class="monolith-tab-btn"
         :class="{ active: activeTab === 'overview' }"
         @click="$emit('selectTab', 'overview')"
         title="Обзор медиатеки"
@@ -48,7 +48,7 @@
 
       <!-- Tracks -->
       <button
-        class="hero-edge-tab-btn"
+        class="monolith-tab-btn"
         :class="{ active: activeTab === 'tracks' }"
         @click="$emit('selectTab', 'tracks')"
         title="Треки"
@@ -61,7 +61,7 @@
 
       <!-- Playlists -->
       <button
-        class="hero-edge-tab-btn"
+        class="monolith-tab-btn"
         :class="{ active: activeTab === 'playlists' }"
         @click="$emit('selectTab', 'playlists')"
         title="Плейлисты"
@@ -75,7 +75,7 @@
       <!-- Albums -->
       <button
         v-if="overviewAlbumsCount > 0 || activeTab === 'albums'"
-        class="hero-edge-tab-btn"
+        class="monolith-tab-btn"
         :class="{ active: activeTab === 'albums' }"
         @click="$emit('selectTab', 'albums')"
         title="Альбомы"
@@ -89,7 +89,7 @@
       <!-- SoundCloud Tab -->
       <button
         v-if="scAccount && (scAccount.show_playlists || scAccount.show_tracks || isSelf)"
-        class="hero-edge-tab-btn sc-tab"
+        class="monolith-tab-btn sc-tab"
         :class="{ active: activeTab === 'soundcloud' }"
         @click="$emit('selectTab', 'soundcloud')"
         title="SoundCloud"
@@ -520,56 +520,62 @@ const getSpotifyUrl = (acc) => {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   1. LEFT COLUMN: Integrated Edge Vertical Tabs
+   1. LEFT COLUMN: Monolithic Unified Control Unit
    ═══════════════════════════════════════════════════════════ */
-.hero-edge-tabs {
+.hero-monolith-tabs {
   position: relative;
   z-index: 2;
-  width: 200px;
+  width: 215px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 6px;
+  background: rgba(13, 13, 17, 0.76);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: var(--r-lg, 16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 5px;
+  gap: 3px;
+  box-shadow: 
+    5px 5px 14px var(--sh-dark, rgba(0, 0, 0, 0.55)),
+    -2px -2px 6px var(--sh-light, rgba(255, 255, 255, 0.03)),
+    inset 1px 1px 2px rgba(255, 255, 255, 0.04);
 }
 
-.hero-edge-tab-btn {
+.monolith-tab-btn {
   display: flex;
   align-items: center;
   width: 100%;
   height: 38px;
   padding: 0 12px 0 10px;
-  border-radius: var(--r-md, 12px);
-  background: rgba(20, 20, 24, 0.6);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--r-md, 11px);
+  background: transparent;
+  border: 1px solid transparent;
   color: var(--c-text-2, #b0b0b0);
   font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
   text-align: left;
   user-select: none;
-  box-shadow: 2px 2px 5px var(--sh-dark, rgba(0, 0, 0, 0.5)), -1px -1px 2px var(--sh-light, rgba(255, 255, 255, 0.03));
   transition: all 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+  position: relative;
 }
 
-.hero-edge-tab-btn:hover {
-  background: rgba(36, 36, 42, 0.85);
+.monolith-tab-btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.06);
   color: var(--c-text-1, #ffffff);
-  border-color: rgba(255, 255, 255, 0.16);
-  transform: translateX(2px);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
-.hero-edge-tab-btn.active {
-  background: var(--c-bg-0, #0d0d0d);
+.monolith-tab-btn.active {
+  background: linear-gradient(135deg, rgba(28, 28, 35, 0.95) 0%, rgba(18, 18, 22, 0.95) 100%);
   border-color: var(--c-accent, #1db954);
   color: #ffffff;
   font-weight: 700;
   box-shadow: 
-    inset 2px 2px 4px var(--sh-inset-dark, rgba(0, 0, 0, 0.6)),
-    inset -1px -1px 2px var(--sh-inset-light, rgba(255, 255, 255, 0.03)),
-    0 0 10px var(--c-accent-glow, rgba(29, 185, 84, 0.35));
+    0 0 14px var(--c-accent-glow, rgba(29, 185, 84, 0.35)),
+    inset 0 1px 1px rgba(255, 255, 255, 0.1),
+    inset 1px 1px 3px var(--sh-inset-dark, rgba(0, 0, 0, 0.5));
 }
 
 .tab-edge-icon {
@@ -583,7 +589,7 @@ const getSpotifyUrl = (acc) => {
   transition: color 0.15s;
 }
 
-.hero-edge-tab-btn.active .tab-edge-icon {
+.monolith-tab-btn.active .tab-edge-icon {
   color: var(--c-accent, #1db954);
 }
 
@@ -593,12 +599,12 @@ const getSpotifyUrl = (acc) => {
   background: rgba(255, 255, 255, 0.1);
   margin: 0 10px;
   flex-shrink: 0;
-  transition: background 0.15s;
+  transition: background 0.15s, box-shadow 0.15s;
 }
 
-.hero-edge-tab-btn.active .tab-edge-divider {
+.monolith-tab-btn.active .tab-edge-divider {
   background: var(--c-accent, #1db954);
-  box-shadow: 0 0 6px var(--c-accent-glow, rgba(29, 185, 84, 0.5));
+  box-shadow: 0 0 8px var(--c-accent-glow, rgba(29, 185, 84, 0.5));
 }
 
 .tab-edge-label {
@@ -620,30 +626,30 @@ const getSpotifyUrl = (acc) => {
   flex-shrink: 0;
 }
 
-.hero-edge-tab-btn.active .tab-edge-badge {
+.monolith-tab-btn.active .tab-edge-badge {
   background: rgba(29, 185, 84, 0.2);
   color: var(--c-accent, #1db954);
 }
 
 /* SoundCloud Tab Accent */
-.hero-edge-tab-btn.sc-tab.active {
+.monolith-tab-btn.sc-tab.active {
   border-color: #ff5500;
   box-shadow: 
-    inset 2px 2px 4px var(--sh-inset-dark, rgba(0, 0, 0, 0.6)),
-    inset -1px -1px 2px var(--sh-inset-light, rgba(255, 255, 255, 0.03)),
-    0 0 12px rgba(255, 85, 0, 0.4);
+    0 0 14px rgba(255, 85, 0, 0.4),
+    inset 0 1px 1px rgba(255, 255, 255, 0.1),
+    inset 1px 1px 3px var(--sh-inset-dark, rgba(0, 0, 0, 0.5));
 }
 
-.hero-edge-tab-btn.sc-tab.active .tab-edge-divider {
+.monolith-tab-btn.sc-tab.active .tab-edge-divider {
   background: #ff5500;
-  box-shadow: 0 0 6px rgba(255, 85, 0, 0.6);
+  box-shadow: 0 0 8px rgba(255, 85, 0, 0.6);
 }
 
-.hero-edge-tab-btn.sc-tab.active .tab-edge-icon {
+.monolith-tab-btn.sc-tab.active .tab-edge-icon {
   color: #ff5500;
 }
 
-.hero-edge-tab-btn.sc-tab.active .tab-edge-badge {
+.monolith-tab-btn.sc-tab.active .tab-edge-badge {
   background: rgba(255, 85, 0, 0.2);
   color: #ff5500;
 }
@@ -1075,8 +1081,8 @@ const getSpotifyUrl = (acc) => {
     padding: 12px 14px;
   }
 
-  .hero-edge-tabs {
-    width: 175px;
+  .hero-monolith-tabs {
+    width: 185px;
   }
 
   .hero-name {
@@ -1138,24 +1144,24 @@ const getSpotifyUrl = (acc) => {
     justify-content: center;
   }
 
-  .hero-edge-tabs {
+  .hero-monolith-tabs {
     flex-direction: row;
     width: 100%;
     overflow-x: auto;
-    padding-bottom: 4px;
+    padding: 4px;
+    gap: 4px;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
-    gap: 8px;
   }
 
-  .hero-edge-tabs::-webkit-scrollbar {
+  .hero-monolith-tabs::-webkit-scrollbar {
     display: none;
   }
 
-  .hero-edge-tab-btn {
+  .monolith-tab-btn {
     width: auto;
     flex-shrink: 0;
-    padding: 0 14px 0 12px;
+    padding: 0 14px 0 10px;
   }
 
   .hero-tab-details-panel {
