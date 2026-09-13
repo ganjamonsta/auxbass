@@ -3,7 +3,7 @@
     <!-- No channel - show setup prompt -->
     <div v-if="!authStore.hasChannel" class="no-channel-prompt">
       <div class="prompt-icon"><Users :size="48" /></div>
-      <h2>Кенты</h2>
+      <h2>Подписки</h2>
       <p>Подключите Telegram-канал, чтобы находить друзей и подписываться на их музыку</p>
       <button class="setup-btn" @click="goToChannelSetup">
         Подключить канал

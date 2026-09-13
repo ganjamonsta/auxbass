@@ -134,7 +134,7 @@
               <div class="item-icon-box">
                 <Users :size="18" />
               </div>
-              <span class="item-label">Кенты</span>
+              <span class="item-label">Подписки</span>
               <span v-if="friendsCount" class="item-badge">{{ friendsCount }}</span>
             </button>
 

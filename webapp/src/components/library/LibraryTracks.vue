@@ -56,7 +56,7 @@
       </VirtualTrackList>
     </div>
 
-    <!-- Regular track list with search (friends/global sections) -->
+    <!-- Regular track list with search -->
     <div v-else class="track-list search-results" ref="trackListRef">
       <!-- Loading state with skeletons -->
       <template v-if="loading && !tracks.length">
@@ -70,128 +70,59 @@
             <span class="section-title">Моя библиотека</span>
             <span class="section-count">{{ tracks.length }}<template v-if="searchTotal > tracks.length"> из {{ searchTotal }}</template></span>
           </div>
-        </template>
-        
-        <TrackItem
-          v-for="track in tracks"
-          :key="track.id"
-          :track="track"
-          :isPlaying="playerStore.currentTrack?.id === track.id"
-          :isActive="playerStore.isPlaying && playerStore.currentTrack?.id === track.id"
-          :isLiked="track.is_liked"
-          @click="playTrack(track)"
-          @like="handleLikeTrack(track)"
-          @menu="(e) => openMenu('track', track, 'library', e)"
-          @download="handleDirectDownload(track)"
-          @hdNotice="handleHdNotice"
-        />
-
-        <!-- Load more trigger for my library search infinite scroll -->
-        <div v-if="hasMore" ref="loadTriggerRef" class="load-trigger">
-          <div v-if="loadingMore" class="loading-more">
-            <div class="spinner small"></div>
-          </div>
-        </div>
-
-        <!-- Load more my tracks button -->
-        <button v-if="hasMore" class="load-more-btn" :disabled="loadingMore" @click="loadMore">
-          <template v-if="loadingMore">
-            <div class="spinner small"></div>
-            <span>Загрузка...</span>
-          </template>
-          <template v-else>
-            <span>Показать ещё ({{ tracks.length }} из {{ searchTotal }})</span>
-          </template>
-        </button>
-        
-        <!-- Section: Friends' Libraries results -->
-        <template v-if="friendsTracks.length">
-          <div class="section-header friends-section">
-            <span class="section-title"><Users :size="16" /> У друзей</span>
-            <span class="section-count">{{ friendsTracks.length }}<template v-if="friendsTotal > friendsTracks.length"> из {{ friendsTotal }}</template></span>
-          </div>
           
           <TrackItem
-            v-for="track in friendsTracks"
-            :key="'friends-' + track.id"
+            v-for="track in tracks"
+            :key="track.id"
             :track="track"
             :isPlaying="playerStore.currentTrack?.id === track.id"
             :isActive="playerStore.isPlaying && playerStore.currentTrack?.id === track.id"
             :isLiked="track.is_liked"
-            :showAddToLibrary="true"
-            :inLibrary="track.in_library"
-            @click="playFriendsTrack(track)"
+            @click="playTrack(track)"
             @like="handleLikeTrack(track)"
             @menu="(e) => openMenu('track', track, 'library', e)"
             @download="handleDirectDownload(track)"
             @hdNotice="handleHdNotice"
-            @addToLibrary="handleAddToLibrary(track)"
           />
 
-          <!-- Load more friends -->
-          <button v-if="hasMoreFriends" class="load-more-btn" :disabled="friendsLoadingMore" @click="loadMoreFriends">
-            <template v-if="friendsLoadingMore">
+          <!-- Load more trigger for my library search infinite scroll -->
+          <div v-if="hasMore" ref="loadTriggerRef" class="load-trigger">
+            <div v-if="loadingMore" class="loading-more">
               <div class="spinner small"></div>
-              <span>Загрузка...</span>
-            </template>
-            <template v-else>
-              <span>Показать ещё</span>
-            </template>
-          </button>
-        </template>
-        
-        <!-- Loading friends results -->
-        <div v-if="friendsLoading" class="global-loading">
-          <div class="spinner small"></div>
-          <span>Поиск у друзей...</span>
-        </div>
-        
-        <!-- Section: Global Network results -->
-        <template v-if="globalTracks.length">
-          <div class="section-header global-section">
-            <span class="section-title"><Globe :size="16" /> Общая сеть</span>
-            <span class="section-count">{{ globalTracks.length }}<template v-if="globalTotal > globalTracks.length"> из {{ globalTotal }}</template></span>
+            </div>
           </div>
-          
-          <TrackItem
-            v-for="track in globalTracks"
-            :key="'global-' + track.id"
-            :track="track"
-            :isPlaying="playerStore.currentTrack?.id === track.id"
-            :isActive="playerStore.isPlaying && playerStore.currentTrack?.id === track.id"
-            :isLiked="track.is_liked"
-            :showAddToLibrary="true"
-            :inLibrary="track.in_library"
-            @click="playGlobalTrack(track)"
-            @like="handleLikeTrack(track)"
-            @menu="(e) => openMenu('track', track, 'library', e)"
-            @download="handleDirectDownload(track)"
-            @hdNotice="handleHdNotice"
-            @addToLibrary="handleAddToLibrary(track)"
-          />
 
-          <!-- Load more global -->
-          <button v-if="hasMoreGlobal" class="load-more-btn" :disabled="globalLoadingMore" @click="loadMoreGlobal">
-            <template v-if="globalLoadingMore">
+          <!-- Load more my tracks button -->
+          <button v-if="hasMore" class="load-more-btn" :disabled="loadingMore" @click="loadMore">
+            <template v-if="loadingMore">
               <div class="spinner small"></div>
               <span>Загрузка...</span>
             </template>
             <template v-else>
-              <span>Показать ещё</span>
+              <span>Показать ещё ({{ tracks.length }} из {{ searchTotal }})</span>
             </template>
           </button>
+
+          <!-- Subtle shortcut to global search at the end of library results -->
+          <div class="search-global-footer">
+            <button 
+              type="button" 
+              class="btn-global-search-subtle" 
+              @click="goToGlobalSearch"
+            >
+              <Search :size="15" />
+              <span>Искать «{{ localQuery || searchQuery }}» в глобальном поиске</span>
+            </button>
+          </div>
         </template>
         
-        <!-- Loading global results -->
-        <div v-if="globalLoading" class="global-loading">
-          <div class="spinner small"></div>
-          <span>Поиск в общей сети...</span>
-        </div>
-        
-        <div v-if="!tracks.length && !friendsTracks.length && !globalTracks.length && !loading && !friendsLoading && !globalLoading" class="empty-state">
+        <!-- Empty state when no tracks found in library -->
+        <div v-else-if="!loading" class="empty-state search-empty">
           <span class="empty-icon"><Music :size="48" /></span>
           <h3>Ничего не найдено</h3>
-          <p class="empty-subtext" v-if="localQuery || searchQuery">По запросу «{{ localQuery || searchQuery }}» в медиатеке нет треков</p>
+          <p class="empty-subtext" v-if="localQuery || searchQuery">
+            По запросу «{{ localQuery || searchQuery }}» в медиатеке нет треков
+          </p>
           <button 
             v-if="localQuery || searchQuery" 
             type="button" 
@@ -215,7 +146,6 @@ import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import { useSort, useTrackActions, useTrackSync } from '@/composables'
-import { useTrackSearch } from '@/composables/useTrackSearch'
 import { useContextMenu } from '@/composables/useContextMenu'
 import VirtualTrackList from '@/components/VirtualTrackList.vue'
 import TrackItem from '@/components/TrackItem.vue'
@@ -224,7 +154,7 @@ import SortChips from '@/components/SortChips.vue'
 import ExpandableSearch from '@/components/ui/ExpandableSearch.vue'
 import api from '@/api/client'
 import { getAllCachedTracks } from '@/utils/audioCacheDb'
-import { Users, Music, Globe, Shuffle, Search } from 'lucide-vue-next'
+import { Music, Shuffle, Search } from 'lucide-vue-next'
 
 // Universal context menu
 const { openMenu } = useContextMenu()
@@ -328,7 +258,7 @@ const page = ref(1)
 const searchTotal = ref(0) // Real total from API during search
 const total = computed(() => {
   if (props.searchQuery) {
-    return searchTotal.value || (friendsTracks.value.length + globalTracks.value.length)
+    return searchTotal.value
   }
   return virtualTotal.value
 })
@@ -338,28 +268,8 @@ let observer = null
 
 const hasMore = computed(() => tracks.value.length < searchTotal.value)
 
-// Unified friends + global search (via composable)
-const {
-  friendsResults: friendsTracks,
-  globalResults: globalTracks,
-  isFriendsLoading: friendsLoading,
-  isGlobalLoading: globalLoading,
-  isFriendsLoadingMore: friendsLoadingMore,
-  isGlobalLoadingMore: globalLoadingMore,
-  hasMoreFriends,
-  hasMoreGlobal,
-  friendsTotal,
-  globalTotal,
-  searchFriendsAndGlobal,
-  loadMoreFriends,
-  loadMoreGlobal,
-  clearSearch: clearSecondarySearch,
-} = useTrackSearch({ perPage: 50 })
-
 // Sync local track arrays with track changes/removals
 useTrackSync(tracks, { isLibraryList: true })
-useTrackSync(friendsTracks)
-useTrackSync(globalTracks)
 
 // Fetch function for VirtualTrackList (without search)
 const fetchTracks = async ({ offset, limit }) => {
@@ -489,12 +399,9 @@ watch(() => props.searchQuery, async (newVal) => {
   if (newVal) {
     // Search mode - load tracks via library store
     await loadSearchTracks()
-    // Search friends + global via unified composable
-    await searchFriendsAndGlobal(newVal, tracks.value)
   } else {
     // No search - reset to virtual list mode
     tracks.value = []
-    clearSecondarySearch()
     // Reset virtual list
     if (virtualTrackListRef.value) {
       virtualTrackListRef.value.reset()
@@ -513,62 +420,15 @@ const playTrack = (track) => {
   playerStore.playTrack(track, tracks.value)
 }
 
-// Play track from friends results (combine all lists for queue)
-const playFriendsTrack = (track) => {
-  const allTracks = [...tracks.value, ...friendsTracks.value, ...globalTracks.value]
-  playerStore.playTrack(track, allTracks)
-}
-
-// Play track from global results (combine all lists for queue)
-const playGlobalTrack = (track) => {
-  const allTracks = [...tracks.value, ...friendsTracks.value, ...globalTracks.value]
-  playerStore.playTrack(track, allTracks)
-}
-
-// Add track from global/friends library to user's library
-const handleAddToLibrary = async (track) => {
-  const success = await libraryStore.addToLibrary(track.id)
-  if (success) {
-    // Update the track in friendsTracks or globalTracks to show it's now in library
-    const friendsIdx = friendsTracks.value.findIndex(t => t.id === track.id)
-    if (friendsIdx !== -1) {
-      friendsTracks.value[friendsIdx].in_library = true
-      tracks.value.unshift({ ...friendsTracks.value[friendsIdx], in_library: true })
-      friendsTracks.value.splice(friendsIdx, 1)
-    }
-    
-    const globalIdx = globalTracks.value.findIndex(t => t.id === track.id)
-    if (globalIdx !== -1) {
-      globalTracks.value[globalIdx].in_library = true
-      tracks.value.unshift({ ...globalTracks.value[globalIdx], in_library: true })
-      globalTracks.value.splice(globalIdx, 1)
-    }
-    
-    uiStore.toast.success('Добавлено', 'Трек добавлен в библиотеку')
-  }
-}
-
 // Shuffle all library tracks using lazy loading
 const shuffleAll = async () => {
   if (shuffling.value) return
   shuffling.value = true
   try {
     const trimmedQuery = props.searchQuery ? props.searchQuery.trim() : ''
-    if (trimmedQuery && !searchTotal.value && (friendsTracks.value.length || globalTracks.value.length)) {
-      const allSearchTracks = [...friendsTracks.value, ...globalTracks.value]
-      if (allSearchTracks.length > 0) {
-        const shuffled = [...allSearchTracks]
-        for (let i = shuffled.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1))
-          ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
-        }
-        playerStore.playTrack(shuffled[0], shuffled)
-      }
-    } else {
-      await playerStore.playShuffleAll('library', null, null, {
-        search: trimmedQuery || undefined
-      })
-    }
+    await playerStore.playShuffleAll('library', null, null, {
+      search: trimmedQuery || undefined
+    })
   } finally {
     shuffling.value = false
   }
@@ -687,22 +547,37 @@ onUnmounted(() => {
   color: var(--c-text-3, rgba(255, 255, 255, 0.5));
 }
 
-/* Section modifiers for search results */
-.section-header.global-section,
-.section-header.friends-section {
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid var(--c-bg-4, rgba(255, 255, 255, 0.08));
+/* Global search footer button inside library search */
+.search-global-footer {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0 12px;
 }
 
-.global-loading {
-  display: flex;
+.btn-global-search-subtle {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
-  padding: 16px;
-  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+  padding: 8px 18px;
+  background: var(--c-bg-3, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--c-bg-4, rgba(255, 255, 255, 0.12));
+  border-radius: 20px;
+  color: var(--c-accent, #1db954);
   font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.btn-global-search-subtle:hover {
+  background: rgba(29, 185, 84, 0.15);
+  border-color: rgba(29, 185, 84, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-global-search-subtle:active {
+  transform: scale(0.98);
 }
 
 .load-more-btn {
