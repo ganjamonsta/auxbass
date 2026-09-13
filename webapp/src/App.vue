@@ -90,7 +90,7 @@
 
       <!-- Desktop: Now Playing Sidebar -->
       <NowPlayingSidebar 
-        v-if="isDesktop && playerStore.currentTrack && authStore.isAuthenticated"
+        v-if="isNowPlayingActive" 
         @goToUser="handleGoToUser"
       />
 
@@ -297,35 +297,45 @@ const handleLibraryTabClick = (tabId) => {
 }
 
 // Responsive detection & auto-collapse calculation
-const isDesktop = ref(window.innerWidth >= 1024)
-
-const checkCenterSpace = () => {
-  const width = window.innerWidth
-  const hasNowPlaying = !!(playerStore.currentTrack && authStore.isAuthenticated)
-  const occupiedSidebars = 280 + (hasNowPlaying ? 320 : 0)
-  const centerSpace = width - occupiedSidebars
-  // Space is tight if center is less than 780px OR screen width < 1200px
-  return centerSpace < 780 || width < 1200
-}
+// Desktop layout is >= 768px, Mobile layout is < 768px
+const isDesktop = ref(window.innerWidth >= 768)
 
 const updateLayoutState = () => {
   const width = window.innerWidth
-  isDesktop.value = width >= 1024
+  isDesktop.value = width >= 768
 
   if (!isDesktop.value) {
     uiStore.closeSidebarOverlay()
     return
   }
 
-  const isTight = checkCenterSpace()
-  uiStore.isAutoCollapsed = isTight
+  // Right sidebar (NowPlayingSidebar) auto-hiding on narrow screens:
+  // Automatically hides if window width < 1120px
+  const shouldHideRight = width < 1120
+  if (uiStore.userNowPlayingPreference === null) {
+    uiStore.setNowPlayingSidebar(!shouldHideRight)
+  } else {
+    // If screen becomes very narrow (< 960px), hide right sidebar to avoid crushing center
+    if (width < 960 && uiStore.isNowPlayingSidebarVisible) {
+      uiStore.setNowPlayingSidebar(false)
+    }
+  }
+
+  // Left sidebar auto-collapsing:
+  const hasNowPlaying = !!(playerStore.currentTrack && authStore.isAuthenticated && uiStore.isNowPlayingSidebarVisible)
+  const occupiedSidebars = 280 + (hasNowPlaying ? 320 : 0)
+  const centerSpace = width - occupiedSidebars
+  // Tight if center space < 780px or screen width < 1250px
+  const isTightLeft = centerSpace < 780 || width < 1250
+
+  uiStore.isAutoCollapsed = isTightLeft
 
   // If user hasn't explicitly overridden during session, auto-collapse when tight and expand when spacious
   if (uiStore.userCollapsedPreference === null) {
-    uiStore.setSidebarCollapsed(isTight)
+    uiStore.setSidebarCollapsed(isTightLeft)
   } else {
     // If it is tight, auto-collapse takes priority to prevent broken UI
-    if (isTight && !uiStore.isSidebarCollapsed) {
+    if (isTightLeft && !uiStore.isSidebarCollapsed) {
       uiStore.setSidebarCollapsed(true)
     }
   }
@@ -345,7 +355,7 @@ watch(() => route.path, () => {
   }
 })
 
-// Keyboard shortcuts: Esc to close overlay, Ctrl+B / Cmd+B to toggle sidebar
+// Keyboard shortcuts: Esc to close overlay, Ctrl+B / Cmd+B to toggle left sidebar, Ctrl+J to toggle right sidebar
 const handleGlobalKeyDown = (e) => {
   if (e.key === 'Escape' && uiStore.isSidebarOverlayOpen) {
     uiStore.closeSidebarOverlay()
@@ -354,13 +364,21 @@ const handleGlobalKeyDown = (e) => {
     e.preventDefault()
     uiStore.toggleSidebarCollapse()
   }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'j' && isDesktop.value && playerStore.currentTrack) {
+    e.preventDefault()
+    uiStore.toggleNowPlayingSidebar()
+  }
 }
+
+const isNowPlayingActive = computed(() => {
+  return isDesktop.value && !!playerStore.currentTrack && authStore.isAuthenticated && uiStore.isNowPlayingSidebarVisible
+})
 
 // App classes for layout
 const appClasses = computed(() => ({
   'has-player': !!playerStore.currentTrack,
   'desktop-layout': isDesktop.value && authStore.isAuthenticated,
-  'has-now-playing': isDesktop.value && !!playerStore.currentTrack && authStore.isAuthenticated,
+  'has-now-playing': isNowPlayingActive.value,
   'sidebar-collapsed': isDesktop.value && authStore.isAuthenticated && uiStore.isSidebarCollapsed,
   'sidebar-overlay-open': isDesktop.value && authStore.isAuthenticated && uiStore.isSidebarOverlayOpen
 }))
@@ -896,7 +914,7 @@ html, body {
 }
 
 /* Desktop adjustments */
-@media (min-width: 1024px) {
+@media (min-width: 768px) {
   .app.desktop-layout .main-content {
     padding: 0 24px 20px;
   }

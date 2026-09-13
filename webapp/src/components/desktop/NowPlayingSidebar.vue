@@ -3,6 +3,14 @@
     <!-- Header -->
     <div class="sidebar-header">
       <span class="header-title">Сейчас играет</span>
+      <button 
+        class="now-playing-close-btn" 
+        @click="uiStore.setNowPlayingSidebar(false, true)"
+        title="Скрыть панель"
+        aria-label="Скрыть панель"
+      >
+        <PanelRightClose :size="18" />
+      </button>
     </div>
 
     <!-- Large Cover Art -->
@@ -246,8 +254,12 @@ import { ref, computed, defineEmits } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
+import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { splitArtists, getDisplayTitle, getDisplayArtist, getAllTrackArtists, getCoverUrl, CoverSize, formatDuration } from '@/utils/formatters'
+import { PanelRightClose } from 'lucide-vue-next'
+
+const uiStore = useUIStore()
 import { Play } from 'lucide-vue-next'
 import LyricsViewer from '@/components/LyricsViewer.vue'
 
@@ -407,7 +419,29 @@ const handleToggleLike = async () => {
 
 /* Header */
 .sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 16px;
+}
+
+.now-playing-close-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.now-playing-close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
 }
 
 .header-title {

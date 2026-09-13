@@ -210,6 +210,18 @@
       <button class="mute-btn" :class="{ muted: isMuted }" @click="playerStore.toggleMute()">
         <VolumeX v-if="isMuted" :size="16" /><Volume2 v-else :size="16" />
       </button>
+
+      <!-- Toggle Now Playing Sidebar button -->
+      <button 
+        class="sidebar-ctrl-btn" 
+        :class="{ active: uiStore.isNowPlayingSidebarVisible }" 
+        @click="uiStore.toggleNowPlayingSidebar()"
+        :title="uiStore.isNowPlayingSidebarVisible ? 'Скрыть панель «Сейчас играет»' : 'Показать панель «Сейчас играет»'"
+        aria-label="Панель Сейчас играет"
+      >
+        <PanelRightClose v-if="uiStore.isNowPlayingSidebarVisible" :size="16" />
+        <PanelRight v-else :size="16" />
+      </button>
     </div>
   </div>
 </template>
@@ -218,15 +230,17 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
+import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { getCoverUrl, CoverSize } from '@/utils'
-import { Play, Square, Pause, Volume2, VolumeX, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Share2 } from 'lucide-vue-next'
+import { Play, Square, Pause, Volume2, VolumeX, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Share2, PanelRightClose, PanelRight } from 'lucide-vue-next'
 import { useNetworkMonitor } from '@/composables/useNetworkMonitor'
 import { useShare } from '@/composables/useShare'
 import VfdSegmentDisplay from './VfdSegmentDisplay.vue'
 
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
+const uiStore = useUIStore()
 const { openMenu } = useContextMenu()
 const { openShare } = useShare()
 const networkMonitor = useNetworkMonitor()
@@ -1129,6 +1143,28 @@ onUnmounted(() => {
 .share-ctrl-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   color: #60a5fa;
+}
+
+.sidebar-ctrl-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.sidebar-ctrl-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.sidebar-ctrl-btn.active {
+  color: var(--c-accent, #1db954);
 }
 
 .like-btn:hover {

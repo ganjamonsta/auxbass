@@ -93,10 +93,38 @@ export const useUIStore = defineStore('ui', () => {
     }
   }
 
+  // Right NowPlayingSidebar visibility state
+  const isNowPlayingSidebarVisible = ref(true)
+  const userNowPlayingPreference = ref(null) // null = auto, boolean = explicit user choice
+
+  const openNowPlayingSidebar = () => {
+    isNowPlayingSidebarVisible.value = true
+  }
+
+  const closeNowPlayingSidebar = (manual = false) => {
+    isNowPlayingSidebarVisible.value = false
+    if (manual) {
+      userNowPlayingPreference.value = false
+    }
+  }
+
+  const toggleNowPlayingSidebar = () => {
+    const next = !isNowPlayingSidebarVisible.value
+    isNowPlayingSidebarVisible.value = next
+    userNowPlayingPreference.value = next
+  }
+
+  const setNowPlayingSidebar = (visible, manual = false) => {
+    isNowPlayingSidebarVisible.value = visible
+    if (manual) {
+      userNowPlayingPreference.value = visible
+    }
+  }
+
   return {
     libraryTab,
     setLibraryTab,
-    // Sidebar state
+    // Left Sidebar state
     isSidebarCollapsed,
     isSidebarOverlayOpen,
     isAutoCollapsed,
@@ -106,6 +134,13 @@ export const useUIStore = defineStore('ui', () => {
     toggleSidebarOverlay,
     setSidebarCollapsed,
     toggleSidebarCollapse,
+    // Right NowPlaying Sidebar state
+    isNowPlayingSidebarVisible,
+    userNowPlayingPreference,
+    openNowPlayingSidebar,
+    closeNowPlayingSidebar,
+    toggleNowPlayingSidebar,
+    setNowPlayingSidebar,
     // Toast
     toasts,
     showToast,

@@ -90,10 +90,10 @@ const tasksStore = useTasksStore()
 const playerStore = usePlayerStore()
 const authStore = useAuthStore()
 
-const isDesktop = ref(typeof window !== 'undefined' ? window.innerWidth >= 1024 : false)
+const isDesktop = ref(typeof window !== 'undefined' ? window.innerWidth >= 768 : false)
 
 const handleResize = () => {
-  isDesktop.value = window.innerWidth >= 1024
+  isDesktop.value = window.innerWidth >= 768
 }
 
 onMounted(() => {

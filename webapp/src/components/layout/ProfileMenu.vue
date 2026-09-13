@@ -236,11 +236,11 @@ const playerStore = usePlayerStore()
 const tasksStore = useTasksStore()
 const pwaInstall = usePwaInstall()
 
-const isMobile = ref(window.innerWidth < 1024)
+const isMobile = ref(window.innerWidth < 768)
 const desktopStyle = ref({})
 
 const updateScreen = () => {
-  isMobile.value = window.innerWidth < 1024
+  isMobile.value = window.innerWidth < 768
 }
 
 const updateDesktopPosition = () => {

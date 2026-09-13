@@ -64,7 +64,7 @@
 .app.desktop-layout .desktop-player { grid-area: player; width: 100%; height: var(--desktop-player-height); overflow: visible; }
 
 /* Desktop responsive */
-@media (min-width: 1024px) {
+@media (min-width: 768px) {
   .app.desktop-layout .content { padding-bottom: 20px; }
   .app.desktop-layout .oneui-header { padding: 16px 24px; background: transparent; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
   .app.desktop-layout .header-title-main { font-size: 28px; }
