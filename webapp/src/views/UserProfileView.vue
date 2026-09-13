@@ -336,6 +336,7 @@
       <div v-show="activeTab === 'tracks'" class="tab-pane tracks-pane">
         <VirtualTrackList
           v-if="hasOpenedTracks || activeTab === 'tracks'"
+          :key="'user-tracks-' + userId"
           ref="virtualTrackListRef"
           :fetchFn="fetchUserTracks"
           :pageSize="50"
@@ -360,6 +361,7 @@
       <div v-show="activeTab === 'playlists'" class="tab-pane playlists-pane">
         <VirtualGrid
           v-if="hasOpenedPlaylists || activeTab === 'playlists'"
+          :key="'user-playlists-' + userId"
           ref="playlistsGridRef"
           type="playlist"
           :fetchFn="fetchUserPlaylists"
@@ -380,6 +382,7 @@
       <div v-show="activeTab === 'albums'" class="tab-pane albums-pane">
         <VirtualGrid
           v-if="hasOpenedAlbums || activeTab === 'albums'"
+          :key="'user-albums-' + userId"
           ref="albumsGridRef"
           type="album"
           :fetchFn="fetchUserAlbums"
@@ -584,7 +587,17 @@ const virtualTrackListRef = ref(null)
 const playlistsGridRef = ref(null)
 const albumsGridRef = ref(null)
 
+const resetScrollToTop = () => {
+  const mainContent = document.querySelector('.main-content')
+  if (mainContent) {
+    mainContent.scrollTop = 0
+  }
+}
+
 const selectTab = async (tabKey) => {
+  if (activeTab.value !== tabKey) {
+    resetScrollToTop()
+  }
   markTabOpened(tabKey)
   activeTab.value = tabKey
   await nextTick()
@@ -1010,6 +1023,11 @@ watch(
   () => route.params.id,
   (newId) => {
     if (newId && route.name === 'user-profile') {
+      activeTab.value = 'overview'
+      hasOpenedTracks.value = false
+      hasOpenedPlaylists.value = false
+      hasOpenedAlbums.value = false
+      resetScrollToTop()
       loadUserProfile(true)
     }
   }

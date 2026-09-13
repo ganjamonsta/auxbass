@@ -30,7 +30,7 @@ export function useVirtualScroll(options = {}) {
     columns = 1,
     immediate = true,
     scrollContainer = null,
-    maxCachedPages = 8
+    maxCachedPages = 12
   } = options
 
   // State
@@ -265,6 +265,27 @@ export function useVirtualScroll(options = {}) {
     }
   }
 
+  // Detect UI scale applied via zoom or --ui-scale
+  const getUIScale = () => {
+    if (typeof document === 'undefined') return 1.0
+    const zoomStyle = document.documentElement.style.zoom
+    if (zoomStyle) {
+      const parsed = parseFloat(zoomStyle)
+      if (!isNaN(parsed) && parsed > 0) return parsed
+    }
+    const cssVar = getComputedStyle(document.documentElement).getPropertyValue('--ui-scale')
+    if (cssVar) {
+      const parsed = parseFloat(cssVar)
+      if (!isNaN(parsed) && parsed > 0) return parsed
+    }
+    const computedZoom = getComputedStyle(document.documentElement).zoom
+    if (computedZoom) {
+      const parsed = parseFloat(computedZoom)
+      if (!isNaN(parsed) && parsed > 0) return parsed
+    }
+    return 1.0
+  }
+
   // Update scroll metrics
   const updateScroll = () => {
     if (!containerRef.value) return
@@ -281,14 +302,17 @@ export function useVirtualScroll(options = {}) {
     const sc = detectedScrollContainer || findScrollContainer(containerRef.value)
     detectedScrollContainer = sc
 
+    const scale = getUIScale()
+
     if (sc === window) {
-      viewportHeight.value = window.innerHeight
-      const listTop = containerRect.top
+      viewportHeight.value = window.innerHeight / scale
+      const listTop = containerRect.top / scale
       scrollTop.value = Math.max(0, -listTop)
     } else if (sc) {
-      viewportHeight.value = sc.clientHeight || window.innerHeight || 800
+      viewportHeight.value = sc.clientHeight || (window.innerHeight / scale) || 800
       const scRect = sc.getBoundingClientRect()
-      const relativeTop = containerRect.top - scRect.top
+      // Compensate for UI scale on getBoundingClientRect visual pixels
+      const relativeTop = (containerRect.top - scRect.top) / scale
       scrollTop.value = Math.max(0, -relativeTop)
     }
 

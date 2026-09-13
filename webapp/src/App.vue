@@ -542,6 +542,7 @@ const applyUIScale = () => {
   document.documentElement.style.zoom = scale
   document.documentElement.style.setProperty('--ui-scale', String(scale))
   updateLayoutState()
+  window.dispatchEvent(new Event('resize'))
 }
 
 // Watch for scale changes
