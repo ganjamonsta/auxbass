@@ -13,6 +13,7 @@ class ExternalAccountResponse(BaseModel):
     username: str
     display_name: Optional[str] = None
     profile_url: Optional[str] = None
+    permalink_url: Optional[str] = None
     avatar_url: Optional[str] = None
     likes_count: int = 0
     tracks_count: int = 0

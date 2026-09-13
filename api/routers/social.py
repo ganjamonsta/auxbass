@@ -76,9 +76,11 @@ class UserExternalAccountPublicResponse(BaseModel):
     username: str
     display_name: Optional[str] = None
     profile_url: Optional[str] = None
+    permalink_url: Optional[str] = None
     avatar_url: Optional[str] = None
     likes_count: int = 0
     tracks_count: int = 0
+    connected: bool = True
     show_on_profile: bool = True
     show_playlists: bool = True
     show_tracks: bool = True
@@ -838,9 +840,11 @@ async def get_user_external_accounts(
                 username=acc.username,
                 display_name=acc.display_name,
                 profile_url=acc.profile_url,
+                permalink_url=acc.profile_url,
                 avatar_url=acc.avatar_url,
                 likes_count=acc.likes_count or 0,
                 tracks_count=acc.tracks_count or 0,
+                connected=True,
                 show_on_profile=getattr(acc, "show_on_profile", True) if getattr(acc, "show_on_profile", None) is not None else True,
                 show_playlists=getattr(acc, "show_playlists", True) if getattr(acc, "show_playlists", None) is not None else True,
                 show_tracks=getattr(acc, "show_tracks", True) if getattr(acc, "show_tracks", None) is not None else True,

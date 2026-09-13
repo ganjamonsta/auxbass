@@ -102,6 +102,7 @@ def _account_to_response(account: UserExternalAccount) -> ExternalAccountRespons
         username=account.username,
         display_name=account.display_name,
         profile_url=account.profile_url,
+        permalink_url=account.profile_url,
         avatar_url=account.avatar_url,
         likes_count=account.likes_count,
         tracks_count=account.tracks_count,

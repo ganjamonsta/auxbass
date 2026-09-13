@@ -14,10 +14,10 @@
         <h2 class="ext-strip-name">{{ scAccount.display_name || scAccount.username }}</h2>
         <div class="ext-strip-sub">
           <span class="ext-strip-handle">@{{ scAccount.username }}</span>
-          <span v-if="scAccount.permalink_url" class="stat-separator">•</span>
+          <span v-if="scAccount.profile_url || scAccount.permalink_url" class="stat-separator">•</span>
           <a 
-            v-if="scAccount.permalink_url" 
-            :href="scAccount.permalink_url" 
+            v-if="scAccount.profile_url || scAccount.permalink_url" 
+            :href="scAccount.profile_url || scAccount.permalink_url" 
             target="_blank" 
             rel="noopener noreferrer" 
             class="ext-strip-link"
@@ -28,6 +28,10 @@
         </div>
       </div>
       <div class="ext-strip-stats">
+        <div class="ext-stat-box" v-if="scAccount.likes_count">
+          <span class="ext-stat-num">{{ scAccount.likes_count }}</span>
+          <span class="ext-stat-lbl">лайков</span>
+        </div>
         <div class="ext-stat-box">
           <span class="ext-stat-num">{{ scPlaylists.length }}</span>
           <span class="ext-stat-lbl">плейлистов</span>
@@ -137,6 +141,16 @@
           <span>Релизы и треки</span>
           <span class="subtab-count">{{ scTracks.length }}</span>
         </button>
+        <button 
+          v-if="isSelf"
+          class="sc-subtab-btn sc-likes-tab-btn" 
+          :class="{ active: scSubTab === 'likes' }"
+          @click="selectLikesSubTab"
+        >
+          <Heart :size="15" />
+          <span>Лайки</span>
+          <span v-if="scAccount.likes_count || scLikes.length" class="subtab-count">{{ scAccount.likes_count || scLikes.length }}</span>
+        </button>
       </div>
 
       <!-- Subtab 1: Playlists -->
@@ -215,14 +229,61 @@
           <p>Пользователь ещё не загружал собственные авторские треки на SoundCloud</p>
         </div>
       </div>
+
+      <!-- Subtab 3: Likes (when viewing self) -->
+      <div v-if="scSubTab === 'likes'" class="sc-subtab-content">
+        <div v-if="loadingScLikes && scLikes.length === 0" class="loading-container">
+          <div class="spinner"></div>
+        </div>
+        <div v-else-if="scLikes.length > 0" class="sc-tracks-wrapper">
+          <div class="sc-likes-top-bar">
+            <span class="sc-likes-title-hint">Понравившиеся треки на SoundCloud ({{ scLikes.length }})</span>
+            <button class="btn-pill-secondary sc-open-search-btn" @click="goToLikesInSearch">
+              <Search :size="14" />
+              <span>Открыть в поиске / импорте</span>
+            </button>
+          </div>
+          <div class="ext-tracks-list">
+            <ExternalTrackItem
+              v-for="item in scLikes"
+              :key="item.url"
+              :item="item"
+              variant="soundcloud"
+              :showBadges="true"
+              :isImporting="importingTrackUrl === item.url"
+              :isDownloading="tasksStore.isTrackDownloading(item.url)"
+              :isQueued="tasksStore.isTrackQueued(item.url)"
+              :isInLibrary="isTrackInLibrary(item)"
+              @play="$emit('quickPlay', $event)"
+              @add="$emit('quickAdd', $event)"
+            />
+          </div>
+          <div v-if="scLikesCursor" class="load-more-box">
+            <button 
+              class="btn-pill-secondary" 
+              :disabled="loadingMoreScLikes" 
+              @click="loadMoreScLikes"
+            >
+              <div v-if="loadingMoreScLikes" class="spinner small"></div>
+              <span v-else>Загрузить ещё лайки</span>
+            </button>
+          </div>
+        </div>
+        <div v-else class="empty-state">
+          <div class="empty-icon"><Heart :size="44" /></div>
+          <h3>Нет лайкнутых треков</h3>
+          <p>В вашем профиле SoundCloud пока нет лайкнутых треков</p>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useTasksStore } from '@/stores/tasks'
-import { socialApi } from '@/api/client'
+import { socialApi, ingestionApi } from '@/api/client'
 import { useUIStore } from '@/stores/ui'
 import { getTracksWord } from './profileUtils'
 import ExternalTrackItem from '@/components/ExternalTrackItem.vue'
@@ -230,6 +291,8 @@ import {
   Folder,
   Music,
   Play,
+  Heart,
+  Search,
   ExternalLink,
   ArrowLeft,
   CloudDownload,
@@ -253,12 +316,65 @@ defineEmits(['loadMore', 'syncPlaylist', 'quickPlay', 'quickAdd'])
 
 const tasksStore = useTasksStore()
 const uiStore = useUIStore()
+const router = useRouter()
 
 // Local SC-tab state
 const scSubTab = ref('playlists')
 const selectedScPlaylist = ref(null)
 const scPlaylistTracks = ref([])
 const loadingScPlaylistTracks = ref(false)
+
+// Likes state
+const scLikes = ref([])
+const loadingScLikes = ref(false)
+const scLikesCursor = ref(null)
+const loadingMoreScLikes = ref(false)
+const hasFetchedLikes = ref(false)
+
+const loadScLikes = async (reset = true) => {
+  if (!props.isSelf) return
+  loadingScLikes.value = true
+  if (reset) {
+    scLikesCursor.value = null
+    scLikes.value = []
+  }
+  try {
+    const res = await ingestionApi.getSoundCloudLikes({ limit: 40 })
+    scLikes.value = res.data?.items || []
+    scLikesCursor.value = res.data?.next_cursor || null
+    hasFetchedLikes.value = true
+  } catch (err) {
+    console.error('Failed to load SC likes:', err)
+  } finally {
+    loadingScLikes.value = false
+  }
+}
+
+const loadMoreScLikes = async () => {
+  if (!scLikesCursor.value || loadingMoreScLikes.value) return
+  loadingMoreScLikes.value = true
+  try {
+    const res = await ingestionApi.getSoundCloudLikes({ cursor: scLikesCursor.value, limit: 40 })
+    const more = res.data?.items || []
+    scLikes.value = [...scLikes.value, ...more]
+    scLikesCursor.value = res.data?.next_cursor || null
+  } catch (err) {
+    console.error('Failed to load more SC likes:', err)
+  } finally {
+    loadingMoreScLikes.value = false
+  }
+}
+
+const selectLikesSubTab = () => {
+  scSubTab.value = 'likes'
+  if (!hasFetchedLikes.value) {
+    loadScLikes(true)
+  }
+}
+
+const goToLikesInSearch = () => {
+  router.push({ path: '/search', query: { tab: 'soundcloud', mode: 'likes' } })
+}
 
 const isTrackInLibrary = (item) => {
   if (!item) return false
@@ -286,7 +402,7 @@ const closeScPlaylist = () => {
 }
 
 // Expose for parent access if needed
-defineExpose({ scPlaylistTracks })
+defineExpose({ scPlaylistTracks, openScPlaylist, closeScPlaylist })
 </script>
 
 <style scoped>
@@ -760,5 +876,45 @@ defineExpose({ scPlaylistTracks })
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+}
+
+.sc-likes-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding: 4px 8px;
+  gap: 16px;
+}
+
+.sc-likes-title-hint {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+}
+
+.sc-open-search-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  color: var(--c-text-1, #fff);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sc-open-search-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 85, 0, 0.4);
+}
+
+.sc-likes-tab-btn.active {
+  background: rgba(255, 85, 0, 0.18);
+  border-color: #ff5500;
+  color: #ff5500;
 }
 </style>

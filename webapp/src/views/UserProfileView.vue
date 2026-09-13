@@ -134,6 +134,8 @@
           :overviewTracks="overviewTracks"
           :overviewPlaylists="overviewPlaylists"
           :overviewAlbums="overviewAlbums"
+          :scAccount="scAccount"
+          :spAccount="spAccount"
           :scPlaylists="scPlaylists"
           :scTracks="scTracks"
           :spPlaylists="spPlaylists"
@@ -242,6 +244,7 @@
           :spAccount="spAccount"
           :spPlaylists="spPlaylists"
           :loadingSpPlaylists="loadingSpPlaylists"
+          :isSelf="isSelf"
         />
       </div>
     </template>
@@ -265,6 +268,7 @@ import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
 import { useTasksStore } from '@/stores/tasks'
+import { useExternalAccountsStore } from '@/stores/externalAccounts'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useTrackActions, useShare } from '@/composables'
 import { socialApi, playlistsApi, ingestionApi } from '@/api/client'
@@ -298,6 +302,7 @@ const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
 const uiStore = useUIStore()
 const tasksStore = useTasksStore()
+const externalAccountsStore = useExternalAccountsStore()
 const { openMenu } = useContextMenu()
 const { share } = useShare()
 
@@ -345,8 +350,22 @@ const loadingOverview = ref(false)
 
 // ─── External Accounts ───
 const externalAccounts = ref([])
-const scAccount = computed(() => externalAccounts.value.find(a => a.provider === 'soundcloud'))
-const spAccount = computed(() => externalAccounts.value.find(a => a.provider === 'spotify'))
+const scAccount = computed(() => {
+  const fromApi = externalAccounts.value.find(a => a.provider === 'soundcloud')
+  if (fromApi) return fromApi
+  if (isSelf.value && externalAccountsStore.isScConnected) {
+    return externalAccountsStore.scAccount
+  }
+  return null
+})
+const spAccount = computed(() => {
+  const fromApi = externalAccounts.value.find(a => a.provider === 'spotify')
+  if (fromApi) return fromApi
+  if (isSelf.value && externalAccountsStore.isSpConnected) {
+    return externalAccountsStore.spAccount
+  }
+  return null
+})
 
 const scPlaylists = ref([])
 const loadingScPlaylists = ref(false)
@@ -444,16 +463,21 @@ const loadOverviewData = async (id) => {
 const loadExternalAccounts = async (id) => {
   if (!id) return
   try {
+    if (isSelf.value) {
+      externalAccountsStore.fetchSoundCloud()
+      externalAccountsStore.fetchSpotify()
+    }
     const res = await socialApi.getUserExternalAccounts(id)
-    externalAccounts.value = res.data?.accounts || []
+    const accounts = Array.isArray(res.data) ? res.data : (res.data?.accounts || [])
+    externalAccounts.value = accounts
 
-    const sc = externalAccounts.value.find(a => a.provider === 'soundcloud')
+    const sc = accounts.find(a => a.provider === 'soundcloud') || (isSelf.value && externalAccountsStore.isScConnected ? externalAccountsStore.scAccount : null)
     if (sc) {
       if (sc.show_playlists || isSelf.value) loadScPlaylists(id)
       if (sc.show_tracks || isSelf.value) loadScTracks(id, true)
     }
 
-    const sp = externalAccounts.value.find(a => a.provider === 'spotify')
+    const sp = accounts.find(a => a.provider === 'spotify') || (isSelf.value && externalAccountsStore.isSpConnected ? externalAccountsStore.spAccount : null)
     if (sp) {
       if (sp.show_playlists || isSelf.value) loadSpPlaylists(id)
     }
@@ -754,8 +778,10 @@ const handleQuickAddExternalTrack = (item) => {
   tasksStore.enqueueTrack(item, 'soundcloud')
 }
 
-const handleOpenScPlaylist = (pl) => {
-  selectTab('soundcloud')
+const handleOpenScPlaylist = async (pl) => {
+  await selectTab('soundcloud')
+  await nextTick()
+  scTabRef.value?.openScPlaylist?.(pl)
 }
 
 // ─── Import/Ingestion Handlers ───

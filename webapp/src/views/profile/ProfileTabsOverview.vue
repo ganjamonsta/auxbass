@@ -258,6 +258,8 @@ const props = defineProps({
   overviewTracks: { type: Array, default: () => [] },
   overviewPlaylists: { type: Array, default: () => [] },
   overviewAlbums: { type: Array, default: () => [] },
+  scAccount: { type: Object, default: null },
+  spAccount: { type: Object, default: null },
   scPlaylists: { type: Array, default: () => [] },
   scTracks: { type: Array, default: () => [] },
   spPlaylists: { type: Array, default: () => [] },

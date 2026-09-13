@@ -14,10 +14,10 @@
         <h2 class="ext-strip-name">{{ spAccount.display_name || spAccount.username }}</h2>
         <div class="ext-strip-sub">
           <span class="ext-strip-handle">@{{ spAccount.username }}</span>
-          <span v-if="spAccount.permalink_url" class="stat-separator">•</span>
+          <span v-if="spAccount.profile_url || spAccount.permalink_url" class="stat-separator">•</span>
           <a 
-            v-if="spAccount.permalink_url" 
-            :href="spAccount.permalink_url" 
+            v-if="spAccount.profile_url || spAccount.permalink_url" 
+            :href="spAccount.profile_url || spAccount.permalink_url" 
             target="_blank" 
             rel="noopener noreferrer" 
             class="ext-strip-link"
@@ -50,6 +50,9 @@
           v-for="pl in spPlaylists" 
           :key="pl.id" 
           class="feed-card ext-card sp-card"
+          :class="{ 'clickable-card': isSelf }"
+          @click="openSpotifyImport(pl)"
+          :title="isSelf ? 'Открыть в окне импорта' : ''"
         >
           <div class="feed-card-cover sp-cover-box">
             <FileSpreadsheet :size="36" class="sp-card-icon" />
@@ -67,7 +70,22 @@
       <div v-else class="empty-state">
         <div class="empty-icon"><Radio :size="44" /></div>
         <h3>Нет плейлистов Spotify</h3>
-        <p>У пользователя пока нет сохраненных плейлистов из Spotify</p>
+        <p>{{ isSelf ? 'У вас пока нет сохраненных плейлистов из Spotify в Telegram-канале' : 'У пользователя пока нет сохраненных плейлистов из Spotify' }}</p>
+        <div v-if="isSelf" class="sp-empty-actions">
+          <button class="action-btn primary sp-primary-btn" @click="tasksStore.openExportifyModal()">
+            <Upload :size="15" />
+            <span>Загрузить CSV файл</span>
+          </button>
+          <a 
+            href="https://exportify.app" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            class="action-btn secondary"
+          >
+            <span>exportify.app</span>
+            <ExternalLink :size="13" />
+          </a>
+        </div>
       </div>
     </div>
   </div>
@@ -75,13 +93,23 @@
 
 <script setup>
 import { getTracksWord } from './profileUtils'
-import { Radio, ExternalLink, FileSpreadsheet } from 'lucide-vue-next'
+import { useTasksStore } from '@/stores/tasks'
+import { Radio, ExternalLink, FileSpreadsheet, Upload } from 'lucide-vue-next'
 
-defineProps({
+const props = defineProps({
   spAccount: { type: Object, default: null },
   spPlaylists: { type: Array, default: () => [] },
   loadingSpPlaylists: { type: Boolean, default: false },
+  isSelf: { type: Boolean, default: false },
 })
+
+const tasksStore = useTasksStore()
+
+const openSpotifyImport = (pl) => {
+  if (props.isSelf) {
+    tasksStore.openExportifyModal()
+  }
+}
 </script>
 
 <style scoped>
@@ -374,5 +402,47 @@ defineProps({
 .sp-date {
   color: var(--c-text-3, rgba(255, 255, 255, 0.4));
   font-size: 11px;
+}
+
+.sp-empty-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.sp-primary-btn {
+  background: #1db954;
+  color: #000;
+  font-weight: 700;
+}
+
+.sp-primary-btn:hover {
+  background: #1ed760;
+  box-shadow: 0 4px 14px rgba(29, 185, 84, 0.35);
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.action-btn.secondary {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--c-text-1, #fff);
+}
+
+.action-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
 }
 </style>

@@ -1,6 +1,22 @@
 <template>
-  <div class="profile-hero-card">
+  <div class="profile-hero-card" :class="{ 'has-avatar-backdrop': !!userAvatar }">
     <div class="hero-ambient-glow" :style="ambientGlowStyle"></div>
+
+    <!-- Mobile Backdrop: Large Avatar in the background -->
+    <div v-if="userAvatar" class="hero-mobile-backdrop">
+      <img :src="userAvatar" alt="" class="hero-backdrop-img" />
+      <div class="hero-backdrop-overlay"></div>
+    </div>
+
+    <!-- Top-left camera button on mobile if self -->
+    <button 
+      v-if="isSelf" 
+      class="hero-edit-corner-btn" 
+      @click="$emit('edit')" 
+      title="Изменить фото профиля"
+    >
+      <Camera :size="17" />
+    </button>
 
     <!-- Left: Full-Height Avatar -->
     <div 
@@ -60,19 +76,49 @@
         </div>
 
         <!-- External Connected Accounts Badges -->
-        <template v-if="scAccount">
+        <template v-if="scAccount && (isSelf || scAccount.show_on_profile !== false)">
           <span class="stat-separator">•</span>
-          <button class="hero-ext-badge sc-badge" @click="$emit('selectTab', 'soundcloud')" title="SoundCloud профиль">
+          <button 
+            class="hero-ext-badge sc-badge" 
+            @click="$emit('selectTab', 'soundcloud')" 
+            :title="`SoundCloud: @${scAccount.username}${scAccount.likes_count ? ' • ' + scAccount.likes_count + ' лайков' : ''}`"
+          >
             <span class="sc-badge-inline">SC</span>
             <span class="ext-badge-name">{{ scAccount.username }}</span>
+            <a 
+              v-if="scAccount.profile_url || scAccount.permalink_url" 
+              :href="scAccount.profile_url || scAccount.permalink_url" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              class="ext-badge-direct-link" 
+              @click.stop
+              title="Открыть профиль на SoundCloud"
+            >
+              <ExternalLink :size="10" />
+            </a>
           </button>
         </template>
 
-        <template v-if="spAccount">
+        <template v-if="spAccount && (isSelf || spAccount.show_on_profile !== false)">
           <span class="stat-separator">•</span>
-          <button class="hero-ext-badge sp-badge" @click="$emit('selectTab', 'spotify')" title="Spotify профиль">
+          <button 
+            class="hero-ext-badge sp-badge" 
+            @click="$emit('selectTab', 'spotify')" 
+            :title="`Spotify: ${spAccount.display_name || spAccount.username}`"
+          >
             <Radio :size="12" class="sp-icon-inline" />
             <span class="ext-badge-name">{{ spAccount.display_name || spAccount.username }}</span>
+            <a 
+              v-if="spAccount.profile_url || spAccount.permalink_url" 
+              :href="spAccount.profile_url || spAccount.permalink_url" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              class="ext-badge-direct-link" 
+              @click.stop
+              title="Открыть профиль на Spotify"
+            >
+              <ExternalLink :size="10" />
+            </a>
           </button>
         </template>
       </div>
@@ -153,6 +199,7 @@ import {
   EyeOff,
   Edit3,
   Radio,
+  ExternalLink,
 } from 'lucide-vue-next'
 
 defineProps({
@@ -508,6 +555,30 @@ defineEmits(['play', 'shuffle', 'follow', 'edit', 'share', 'selectTab'])
   white-space: nowrap;
 }
 
+.ext-badge-direct-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  opacity: 0.65;
+  margin-left: 2px;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.ext-badge-direct-link:hover {
+  opacity: 1;
+  transform: scale(1.18);
+}
+
+/* Mobile backdrop & edit button base */
+.hero-mobile-backdrop {
+  display: none;
+}
+
+.hero-edit-corner-btn {
+  display: none;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .profile-hero-card {
@@ -520,11 +591,106 @@ defineEmits(['play', 'shuffle', 'follow', 'edit', 'share', 'selectTab'])
     box-sizing: border-box;
   }
 
+  /* Backdrop: Large avatar on mobile */
+  .hero-mobile-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .hero-backdrop-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 20%;
+    filter: brightness(0.55) saturate(1.15);
+    transform: scale(1.04);
+  }
+
+  .hero-backdrop-overlay {
+    position: absolute;
+    inset: 0;
+    background: 
+      linear-gradient(
+        180deg,
+        rgba(10, 14, 20, 0.3) 0%,
+        rgba(10, 14, 20, 0.65) 45%,
+        rgba(10, 14, 20, 0.92) 80%,
+        var(--c-bg-2, #181818) 100%
+      ),
+      radial-gradient(
+        ellipse at top,
+        rgba(0, 0, 0, 0.1) 0%,
+        rgba(0, 0, 0, 0.55) 100%
+      );
+  }
+
+  /* Corner edit button for mobile when isSelf */
+  .hero-edit-corner-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 24px;
+    left: 24px;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--c-text-1, #fff);
+    cursor: pointer;
+    z-index: 5;
+    transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  }
+
+  .hero-edit-corner-btn:hover {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.25);
+    transform: scale(1.06);
+  }
+
+  .hero-edit-corner-btn:active {
+    transform: scale(0.96);
+  }
+
+  /* When avatar is in the background, hide duplicate circle avatar & elevate card layout */
+  .profile-hero-card.has-avatar-backdrop {
+    padding: 36px 20px 24px;
+    min-height: 230px;
+    justify-content: flex-end;
+  }
+
+  .profile-hero-card.has-avatar-backdrop .hero-avatar {
+    display: none;
+  }
+
+  .profile-hero-card.has-avatar-backdrop .hero-name {
+    font-size: 28px;
+    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.9);
+  }
+
+  .profile-hero-card.has-avatar-backdrop .hero-meta-top,
+  .profile-hero-card.has-avatar-backdrop .hero-subline,
+  .profile-hero-card.has-avatar-backdrop .hero-stat-pill {
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.95);
+  }
+
+  .profile-hero-card.has-avatar-backdrop .hero-ambient-glow {
+    opacity: 0.35;
+  }
+
   .hero-avatar {
-    width: 130px;
-    height: 130px;
-    min-width: 130px;
-    font-size: 42px;
+    width: 110px;
+    height: 110px;
+    min-width: 110px;
+    font-size: 38px;
   }
 
   .hero-body {
@@ -538,7 +704,7 @@ defineEmits(['play', 'shuffle', 'follow', 'edit', 'share', 'selectTab'])
   }
 
   .hero-name {
-    font-size: 28px;
+    font-size: 26px;
     max-width: 100%;
   }
 
@@ -552,38 +718,65 @@ defineEmits(['play', 'shuffle', 'follow', 'edit', 'share', 'selectTab'])
   }
 }
 
-@media (max-width: 480px) {
-  .hero-avatar {
-    width: 108px;
-    height: 108px;
-    min-width: 108px;
-    font-size: 36px;
-  }
-
-  .hero-name {
-    font-size: 24px;
-  }
-}
-
 @media (max-width: 600px) {
   .profile-hero-card {
-    padding: 14px 16px;
+    padding: 18px 16px;
   }
+
+  .profile-hero-card.has-avatar-backdrop {
+    padding: 28px 16px 20px;
+    min-height: 210px;
+  }
+
+  .hero-edit-corner-btn,
+  .hero-share-corner-btn {
+    top: 16px;
+    width: 38px;
+    height: 38px;
+  }
+
+  .hero-edit-corner-btn {
+    left: 16px;
+  }
+
+  .hero-share-corner-btn {
+    right: 16px;
+  }
+
   .hero-avatar {
-    width: 56px;
-    height: 56px;
-    min-width: 56px;
+    width: 72px;
+    height: 72px;
+    min-width: 72px;
+    font-size: 26px;
+  }
+
+  .hero-name {
     font-size: 22px;
   }
-  .hero-name {
-    font-size: 18px;
+
+  .profile-hero-card.has-avatar-backdrop .hero-name {
+    font-size: 24px;
   }
+
   .hero-actions-bar {
     gap: 8px;
   }
-  .hero-pill-btn {
-    padding: 7px 12px;
-    font-size: 12px;
+}
+
+@media (max-width: 480px) {
+  .profile-hero-card.has-avatar-backdrop {
+    padding: 24px 14px 18px;
+  }
+
+  .profile-hero-card.has-avatar-backdrop .hero-name {
+    font-size: 23px;
+  }
+
+  .hero-avatar {
+    width: 64px;
+    height: 64px;
+    min-width: 64px;
+    font-size: 24px;
   }
 }
 </style>
