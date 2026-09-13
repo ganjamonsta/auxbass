@@ -34,842 +34,135 @@
 
       <template v-else>
         <!-- ==================== TAB: ALL ==================== -->
-        <div v-if="activeFilter === 'all'" class="all-results-mode">
-          <!-- Matching Tracks Overview -->
-          <section v-if="topTracks.length > 0" class="result-section">
-            <div class="result-header">
-              <div class="header-left">
-                <Music :size="18" class="header-icon" />
-                <h3 class="result-title">Треки</h3>
-                <span class="result-count">{{ totalTracksCount }}</span>
-              </div>
-              <button 
-                v-if="totalTracksCount > topTracks.length" 
-                class="section-view-all" 
-                @click="activeFilter = 'tracks'"
-              >
-                <span>Все треки</span>
-                <ArrowRight :size="14" />
-              </button>
-            </div>
-            <div class="track-results-list">
-              <TrackItem
-                v-for="(track, index) in topTracks"
-                :key="track.id"
-                :track="track"
-                :isPlaying="playerStore.currentTrack?.id === track.id"
-                :isLiked="libraryStore.isTrackLiked(track.id)"
-                :showAddToLibrary="!track.in_library && !libraryStore.isInLibrary(track.id)"
-                :inLibrary="Boolean(track.in_library || libraryStore.isInLibrary(track.id))"
-                @click="handlePlayTrack(track, topTracks, index)"
-                @like="handleLikeTrack(track)"
-                @menu="(e) => openMenu('track', track, 'search', e)"
-                @download="handleDirectDownload(track)"
-                @hdNotice="handleHdNotice"
-                @addToLibrary="handleAddToLibrary(track)"
-              />
-            </div>
-          </section>
-
-          <!-- Matching SoundCloud Global Search Overview -->
-          <section v-if="soundcloudResults.length > 0" class="result-section soundcloud-section">
-            <div class="result-header">
-              <div class="header-left">
-                <span class="sc-badge">SC</span>
-                <h3 class="result-title">SoundCloud (Найдено в мире)</h3>
-                <span class="result-count">{{ soundcloudResults.length }}</span>
-              </div>
-              <button 
-                v-if="soundcloudResults.length > 5" 
-                class="section-view-all" 
-                @click="activeFilter = 'soundcloud'"
-              >
-                <span>Все {{ soundcloudResults.length }}</span>
-                <ArrowRight :size="14" />
-              </button>
-            </div>
-            
-            <div class="sc-results-list">
-              <ExternalTrackItem
-                v-for="item in soundcloudResults.slice(0, 5)"
-                :key="item.url"
-                :item="item"
-                variant="soundcloud"
-                :is-importing="importingTrackUrl === item.url"
-                :is-downloading="tasksStore.isTrackDownloading(item.url)"
-                :is-queued="tasksStore.isTrackQueued(item.url)"
-                :is-in-library="isTrackInLibrary(item)"
-                @play="handleQuickPlaySoundCloud"
-                @add="handleQuickAddSoundCloud"
-              />
-            </div>
-          </section>
-
-          <!-- Matching Spotify Global Search Overview -->
-          <section v-if="spotifyResults.length > 0" class="result-section spotify-section">
-            <div class="result-header">
-              <div class="header-left">
-                <span class="sp-badge">SP</span>
-                <h3 class="result-title">Spotify (Каталог)</h3>
-                <span class="result-count">{{ spotifyResults.length }}</span>
-              </div>
-              <button 
-                v-if="spotifyResults.length > 5" 
-                class="section-view-all" 
-                @click="activeFilter = 'spotify'"
-              >
-                <span>Все {{ spotifyResults.length }}</span>
-                <ArrowRight :size="14" />
-              </button>
-            </div>
-            
-            <div class="sc-results-list">
-              <ExternalTrackItem
-                v-for="item in spotifyResults.slice(0, 5)"
-                :key="item.url"
-                :item="item"
-                variant="spotify"
-                :is-importing="importingTrackUrl === item.url"
-                :is-downloading="tasksStore.isTrackDownloading(item.url)"
-                :is-queued="tasksStore.isTrackQueued(item.url)"
-                :is-in-library="isTrackInLibrary(item)"
-                @play="handleQuickPlaySpotify"
-                @add="handleQuickAddSpotify"
-              />
-            </div>
-          </section>
-
-          <!-- Matching Artists Overview -->
-          <section v-if="artistsResults.length > 0" class="result-section">
-            <div class="result-header">
-              <div class="header-left">
-                <Users :size="18" class="header-icon" />
-                <h3 class="result-title">Артисты</h3>
-                <span class="result-count">{{ artistsResults.length }}</span>
-              </div>
-              <button 
-                v-if="artistsResults.length > 6" 
-                class="section-view-all" 
-                @click="activeFilter = 'artists'"
-              >
-                <span>Все артисты</span>
-                <ArrowRight :size="14" />
-              </button>
-            </div>
-            <div class="horizontal-scroll">
-              <div 
-                v-for="artist in artistsResults.slice(0, 10)" 
-                :key="artist.name || artist.artist"
-                class="feed-card artist-card"
-                @click="goToArtist(artist.name || artist.artist)"
-              >
-                <div class="feed-card-cover artist-cover" :style="getArtistCoverStyle(artist)">
-                  <img 
-                    v-if="artist.image_url" 
-                    :src="getCoverUrl(artist.image_url, CoverSize.MEDIUM)" 
-                    alt="" 
-                    loading="lazy"
-                  />
-                  <span v-else class="artist-initials">
-                    {{ getArtistInitials(artist) }}
-                  </span>
-                </div>
-                <div class="feed-card-title">{{ artist.name || artist.artist }}</div>
-                <div class="feed-card-subtitle">
-                  <template v-if="artist.track_count">{{ artist.track_count }} {{ formatTrackCount(artist.track_count) }}</template>
-                  <template v-else>Исполнитель</template>
-                </div>
-                <div v-if="artist.tags?.length" class="card-tags center">
-                  <span v-for="t in artist.tags.slice(0, 2)" :key="t" class="card-tag">#{{ t }}</span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <!-- Matching Albums Overview -->
-          <section v-if="albumsResults.length > 0" class="result-section">
-            <div class="result-header">
-              <div class="header-left">
-                <Disc3 :size="18" class="header-icon" />
-                <h3 class="result-title">Альбомы</h3>
-                <span class="result-count">{{ albumsResults.length }}</span>
-              </div>
-              <button 
-                v-if="albumsResults.length > 6" 
-                class="section-view-all" 
-                @click="activeFilter = 'albums'"
-              >
-                <span>Все альбомы</span>
-                <ArrowRight :size="14" />
-              </button>
-            </div>
-            <div class="horizontal-scroll">
-              <div 
-                v-for="album in albumsResults.slice(0, 10)" 
-                :key="album.id"
-                class="feed-card"
-                @click="goToAlbum(album.id)"
-                @contextmenu.prevent="openMenu('album', album, 'search', $event)"
-              >
-                <div class="feed-card-cover">
-                  <img 
-                    v-if="album.cover_url" 
-                    :src="getCoverUrl(album.cover_url, CoverSize.MEDIUM)" 
-                    alt="" 
-                    loading="lazy"
-                  />
-                  <Disc3 v-else :size="32" />
-                </div>
-                <div class="feed-card-title">{{ album.name }}</div>
-                <div class="feed-card-subtitle">{{ album.artist }}</div>
-                <div v-if="album.tags?.length" class="card-tags">
-                  <span v-for="t in album.tags.slice(0, 2)" :key="t" class="card-tag">#{{ t }}</span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <!-- Matching Playlists Overview -->
-          <section v-if="playlistsResults.length > 0" class="result-section">
-            <div class="result-header">
-              <div class="header-left">
-                <Folder :size="18" class="header-icon" />
-                <h3 class="result-title">Плейлисты</h3>
-                <span class="result-count">{{ playlistsResults.length }}</span>
-              </div>
-              <button 
-                v-if="playlistsResults.length > 6" 
-                class="section-view-all" 
-                @click="activeFilter = 'playlists'"
-              >
-                <span>Все плейлисты</span>
-                <ArrowRight :size="14" />
-              </button>
-            </div>
-            <div class="horizontal-scroll">
-              <div 
-                v-for="pl in playlistsResults.slice(0, 10)" 
-                :key="pl.id"
-                class="feed-card"
-                @click="goToPlaylist(pl.id)"
-                @contextmenu.prevent="openMenu('playlist', pl, 'search', $event)"
-              >
-                <div class="feed-card-cover" :style="getPlaylistCoverStyle(pl)">
-                  <img 
-                    v-if="pl.covers?.length" 
-                    :src="getCoverUrl(pl.covers[0], CoverSize.MEDIUM)" 
-                    alt=""
-                    loading="lazy"
-                  />
-                  <Music v-else :size="32" />
-                </div>
-                <div class="feed-card-title">{{ pl.name }}</div>
-                <div class="feed-card-subtitle">{{ pl.track_count || 0 }} {{ formatTrackCount(pl.track_count || 0) }}</div>
-                <div v-if="pl.tags?.length" class="card-tags">
-                  <span v-for="t in pl.tags.slice(0, 2)" :key="t" class="card-tag">#{{ t }}</span>
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
+        <SearchTabAll 
+          v-if="activeFilter === 'all'"
+          :topTracks="topTracks"
+          :totalTracksCount="totalTracksCount"
+          :soundcloudResults="soundcloudResults"
+          :spotifyResults="spotifyResults"
+          :artistsResults="artistsResults"
+          :albumsResults="albumsResults"
+          :playlistsResults="playlistsResults"
+          :importingTrackUrl="importingTrackUrl"
+          @switchFilter="activeFilter = $event"
+          @playTrack="handlePlayTrack"
+          @likeTrack="handleLikeTrack"
+          @menu="(e, type, item) => openMenu(type, item, 'search', e)"
+          @downloadTrack="handleDirectDownload"
+          @hdNotice="handleHdNotice"
+          @addToLibrary="handleAddToLibrary"
+          @quickPlaySoundCloud="handleQuickPlaySoundCloud"
+          @quickAddSoundCloud="handleQuickAddSoundCloud"
+          @quickPlaySpotify="handleQuickPlaySpotify"
+          @quickAddSpotify="handleQuickAddSpotify"
+          @goToArtist="goToArtist"
+          @goToAlbum="goToAlbum"
+          @goToPlaylist="goToPlaylist"
+        />
 
         <!-- ==================== TAB: TRACKS ==================== -->
-        <div v-else-if="activeFilter === 'tracks'" class="tracks-results-mode">
-          <!-- Initial loading skeleton when searching tracks -->
-          <div v-if="isTracksSearching && allTracksList.length === 0" class="search-skeleton-list">
-            <TrackSkeleton v-for="n in 8" :key="n" />
-          </div>
-
-          <!-- Empty state when all track sources are exhausted -->
-          <NoResultsBox v-else-if="!isTracksSearching && !isFriendsLoading && !isGlobalLoading && allTracksList.length === 0" text="Треки не найдены" hint="Попробуйте изменить поисковый запрос или выбрать другой тег" />
-
-          <template v-else>
-            <!-- 1. My Library Tracks -->
-            <section v-if="libraryResults.length > 0" class="result-section">
-              <div class="section-header">
-                <span class="section-title">
-                  <Music :size="16" /> Моя библиотека
-                </span>
-                <span class="section-count">
-                  {{ libraryResults.length }}<template v-if="libraryTotal > libraryResults.length"> из {{ libraryTotal }}</template>
-                </span>
-              </div>
-              <div class="track-results-list">
-                <TrackItem
-                  v-for="(track, index) in libraryResults"
-                  :key="track.id"
-                  :track="track"
-                  :isPlaying="playerStore.currentTrack?.id === track.id"
-                  :isLiked="libraryStore.isTrackLiked(track.id)"
-                  :showAddToLibrary="false"
-                  :inLibrary="true"
-                  @click="handlePlayTrack(track, libraryResults, index)"
-                  @like="handleLikeTrack(track)"
-                  @menu="(e) => openMenu('track', track, 'search', e)"
-                  @download="handleDirectDownload(track)"
-                  @hdNotice="handleHdNotice"
-                />
-              </div>
-              <button 
-                v-if="hasMoreLibrary" 
-                class="load-more-btn" 
-                :disabled="isLibraryLoadingMore" 
-                @click="loadMoreLibrary"
-              >
-                <div v-if="isLibraryLoadingMore" class="spinner small"></div>
-                <span>{{ isLibraryLoadingMore ? 'Загрузка...' : `Показать ещё (${libraryResults.length} из ${libraryTotal})` }}</span>
-              </button>
-            </section>
-
-            <!-- 2. Friends' Tracks -->
-            <section v-if="friendsResults.length > 0" class="result-section">
-              <div class="section-header friends-section">
-                <span class="section-title">
-                  <Users :size="16" /> У друзей
-                </span>
-                <span class="section-count">
-                  {{ friendsResults.length }}<template v-if="friendsTotal > friendsResults.length"> из {{ friendsTotal }}</template>
-                </span>
-              </div>
-              <div class="track-results-list">
-                <TrackItem
-                  v-for="(track, index) in friendsResults"
-                  :key="'friends-' + track.id"
-                  :track="track"
-                  :isPlaying="playerStore.currentTrack?.id === track.id"
-                  :isLiked="libraryStore.isTrackLiked(track.id)"
-                  :showAddToLibrary="true"
-                  :inLibrary="Boolean(track.in_library || libraryStore.isInLibrary(track.id))"
-                  @click="handlePlayTrack(track, allTracksList, index)"
-                  @like="handleLikeTrack(track)"
-                  @menu="(e) => openMenu('track', track, 'search', e)"
-                  @download="handleDirectDownload(track)"
-                  @hdNotice="handleHdNotice"
-                  @addToLibrary="handleAddToLibrary(track)"
-                />
-              </div>
-              <button 
-                v-if="hasMoreFriends" 
-                class="load-more-btn" 
-                :disabled="isFriendsLoadingMore" 
-                @click="loadMoreFriends"
-              >
-                <div v-if="isFriendsLoadingMore" class="spinner small"></div>
-                <span>{{ isFriendsLoadingMore ? 'Загрузка...' : 'Показать ещё у друзей' }}</span>
-              </button>
-            </section>
-
-            <!-- Loading friends -->
-            <div v-if="isFriendsLoading" class="section-loading-indicator">
-              <div class="spinner small"></div>
-              <span>Поиск у друзей...</span>
-            </div>
-
-            <!-- 3. Global Network Tracks -->
-            <section v-if="globalResults.length > 0" class="result-section">
-              <div class="section-header global-section">
-                <span class="section-title">
-                  <Globe :size="16" /> Общая сеть
-                </span>
-                <span class="section-count">
-                  {{ globalResults.length }}<template v-if="globalTotal > globalResults.length"> из {{ globalTotal }}</template>
-                </span>
-              </div>
-              <div class="track-results-list">
-                <TrackItem
-                  v-for="(track, index) in globalResults"
-                  :key="'global-' + track.id"
-                  :track="track"
-                  :isPlaying="playerStore.currentTrack?.id === track.id"
-                  :isLiked="libraryStore.isTrackLiked(track.id)"
-                  :showAddToLibrary="true"
-                  :inLibrary="Boolean(track.in_library || libraryStore.isInLibrary(track.id))"
-                  @click="handlePlayTrack(track, allTracksList, index)"
-                  @like="handleLikeTrack(track)"
-                  @menu="(e) => openMenu('track', track, 'search', e)"
-                  @download="handleDirectDownload(track)"
-                  @hdNotice="handleHdNotice"
-                  @addToLibrary="handleAddToLibrary(track)"
-                />
-              </div>
-              <button 
-                v-if="hasMoreGlobal" 
-                class="load-more-btn" 
-                :disabled="isGlobalLoadingMore" 
-                @click="loadMoreGlobal"
-              >
-                <div v-if="isGlobalLoadingMore" class="spinner small"></div>
-                <span>{{ isGlobalLoadingMore ? 'Загрузка...' : 'Показать ещё в общей сети' }}</span>
-              </button>
-            </section>
-
-            <!-- Loading global -->
-            <div v-if="isGlobalLoading" class="section-loading-indicator">
-              <div class="spinner small"></div>
-              <span>Поиск в общей сети...</span>
-            </div>
-          </template>
-        </div>
+        <SearchTabTracks
+          v-else-if="activeFilter === 'tracks'"
+          :isTracksSearching="isTracksSearching"
+          :allTracksList="allTracksList"
+          :libraryResults="libraryResults"
+          :libraryTotal="libraryTotal"
+          :hasMoreLibrary="hasMoreLibrary"
+          :isLibraryLoadingMore="isLibraryLoadingMore"
+          :friendsResults="friendsResults"
+          :friendsTotal="friendsTotal"
+          :hasMoreFriends="hasMoreFriends"
+          :isFriendsLoadingMore="isFriendsLoadingMore"
+          :isFriendsLoading="isFriendsLoading"
+          :globalResults="globalResults"
+          :globalTotal="globalTotal"
+          :hasMoreGlobal="hasMoreGlobal"
+          :isGlobalLoadingMore="isGlobalLoadingMore"
+          :isGlobalLoading="isGlobalLoading"
+          @playTrack="handlePlayTrack"
+          @likeTrack="handleLikeTrack"
+          @menu="(e, type, item) => openMenu(type, item, 'search', e)"
+          @downloadTrack="handleDirectDownload"
+          @hdNotice="handleHdNotice"
+          @addToLibrary="handleAddToLibrary"
+          @loadMoreLibrary="loadMoreLibrary"
+          @loadMoreFriends="loadMoreFriends"
+          @loadMoreGlobal="loadMoreGlobal"
+        />
 
         <!-- ==================== TAB: ARTISTS ==================== -->
-        <div v-else-if="activeFilter === 'artists'" class="artists-results-mode">
-          <div class="section-header">
-            <span class="section-title">
-              <Users :size="18" /> Артисты
-            </span>
-            <span class="section-count">{{ artistsResults.length }}</span>
-          </div>
-          <div v-if="artistsResults.length > 0" class="artists-grid">
-            <div 
-              v-for="artist in artistsResults" 
-              :key="artist.name || artist.artist"
-              class="feed-card artist-card"
-              @click="goToArtist(artist.name || artist.artist)"
-            >
-              <div class="feed-card-cover artist-cover" :style="getArtistCoverStyle(artist)">
-                <img 
-                  v-if="artist.image_url" 
-                  :src="getCoverUrl(artist.image_url, CoverSize.MEDIUM)" 
-                  alt="" 
-                  loading="lazy"
-                />
-                <span v-else class="artist-initials">
-                  {{ getArtistInitials(artist) }}
-                </span>
-              </div>
-              <div class="feed-card-title">{{ artist.name || artist.artist }}</div>
-              <div class="feed-card-subtitle">
-                <template v-if="artist.track_count">{{ artist.track_count }} {{ formatTrackCount(artist.track_count) }}</template>
-                <template v-else>Исполнитель</template>
-              </div>
-              <div v-if="artist.tags?.length" class="card-tags center">
-                <span v-for="t in artist.tags.slice(0, 2)" :key="t" class="card-tag">#{{ t }}</span>
-              </div>
-            </div>
-          </div>
-          <NoResultsBox v-else-if="!isArtistsSearching" text="Артисты не найдены" hint="Попробуйте изменить поисковый запрос" />
-        </div>
+        <SearchTabArtists
+          v-else-if="activeFilter === 'artists'"
+          :artistsResults="artistsResults"
+          :isArtistsSearching="isArtistsSearching"
+          @goToArtist="goToArtist"
+        />
 
         <!-- ==================== TAB: SOUNDCLOUD ==================== -->
-        <div v-else-if="activeFilter === 'soundcloud'" class="soundcloud-results-mode">
-          <!-- Back to full search breadcrumb bar -->
-          <div class="sc-nav-breadcrumb-bar">
-            <button class="sc-back-search-btn" @click="resetToAllSearch">
-              <ArrowLeft :size="15" />
-              <span>Все разделы поиска</span>
-            </button>
-            <div class="sc-service-pill sc">
-              <span class="sc-badge">SC</span>
-              <span>SoundCloud</span>
-            </div>
-          </div>
-
-          <!-- Sub-tab Switcher -->
-          <div class="sc-tab-switcher">
-            <button 
-              class="sc-subtab-btn" 
-              :class="{ active: scSubTab === 'search' }"
-              @click="setScSubTab('search')"
-            >
-              <Globe :size="15" />
-              <span>Глобальный поиск</span>
-              <span v-if="soundcloudResults.length > 0" class="sc-subtab-count">{{ soundcloudResults.length }}</span>
-            </button>
-            <button 
-              class="sc-subtab-btn" 
-              :class="{ active: scSubTab === 'likes' }"
-              @click="setScSubTab('likes')"
-            >
-              <Heart :size="15" />
-              <span>Мои лайки</span>
-              <span v-if="searchQuery.trim()" class="sc-subtab-count">{{ filteredScLikes.length }}</span>
-              <span v-else-if="scAccount?.likes_count" class="sc-subtab-count">{{ scAccount.likes_count }}</span>
-            </button>
-          </div>
-
-          <!-- 1. SEARCH MODE -->
-          <template v-if="scSubTab === 'search'">
-            <div class="section-header">
-              <span class="section-title">
-                <span class="sc-badge">SC</span> SoundCloud (Глобальный поиск)
-              </span>
-              <span class="section-count">{{ soundcloudResults.length }}</span>
-            </div>
-
-            <div v-if="isSoundCloudSearching" class="section-loading-indicator">
-              <div class="spinner small"></div>
-              <span>Поиск на SoundCloud...</span>
-            </div>
-
-            <div v-else-if="soundcloudResults.length > 0" class="sc-results-list full-list">
-              <ExternalTrackItem
-                v-for="item in soundcloudResults"
-                :key="item.url"
-                :item="item"
-                variant="soundcloud"
-                :show-badges="true"
-                :is-importing="importingTrackUrl === item.url"
-                :is-downloading="tasksStore.isTrackDownloading(item.url)"
-                :is-queued="tasksStore.isTrackQueued(item.url)"
-                :is-in-library="isTrackInLibrary(item)"
-                @play="handleQuickPlaySoundCloud"
-                @add="handleQuickAddSoundCloud"
-              />
-
-              <!-- Load More SoundCloud Button -->
-              <div class="sc-load-more-wrap">
-                <button 
-                  v-if="soundcloudResults.length < 60"
-                  class="sc-load-more-btn"
-                  :disabled="isLoadingMoreSoundCloud"
-                  @click="loadMoreSoundCloud"
-                >
-                  <div v-if="isLoadingMoreSoundCloud" class="spinner small"></div>
-                  <template v-else>Загрузить ещё (до 60)</template>
-                </button>
-                <span v-else class="sc-end-notice">Показаны 60 лучших результатов SoundCloud</span>
-              </div>
-            </div>
-
-            <NoResultsBox v-else-if="!isSoundCloudSearching" :text="searchQuery.trim() ? 'На SoundCloud ничего не найдено' : 'Введите поисковый запрос выше для поиска треков на SoundCloud'" />
-          </template>
-
-          <!-- 2. LIKES MODE -->
-          <template v-else-if="scSubTab === 'likes'">
-            <!-- Account Connected Header -->
-            <div v-if="scAccount?.connected" class="sc-likes-header-card">
-              <div class="sc-likes-user-bar">
-                <img 
-                  v-if="scAccount.avatar_url" 
-                  :src="scAccount.avatar_url" 
-                  alt="" 
-                  class="sc-likes-avatar"
-                  referrerpolicy="no-referrer" 
-                />
-                <div v-else class="sc-likes-avatar-placeholder">
-                  <Radio :size="18" />
-                </div>
-                <div class="sc-likes-user-meta">
-                  <span class="sc-likes-username">{{ scAccount.display_name || scAccount.username }}</span>
-                  <span class="sc-likes-stats-text">❤️ {{ scAccount.likes_count || scLikes.length }} лайков на SoundCloud</span>
-                </div>
-              </div>
-
-              <div class="sc-likes-header-actions">
-                <button 
-                  class="sc-sync-btn"
-                  :disabled="isSyncingAllLikes || isScLikesLoading || unimportedLikesCount === 0"
-                  @click="handleSyncAllLikes"
-                  title="Импортировать все новые треки в медиатеку и канал"
-                >
-                  <div v-if="isSyncingAllLikes" class="spinner small"></div>
-                  <CloudDownload v-else :size="15" />
-                  <span>{{ isSyncingAllLikes ? 'Синхронизация...' : `Синхронизировать новые (${unimportedLikesCount})` }}</span>
-                </button>
-                <button 
-                  class="sc-refresh-icon-btn" 
-                  :disabled="isScLikesLoading"
-                  @click="fetchScLikes(true)"
-                  title="Обновить список лайков"
-                >
-                  <RefreshCw :size="15" :class="{ 'spin-icon': isScLikesLoading }" />
-                </button>
-              </div>
-            </div>
-
-            <!-- Sync progress bar if active -->
-            <div v-if="syncJobProgress" class="sc-sync-progress-banner">
-              <div class="sc-sync-info-row">
-                <span class="sc-sync-msg">Импорт: {{ syncJobProgress.current_track_title || 'Загрузка...' }}</span>
-                <span class="sc-sync-count">{{ syncJobProgress.processed_tracks }} / {{ syncJobProgress.total_tracks }}</span>
-              </div>
-              <div class="sc-sync-bar-track">
-                <div 
-                  class="sc-sync-bar-fill" 
-                  :style="{ width: `${Math.round((syncJobProgress.processed_tracks / (syncJobProgress.total_tracks || 1)) * 100)}%` }"
-                ></div>
-              </div>
-            </div>
-
-            <!-- Loading indicator -->
-            <div v-if="isScLikesLoading && scLikes.length === 0" class="section-loading-indicator">
-              <div class="spinner small"></div>
-              <span>Загрузка лайков с SoundCloud...</span>
-            </div>
-
-            <!-- Active Search Filter Banner for Likes -->
-            <div v-if="searchQuery.trim() && scLikes.length > 0" class="sc-likes-filter-notice">
-              <span>Фильтр лайков: <b>«{{ searchQuery.trim() }}»</b> (найдено {{ filteredScLikes.length }})</span>
-              <button class="clear-filter-mini-btn" @click="clearSearchInput" title="Сбросить фильтр поиска">
-                ✕ Сбросить
-              </button>
-            </div>
-
-            <!-- Likes Track List -->
-            <div v-if="filteredScLikes.length > 0" class="sc-results-list full-list">
-              <ExternalTrackItem
-                v-for="item in filteredScLikes"
-                :key="item.url"
-                :item="item"
-                variant="soundcloud"
-                :show-badges="true"
-                :is-importing="importingTrackUrl === item.url"
-                :is-downloading="tasksStore.isTrackDownloading(item.url)"
-                :is-queued="tasksStore.isTrackQueued(item.url)"
-                :is-in-library="isTrackInLibrary(item)"
-                @play="handleQuickPlaySoundCloud"
-                @add="handleQuickAddSoundCloud"
-              />
-
-              <!-- Load more likes button -->
-              <div v-if="scLikesCursor" class="sc-load-more-wrap">
-                <button 
-                  class="sc-load-more-btn"
-                  :disabled="isLoadingMoreScLikes || isSearchingDeeperLikes"
-                  @click="searchQuery.trim() ? loadAllLikesUntilMatch() : loadMoreScLikes()"
-                >
-                  <div v-if="isLoadingMoreScLikes || isSearchingDeeperLikes" class="spinner small"></div>
-                  <template v-else>
-                    {{ searchQuery.trim() ? 'Искать глубже в остальных лайках' : `Загрузить ещё лайки (${scLikes.length} из ${scAccount?.likes_count || '...'})` }}
-                  </template>
-                </button>
-              </div>
-            </div>
-
-            <!-- No results in likes matching query -->
-            <NoResultsBox v-else-if="searchQuery.trim() && scLikes.length > 0 && !isScLikesLoading" :text="`В загруженных лайках нет треков по запросу «${searchQuery}»`" :hint="`Проверено ${scLikes.length} из ${scAccount?.likes_count || scLikes.length} лайков вашего профиля.`">
-              <div class="sc-no-results-actions">
-                <button 
-                  v-if="scLikesCursor"
-                  class="sc-load-more-btn"
-                  :disabled="isLoadingMoreScLikes || isSearchingDeeperLikes"
-                  @click="loadAllLikesUntilMatch"
-                >
-                  <div v-if="isLoadingMoreScLikes || isSearchingDeeperLikes" class="spinner small"></div>
-                  <template v-else>Искать дальше в остальных лайках</template>
-                </button>
-                <button class="sc-load-more-btn sc-global-fallback-btn" @click="scSubTab = 'search'">
-                  <Globe :size="15" />
-                  <span>Искать во всём каталоге SoundCloud</span>
-                </button>
-              </div>
-            </NoResultsBox>
-
-            <!-- Not Connected Prompt -->
-            <div v-else-if="!scAccount?.connected && !isScLikesLoading" class="sc-not-connected-banner">
-              <div class="sc-banner-icon">
-                <Radio :size="32" />
-              </div>
-              <h4 class="sc-banner-title">Аккаунт SoundCloud не подключен</h4>
-              <p class="sc-banner-desc">
-                Привяжите ваш профиль SoundCloud в настройках, чтобы просматривать лайки, слушать и автоматически сохранять аудиофайлы в личный Telegram-канал.
-              </p>
-              <button class="sc-btn primary" @click="router.push('/settings')">
-                <Settings :size="15" />
-                <span>Открыть настройки</span>
-              </button>
-            </div>
-
-            <!-- Empty likes -->
-            <NoResultsBox v-else-if="!isScLikesLoading" text="Лайков на SoundCloud пока нет" hint="Поставьте лайки на SoundCloud и нажмите «Обновить»" />
-          </template>
-        </div>
+        <SearchTabSoundCloud
+          v-else-if="activeFilter === 'soundcloud'"
+          :soundcloudResults="soundcloudResults"
+          :searchQuery="searchQuery"
+          :scSubTab="scSubTab"
+          :isSoundCloudSearching="isSoundCloudSearching"
+          :isLoadingMoreSoundCloud="isLoadingMoreSoundCloud"
+          :importingTrackUrl="importingTrackUrl"
+          :scAccount="scAccount"
+          :scLikes="scLikes"
+          :filteredScLikes="filteredScLikes"
+          :scLikesCursor="scLikesCursor"
+          :isScLikesLoading="isScLikesLoading"
+          :isLoadingMoreScLikes="isLoadingMoreScLikes"
+          :isSearchingDeeperLikes="isSearchingDeeperLikes"
+          :isSyncingAllLikes="isSyncingAllLikes"
+          :syncJobProgress="syncJobProgress"
+          :unimportedLikesCount="unimportedLikesCount"
+          @resetToAllSearch="resetToAllSearch"
+          @setScSubTab="setScSubTab"
+          @loadMoreSoundCloud="loadMoreSoundCloud"
+          @quickPlaySoundCloud="handleQuickPlaySoundCloud"
+          @quickAddSoundCloud="handleQuickAddSoundCloud"
+          @handleSyncAllLikes="handleSyncAllLikes"
+          @fetchScLikes="fetchScLikes"
+          @clearSearchInput="clearSearchInput"
+          @loadAllLikesUntilMatch="loadAllLikesUntilMatch"
+          @loadMoreScLikes="loadMoreScLikes"
+          @goToSettings="router.push('/settings')"
+        />
 
         <!-- ==================== TAB: SPOTIFY ==================== -->
-        <div v-else-if="activeFilter === 'spotify'" class="spotify-results-mode">
-          <!-- Back to full search breadcrumb bar -->
-          <div class="sc-nav-breadcrumb-bar">
-            <button class="sc-back-search-btn" @click="resetToAllSearch">
-              <ArrowLeft :size="15" />
-              <span>Все разделы поиска</span>
-            </button>
-            <div class="sc-service-pill sp">
-              <span class="sp-badge">SP</span>
-              <span>Spotify</span>
-            </div>
-          </div>
-
-          <!-- Sub-tab Switcher -->
-          <div class="sc-tab-switcher">
-            <button 
-              class="sc-subtab-btn" 
-              :class="{ active: spSubTab === 'search' }"
-              @click="setSpSubTab('search')"
-            >
-              <Globe :size="15" />
-              <span>Глобальный поиск</span>
-              <span v-if="spotifyResults.length > 0" class="sc-subtab-count sp-count">{{ spotifyResults.length }}</span>
-            </button>
-            <button 
-              class="sc-subtab-btn" 
-              :class="{ active: spSubTab === 'exportify' }"
-              @click="setSpSubTab('exportify')"
-            >
-              <FileSpreadsheet :size="15" />
-              <span>Импорт Exportify (CSV)</span>
-            </button>
-          </div>
-
-          <!-- 1. SEARCH MODE -->
-          <template v-if="spSubTab === 'search'">
-            <div class="section-header">
-              <span class="section-title">
-                <span class="sp-badge">SP</span> Spotify (Глобальный поиск)
-              </span>
-              <span class="section-count">{{ spotifyResults.length }}</span>
-            </div>
-
-            <div v-if="isSpotifySearching" class="section-loading-indicator">
-              <div class="spinner small"></div>
-              <span>Поиск на Spotify...</span>
-            </div>
-
-            <div v-else-if="spotifyResults.length > 0" class="sc-results-list full-list">
-              <ExternalTrackItem
-                v-for="item in spotifyResults"
-                :key="item.url"
-                :item="item"
-                variant="spotify"
-                :show-badges="true"
-                :is-importing="importingTrackUrl === item.url"
-                :is-downloading="tasksStore.isTrackDownloading(item.url)"
-                :is-queued="tasksStore.isTrackQueued(item.url)"
-                :is-in-library="isTrackInLibrary(item)"
-                @play="handleQuickPlaySpotify"
-                @add="handleQuickAddSpotify"
-              />
-
-              <!-- Load More Spotify Button -->
-              <div class="sc-load-more-wrap">
-                <button 
-                  v-if="spotifyResults.length < 60"
-                  class="sc-load-more-btn sp-load-more"
-                  :disabled="isLoadingMoreSpotify"
-                  @click="loadMoreSpotify"
-                >
-                  <div v-if="isLoadingMoreSpotify" class="spinner small"></div>
-                  <template v-else>Загрузить ещё (до 60)</template>
-                </button>
-                <span v-else class="sc-end-notice">Показаны 60 лучших результатов Spotify</span>
-              </div>
-            </div>
-
-            <NoResultsBox v-else-if="!isSpotifySearching" :text="searchQuery.trim() ? 'В каталоге ничего не найдено' : 'Введите поисковый запрос выше для поиска треков в каталоге Spotify'" />
-          </template>
-
-          <!-- 2. EXPORTIFY CSV MODE -->
-          <template v-else-if="spSubTab === 'exportify'">
-            <div class="sp-exportify-view-card">
-              <div class="sp-exportify-header-banner">
-                <div class="sp-exportify-icon-large">
-                  <FileSpreadsheet :size="32" />
-                </div>
-                <div class="sp-exportify-banner-text">
-                  <h3 class="sp-exportify-title">Импорт медиатеки Spotify через Exportify</h3>
-                  <p class="sp-exportify-subtitle">
-                    100% бесплатно и без ограничений: выгрузите любимые треки или плейлисты в CSV и импортируйте их в высоком качестве 320 kbps с автоматическим распознаванием дубликатов.
-                  </p>
-                </div>
-              </div>
-
-              <div class="sp-exportify-steps-grid">
-                <div class="sp-step-card">
-                  <span class="sp-step-badge">1</span>
-                  <h4>Экспорт на exportify.app</h4>
-                  <p>Откройте бесплатный веб-сервис в браузере (работает в 1 клик):</p>
-                  <a href="https://exportify.app" target="_blank" rel="noopener noreferrer" class="sp-ext-link-btn">
-                    <span>exportify.app</span>
-                    <ExternalLink :size="13" />
-                  </a>
-                </div>
-                <div class="sp-step-card">
-                  <span class="sp-step-badge">2</span>
-                  <h4>Скачайте CSV-файл</h4>
-                  <p>Нажмите <b>«Export»</b> напротив <b>«Liked Songs»</b> или любого плейлиста.</p>
-                </div>
-                <div class="sp-step-card highlight">
-                  <span class="sp-step-badge">3</span>
-                  <h4>Загрузите сюда</h4>
-                  <p>Откройте окно импорта и перетащите скачанный файл:</p>
-                  <button class="sp-open-modal-btn" @click="tasksStore.openExportifyModal()">
-                    <Upload :size="15" />
-                    <span>Открыть окно импорта CSV</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </template>
-        </div>
+        <SearchTabSpotify
+          v-else-if="activeFilter === 'spotify'"
+          :spotifyResults="spotifyResults"
+          :searchQuery="searchQuery"
+          :spSubTab="spSubTab"
+          :isSpotifySearching="isSpotifySearching"
+          :isLoadingMoreSpotify="isLoadingMoreSpotify"
+          :importingTrackUrl="importingTrackUrl"
+          @resetToAllSearch="resetToAllSearch"
+          @setSpSubTab="setSpSubTab"
+          @loadMoreSpotify="loadMoreSpotify"
+          @quickPlaySpotify="handleQuickPlaySpotify"
+          @quickAddSpotify="handleQuickAddSpotify"
+        />
 
         <!-- ==================== TAB: ALBUMS ==================== -->
-        <div v-else-if="activeFilter === 'albums'" class="albums-results-mode">
-          <div class="section-header">
-            <span class="section-title">
-              <Disc3 :size="18" /> Альбомы
-            </span>
-            <span class="section-count">{{ albumsResults.length }}</span>
-          </div>
-          <div v-if="albumsResults.length > 0" class="albums-grid">
-            <div 
-              v-for="album in albumsResults" 
-              :key="album.id"
-              class="feed-card"
-              @click="goToAlbum(album.id)"
-              @contextmenu.prevent="openMenu('album', album, 'search', $event)"
-            >
-              <div class="feed-card-cover">
-                <img 
-                  v-if="album.cover_url" 
-                  :src="getCoverUrl(album.cover_url, CoverSize.MEDIUM)" 
-                  alt="" 
-                  loading="lazy"
-                />
-                <Disc3 v-else :size="32" />
-              </div>
-              <div class="feed-card-title">{{ album.name }}</div>
-              <div class="feed-card-subtitle">{{ album.artist }}</div>
-              <div v-if="album.tags?.length" class="card-tags">
-                <span v-for="t in album.tags.slice(0, 2)" :key="t" class="card-tag">#{{ t }}</span>
-              </div>
-            </div>
-          </div>
-          <NoResultsBox v-else-if="!isAlbumsSearching" text="Альбомы не найдены" hint="Попробуйте изменить поисковый запрос" />
-        </div>
+        <SearchTabAlbums
+          v-else-if="activeFilter === 'albums'"
+          :albumsResults="albumsResults"
+          :isAlbumsSearching="isAlbumsSearching"
+          @goToAlbum="goToAlbum"
+          @menu="(e, type, item) => openMenu(type, item, 'search', e)"
+        />
 
         <!-- ==================== TAB: PLAYLISTS ==================== -->
-        <div v-else-if="activeFilter === 'playlists'" class="playlists-results-mode">
-          <div class="section-header">
-            <span class="section-title">
-              <Folder :size="18" /> Плейлисты
-            </span>
-            <span class="section-count">{{ playlistsResults.length }}</span>
-          </div>
-          <div v-if="playlistsResults.length > 0" class="playlists-grid">
-            <div 
-              v-for="pl in playlistsResults" 
-              :key="pl.id"
-              class="feed-card"
-              @click="goToPlaylist(pl.id)"
-              @contextmenu.prevent="openMenu('playlist', pl, 'search', $event)"
-            >
-              <div class="feed-card-cover" :style="getPlaylistCoverStyle(pl)">
-                <img 
-                  v-if="pl.covers?.length" 
-                  :src="getCoverUrl(pl.covers[0], CoverSize.MEDIUM)" 
-                  alt=""
-                  loading="lazy"
-                />
-                <Music v-else :size="32" />
-              </div>
-              <div class="feed-card-title">{{ pl.name }}</div>
-              <div class="feed-card-subtitle">{{ pl.track_count || 0 }} {{ formatTrackCount(pl.track_count || 0) }}</div>
-              <div v-if="pl.tags?.length" class="card-tags">
-                <span v-for="t in pl.tags.slice(0, 2)" :key="t" class="card-tag">#{{ t }}</span>
-              </div>
-            </div>
-          </div>
-          <NoResultsBox v-else-if="!isPlaylistsSearching" text="Плейлисты не найдены" hint="Попробуйте изменить поисковый запрос" />
-        </div>
+        <SearchTabPlaylists
+          v-else-if="activeFilter === 'playlists'"
+          :playlistsResults="playlistsResults"
+          :isPlaylistsSearching="isPlaylistsSearching"
+          @goToPlaylist="goToPlaylist"
+          @menu="(e, type, item) => openMenu(type, item, 'search', e)"
+        />
 
         <!-- Global Empty Results (All categories empty) -->
         <NoResultsBox v-if="noResults" :text="`Ничего не найдено по запросу «${searchQuery}»`" hint="Попробуйте ввести другой тег, название трека, исполнителя или плейлиста" />
@@ -877,80 +170,29 @@
     </div>
 
     <!-- ==================== EXPLORE MODE: DYNAMIC TAGS GRID ==================== -->
-    <div v-else class="search-explore-container">
-      <div class="explore-header">
-        <div class="explore-title-row">
-          <div class="title-with-icon">
-            <Hash :size="20" class="explore-icon" />
-            <h2 class="explore-heading">Обзор по тегам</h2>
-          </div>
-          <!-- Scope switcher -->
-          <div class="tag-scope-tabs">
-            <button 
-              class="scope-tab" 
-              :class="{ active: tagScope === 'library' }"
-              @click="switchScope('library')"
-            >
-              Мои теги
-            </button>
-            <button 
-              class="scope-tab" 
-              :class="{ active: tagScope === 'global' }"
-              @click="switchScope('global')"
-            >
-              Все теги
-            </button>
-          </div>
-        </div>
-        <p class="explore-subheading">Нажмите на любой тег, чтобы открыть подборку музыки</p>
-      </div>
-
-      <!-- Loading tags skeleton -->
-      <div v-if="loadingTags && tags.length === 0" class="tags-loading-grid">
-        <div v-for="n in 8" :key="n" class="tag-tile-skeleton">
-          <div class="skeleton-tag-title"></div>
-          <div class="skeleton-tag-count"></div>
-        </div>
-      </div>
-
-      <!-- Tags Grid -->
-      <div v-else class="tags-grid">
-        <div 
-          v-for="tag in displayTags" 
-          :key="tag.name"
-          class="tag-tile"
-          :style="{ background: getTagGradient(tag.name) }"
-          @click="handleTagClick(tag.name)"
-        >
-          <div class="tag-info">
-            <span class="tag-name">#{{ tag.name }}</span>
-            <span v-if="tag.track_count > 0" class="tag-count">
-              {{ tag.track_count }} {{ formatTrackCount(tag.track_count) }}
-            </span>
-          </div>
-
-          <!-- Decorative Hash watermark -->
-          <div class="tag-watermark">
-            <Hash :size="48" stroke-width="2.5" />
-          </div>
-
-          <!-- Quick play mix button -->
-          <button 
-            v-if="tag.track_count > 0"
-            class="tag-play-btn"
-            @click.stop="handlePlayTagMix(tag.name)"
-            title="Слушать микс по тегу"
-          >
-            <Play :size="16" fill="currentColor" />
-          </button>
-        </div>
-      </div>
-    </div>
+    <SearchExploreTags
+      v-else
+      :tagScope="tagScope"
+      :loadingTags="loadingTags"
+      :tags="tags"
+      :displayTags="displayTags"
+      @switchScope="switchScope"
+      @tagClick="handleTagClick"
+      @playTagMix="handlePlayTagMix"
+    />
 
   </div>
 </template>
 
 <script setup>
+import SearchTabAll from '@/components/search/SearchTabAll.vue'
+import SearchTabTracks from '@/components/search/SearchTabTracks.vue'
+import SearchTabSoundCloud from '@/components/search/SearchTabSoundCloud.vue'
+import SearchTabSpotify from '@/components/search/SearchTabSpotify.vue'
+import SearchTabArtists from '@/components/search/SearchTabArtists.vue'
+import SearchTabAlbums from '@/components/search/SearchTabAlbums.vue'
+import SearchTabPlaylists from '@/components/search/SearchTabPlaylists.vue'
+import SearchExploreTags from '@/components/search/SearchExploreTags.vue'
 import { ref, computed, watch, onMounted, onUnmounted, onActivated } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
