@@ -457,7 +457,22 @@ const handleSyncAllLikes = async () => {
   isSyncingAllLikes.value = true
   try {
     const urls = toImport.map(t => t.url)
-    const res = await ingestionApi.start(urls[0], urls)
+    const tracks = toImport.map(t => ({
+      url: t.url,
+      title: t.title,
+      artist: t.artist,
+      duration: t.duration,
+      cover_url: t.cover_url,
+      genre: t.genre,
+      tags: t.tags,
+      extra: {
+        is_soundcloud: true,
+        liked_at: t.liked_at,
+        genre: t.genre,
+        tags: t.tags,
+      }
+    }))
+    const res = await ingestionApi.start(urls[0], urls, tracks, `SoundCloud Likes (${toImport.length})`)
     const jobId = res.data?.id
     uiStore.toast?.success('Синхронизация', `Запущен импорт ${urls.length} треков в медиатеку и Telegram-канал`)
 
@@ -534,6 +549,8 @@ const handleQuickPlaySoundCloud = async (scTrack) => {
       artist: scTrack.artist,
       duration: scTrack.duration,
       cover_url: scTrack.cover_url,
+      genre: scTrack.genre,
+      tags: scTrack.tags,
       add_to_library: false,
     })
 

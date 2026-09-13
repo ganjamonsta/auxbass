@@ -168,6 +168,7 @@ export const authApi = {
   validate: () => api.post('/auth/validate'),
   me: () => api.get('/auth/me'),
   status: () => api.get('/auth/status'),  // Get user status with channel info
+  verifyChannel: () => api.post('/auth/channel/verify'), // Actively check channel permissions
   getConfig: () => api.get('/auth/config'),
   verifyCode: (data) => api.post('/auth/verify-code', data),
   refresh: () => api.post('/auth/refresh'),
@@ -336,7 +337,7 @@ export const socialApi = {
 // Ingestion (External imports from SoundCloud, Spotify, etc.)
 export const ingestionApi = {
   preview: (url) => api.post('/ingestion/preview', { url }),
-  start: nonCacheable((url, selectedUrls = null) => api.post('/ingestion/start', { url, selected_urls: selectedUrls }), 'track'),
+  start: nonCacheable((url, selectedUrls = null, tracks = null, title = null) => api.post('/ingestion/start', { url, selected_urls: selectedUrls, tracks, title }), 'track'),
   getJob: (jobId) => api.get(`/ingestion/jobs/${jobId}`, { bypassCache: true }),
   cancelJob: (jobId) => api.post(`/ingestion/jobs/${jobId}/cancel`),
   getRecent: () => api.get('/ingestion/recent', { bypassCache: true }),

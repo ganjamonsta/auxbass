@@ -18,7 +18,7 @@ from sqlalchemy import select, and_, or_
 
 from shared.config import get_settings
 from shared.database import get_session
-from shared.models import Track, Playlist, PlaylistTrack, UserLibrary, LibrarySource
+from shared.models import Track, Playlist, PlaylistTrack, UserLibrary, LibrarySource, ForwardSourceType
 from shared.matching import (
     normalize_artist,
     normalize_title,
@@ -269,24 +269,47 @@ class IngestionPipeline:
                 track_count=job.total_tracks,
             )
 
-            # 1. Fetch full tracklist (or use pre-parsed custom tracks from Exportify CSV)
+            # 1. Fetch full tracklist (or use pre-parsed custom tracks from Exportify CSV or Likes batch)
             if getattr(job, "custom_tracks", None):
-                tracks_meta = [
-                    TrackMetadata(
-                        provider_name=job.provider_name,
-                        url=t.get("url") or f"https://open.spotify.com/track/{t.get('external_id') or t.get('id') or idx}",
-                        title=t.get("title", "Unknown Track"),
-                        artist=t.get("artist", "Unknown Artist"),
-                        album=t.get("album"),
-                        duration=t.get("duration"),
-                        cover_url=t.get("cover_url") or job.cover_url,
-                        external_id=str(t.get("external_id") or t.get("id") or idx),
-                        extra=t.get("extra") or {},
+                tracks_meta = []
+                for idx, t in enumerate(job.custom_tracks, start=1):
+                    extra = dict(t.get("extra") or {})
+                    if t.get("genre") and "genre" not in extra:
+                        extra["genre"] = t.get("genre")
+                    if t.get("tags") and "tags" not in extra:
+                        extra["tags"] = t.get("tags")
+                    if job.provider_name == "soundcloud":
+                        extra["is_soundcloud"] = True
+
+                    tracks_meta.append(
+                        TrackMetadata(
+                            provider_name=job.provider_name,
+                            url=t.get("url") or f"https://open.spotify.com/track/{t.get('external_id') or t.get('id') or idx}",
+                            title=t.get("title", "Unknown Track"),
+                            artist=t.get("artist", "Unknown Artist"),
+                            album=t.get("album"),
+                            duration=t.get("duration"),
+                            cover_url=t.get("cover_url") or job.cover_url,
+                            external_id=str(t.get("external_id") or t.get("id") or idx),
+                            extra=extra,
+                        )
                     )
-                    for idx, t in enumerate(job.custom_tracks, start=1)
-                ]
             else:
                 tracks_meta = await provider.fetch_tracklist(entity)
+                # If multiple individual track URLs were selected, resolve the others if not in tracklist
+                if job.selected_urls and len(job.selected_urls) > len(tracks_meta):
+                    existing_urls = {t.url for t in tracks_meta}
+                    for u in job.selected_urls:
+                        if u not in existing_urls:
+                            try:
+                                u_ent = await provider.resolve_entity(u)
+                                u_tracks = await provider.fetch_tracklist(u_ent)
+                                for ut in u_tracks:
+                                    if ut.url not in existing_urls:
+                                        tracks_meta.append(ut)
+                                        existing_urls.add(ut.url)
+                            except Exception as res_err:
+                                logger.warning(f"Could not resolve selected URL {u}: {res_err}")
 
             if not tracks_meta:
                 job.status = JobStatus.FAILED
@@ -368,6 +391,11 @@ class IngestionPipeline:
                             duration=existing.duration,
                             library_source=LibrarySource.UPLOADED,
                             enrich=False,
+                            cover_url=track_meta.cover_url,
+                            genre=track_meta.extra.get("genre"),
+                            tags=track_meta.extra.get("tags"),
+                            album_name=track_meta.album,
+                            source_provider=job.provider_name,
                         )
 
                         # Add to playlist if playlist import
@@ -423,7 +451,9 @@ class IngestionPipeline:
                         job.download_percent = 100
                         job.updated_at = datetime.now(timezone.utc)
 
-                        safe_filename = f"{track_meta.artist} - {track_meta.title}.mp3".replace("/", "-")
+                        effective_meta = downloaded.metadata or track_meta
+
+                        safe_filename = f"{effective_meta.artist} - {effective_meta.title}.mp3".replace("/", "-")
                         audio_input = FSInputFile(downloaded.audio_path, filename=safe_filename)
                         thumb_input = None
                         if downloaded.cover_path and os.path.exists(downloaded.cover_path):
@@ -436,9 +466,9 @@ class IngestionPipeline:
                                 sent_msg = await self.bot.send_audio(
                                     chat_id=target_chat_id,
                                     audio=audio_input,
-                                    title=track_meta.title,
-                                    performer=track_meta.artist,
-                                    duration=track_meta.duration,
+                                    title=effective_meta.title,
+                                    performer=effective_meta.artist,
+                                    duration=effective_meta.duration,
                                     thumbnail=thumb_input,
                                 )
                                 break
@@ -469,14 +499,21 @@ class IngestionPipeline:
                             user_id=job.user_id,
                             file_id=sent_msg.audio.file_id,
                             file_unique_id=sent_msg.audio.file_unique_id,
-                            title=track_meta.title,
-                            artist=track_meta.artist,
-                            duration=sent_msg.audio.duration or track_meta.duration,
+                            title=effective_meta.title,
+                            artist=effective_meta.artist,
+                            duration=sent_msg.audio.duration or effective_meta.duration,
                             file_size=sent_msg.audio.file_size or downloaded.file_size,
                             mime_type=sent_msg.audio.mime_type or "audio/mpeg",
                             file_name=safe_filename,
+                            forward_source_type=ForwardSourceType.BOT,
+                            forward_source_name=job.provider_name,
                             library_source=LibrarySource.UPLOADED,
                             enrich=True,
+                            cover_url=effective_meta.cover_url,
+                            genre=effective_meta.extra.get("genre"),
+                            tags=effective_meta.extra.get("tags"),
+                            album_name=effective_meta.album,
+                            source_provider=job.provider_name,
                         )
 
                         # E. Add to playlist

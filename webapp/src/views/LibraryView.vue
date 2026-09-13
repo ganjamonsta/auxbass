@@ -1,7 +1,7 @@
 <template>
   <div class="library-view">
-    <!-- No channel - show setup prompt -->
-    <div v-if="!authStore.hasChannel" class="no-channel-prompt">
+    <!-- No channel AND no existing content - show onboarding setup prompt -->
+    <div v-if="!authStore.hasChannel && !hasExistingContent" class="no-channel-prompt">
       <div class="prompt-icon">📚</div>
       <h2>Ваша библиотека</h2>
       <p>Подключите Telegram-канал, чтобы сохранять треки и создавать свою коллекцию музыки</p>
@@ -10,8 +10,17 @@
       </button>
     </div>
 
-    <!-- Has channel - show library -->
+    <!-- Has channel OR has existing content - show library -->
     <template v-else>
+      <!-- Channel Warning Banner if disconnected but user has tracks -->
+      <div v-if="!authStore.hasChannel" class="channel-warning-banner" @click="goToChannelSetup">
+        <span class="warning-icon">⚠️</span>
+        <div class="warning-text">
+          <strong>Связь с Telegram-каналом потеряна</strong>
+          <span>{{ authStore.channelError || 'Бот удалён или не имеет прав администратора. Новые треки не бэкапятся.' }}</span>
+        </div>
+        <button class="warning-btn">Подключить</button>
+      </div>
       <!-- Persistent Library Tabs Navigation (always visible across all tabs) -->
       <div class="library-persistent-nav" :class="{ 'search-active': isOverviewSearchOpen }">
         <!-- Desktop Section Title -->
@@ -423,6 +432,13 @@ const handleImportFinished = () => {
 const goToChannelSetup = () => {
   router.push('/settings#channel')
 }
+
+const hasExistingContent = computed(() => {
+  return (libraryStore.tracks?.length > 0) || 
+         (libraryStore.playlists?.length > 0) || 
+         !!authStore.channelInfo ||
+         !!authStore.channelError
+})
 
 // Available tabs
 const tabs = [
@@ -1411,5 +1427,68 @@ onUnmounted(() => {
 .no-channel-prompt .setup-btn:hover {
   transform: scale(1.02);
   box-shadow: 0 4px 16px rgba(0, 230, 118, 0.3);
+}
+
+/* ─── Channel Warning Banner ─── */
+.channel-warning-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.channel-warning-banner:hover {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.channel-warning-banner .warning-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.channel-warning-banner .warning-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.channel-warning-banner .warning-text strong {
+  font-size: 14px;
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+.channel-warning-banner .warning-text span {
+  font-size: 12px;
+  color: var(--c-text-2, #a1a1aa);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.channel-warning-banner .warning-btn {
+  background: #f59e0b;
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.channel-warning-banner .warning-btn:hover {
+  transform: scale(1.04);
 }
 </style>

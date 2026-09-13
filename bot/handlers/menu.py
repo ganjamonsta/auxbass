@@ -433,6 +433,40 @@ async def cb_channel_setup(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
+@router.callback_query(F.data.startswith("ch:connect:"))
+async def cb_channel_auto_connect(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    channel_id_str = callback.data.split(":", 2)[2]
+    try:
+        channel_id = int(channel_id_str)
+        channel_obj = await channel_service.setup_channel(
+            user_id=callback.from_user.id,
+            channel_id=channel_id,
+            bot=callback.bot,
+        )
+        if channel_obj:
+            # Also reconcile tracks
+            restored = await channel_service.reconcile_channel_tracks(callback.from_user.id)
+            restored_str = f"\n\n♻️ Восстановлен доступ к <b>{restored}</b> трекам." if restored > 0 else ""
+            await callback.message.edit_text(
+                f"✅ <b>Канал подключён!</b>\n\n"
+                f"📢 <b>{channel_obj.channel_title or 'Резервный канал'}</b>\n\n"
+                f"Все новые аудиофайлы будут автоматически пересылаться в этот канал.{restored_str}",
+                reply_markup=get_channel_back_keyboard(),
+            )
+        else:
+            await callback.message.edit_text(
+                "❌ Не удалось подключить канал. Убедитесь, что у бота есть права администратора.",
+                reply_markup=get_channel_back_keyboard(),
+            )
+    except Exception as e:
+        await callback.message.edit_text(
+            f"❌ Ошибка подключения канала: {e}",
+            reply_markup=get_channel_back_keyboard(),
+        )
+    await callback.answer()
+
+
 @router.callback_query(F.data == "ch:setup_cancel")
 async def cb_channel_setup_cancel(callback: CallbackQuery, state: FSMContext):
     await state.clear()

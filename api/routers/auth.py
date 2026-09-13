@@ -20,7 +20,7 @@ from aiogram.types import BufferedInputFile
 
 from shared.config import get_settings
 from shared.database import get_session, get_db
-from shared.models import User, UserChannel
+from shared.models import User, UserChannel, utcnow
 from api.schemas.common import TelegramUser, UserStatusResponse
 from api.schemas.auth import (
     AuthResult,
@@ -392,6 +392,68 @@ async def get_user_status(
         has_channel=has_channel,
         can_save=has_channel,  # Can save = has channel
         channel_info=channel_info,
+    )
+
+
+@router.post("/channel/verify", response_model=UserStatusResponse)
+async def verify_channel_status(
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Actively verify bot's access to user's configured channel via Telegram Bot API.
+    Updates UserChannel.is_active if access has changed, and reconciles unavailable tracks if restored.
+    """
+    channel = await db.scalar(
+        select(UserChannel).where(UserChannel.user_id == user.id)
+    )
+    if not channel:
+        return UserStatusResponse(
+            user=user,
+            has_channel=False,
+            can_save=False,
+            channel_info=None,
+            error="Канал не настроен. Подключите канал через команду /channel в боте.",
+        )
+
+    from bot.services.channels import get_channel_service
+    ch_svc = get_channel_service()
+
+    error_msg = None
+    if ch_svc and ch_svc.bot:
+        success, title, err = await ch_svc.verify_channel_access(channel.channel_id)
+        if success:
+            if not channel.is_active:
+                channel.is_active = True
+                channel.updated_at = utcnow()
+            if title:
+                channel.channel_title = title
+            await db.commit()
+            # Reconcile tracks if access restored
+            await ch_svc.reconcile_channel_tracks(user.id)
+        else:
+            error_msg = err or "Бот не имеет прав администратора в канале"
+            if channel.is_active:
+                channel.is_active = False
+                channel.updated_at = utcnow()
+                await db.commit()
+    else:
+        error_msg = "Сервис бота недоступен для проверки"
+
+    has_channel = channel.is_active
+    channel_info = {
+        "channel_id": channel.channel_id,
+        "channel_username": channel.channel_username,
+        "channel_title": channel.channel_title,
+        "auto_forward": channel.auto_forward,
+    } if has_channel else None
+
+    return UserStatusResponse(
+        user=user,
+        has_channel=has_channel,
+        can_save=has_channel,
+        channel_info=channel_info,
+        error=error_msg,
     )
 
 

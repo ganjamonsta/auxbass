@@ -25,6 +25,7 @@ class UserStatusResponse(BaseModel):
     has_channel: bool = False  # True if user connected backup channel
     can_save: bool = False  # True if user can save tracks, create playlists, etc.
     channel_info: Optional[dict] = None  # Channel details if connected
+    error: Optional[str] = None  # Optional error description if verification failed
 
 
 class PaginatedResponse(BaseModel):

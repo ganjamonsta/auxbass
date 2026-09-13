@@ -28,6 +28,15 @@
                   @{{ authStore.channelInfo.channel_username }}
                 </span>
               </div>
+              <button 
+                class="action-btn secondary check-access-btn" 
+                :disabled="isRefreshingChannel" 
+                @click="refreshStatus" 
+                title="Проверить права бота в канале"
+              >
+                <RefreshCw :size="12" :class="{ 'spin-anim': isRefreshingChannel }" />
+                <span>{{ isRefreshingChannel ? 'Проверка...' : 'Проверить' }}</span>
+              </button>
             </div>
             <div class="channel-features">
               <div class="feature-item"><Check :size="13" /> Сохранение треков</div>
@@ -57,9 +66,13 @@
                 <li>Перешлите любое сообщение из канала боту</li>
               </ol>
             </div>
-            <button class="action-btn primary channel-refresh-btn" @click="refreshStatus">
-              <RefreshCw :size="15" />
-              <span>Обновить статус</span>
+            <p v-if="authStore.channelError" class="channel-error-msg">
+              <AlertCircle :size="14" />
+              <span>{{ authStore.channelError }}</span>
+            </p>
+            <button class="action-btn primary channel-refresh-btn" :disabled="isRefreshingChannel" @click="refreshStatus">
+              <RefreshCw :size="15" :class="{ 'spin-anim': isRefreshingChannel }" />
+              <span>{{ isRefreshingChannel ? 'Проверка прав...' : 'Обновить статус' }}</span>
             </button>
           </div>
         </template>
@@ -836,6 +849,7 @@ import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
 import { useTasksStore } from '@/stores/tasks'
 import { useExternalAccountsStore } from '@/stores/externalAccounts'
+import { useUIStore } from '@/stores/ui'
 import api, { authApi, ingestionApi } from '@/api/client'
 import { 
   Megaphone, Check, Folder, Heart, ListMusic, Cloud, RefreshCw, Lock, 
@@ -856,6 +870,7 @@ const playerStore = usePlayerStore()
 const tasksStore = useTasksStore()
 const externalAccountsStore = useExternalAccountsStore()
 const pwaInstall = usePwaInstall()
+const uiStore = useUIStore()
 
 const goToMyProfile = () => {
   if (authStore.user?.id) {
@@ -1124,8 +1139,23 @@ const loadBotConfig = async () => {
   }
 }
 
+const isRefreshingChannel = ref(false)
+
 const refreshStatus = async () => {
-  await authStore.fetchStatus()
+  if (isRefreshingChannel.value) return
+  isRefreshingChannel.value = true
+  try {
+    const res = await authStore.verifyChannel()
+    if (res.has_channel) {
+      uiStore.toast.success('Канал активен', `Бот подключён к «${res.channel_info?.channel_title || 'каналу'}»`)
+    } else {
+      uiStore.toast.warning('Канал недоступен', res.error || 'Бот не имеет прав администратора в канале')
+    }
+  } catch (err) {
+    uiStore.toast.error('Ошибка проверки', 'Не удалось проверить статус канала')
+  } finally {
+    isRefreshingChannel.value = false
+  }
 }
 
 const loadPrivacySettings = async () => {
@@ -1842,6 +1872,38 @@ const handleResetState = (event) => {
 .channel-refresh-btn {
   width: 100%;
   margin-top: 4px;
+}
+
+.channel-error-msg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ef4444;
+  font-size: 13px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin: 12px 0 6px 0;
+  text-align: left;
+}
+
+.check-access-btn {
+  margin-left: auto;
+  font-size: 12px;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+}
+
+.spin-anim {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* ═══════════════════════════════════════════════

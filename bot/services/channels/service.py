@@ -413,6 +413,42 @@ class ChannelService:
             
             return False
     
+    async def reconcile_channel_tracks(self, user_id: int) -> int:
+        """
+        Reconcile unavailable tracks that exist in the user's channel.
+        Resets track.is_unavailable = False for tracks with confirmed ChannelMessage.
+        Returns count of restored tracks.
+        """
+        async with get_session() as session:
+            channel = await session.scalar(
+                select(UserChannel).where(
+                    UserChannel.user_id == user_id,
+                    UserChannel.is_active == True,
+                )
+            )
+            if not channel:
+                return 0
+            
+            stmt = (
+                select(Track)
+                .join(ChannelMessage, ChannelMessage.track_id == Track.id)
+                .where(
+                    ChannelMessage.channel_id == channel.id,
+                    ChannelMessage.status == ChannelMessageStatus.SENT,
+                    Track.is_unavailable == True,
+                )
+            )
+            tracks = (await session.scalars(stmt)).all()
+            count = 0
+            for t in tracks:
+                t.is_unavailable = False
+                count += 1
+            
+            if count > 0:
+                await session.commit()
+                logger.info(f"Reconciled {count} unavailable tracks for user {user_id}")
+            return count
+    
     async def forward_track_to_channel(
         self,
         user_id: int,

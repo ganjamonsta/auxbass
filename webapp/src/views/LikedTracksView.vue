@@ -1,7 +1,7 @@
 <template>
   <div class="liked-tracks-view">
-    <!-- No channel - show setup prompt -->
-    <div v-if="!authStore.hasChannel" class="no-channel-prompt">
+    <!-- No channel AND no existing content - show setup prompt -->
+    <div v-if="!authStore.hasChannel && !hasExistingContent" class="no-channel-prompt">
       <div class="prompt-icon">
         <Heart :size="48" />
       </div>
@@ -13,6 +13,15 @@
     </div>
 
     <template v-else>
+      <!-- Channel Warning Banner if disconnected but user has tracks -->
+      <div v-if="!authStore.hasChannel" class="channel-warning-banner" @click="goToChannelSetup">
+        <span class="warning-icon">⚠️</span>
+        <div class="warning-text">
+          <strong>Связь с Telegram-каналом потеряна</strong>
+          <span>{{ authStore.channelError || 'Бот удалён или не имеет прав администратора. Новые лайки не будут сохранены в канал.' }}</span>
+        </div>
+        <button class="warning-btn">Подключить</button>
+      </div>
       <!-- Unified Hero Header -->
       <div class="hero-header">
         <div class="hero-cover liked-cover">
@@ -117,6 +126,10 @@ const { handleDirectDownload, handleHdNotice } = useTrackActions()
 const goToChannelSetup = () => {
   router.push('/settings#channel')
 }
+
+const hasExistingContent = computed(() => {
+  return (tracks.value?.length > 0) || !!authStore.channelInfo || !!authStore.channelError
+})
 
 const tracks = computed(() => libraryStore.likedTracks)
 const loading = ref(true)
@@ -230,5 +243,68 @@ onMounted(async () => {
 .empty-state .hint {
   font-size: 13px;
   color: var(--c-text-3);
+}
+
+/* ─── Channel Warning Banner ─── */
+.channel-warning-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.channel-warning-banner:hover {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.channel-warning-banner .warning-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.channel-warning-banner .warning-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.channel-warning-banner .warning-text strong {
+  font-size: 14px;
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+.channel-warning-banner .warning-text span {
+  font-size: 12px;
+  color: var(--c-text-2, #a1a1aa);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.channel-warning-banner .warning-btn {
+  background: #f59e0b;
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.channel-warning-banner .warning-btn:hover {
+  transform: scale(1.04);
 }
 </style>

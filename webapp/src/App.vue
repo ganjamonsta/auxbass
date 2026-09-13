@@ -209,6 +209,32 @@
       <!-- Share Modal -->
       <ShareModal />
 
+      <!-- Channel Access Required Modal -->
+      <Teleport to="body">
+        <div v-if="channelAccessModal.show" class="channel-access-overlay" @click.self="channelAccessModal.show = false">
+          <div class="channel-access-dialog">
+            <div class="channel-access-icon">📢</div>
+            <h3>Требуется доступ к каналу</h3>
+            <p>
+              Бот <strong v-if="channelAccessModal.botUsername">@{{ channelAccessModal.botUsername }}</strong>
+              не имеет доступа к вашему каналу
+              <strong v-if="channelAccessModal.channelTitle">«{{ channelAccessModal.channelTitle }}»</strong>.
+            </p>
+            <p class="channel-access-sub">
+              Чтобы воспроизводить треки и обновлять ссылки, добавьте бота администратором в канал с правом публикации сообщений.
+            </p>
+            <div class="channel-access-actions">
+              <button class="action-btn primary" @click="goToChannelSettings">
+                Настройки канала
+              </button>
+              <button class="action-btn secondary" @click="channelAccessModal.show = false">
+                Понятно
+              </button>
+            </div>
+          </div>
+        </div>
+      </Teleport>
+
       <!-- Profile Context Menu -->
       <ProfileMenu v-model="showProfileMenu" placement="header" />
     </template>
@@ -596,6 +622,27 @@ const handleNetworkRecovered = () => {
   uiStore.toast.success('Сеть восстановлена', 'Соединение восстановлено')
 }
 
+// === Channel Access Required Modal State ===
+const channelAccessModal = ref({
+  show: false,
+  channelTitle: '',
+  botUsername: ''
+})
+
+const handleChannelAccessRequired = (e) => {
+  const detail = e.detail || {}
+  channelAccessModal.value = {
+    show: true,
+    channelTitle: detail.channel_title || authStore.channelInfo?.channel_title || '',
+    botUsername: detail.bot_username || authStore.botUsername || ''
+  }
+}
+
+const goToChannelSettings = () => {
+  channelAccessModal.value.show = false
+  router.push('/settings#channel')
+}
+
 // Initialize auth on mount
 onMounted(async () => {
   // Apply initial scale
@@ -685,6 +732,7 @@ onMounted(async () => {
   window.addEventListener('player:error', handlePlayerError)
   window.addEventListener('player:stall-recovered', handleStallRecovered)
   window.addEventListener('player:network-recovered', handleNetworkRecovered)
+  window.addEventListener('player:channel-access-required', handleChannelAccessRequired)
   
   // Handle unavailable tracks - show notification with helpful message
   playerStore.setOnTrackUnavailable((track, message, isLargeFile) => {
@@ -720,6 +768,7 @@ onUnmounted(() => {
   window.removeEventListener('player:error', handlePlayerError)
   window.removeEventListener('player:stall-recovered', handleStallRecovered)
   window.removeEventListener('player:network-recovered', handleNetworkRecovered)
+  window.removeEventListener('player:channel-access-required', handleChannelAccessRequired)
   networkMonitor.stopMonitoring()
   // Reset zoom on unmount
   document.body.style.zoom = ''
@@ -1042,5 +1091,84 @@ html, body {
 
 .header-profile-btn:hover .header-avatar-badge {
   transform: scale(1.06);
+}
+
+/* ── Channel Access Required Modal ── */
+.channel-access-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.channel-access-dialog {
+  background: var(--bg-card, #18181b);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  border-radius: 16px;
+  max-width: 420px;
+  width: 100%;
+  padding: 24px;
+  text-align: center;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+.channel-access-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+
+.channel-access-dialog h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--text-primary, #fff);
+}
+
+.channel-access-dialog p {
+  font-size: 14px;
+  color: var(--text-secondary, #a1a1aa);
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.channel-access-dialog p strong {
+  color: var(--c-accent, #1db954);
+}
+
+.channel-access-sub {
+  font-size: 13px !important;
+  opacity: 0.8;
+  margin-bottom: 20px !important;
+}
+
+.channel-access-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.channel-access-actions .action-btn {
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.channel-access-actions .action-btn.primary {
+  background: var(--c-accent, #1db954);
+  color: #000;
+}
+
+.channel-access-actions .action-btn.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
 }
 </style>

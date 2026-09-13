@@ -25,7 +25,7 @@ from shared.config import get_settings
 from shared.database import get_session, get_db
 from shared.models import (
     User, Track, UserLibrary, AlbumTrack, Playlist, PlaylistTrack, LibrarySource,
-    UserExternalAccount, UserChannel, ChannelMessage, ChannelMessageStatus, utcnow
+    ForwardSourceType, UserExternalAccount, UserChannel, ChannelMessage, ChannelMessageStatus, utcnow
 )
 from api.routers.auth import get_current_user, TelegramUser
 from api.schemas.tracks import TrackResponse
@@ -55,6 +55,8 @@ class SearchItemResponse(BaseModel):
     duration: Optional[int] = None
     cover_url: Optional[str] = None
     external_id: Optional[str] = None
+    genre: Optional[str] = None
+    tags: Optional[List[str]] = None
     in_library: bool = False
     in_channel: bool = False
     already_in_tg: bool = False
@@ -67,6 +69,8 @@ class QuickImportRequest(BaseModel):
     artist: Optional[str] = None
     duration: Optional[int] = None
     cover_url: Optional[str] = None
+    genre: Optional[str] = None
+    tags: Optional[List[str]] = None
     add_to_library: bool = False
 
 
@@ -98,6 +102,8 @@ class SoundCloudLikeItem(BaseModel):
     artist: str
     duration: Optional[int] = None
     cover_url: Optional[str] = None
+    genre: Optional[str] = None
+    tags: Optional[List[str]] = None
     in_library: bool = False
     in_channel: bool = False
     already_in_tg: bool = False
@@ -120,6 +126,8 @@ class TrackPreviewItem(BaseModel):
     artist: str
     duration: Optional[int] = None
     cover_url: Optional[str] = None
+    genre: Optional[str] = None
+    tags: Optional[List[str]] = None
     in_library: bool = False
     already_in_tg: bool = False
     track_id: Optional[int] = None
@@ -175,7 +183,9 @@ class PreviewResponse(BaseModel):
 
 class StartImportRequest(BaseModel):
     url: str
+    title: Optional[str] = None
     selected_urls: Optional[List[str]] = None
+    tracks: Optional[List[Dict[str, Any]]] = None
 
 
 class JobResponse(BaseModel):
@@ -267,6 +277,8 @@ async def preview_url(
                     artist=t.artist,
                     duration=t.duration,
                     cover_url=t.cover_url,
+                    genre=t.extra.get("genre") if t.extra else None,
+                    tags=t.extra.get("tags") if t.extra else None,
                     in_library=in_lib,
                     already_in_tg=already_in_tg,
                     track_id=existing_id,
@@ -316,18 +328,21 @@ async def start_import(
         )
 
     selected_urls = req.selected_urls
-    total_tracks = len(selected_urls) if selected_urls else entity.track_count
+    custom_tracks = req.tracks or None
+    total_tracks = len(custom_tracks) if custom_tracks else (len(selected_urls) if selected_urls else entity.track_count)
+    job_title = req.title or (f"SoundCloud Likes ({total_tracks})" if (selected_urls and len(selected_urls) > 1 and entity.entity_type == EntityType.TRACK) else entity.title)
 
     job = await job_manager.create_job(
         user_id=user.id,
         url=url,
         provider_name=provider.name,
         entity_type=entity.entity_type.value,
-        title=entity.title,
+        title=job_title,
         total_tracks=total_tracks,
         author=entity.author,
         cover_url=entity.cover_url,
         selected_urls=selected_urls,
+        custom_tracks=custom_tracks,
     )
 
     bot = _get_active_bot()
@@ -418,6 +433,8 @@ async def search_external_tracks(
                 duration=r.duration,
                 cover_url=r.cover_url,
                 external_id=r.external_id,
+                genre=r.extra.get("genre") if r.extra else None,
+                tags=r.extra.get("tags") if r.extra else None,
                 in_library=in_lib,
                 already_in_tg=already_in_tg,
                 track_id=existing_id,
@@ -457,6 +474,10 @@ async def quick_import_track(
                 library_source=LibrarySource.UPLOADED,
                 enrich=False,
                 add_to_library=True,
+                cover_url=req.cover_url,
+                genre=req.genre,
+                tags=req.tags,
+                source_provider="soundcloud" if "soundcloud" in req.url else None,
             )
 
             # Auto-forward to user's Telegram backup channel if active
@@ -494,6 +515,14 @@ async def quick_import_track(
             detail="Unsupported track URL",
         )
 
+    extra_data = {}
+    if req.genre:
+        extra_data["genre"] = req.genre
+    if req.tags:
+        extra_data["tags"] = req.tags
+    if "soundcloud" in req.url:
+        extra_data["is_soundcloud"] = True
+
     track_meta = TrackMetadata(
         provider_name=provider.name,
         url=req.url,
@@ -501,6 +530,7 @@ async def quick_import_track(
         artist=req.artist or "Artist",
         duration=req.duration,
         cover_url=req.cover_url,
+        extra=extra_data,
     )
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -533,7 +563,9 @@ async def quick_import_track(
         bot = _get_active_bot()
         target_chat = settings.scanner_buffer_chat_id or user.id
 
-        safe_filename = f"{track_meta.artist} - {track_meta.title}.mp3".replace("/", "-")
+        effective_meta = downloaded.metadata or track_meta
+
+        safe_filename = f"{effective_meta.artist} - {effective_meta.title}.mp3".replace("/", "-")
         audio_input = FSInputFile(downloaded.audio_path, filename=safe_filename)
         thumb_input = None
         if downloaded.cover_path and os.path.exists(downloaded.cover_path):
@@ -543,9 +575,9 @@ async def quick_import_track(
             sent_msg = await bot.send_audio(
                 chat_id=target_chat,
                 audio=audio_input,
-                title=track_meta.title,
-                performer=track_meta.artist,
-                duration=track_meta.duration,
+                title=effective_meta.title,
+                performer=effective_meta.artist,
+                duration=effective_meta.duration,
                 thumbnail=thumb_input,
             )
         except Exception as e:
@@ -566,15 +598,22 @@ async def quick_import_track(
             user_id=user.id,
             file_id=sent_msg.audio.file_id,
             file_unique_id=sent_msg.audio.file_unique_id,
-            title=track_meta.title,
-            artist=track_meta.artist,
-            duration=sent_msg.audio.duration or track_meta.duration,
+            title=effective_meta.title,
+            artist=effective_meta.artist,
+            duration=sent_msg.audio.duration or effective_meta.duration,
             file_size=sent_msg.audio.file_size or downloaded.file_size,
             mime_type=sent_msg.audio.mime_type or "audio/mpeg",
             file_name=safe_filename,
+            forward_source_type=ForwardSourceType.BOT,
+            forward_source_name=provider.name,
             library_source=LibrarySource.UPLOADED,
             enrich=True,
             add_to_library=req.add_to_library,
+            cover_url=effective_meta.cover_url,
+            genre=effective_meta.extra.get("genre"),
+            tags=effective_meta.extra.get("tags"),
+            album_name=effective_meta.album,
+            source_provider=provider.name,
         )
 
         # Auto-forward to user's Telegram backup channel ONLY if add_to_library is True
@@ -786,6 +825,8 @@ async def get_soundcloud_likes(
                 artist=t.artist,
                 duration=t.duration,
                 cover_url=t.cover_url,
+                genre=t.extra.get("genre") if t.extra else None,
+                tags=t.extra.get("tags") if t.extra else None,
                 in_library=in_lib,
                 in_channel=in_chan,
                 already_in_tg=already_in_tg,

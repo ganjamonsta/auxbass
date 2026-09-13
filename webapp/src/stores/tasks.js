@@ -87,6 +87,8 @@ export const useTasksStore = defineStore('tasks', () => {
       artist: track.artist || 'Неизвестный исполнитель',
       duration: track.duration,
       cover_url: track.cover_url,
+      genre: track.genre,
+      tags: track.tags,
       source: source || 'soundcloud',
       rawTrack: track,
     }
@@ -146,6 +148,8 @@ export const useTasksStore = defineStore('tasks', () => {
         artist: item.artist,
         duration: item.duration,
         cover_url: item.cover_url,
+        genre: item.genre,
+        tags: item.tags,
         add_to_library: true,
       })
 

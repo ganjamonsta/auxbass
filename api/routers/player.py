@@ -382,14 +382,18 @@ async def get_telegram_file_path(file_id: str) -> Optional[str]:
         return None
 
 
-async def refresh_file_id_from_channel(track_id: int, db: AsyncSession) -> Optional[str]:
+async def refresh_file_id_from_channel(
+    track_id: int, db: AsyncSession
+) -> tuple[Optional[str], Optional[str], Optional[str]]:
     """
     Try to get fresh file_id from user's channel message.
     
-    When a track's file_id becomes stale, we can retrieve the message
-    from the channel where it was forwarded and extract the new file_id.
-    
-    Returns the new file_id if successful, None otherwise.
+    Returns:
+        (new_file_id, error_code, channel_title)
+        error_code can be:
+          - None: success or no channel message
+          - "channel_access_denied": bot has no access to channel (kicked, demoted, inactive)
+          - "forward_failed": other telegram error
     """
     # Find channel message for this track
     result = await db.execute(
@@ -397,134 +401,90 @@ async def refresh_file_id_from_channel(track_id: int, db: AsyncSession) -> Optio
         .join(UserChannel, ChannelMessage.channel_id == UserChannel.id)
         .where(ChannelMessage.track_id == track_id)
         .where(ChannelMessage.status == ChannelMessageStatus.SENT)
-        .where(UserChannel.is_active == True)
         .limit(1)
     )
     row = result.first()
     
     if not row:
         logger.debug(f"[Refresh FileID] No channel message found for track {track_id}")
-        return None
+        return None, None, None
     
     channel_msg, user_channel = row
     
-    # Call Telegram API to get the message
+    if not user_channel.is_active:
+        logger.info(f"[Refresh FileID] Channel {user_channel.channel_id} is inactive for track {track_id}")
+        return None, "channel_access_denied", user_channel.channel_title
+    
     base_url = settings.telegram_api_url.rstrip('/')
-    # Use copyMessage or forwardMessage to get fresh file_id? No, use getMessages via channel
-    # Actually, Bot API doesn't have getMessages. We need to use getUpdates or getChat...
-    # The only way is to forward the message to ourselves and get the file_id
-    # OR use getChatMember + some trick
-    
-    # Actually, the cleanest way: use forwardMessage to forward to the same channel (or bot's chat)
-    # and then delete it. But that's ugly.
-    
-    # Better approach: just call getFile on the old file_id - if it fails, we truly need user to re-upload
-    # BUT we can try to get the message via Bot API's copyMessage with send_copy=False... no that doesn't exist
-    
-    # The Bot API way: forward message to bot's own chat (or use sendAudio with file_id)
-    # Let's try a trick: use sendAudio to bot's own chat with the old file_id, 
-    # if it succeeds we know file is still there
-    
-    # Actually simplest: Telegram doesn't provide getMessages for bots without updates
-    # The ONLY reliable way is for user to re-send the file, OR use Local Bot API Server
-    
-    # However! We can try using the channel's message_id to COPY the message which gives us new file_id
-    api_url = f"{base_url}/bot{settings.bot_token}/copyMessage"
-    
     session = await get_http_session()
-    try:
-        # Copy message from channel to the channel itself (we'll delete it after)
-        async with session.post(api_url, json={
-            "chat_id": user_channel.channel_id,
-            "from_chat_id": user_channel.channel_id,
-            "message_id": channel_msg.message_id,
-        }) as resp:
-            if resp.status != 200:
-                logger.warning(f"[Refresh FileID] copyMessage failed: status={resp.status}")
-                return None
-            
-            data = await resp.json()
-            if not data.get("ok"):
-                logger.warning(f"[Refresh FileID] copyMessage error: {data.get('description')}")
-                return None
-            
-            new_message_id = data.get("result", {}).get("message_id")
-            if not new_message_id:
-                return None
-            
-            logger.info(f"[Refresh FileID] Copied message {channel_msg.message_id} -> {new_message_id}")
-    except aiohttp.ClientError as e:
-        logger.error(f"[Refresh FileID] HTTP error: {e}")
-        return None
     
-    # Now forward THIS new message to get audio with file_id
-    # Actually copyMessage doesn't return the audio... we need forwardMessage
-    # Let's delete the copied message and try forwardMessage instead
-    
-    # Delete the copied message
-    delete_url = f"{base_url}/bot{settings.bot_token}/deleteMessage"
-    try:
-        async with session.post(delete_url, json={
-            "chat_id": user_channel.channel_id,
-            "message_id": new_message_id,
-        }) as resp:
-            pass  # Ignore result
-    except:
-        pass
-    
-    # Try forwardMessage which DOES return the full message with audio
+    # Try forwardMessage which directly returns the full message with audio
     forward_url = f"{base_url}/bot{settings.bot_token}/forwardMessage"
+    delete_url = f"{base_url}/bot{settings.bot_token}/deleteMessage"
+    
     try:
         async with session.post(forward_url, json={
             "chat_id": user_channel.channel_id,
             "from_chat_id": user_channel.channel_id, 
             "message_id": channel_msg.message_id,
         }) as resp:
-            if resp.status != 200:
-                logger.warning(f"[Refresh FileID] forwardMessage failed: status={resp.status}")
-                return None
+            try:
+                data = await resp.json()
+            except Exception:
+                data = {}
             
-            data = await resp.json()
-            if not data.get("ok"):
-                logger.warning(f"[Refresh FileID] forwardMessage error: {data.get('description')}")
-                return None
+            desc = str(data.get("description", "")).lower()
+            
+            # Check if bot was kicked, demoted, or channel not found
+            if resp.status in (401, 403) or (
+                resp.status == 400 and (
+                    "chat not found" in desc or 
+                    "rights" in desc or 
+                    "not a member" in desc or 
+                    "kicked" in desc or
+                    "bot was blocked" in desc or
+                    "administrator" in desc
+                )
+            ):
+                logger.warning(
+                    f"[Refresh FileID] Bot lacks channel access for user {user_channel.user_id}: "
+                    f"status={resp.status}, desc={desc}"
+                )
+                user_channel.is_active = False
+                user_channel.updated_at = utcnow()
+                await db.commit()
+                return None, "channel_access_denied", user_channel.channel_title
+            
+            if resp.status != 200 or not data.get("ok"):
+                logger.warning(f"[Refresh FileID] forwardMessage failed: status={resp.status}, desc={desc}")
+                return None, "forward_failed", user_channel.channel_title
             
             result_msg = data.get("result", {})
-            audio = result_msg.get("audio")
+            audio = result_msg.get("audio") or result_msg.get("document")
+            new_message_id = result_msg.get("message_id")
             
-            if not audio or not audio.get("file_id"):
-                logger.warning(f"[Refresh FileID] No audio in forwarded message")
-                # Delete forwarded message
+            # Clean up the forwarded message
+            if new_message_id:
                 try:
                     async with session.post(delete_url, json={
                         "chat_id": user_channel.channel_id,
-                        "message_id": result_msg.get("message_id"),
-                    }) as resp:
+                        "message_id": new_message_id,
+                    }) as _:
                         pass
-                except:
+                except Exception:
                     pass
-                return None
+            
+            if not audio or not audio.get("file_id"):
+                logger.warning(f"[Refresh FileID] No audio/document in forwarded message")
+                return None, "no_audio", user_channel.channel_title
             
             new_file_id = audio["file_id"]
-            new_message_id = result_msg.get("message_id")
-            
             logger.info(f"[Refresh FileID] Got fresh file_id for track {track_id}")
-            
-            # Delete the forwarded message (cleanup)
-            try:
-                async with session.post(delete_url, json={
-                    "chat_id": user_channel.channel_id,
-                    "message_id": new_message_id,
-                }) as resp:
-                    pass
-            except:
-                pass
-            
-            return new_file_id
+            return new_file_id, None, user_channel.channel_title
             
     except aiohttp.ClientError as e:
         logger.error(f"[Refresh FileID] HTTP error in forwardMessage: {e}")
-        return None
+        return None, "network_error", user_channel.channel_title
 
 
 @router.get("/stream/{track_id}", response_model=StreamUrlResponse)
@@ -617,7 +577,7 @@ async def get_stream_url(
         
         # Try to refresh file_id from channel message
         logger.info(f"[Stream Request] Track {track_id} file_id stale, attempting refresh from channel...")
-        new_file_id = await refresh_file_id_from_channel(track_id, db)
+        new_file_id, err_code, ch_title = await refresh_file_id_from_channel(track_id, db)
         
         if new_file_id:
             # Update track with new file_id
@@ -630,6 +590,22 @@ async def get_stream_url(
             file_path = await get_telegram_file_path(new_file_id)
         
         if not file_path:
+            if err_code == "channel_access_denied":
+                bot_user = settings.bot_username or "TG Player"
+                logger.warning(
+                    f"[Stream Request] Track {track_id} cannot be refreshed: "
+                    f"bot lacks access to channel '{ch_title}'"
+                )
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "message": f"Бот не имеет доступа к вашему каналу «{ch_title or 'Резервный'}». Добавьте @{bot_user} администратором в канал, чтобы слушать треки.",
+                        "code": "channel_bot_missing",
+                        "channel_title": ch_title or "Резервный канал",
+                        "bot_username": settings.bot_username or "",
+                    }
+                )
+
             # Still no luck - mark as unavailable
             if not track.is_unavailable:
                 track.is_unavailable = True
@@ -921,19 +897,19 @@ async def get_batch_stream_urls(
             
             # File path is None - try to refresh file_id from channel
             logger.info(f"[Batch] Track {track.id} file_id stale, attempting refresh from channel...")
-            new_file_id = await refresh_file_id_from_channel(track.id, db)
+            new_file_id, err_code, _ = await refresh_file_id_from_channel(track.id, db)
             
             if new_file_id:
                 # Try again with new file_id
                 file_path = await get_telegram_file_path(new_file_id)
                 if file_path:
                     logger.info(f"[Batch] Track {track.id} file_id refreshed successfully!")
-                    return file_path, new_file_id, False
+                    return file_path, new_file_id, False, None
             
-            return None, None, False
+            return None, None, False, err_code
         except Exception as e:
             logger.debug(f"Failed to get file path for track {track.id}: {e}")
-            return None, None, False
+            return None, None, False, None
     
     # Fetch all file paths concurrently
     file_path_tasks = []
@@ -957,7 +933,7 @@ async def get_batch_stream_urls(
             file_path_map[track_id] = None
             continue
         
-        file_path, new_file_id, is_hd_or_large = result
+        file_path, new_file_id, is_hd_or_large, err_code = (result if len(result) == 4 else (*result, None))
         file_path_map[track_id] = file_path
         
         if new_file_id and track:
@@ -965,7 +941,7 @@ async def get_batch_stream_urls(
             track.file_id = new_file_id
             track.is_unavailable = False
             tracks_to_update.append(track_id)
-        elif not file_path and track and not track.is_unavailable and not is_hd_or_large:
+        elif not file_path and track and not track.is_unavailable and not is_hd_or_large and err_code != "channel_access_denied":
             # Mark as unavailable ONLY for regular files whose telegram path is truly gone
             track.is_unavailable = True
             tracks_to_mark_unavailable.append(track_id)

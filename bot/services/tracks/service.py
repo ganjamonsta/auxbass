@@ -17,7 +17,7 @@ from sqlalchemy.orm import selectinload
 from shared.database import get_session
 from shared.models import (
     Track, TrackEnrichment, Album, AlbumTrack, User, UserLibrary,
-    EnrichmentStatus, LibrarySource, ForwardSourceType, utcnow
+    EnrichmentStatus, LibrarySource, ForwardSourceType, TagSource, TrackTag, utcnow
 )
 from shared.matching import normalize_artist, clean_track_metadata
 
@@ -72,8 +72,12 @@ class TrackService:
         """Connect enrichment completion to album assignment and channel update"""
         async def on_enrichment_complete(track_id: int, result):
             if result.success:
-                # Auto-assign album if found
-                if result.album_name:
+                async with get_session() as session:
+                    track = await session.get(Track, track_id)
+                    forward_src = track.forward_source_name if track else None
+
+                # Auto-assign album if found, but NOT for SoundCloud singles/remixes
+                if result.album_name and forward_src != "soundcloud":
                     try:
                         await album_service.auto_assign_album_from_enrichment(track_id)
                     except Exception as e:
@@ -106,6 +110,11 @@ class TrackService:
         forward_source_username: Optional[str] = None,
         enrich: bool = True,
         add_to_library: bool = True,
+        cover_url: Optional[str] = None,
+        genre: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        album_name: Optional[str] = None,
+        source_provider: Optional[str] = None,
     ) -> SaveTrackResult:
         """
         Save a new track or add existing one to user's library.
@@ -158,6 +167,31 @@ class TrackService:
                 if track.is_unavailable:
                     track.is_unavailable = False
                     logger.info(f"Track {track.id} is now available again (file re-uploaded)")
+
+                # If track enrichment exists or provider metadata supplied, backfill missing fields
+                if cover_url or genre or tags or album_name:
+                    existing_enrichment = await session.scalar(
+                        select(TrackEnrichment).where(TrackEnrichment.track_id == track.id)
+                    )
+                    if existing_enrichment:
+                        if cover_url and not existing_enrichment.cover_url:
+                            existing_enrichment.cover_url = cover_url
+                        if genre and not existing_enrichment.genre:
+                            existing_enrichment.genre = genre
+                        if tags and not existing_enrichment.tags:
+                            existing_enrichment.tags = tags
+                        if album_name and not existing_enrichment.album_name:
+                            existing_enrichment.album_name = album_name
+                    else:
+                        enrichment = TrackEnrichment(
+                            track_id=track.id,
+                            cover_url=cover_url,
+                            genre=genre,
+                            tags=tags,
+                            album_name=album_name,
+                            confidence=85 if source_provider in ("soundcloud", "spotify") else 50,
+                        )
+                        session.add(enrichment)
             else:
                 # Create new track
                 is_new = True
@@ -177,6 +211,8 @@ class TrackService:
                 # Sanitize artist name to prevent URL issues
                 sanitized_artist = sanitize_artist(artist)
                 
+                effective_source_name = forward_source_name or source_provider
+
                 track = Track(
                     file_id=file_id,
                     file_unique_id=file_unique_id,
@@ -190,12 +226,34 @@ class TrackService:
                     uploader_id=user_id,
                     forward_source_type=forward_source_type,
                     forward_source_id=forward_source_id,
-                    forward_source_name=forward_source_name,
+                    forward_source_name=effective_source_name,
                     forward_source_username=forward_source_username,
                     enrichment_status=EnrichmentStatus.PENDING if enrich else EnrichmentStatus.COMPLETED,
                 )
                 session.add(track)
                 await session.flush()
+
+                # Immediately register provider metadata in enrichment
+                if cover_url or genre or tags or album_name:
+                    enrichment = TrackEnrichment(
+                        track_id=track.id,
+                        cover_url=cover_url,
+                        genre=genre,
+                        tags=tags,
+                        album_name=album_name,
+                        confidence=85 if source_provider in ("soundcloud", "spotify") else 50,
+                    )
+                    session.add(enrichment)
+
+                    if tags:
+                        for tag_text in tags:
+                            normalized = tag_text.strip().lower()[:50]
+                            if normalized:
+                                session.add(TrackTag(
+                                    track_id=track.id,
+                                    tag=normalized,
+                                    source=TagSource.ENRICHMENT,
+                                ))
                 
                 logger.info(f"Created track {track.id}: {title} - {artist}")
             

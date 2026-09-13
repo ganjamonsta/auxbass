@@ -74,6 +74,38 @@ def _parse_artist_and_title(raw_title: str, uploader: Optional[str]) -> tuple[st
     return artist, clean_title
 
 
+def _extract_sc_tags(
+    tag_list: Optional[str] = None,
+    description: Optional[str] = None,
+    raw_tags: Optional[List[str]] = None,
+) -> List[str]:
+    """Parse tags and hashtags from SoundCloud tag_list, tags list, and description."""
+    tags: List[str] = []
+
+    if isinstance(raw_tags, list):
+        for t in raw_tags:
+            if isinstance(t, str) and t.strip():
+                clean_t = t.strip().lower()
+                if clean_t and clean_t not in tags:
+                    tags.append(clean_t)
+
+    if tag_list and isinstance(tag_list, str):
+        matches = re.findall(r'"([^"]+)"|(\S+)', tag_list)
+        for quoted, unquoted in matches:
+            t = (quoted or unquoted).strip().lower()
+            if t and t not in tags:
+                tags.append(t)
+
+    if description and isinstance(description, str):
+        hashtags = re.findall(r'#([A-Za-z0-9_\u0400-\u04FF]+)', description)
+        for h in hashtags:
+            clean_h = h.strip().lower()
+            if clean_h and clean_h not in tags:
+                tags.append(clean_h)
+
+    return tags[:10]
+
+
 class SoundCloudProvider(BaseMusicProvider):
     """SoundCloud music provider powered by yt-dlp."""
     name: str = "soundcloud"
@@ -306,15 +338,16 @@ class SoundCloudProvider(BaseMusicProvider):
             }
             try:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([track_meta.url])
+                    return ydl.extract_info(track_meta.url, download=True)
             except Exception as e:
                 err_msg = str(e)
                 if "drm protected" in err_msg.lower():
                     raise ValueError("DRM_PROTECTED") from e
                 raise
 
+        info_dict = None
         try:
-            await asyncio.to_thread(_download)
+            info_dict = await asyncio.to_thread(_download)
         except Exception as e:
             if "drm protected" in str(e).lower() or "DRM_PROTECTED" in str(e):
                 logger.info(
@@ -344,6 +377,35 @@ class SoundCloudProvider(BaseMusicProvider):
             raise FileNotFoundError(f"Failed to download audio for track: {track_meta.title}")
 
         file_size = os.path.getsize(expected_audio)
+
+        # Enrich track_meta with original metadata extracted from SoundCloud
+        if isinstance(info_dict, dict):
+            sc_thumb = _extract_sc_thumbnail(info_dict, track_meta.cover_url)
+            if sc_thumb:
+                track_meta.cover_url = _improve_sc_thumbnail(sc_thumb)
+
+            sc_genre = info_dict.get("genre")
+            if sc_genre and isinstance(sc_genre, str) and sc_genre.strip():
+                track_meta.extra["genre"] = sc_genre.strip()
+
+            sc_tags = _extract_sc_tags(
+                tag_list=info_dict.get("tag_list"),
+                description=info_dict.get("description"),
+                raw_tags=info_dict.get("tags"),
+            )
+            if sc_tags:
+                track_meta.extra["tags"] = sc_tags
+
+            raw_title = info_dict.get("title")
+            uploader = info_dict.get("uploader") or info_dict.get("artist")
+            if raw_title:
+                parsed_artist, parsed_title = _parse_artist_and_title(raw_title, uploader)
+                if not track_meta.title or track_meta.title in ("Track", "SoundCloud Track"):
+                    track_meta.title = parsed_title
+                if not track_meta.artist or track_meta.artist in ("Artist", "SoundCloud"):
+                    track_meta.artist = parsed_artist
+
+            track_meta.extra["is_soundcloud"] = True
 
         # Download thumbnail cover if available
         cover_path = None
@@ -417,6 +479,21 @@ class SoundCloudProvider(BaseMusicProvider):
             duration = int(entry.get("duration") or 0) or None
             cover = _extract_sc_thumbnail(entry)
 
+            sc_genre = entry.get("genre") if isinstance(entry.get("genre"), str) else None
+            sc_tags = _extract_sc_tags(
+                tag_list=entry.get("tag_list"),
+                description=entry.get("description"),
+                raw_tags=entry.get("tags"),
+            )
+            extra_data = {
+                "uploader": uploader,
+                "is_soundcloud": True,
+            }
+            if sc_genre and sc_genre.strip():
+                extra_data["genre"] = sc_genre.strip()
+            if sc_tags:
+                extra_data["tags"] = sc_tags
+
             results.append(
                 TrackMetadata(
                     provider_name=self.name,
@@ -426,7 +503,7 @@ class SoundCloudProvider(BaseMusicProvider):
                     duration=duration,
                     cover_url=cover,
                     external_id=str(entry.get("id") or ""),
-                    extra={"uploader": uploader},
+                    extra=extra_data,
                 )
             )
 
@@ -574,6 +651,21 @@ class SoundCloudProvider(BaseMusicProvider):
             duration = int(dur_raw / 1000) if dur_raw > 1000 else int(dur_raw) or None
             cover = _improve_sc_thumbnail(tr.get("artwork_url") or user_obj.get("avatar_url"))
 
+            sc_genre = tr.get("genre") if isinstance(tr.get("genre"), str) else None
+            sc_tags = _extract_sc_tags(
+                tag_list=tr.get("tag_list"),
+                description=tr.get("description"),
+            )
+            extra_data = {
+                "uploader": uploader,
+                "liked_at": item.get("created_at"),
+                "is_soundcloud": True,
+            }
+            if sc_genre and sc_genre.strip():
+                extra_data["genre"] = sc_genre.strip()
+            if sc_tags:
+                extra_data["tags"] = sc_tags
+
             tracks.append(
                 TrackMetadata(
                     provider_name=self.name,
@@ -583,7 +675,7 @@ class SoundCloudProvider(BaseMusicProvider):
                     duration=duration,
                     cover_url=cover,
                     external_id=str(tr.get("id") or ""),
-                    extra={"uploader": uploader, "liked_at": item.get("created_at")},
+                    extra=extra_data,
                 )
             )
 

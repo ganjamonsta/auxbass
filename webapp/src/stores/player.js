@@ -612,7 +612,25 @@ export const usePlayerStore = defineStore('player', () => {
 
       console.error('[Play Error]', error)
       const statusCode = error.response?.status
-      const detail = error.response?.data?.detail || error.message || 'Ошибка воспроизведения'
+      const rawDetail = error.response?.data?.detail
+      const isObjDetail = typeof rawDetail === 'object' && rawDetail !== null
+      const errCode = isObjDetail ? rawDetail.code : error.response?.data?.code
+      const detail = (isObjDetail ? rawDetail.message : rawDetail) || error.message || 'Ошибка воспроизведения'
+
+      // Check if bot lacks access to backup channel (e.g. new bot or bot kicked)
+      if (errCode === 'channel_bot_missing' || (typeof detail === 'string' && (detail.includes('Бот не имеет доступа к вашему каналу') || detail.includes('channel_bot_missing')))) {
+        isPlaying.value = false
+        loading.value = false
+        lastError.value = {
+          type: 'channel_bot_missing',
+          track,
+          message: detail,
+          channel_title: isObjDetail ? rawDetail.channel_title : null,
+          bot_username: isObjDetail ? rawDetail.bot_username : null
+        }
+        window.dispatchEvent(new CustomEvent('player:channel-access-required', { detail: lastError.value }))
+        return
+      }
 
       if (checkCascadingSkips()) {
         lastError.value = { type: 'cascade_error', track, message: 'Слишком много ошибок подряд' }

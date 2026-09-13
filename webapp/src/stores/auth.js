@@ -25,6 +25,7 @@ export const useAuthStore = defineStore('auth', () => {
   const hasChannel = ref(cachedStatus.hasChannel)
   const canSave = ref(cachedStatus.canSave)
   const channelInfo = ref(cachedStatus.channelInfo)
+  const channelError = ref(null)
   const showChannelBanner = ref(false)  // Show banner when user tries premium action
   
   // App config
@@ -104,6 +105,27 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (err) {
       console.error('Failed to fetch status:', err)
       // Don't fail initialization for status fetch, keep cached status
+    }
+  }
+
+  async function verifyChannel() {
+    try {
+      const response = await authApi.verifyChannel()
+      hasChannel.value = response.data.has_channel || false
+      canSave.value = response.data.can_save || false
+      channelInfo.value = response.data.channel_info || null
+      channelError.value = response.data.error || null
+      try {
+        localStorage.setItem(CHANNEL_STATUS_KEY, JSON.stringify({
+          hasChannel: hasChannel.value,
+          canSave: canSave.value,
+          channelInfo: channelInfo.value
+        }))
+      } catch (_) {}
+      return response.data
+    } catch (err) {
+      console.error('Failed to verify channel:', err)
+      throw err
     }
   }
   
@@ -268,6 +290,7 @@ export const useAuthStore = defineStore('auth', () => {
     hasChannel,
     canSave,
     channelInfo,
+    channelError,
     showChannelBanner,
     appName,
     botUsername,
@@ -285,6 +308,7 @@ export const useAuthStore = defineStore('auth', () => {
     uploadAvatar,
     deleteAvatar,
     fetchStatus,
+    verifyChannel,
     fetchConfig,
     promptChannelSetup,
     requireChannel,
