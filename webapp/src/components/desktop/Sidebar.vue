@@ -530,30 +530,31 @@ onUnmounted(() => {
 .sidebar.sidebar-wrapper {
   position: relative;
   height: 100%;
-  overflow: visible;
+  min-height: 0;
+  overflow: hidden;
   user-select: none;
 }
 
 .sidebar-scroll {
   width: 100%;
   height: 100%;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .sidebar-scroll::-webkit-scrollbar {
-  width: 6px;
-}
-
-.sidebar-scroll::-webkit-scrollbar-track {
+  display: none;
+  width: 0;
+  height: 0;
   background: transparent;
-}
-
-.sidebar-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 3px;
 }
 
 
@@ -568,15 +569,32 @@ onUnmounted(() => {
 
 .sidebar.rail-mode .sidebar-scroll {
   align-items: center;
-  padding: 16px 0 16px;
+  padding: 0 0 16px;
 }
 
 .rail-header {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   width: 100%;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #0a0a0a;
+  padding-top: 16px;
+  padding-bottom: 8px;
+}
+
+.rail-header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -12px;
+  height: 12px;
+  background: linear-gradient(to bottom, #0a0a0a, transparent);
+  pointer-events: none;
 }
 
 .rail-logo-btn {
@@ -756,7 +774,23 @@ onUnmounted(() => {
   align-items: center;
   gap: 10px;
   padding-top: 14px;
+  padding-bottom: 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+  position: sticky;
+  bottom: 0;
+  background: #0a0a0a;
+  z-index: 10;
+}
+
+.rail-footer::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -12px;
+  height: 12px;
+  background: linear-gradient(to top, #0a0a0a, transparent);
+  pointer-events: none;
 }
 
 .rail-avatar {
@@ -831,6 +865,21 @@ onUnmounted(() => {
   align-items: center;
   gap: 10px;
   padding: 20px 16px 16px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #0a0a0a;
+}
+
+.sidebar-logo::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -14px;
+  height: 14px;
+  background: linear-gradient(to bottom, #0a0a0a, transparent);
+  pointer-events: none;
 }
 
 .sidebar-logo-btn {
@@ -1180,6 +1229,18 @@ onUnmounted(() => {
   position: sticky;
   bottom: 0;
   margin-top: auto;
+  z-index: 10;
+}
+
+.sidebar-footer::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -14px;
+  height: 14px;
+  background: linear-gradient(to top, #0a0a0a, transparent);
+  pointer-events: none;
 }
 
 .user-info {

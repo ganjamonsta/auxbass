@@ -411,10 +411,23 @@ const handleToggleLike = async () => {
   border-left: 1px solid rgba(255, 255, 255, 0.05);
   display: flex;
   flex-direction: column;
-  padding: 16px;
+  padding: 0 16px 16px;
   overflow-x: hidden;
   overflow-y: auto;
   height: 100%;
+  min-height: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.now-playing-sidebar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+  background: transparent;
 }
 
 /* Header */
@@ -423,6 +436,22 @@ const handleToggleLike = async () => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #0a0a0a;
+  padding: 16px 0 12px;
+}
+
+.sidebar-header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -14px;
+  height: 14px;
+  background: linear-gradient(to bottom, #0a0a0a, transparent);
+  pointer-events: none;
 }
 
 .now-playing-close-btn {
@@ -937,33 +966,6 @@ const handleToggleLike = async () => {
   color: #29b6f6;
 }
 
-/* Scrollbar */
-.now-playing-sidebar {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
-}
-
-.now-playing-sidebar::-webkit-scrollbar {
-  width: 8px;
-}
-
-.now-playing-sidebar::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 4px;
-  margin: 8px 0;
-}
-
-.now-playing-sidebar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-.now-playing-sidebar::-webkit-scrollbar-thumb:hover {
-  background: var(--c-text-3);
-}
-
 .sidebar-lyrics-section {
   background: var(--c-bg-2, #161622);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -975,30 +977,19 @@ const handleToggleLike = async () => {
   flex-direction: column;
 }
 
-.now-playing-sidebar::-webkit-scrollbar-thumb:active {
-  background: rgba(255, 255, 255, 0.35);
-}
-
-/* Queue list scrollbar */
+/* Queue list without scrollbars */
 .queue-list {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-behavior: smooth;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .queue-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.queue-list::-webkit-scrollbar-track {
+  display: none;
+  width: 0;
+  height: 0;
   background: transparent;
-}
-
-.queue-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 3px;
-}
-
-.queue-list::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
 }
 </style>

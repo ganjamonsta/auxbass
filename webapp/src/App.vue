@@ -788,6 +788,8 @@ html, body {
 .app.desktop-layout :deep(.sidebar) {
   grid-area: sidebar;
   height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .app.desktop-layout .main-content-wrapper {
@@ -802,8 +804,8 @@ html, body {
 .app.desktop-layout :deep(.now-playing-sidebar) {
   grid-area: nowplaying;
   height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .app.desktop-layout :deep(.desktop-player) {
