@@ -2,30 +2,17 @@
   <div class="profile-hero-card" :class="{ 'has-avatar-backdrop': !!userAvatar }">
     <div class="hero-ambient-glow" :style="ambientGlowStyle"></div>
 
-    <!-- Desktop Background: Left Avatar Backdrop with smooth gradient fade into card -->
-    <div class="hero-avatar-backdrop-left">
-      <img v-if="userAvatar" :src="userAvatar" alt="" class="backdrop-left-img" />
-      <div v-else class="backdrop-left-fallback" :style="avatarGradientStyle">
-        <span class="backdrop-left-initials">{{ initials }}</span>
-      </div>
-      <div class="backdrop-left-mask"></div>
+    <!-- Tiled Avatar Backdrop across the entire card (Windows wallpaper tile style) -->
+    <div v-if="userAvatar" class="hero-tiled-backdrop">
+      <div 
+        class="hero-tiled-bg" 
+        :style="{ backgroundImage: `url(${userAvatar})` }"
+      ></div>
+      <div class="hero-tiled-overlay"></div>
     </div>
-
-    <!-- Mobile Full Backdrop (on small screens) -->
-    <div v-if="userAvatar" class="hero-mobile-backdrop">
-      <img :src="userAvatar" alt="" class="hero-backdrop-img" />
-      <div class="hero-backdrop-overlay"></div>
+    <div v-else class="hero-fallback-backdrop" :style="avatarGradientStyle">
+      <span class="fallback-backdrop-initials">{{ initials }}</span>
     </div>
-
-    <!-- Top-left camera button if self -->
-    <button 
-      v-if="isSelf" 
-      class="hero-edit-corner-btn" 
-      @click="$emit('edit')" 
-      title="Изменить фото профиля"
-    >
-      <Camera :size="16" />
-    </button>
 
     <!-- Top-right absolute share button -->
     <button class="hero-share-corner-btn" @click="$emit('share')" title="Поделиться профилем">
@@ -408,86 +395,57 @@ const getSpotifyUrl = (acc) => {
   filter: blur(28px);
 }
 
-/* ─── Background Avatar on the Left Edge ─── */
-.hero-avatar-backdrop-left {
+/* ─── Tiled Avatar Backdrop (Windows Wallpaper Tile Style) ─── */
+.hero-tiled-backdrop {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 440px;
+  inset: 0;
   pointer-events: none;
   z-index: 0;
   overflow: hidden;
 }
 
-.backdrop-left-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
-  filter: brightness(0.55) saturate(1.15);
+.hero-tiled-bg {
+  position: absolute;
+  inset: 0;
+  background-repeat: repeat;
+  background-size: 160px 160px;
+  background-position: 0 0;
+  filter: brightness(0.5) saturate(1.15);
+  opacity: 0.85;
 }
 
-.backdrop-left-fallback {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0.45;
-}
-
-.backdrop-left-initials {
-  font-size: 88px;
-  font-weight: 800;
-  color: rgba(255, 255, 255, 0.12);
-  user-select: none;
-}
-
-.backdrop-left-mask {
+.hero-tiled-overlay {
   position: absolute;
   inset: 0;
   background: 
-    linear-gradient(
-      90deg, 
-      rgba(24, 24, 24, 0.4) 0%, 
-      rgba(24, 24, 24, 0.75) 52%, 
-      var(--c-bg-2, #181818) 100%
+    radial-gradient(
+      ellipse at center,
+      rgba(15, 15, 20, 0.35) 0%,
+      rgba(15, 15, 20, 0.65) 100%
     ),
     linear-gradient(
-      180deg, 
-      rgba(24, 24, 24, 0.2) 0%, 
-      rgba(24, 24, 24, 0.6) 100%
+      180deg,
+      rgba(18, 18, 24, 0.25) 0%,
+      rgba(18, 18, 24, 0.55) 100%
     );
 }
 
-/* Edit corner button (top-left) */
-.hero-edit-corner-btn {
+.hero-fallback-backdrop {
   position: absolute;
-  top: 18px;
-  left: 18px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: rgba(22, 22, 26, 0.7);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: var(--c-text-2, #aaa);
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  z-index: 4;
-  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  opacity: 0.3;
 }
 
-.hero-edit-corner-btn:hover {
-  color: #fff;
-  background: rgba(40, 40, 48, 0.9);
-  border-color: var(--c-accent, #1db954);
-  transform: scale(1.06);
+.fallback-backdrop-initials {
+  font-size: 96px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.12);
+  user-select: none;
 }
 
 /* Top-right share button */
@@ -1067,11 +1025,6 @@ const getSpotifyUrl = (acc) => {
   color: #fff;
 }
 
-/* Mobile backdrop styles */
-.hero-mobile-backdrop {
-  display: none;
-}
-
 /* ═══════════════════════════════════════════════════════════
    RESPONSIVE LAYOUT
    ═══════════════════════════════════════════════════════════ */
@@ -1096,40 +1049,6 @@ const getSpotifyUrl = (acc) => {
     align-items: stretch;
     padding: 22px 18px 18px;
     gap: 16px;
-  }
-
-  .hero-avatar-backdrop-left {
-    display: none;
-  }
-
-  .hero-mobile-backdrop {
-    display: block;
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  .hero-backdrop-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center 20%;
-    filter: brightness(0.45) saturate(1.15);
-    transform: scale(1.04);
-  }
-
-  .hero-backdrop-overlay {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      180deg,
-      rgba(10, 14, 20, 0.3) 0%,
-      rgba(10, 14, 20, 0.7) 45%,
-      rgba(10, 14, 20, 0.94) 85%,
-      var(--c-bg-2, #181818) 100%
-    );
   }
 
   .hero-body {
@@ -1178,19 +1097,11 @@ const getSpotifyUrl = (acc) => {
     font-size: 24px;
   }
 
-  .hero-edit-corner-btn,
   .hero-share-corner-btn {
     top: 14px;
+    right: 14px;
     width: 34px;
     height: 34px;
-  }
-
-  .hero-edit-corner-btn {
-    left: 14px;
-  }
-
-  .hero-share-corner-btn {
-    right: 14px;
   }
 
   .hero-actions-bar {
