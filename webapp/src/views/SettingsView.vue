@@ -277,52 +277,32 @@
       </div>
     </section>
 
-    <!-- 4. User Account Section -->
+    <!-- 4. Profile & Privacy Section -->
     <section class="settings-section">
       <div class="section-header">
         <h2>
           <User :size="18" />
-          <span>Аккаунт и профиль</span>
+          <span>Профиль и приватность</span>
         </h2>
       </div>
 
-      <div class="settings-card account-card">
-        <div class="user-profile-row" v-if="authStore.user" @click="goToMyProfile" title="Открыть свой профиль">
-          <div class="avatar-wrap">
-            <div class="avatar" :style="avatarGradient">
+      <div class="settings-card profile-privacy-card">
+        <!-- Top Profile Card -->
+        <div class="profile-header-card" v-if="authStore.user">
+          <div class="profile-avatar-block" @click="avatarFileInputRef?.click()" title="Нажмите, чтобы загрузить или сменить фото">
+            <div class="profile-avatar-visual" :style="avatarGradient">
               <img 
                 v-if="authStore.user?.custom_avatar_url" 
                 :src="authStore.user.custom_avatar_url" 
                 alt="Avatar" 
                 class="avatar-image-cover" 
               />
-              <User v-else-if="!authStore.user.first_name && !authStore.user.custom_nickname" :size="24" />
+              <User v-else-if="!authStore.user.first_name && !authStore.user.custom_nickname" :size="26" />
               <span v-else class="avatar-letter">{{ (authStore.user.custom_nickname || authStore.user.first_name || 'U').charAt(0).toUpperCase() }}</span>
+              <div class="profile-avatar-hover-ring">
+                <Camera :size="18" />
+              </div>
             </div>
-          </div>
-          <div class="user-details">
-            <span class="user-name">
-              {{ authStore.userDisplayName }}
-            </span>
-            <span class="user-id">
-              @{{ authStore.user.username || ('ID: ' + authStore.user.id) }}
-              <span v-if="privacySettings.hide_telegram_id" class="hidden-privacy-pill" title="Скрыт от других пользователей">
-                <EyeOff :size="11" /> скрыт
-              </span>
-            </span>
-          </div>
-          <button class="view-profile-btn" @click.stop="goToMyProfile">
-            <span>Профиль</span>
-            <ChevronRight :size="16" />
-          </button>
-        </div>
-
-        <div class="card-divider"></div>
-
-        <!-- Avatar upload / delete actions -->
-        <div class="profile-custom-block">
-          <span class="custom-block-label">Аватарка профиля</span>
-          <div class="avatar-edit-actions">
             <input 
               ref="avatarFileInputRef" 
               type="file" 
@@ -330,45 +310,66 @@
               style="display: none" 
               @change="handleAvatarFileChange" 
             />
-            <button 
-              class="action-btn primary small-btn" 
-              :disabled="isUploadingAvatar" 
-              @click="avatarFileInputRef?.click()"
-            >
-              <Camera :size="14" />
-              <span>{{ isUploadingAvatar ? 'Загрузка...' : (authStore.user?.custom_avatar_url ? 'Сменить фото' : 'Загрузить фото') }}</span>
-            </button>
-            <button 
-              v-if="authStore.user?.custom_avatar_url" 
-              class="action-btn danger-ghost small-btn" 
-              :disabled="isUploadingAvatar" 
-              @click="handleRemoveAvatar"
-            >
-              <Trash2 :size="14" />
-              <span>Удалить фото</span>
-            </button>
           </div>
-          <span class="field-hint">Поддерживаются форматы JPG, PNG, WEBP до 10 МБ.</span>
+
+          <div class="profile-meta-info">
+            <div class="profile-name-row">
+              <span class="profile-user-name">{{ authStore.userDisplayName }}</span>
+              <button class="view-profile-chip" @click="goToMyProfile" title="Открыть свой профиль">
+                <span>Профиль</span>
+                <ChevronRight :size="14" />
+              </button>
+            </div>
+            <div class="profile-handle-row">
+              <span class="profile-handle">@{{ authStore.user.username || ('ID: ' + authStore.user.id) }}</span>
+              <span v-if="privacySettings.hide_telegram_id" class="hidden-privacy-pill" title="Скрыт от других пользователей">
+                <EyeOff :size="10" /> скрыт
+              </span>
+            </div>
+            <!-- Quick photo actions -->
+            <div class="avatar-quick-actions">
+              <button 
+                class="avatar-text-btn" 
+                :disabled="isUploadingAvatar" 
+                @click="avatarFileInputRef?.click()"
+              >
+                <Camera :size="12" />
+                <span>{{ isUploadingAvatar ? 'Загрузка...' : (authStore.user?.custom_avatar_url ? 'Сменить фото' : 'Загрузить фото') }}</span>
+              </button>
+              <button 
+                v-if="authStore.user?.custom_avatar_url" 
+                class="avatar-text-btn danger" 
+                :disabled="isUploadingAvatar" 
+                @click="handleRemoveAvatar"
+              >
+                <Trash2 :size="12" />
+                <span>Удалить</span>
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div class="card-divider"></div>
+        <div class="setting-divider"></div>
 
-        <!-- Custom Nickname block -->
-        <div class="profile-custom-block">
-          <span class="custom-block-label">Кастомный никнейм</span>
-          <div class="nickname-input-row">
+        <!-- Custom Nickname Section -->
+        <div class="profile-field-block">
+          <div class="field-header">
+            <span class="field-title">Кастомный никнейм</span>
+            <span class="field-hint">Отображается вместо Telegram-имени</span>
+          </div>
+          <div class="nickname-field-group">
             <input 
               v-model="customNicknameInput" 
               type="text" 
               maxlength="50"
-              placeholder="Введите никнейм (например, xFer Serum)" 
-              class="service-text-input nickname-input" 
+              placeholder="Введите никнейм" 
+              class="nickname-clean-input" 
               :disabled="isSavingProfile"
               @keydown.enter="handleSaveNickname"
             />
             <button 
-              class="action-btn primary small-btn save-nick-btn" 
-              :disabled="isSavingProfile || customNicknameInput === (authStore.user?.custom_nickname || '')" 
+              class="action-btn primary small-btn" 
+              :disabled="isSavingProfile || customNicknameInput.trim() === (authStore.user?.custom_nickname || '')" 
               @click="handleSaveNickname"
             >
               <Check v-if="!isSavingProfile" :size="14" />
@@ -386,11 +387,71 @@
               <span>Сбросить</span>
             </button>
           </div>
-          <span class="field-hint">Отображается вместо имени из Telegram во всем интерфейсе и для других пользователей.</span>
         </div>
 
-        <div class="card-divider"></div>
+        <div class="setting-divider"></div>
 
+        <!-- Privacy Subgroup Header -->
+        <div class="privacy-subgroup-header">
+          <Lock :size="13" />
+          <span>Приватность</span>
+        </div>
+
+        <!-- Privacy Toggle 1: Hide Telegram ID & Username -->
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-name">Скрыть Telegram ID и ник</span>
+            <span class="setting-desc">Ваш @username и ID не будут видны другим в профиле и поиске</span>
+          </div>
+          <label class="toggle">
+            <input 
+              type="checkbox" 
+              v-model="privacySettings.hide_telegram_id" 
+              @change="updatePrivacy('hide_telegram_id', $event.target.checked)"
+            />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-divider"></div>
+
+        <!-- Privacy Toggle 2: Hide Profile Completely -->
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-name">Скрыть профиль полностью</span>
+            <span class="setting-desc">Медиатека и альбомы будут скрыты от других</span>
+          </div>
+          <label class="toggle">
+            <input 
+              type="checkbox" 
+              v-model="privacySettings.hide_profile" 
+              @change="updatePrivacy('hide_profile', $event.target.checked)"
+            />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-divider"></div>
+
+        <!-- Privacy Toggle 3: Hide from Search -->
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-name">Скрыть из поиска</span>
+            <span class="setting-desc">Вас не найдут в поиске, доступ только по прямой ссылке</span>
+          </div>
+          <label class="toggle">
+            <input 
+              type="checkbox" 
+              v-model="privacySettings.hide_from_search" 
+              @change="updatePrivacy('hide_from_search', $event.target.checked)"
+            />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-divider"></div>
+
+        <!-- Logout Action -->
         <button class="logout-btn" @click="logout">
           <LogOut :size="16" />
           <span>Выйти из аккаунта</span>
@@ -431,67 +492,6 @@
             <div class="skeleton-stat-value"></div>
             <div class="skeleton-stat-label"></div>
           </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 6. Privacy Section -->
-    <section class="settings-section">
-      <div class="section-header">
-        <h2>
-          <Lock :size="18" />
-          <span>Приватность</span>
-        </h2>
-      </div>
-
-      <div class="settings-card">
-        <div class="setting-row">
-          <div class="setting-info">
-            <span class="setting-name">Скрыть из поиска</span>
-            <span class="setting-desc">Вас не найдут другие пользователи, но медиатека будет доступна по прямой ссылке</span>
-          </div>
-          <label class="toggle">
-            <input 
-              type="checkbox" 
-              v-model="privacySettings.hide_from_search" 
-              @change="updatePrivacy('hide_from_search', $event.target.checked)"
-            />
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-
-        <div class="setting-divider"></div>
-
-        <div class="setting-row">
-          <div class="setting-info">
-            <span class="setting-name">Скрыть профиль полностью</span>
-            <span class="setting-desc">Медиатека и альбомы будут скрыты от других. Приватность плейлистов сохранится</span>
-          </div>
-          <label class="toggle">
-            <input 
-              type="checkbox" 
-              v-model="privacySettings.hide_profile" 
-              @change="updatePrivacy('hide_profile', $event.target.checked)"
-            />
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-
-        <div class="setting-divider"></div>
-
-        <div class="setting-row">
-          <div class="setting-info">
-            <span class="setting-name">Скрыть Telegram ID и ник</span>
-            <span class="setting-desc">Ваш @username и Telegram ID не будут видны другим пользователям в профиле и поиске</span>
-          </div>
-          <label class="toggle">
-            <input 
-              type="checkbox" 
-              v-model="privacySettings.hide_telegram_id" 
-              @change="updatePrivacy('hide_telegram_id', $event.target.checked)"
-            />
-            <span class="toggle-slider"></span>
-          </label>
         </div>
       </div>
     </section>
@@ -2100,83 +2100,47 @@ const handleResetState = (event) => {
 }
 
 /* ═══════════════════════════════════════════════
-   4. Account Section
+   4. Profile & Privacy Section
    ═══════════════════════════════════════════════ */
-.user-profile-row {
+.profile-privacy-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.profile-header-card {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
+  padding: 4px 0;
+}
+
+.profile-avatar-block {
+  position: relative;
   cursor: pointer;
-  border-radius: var(--r-md);
-  transition: opacity 0.15s;
-}
-
-.user-profile-row:hover {
-  opacity: 0.9;
-}
-
-.avatar {
-  width: 48px;
-  height: 48px;
   border-radius: 50%;
-  color: #fff;
+  width: 58px;
+  height: 58px;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.profile-avatar-block:hover {
+  transform: scale(1.03);
+}
+
+.profile-avatar-visual {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-}
-
-.avatar-letter {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.user-details {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  flex: 1;
-}
-
-.user-name {
-  color: var(--c-text-1);
-  font-weight: 600;
-  font-size: 15px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.user-id {
-  color: var(--c-text-3);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-.view-profile-btn {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 6px 12px;
-  background: rgba(29, 185, 84, 0.15);
-  color: var(--c-accent);
-  border: 1px solid rgba(29, 185, 84, 0.25);
-  border-radius: var(--r-full);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.15s ease;
-}
-
-.avatar-wrap {
   position: relative;
-  width: 48px;
-  height: 48px;
-  flex-shrink: 0;
+  overflow: hidden;
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  border: 2px solid rgba(255, 255, 255, 0.14);
 }
 
 .avatar-image-cover {
@@ -2186,46 +2150,192 @@ const handleResetState = (event) => {
   border-radius: 50%;
 }
 
+.avatar-letter {
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.profile-avatar-hover-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  color: #fff;
+}
+
+.profile-avatar-block:hover .profile-avatar-hover-ring {
+  opacity: 1;
+}
+
+.profile-meta-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.profile-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.profile-user-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--c-text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+}
+
+.view-profile-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 10px;
+  border-radius: var(--r-full);
+  background: rgba(29, 185, 84, 0.12);
+  color: var(--c-accent);
+  border: 1px solid rgba(29, 185, 84, 0.25);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.view-profile-chip:hover {
+  background: rgba(29, 185, 84, 0.22);
+  border-color: rgba(29, 185, 84, 0.4);
+  transform: translateY(-1px);
+}
+
+.profile-handle-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.profile-handle {
+  font-size: 12px;
+  color: var(--c-text-3);
+  font-weight: 500;
+}
+
 .hidden-privacy-pill {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  margin-left: 6px;
   padding: 1px 6px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
   font-size: 10px;
   color: var(--c-text-2);
+  font-weight: 500;
 }
 
-.profile-custom-block {
+.avatar-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.avatar-text-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--c-text-2);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.avatar-text-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--c-text-1);
+}
+
+.avatar-text-btn.danger {
+  color: #ff5c5c;
+  background: rgba(255, 92, 92, 0.08);
+  border-color: rgba(255, 92, 92, 0.15);
+}
+
+.avatar-text-btn.danger:hover:not(:disabled) {
+  background: rgba(255, 92, 92, 0.18);
+  border-color: rgba(255, 92, 92, 0.3);
+}
+
+/* Custom Nickname Block */
+.profile-field-block {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+  padding: 2px 0;
 }
 
-.custom-block-label {
+.field-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.field-title {
   font-size: 13px;
   font-weight: 600;
   color: var(--c-text-1);
 }
 
-.avatar-edit-actions {
+.field-hint {
+  font-size: 11px;
+  color: var(--c-text-3);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.nickname-field-group {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
 }
 
-.nickname-input-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.nickname-input {
+.nickname-clean-input {
   flex: 1;
+  min-width: 0;
+  background: var(--c-bg-1, #121212);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--r-md);
+  padding: 8px 12px;
+  color: var(--c-text-1);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.nickname-clean-input:focus {
+  border-color: var(--c-accent);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .small-btn {
@@ -2234,14 +2344,17 @@ const handleResetState = (event) => {
   white-space: nowrap;
 }
 
-.save-nick-btn {
-  display: inline-flex;
+/* Privacy Subgroup */
+.privacy-subgroup-header {
+  display: flex;
   align-items: center;
   gap: 6px;
-}
-
-.view-profile-btn:hover {
-  background: rgba(29, 185, 84, 0.25);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--c-text-3);
+  padding: 2px 0 6px;
 }
 
 .logout-btn {
@@ -2252,18 +2365,19 @@ const handleResetState = (event) => {
   width: 100%;
   padding: 10px;
   background: transparent;
-  border: 1px solid rgba(244, 67, 54, 0.3);
+  border: 1px solid rgba(244, 67, 54, 0.25);
   border-radius: var(--r-md);
   color: var(--c-error);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+  margin-top: 2px;
 }
 
 .logout-btn:hover {
-  background: rgba(244, 67, 54, 0.1);
-  border-color: var(--c-error);
+  background: rgba(244, 67, 54, 0.08);
+  border-color: rgba(244, 67, 54, 0.4);
 }
 
 /* ═══════════════════════════════════════════════
