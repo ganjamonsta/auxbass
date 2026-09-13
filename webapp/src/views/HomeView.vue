@@ -426,8 +426,8 @@ onUnmounted(() => {
 
 <style scoped>
 .home-view {
-  padding: 16px 16px 32px;
-  max-width: 1400px;
+  padding: var(--content-padding, 16px) var(--content-padding, 16px) 32px;
+  max-width: var(--content-max-width, 1400px);
   margin: 0 auto;
 }
 
@@ -460,14 +460,13 @@ onUnmounted(() => {
 /* Quick Access Grid (Spotify style) */
 .quick-access-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: var(--quick-grid-cols, repeat(2, 1fr));
   gap: 10px;
   margin-bottom: 28px;
 }
 
 @media (min-width: 768px) {
   .quick-access-grid {
-    grid-template-columns: repeat(3, 1fr);
     gap: 12px;
     margin-bottom: 36px;
   }
@@ -668,7 +667,7 @@ onUnmounted(() => {
 
 /* Feed Cards */
 .feed-card {
-  width: 132px;
+  width: var(--card-min-width, 132px);
   flex-shrink: 0;
   cursor: pointer;
   display: flex;
@@ -677,13 +676,13 @@ onUnmounted(() => {
 
 @media (min-width: 1024px) {
   .feed-card {
-    width: 160px;
+    width: var(--card-min-width, 160px);
   }
 }
 
 .feed-card-cover {
-  width: 132px;
-  height: 132px;
+  width: var(--card-min-width, 132px);
+  height: var(--card-min-width, 132px);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.05);
   overflow: hidden;
@@ -698,8 +697,6 @@ onUnmounted(() => {
 
 @media (min-width: 1024px) {
   .feed-card-cover {
-    width: 160px;
-    height: 160px;
     border-radius: 12px;
     margin-bottom: 10px;
   }

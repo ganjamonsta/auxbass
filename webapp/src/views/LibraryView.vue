@@ -655,8 +655,8 @@ onUnmounted(() => {
 
 <style scoped>
 .library-view {
-  padding: 16px 16px 32px;
-  max-width: 1400px;
+  padding: var(--content-padding, 16px) var(--content-padding, 16px) 32px;
+  max-width: var(--content-max-width, 1400px);
   margin: 0 auto;
 }
 
@@ -798,8 +798,8 @@ onUnmounted(() => {
 }
 
 .feed-card {
-  flex: 0 0 136px;
-  width: 136px;
+  flex: 0 0 var(--card-min-width, 136px);
+  width: var(--card-min-width, 136px);
   cursor: pointer;
   scroll-snap-align: start;
   user-select: none;
@@ -808,8 +808,8 @@ onUnmounted(() => {
 
 @media (min-width: 768px) {
   .feed-card {
-    flex: 0 0 156px;
-    width: 156px;
+    flex: 0 0 var(--card-min-width, 156px);
+    width: var(--card-min-width, 156px);
   }
 }
 
@@ -1056,14 +1056,14 @@ onUnmounted(() => {
 }
 
 .feed-card-skeleton {
-  flex: 0 0 136px;
-  width: 136px;
+  flex: 0 0 var(--card-min-width, 136px);
+  width: var(--card-min-width, 136px);
 }
 
 @media (min-width: 768px) {
   .feed-card-skeleton {
-    flex: 0 0 156px;
-    width: 156px;
+    flex: 0 0 var(--card-min-width, 156px);
+    width: var(--card-min-width, 156px);
   }
 }
 

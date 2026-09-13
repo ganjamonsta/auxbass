@@ -121,6 +121,12 @@
   --sidebar-width: 280px;
   --sidebar-collapsed-width: 72px;
   --now-playing-width: 320px;
+
+  /* ─── Adaptive Content (defaults for mobile, overridden by .desktop-layout) ─── */
+  --content-padding: 16px;
+  --content-max-width: 1400px;
+  --card-min-width: 136px;
+  --quick-grid-cols: repeat(2, 1fr);
 }
 
 /* ═══════════════════════════════════════════════════════════

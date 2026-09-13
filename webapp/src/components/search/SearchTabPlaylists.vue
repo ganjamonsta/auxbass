@@ -95,14 +95,13 @@ const getPlaylistCoverStyle = (playlist) => {
 
 .playlists-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--card-min-width, 136px), 1fr));
   gap: 14px;
   margin-top: 8px;
 }
 
 @media (min-width: 768px) {
   .playlists-grid {
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 16px;
   }
 }
@@ -113,8 +112,8 @@ const getPlaylistCoverStyle = (playlist) => {
 }
 
 .feed-card {
-  flex: 0 0 136px;
-  width: 136px;
+  flex: 0 0 var(--card-min-width, 136px);
+  width: var(--card-min-width, 136px);
   cursor: pointer;
   user-select: none;
   transition: transform 0.2s ease;
@@ -122,8 +121,8 @@ const getPlaylistCoverStyle = (playlist) => {
 
 @media (min-width: 768px) {
   .feed-card {
-    flex: 0 0 156px;
-    width: 156px;
+    flex: 0 0 var(--card-min-width, 156px);
+    width: var(--card-min-width, 156px);
   }
 }
 

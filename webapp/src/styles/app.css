@@ -24,32 +24,7 @@
   min-height: 0;
 }
 
-/* ========== Desktop Layout ========== */
-.app.desktop-layout {
-  display: grid;
-  grid-template-columns: var(--sidebar-width) 1fr;
-  grid-template-rows: 1fr var(--desktop-player-height);
-  grid-template-areas:
-    "sidebar main"
-    "player player";
-  height: 100%;
-  width: 100%;
-  max-height: 100%;
-  position: relative;
-  transition: grid-template-columns 0.24s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.app.desktop-layout.sidebar-collapsed {
-  --sidebar-width: var(--sidebar-collapsed-width, 72px);
-}
-
-.app.desktop-layout.has-now-playing {
-  grid-template-columns: var(--sidebar-width) 1fr var(--now-playing-width);
-  grid-template-areas:
-    "sidebar main nowplaying"
-    "player player player";
-}
-
+/* ========== Desktop Layout (Grid defined in App.vue, tokens used here) ========== */
 .app.desktop-layout .sidebar { grid-area: sidebar; height: 100%; }
 
 .app.desktop-layout .main-content-wrapper {
@@ -66,21 +41,21 @@
 /* Desktop responsive */
 @media (min-width: 768px) {
   .app.desktop-layout .content { padding-bottom: 20px; }
-  .app.desktop-layout .oneui-header { padding: 16px 24px; background: transparent; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+  .app.desktop-layout .oneui-header { padding: 16px var(--content-padding, 24px); background: transparent; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
   .app.desktop-layout .header-title-main { font-size: 28px; }
-  .app.desktop-layout .library { padding: 0 24px; }
+  .app.desktop-layout .library { padding: 0 var(--content-padding, 24px); }
   .app.desktop-layout .track-item { border-radius: 8px; margin-bottom: 2px; }
   .app.desktop-layout .track-item:hover { background: rgba(255, 255, 255, 0.1); }
   .app.desktop-layout .feed-section-title { font-size: 24px; margin-bottom: 20px; }
   .app.desktop-layout .quick-grid { gap: 16px; }
   .app.desktop-layout .quick-item { padding: 16px; border-radius: 8px; }
   .app.desktop-layout .horizontal-scroll { gap: 20px; }
-  .app.desktop-layout .feed-card { min-width: 180px; }
-  .app.desktop-layout .feed-card-cover { width: 160px; height: 160px; }
+  .app.desktop-layout .feed-card { min-width: var(--card-min-width, 160px); }
+  .app.desktop-layout .feed-card-cover { width: var(--card-min-width, 160px); height: var(--card-min-width, 160px); }
 }
 
 @media (min-width: 1440px) {
-  .app.desktop-layout .library { padding: 0 40px; max-width: 1600px; }
+  .app.desktop-layout .library { padding: 0 var(--content-padding, 40px); max-width: var(--content-max-width, 1600px); }
   .app.desktop-layout .feed-card { min-width: 200px; }
   .app.desktop-layout .feed-card-cover { width: 180px; height: 180px; }
 }

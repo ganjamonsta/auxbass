@@ -541,7 +541,7 @@ const applyUIScale = () => {
   // Apply zoom to documentElement for full-viewport scaling without gaps or overflow clipping
   document.documentElement.style.zoom = scale
   document.documentElement.style.setProperty('--ui-scale', String(scale))
-  updateDesktopState()
+  updateLayoutState()
 }
 
 // Watch for scale changes
@@ -772,10 +772,17 @@ html, body {
   overflow: hidden;
   position: relative;
   transition: grid-template-columns 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Adaptive content tokens — cascade to child views */
+  --content-padding: 24px;
+  --content-max-width: 1400px;
+  --card-min-width: 160px;
+  --quick-grid-cols: repeat(3, 1fr);
 }
 
 .app.desktop-layout.sidebar-collapsed {
   --sidebar-width: var(--sidebar-collapsed-width, 72px);
+  --content-max-width: 1600px;
 }
 
 .app.desktop-layout.has-now-playing {
@@ -783,6 +790,17 @@ html, body {
   grid-template-areas:
     "sidebar main nowplaying"
     "player player player";
+  --content-padding: 16px;
+  --content-max-width: 1200px;
+  --card-min-width: 136px;
+  --quick-grid-cols: repeat(2, 1fr);
+}
+
+.app.desktop-layout.sidebar-collapsed.has-now-playing {
+  --content-padding: 20px;
+  --content-max-width: 1400px;
+  --card-min-width: 148px;
+  --quick-grid-cols: repeat(3, 1fr);
 }
 
 .app.desktop-layout :deep(.sidebar) {
@@ -880,9 +898,9 @@ html, body {
   opacity: 0.7;
 }
 
-/* Desktop: content padding */
+/* Desktop: content padding — uses adaptive token */
 .app.desktop-layout .main-content {
-  padding-bottom: 20px;
+  padding: 0 var(--content-padding, 24px) 20px;
 }
 
 .auth-loading {
@@ -908,10 +926,6 @@ html, body {
 
 /* Desktop adjustments */
 @media (min-width: 768px) {
-  .app.desktop-layout .main-content {
-    padding: 0 24px 20px;
-  }
-  
   .app.desktop-layout :deep(.track-item) {
     border-radius: 8px;
     margin-bottom: 2px;
@@ -944,9 +958,14 @@ html, body {
 }
 
 @media (min-width: 1440px) {
-  .app.desktop-layout .main-content {
-    padding: 0 40px 20px;
-    max-width: 1600px;
+  .app.desktop-layout {
+    --content-padding: 40px;
+  }
+  .app.desktop-layout.has-now-playing {
+    --content-padding: 24px;
+  }
+  .app.desktop-layout.sidebar-collapsed.has-now-playing {
+    --content-padding: 32px;
   }
 }
 
