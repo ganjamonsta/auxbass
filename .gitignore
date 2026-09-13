@@ -124,3 +124,6 @@ frps.ini
 tg_player.db.old
 tg_player.db.backup
 tg_player.db.bak
+tg_player.db-shm
+.gitignore
+tg_player.db-wal

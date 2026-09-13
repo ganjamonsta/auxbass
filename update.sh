@@ -78,6 +78,12 @@ if [ "$DOWNLOADED" -eq 0 ] && ([ ! -d "webapp/dist" ] || [ ! -f "webapp/dist/ind
     fi
 fi
 
+# 4. Run SQLite Schema Migrations
+if [ -f "scripts/migrate_sqlite.py" ]; then
+    echo "🗄️ [4/4] Проверка и применение миграций SQLite..."
+    python -c "import scripts.migrate_sqlite as m; m.migrate_sqlite_db('tg_player.db')" 2>/dev/null || true
+fi
+
 echo "========================================================"
 echo "          ✅ Обновление успешно завершено!              "
 echo "========================================================"

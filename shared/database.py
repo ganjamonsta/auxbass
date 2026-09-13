@@ -156,6 +156,7 @@ async def _ensure_sqlite_columns(conn):
             ("uploader_id", "INTEGER"),
         ],
         "users": [
+            ("photo_url", "TEXT"),
             ("custom_nickname", "TEXT"),
             ("custom_avatar_url", "TEXT"),
             ("hide_from_search", "INTEGER DEFAULT 0"),
@@ -168,6 +169,8 @@ async def _ensure_sqlite_columns(conn):
         ],
         "playlists": [
             ("custom_cover_url", "TEXT"),
+            ("pending_cover_url", "TEXT"),
+            ("pending_cover_expires_at", "TIMESTAMP"),
         ],
         "user_library": [
             ("is_disliked", "INTEGER DEFAULT 0"),
