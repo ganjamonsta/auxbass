@@ -945,6 +945,7 @@ html, body {
   min-height: 0;
   min-width: 0;
   position: relative;
+  scrollbar-gutter: stable;
 }
 
 /* Pull-to-refresh indicator */

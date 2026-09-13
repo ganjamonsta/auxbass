@@ -487,7 +487,9 @@ const getSpotifyUrl = (acc) => {
   position: relative;
   z-index: 2;
   width: 215px;
-  flex-shrink: 0;
+  min-width: 215px;
+  max-width: 215px;
+  flex: 0 0 215px;
   align-self: stretch;
   display: flex;
   flex-direction: column;
@@ -541,7 +543,7 @@ const getSpotifyUrl = (acc) => {
   background: linear-gradient(90deg, rgba(29, 185, 84, 0.16) 0%, rgba(24, 24, 30, 0.85) 50%, rgba(14, 14, 18, 0.85) 100%);
   border-left: 4px solid var(--c-accent, #1db954);
   color: #ffffff;
-  font-weight: 700;
+  font-weight: 600;
   box-shadow: 
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
     inset 0 -1px 0 rgba(0, 0, 0, 0.4);
@@ -855,7 +857,9 @@ const getSpotifyUrl = (acc) => {
   position: relative;
   z-index: 2;
   width: 250px;
-  flex-shrink: 0;
+  min-width: 250px;
+  max-width: 250px;
+  flex: 0 0 250px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1050,11 +1054,17 @@ const getSpotifyUrl = (acc) => {
 @media (max-width: 1080px) {
   .hero-tab-details-panel {
     width: 220px;
+    min-width: 220px;
+    max-width: 220px;
+    flex: 0 0 220px;
     padding: 12px 14px;
   }
 
   .hero-monolith-tabs {
     width: 185px;
+    min-width: 185px;
+    max-width: 185px;
+    flex: 0 0 185px;
   }
 
   .hero-name {
