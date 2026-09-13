@@ -137,10 +137,17 @@ export const useLibraryStore = defineStore('library', () => {
         currentSearchParams.value = searchParams
       }
       
+      const isRefresh = Boolean(params.refresh || params.bypassCache)
+      if (isRefresh) {
+        apiCache.invalidatePattern('/tracks')
+      }
+
       const response = await tracksApi.getAll({
         page: params.page || 1,
         per_page: 50,
         ...params,
+      }, {
+        bypassCache: isRefresh
       })
       
       const data = response.data
@@ -180,7 +187,7 @@ export const useLibraryStore = defineStore('library', () => {
       }
       
       total.value = data.total
-      page.value = data.page
+      page.value = data.page || params.page || 1
       hasMore.value = tracks.value.length < data.total
     } catch (error) {
       console.error('Failed to fetch tracks:', error)
@@ -942,6 +949,23 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
   
+  // Optimistically add track to library list after download/import
+  const addTrackOptimistic = (trackObj) => {
+    if (!trackObj || !trackObj.id) return
+    apiCache.invalidateRelated('track', trackObj.id)
+    apiCache.invalidatePattern('/tracks')
+    apiCache.invalidatePattern('/library')
+    
+    if (Array.isArray(tracks.value) && !tracks.value.some(t => t?.id === trackObj.id)) {
+      tracks.value.unshift({ ...trackObj, in_library: true })
+      total.value = (total.value || 0) + 1
+    }
+    window.dispatchEvent(new CustomEvent('track:added:library', {
+      detail: { trackId: trackObj.id }
+    }))
+    fetchArtists(artistScope.value)
+  }
+
   // Remove track from my library
   const removeFromLibrary = async (trackId) => {
     try {
@@ -1112,6 +1136,7 @@ export const useLibraryStore = defineStore('library', () => {
     fetchUserTracks,
     clearSelectedUser,
     addToLibrary,
+    addTrackOptimistic,
     removeFromLibrary,
     isInLibrary,
     isTrackInLibrary,

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { ingestionApi } from '@/api/client'
+import apiCache from '@/utils/apiCache'
 import { useUIStore } from './ui'
 import { useLibraryStore } from './library'
 
@@ -155,12 +156,18 @@ export const useTasksStore = defineStore('tasks', () => {
         item.rawTrack.track_id = trackObj.id
       }
 
+      if (trackObj) {
+        libraryStore.addTrackOptimistic(trackObj)
+      } else {
+        apiCache.invalidateRelated('track')
+      }
+
       queueCompletedBatch.value++
       const mapDone = new Map(trackStatusMap.value)
       mapDone.set(item.url, 'completed')
       trackStatusMap.value = mapDone
 
-      libraryStore.fetchTracks({ refresh: true })
+      libraryStore.fetchTracks({ refresh: true, bypassCache: true })
     } catch (err) {
       console.error('[TasksStore] Quick import queue error:', err)
       queueFailedBatch.value++
@@ -251,9 +258,12 @@ export const useTasksStore = defineStore('tasks', () => {
 
         if (['completed', 'failed', 'cancelled'].includes(updated.status)) {
           stopPolling(jobId)
-          libraryStore.fetchTracks({ refresh: true })
 
           if (updated.status === 'completed') {
+            apiCache.invalidateRelated('track')
+            libraryStore.fetchTracks({ refresh: true, bypassCache: true })
+            libraryStore.fetchPlaylists(true)
+
             if (minimizedJobIds.value.has(jobId)) {
               uiStore.toast?.success(
                 'Импорт завершён!',

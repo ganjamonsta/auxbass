@@ -182,8 +182,15 @@ export const authApi = {
 
 // Tracks
 export const tracksApi = {
-  // My library (cached)
-  getAll: cacheable((params = {}) => api.get('/tracks', { params })),
+  // My library (cached by default, bypasses cache when refresh/bypassCache requested)
+  getAll: (params = {}, options = {}) => {
+    const bypassCache = !!params.refresh || !!params.bypassCache || !!options.bypassCache
+    return api.get('/tracks', {
+      params,
+      bypassCache,
+      ...options
+    })
+  },
   // Bypass cache when sort_by is 'random' to get fresh shuffled order each time
   // Add timestamp to ensure truly random results on every call
   getAllIds: (params = {}) => api.get('/tracks/ids', { 
@@ -329,12 +336,12 @@ export const socialApi = {
 // Ingestion (External imports from SoundCloud, Spotify, etc.)
 export const ingestionApi = {
   preview: (url) => api.post('/ingestion/preview', { url }),
-  start: (url, selectedUrls = null) => api.post('/ingestion/start', { url, selected_urls: selectedUrls }),
+  start: nonCacheable((url, selectedUrls = null) => api.post('/ingestion/start', { url, selected_urls: selectedUrls }), 'track'),
   getJob: (jobId) => api.get(`/ingestion/jobs/${jobId}`, { bypassCache: true }),
   cancelJob: (jobId) => api.post(`/ingestion/jobs/${jobId}/cancel`),
   getRecent: () => api.get('/ingestion/recent', { bypassCache: true }),
   search: (q, provider = 'soundcloud', limit = 30) => api.get('/ingestion/search', { params: { q, provider, limit } }),
-  quickImport: (data) => api.post('/ingestion/quick-import', data),
+  quickImport: nonCacheable((data) => api.post('/ingestion/quick-import', data), 'track'),
   getSoundCloudAccount: () => api.get('/ingestion/account/soundcloud', { bypassCache: true }),
   connectSoundCloudAccount: nonCacheable((data) => api.post('/ingestion/account/soundcloud/connect', data), 'externalAccount'),
   disconnectSoundCloudAccount: nonCacheable(() => api.delete('/ingestion/account/soundcloud'), 'externalAccount'),
@@ -346,6 +353,6 @@ export const ingestionApi = {
   previewExportifyCsv: (formData) => api.post('/ingestion/spotify/exportify/preview', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
-  startExportifyImport: (data) => api.post('/ingestion/spotify/exportify/start', data),
+  startExportifyImport: nonCacheable((data) => api.post('/ingestion/spotify/exportify/start', data), 'track'),
 }
 

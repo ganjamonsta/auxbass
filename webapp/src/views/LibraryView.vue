@@ -413,8 +413,8 @@ const tasksStore = useTasksStore()
 const { openMenu } = useContextMenu()
 
 const handleImportFinished = () => {
-  loadOverviewData()
-  libraryStore.fetchPlaylists()
+  loadOverviewData(true)
+  libraryStore.fetchPlaylists(true)
   if (uiStore.toast) {
     uiStore.toast.success('Импорт завершен', 'Музыка добавлена в библиотеку')
   }
@@ -648,7 +648,7 @@ const loadOverviewData = async (force = false) => {
 
   // 3. Tracks
   loadingTracks.value = !libraryStore.tracks?.length
-  libraryStore.fetchTracks({ limit: 20 }).finally(() => {
+  libraryStore.fetchTracks({ limit: 20, refresh: force, bypassCache: force }).finally(() => {
     loadingTracks.value = false
   })
 

@@ -98,9 +98,9 @@ async def get_track_ids(
             sort_column = UserLibrary.added_at
         
         if sort_order == "desc":
-            query = query.order_by(desc(sort_column))
+            query = query.order_by(desc(sort_column), desc(UserLibrary.id))
         else:
-            query = query.order_by(asc(sort_column))
+            query = query.order_by(asc(sort_column), asc(UserLibrary.id))
     
     result = await db.execute(query)
     ids = [row[0] for row in result.all()]
@@ -1238,6 +1238,8 @@ async def remove_from_library(
 async def get_all_tracks(
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
+    page: Optional[int] = Query(None, ge=1),
+    per_page: Optional[int] = Query(None, ge=1, le=100),
     search: Optional[str] = None,
     sort_by: str = Query("added_at", pattern="^(added_at|title|artist|duration)$"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
@@ -1245,6 +1247,10 @@ async def get_all_tracks(
     db: AsyncSession = Depends(get_db),
 ):
     """Get user's tracks (alias for /library)"""
+    effective_limit = per_page or limit
+    effective_offset = (page - 1) * effective_limit if page is not None else offset
+    effective_page = page or ((effective_offset // effective_limit) + 1)
+
     query = (
         select(Track, UserLibrary)
         .join(UserLibrary, UserLibrary.track_id == Track.id)
@@ -1280,12 +1286,12 @@ async def get_all_tracks(
     }.get(sort_by, UserLibrary.added_at)
     
     if sort_order == "desc":
-        query = query.order_by(desc(order_col))
+        query = query.order_by(desc(order_col), desc(UserLibrary.id))
     else:
-        query = query.order_by(asc(order_col))
+        query = query.order_by(asc(order_col), asc(UserLibrary.id))
     
     # Pagination with offset/limit
-    query = query.offset(offset).limit(limit)
+    query = query.offset(effective_offset).limit(effective_limit)
     
     result = await db.execute(query)
     rows = result.unique().all()
@@ -1293,8 +1299,10 @@ async def get_all_tracks(
     return TracksListResponse(
         items=[track_to_response(track, lib) for track, lib in rows],
         total=total,
-        offset=offset,
-        limit=limit,
+        offset=effective_offset,
+        limit=effective_limit,
+        page=effective_page,
+        per_page=effective_limit,
     )
 
 
