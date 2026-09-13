@@ -14,7 +14,7 @@ class ApiCache {
     this.ttls = {
       default: 5 * 60 * 1000,       // 5 minutes - generic data
       tracks: 3 * 60 * 1000,         // 3 minutes - track listings
-      playlists: 5 * 60 * 1000,      // 5 minutes - playlists
+      playlists: 15 * 1000,          // 15 seconds - user playlists (keep fresh!)
       artists: 10 * 60 * 1000,       // 10 minutes - artists (rarely change)
       albums: 10 * 60 * 1000,        // 10 minutes - albums (rarely change)
       artistDetail: 15 * 60 * 1000,  // 15 minutes - artist details
@@ -75,6 +75,7 @@ class ApiCache {
     if (url.includes('/artists/') && url.includes('/tracks')) return this.ttls.artistDetail
     if (url.includes('/artists')) return this.ttls.artists
     if (url.includes('/albums')) return this.ttls.albums
+    if (url.includes('/playlists/global')) return 3 * 60 * 1000
     if (url.includes('/playlists')) return this.ttls.playlists
     if (url.includes('/tracks')) return this.ttls.tracks
     

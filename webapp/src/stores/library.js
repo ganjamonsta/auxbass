@@ -197,7 +197,7 @@ export const useLibraryStore = defineStore('library', () => {
   // Fetch playlists
   const fetchPlaylists = async (force = false) => {
     try {
-      const response = await playlistsApi.getAll(force ? { _t: Date.now() } : {})
+      const response = await playlistsApi.getAll(force ? { _t: Date.now() } : {}, { bypassCache: true })
       const raw = response.data?.items || response.data || []
 
       // Cache-bust covers so UI reloads fresh images after updates

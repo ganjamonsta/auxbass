@@ -391,47 +391,32 @@ const onPlaylistChanged = () => {
 onMounted(() => {
   window.addEventListener('playlist:changed', onPlaylistChanged)
 
-  // 1. Playlists (Quick access + Your Playlists)
-  if (!libraryStore.playlists?.length) {
-    libraryStore.fetchPlaylists().finally(() => {
-      loadingPlaylists.value = false
-      loadingQuickAccess.value = false
-    })
-  } else {
+  // SWR: If store already has cached data from localStorage, immediately show it (no skeletons)
+  loadingPlaylists.value = !libraryStore.playlists?.length
+  loadingQuickAccess.value = !libraryStore.playlists?.length && !libraryStore.likedTracks?.length
+  loadingHistory.value = !libraryStore.history?.length
+  loadingUploads.value = !libraryStore.recentUploads?.length
+
+  // ALWAYS revalidate in background so changes appear without relogin or cookie clearing
+  libraryStore.fetchPlaylists(true).finally(() => {
     loadingPlaylists.value = false
     loadingQuickAccess.value = false
-    // Background refresh to guarantee freshness
-    libraryStore.fetchPlaylists()
-  }
-
-  // 2. Liked tracks
-  if (!libraryStore.likedTracks?.length) {
-    libraryStore.fetchLikedTracks().finally(() => {
-      loadingQuickAccess.value = false
-    })
-  }
-
-  // 3. History
-  if (!libraryStore.history?.length) {
-    libraryStore.fetchHistory(20).finally(() => {
-      loadingHistory.value = false
-    })
-  } else {
+  })
+  libraryStore.fetchLikedTracks().finally(() => {
+    loadingQuickAccess.value = false
+  })
+  libraryStore.fetchHistory(20).finally(() => {
     loadingHistory.value = false
-  }
-
-  // 4. Recent Uploads
-  if (!libraryStore.recentUploads?.length) {
-    libraryStore.fetchRecentUploads(15).finally(() => {
-      loadingUploads.value = false
-    })
-  } else {
+  })
+  libraryStore.fetchRecentUploads(15).finally(() => {
     loadingUploads.value = false
-  }
+  })
 })
 
 onActivated(() => {
-  libraryStore.fetchPlaylists()
+  // Always refresh playlists and liked tracks when returning to Home tab
+  libraryStore.fetchPlaylists(true)
+  libraryStore.fetchLikedTracks()
 })
 
 onUnmounted(() => {

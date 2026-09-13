@@ -507,42 +507,31 @@ const getArtistCoverStyle = (artist) => {
 
 // Fetch Overview Data
 const loadOverviewData = async (force = false) => {
-  // 1. Playlists
-  if (!libraryStore.playlists?.length || force) {
-    loadingPlaylists.value = !libraryStore.playlists?.length
-    libraryStore.fetchPlaylists(force).finally(() => {
-      loadingPlaylists.value = false
-    })
-  } else {
-    // Background refresh
-    libraryStore.fetchPlaylists()
-  }
+  // 1. Playlists (SWR: show cached immediately, revalidate in background)
+  loadingPlaylists.value = !libraryStore.playlists?.length
+  libraryStore.fetchPlaylists(force).finally(() => {
+    loadingPlaylists.value = false
+  })
 
   // 2. Liked
-  if (!libraryStore.likedTracks?.length || force) {
-    libraryStore.fetchLikedTracks()
-  }
+  libraryStore.fetchLikedTracks()
 
   // 3. Tracks
-  if (!libraryStore.tracks?.length) {
-    loadingTracks.value = true
-    libraryStore.fetchTracks({ limit: 20 }).finally(() => {
-      loadingTracks.value = false
-    })
-  }
+  loadingTracks.value = !libraryStore.tracks?.length
+  libraryStore.fetchTracks({ limit: 20 }).finally(() => {
+    loadingTracks.value = false
+  })
 
   // 4. Artists
-  if (!libraryStore.artists?.length) {
-    loadingArtists.value = true
-    libraryStore.fetchArtists().finally(() => {
-      loadingArtists.value = false
-    })
-  }
+  loadingArtists.value = !libraryStore.artists?.length
+  libraryStore.fetchArtists().finally(() => {
+    loadingArtists.value = false
+  })
 
   // 5. Albums
-  loadingAlbums.value = true
+  loadingAlbums.value = !overviewAlbums.value?.length
   try {
-    const response = await api.get('/albums', { params: { limit: 12 } })
+    const response = await api.get('/albums', { params: { limit: 12 }, bypassCache: force })
     overviewAlbums.value = response.data?.items || []
     albumsTotal.value = response.data?.total || overviewAlbums.value.length
   } catch (e) {

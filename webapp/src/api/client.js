@@ -247,7 +247,7 @@ export const tracksApi = {
 
 // Playlists
 export const playlistsApi = {
-  getAll: cacheable((params = {}) => api.get('/playlists', { params })),
+  getAll: cacheable((params = {}, options = {}) => api.get('/playlists', { params, ...options })),
   getGlobal: cacheable((params = {}) => api.get('/playlists/global', { params })),
   getManageAll: cacheable(() => api.get('/playlists/manage/all')),
   getOne: cacheable((id, params = {}, options = {}) => api.get(`/playlists/${id}`, { params, ...options })),

@@ -268,7 +268,10 @@ const fetchPlaylists = async ({ offset, limit }) => {
   const endpoint = props.scope === 'global' ? '/playlists/global' : '/playlists'
 
   if (!showLikedCard) {
-    const response = await api.get(endpoint, { params: { ...params, offset, limit } })
+    const response = await api.get(endpoint, { 
+      params: { ...params, offset, limit },
+      bypassCache: isLib
+    })
     return response.data
   }
 
@@ -283,7 +286,10 @@ const fetchPlaylists = async ({ offset, limit }) => {
 
   if (offset === 0) {
     const apiLimit = Math.max(1, limit - 1)
-    const response = await api.get(endpoint, { params: { ...params, offset: 0, limit: apiLimit } })
+    const response = await api.get(endpoint, { 
+      params: { ...params, offset: 0, limit: apiLimit },
+      bypassCache: isLib
+    })
     const items = [likedItem, ...(response.data?.items || [])]
     const apiTotal = response.data?.total ?? response.data?.items?.length ?? 0
     return {
@@ -292,7 +298,10 @@ const fetchPlaylists = async ({ offset, limit }) => {
     }
   } else {
     const apiOffset = offset - 1
-    const response = await api.get(endpoint, { params: { ...params, offset: apiOffset, limit } })
+    const response = await api.get(endpoint, { 
+      params: { ...params, offset: apiOffset, limit },
+      bypassCache: isLib
+    })
     const apiTotal = response.data?.total ?? response.data?.items?.length ?? 0
     return {
       items: response.data?.items || [],
@@ -435,6 +444,7 @@ const loadLikedCount = async () => {
 
 // Listen for playlist:changed events to auto-refresh the grid
 const onPlaylistChanged = () => {
+  loadLikedCount()
   virtualGridRef.value?.reset()
 }
 
