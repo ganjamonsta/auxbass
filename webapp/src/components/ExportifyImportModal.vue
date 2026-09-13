@@ -7,14 +7,77 @@
           <div class="modal-header">
             <div class="header-left">
               <div class="sp-icon-badge">
-                <Music2 :size="20" class="badge-icon" />
+                <Music2 :size="18" class="badge-icon" />
               </div>
               <div class="header-titles">
-                <h3 class="modal-title">Импорт Spotify (Exportify CSV)</h3>
-                <p class="modal-subtitle">Распознавание треков, защита от дублей и аудио 320 kbps</p>
+                <div class="modal-title-row">
+                  <h3 class="modal-title">Импорт Spotify</h3>
+                  <!-- File badge with dropdown switcher -->
+                  <div v-if="previewData" class="header-file-switcher">
+                    <button 
+                      class="header-file-pill" 
+                      :class="{ clickable: externalAccountsStore.recentSpotifyImports.length > 1 }"
+                      @click="externalAccountsStore.recentSpotifyImports.length > 1 && (showFileSwitcher = !showFileSwitcher)"
+                      :title="externalAccountsStore.recentSpotifyImports.length > 1 ? 'Нажмите, чтобы переключить файл' : previewData.filename"
+                    >
+                      <FileSpreadsheet :size="12" />
+                      <span class="file-pill-name">{{ formatImportFilename(previewData.filename) }}</span>
+                      <ChevronDown 
+                        v-if="externalAccountsStore.recentSpotifyImports.length > 1" 
+                        :size="12" 
+                        class="switcher-chevron" 
+                        :class="{ 'rotate-180': showFileSwitcher }" 
+                      />
+                    </button>
+
+                    <!-- Dropdown menu -->
+                    <div v-if="showFileSwitcher" class="file-switcher-dropdown">
+                      <div class="file-switcher-header">Сохранённые импорты ({{ externalAccountsStore.recentSpotifyImports.length }}):</div>
+                      <div 
+                        v-for="f in externalAccountsStore.recentSpotifyImports" 
+                        :key="f.file_id || f.id"
+                        class="file-switcher-item"
+                        :class="{ active: currentActiveFileId === f.file_id }"
+                        @click="switchToFile(f)"
+                      >
+                        <FileSpreadsheet :size="14" />
+                        <span class="switcher-item-name">{{ formatImportFilename(f.filename) }}</span>
+                        <span class="switcher-item-count">{{ f.total_tracks }} тр.</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <p class="modal-subtitle">
+                  <template v-if="previewData">
+                    {{ previewData.total_tracks }} треков • 
+                    <span :class="{ 'highlight-new': previewData.new_tracks_count > 0 }">
+                      {{ previewData.new_tracks_count }} новых для добавления
+                    </span>
+                    <template v-if="previewData.in_library_count > 0">
+                      • {{ previewData.in_library_count }} в медиатеке
+                    </template>
+                  </template>
+                  <template v-else>
+                    Распознавание треков, защита от дублей и аудио 320 kbps
+                  </template>
+                </p>
               </div>
             </div>
             <div class="header-right-actions">
+              <template v-if="previewData && !activeJob">
+                <button class="header-tool-btn" @click="resetPreview" title="Загрузить другой CSV">
+                  <Upload :size="14" />
+                  <span>Другой CSV</span>
+                </button>
+                <button 
+                  v-if="currentActiveFileId" 
+                  class="header-tool-btn danger" 
+                  @click="confirmDeleteCurrentFile" 
+                  title="Удалить этот файл из истории"
+                >
+                  <Trash2 :size="14" />
+                </button>
+              </template>
               <button 
                 v-if="activeJob && activeJob.status === 'in_progress'"
                 class="minimize-btn" 
@@ -251,97 +314,18 @@
 
             <!-- Preview & Deduplication Review Step -->
             <div v-else class="preview-section">
-              <!-- Summary Bar -->
-              <div class="summary-card">
-                <div class="summary-file-row">
-                  <div class="summary-file-name">
-                    <FileSpreadsheet :size="16" />
-                    <span class="summary-filename-text" :title="previewData.filename">
-                      {{ formatImportFilename(previewData.filename) }}
-                    </span>
-                    <span class="file-ext-tag">CSV</span>
-                  </div>
-                  <div class="summary-file-actions">
-                    <!-- File switcher dropdown -->
-                    <div v-if="externalAccountsStore.recentSpotifyImports.length > 1" class="file-switcher-dropdown-wrap">
-                      <button 
-                        class="file-switcher-btn" 
-                        @click="showFileSwitcher = !showFileSwitcher"
-                        title="Выбрать другой сохранённый файл"
-                      >
-                        <ListFilter :size="13" />
-                        <span>Выбрать плейлист</span>
-                        <ChevronDown :size="13" class="switcher-chevron" :class="{ 'rotate-180': showFileSwitcher }" />
-                      </button>
-                      <div v-if="showFileSwitcher" class="file-switcher-dropdown">
-                        <div class="file-switcher-header">Сохранённые импорты:</div>
-                        <div 
-                          v-for="f in externalAccountsStore.recentSpotifyImports" 
-                          :key="f.file_id || f.id"
-                          class="file-switcher-item"
-                          :class="{ active: currentActiveFileId === f.file_id }"
-                          @click="switchToFile(f)"
-                        >
-                          <FileSpreadsheet :size="14" />
-                          <span class="switcher-item-name">{{ formatImportFilename(f.filename) }}</span>
-                          <span class="switcher-item-count">{{ f.total_tracks }} треков</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button class="reset-file-btn" @click="resetPreview" title="Загрузить другой файл">
-                      <Upload :size="12" />
-                      <span>Новый файл</span>
-                    </button>
-
-                    <button 
-                      v-if="currentActiveFileId" 
-                      class="delete-active-file-btn" 
-                      @click="confirmDeleteCurrentFile" 
-                      title="Удалить этот файл импорта из истории"
-                    >
-                      <Trash2 :size="13" />
-                      <span>Удалить файл</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div class="stats-pills-row">
-                  <div class="stat-pill total">
-                    <span class="stat-pill-label">Всего:</span>
-                    <span class="stat-pill-val">{{ previewData.total_tracks }}</span>
-                  </div>
-                  <div class="stat-pill new">
-                    <span class="stat-pill-label">Новых:</span>
-                    <span class="stat-pill-val">{{ previewData.new_tracks_count }}</span>
-                  </div>
-                  <div class="stat-pill in-lib" v-if="previewData.in_library_count > 0">
-                    <span class="stat-pill-label">В медиатеке:</span>
-                    <span class="stat-pill-val">{{ previewData.in_library_count }}</span>
-                  </div>
-                  <div class="stat-pill in-chan" v-if="previewData.in_channel_count > 0">
-                    <span class="stat-pill-label">В канале:</span>
-                    <span class="stat-pill-val">{{ previewData.in_channel_count }}</span>
-                  </div>
-                  <div class="stat-pill in-tg" v-if="previewData.already_in_tg_count > 0">
-                    <span class="stat-pill-label">В базе TG:</span>
-                    <span class="stat-pill-val">{{ previewData.already_in_tg_count }}</span>
-                  </div>
-                </div>
-              </div>
-
               <!-- Search & Filter Controls -->
               <div class="search-filter-section">
                 <div class="search-input-wrap">
-                  <Search :size="15" class="search-icon" />
+                  <Search :size="14" class="search-icon" />
                   <input 
                     v-model="searchQuery" 
                     type="text" 
-                    placeholder="Поиск по названию трека, исполнителю или альбому..." 
+                    placeholder="Поиск по названию трека или артисту..." 
                     class="search-input"
                   />
                   <button v-if="searchQuery" class="clear-search-btn" @click="searchQuery = ''" title="Очистить поиск">
-                    <X :size="13" />
+                    <X :size="12" />
                   </button>
                 </div>
 
@@ -371,15 +355,7 @@
                     <span>В медиатеке ({{ previewData.in_library_count }})</span>
                   </button>
                   <button 
-                    v-if="previewData.already_in_tg_count > 0 || previewData.in_channel_count > 0"
-                    class="filter-chip in-tg" 
-                    :class="{ active: activeFilter === 'in_tg' }"
-                    @click="activeFilter = 'in_tg'"
-                  >
-                    <Zap :size="11" />
-                    <span>В Telegram ({{ previewData.already_in_tg_count + previewData.in_channel_count }})</span>
-                  </button>
-                  <button 
+                    v-if="selectedUrls.size > 0"
                     class="filter-chip selected" 
                     :class="{ active: activeFilter === 'selected' }"
                     @click="activeFilter = 'selected'"
@@ -391,37 +367,30 @@
 
               <!-- Selection Controls Toolbar -->
               <div class="selection-toolbar">
-                <div class="selection-count-text">
-                  Выбрано: <strong>{{ selectedUrls.size }}</strong> из {{ previewData.tracks.length }}
-                  <span v-if="searchQuery.trim() || activeFilter !== 'all'" class="filtered-hint">
-                    (в фильтре: {{ filteredTracks.length }})
+                <div class="selection-left" @click="toggleSelectAllFiltered">
+                  <div 
+                    class="track-checkbox" 
+                    :class="{ checked: isAllFilteredSelected, partial: isSomeFilteredSelected }"
+                  >
+                    <Check v-if="isAllFilteredSelected" :size="12" />
+                    <Minus v-else-if="isSomeFilteredSelected" :size="12" />
+                  </div>
+                  <span class="selection-count-text">
+                    Выбрано: <strong>{{ selectedUrls.size }}</strong> из {{ previewData.tracks.length }}
+                    <span v-if="searchQuery.trim() || activeFilter !== 'all'" class="filtered-hint">
+                      (в фильтре: {{ filteredTracks.length }})
+                    </span>
                   </span>
                 </div>
+
                 <div class="selection-buttons">
-                  <button 
-                    v-if="searchQuery.trim() || activeFilter !== 'all'"
-                    class="sel-btn highlight"
-                    @click="selectFiltered"
-                    title="Выбрать все треки в текущем фильтре"
-                  >
-                    <CheckCheck :size="13" />
-                    <span>Выбрать показанные</span>
-                  </button>
-                  <button 
-                    v-if="searchQuery.trim() || activeFilter !== 'all'"
-                    class="sel-btn"
-                    @click="deselectFiltered"
-                    title="Снять выбор с показанных треков"
-                  >
-                    <span>Снять показанные</span>
-                  </button>
                   <button 
                     class="sel-btn highlight"
                     :class="{ active: isOnlyNewSelected }"
                     @click="selectOnlyNew"
                     title="Выбрать только треки, которых ещё нет в вашей медиатеке"
                   >
-                    <Sparkles :size="13" />
+                    <Sparkles :size="12" />
                     <span>Только новые</span>
                   </button>
                   <button class="sel-btn" @click="selectAll">Все</button>
@@ -429,66 +398,12 @@
                 </div>
               </div>
 
-              <!-- Destination Options (Playlist Selection) -->
-              <div class="destination-section">
-                <div class="destination-label">Куда сохранить треки:</div>
-                <div class="destination-modes">
-                  <label class="destination-chip" :class="{ active: destinationMode === 'none' }">
-                    <input type="radio" value="none" v-model="destinationMode" />
-                    <Library :size="13" />
-                    <span>Только в медиатеку</span>
-                  </label>
-                  <label class="destination-chip" :class="{ active: destinationMode === 'new' }">
-                    <input type="radio" value="new" v-model="destinationMode" />
-                    <Plus :size="13" />
-                    <span>Создать новый плейлист</span>
-                  </label>
-                  <label 
-                    class="destination-chip" 
-                    :class="{ active: destinationMode === 'existing', disabled: !userPlaylists.length }"
-                  >
-                    <input type="radio" value="existing" v-model="destinationMode" :disabled="!userPlaylists.length" />
-                    <FolderPlus :size="13" />
-                    <span>В существующий плейлист</span>
-                  </label>
-                </div>
-
-                <!-- If creating new playlist -->
-                <div v-if="destinationMode === 'new'" class="destination-input-wrap">
-                  <input 
-                    v-model="playlistName"
-                    type="text" 
-                    placeholder="Название нового плейлиста" 
-                    class="playlist-name-input"
-                  />
-                </div>
-
-                <!-- If selecting existing playlist -->
-                <div v-if="destinationMode === 'existing'" class="destination-select-wrap">
-                  <div class="custom-select-wrapper">
-                    <select v-model="selectedExistingPlaylistId" class="playlist-dropdown">
-                      <option :value="null" disabled>-- Выберите плейлист из вашей медиатеки --</option>
-                      <option 
-                        v-for="pl in userPlaylists" 
-                        :key="pl.id" 
-                        :value="pl.id"
-                      >
-                        {{ pl.name }} ({{ pl.track_count || 0 }} треков)
-                      </option>
-                    </select>
-                  </div>
-                  <span v-if="selectedPlaylistSummary" class="destination-summary-hint">
-                    Треки будут добавлены в конец плейлиста «{{ selectedPlaylistSummary.name }}»
-                  </span>
-                </div>
-              </div>
-
               <!-- Tracklist (Progressive Rendering with Scroll to prevent lag) -->
               <div class="tracklist-box" @scroll="handleTracklistScroll">
                 <div v-if="filteredTracks.length === 0" class="no-tracks-found">
-                  <Search :size="28" />
+                  <Search :size="24" />
                   <span>Ничего не найдено по вашему запросу</span>
-                  <button class="reset-filter-btn" @click="resetFilters">Сбросить поиск и фильтры</button>
+                  <button class="reset-filter-btn" @click="resetFilters">Сбросить фильтры</button>
                 </div>
 
                 <div 
@@ -538,33 +453,17 @@
                     </div>
                   </div>
 
-                  <!-- Recognition Status Badges -->
+                  <!-- Status Badges -->
                   <div class="track-badges">
-                    <span v-if="track.in_library" class="track-badge in-lib" title="Трек уже в вашей медиатеке. Повторно добавлен не будет.">
+                    <span v-if="track.in_library" class="track-badge in-lib" title="Трек уже в вашей медиатеке">
                       <Check :size="10" /> В медиатеке
                     </span>
-                    <span v-if="track.in_channel" class="track-badge in-chan" title="Файл уже отправлен в ваш личный Telegram-канал.">
-                      <CloudDownload :size="10" /> В канале
-                    </span>
-                    <span v-else-if="track.already_in_tg" class="track-badge in-tg" title="Файл уже загружен на сервер Telegram! Добавится мгновенно без скачивания.">
-                      <Zap :size="10" /> В базе TG
+                    <span v-else-if="track.already_in_tg || track.in_channel" class="track-badge in-tg" title="Файл уже есть в Telegram — добавится мгновенно">
+                      <Zap :size="10" /> В Telegram
                     </span>
                   </div>
 
-                  <!-- Preview play action and duration -->
-                  <div class="track-actions-right">
-                    <button 
-                      class="track-row-play-btn"
-                      :class="{ 'is-playing': isTrackPlaying(track), 'is-loading': previewLoadingUrl === track.url }"
-                      @click.stop="handlePreviewTrack(track, $event)"
-                      :title="isTrackPlaying(track) ? 'Пауза' : 'Слушать аудио'"
-                    >
-                      <div v-if="previewLoadingUrl === track.url" class="spinner micro"></div>
-                      <Pause v-else-if="isTrackPlaying(track)" :size="12" fill="currentColor" />
-                      <Play v-else :size="12" fill="currentColor" />
-                    </button>
-                    <span class="track-duration">{{ formatDuration(track.duration) }}</span>
-                  </div>
+                  <span class="track-duration">{{ formatDuration(track.duration) }}</span>
                 </div>
 
                 <div v-if="visibleTracks.length < filteredTracks.length" class="scroll-more-indicator">
@@ -572,22 +471,49 @@
                 </div>
               </div>
 
-              <!-- Bottom Action Bar -->
-              <div class="preview-actions-bar">
-                <button class="action-btn secondary" @click="handleClose">
-                  Отмена
-                </button>
-                <button 
-                  class="action-btn primary"
-                  :disabled="selectedUrls.size === 0 || isStartingImport || (destinationMode === 'existing' && !selectedExistingPlaylistId)"
-                  @click="handleStartImport"
-                >
-                  <div v-if="isStartingImport" class="spinner small"></div>
-                  <CloudDownload v-else :size="16" />
-                  <span>
-                    {{ isStartingImport ? 'Запуск...' : actionButtonLabel }}
-                  </span>
-                </button>
+              <!-- Bottom Action Bar with Destination Selector -->
+              <div class="preview-footer">
+                <div class="destination-bar">
+                  <span class="dest-label">Куда:</span>
+                  <div class="dest-select-box">
+                    <select v-model="destinationChoice" class="dest-select">
+                      <option value="new">➕ Создать плейлист</option>
+                      <option value="none">📚 Только в медиатеку</option>
+                      <optgroup v-if="userPlaylists.length" label="Существующий плейлист">
+                        <option 
+                          v-for="pl in userPlaylists" 
+                          :key="pl.id" 
+                          :value="`existing:${pl.id}`"
+                        >
+                          📂 {{ pl.name }} ({{ pl.track_count || 0 }} тр.)
+                        </option>
+                      </optgroup>
+                    </select>
+                    <ChevronDown :size="13" class="dest-select-chevron" />
+                  </div>
+                  <input 
+                    v-if="destinationChoice === 'new'"
+                    v-model="playlistName"
+                    type="text" 
+                    placeholder="Название нового плейлиста"
+                    class="dest-name-input"
+                  />
+                </div>
+
+                <div class="footer-action-buttons">
+                  <button class="action-btn secondary" @click="handleClose">
+                    Отмена
+                  </button>
+                  <button 
+                    class="action-btn primary"
+                    :disabled="selectedUrls.size === 0 || isStartingImport || (destinationMode === 'existing' && !selectedExistingPlaylistId)"
+                    @click="handleStartImport"
+                  >
+                    <div v-if="isStartingImport" class="spinner small"></div>
+                    <CloudDownload v-else :size="15" />
+                    <span>{{ isStartingImport ? 'Запуск...' : actionButtonLabel }}</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -670,9 +596,23 @@ const activeFilter = ref('all') // 'all' | 'new' | 'in_library' | 'in_tg' | 'sel
 const displayLimit = ref(60)
 
 // Destination
+const destinationChoice = ref('new')
 const destinationMode = ref('new') // 'none' | 'new' | 'existing'
 const playlistName = ref('')
 const selectedExistingPlaylistId = ref(null)
+
+watch(destinationChoice, (val) => {
+  if (val === 'new') {
+    destinationMode.value = 'new'
+    selectedExistingPlaylistId.value = null
+  } else if (val === 'none') {
+    destinationMode.value = 'none'
+    selectedExistingPlaylistId.value = null
+  } else if (val && val.startsWith('existing:')) {
+    destinationMode.value = 'existing'
+    selectedExistingPlaylistId.value = parseInt(val.split(':')[1], 10)
+  }
+})
 
 const isStartingImport = ref(false)
 const activeJob = ref(null)
@@ -698,8 +638,6 @@ const filteredTracks = computed(() => {
     list = list.filter(t => !t.in_library)
   } else if (activeFilter.value === 'in_library') {
     list = list.filter(t => t.in_library)
-  } else if (activeFilter.value === 'in_tg') {
-    list = list.filter(t => t.already_in_tg || t.in_channel)
   } else if (activeFilter.value === 'selected') {
     list = list.filter(t => selectedUrls.value.has(t.url))
   }
@@ -719,6 +657,24 @@ const visibleTracks = computed(() => {
   return filteredTracks.value.slice(0, displayLimit.value)
 })
 
+const isAllFilteredSelected = computed(() => {
+  if (!filteredTracks.value.length) return false
+  return filteredTracks.value.every(t => selectedUrls.value.has(t.url))
+})
+
+const isSomeFilteredSelected = computed(() => {
+  if (isAllFilteredSelected.value) return false
+  return filteredTracks.value.some(t => selectedUrls.value.has(t.url))
+})
+
+const toggleSelectAllFiltered = () => {
+  if (isAllFilteredSelected.value) {
+    deselectFiltered()
+  } else {
+    selectFiltered()
+  }
+}
+
 const isOnlyNewSelected = computed(() => {
   if (!previewData.value || previewData.value.tracks.length === 0) return false
   const newTracks = previewData.value.tracks.filter(t => !t.in_library)
@@ -729,13 +685,7 @@ const isOnlyNewSelected = computed(() => {
 
 const actionButtonLabel = computed(() => {
   const count = selectedUrls.value.size
-  if (destinationMode.value === 'existing') {
-    const plName = selectedPlaylistSummary.value?.name
-    return plName ? `Добавить в «${plName}» (${count})` : `Добавить в плейлист (${count})`
-  }
-  if (destinationMode.value === 'new') {
-    return `Создать плейлист и импортировать (${count})`
-  }
+  if (count === 0) return 'Выберите треки'
   return `Импортировать ${count} треков`
 })
 
@@ -798,6 +748,7 @@ const processFile = async (file) => {
     // Set default playlist name based on file name
     const cleanName = file.name.replace(/\.csv$/i, '').replace(/[_-]/g, ' ')
     playlistName.value = cleanName.charAt(0).toUpperCase() + cleanName.slice(1)
+    destinationChoice.value = 'new'
 
     // Select only new tracks by default!
     selectOnlyNew()
@@ -829,6 +780,7 @@ const loadLastSavedImport = async (fileId = null) => {
 
     const cleanName = (res.data.filename || 'Spotify Playlist').replace(/\.csv$/i, '').replace(/[_-]/g, ' ')
     playlistName.value = cleanName.charAt(0).toUpperCase() + cleanName.slice(1)
+    destinationChoice.value = 'new'
 
     selectOnlyNew()
   } catch (err) {
@@ -1005,6 +957,7 @@ const resetPreview = () => {
   selectedUrls.value = new Set()
   parseError.value = null
   showFileSwitcher.value = false
+  destinationChoice.value = 'new'
   resetFilters()
 }
 
@@ -1178,8 +1131,9 @@ watch(
 
 .exportify-dialog {
   width: 100%;
-  max-width: 680px;
-  max-height: 88vh;
+  max-width: 720px;
+  height: 86vh;
+  max-height: 820px;
   display: flex;
   flex-direction: column;
   background: #141619;
@@ -1193,55 +1147,217 @@ watch(
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 22px;
+  padding: 16px 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(255, 255, 255, 0.02);
+  flex-shrink: 0;
 }
 
 .header-left {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+  flex: 1;
 }
 
 .sp-icon-badge {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   background: linear-gradient(135deg, #1db954 0%, #15883e 100%);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 14px rgba(29, 185, 84, 0.35);
+  flex-shrink: 0;
+}
+
+.header-titles {
+  min-width: 0;
+  flex: 1;
+}
+
+.modal-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .modal-title {
   margin: 0;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
   color: #f1f3f5;
+  white-space: nowrap;
+}
+
+.header-file-switcher {
+  position: relative;
+  display: inline-flex;
+}
+
+.header-file-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(29, 185, 84, 0.12);
+  border: 1px solid rgba(29, 185, 84, 0.25);
+  color: #1ed760;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: default;
+  transition: all 0.2s;
+}
+
+.header-file-pill.clickable {
+  cursor: pointer;
+}
+
+.header-file-pill.clickable:hover {
+  background: rgba(29, 185, 84, 0.22);
+  border-color: #1ed760;
+}
+
+.file-pill-name {
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.switcher-chevron {
+  transition: transform 0.2s ease;
+}
+
+.switcher-chevron.rotate-180 {
+  transform: rotate(180deg);
+}
+
+.file-switcher-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 100;
+  background: #181b20;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 6px;
+  width: 250px;
+  max-height: 240px;
+  overflow-y: auto;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+}
+
+.file-switcher-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  padding: 6px 8px 4px 8px;
+}
+
+.file-switcher-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.file-switcher-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.file-switcher-item.active {
+  background: rgba(29, 185, 84, 0.15);
+  color: #1ed760;
+  font-weight: 600;
+}
+
+.switcher-item-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.switcher-item-count {
+  font-size: 11px;
+  color: #64748b;
 }
 
 .modal-subtitle {
-  margin: 2px 0 0 0;
+  margin: 3px 0 0 0;
   font-size: 12px;
   color: #8b929a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.highlight-new {
+  color: #1ed760;
+  font-weight: 600;
 }
 
 .header-right-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+}
+
+.header-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.header-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.header-tool-btn.danger {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.2);
+  padding: 5px 8px;
+}
+
+.header-tool-btn.danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  color: #fff;
 }
 
 .minimize-btn {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: #94a3b8;
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1259,9 +1375,9 @@ watch(
   background: rgba(255, 255, 255, 0.06);
   border: none;
   color: #8b929a;
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1275,9 +1391,12 @@ watch(
 }
 
 .modal-body {
-  padding: 20px;
-  overflow-y: auto;
+  padding: 16px 20px;
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 /* Saved Channel Files Section */
@@ -1561,243 +1680,29 @@ watch(
   font-size: 13px;
 }
 
-/* Summary Card */
-.summary-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 14px;
-  padding: 14px 16px;
-  margin-bottom: 14px;
-}
-
-.summary-file-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
-.summary-file-name {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #f1f3f5;
-  min-width: 0;
-  flex: 1;
-}
-
-.summary-filename-text {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.file-ext-tag {
-  font-size: 10px;
-  font-weight: 700;
-  background: rgba(29, 185, 84, 0.15);
-  color: #1ed760;
-  padding: 1px 5px;
-  border-radius: 4px;
-  border: 1px solid rgba(29, 185, 84, 0.3);
-}
-
-.summary-file-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-/* File switcher */
-.file-switcher-dropdown-wrap {
-  position: relative;
-}
-
-.file-switcher-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(29, 185, 84, 0.12);
-  border: 1px solid rgba(29, 185, 84, 0.3);
-  color: #1ed760;
-  padding: 5px 10px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.file-switcher-btn:hover {
-  background: rgba(29, 185, 84, 0.2);
-  border-color: #1ed760;
-}
-
-.switcher-chevron {
-  transition: transform 0.2s ease;
-}
-
-.switcher-chevron.rotate-180 {
-  transform: rotate(180deg);
-}
-
-.file-switcher-dropdown {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 100;
-  background: #181b20;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  padding: 6px;
-  width: 240px;
-  max-height: 240px;
-  overflow-y: auto;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
-}
-
-.file-switcher-header {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #64748b;
-  padding: 6px 8px 4px 8px;
-}
-
-.file-switcher-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  font-size: 12px;
-  color: #cbd5e1;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.file-switcher-item:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
-}
-
-.file-switcher-item.active {
-  background: rgba(29, 185, 84, 0.15);
-  color: #1ed760;
-  font-weight: 600;
-}
-
-.switcher-item-name {
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.switcher-item-count {
-  font-size: 11px;
-  color: #64748b;
-}
-
-.reset-file-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #8b929a;
-  padding: 5px 10px;
-  border-radius: 8px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.reset-file-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #fff;
-}
-
-.delete-active-file-btn {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.25);
-  color: #f87171;
-  padding: 5px 10px;
-  border-radius: 8px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.delete-active-file-btn:hover {
-  background: rgba(239, 68, 68, 0.2);
-  border-color: #ef4444;
-  color: #fff;
-}
-
-.stats-pills-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.stat-pill {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.stat-pill.total {
-  background: rgba(255, 255, 255, 0.06);
-  color: #e2e8f0;
-}
-.stat-pill.new {
-  background: rgba(29, 185, 84, 0.15);
-  color: #1ed760;
-  border: 1px solid rgba(29, 185, 84, 0.3);
-}
-.stat-pill.in-lib {
-  background: rgba(59, 130, 246, 0.12);
-  color: #93c5fd;
-}
-.stat-pill.in-chan {
-  background: rgba(168, 85, 247, 0.12);
-  color: #d8b4fe;
-}
-.stat-pill.in-tg {
-  background: rgba(245, 158, 11, 0.12);
-  color: #fcd34d;
-}
-
-.stat-pill-val {
-  font-weight: 700;
-}
-
-/* Search & Filter Bar */
-.search-filter-section {
+/* Preview Section */
+.preview-section {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Search & Filter Toolbar */
+.search-filter-section {
+  display: flex;
+  align-items: center;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
 }
 
 .search-input-wrap {
   position: relative;
   display: flex;
   align-items: center;
+  flex: 1;
+  min-width: 220px;
 }
 
 .search-input-wrap .search-icon {
@@ -1813,7 +1718,7 @@ watch(
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: #fff;
   border-radius: 10px;
-  padding: 9px 36px 9px 36px;
+  padding: 8px 34px 8px 34px;
   font-size: 13px;
   outline: none;
   transition: all 0.2s;
@@ -1835,7 +1740,7 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
+  padding: 3px;
   border-radius: 50%;
 }
 
@@ -1849,7 +1754,7 @@ watch(
   align-items: center;
   gap: 6px;
   overflow-x: auto;
-  padding-bottom: 2px;
+  flex-shrink: 0;
 }
 
 .filter-chip {
@@ -1881,27 +1786,51 @@ watch(
 }
 
 .filter-chip.new.active {
-  background: rgba(29, 185, 84, 0.2);
+  background: rgba(29, 185, 84, 0.18);
   border-color: #1ed760;
   color: #1ed760;
 }
 
 .filter-chip.in-lib.active {
-  background: rgba(59, 130, 246, 0.2);
+  background: rgba(59, 130, 246, 0.18);
   border-color: #60a5fa;
   color: #93c5fd;
 }
 
-.filter-chip.in-tg.active {
-  background: rgba(168, 85, 247, 0.2);
-  border-color: #c084fc;
-  color: #d8b4fe;
-}
-
 .filter-chip.selected.active {
-  background: rgba(245, 158, 11, 0.2);
+  background: rgba(245, 158, 11, 0.18);
   border-color: #fbbf24;
   color: #fcd34d;
+}
+
+/* Selection Controls Toolbar */
+.selection-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.selection-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.selection-count-text {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.selection-count-text strong {
+  color: #fff;
 }
 
 .filtered-hint {
@@ -1910,150 +1839,52 @@ watch(
   margin-left: 4px;
 }
 
-/* Destination Section */
-.destination-section {
+.selection-buttons {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 12px;
-  padding: 12px 14px;
-  margin-bottom: 12px;
-}
-
-.destination-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #64748b;
-}
-
-.destination-modes {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.destination-chip {
-  display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 500;
-  background: rgba(255, 255, 255, 0.04);
+}
+
+.sel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: #94a3b8;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.15s;
-  user-select: none;
 }
 
-.destination-chip input[type="radio"] {
-  display: none;
-}
-
-.destination-chip:hover:not(.disabled) {
-  background: rgba(255, 255, 255, 0.08);
+.sel-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
   color: #fff;
 }
 
-.destination-chip.active {
-  background: rgba(29, 185, 84, 0.15);
-  border-color: rgba(29, 185, 84, 0.4);
+.sel-btn.highlight {
+  background: rgba(29, 185, 84, 0.1);
+  border-color: rgba(29, 185, 84, 0.25);
   color: #1ed760;
+}
+
+.sel-btn.highlight.active {
+  background: rgba(29, 185, 84, 0.22);
+  border-color: #1ed760;
+  color: #fff;
   font-weight: 600;
 }
 
-.destination-chip.disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.destination-input-wrap, .destination-select-wrap {
-  margin-top: 4px;
-}
-
-.custom-select-wrapper {
-  position: relative;
-}
-
-.playlist-dropdown {
-  width: 100%;
-  background: #181b20;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #fff;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 13px;
-  outline: none;
-  cursor: pointer;
-}
-
-.playlist-dropdown:focus {
-  border-color: #1db954;
-}
-
-.playlist-dropdown option {
-  background: #181b20;
-  color: #fff;
-}
-
-.destination-summary-hint {
-  display: block;
-  margin-top: 6px;
-  font-size: 11px;
-  color: #64748b;
-}
-
-.scroll-more-indicator {
-  padding: 12px;
-  text-align: center;
-  font-size: 11px;
-  color: #64748b;
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 8px;
-  margin-top: 6px;
-}
-
-.no-tracks-found {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 40px 16px;
-  color: #64748b;
-  font-size: 13px;
-}
-
-.reset-filter-btn {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #e2e8f0;
-  padding: 6px 14px;
-  border-radius: 8px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.reset-filter-btn:hover {
-  background: rgba(29, 185, 84, 0.2);
-  border-color: #1ed760;
-  color: #1ed760;
-}
-
-/* Tracklist */
+/* Tracklist Box */
 .tracklist-box {
-  max-height: 380px;
+  flex: 1;
+  min-height: 240px;
   overflow-y: auto;
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(0, 0, 0, 0.2);
   padding: 4px;
 }
@@ -2062,8 +1893,8 @@ watch(
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
-  border-radius: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
   cursor: pointer;
   transition: background 0.15s;
   user-select: none;
@@ -2093,6 +1924,12 @@ watch(
 .track-checkbox.checked {
   background: #1db954;
   border-color: #1db954;
+}
+
+.track-checkbox.partial {
+  background: rgba(29, 185, 84, 0.25);
+  border-color: #1db954;
+  color: #1ed760;
 }
 
 .track-index {
@@ -2140,6 +1977,12 @@ watch(
   color: #1ed760;
 }
 
+.track-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .track-row.now-playing {
   border-left: 2px solid #1db954;
   background: rgba(29, 185, 84, 0.12) !important;
@@ -2151,58 +1994,6 @@ watch(
   margin-left: 6px;
   color: #1ed760;
   vertical-align: middle;
-}
-
-.track-actions-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.track-row-play-btn {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
-  color: #cbd5e1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s;
-  padding: 0;
-}
-
-.track-row-play-btn:hover {
-  background: rgba(29, 185, 84, 0.2);
-  border-color: rgba(29, 185, 84, 0.4);
-  color: #1ed760;
-  transform: scale(1.08);
-}
-
-.track-row-play-btn.is-playing {
-  background: #1db954;
-  border-color: #1db954;
-  color: #000000;
-}
-
-.track-row-play-btn.is-loading {
-  background: rgba(255, 255, 255, 0.05);
-  cursor: wait;
-}
-
-.spinner.micro {
-  width: 12px;
-  height: 12px;
-  border-width: 1.5px;
-}
-
-.track-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 .track-meta {
@@ -2254,10 +2045,7 @@ watch(
   background: rgba(34, 197, 94, 0.15);
   color: #4ade80;
 }
-.track-badge.in-chan {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
-}
+
 .track-badge.in-tg {
   background: rgba(168, 85, 247, 0.15);
   color: #c084fc;
@@ -2271,22 +2059,136 @@ watch(
   flex-shrink: 0;
 }
 
-/* Bottom Action Bar */
-.preview-actions-bar {
+.scroll-more-indicator {
+  padding: 10px;
+  text-align: center;
+  font-size: 11px;
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+  margin-top: 4px;
+}
+
+.no-tracks-found {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 16px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.reset-filter-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.reset-filter-btn:hover {
+  background: rgba(29, 185, 84, 0.2);
+  border-color: #1ed760;
+  color: #1ed760;
+}
+
+/* Bottom Action Bar with Destination Selector */
+.preview-footer {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 12px;
-  margin-top: 16px;
+  padding-top: 14px;
+  margin-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.destination-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 280px;
+}
+
+.dest-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.dest-select-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  max-width: 220px;
+}
+
+.dest-select {
+  appearance: none;
+  background: #181b20;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 26px 6px 10px;
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+  width: 100%;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.dest-select:focus {
+  border-color: #1db954;
+}
+
+.dest-select-chevron {
+  position: absolute;
+  right: 8px;
+  pointer-events: none;
+  color: #64748b;
+}
+
+.dest-name-input {
+  background: #181b20;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  outline: none;
+  width: 160px;
+}
+
+.dest-name-input:focus {
+  border-color: #1db954;
+}
+
+.footer-action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .action-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 20px;
-  border-radius: 12px;
-  font-size: 14px;
+  padding: 8px 18px;
+  border-radius: 10px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   border: none;
