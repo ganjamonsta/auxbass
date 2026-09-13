@@ -898,9 +898,9 @@ html, body {
   opacity: 0.7;
 }
 
-/* Desktop: content padding — uses adaptive token */
+/* Desktop: content padding — views manage their own content padding */
 .app.desktop-layout .main-content {
-  padding: 0 var(--content-padding, 24px) 20px;
+  padding: 0 0 20px;
 }
 
 .auth-loading {

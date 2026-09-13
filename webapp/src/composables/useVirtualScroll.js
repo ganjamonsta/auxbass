@@ -63,13 +63,18 @@ export function useVirtualScroll(options = {}) {
     if (scrollContainer?.value) return scrollContainer.value
     if (scrollContainer && typeof scrollContainer === 'object' && 'nodeType' in scrollContainer) return scrollContainer
     let parent = el?.parentElement
-    while (parent) {
+    while (parent && parent !== document.body && parent !== document.documentElement) {
+      if (parent.classList?.contains('main-content')) {
+        return parent
+      }
       const style = window.getComputedStyle(parent)
-      if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+      if ((style.overflowY === 'auto' || style.overflowY === 'scroll') && parent.clientHeight > 0 && parent.scrollHeight > parent.clientHeight) {
         return parent
       }
       parent = parent.parentElement
     }
+    const mainContent = document.querySelector('.main-content')
+    if (mainContent) return mainContent
     return window
   }
 
@@ -130,6 +135,9 @@ export function useVirtualScroll(options = {}) {
   const hasMore = computed(() => itemsMap.value.size < total.value)
   const isEmpty = computed(() => initialized.value && !loading.value && total.value === 0)
 
+  // Maximum concurrent page requests
+  const MAX_CONCURRENT_PAGES = 2
+
   // Fetch a specific page/chunk by offset
   const fetchPage = async (pageOffset) => {
     if (loadedPages.has(pageOffset) || pendingPages.has(pageOffset)) return
@@ -170,40 +178,64 @@ export function useVirtualScroll(options = {}) {
       loading.value = false
       loadingMore.value = pendingPages.size > 0
       initialized.value = true
+      checkNeededPages()
     }
   }
 
   // Check which pages are needed for the current visible window
   const checkNeededPages = () => {
     if (total.value <= 0) return
+    if (pendingPages.size >= MAX_CONCURRENT_PAGES) return
+
     const start = startIndex.value
     const end = endIndex.value
 
+    const neededOffsets = new Set()
     for (let i = start; i < end; i++) {
       if (!itemsMap.value.has(i)) {
         const pageOffset = Math.floor(i / pageSize) * pageSize
         if (!loadedPages.has(pageOffset) && !pendingPages.has(pageOffset)) {
-          fetchPage(pageOffset)
+          neededOffsets.add(pageOffset)
         }
       }
+    }
+
+    if (neededOffsets.size === 0) return
+
+    // Prioritize chunks closest to current visible start
+    const sortedOffsets = Array.from(neededOffsets).sort((a, b) => {
+      return Math.abs(a - start) - Math.abs(b - start)
+    })
+
+    for (const pageOffset of sortedOffsets) {
+      if (pendingPages.size >= MAX_CONCURRENT_PAGES) break
+      fetchPage(pageOffset)
     }
   }
 
   // Update scroll metrics
   const updateScroll = () => {
     if (!containerRef.value) return
-    const sc = detectedScrollContainer || findScrollContainer(containerRef.value)
-    detectedScrollContainer = sc
 
     const containerRect = containerRef.value.getBoundingClientRect()
     containerWidth.value = containerRef.value.clientWidth
+
+    // If container is hidden (e.g. inside a non-active tab), skip calculation to prevent runaway fetches
+    if (containerRect.width === 0 && containerRect.height === 0) {
+      ticking = false
+      return
+    }
+
+    const sc = detectedScrollContainer || findScrollContainer(containerRef.value)
+    detectedScrollContainer = sc
 
     if (sc === window) {
       viewportHeight.value = window.innerHeight
       const listTop = containerRect.top
       scrollTop.value = Math.max(0, -listTop)
     } else if (sc) {
-      viewportHeight.value = sc.clientHeight
+      // Bounded viewport: can never exceed browser window height
+      viewportHeight.value = Math.min(sc.clientHeight || window.innerHeight, window.innerHeight || 800)
       const scRect = sc.getBoundingClientRect()
       const relativeTop = containerRect.top - scRect.top
       scrollTop.value = Math.max(0, -relativeTop)

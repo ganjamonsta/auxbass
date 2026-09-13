@@ -115,8 +115,32 @@
     <section v-else-if="recentHistoryTracks.length > 0" class="home-section">
       <div class="section-header">
         <h2 class="section-title">Недавно прослушано</h2>
+        <div class="section-actions">
+          <button 
+            class="scroll-arrow-btn" 
+            :disabled="!historyScroll.canScrollLeft.value"
+            @click="historyScroll.scroll('left')"
+            title="Назад"
+            aria-label="Назад"
+          >
+            <ChevronLeft :size="16" />
+          </button>
+          <button 
+            class="scroll-arrow-btn" 
+            :disabled="!historyScroll.canScrollRight.value"
+            @click="historyScroll.scroll('right')"
+            title="Вперед"
+            aria-label="Вперед"
+          >
+            <ChevronRight :size="16" />
+          </button>
+        </div>
       </div>
-      <div class="horizontal-scroll">
+      <div 
+        class="horizontal-scroll"
+        :ref="historyScroll.containerRef"
+        @wheel="historyScroll.onWheel"
+      >
         <div 
           v-for="track in recentHistoryTracks" 
           :key="track.id" 
@@ -164,9 +188,33 @@
     <section v-else-if="allPlaylists.length > 0" class="home-section">
       <div class="section-header">
         <h2 class="section-title">Ваши плейлисты</h2>
-        <button class="section-link" @click="goToLibraryPlaylists">Все</button>
+        <div class="section-actions">
+          <button class="section-link" @click="goToLibraryPlaylists">Все</button>
+          <button 
+            class="scroll-arrow-btn" 
+            :disabled="!playlistsScroll.canScrollLeft.value"
+            @click="playlistsScroll.scroll('left')"
+            title="Назад"
+            aria-label="Назад"
+          >
+            <ChevronLeft :size="16" />
+          </button>
+          <button 
+            class="scroll-arrow-btn" 
+            :disabled="!playlistsScroll.canScrollRight.value"
+            @click="playlistsScroll.scroll('right')"
+            title="Вперед"
+            aria-label="Вперед"
+          >
+            <ChevronRight :size="16" />
+          </button>
+        </div>
       </div>
-      <div class="horizontal-scroll">
+      <div 
+        class="horizontal-scroll"
+        :ref="playlistsScroll.containerRef"
+        @wheel="playlistsScroll.onWheel"
+      >
         <div 
           v-for="pl in allPlaylists.slice(0, 10)" 
           :key="pl.id" 
@@ -217,8 +265,32 @@
     <section v-else-if="recentUploads.length > 0" class="home-section">
       <div class="section-header">
         <h2 class="section-title">Новинки сообщества</h2>
+        <div class="section-actions">
+          <button 
+            class="scroll-arrow-btn" 
+            :disabled="!uploadsScroll.canScrollLeft.value"
+            @click="uploadsScroll.scroll('left')"
+            title="Назад"
+            aria-label="Назад"
+          >
+            <ChevronLeft :size="16" />
+          </button>
+          <button 
+            class="scroll-arrow-btn" 
+            :disabled="!uploadsScroll.canScrollRight.value"
+            @click="uploadsScroll.scroll('right')"
+            title="Вперед"
+            aria-label="Вперед"
+          >
+            <ChevronRight :size="16" />
+          </button>
+        </div>
       </div>
-      <div class="horizontal-scroll">
+      <div 
+        class="horizontal-scroll"
+        :ref="uploadsScroll.containerRef"
+        @wheel="uploadsScroll.onWheel"
+      >
         <div 
           v-for="track in recentUploads.slice(0, 12)" 
           :key="track.id" 
@@ -282,8 +354,11 @@ import {
   Plus, 
   Music, 
   Sparkles, 
-  Shuffle 
+  Shuffle,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-vue-next'
+import { useHorizontalScroll } from '@/composables/useHorizontalScroll'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -291,6 +366,11 @@ const libraryStore = useLibraryStore()
 const playerStore = usePlayerStore()
 const uiStore = useUIStore()
 const { openMenu } = useContextMenu()
+
+// Horizontal scroll managers for desktop carousels
+const historyScroll = useHorizontalScroll()
+const playlistsScroll = useHorizontalScroll()
+const uploadsScroll = useHorizontalScroll()
 
 // Independent async loading flags per section
 const loadingQuickAccess = ref(!libraryStore.playlists?.length && !libraryStore.likedTracks?.length)
@@ -426,14 +506,18 @@ onUnmounted(() => {
 
 <style scoped>
 .home-view {
-  padding: var(--content-padding, 16px) var(--content-padding, 16px) 32px;
-  max-width: var(--content-max-width, 1400px);
-  margin: 0 auto;
+  padding: var(--content-padding, 16px) 0 32px var(--content-padding, 16px);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* Greeting */
 .home-greeting {
   margin-bottom: 24px;
+  max-width: var(--content-max-width, 1400px);
+  padding-right: var(--content-padding, 16px);
+  box-sizing: border-box;
 }
 
 .greeting-title {
@@ -463,12 +547,16 @@ onUnmounted(() => {
   grid-template-columns: var(--quick-grid-cols, repeat(2, 1fr));
   gap: 10px;
   margin-bottom: 28px;
+  max-width: var(--content-max-width, 1400px);
+  margin-right: var(--content-padding, 16px);
+  box-sizing: border-box;
 }
 
 @media (min-width: 768px) {
   .quick-access-grid {
     gap: 12px;
     margin-bottom: 36px;
+    margin-right: var(--content-padding, 24px);
   }
 }
 
@@ -621,6 +709,7 @@ onUnmounted(() => {
 /* Sections */
 .home-section {
   margin-bottom: 28px;
+  width: 100%;
 }
 
 .section-header {
@@ -628,6 +717,15 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
+  max-width: var(--content-max-width, 1400px);
+  padding-right: var(--content-padding, 16px);
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .section-header {
+    padding-right: var(--content-padding, 24px);
+  }
 }
 
 .section-title {
@@ -635,6 +733,51 @@ onUnmounted(() => {
   font-weight: 700;
   color: var(--c-text-1, #fff);
   letter-spacing: -0.01em;
+}
+
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scroll-arrow-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--c-text-1, #fff);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  padding: 0;
+  user-select: none;
+}
+
+.scroll-arrow-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: scale(1.06);
+}
+
+.scroll-arrow-btn:active:not(:disabled) {
+  transform: scale(0.94);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.scroll-arrow-btn:disabled {
+  opacity: 0.2;
+  cursor: default;
+  pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  .scroll-arrow-btn {
+    display: none;
+  }
 }
 
 .section-link {
@@ -656,13 +799,41 @@ onUnmounted(() => {
   display: flex;
   gap: 12px;
   overflow-x: auto;
-  scrollbar-width: none;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: 4px;
+  padding-bottom: 8px;
+  padding-right: var(--content-padding, 24px);
+  width: 100%;
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.2s ease;
+}
+
+.horizontal-scroll:hover {
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
 
 .horizontal-scroll::-webkit-scrollbar {
-  display: none;
+  height: 5px;
+}
+
+.horizontal-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.horizontal-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.horizontal-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.horizontal-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.38);
 }
 
 /* Feed Cards */
@@ -793,6 +964,15 @@ onUnmounted(() => {
   border-radius: 16px;
   padding: 20px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 0 24px rgba(139, 92, 246, 0.08);
+  max-width: var(--content-max-width, 1400px);
+  margin-right: var(--content-padding, 16px);
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .discovery-banner {
+    margin-right: var(--content-padding, 24px);
+  }
 }
 
 .discovery-badge {

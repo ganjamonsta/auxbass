@@ -335,6 +335,7 @@
       <!-- Tracks Tab Content -->
       <div v-show="activeTab === 'tracks'" class="tab-pane tracks-pane">
         <VirtualTrackList
+          v-if="hasOpenedTracks || activeTab === 'tracks'"
           ref="virtualTrackListRef"
           :fetchFn="fetchUserTracks"
           :pageSize="50"
@@ -358,6 +359,7 @@
       <!-- Playlists Tab Content -->
       <div v-show="activeTab === 'playlists'" class="tab-pane playlists-pane">
         <VirtualGrid
+          v-if="hasOpenedPlaylists || activeTab === 'playlists'"
           ref="playlistsGridRef"
           type="playlist"
           :fetchFn="fetchUserPlaylists"
@@ -377,6 +379,7 @@
       <!-- Albums Tab Content -->
       <div v-show="activeTab === 'albums'" class="tab-pane albums-pane">
         <VirtualGrid
+          v-if="hasOpenedAlbums || activeTab === 'albums'"
           ref="albumsGridRef"
           type="album"
           :fetchFn="fetchUserAlbums"
@@ -560,6 +563,15 @@ const isForbidden = ref(false)
 const isFollowing = ref(false)
 const followLoading = ref(false)
 const activeTab = ref('overview')
+const hasOpenedTracks = ref(false)
+const hasOpenedPlaylists = ref(false)
+const hasOpenedAlbums = ref(false)
+
+const markTabOpened = (tabKey) => {
+  if (tabKey === 'tracks') hasOpenedTracks.value = true
+  if (tabKey === 'playlists') hasOpenedPlaylists.value = true
+  if (tabKey === 'albums') hasOpenedAlbums.value = true
+}
 
 // Overview data
 const overviewTracks = ref([])
@@ -573,6 +585,7 @@ const playlistsGridRef = ref(null)
 const albumsGridRef = ref(null)
 
 const selectTab = async (tabKey) => {
+  markTabOpened(tabKey)
   activeTab.value = tabKey
   await nextTick()
   window.dispatchEvent(new Event('resize'))
@@ -586,6 +599,7 @@ const selectTab = async (tabKey) => {
 }
 
 watch(activeTab, async (newTab) => {
+  markTabOpened(newTab)
   await nextTick()
   window.dispatchEvent(new Event('resize'))
   if (newTab === 'tracks') {
@@ -1031,7 +1045,6 @@ onMounted(() => {
   min-height: calc(100vh - 120px);
   width: 100%;
   box-sizing: border-box;
-  overflow-x: hidden;
 }
 
 .loading-container {
@@ -1685,7 +1698,6 @@ onMounted(() => {
   .user-profile-view {
     padding: 16px 16px calc(var(--player-height, 70px) + var(--nav-height, 64px) + 32px);
     max-width: 100%;
-    overflow-x: hidden;
   }
 
   .profile-hero-card {
