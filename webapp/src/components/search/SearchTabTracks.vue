@@ -186,3 +186,91 @@ const emit = defineEmits([
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
 </script>
+
+<style scoped>
+.result-section {
+  margin-bottom: 28px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--c-text-1, #fff);
+  letter-spacing: -0.01em;
+}
+
+.section-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.45));
+}
+
+.track-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.section-header.friends-section,
+.section-header.global-section {
+  margin-top: 24px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.section-loading-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+  font-size: 13px;
+}
+
+.load-more-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  margin-top: 12px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--c-accent, #1db954);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.load-more-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+.load-more-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.search-skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+</style>

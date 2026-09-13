@@ -89,28 +89,31 @@
             </div>
           </div>
 
+          <!-- Top-right absolute share button -->
+          <button class="hero-share-corner-btn" @click="handleShare" title="Поделиться профилем">
+            <Share2 :size="18" />
+          </button>
+
           <!-- Action Buttons Bar -->
           <div class="hero-actions-bar">
-            <!-- Play library button -->
-            <button 
-              v-if="user.track_count > 0"
-              class="hero-play-btn" 
-              @click="handlePlayUserLibrary"
-              title="Слушать медиатеку"
-            >
-              <Play :size="17" fill="currentColor" />
-              <span>Слушать</span>
-            </button>
-
-            <!-- Shuffle button -->
-            <button 
-              v-if="user.track_count > 1"
-              class="hero-icon-btn" 
-              @click="handleShuffleUserLibrary"
-              title="Перемешать медиатеку"
-            >
-              <Shuffle :size="16" />
-            </button>
+            <!-- Unified Play & Shuffle Capsule -->
+            <div class="action-buttons hero-play-capsule" v-if="user.track_count > 0">
+              <button 
+                class="action-btn play-btn" 
+                @click="handlePlayUserLibrary"
+                title="Слушать медиатеку"
+              >
+                <Play :size="19" fill="currentColor" />
+              </button>
+              <button 
+                v-if="user.track_count > 1"
+                class="action-btn shuffle-btn" 
+                @click="handleShuffleUserLibrary"
+                title="Перемешать медиатеку"
+              >
+                <Shuffle :size="17" />
+              </button>
+            </div>
 
             <!-- Follow button -->
             <button
@@ -119,10 +122,10 @@
               :class="{ 'is-following': isFollowing }"
               :disabled="followLoading"
               @click="toggleFollow"
+              :title="isFollowing ? 'Отписаться' : 'Подписаться'"
             >
-              <Check v-if="isFollowing" :size="16" />
-              <UserPlus v-else :size="16" />
-              <span>{{ isFollowing ? 'Подписан' : 'Подписаться' }}</span>
+              <Check v-if="isFollowing" :size="18" />
+              <UserPlus v-else :size="18" />
             </button>
 
             <!-- Edit Profile (if self) -->
@@ -132,8 +135,7 @@
               @click="openEditProfileModal"
               title="Редактировать профиль"
             >
-              <Edit3 :size="16" />
-              <span>Изменить</span>
+              <Edit3 :size="18" />
             </button>
 
             <!-- Settings (if self) -->
@@ -143,14 +145,7 @@
               @click="router.push('/settings')"
               title="Настройки аккаунта"
             >
-              <Settings :size="16" />
-              <span>Настройки</span>
-            </button>
-
-            <!-- Share button -->
-            <button class="hero-pill-btn share-btn" @click="handleShare" title="Поделиться профилем">
-              <Share2 :size="16" />
-              <span>Поделиться</span>
+              <Settings :size="18" />
             </button>
           </div>
         </div>
@@ -1273,70 +1268,72 @@ onMounted(() => {
   margin-top: 4px;
 }
 
-.hero-play-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 22px;
-  border-radius: 9999px;
-  background: var(--c-accent, #1db954);
-  color: #000;
-  font-weight: 700;
-  font-size: 14px;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
-  box-shadow: 0 4px 16px rgba(29, 185, 84, 0.4);
-}
-
-.hero-play-btn:hover {
-  transform: scale(1.04);
-  background: #1ed760;
-  box-shadow: 0 6px 20px rgba(29, 185, 84, 0.5);
-}
-
-.hero-icon-btn {
-  width: 40px;
-  height: 40px;
+.hero-share-corner-btn {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   color: var(--c-text-1, #fff);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
+  z-index: 5;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
-.hero-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  transform: scale(1.05);
+.hero-share-corner-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: scale(1.06);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+.hero-share-corner-btn:active {
+  transform: scale(0.96);
+}
+
+.hero-play-capsule {
+  flex-shrink: 0;
 }
 
 .hero-pill-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 18px;
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: var(--c-text-1, #fff);
-  font-size: 13.5px;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+  padding: 0;
 }
 
 .hero-pill-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.14);
-  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.22);
+  transform: scale(1.06);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+.hero-pill-btn:active:not(:disabled) {
+  transform: scale(0.96);
 }
 
 .hero-pill-btn.follow-btn.is-following {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--c-accent, #1db954);
+  border-color: rgba(29, 185, 84, 0.3);
 }
 
 /* Modern Tab Bar */

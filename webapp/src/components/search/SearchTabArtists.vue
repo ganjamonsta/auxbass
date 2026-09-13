@@ -76,3 +76,152 @@ const getArtistCoverStyle = (artist) => {
   }
 }
 </script>
+
+<style scoped>
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--c-text-1, #fff);
+  letter-spacing: -0.01em;
+}
+
+.section-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.45));
+}
+
+.artists-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+  gap: 14px;
+  margin-top: 8px;
+}
+
+@media (min-width: 768px) {
+  .artists-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+  }
+}
+
+.artists-grid .feed-card {
+  width: 100%;
+  flex: initial;
+}
+
+.feed-card {
+  flex: 0 0 136px;
+  width: 136px;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.2s ease;
+}
+
+@media (min-width: 768px) {
+  .feed-card {
+    flex: 0 0 156px;
+    width: 156px;
+  }
+}
+
+.feed-card:hover {
+  transform: translateY(-2px);
+}
+
+.feed-card:active {
+  transform: scale(0.97);
+}
+
+.feed-card-cover {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  background: var(--c-bg-2, #181818);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.artist-card .artist-cover {
+  border-radius: 50%;
+}
+
+.artist-initials {
+  font-size: 24px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.artist-card .feed-card-title,
+.artist-card .feed-card-subtitle {
+  text-align: center;
+}
+
+.feed-card-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s;
+}
+
+.feed-card:hover .feed-card-cover img {
+  transform: scale(1.04);
+}
+
+.feed-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text-1, #fff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.feed-card-subtitle {
+  font-size: 12px;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.card-tags.center {
+  justify-content: center;
+}
+
+.card-tag {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--c-accent, #1db954);
+  background: rgba(29, 185, 84, 0.12);
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+  line-height: 14px;
+}
+</style>

@@ -324,3 +324,224 @@ const getPlaylistCoverStyle = (playlist) => {
   }
 }
 </script>
+
+<style scoped>
+/* Results */
+.result-section {
+  margin-bottom: 28px;
+}
+
+.result-header, .section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.header-left, .section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--c-text-1, #fff);
+  letter-spacing: -0.01em;
+}
+
+.header-icon {
+  color: var(--c-accent, #1db954);
+}
+
+.result-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--c-text-1, #fff);
+  margin: 0;
+}
+
+.result-count, .section-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.45));
+}
+
+.section-view-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.6));
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.section-view-all:hover {
+  color: var(--c-accent, #1db954);
+  transform: translateX(2px);
+}
+
+.track-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* SoundCloud & Spotify badges in overview */
+.sc-badge {
+  background: #ff5500;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.sp-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #1ed760;
+  color: #000;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.sc-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Horizontal scroll cards */
+.horizontal-scroll {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 8px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.horizontal-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.feed-card {
+  flex: 0 0 136px;
+  width: 136px;
+  cursor: pointer;
+  scroll-snap-align: start;
+  user-select: none;
+  transition: transform 0.2s ease;
+}
+
+@media (min-width: 768px) {
+  .feed-card {
+    flex: 0 0 156px;
+    width: 156px;
+  }
+}
+
+.feed-card:hover {
+  transform: translateY(-2px);
+}
+
+.feed-card:active {
+  transform: scale(0.97);
+}
+
+.feed-card-cover {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  background: var(--c-bg-2, #181818);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.feed-card-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s;
+}
+
+.feed-card:hover .feed-card-cover img {
+  transform: scale(1.04);
+}
+
+.artist-card .artist-cover {
+  border-radius: 50%;
+}
+
+.artist-initials {
+  font-size: 24px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.artist-card .feed-card-title,
+.artist-card .feed-card-subtitle {
+  text-align: center;
+}
+
+.feed-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text-1, #fff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.feed-card-subtitle {
+  font-size: 12px;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Card Tags */
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.card-tags.center {
+  justify-content: center;
+}
+
+.card-tag {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--c-accent, #1db954);
+  background: rgba(29, 185, 84, 0.12);
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+  line-height: 14px;
+}
+</style>
