@@ -746,6 +746,32 @@
             <span>{{ pwaInstall.isIOS ? 'Как установить' : 'Установить' }}</span>
           </button>
         </div>
+
+        <div class="setting-divider"></div>
+
+        <!-- App Version & Force Refresh -->
+        <div class="setting-row app-version-row">
+          <div class="setting-info">
+            <div class="app-version-header">
+              <span class="setting-name">Версия и кэш</span>
+              <span class="version-badge">v{{ appUpdate.clientVersion }}</span>
+            </div>
+            <span class="setting-desc">
+              Сборка: <code class="build-code">{{ appUpdate.clientBuildId ? appUpdate.clientBuildId.substring(0, 16) : 'актуальная' }}</code>
+              <span v-if="appUpdate.updateAvailable" class="update-pending-tag"> • Доступно обновление!</span>
+            </span>
+          </div>
+          <button 
+            class="action-btn secondary update-action-btn"
+            :class="{ 'highlight': appUpdate.updateAvailable }"
+            :disabled="appUpdate.isUpdating"
+            @click="handleForceUpdate"
+            title="Очистить кэш браузера и перезагрузить свежий интерфейс"
+          >
+            <RefreshCw :size="14" :class="{ 'spin-anim': appUpdate.isUpdating }" />
+            <span>{{ appUpdate.isUpdating ? 'Обновление…' : (appUpdate.updateAvailable ? 'Обновить' : 'Сбросить кэш') }}</span>
+          </button>
+        </div>
       </div>
     </section>
 
@@ -873,6 +899,7 @@ import {
   Camera, EyeOff, X, RotateCcw, Music
 } from 'lucide-vue-next'
 import { usePwaInstall } from '@/composables/usePwaInstall'
+import { useAppUpdate } from '@/composables/useAppUpdate'
 import { getCacheStats, getCachedAudioStats } from '@/utils/audioCacheDb'
 import { clearAudioCache } from '@/stores/playerCache'
 import { formatDurationLong as formatDuration } from '@/utils'
@@ -884,7 +911,12 @@ const playerStore = usePlayerStore()
 const tasksStore = useTasksStore()
 const externalAccountsStore = useExternalAccountsStore()
 const pwaInstall = usePwaInstall()
+const appUpdate = useAppUpdate()
 const uiStore = useUIStore()
+
+const handleForceUpdate = async () => {
+  await appUpdate.forceAppRefresh()
+}
 
 const goToMyProfile = () => {
   if (authStore.user?.id) {
@@ -3207,6 +3239,61 @@ const handleResetState = (event) => {
   .sp-profile-name {
     max-width: 140px;
   }
+}
+
+.app-version-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.app-version-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.version-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.build-code {
+  font-family: monospace;
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.update-pending-tag {
+  color: #1ed760;
+  font-weight: 600;
+}
+
+.update-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.update-action-btn.highlight {
+  background: rgba(29, 185, 84, 0.2);
+  border-color: rgba(29, 185, 84, 0.5);
+  color: #1ed760;
+}
+
+.update-action-btn.highlight:hover {
+  background: rgba(29, 185, 84, 0.3);
 }
 </style>
 

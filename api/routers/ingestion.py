@@ -9,13 +9,15 @@ import asyncio
 import tempfile
 import io
 import csv
+import json
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 
+import aiohttp
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form
 from aiogram import Bot
 from aiogram.enums import ParseMode
-from aiogram.types import FSInputFile
+from aiogram.types import FSInputFile, BufferedInputFile
 from aiogram.client.default import DefaultBotProperties
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,7 +27,7 @@ from shared.config import get_settings
 from shared.database import get_session, get_db
 from shared.models import (
     User, Track, UserLibrary, AlbumTrack, Playlist, PlaylistTrack, LibrarySource,
-    ForwardSourceType, UserExternalAccount, UserChannel, ChannelMessage, ChannelMessageStatus, utcnow
+    ForwardSourceType, UserExternalAccount, UserImportFile, UserChannel, ChannelMessage, ChannelMessageStatus, utcnow
 )
 from api.routers.auth import get_current_user, TelegramUser
 from api.schemas.tracks import TrackResponse
@@ -1271,45 +1273,13 @@ async def disconnect_spotify_account(
 
 # ============== Exportify Spotify CSV Import & Deduplication ==============
 
-@router.post("/spotify/exportify/preview", response_model=ExportifyPreviewResponse)
-async def preview_exportify_csv(
-    file: Optional[UploadFile] = File(None),
-    csv_text: Optional[str] = Form(None),
-    user: TelegramUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Parse an Exportify CSV file (Liked Songs or any playlist), extract track metadata,
-    and perform robust recognition against local library, Telegram storage, and backup channel.
-    """
-    raw_content = ""
-    filename = "exported_tracks.csv"
-
-    if file:
-        filename = file.filename or "exportify.csv"
-        content_bytes = await file.read()
-        if len(content_bytes) > 5 * 1024 * 1024:  # 5MB limit for CSV
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="CSV файл слишком большой (макс. 5 МБ).",
-            )
-        try:
-            raw_content = content_bytes.decode("utf-8-sig")
-        except UnicodeDecodeError:
-            raw_content = content_bytes.decode("latin-1", errors="replace")
-    elif csv_text:
-        if len(csv_text) > 5 * 1024 * 1024:  # 5MB limit
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="CSV текст слишком большой (макс. 5 МБ).",
-            )
-        raw_content = csv_text
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Необходимо прикрепить файл CSV или передать текст CSV.",
-        )
-
+async def _parse_exportify_csv_content(
+    raw_content: str,
+    filename: str,
+    user_id: int,
+    db: AsyncSession,
+) -> ExportifyPreviewResponse:
+    """Internal helper to parse Exportify CSV text and match tracks against DB/Telegram library."""
     if not raw_content.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1333,13 +1303,13 @@ async def preview_exportify_csv(
         return None
 
     # Preload user's library and channel backup status in batch
-    user_lib_q = select(UserLibrary.track_id).where(UserLibrary.user_id == user.id)
+    user_lib_q = select(UserLibrary.track_id).where(UserLibrary.user_id == user_id)
     user_lib_track_ids = set((await db.scalars(user_lib_q)).all())
 
     user_ch_q = (
         select(ChannelMessage.track_id)
         .join(UserChannel, ChannelMessage.channel_id == UserChannel.id)
-        .where(UserChannel.user_id == user.id, ChannelMessage.status == ChannelMessageStatus.SENT)
+        .where(UserChannel.user_id == user_id, ChannelMessage.status == ChannelMessageStatus.SENT)
     )
     user_channel_track_ids = set((await db.scalars(user_ch_q)).all())
 
@@ -1422,6 +1392,174 @@ async def preview_exportify_csv(
         already_in_tg_count=in_tg_cnt,
         tracks=items,
     )
+
+
+@router.post("/spotify/exportify/preview", response_model=ExportifyPreviewResponse)
+async def preview_exportify_csv(
+    file: Optional[UploadFile] = File(None),
+    csv_text: Optional[str] = Form(None),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Parse an Exportify CSV file (Liked Songs or any playlist), extract track metadata,
+    perform robust recognition against local library, and backup the CSV to user's Telegram channel.
+    """
+    raw_content = ""
+    filename = "exported_tracks.csv"
+    content_bytes = b""
+
+    if file:
+        filename = file.filename or "exportify.csv"
+        content_bytes = await file.read()
+        if len(content_bytes) > 5 * 1024 * 1024:  # 5MB limit for CSV
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="CSV файл слишком большой (макс. 5 МБ).",
+            )
+        try:
+            raw_content = content_bytes.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            raw_content = content_bytes.decode("latin-1", errors="replace")
+    elif csv_text:
+        if len(csv_text) > 5 * 1024 * 1024:  # 5MB limit
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="CSV текст слишком большой (макс. 5 МБ).",
+            )
+        raw_content = csv_text
+        content_bytes = csv_text.encode("utf-8")
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Необходимо прикрепить файл CSV или передать текст CSV.",
+        )
+
+    preview_res = await _parse_exportify_csv_content(raw_content, filename, user.id, db)
+
+    # Backup the CSV document to user's Telegram channel / PM (Stateless Telegram Storage architecture)
+    if content_bytes:
+        try:
+            user_channel = await db.scalar(
+                select(UserChannel).where(UserChannel.user_id == user.id, UserChannel.is_active == True)
+            )
+            target_chat_id = user_channel.channel_id if user_channel else user.id
+            bot = _get_active_bot()
+            caption = (
+                f"📁 <b>Импорт Spotify (Exportify)</b>: <code>{filename}</code>\n"
+                f"🎵 Треков в файле: {preview_res.total_tracks}\n"
+                f"✨ Новых для медиатеки: {preview_res.new_tracks_count}\n\n"
+                f"#spotify #import #exportify"
+            )
+            sent_msg = await bot.send_document(
+                chat_id=target_chat_id,
+                document=BufferedInputFile(file=content_bytes, filename=filename),
+                caption=caption,
+            )
+            if sent_msg and sent_msg.document:
+                import_file = UserImportFile(
+                    user_id=user.id,
+                    provider="spotify",
+                    filename=filename,
+                    file_id=sent_msg.document.file_id,
+                    file_size=sent_msg.document.file_size or len(content_bytes),
+                    total_tracks=preview_res.total_tracks,
+                    channel_id=user_channel.channel_id if user_channel else None,
+                    message_id=sent_msg.message_id,
+                    summary_json=json.dumps({
+                        "total_tracks": preview_res.total_tracks,
+                        "new_tracks_count": preview_res.new_tracks_count,
+                        "in_library_count": preview_res.in_library_count,
+                        "in_channel_count": preview_res.in_channel_count,
+                        "already_in_tg_count": preview_res.already_in_tg_count,
+                    }),
+                )
+                db.add(import_file)
+                await db.commit()
+                logger.info(f"Saved Exportify CSV '{filename}' to Telegram channel/user {target_chat_id} (file_id: {sent_msg.document.file_id})")
+        except Exception as e:
+            logger.warning(f"Could not backup Exportify CSV to Telegram: {e}")
+
+    return preview_res
+
+
+@router.get("/spotify/last-import")
+async def get_last_spotify_import(
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get metadata for the last saved Spotify import file in Telegram."""
+    import_file = await db.scalar(
+        select(UserImportFile)
+        .where(UserImportFile.user_id == user.id, UserImportFile.provider == "spotify")
+        .order_by(UserImportFile.id.desc())
+        .limit(1)
+    )
+    if not import_file:
+        return {"found": False}
+
+    summary = {}
+    if import_file.summary_json:
+        try:
+            summary = json.loads(import_file.summary_json)
+        except Exception:
+            pass
+
+    return {
+        "found": True,
+        "id": import_file.id,
+        "provider": import_file.provider,
+        "filename": import_file.filename,
+        "file_id": import_file.file_id,
+        "file_size": import_file.file_size,
+        "total_tracks": import_file.total_tracks,
+        "channel_id": import_file.channel_id,
+        "message_id": import_file.message_id,
+        "created_at": import_file.created_at.isoformat() if import_file.created_at else None,
+        "summary": summary,
+    }
+
+
+@router.get("/spotify/last-import/preview", response_model=ExportifyPreviewResponse)
+async def preview_last_spotify_import(
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Download last saved Spotify CSV from Telegram and return fresh track preview."""
+    import_file = await db.scalar(
+        select(UserImportFile)
+        .where(UserImportFile.user_id == user.id, UserImportFile.provider == "spotify")
+        .order_by(UserImportFile.id.desc())
+        .limit(1)
+    )
+    if not import_file:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Сохранённый файл импорта не найден.")
+
+    bot = _get_active_bot()
+    try:
+        file_info = await bot.get_file(import_file.file_id)
+        file_path = file_info.file_path
+        base_url = settings.telegram_api_url.rstrip("/")
+        download_url = f"{base_url}/file/bot{settings.bot_token}/{file_path}"
+        timeout = aiohttp.ClientTimeout(total=30)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(download_url) as resp:
+                if resp.status != 200:
+                    raise HTTPException(status_code=502, detail="Не удалось скачать файл из Telegram.")
+                content_bytes = await resp.read()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch import file from Telegram: {e}", exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Ошибка загрузки из Telegram: {str(e)}")
+
+    try:
+        raw_content = content_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raw_content = content_bytes.decode("latin-1", errors="replace")
+
+    return await _parse_exportify_csv_content(raw_content, import_file.filename, user.id, db)
+
 
 
 @router.post("/spotify/exportify/start", response_model=JobResponse)

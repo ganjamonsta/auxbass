@@ -34,6 +34,7 @@ from api.routers.player import router as player_router, close_http_session
 from api.routers.social import router as social_router
 from api.routers.tags import router as tags_router
 from api.routers.ingestion import router as ingestion_router
+from api.services.version import get_version_info
 
 
 settings = get_settings()
@@ -290,13 +291,28 @@ async def health():
         or maintenance_file.exists()
     )
     bot_online = getattr(app.state, "bot_online", True)
+    v_info = get_version_info()
     
     return {
         "status": "maintenance" if is_maintenance else "healthy",
         "bot_online": bot_online,
         "maintenance": is_maintenance,
-        "version": "2.0.0"
+        "version": v_info["version"],
+        "build_id": v_info["build_id"],
+        "git_commit": v_info["git_commit"],
+        "dist_hash": v_info["dist_hash"],
+        "server_start_time": v_info["server_start_time"]
     }
+
+
+@app.get("/api/version")
+@app.get("/version.json")
+async def version_endpoint():
+    v_info = get_version_info()
+    return JSONResponse(
+        content=v_info,
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+    )
 
 
 # SPA Fallback - must be LAST route
@@ -325,7 +341,15 @@ async def spa_fallback(full_path: str):
         # Read into memory to avoid BaseHTTPMiddleware conflict with FileResponse
         from fastapi.responses import Response
         content = index_path.read_bytes()
-        return Response(content=content, media_type="text/html")
+        return Response(
+            content=content,
+            media_type="text/html",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
     
     return {"error": "webapp not built", "hint": "run: cd webapp && npm run build"}
 

@@ -47,6 +47,17 @@ def ensure_archive() -> bool:
         print("❌ Ошибка: webapp/dist/index.html не найден. Сначала соберите фронтенд (npm run build).")
         return False
 
+    version_file = DIST_DIR / "version.json"
+    if not version_file.exists():
+        import json
+        import time
+        v_data = {
+            "version": "2.0.0",
+            "buildId": f"rel-{int(time.time())}",
+            "buildTime": int(time.time() * 1000)
+        }
+        version_file.write_text(json.dumps(v_data, indent=2), encoding="utf-8")
+
     print("📦 Упаковка webapp/dist в webapp-dist.tar.gz...")
     with tarfile.open(ARCHIVE_PATH, "w:gz") as tar:
         tar.add(DIST_DIR, arcname="webapp/dist")

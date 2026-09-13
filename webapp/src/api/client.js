@@ -364,6 +364,8 @@ export const ingestionApi = {
   previewExportifyCsv: (formData) => api.post('/ingestion/spotify/exportify/preview', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
+  getLastSpotifyImport: () => api.get('/ingestion/spotify/last-import', { bypassCache: true }),
+  previewLastSpotifyImport: () => api.get('/ingestion/spotify/last-import/preview', { bypassCache: true }),
   startExportifyImport: nonCacheable((data) => api.post('/ingestion/spotify/exportify/start', data), 'track'),
 }
 

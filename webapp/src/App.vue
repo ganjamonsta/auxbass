@@ -186,6 +186,9 @@
       <!-- Network status banner -->
       <NetworkBanner />
       
+      <!-- Server update prompt banner -->
+      <AppUpdatePrompt />
+      
       <!-- PWA install banner & guide modal -->
       <PwaInstallBanner />
       <PwaInstallModal />
@@ -259,6 +262,7 @@ import { MobileFooter } from '@/components/layout'
 import { useNetworkMonitor } from '@/composables/useNetworkMonitor'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
 import { usePwaInstall } from '@/composables/usePwaInstall'
+import { initAppUpdateListeners } from '@/composables/useAppUpdate'
 import { Music, Disc3, User, Folder, Library } from 'lucide-vue-next'
 import { tracksApi } from '@/api/client'
 
@@ -273,6 +277,7 @@ const ProfileMenu = defineAsyncComponent(() => import('@/components/layout/Profi
 const ShareModal = defineAsyncComponent(() => import('@/components/ShareModal.vue'))
 const PwaInstallModal = defineAsyncComponent(() => import('@/components/PwaInstallModal.vue'))
 const PwaInstallBanner = defineAsyncComponent(() => import('@/components/PwaInstallBanner.vue'))
+const AppUpdatePrompt = defineAsyncComponent(() => import('@/components/AppUpdatePrompt.vue'))
 const ChannelBanner = defineAsyncComponent(() => import('@/components/ChannelBanner.vue'))
 const MaintenanceBanner = defineAsyncComponent(() => import('@/components/MaintenanceBanner.vue'))
 const NetworkBanner = defineAsyncComponent(() => import('@/components/NetworkBanner.vue'))
@@ -729,8 +734,9 @@ onMounted(async () => {
   // Handle deep link / start_param navigation
   await handleStartParams()
   
-  // === Start network monitoring ===
+  // === Start network monitoring & update tracking ===
   networkMonitor.startMonitoring()
+  initAppUpdateListeners()
   
   // === Player event listeners ===
   window.addEventListener('player:error', handlePlayerError)

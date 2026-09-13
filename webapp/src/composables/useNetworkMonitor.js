@@ -12,6 +12,7 @@
  */
 
 import { ref, computed, readonly, watch } from 'vue'
+import { handleHealthResponse } from './useAppUpdate'
 
 // ============== Константы ==============
 const LATENCY_CHECK_INTERVAL = 30_000  // Проверка latency каждые 30 сек (при воспроизведении)
@@ -126,6 +127,7 @@ const checkLatency = async () => {
         const data = await resp.json()
         isBotOnline.value = data.bot_online !== false
         isMaintenance.value = data.maintenance === true || data.status === 'maintenance'
+        handleHealthResponse(data)
       } catch (_) {
         isBotOnline.value = true
         isMaintenance.value = false

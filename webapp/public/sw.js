@@ -167,3 +167,18 @@ self.addEventListener('sync', (event) => {
     console.log('[SW] Syncing library...');
   }
 });
+
+// Обработка сообщений от клиента (форс-обновление и очистка кэша)
+self.addEventListener('message', (event) => {
+  if (!event.data) return;
+  if (event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+  if (event.data.type === 'CLEAR_CACHE') {
+    event.waitUntil(
+      caches.keys().then((names) => {
+        return Promise.all(names.map((name) => caches.delete(name)));
+      })
+    );
+  }
+});

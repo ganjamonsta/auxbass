@@ -141,6 +141,10 @@ class User(Base):
         cascade="all, delete-orphan"
     )
     external_accounts: Mapped[List["UserExternalAccount"]] = relationship(
+        back_populates="user", 
+        cascade="all, delete-orphan"
+    )
+    import_files: Mapped[List["UserImportFile"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan"
     )
@@ -830,5 +834,37 @@ class UserExternalAccount(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "provider", name="uq_user_external_provider"),
         Index("idx_user_external_user", "user_id"),
+    )
+
+
+# ============== Saved Import Files (Exportify CSV, etc. stored in Telegram) ==============
+
+class UserImportFile(Base):
+    """
+    Saved external import file (e.g. Spotify Exportify CSV) backed up in user's Telegram channel.
+    Server stores only Telegram file_id & metadata, compliant with stateless storage architecture.
+    """
+    __tablename__ = "user_import_files"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    provider: Mapped[str] = mapped_column(String(50), default="spotify", nullable=False)  # 'spotify'
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_id: Mapped[str] = mapped_column(String(255), nullable=False)  # Telegram document file_id
+    file_size: Mapped[int] = mapped_column(Integer, default=0)
+    total_tracks: Mapped[int] = mapped_column(Integer, default=0)
+    channel_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    message_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    summary_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+    # Relationship to user
+    user: Mapped["User"] = relationship(back_populates="import_files")
+
+    __table_args__ = (
+        Index("idx_user_import_files_user", "user_id"),
+        Index("idx_user_import_files_user_provider", "user_id", "provider"),
     )
 
