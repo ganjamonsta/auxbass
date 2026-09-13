@@ -65,6 +65,7 @@ class TrackUpdate(BaseModel):
     """Track update request"""
     title: Optional[str] = None
     artist: Optional[str] = None
+    album: Optional[str] = None  # Album name
     genre: Optional[str] = None  # Genre (stored in enrichment)
 
 

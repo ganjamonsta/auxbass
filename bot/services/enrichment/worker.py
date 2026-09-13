@@ -218,15 +218,16 @@ class EnrichmentWorker:
                     enrichment.confidence = max(enrichment.confidence or 0, result.confidence)
                     enrichment.enriched_at = utcnow()
                     
-                    # Propagate canonical title and artist ONLY for normal uploads
+                    # Propagate canonical title and artist ONLY for placeholder/empty metadata
                     # External provider tracks (SoundCloud, Spotify) already have author metadata
                     if not is_from_provider and result.confidence >= 65:
                         if result.canonical_title:
-                            c_title, _ = clean_track_metadata(track.title, track.artist, track.file_name)
-                            if c_title != track.title or not track.title or track.title in ("Без названия", "Unknown Track", "untitled"):
+                            placeholder_titles = ("без названия", "unknown track", "untitled", "audio", "track")
+                            if not track.title or track.title.strip().lower() in placeholder_titles:
                                 track.title = result.canonical_title
                         if result.canonical_artist:
-                            if not track.artist or track.artist.strip().lower() in ("unknown", "unknown artist", "неизвестен", "неизвестный исполнитель") or "@" in track.artist or "t.me/" in track.artist:
+                            placeholder_artists = ("unknown", "unknown artist", "неизвестен", "неизвестный исполнитель", "неизвестный")
+                            if not track.artist or track.artist.strip().lower() in placeholder_artists or "@" in track.artist or "t.me/" in track.artist:
                                 track.artist = result.canonical_artist
                                 track.normalized_artist = normalize_artist(result.canonical_artist)
                     

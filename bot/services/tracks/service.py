@@ -399,8 +399,7 @@ class TrackService:
         """
         Update track metadata.
         
-        Only uploader can edit track.
-        Triggers re-enrichment if title or artist changed.
+        Allowed for track uploader or any user who has the track in their library.
         
         Returns:
             True if track was found and updated
@@ -410,33 +409,43 @@ class TrackService:
             if not track:
                 return False
             
-            # Only uploader can edit
-            if track.uploader_id != user_id:
-                logger.warning(f"User {user_id} tried to edit track {track_id} owned by {track.uploader_id}")
+            # Check permission: user must be uploader OR have track in UserLibrary
+            lib_entry = await session.scalar(
+                select(UserLibrary).where(
+                    UserLibrary.user_id == user_id,
+                    UserLibrary.track_id == track_id,
+                )
+            )
+            if track.uploader_id != user_id and not lib_entry:
+                logger.warning(f"User {user_id} tried to edit track {track_id} not in library")
                 return False
             
             changed = False
             
-            if title and title != track.title:
-                track.title = title
+            if title and title.strip() and title.strip() != track.title:
+                track.title = title.strip()
                 changed = True
             
-            if artist:
-                sanitized_artist = sanitize_artist(artist)
+            if artist and artist.strip():
+                sanitized_artist = sanitize_artist(artist.strip())
                 if sanitized_artist != track.artist:
                     track.artist = sanitized_artist
+                    track.normalized_artist = normalize_artist(sanitized_artist)
                     changed = True
             
             if changed:
                 track.updated_at = utcnow()
-                track.enrichment_status = EnrichmentStatus.PENDING
-                
-                # Remove from current albums (will be re-assigned after enrichment)
-                await session.execute(
-                    delete(AlbumTrack).where(AlbumTrack.track_id == track_id)
-                )
-                
-                logger.info(f"Updated track {track_id}, scheduled re-enrichment")
+                track.enrichment_status = EnrichmentStatus.COMPLETED
+                logger.info(f"Updated track {track_id}")
+            
+            await session.commit()
+            
+            if changed:
+                try:
+                    from ..channels import channel_service
+                    await channel_service.update_channel_message(track_id)
+                except Exception as e:
+                    logger.debug(f"Failed to update channel message for track {track_id}: {e}")
             
             return True
     

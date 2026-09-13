@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func, desc, asc, or_
+from sqlalchemy import select, func, desc, asc, or_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -795,11 +795,10 @@ async def update_track(
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Update track metadata (only owner can update)"""
+    """Update track metadata (uploader or any user who has the track in their library)"""
     result = await db.execute(
         select(Track)
         .where(Track.id == track_id)
-        .where(Track.uploader_id == user.id)
         .options(
             selectinload(Track.enrichment),
             selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
@@ -808,38 +807,85 @@ async def update_track(
     track = result.scalar_one_or_none()
     
     if not track:
-        raise_not_found("Track not found or not owned")
+        raise_not_found("Track not found")
+
+    # Check permission: user must be uploader OR have track in UserLibrary
+    lib_result = await db.execute(
+        select(UserLibrary)
+        .where(UserLibrary.user_id == user.id, UserLibrary.track_id == track_id)
+    )
+    lib_entry = lib_result.scalar_one_or_none()
+
+    if track.uploader_id != user.id and not lib_entry:
+        raise HTTPException(status_code=403, detail="Track not found in your library")
     
     # Validate and update metadata
     changed = False
     if data.title is not None and data.title.strip():
-        track.title = data.title.strip()
-        changed = True
+        new_title = data.title.strip()
+        if new_title != track.title:
+            track.title = new_title
+            changed = True
     
     if data.artist is not None and data.artist.strip():
-        track.artist = data.artist.strip()
-        changed = True
+        new_artist = data.artist.strip()
+        if new_artist != track.artist:
+            track.artist = new_artist
+            track.normalized_artist = normalize_artist(new_artist)
+            changed = True
     
     # Update genre if provided
-    if hasattr(data, 'genre') and data.genre is not None and data.genre.strip():
-        # Genre updates come through enrichment
+    if data.genre is not None:
+        new_genre = data.genre.strip() or None
         if not track.enrichment:
             track.enrichment = TrackEnrichment(track_id=track.id)
-        track.enrichment.genre = data.genre.strip()
-        changed = True
+            db.add(track.enrichment)
+        if track.enrichment.genre != new_genre:
+            track.enrichment.genre = new_genre
+            changed = True
+
+    # Update album if provided
+    if data.album is not None:
+        new_album = data.album.strip()
+        if not track.enrichment:
+            track.enrichment = TrackEnrichment(track_id=track.id)
+            db.add(track.enrichment)
+        
+        if track.enrichment.album_name != (new_album or None):
+            track.enrichment.album_name = new_album or None
+            changed = True
+        
+        if new_album:
+            try:
+                from bot.services.albums import album_service
+                album_id = await album_service.get_or_create_album(
+                    album_name=new_album,
+                    artist_name=track.artist or "Unknown Artist",
+                )
+                await album_service.assign_track_to_album(track.id, album_id)
+                changed = True
+            except Exception as e:
+                logger.warning(f"Failed to assign album '{new_album}' to track {track.id}: {e}")
+        else:
+            await db.execute(
+                delete(AlbumTrack).where(AlbumTrack.track_id == track.id)
+            )
+            changed = True
     
     if changed:
         track.updated_at = utcnow()
-        track.enrichment_status = EnrichmentStatus.PENDING
+        # Mark as completed so background worker doesn't overwrite manual edits on restart
+        track.enrichment_status = EnrichmentStatus.COMPLETED
     
     await db.commit()
     
     if changed:
         try:
-            from bot.services.enrichment import enrichment_worker
-            enrichment_worker.notify_new_track()
-        except Exception:
-            pass
+            from bot.services.channels import get_channel_service
+            ch_svc = get_channel_service()
+            await ch_svc.update_channel_message(track_id)
+        except Exception as e:
+            logger.debug(f"Failed to update channel message for track {track_id}: {e}")
 
     # Re-fetch track with all relations to return fresh data
     result = await db.execute(
@@ -855,7 +901,7 @@ async def update_track(
     if not track:
         raise HTTPException(status_code=500, detail="Track disappeared after update")
     
-    # Get UserLibrary entry if it exists
+    # Reload lib_entry
     lib_result = await db.execute(
         select(UserLibrary)
         .where(UserLibrary.user_id == user.id, UserLibrary.track_id == track_id)

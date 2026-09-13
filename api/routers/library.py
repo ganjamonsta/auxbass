@@ -9,7 +9,7 @@ from typing import Optional, List
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func, or_, desc, asc, String
+from sqlalchemy import select, func, or_, desc, asc, String, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -172,7 +172,7 @@ def track_to_response(track: Track, library_entry: Optional[UserLibrary] = None,
         streamable_id=None,
         hd_id=None,
         album=album_info,
-        album_name=album_info["name"] if album_info else None,
+        album_name=album_info["name"] if album_info else (enrichment.album_name if enrichment else None),
         cover_url=enrichment.cover_url if enrichment else None,
         genre=enrichment.genre if enrichment else None,
         tags=tags,
@@ -544,78 +544,120 @@ async def update_track(
     """
     Update track metadata.
     
-    If title, artist, or genre changes, track will be re-enriched.
-    Only the uploader can edit track metadata.
+    Allowed for track uploader or any user who has the track in their library.
     """
-    # Check user has track in library and is uploader
+    # Fetch track with relations
     result = await db.execute(
-        select(Track, UserLibrary)
-        .join(UserLibrary, UserLibrary.track_id == Track.id)
-        .where(Track.id == track_id, UserLibrary.user_id == user.id)
+        select(Track)
+        .where(Track.id == track_id)
         .options(
             selectinload(Track.enrichment),
             selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
         )
     )
-    row = result.first()
+    track = result.scalar_one_or_none()
     
-    if not row:
-        raise HTTPException(status_code=404, detail="Track not found in your library")
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
     
-    track, lib_entry = row
+    # Check permission: user must be uploader OR have track in UserLibrary
+    lib_result = await db.execute(
+        select(UserLibrary)
+        .where(UserLibrary.user_id == user.id, UserLibrary.track_id == track_id)
+    )
+    lib_entry = lib_result.scalar_one_or_none()
     
-    # Only uploader can edit
-    if track.uploader_id != user.id:
-        raise HTTPException(status_code=403, detail="Only the uploader can edit track metadata")
+    if track.uploader_id != user.id and not lib_entry:
+        raise HTTPException(status_code=403, detail="Track not found in your library")
     
     changed = False
     
-    if update.title and update.title.strip() and update.title.strip() != track.title:
-        track.title = update.title.strip()
-        changed = True
+    if update.title is not None and update.title.strip():
+        new_title = update.title.strip()
+        if new_title != track.title:
+            track.title = new_title
+            changed = True
     
-    if update.artist and update.artist.strip() and update.artist.strip() != track.artist:
-        track.artist = update.artist.strip()
-        changed = True
+    if update.artist is not None and update.artist.strip():
+        new_artist = update.artist.strip()
+        if new_artist != track.artist:
+            track.artist = new_artist
+            track.normalized_artist = normalize_artist(new_artist)
+            changed = True
     
     # Update genre if provided
-    if hasattr(update, 'genre') and update.genre is not None and update.genre.strip():
+    if update.genre is not None:
+        new_genre = update.genre.strip() or None
         if not track.enrichment:
             track.enrichment = TrackEnrichment(track_id=track.id)
-        if track.enrichment.genre != update.genre.strip():
-            track.enrichment.genre = update.genre.strip()
+            db.add(track.enrichment)
+        if track.enrichment.genre != new_genre:
+            track.enrichment.genre = new_genre
+            changed = True
+
+    # Update album if provided
+    if update.album is not None:
+        new_album = update.album.strip()
+        if not track.enrichment:
+            track.enrichment = TrackEnrichment(track_id=track.id)
+            db.add(track.enrichment)
+        
+        if track.enrichment.album_name != (new_album or None):
+            track.enrichment.album_name = new_album or None
+            changed = True
+        
+        if new_album:
+            try:
+                from bot.services.albums import album_service
+                album_id = await album_service.get_or_create_album(
+                    album_name=new_album,
+                    artist_name=track.artist or "Unknown Artist",
+                )
+                await album_service.assign_track_to_album(track.id, album_id)
+                changed = True
+            except Exception as e:
+                logger.warning(f"Failed to assign album '{new_album}' to track {track.id}: {e}")
+        else:
+            await db.execute(
+                delete(AlbumTrack).where(AlbumTrack.track_id == track.id)
+            )
             changed = True
     
     if changed:
-        # Schedule re-enrichment
-        track.enrichment_status = EnrichmentStatus.PENDING
         track.updated_at = utcnow()
+        # Mark as completed so background worker doesn't overwrite manual edits on restart
+        track.enrichment_status = EnrichmentStatus.COMPLETED
     
     await db.commit()
     
     if changed:
         try:
-            from bot.services.enrichment import enrichment_worker
-            enrichment_worker.notify_new_track()
-        except Exception:
-            pass
+            from bot.services.channels import get_channel_service
+            ch_svc = get_channel_service()
+            await ch_svc.update_channel_message(track_id)
+        except Exception as e:
+            logger.debug(f"Failed to update channel message for track {track_id}: {e}")
     
     # Reload with relationships to return fresh data
     result = await db.execute(
-        select(Track, UserLibrary)
-        .join(UserLibrary, UserLibrary.track_id == Track.id)
-        .where(Track.id == track_id, UserLibrary.user_id == user.id)
+        select(Track)
+        .where(Track.id == track_id)
         .options(
             selectinload(Track.enrichment),
             selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
         )
     )
-    row = result.first()
+    track = result.scalar_one_or_none()
     
-    if not row:
+    if not track:
         raise HTTPException(status_code=500, detail="Track disappeared after update")
     
-    track, lib_entry = row
+    # Reload lib_entry
+    lib_result = await db.execute(
+        select(UserLibrary)
+        .where(UserLibrary.user_id == user.id, UserLibrary.track_id == track_id)
+    )
+    lib_entry = lib_result.scalar_one_or_none()
     
     return track_to_response(track, lib_entry)
 

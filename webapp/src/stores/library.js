@@ -639,7 +639,7 @@ export const useLibraryStore = defineStore('library', () => {
       return response.data
     } catch (error) {
       console.error('Failed to update track:', error)
-      return null
+      throw error
     }
   }
 

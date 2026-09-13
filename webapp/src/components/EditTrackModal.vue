@@ -67,6 +67,7 @@
 <script setup>
 import { ref, watch, inject } from 'vue'
 import { useLibraryStore } from '../stores/library'
+import { useUIStore } from '../stores/ui'
 import { X } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -77,6 +78,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'saved'])
 
 const library = useLibraryStore()
+const uiStore = useUIStore()
 const telegram = inject('telegram')
 
 const saving = ref(false)
@@ -107,12 +109,15 @@ const handleSubmit = async () => {
     const updated = await library.updateTrack(props.track.id, form.value)
     if (updated) {
       telegram?.HapticFeedback?.notificationOccurred?.('success')
+      uiStore.toast?.success('Сохранено', 'Данные трека обновлены')
       emit('saved', updated)
       emit('close')
     }
   } catch (error) {
     console.error('Failed to update track:', error)
     telegram?.HapticFeedback?.notificationOccurred?.('error')
+    const errMsg = error?.response?.data?.detail || 'Не удалось обновить трек'
+    uiStore.toast?.error('Ошибка сохранения', errMsg)
   } finally {
     saving.value = false
   }

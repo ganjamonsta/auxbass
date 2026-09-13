@@ -20,8 +20,13 @@ from sqlalchemy import select
 
 from shared.config import get_settings
 from shared.database import get_session
-from shared.models import User, LibrarySource, ForwardSourceType
+from shared.models import (
+    User, Track, UserChannel, ChannelMessage, EnrichmentStatus,
+    LibrarySource, ForwardSourceType, utcnow
+)
+from shared.matching import normalize_artist
 from shared.utils import format_duration
+from bot.services.tracks.service import sanitize_artist
 
 from bot.services import track_service, channel_service
 from bot.services.importer import channel_importer
@@ -315,3 +320,73 @@ async def handle_audio_document(message: Message):
             b["target_msg"] = message
             b["task"].cancel()
             b["task"] = asyncio.create_task(_batch_timer_worker(user_id, message.bot))
+
+
+# ───────────────────── Edited Audio Handlers ─────────────────────
+
+async def _handle_edited_audio(message: Message):
+    """Handle edited audio message from private chat or channel"""
+    audio = message.audio
+    if not audio:
+        return
+    
+    async with get_session() as session:
+        track = None
+        # 1. Try finding by file_unique_id
+        if audio.file_unique_id:
+            track = await session.scalar(
+                select(Track).where(Track.file_unique_id == audio.file_unique_id)
+            )
+        
+        # 2. If channel post, try finding by channel message ID
+        if not track and message.chat and message.chat.id:
+            uc = await session.scalar(
+                select(UserChannel).where(UserChannel.channel_id == message.chat.id)
+            )
+            if uc:
+                cm = await session.scalar(
+                    select(ChannelMessage).where(
+                        ChannelMessage.channel_id == uc.id,
+                        ChannelMessage.message_id == message.message_id,
+                    )
+                )
+                if cm:
+                    track = await session.get(Track, cm.track_id)
+        
+        if not track:
+            return
+        
+        changed = False
+        if audio.title and audio.title.strip() and audio.title.strip() != track.title:
+            track.title = audio.title.strip()
+            changed = True
+        
+        if audio.performer and audio.performer.strip():
+            sanitized = sanitize_artist(audio.performer.strip())
+            if sanitized != track.artist:
+                track.artist = sanitized
+                track.normalized_artist = normalize_artist(sanitized)
+                changed = True
+        
+        if changed:
+            track.updated_at = utcnow()
+            track.enrichment_status = EnrichmentStatus.COMPLETED
+            await session.commit()
+            logger.info(f"Updated track {track.id} from Telegram edit: {track.artist} — {track.title}")
+            
+            try:
+                await channel_service.update_channel_message(track.id)
+            except Exception as e:
+                logger.debug(f"Failed to update channel message after Telegram edit: {e}")
+
+
+@router.edited_message(F.audio)
+async def handle_edited_audio_message(message: Message):
+    """Handle user editing audio file in PM"""
+    await _handle_edited_audio(message)
+
+
+@router.edited_channel_post(F.audio)
+async def handle_edited_channel_post(message: Message):
+    """Handle audio message edited in channel"""
+    await _handle_edited_audio(message)
