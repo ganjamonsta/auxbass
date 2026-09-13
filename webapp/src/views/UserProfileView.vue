@@ -87,6 +87,23 @@
               <span class="stat-num">{{ user.followers_count }}</span>
               <span class="stat-label">подписчиков</span>
             </div>
+
+            <!-- External Connected Accounts Badges -->
+            <template v-if="scAccount">
+              <span class="stat-separator">•</span>
+              <button class="hero-ext-badge sc-badge" @click="selectTab('soundcloud')" title="SoundCloud профиль">
+                <span class="sc-badge-inline">SC</span>
+                <span class="ext-badge-name">{{ scAccount.username }}</span>
+              </button>
+            </template>
+
+            <template v-if="spAccount">
+              <span class="stat-separator">•</span>
+              <button class="hero-ext-badge sp-badge" @click="selectTab('spotify')" title="Spotify профиль">
+                <Radio :size="12" class="sp-icon-inline" />
+                <span class="ext-badge-name">{{ spAccount.display_name || spAccount.username }}</span>
+              </button>
+            </template>
           </div>
 
           <!-- Top-right absolute share button -->
@@ -191,6 +208,34 @@
           <Disc3 :size="16" />
           <span>Альбомы</span>
           <span v-if="overviewAlbums.length > 0" class="user-tab-badge">{{ overviewAlbums.length }}</span>
+        </button>
+
+        <!-- SoundCloud Tab -->
+        <button
+          v-if="scAccount && (scAccount.show_playlists || scAccount.show_tracks || isSelf)"
+          class="user-tab-btn sc-tab-btn"
+          :class="{ active: activeTab === 'soundcloud' }"
+          @click="selectTab('soundcloud')"
+        >
+          <span class="sc-badge-inline">SC</span>
+          <span>SoundCloud</span>
+          <span v-if="scPlaylists.length + scTracks.length > 0" class="user-tab-badge sc-badge-num">
+            {{ scPlaylists.length + scTracks.length }}
+          </span>
+        </button>
+
+        <!-- Spotify Tab -->
+        <button
+          v-if="spAccount && (spAccount.show_playlists || isSelf)"
+          class="user-tab-btn sp-tab-btn"
+          :class="{ active: activeTab === 'spotify' }"
+          @click="selectTab('spotify')"
+        >
+          <Radio :size="16" />
+          <span>Spotify</span>
+          <span v-if="spPlaylists.length > 0" class="user-tab-badge sp-badge-num">
+            {{ spPlaylists.length }}
+          </span>
         </button>
       </div>
 
@@ -323,8 +368,101 @@
             </button>
           </section>
 
+          <!-- Section 4: SoundCloud Playlists (Overview preview) -->
+          <section v-if="scPlaylists.length > 0" class="profile-section sc-section">
+            <div class="section-header">
+              <div class="section-title-with-badge clickable" @click="selectTab('soundcloud')" title="Перейти в SoundCloud">
+                <span class="sc-badge-inline">SC</span>
+                <h2 class="section-title">Плейлисты SoundCloud</h2>
+              </div>
+              <button class="section-link" @click="selectTab('soundcloud')">Все {{ scPlaylists.length }}</button>
+            </div>
+            <div class="overview-grid">
+              <div 
+                v-for="pl in scPlaylists.slice(0, 6)" 
+                :key="pl.id" 
+                class="feed-card ext-card sc-card"
+                @click="openScPlaylist(pl)"
+              >
+                <div class="feed-card-cover sc-cover-box">
+                  <img 
+                    v-if="pl.artwork_url" 
+                    :src="pl.artwork_url" 
+                    alt=""
+                    loading="lazy"
+                    referrerpolicy="no-referrer"
+                  />
+                  <Folder v-else :size="36" />
+                  <div class="play-overlay" title="Открыть плейлист">
+                    <Play :size="18" fill="currentColor" />
+                  </div>
+                </div>
+                <div class="feed-card-info">
+                  <div class="feed-card-title">{{ pl.title }}</div>
+                  <div class="feed-card-subtitle">{{ pl.track_count }} {{ getTracksWord(pl.track_count) }}</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 5: SoundCloud Releases (Overview preview) -->
+          <section v-if="scTracks.length > 0" class="profile-section sc-section">
+            <div class="section-header">
+              <div class="section-title-with-badge clickable" @click="selectTab('soundcloud')" title="Перейти в SoundCloud">
+                <span class="sc-badge-inline">SC</span>
+                <h2 class="section-title">Релизы SoundCloud</h2>
+              </div>
+              <button class="section-link" @click="selectTab('soundcloud')">Все {{ scTracks.length }}</button>
+            </div>
+            <div class="ext-tracks-overview-list">
+              <ExternalTrackItem
+                v-for="item in scTracks.slice(0, 5)"
+                :key="item.url"
+                :item="item"
+                variant="soundcloud"
+                :showBadges="true"
+                :isImporting="importingTrackUrl === item.url"
+                :isDownloading="tasksStore.isTrackDownloading(item.url)"
+                :isQueued="tasksStore.isTrackQueued(item.url)"
+                :isInLibrary="isTrackInLibrary(item)"
+                @play="handleQuickPlayExternalTrack"
+                @add="handleQuickAddExternalTrack"
+              />
+            </div>
+          </section>
+
+          <!-- Section 6: Spotify Playlists (Overview preview) -->
+          <section v-if="spPlaylists.length > 0" class="profile-section sp-section">
+            <div class="section-header">
+              <div class="section-title-with-badge clickable" @click="selectTab('spotify')" title="Перейти в Spotify">
+                <Radio :size="16" class="sp-icon-title" />
+                <h2 class="section-title">Плейлисты Spotify</h2>
+              </div>
+              <button class="section-link" @click="selectTab('spotify')">Все {{ spPlaylists.length }}</button>
+            </div>
+            <div class="overview-grid">
+              <div 
+                v-for="pl in spPlaylists.slice(0, 6)" 
+                :key="pl.id" 
+                class="feed-card ext-card sp-card"
+                @click="selectTab('spotify')"
+              >
+                <div class="feed-card-cover sp-cover-box">
+                  <FileSpreadsheet :size="36" class="sp-card-icon" />
+                </div>
+                <div class="feed-card-info">
+                  <div class="feed-card-title">{{ pl.title }}</div>
+                  <div class="feed-card-subtitle">{{ pl.track_count }} {{ getTracksWord(pl.track_count) }}</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <!-- Empty State if user has no public content -->
-          <div v-if="overviewPlaylists.length === 0 && overviewTracks.length === 0 && overviewAlbums.length === 0" class="empty-state">
+          <div 
+            v-if="overviewPlaylists.length === 0 && overviewTracks.length === 0 && overviewAlbums.length === 0 && scPlaylists.length === 0 && scTracks.length === 0 && spPlaylists.length === 0" 
+            class="empty-state"
+          >
             <div class="empty-icon"><Music :size="48" /></div>
             <h2>Медиатека пуста</h2>
             <p>У пользователя пока нет публичных треков или плейлистов</p>
@@ -397,6 +535,288 @@
             <p>Нет альбомов в библиотеке</p>
           </template>
         </VirtualGrid>
+      </div>
+
+      <!-- SoundCloud Tab Content -->
+      <div v-show="activeTab === 'soundcloud'" class="tab-pane sc-pane">
+        <!-- SC Profile Strip -->
+        <div v-if="scAccount" class="ext-profile-strip sc-profile-strip">
+          <div class="ext-strip-avatar">
+            <img v-if="scAccount.avatar_url" :src="scAccount.avatar_url" alt="" referrerpolicy="no-referrer" />
+            <span v-else class="sc-badge-large">SC</span>
+          </div>
+          <div class="ext-strip-info">
+            <div class="ext-strip-platform">
+              <span class="sc-badge-inline">SoundCloud</span>
+              <span class="ext-verified-badge" title="Подключенный аккаунт">Подключен</span>
+            </div>
+            <h2 class="ext-strip-name">{{ scAccount.display_name || scAccount.username }}</h2>
+            <div class="ext-strip-sub">
+              <span class="ext-strip-handle">@{{ scAccount.username }}</span>
+              <span v-if="scAccount.permalink_url" class="stat-separator">•</span>
+              <a 
+                v-if="scAccount.permalink_url" 
+                :href="scAccount.permalink_url" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                class="ext-strip-link"
+              >
+                <span>Открыть на SoundCloud</span>
+                <ExternalLink :size="13" />
+              </a>
+            </div>
+          </div>
+          <div class="ext-strip-stats">
+            <div class="ext-stat-box">
+              <span class="ext-stat-num">{{ scPlaylists.length }}</span>
+              <span class="ext-stat-lbl">плейлистов</span>
+            </div>
+            <div class="ext-stat-box">
+              <span class="ext-stat-num">{{ scTracks.length }}</span>
+              <span class="ext-stat-lbl">релизов</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- If viewing a selected SoundCloud Playlist drawer/detail -->
+        <div v-if="selectedScPlaylist" class="sc-playlist-detail-view">
+          <div class="sc-playlist-detail-header">
+            <button class="btn-back-pill" @click="closeScPlaylist">
+              <ArrowLeft :size="16" />
+              <span>Назад ко всем плейлистам</span>
+            </button>
+            <div class="sc-playlist-detail-meta">
+              <div class="sc-playlist-detail-cover">
+                <img 
+                  v-if="selectedScPlaylist.artwork_url" 
+                  :src="selectedScPlaylist.artwork_url" 
+                  alt="" 
+                  referrerpolicy="no-referrer" 
+                />
+                <Folder v-else :size="48" />
+              </div>
+              <div class="sc-playlist-detail-text">
+                <span class="sc-badge-inline">Плейлист SoundCloud</span>
+                <h2 class="sc-detail-title">{{ selectedScPlaylist.title }}</h2>
+                <div class="sc-detail-sub">
+                  <span>{{ scPlaylistTracks.length || selectedScPlaylist.track_count }} {{ getTracksWord(scPlaylistTracks.length || selectedScPlaylist.track_count) }}</span>
+                  <span v-if="selectedScPlaylist.permalink_url" class="stat-separator">•</span>
+                  <a 
+                    v-if="selectedScPlaylist.permalink_url" 
+                    :href="selectedScPlaylist.permalink_url" 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    class="ext-strip-link"
+                  >
+                    <span>SoundCloud</span>
+                    <ExternalLink :size="12" />
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Loading playlist tracks -->
+          <div v-if="loadingScPlaylistTracks" class="loading-container">
+            <div class="spinner"></div>
+          </div>
+
+          <!-- Playlist tracklist -->
+          <div v-else class="sc-playlist-tracks-list">
+            <ExternalTrackItem
+              v-for="item in scPlaylistTracks"
+              :key="item.url"
+              :item="item"
+              variant="soundcloud"
+              :showBadges="true"
+              :isImporting="importingTrackUrl === item.url"
+              :isDownloading="tasksStore.isTrackDownloading(item.url)"
+              :isQueued="tasksStore.isTrackQueued(item.url)"
+              :isInLibrary="isTrackInLibrary(item)"
+              @play="handleQuickPlayExternalTrack"
+              @add="handleQuickAddExternalTrack"
+            />
+            <div v-if="scPlaylistTracks.length === 0" class="empty-state">
+              <div class="empty-icon"><Music :size="40" /></div>
+              <p>В этом плейлисте нет треков</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Normal Subtabs: Playlists vs Releases -->
+        <div v-else class="sc-main-content">
+          <div class="sc-subtabs-bar">
+            <button 
+              class="sc-subtab-btn" 
+              :class="{ active: scSubTab === 'playlists' }"
+              @click="scSubTab = 'playlists'"
+            >
+              <Folder :size="15" />
+              <span>Плейлисты</span>
+              <span class="subtab-count">{{ scPlaylists.length }}</span>
+            </button>
+            <button 
+              class="sc-subtab-btn" 
+              :class="{ active: scSubTab === 'tracks' }"
+              @click="scSubTab = 'tracks'"
+            >
+              <Music :size="15" />
+              <span>Релизы и треки</span>
+              <span class="subtab-count">{{ scTracks.length }}</span>
+            </button>
+          </div>
+
+          <!-- Subtab 1: Playlists -->
+          <div v-if="scSubTab === 'playlists'" class="sc-subtab-content">
+            <div v-if="loadingScPlaylists" class="loading-container">
+              <div class="spinner"></div>
+            </div>
+            <div v-else-if="scPlaylists.length > 0" class="overview-grid">
+              <div 
+                v-for="pl in scPlaylists" 
+                :key="pl.id" 
+                class="feed-card ext-card sc-card"
+                @click="openScPlaylist(pl)"
+              >
+                <div class="feed-card-cover sc-cover-box">
+                  <img 
+                    v-if="pl.artwork_url" 
+                    :src="pl.artwork_url" 
+                    alt=""
+                    loading="lazy"
+                    referrerpolicy="no-referrer"
+                  />
+                  <Folder v-else :size="36" />
+                  <div class="play-overlay" title="Смотреть треки">
+                    <Play :size="18" fill="currentColor" />
+                  </div>
+                </div>
+                <div class="feed-card-info">
+                  <div class="feed-card-title">{{ pl.title }}</div>
+                  <div class="feed-card-subtitle">{{ pl.track_count }} {{ getTracksWord(pl.track_count) }}</div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="empty-state">
+              <div class="empty-icon"><Folder :size="44" /></div>
+              <h3>Нет плейлистов SoundCloud</h3>
+              <p>Пользователь не создал или скрыл свои плейлисты на SoundCloud</p>
+            </div>
+          </div>
+
+          <!-- Subtab 2: Releases / Tracks -->
+          <div v-if="scSubTab === 'tracks'" class="sc-subtab-content">
+            <div v-if="loadingScTracks" class="loading-container">
+              <div class="spinner"></div>
+            </div>
+            <div v-else-if="scTracks.length > 0" class="sc-tracks-wrapper">
+              <div class="ext-tracks-list">
+                <ExternalTrackItem
+                  v-for="item in scTracks"
+                  :key="item.url"
+                  :item="item"
+                  variant="soundcloud"
+                  :showBadges="true"
+                  :isImporting="importingTrackUrl === item.url"
+                  :isDownloading="tasksStore.isTrackDownloading(item.url)"
+                  :isQueued="tasksStore.isTrackQueued(item.url)"
+                  :isInLibrary="isTrackInLibrary(item)"
+                  @play="handleQuickPlayExternalTrack"
+                  @add="handleQuickAddExternalTrack"
+                />
+              </div>
+              <div v-if="scTracksCursor" class="load-more-box">
+                <button 
+                  class="btn-pill-secondary" 
+                  :disabled="loadingMoreScTracks" 
+                  @click="loadMoreScTracks"
+                >
+                  <div v-if="loadingMoreScTracks" class="spinner small"></div>
+                  <span v-else>Загрузить ещё релизы</span>
+                </button>
+              </div>
+            </div>
+            <div v-else class="empty-state">
+              <div class="empty-icon"><Music :size="44" /></div>
+              <h3>Нет релизов на SoundCloud</h3>
+              <p>Пользователь ещё не загружал собственные авторские треки на SoundCloud</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Spotify Tab Content -->
+      <div v-show="activeTab === 'spotify'" class="tab-pane sp-pane">
+        <!-- Spotify Profile Strip -->
+        <div v-if="spAccount" class="ext-profile-strip sp-profile-strip">
+          <div class="ext-strip-avatar sp-avatar">
+            <img v-if="spAccount.avatar_url" :src="spAccount.avatar_url" alt="" referrerpolicy="no-referrer" />
+            <Radio v-else :size="32" class="sp-icon-large" />
+          </div>
+          <div class="ext-strip-info">
+            <div class="ext-strip-platform">
+              <span class="sp-badge-inline">Spotify</span>
+              <span class="ext-verified-badge" title="Подключенный аккаунт">Подключен</span>
+            </div>
+            <h2 class="ext-strip-name">{{ spAccount.display_name || spAccount.username }}</h2>
+            <div class="ext-strip-sub">
+              <span class="ext-strip-handle">@{{ spAccount.username }}</span>
+              <span v-if="spAccount.permalink_url" class="stat-separator">•</span>
+              <a 
+                v-if="spAccount.permalink_url" 
+                :href="spAccount.permalink_url" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                class="ext-strip-link"
+              >
+                <span>Открыть на Spotify</span>
+                <ExternalLink :size="13" />
+              </a>
+            </div>
+          </div>
+          <div class="ext-strip-stats">
+            <div class="ext-stat-box">
+              <span class="ext-stat-num">{{ spPlaylists.length }}</span>
+              <span class="ext-stat-lbl">плейлистов</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="sp-main-content">
+          <div class="section-header">
+            <h3 class="section-title">Импортированные плейлисты Spotify</h3>
+            <span class="section-badge-pill">{{ spPlaylists.length }}</span>
+          </div>
+
+          <div v-if="loadingSpPlaylists" class="loading-container">
+            <div class="spinner"></div>
+          </div>
+
+          <div v-else-if="spPlaylists.length > 0" class="overview-grid">
+            <div 
+              v-for="pl in spPlaylists" 
+              :key="pl.id" 
+              class="feed-card ext-card sp-card"
+            >
+              <div class="feed-card-cover sp-cover-box">
+                <FileSpreadsheet :size="36" class="sp-card-icon" />
+              </div>
+              <div class="feed-card-info">
+                <div class="feed-card-title">{{ pl.title }}</div>
+                <div class="feed-card-subtitle">
+                  {{ pl.track_count }} {{ getTracksWord(pl.track_count) }}
+                  <span v-if="pl.created_at" class="sp-date">• {{ new Date(pl.created_at).toLocaleDateString() }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="empty-state">
+            <div class="empty-icon"><Radio :size="44" /></div>
+            <h3>Нет плейлистов Spotify</h3>
+            <p>У пользователя пока нет сохраненных плейлистов из Spotify</p>
+          </div>
+        </div>
       </div>
     </template>
 
@@ -507,12 +927,14 @@ import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
+import { useTasksStore } from '@/stores/tasks'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useTrackActions, useShare } from '@/composables'
-import { socialApi, playlistsApi, authApi } from '@/api/client'
+import { socialApi, playlistsApi, authApi, ingestionApi } from '@/api/client'
 import apiCache from '@/utils/apiCache'
 import { getCoverUrl, CoverSize } from '@/utils'
 import TrackItem from '@/components/TrackItem.vue'
+import ExternalTrackItem from '@/components/ExternalTrackItem.vue'
 import VirtualTrackList from '@/components/VirtualTrackList.vue'
 import VirtualGrid from '@/components/VirtualGrid.vue'
 import {
@@ -534,6 +956,10 @@ import {
   X,
   Edit3,
   Trash2,
+  Radio,
+  ExternalLink,
+  ArrowLeft,
+  FileSpreadsheet,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -542,6 +968,7 @@ const authStore = useAuthStore()
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
 const uiStore = useUIStore()
+const tasksStore = useTasksStore()
 const { openMenu } = useContextMenu()
 const { share } = useShare()
 
@@ -581,6 +1008,179 @@ const overviewTracks = ref([])
 const overviewPlaylists = ref([])
 const overviewAlbums = ref([])
 const loadingOverview = ref(false)
+
+// External Accounts State
+const externalAccounts = ref([])
+const scAccount = computed(() => externalAccounts.value.find(a => a.provider === 'soundcloud'))
+const spAccount = computed(() => externalAccounts.value.find(a => a.provider === 'spotify'))
+
+const scPlaylists = ref([])
+const loadingScPlaylists = ref(false)
+const scTracks = ref([])
+const loadingScTracks = ref(false)
+const scTracksCursor = ref(null)
+const loadingMoreScTracks = ref(false)
+const scSubTab = ref('playlists') // 'playlists' | 'tracks'
+const selectedScPlaylist = ref(null)
+const scPlaylistTracks = ref([])
+const loadingScPlaylistTracks = ref(false)
+
+const spPlaylists = ref([])
+const loadingSpPlaylists = ref(false)
+
+const importingTrackUrl = ref(null)
+
+const isTrackInLibrary = (item) => {
+  if (!item) return false
+  return item.in_library || tasksStore.isTrackCompleted(item.url)
+}
+
+const loadExternalAccounts = async (id) => {
+  if (!id) return
+  try {
+    const res = await socialApi.getUserExternalAccounts(id)
+    externalAccounts.value = res.data?.accounts || []
+
+    const sc = externalAccounts.value.find(a => a.provider === 'soundcloud')
+    if (sc) {
+      if (sc.show_playlists || isSelf.value) {
+        loadScPlaylists(id)
+      }
+      if (sc.show_tracks || isSelf.value) {
+        loadScTracks(id, true)
+      }
+    }
+
+    const sp = externalAccounts.value.find(a => a.provider === 'spotify')
+    if (sp) {
+      if (sp.show_playlists || isSelf.value) {
+        loadSpPlaylists(id)
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load user external accounts:', err)
+  }
+}
+
+const loadScPlaylists = async (id) => {
+  loadingScPlaylists.value = true
+  try {
+    const res = await socialApi.getUserExternalPlaylists(id, 'soundcloud')
+    scPlaylists.value = res.data?.items || []
+  } catch (err) {
+    console.error('Failed to load SC playlists:', err)
+    scPlaylists.value = []
+  } finally {
+    loadingScPlaylists.value = false
+  }
+}
+
+const loadScTracks = async (id, reset = true) => {
+  loadingScTracks.value = true
+  if (reset) {
+    scTracksCursor.value = null
+  }
+  try {
+    const res = await socialApi.getUserExternalTracks(id, 'soundcloud', { limit: 40 })
+    scTracks.value = res.data?.items || []
+    scTracksCursor.value = res.data?.next_cursor || null
+  } catch (err) {
+    console.error('Failed to load SC tracks:', err)
+    scTracks.value = []
+  } finally {
+    loadingScTracks.value = false
+  }
+}
+
+const loadMoreScTracks = async () => {
+  if (!scTracksCursor.value || loadingMoreScTracks.value) return
+  loadingMoreScTracks.value = true
+  try {
+    const res = await socialApi.getUserExternalTracks(userId.value, 'soundcloud', {
+      cursor: scTracksCursor.value,
+      limit: 40,
+    })
+    const more = res.data?.items || []
+    scTracks.value = [...scTracks.value, ...more]
+    scTracksCursor.value = res.data?.next_cursor || null
+  } catch (err) {
+    console.error('Failed to load more SC tracks:', err)
+  } finally {
+    loadingMoreScTracks.value = false
+  }
+}
+
+const loadSpPlaylists = async (id) => {
+  loadingSpPlaylists.value = true
+  try {
+    const res = await socialApi.getUserExternalPlaylists(id, 'spotify')
+    spPlaylists.value = res.data?.items || []
+  } catch (err) {
+    console.error('Failed to load Spotify playlists:', err)
+    spPlaylists.value = []
+  } finally {
+    loadingSpPlaylists.value = false
+  }
+}
+
+const openScPlaylist = async (pl) => {
+  selectTab('soundcloud')
+  selectedScPlaylist.value = pl
+  scPlaylistTracks.value = []
+  loadingScPlaylistTracks.value = true
+  try {
+    const res = await socialApi.getUserExternalPlaylistTracks(userId.value, 'soundcloud', pl.id)
+    scPlaylistTracks.value = res.data?.tracks || []
+  } catch (err) {
+    console.error('Failed to load SC playlist tracks:', err)
+    uiStore.toast?.error('Ошибка', 'Не удалось загрузить треки плейлиста')
+  } finally {
+    loadingScPlaylistTracks.value = false
+  }
+}
+
+const closeScPlaylist = () => {
+  selectedScPlaylist.value = null
+  scPlaylistTracks.value = []
+}
+
+const handleQuickPlayExternalTrack = async (item) => {
+  if (importingTrackUrl.value) return
+  importingTrackUrl.value = item.url
+
+  try {
+    const res = await ingestionApi.quickImport({
+      url: item.url,
+      title: item.title,
+      artist: item.artist,
+      duration: item.duration,
+      cover_url: item.cover_url,
+      genre: item.genre,
+      tags: item.tags,
+      add_to_library: false,
+    })
+
+    const track = res.data?.track
+    if (track) {
+      if (track.in_library) {
+        item.in_library = true
+      }
+      item.already_in_tg = true
+      item.track_id = track.id
+      playerStore.play(track, [track])
+    }
+  } catch (e) {
+    console.error('Failed to quick play external track:', e)
+    const errorMsg = e.response?.data?.detail || 'Не удалось загрузить трек'
+    uiStore.toast?.error('Ошибка воспроизведения', errorMsg)
+  } finally {
+    importingTrackUrl.value = null
+  }
+}
+
+const handleQuickAddExternalTrack = (item) => {
+  tasksStore.enqueueTrack(item, 'soundcloud')
+}
 
 // Refs
 const virtualTrackListRef = ref(null)
@@ -821,6 +1421,7 @@ const loadUserProfile = async (bypassCache = false) => {
     user.value = res.data
     isFollowing.value = !!res.data.is_following
     loadOverviewData(id)
+    loadExternalAccounts(id)
   } catch (err) {
     if (err.response?.status === 403) {
       isForbidden.value = true
@@ -1027,6 +1628,11 @@ watch(
       hasOpenedTracks.value = false
       hasOpenedPlaylists.value = false
       hasOpenedAlbums.value = false
+      externalAccounts.value = []
+      scPlaylists.value = []
+      scTracks.value = []
+      spPlaylists.value = []
+      selectedScPlaylist.value = null
       resetScrollToTop()
       loadUserProfile(true)
     }
@@ -2211,5 +2817,465 @@ onMounted(() => {
     padding: 7px 12px;
     font-size: 12px;
   }
+}
+
+/* ─── External Account Badges & Hero Integrations ─── */
+.hero-ext-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  padding: 3px 10px;
+  cursor: pointer;
+  color: var(--c-text-1, #fff);
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.hero-ext-badge:hover {
+  background: rgba(255, 255, 255, 0.14);
+  transform: translateY(-1px);
+}
+
+.hero-ext-badge.sc-badge {
+  border-color: rgba(255, 85, 0, 0.35);
+}
+
+.hero-ext-badge.sc-badge:hover {
+  border-color: #ff5500;
+  box-shadow: 0 4px 14px rgba(255, 85, 0, 0.25);
+}
+
+.hero-ext-badge.sp-badge {
+  border-color: rgba(29, 185, 84, 0.35);
+}
+
+.hero-ext-badge.sp-badge:hover {
+  border-color: #1db954;
+  box-shadow: 0 4px 14px rgba(29, 185, 84, 0.25);
+}
+
+.sc-badge-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ff5500;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 4px;
+  padding: 1px 5px;
+  line-height: 1.2;
+  letter-spacing: 0.5px;
+}
+
+.sp-badge-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #1db954;
+  color: #000;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 4px;
+  padding: 1px 6px;
+  line-height: 1.2;
+}
+
+.sp-icon-inline {
+  color: #1db954;
+  flex-shrink: 0;
+}
+
+.ext-badge-name {
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── External Account Tabs in user-tabs-bar ─── */
+.user-tab-btn.sc-tab-btn {
+  border-color: rgba(255, 85, 0, 0.25);
+}
+
+.user-tab-btn.sc-tab-btn.active {
+  background: #ff5500;
+  color: #fff;
+  border-color: #ff5500;
+  box-shadow: 0 4px 16px rgba(255, 85, 0, 0.4);
+}
+
+.user-tab-btn.sp-tab-btn {
+  border-color: rgba(29, 185, 84, 0.25);
+}
+
+.user-tab-btn.sp-tab-btn.active {
+  background: #1db954;
+  color: #000;
+  border-color: #1db954;
+  box-shadow: 0 4px 16px rgba(29, 185, 84, 0.4);
+}
+
+.sc-badge-num {
+  background: rgba(255, 85, 0, 0.2) !important;
+  color: #ff7733 !important;
+}
+
+.user-tab-btn.sc-tab-btn.active .sc-badge-num {
+  background: rgba(0, 0, 0, 0.25) !important;
+  color: #fff !important;
+}
+
+.sp-badge-num {
+  background: rgba(29, 185, 84, 0.2) !important;
+  color: #1db954 !important;
+}
+
+.user-tab-btn.sp-tab-btn.active .sp-badge-num {
+  background: rgba(0, 0, 0, 0.25) !important;
+  color: #000 !important;
+}
+
+/* ─── External Profile Strips (Header in SC / Spotify Tabs) ─── */
+.ext-profile-strip {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--c-bg-2, #181818);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 24px 28px;
+  margin-bottom: 28px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.sc-profile-strip {
+  background: linear-gradient(135deg, rgba(255, 85, 0, 0.08) 0%, rgba(20, 20, 20, 0.8) 100%);
+  border-color: rgba(255, 85, 0, 0.2);
+}
+
+.sp-profile-strip {
+  background: linear-gradient(135deg, rgba(29, 185, 84, 0.08) 0%, rgba(20, 20, 20, 0.8) 100%);
+  border-color: rgba(29, 185, 84, 0.2);
+}
+
+.ext-strip-avatar {
+  width: 80px;
+  height: 80px;
+  min-width: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ext-strip-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sc-badge-large {
+  font-size: 24px;
+  font-weight: 800;
+  color: #ff5500;
+}
+
+.sp-avatar {
+  background: rgba(29, 185, 84, 0.1);
+  border-color: rgba(29, 185, 84, 0.3);
+}
+
+.sp-icon-large {
+  color: #1db954;
+}
+
+.ext-strip-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ext-strip-platform {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ext-verified-badge {
+  font-size: 11px;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
+  font-weight: 500;
+}
+
+.ext-strip-name {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--c-text-1, #fff);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ext-strip-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+}
+
+.ext-strip-handle {
+  font-weight: 500;
+}
+
+.ext-strip-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+  text-decoration: none;
+  font-size: 12px;
+  transition: color 0.2s ease;
+}
+
+.ext-strip-link:hover {
+  color: var(--c-text-1, #fff);
+  text-decoration: underline;
+}
+
+.ext-strip-stats {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.ext-stat-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 8px 16px;
+  min-width: 70px;
+}
+
+.ext-stat-num {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--c-text-1, #fff);
+}
+
+.ext-stat-lbl {
+  font-size: 11px;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
+}
+
+/* ─── SoundCloud Subtabs Bar (Playlists vs Releases) ─── */
+.sc-subtabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.sc-subtab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sc-subtab-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--c-text-1, #fff);
+}
+
+.sc-subtab-btn.active {
+  background: rgba(255, 85, 0, 0.15);
+  border-color: #ff5500;
+  color: #fff;
+}
+
+.subtab-count {
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 6px;
+  border-radius: 9999px;
+}
+
+.sc-subtab-btn.active .subtab-count {
+  background: #ff5500;
+  color: #fff;
+}
+
+/* ─── External Playlist Detail View ─── */
+.sc-playlist-detail-view {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.sc-playlist-detail-header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.btn-back-pill {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--c-text-1, #fff);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-back-pill:hover {
+  background: rgba(255, 255, 255, 0.14);
+  transform: translateX(-2px);
+}
+
+.sc-playlist-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.sc-playlist-detail-cover {
+  width: 100px;
+  height: 100px;
+  min-width: 100px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sc-playlist-detail-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sc-playlist-detail-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sc-detail-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--c-text-1, #fff);
+  margin: 0;
+}
+
+.sc-detail-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+}
+
+/* ─── Lists & Cards ─── */
+.ext-tracks-list,
+.sc-playlist-tracks-list,
+.ext-tracks-overview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.section-title-with-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.section-title-with-badge.clickable {
+  cursor: pointer;
+}
+
+.section-title-with-badge.clickable:hover .section-title {
+  color: var(--c-accent, #1db954);
+}
+
+.sp-icon-title {
+  color: #1db954;
+}
+
+.sc-cover-box {
+  background: linear-gradient(135deg, rgba(255, 85, 0, 0.2) 0%, rgba(20, 20, 20, 0.8) 100%) !important;
+}
+
+.sp-cover-box {
+  background: linear-gradient(135deg, rgba(29, 185, 84, 0.2) 0%, rgba(20, 20, 20, 0.8) 100%) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sp-card-icon {
+  color: #1db954;
+  opacity: 0.8;
+}
+
+.section-badge-pill {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+}
+
+.sp-date {
+  color: var(--c-text-3, rgba(255, 255, 255, 0.4));
+  font-size: 11px;
+}
+
+.load-more-box {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
 }
 </style>
