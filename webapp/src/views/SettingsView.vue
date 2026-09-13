@@ -303,6 +303,9 @@
                 <Camera :size="18" />
               </div>
             </div>
+            <div class="profile-avatar-badge" title="Сменить фото">
+              <Camera :size="11" />
+            </div>
             <input 
               ref="avatarFileInputRef" 
               type="file" 
@@ -314,10 +317,10 @@
 
           <div class="profile-meta-info">
             <div class="profile-name-row">
-              <span class="profile-user-name">{{ authStore.userDisplayName }}</span>
+              <span class="profile-user-name" :title="authStore.userDisplayName">{{ authStore.userDisplayName }}</span>
               <button class="view-profile-chip" @click="goToMyProfile" title="Открыть свой профиль">
                 <span>Профиль</span>
-                <ChevronRight :size="14" />
+                <ChevronRight :size="12" />
               </button>
             </div>
             <div class="profile-handle-row">
@@ -329,18 +332,19 @@
             <!-- Quick photo actions -->
             <div class="avatar-quick-actions">
               <button 
-                class="avatar-text-btn" 
+                class="avatar-action-btn" 
                 :disabled="isUploadingAvatar" 
                 @click="avatarFileInputRef?.click()"
               >
                 <Camera :size="12" />
-                <span>{{ isUploadingAvatar ? 'Загрузка...' : (authStore.user?.custom_avatar_url ? 'Сменить фото' : 'Загрузить фото') }}</span>
+                <span>{{ isUploadingAvatar ? 'Загрузка...' : (authStore.user?.custom_avatar_url ? 'Сменить' : 'Загрузить фото') }}</span>
               </button>
               <button 
                 v-if="authStore.user?.custom_avatar_url" 
-                class="avatar-text-btn danger" 
+                class="avatar-action-btn danger" 
                 :disabled="isUploadingAvatar" 
                 @click="handleRemoveAvatar"
+                title="Удалить аватарку"
               >
                 <Trash2 :size="12" />
                 <span>Удалить</span>
@@ -354,38 +358,68 @@
         <!-- Custom Nickname Section -->
         <div class="profile-field-block">
           <div class="field-header">
-            <span class="field-title">Кастомный никнейм</span>
-            <span class="field-hint">Отображается вместо Telegram-имени</span>
-          </div>
-          <div class="nickname-field-group">
-            <input 
-              v-model="customNicknameInput" 
-              type="text" 
-              maxlength="50"
-              placeholder="Введите никнейм" 
-              class="nickname-clean-input" 
-              :disabled="isSavingProfile"
-              @keydown.enter="handleSaveNickname"
-            />
+            <div class="field-title-group">
+              <span class="field-title">Кастомный никнейм</span>
+              <span class="field-hint">Отображается вместо Telegram-имени</span>
+            </div>
             <button 
-              class="action-btn primary small-btn" 
-              :disabled="isSavingProfile || customNicknameInput.trim() === (authStore.user?.custom_nickname || '')" 
-              @click="handleSaveNickname"
-            >
-              <Check v-if="!isSavingProfile" :size="14" />
-              <div v-else class="spinner small"></div>
-              <span>Сохранить</span>
-            </button>
-            <button 
-              v-if="authStore.user?.custom_nickname" 
-              class="action-btn danger-ghost small-btn" 
+              v-if="authStore.user?.custom_nickname && !isNicknameDirty" 
+              class="field-reset-link" 
               :disabled="isSavingProfile" 
               @click="handleResetNickname" 
               title="Сбросить на имя из Telegram"
             >
-              <X :size="14" />
-              <span>Сбросить</span>
+              <RotateCcw :size="11" />
+              <span>Сбросить ник</span>
             </button>
+          </div>
+
+          <div class="nickname-field-row">
+            <div class="nickname-input-box" :class="{ 'is-dirty': isNicknameDirty }">
+              <input 
+                v-model="customNicknameInput" 
+                type="text" 
+                maxlength="50"
+                placeholder="Введите никнейм" 
+                class="nickname-clean-input" 
+                :disabled="isSavingProfile"
+                @keydown.enter="handleSaveNickname"
+                @keydown.esc="handleCancelNickname"
+              />
+              <button 
+                v-if="customNicknameInput" 
+                class="input-clear-btn" 
+                @click="customNicknameInput = ''" 
+                title="Очистить"
+                type="button"
+                tabindex="-1"
+              >
+                <X :size="12" />
+              </button>
+            </div>
+
+            <div class="nickname-actions-group">
+              <button 
+                class="profile-save-btn" 
+                :class="{ 'is-active': isNicknameDirty }"
+                :disabled="isSavingProfile || !isNicknameDirty" 
+                @click="handleSaveNickname"
+                title="Сохранить никнейм"
+              >
+                <div v-if="isSavingProfile" class="spinner small"></div>
+                <Check v-else :size="13" />
+                <span>Сохранить</span>
+              </button>
+              <button 
+                v-if="isNicknameDirty" 
+                class="profile-cancel-btn" 
+                :disabled="isSavingProfile" 
+                @click="handleCancelNickname"
+                title="Отменить изменения"
+              >
+                <X :size="13" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -808,7 +842,7 @@ import {
   User, Bell, Sliders, Headphones, Smartphone, Download, HardDrive, 
   Trash2, ChevronRight, ExternalLink, Unlink, Key, ChevronDown, 
   AlertCircle, Radio, FileSpreadsheet, Upload, LogOut, Library,
-  Camera, EyeOff, X
+  Camera, EyeOff, X, RotateCcw
 } from 'lucide-vue-next'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import { getCacheStats, getCachedAudioStats } from '@/utils/audioCacheDb'
@@ -839,6 +873,16 @@ const isSavingProfile = ref(false)
 const isUploadingAvatar = ref(false)
 const avatarFileInputRef = ref(null)
 
+const isNicknameDirty = computed(() => {
+  const current = (authStore.user?.custom_nickname || '').trim()
+  const input = customNicknameInput.value.trim()
+  return input !== current
+})
+
+const handleCancelNickname = () => {
+  customNicknameInput.value = authStore.user?.custom_nickname || ''
+}
+
 watch(() => authStore.user, (newU) => {
   if (newU) {
     customNicknameInput.value = newU.custom_nickname || ''
@@ -846,7 +890,7 @@ watch(() => authStore.user, (newU) => {
 }, { immediate: true })
 
 const handleSaveNickname = async () => {
-  if (isSavingProfile.value) return
+  if (isSavingProfile.value || !isNicknameDirty.value) return
   isSavingProfile.value = true
   try {
     await authStore.updateProfile({ custom_nickname: customNicknameInput.value.trim() })
@@ -1445,7 +1489,9 @@ const handleResetState = (event) => {
 }
 
 .action-btn.primary:disabled {
-  opacity: 0.5;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: rgba(255, 255, 255, 0.35) !important;
+  box-shadow: none;
   cursor: not-allowed;
 }
 
@@ -2156,6 +2202,28 @@ const handleResetState = (event) => {
   opacity: 1;
 }
 
+.profile-avatar-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--c-bg-2, #242424);
+  border: 2px solid var(--c-bg-1, #181818);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-text-2, #a7a7a7);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  transition: all 0.15s ease;
+}
+
+.profile-avatar-block:hover .profile-avatar-badge {
+  background: var(--c-accent, #1db954);
+  color: #000;
+}
+
 .profile-meta-info {
   display: flex;
   flex-direction: column;
@@ -2184,10 +2252,11 @@ const handleResetState = (event) => {
 .view-profile-chip {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 4px 10px;
-  border-radius: var(--r-full);
-  background: rgba(29, 185, 84, 0.12);
+  gap: 3px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 12px;
+  background: rgba(29, 185, 84, 0.1);
   color: var(--c-accent);
   border: 1px solid rgba(29, 185, 84, 0.25);
   font-size: 11px;
@@ -2198,7 +2267,7 @@ const handleResetState = (event) => {
 }
 
 .view-profile-chip:hover {
-  background: rgba(29, 185, 84, 0.22);
+  background: rgba(29, 185, 84, 0.2);
   border-color: rgba(29, 185, 84, 0.4);
   transform: translateY(-1px);
 }
@@ -2236,11 +2305,12 @@ const handleResetState = (event) => {
   margin-top: 4px;
 }
 
-.avatar-text-btn {
+.avatar-action-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 9px;
+  height: 26px;
+  padding: 0 9px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -2249,38 +2319,51 @@ const handleResetState = (event) => {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
-.avatar-text-btn:hover:not(:disabled) {
+.avatar-action-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.1);
   color: var(--c-text-1);
 }
 
-.avatar-text-btn.danger {
-  color: #ff5c5c;
-  background: rgba(255, 92, 92, 0.08);
-  border-color: rgba(255, 92, 92, 0.15);
+.avatar-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.avatar-text-btn.danger:hover:not(:disabled) {
-  background: rgba(255, 92, 92, 0.18);
-  border-color: rgba(255, 92, 92, 0.3);
+.avatar-action-btn.danger {
+  color: #ff6b6b;
+  background: rgba(244, 92, 92, 0.08);
+  border-color: rgba(244, 92, 92, 0.18);
 }
 
-/* Custom Nickname Block */
+.avatar-action-btn.danger:hover:not(:disabled) {
+  background: rgba(244, 92, 92, 0.16);
+  border-color: rgba(244, 92, 92, 0.3);
+  color: #ff5252;
+}
+
+/* ─── Custom Nickname Block ─── */
 .profile-field-block {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   padding: 2px 0;
 }
 
 .field-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.field-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .field-title {
@@ -2296,34 +2379,166 @@ const handleResetState = (event) => {
   line-height: 1.3;
 }
 
-.nickname-field-group {
+.field-reset-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid rgba(255, 92, 92, 0.2);
+  color: #ff6b6b;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.field-reset-link:hover:not(:disabled) {
+  background: rgba(255, 92, 92, 0.1);
+  border-color: rgba(255, 92, 92, 0.35);
+  color: #ff5252;
+}
+
+.field-reset-link:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.nickname-field-row {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
+}
+
+.nickname-input-box {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
 }
 
 .nickname-clean-input {
-  flex: 1;
-  min-width: 0;
-  background: var(--c-bg-1, #121212);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--r-md);
-  padding: 8px 12px;
-  color: var(--c-text-1);
+  width: 100%;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--r-md, 8px);
+  padding: 0 32px 0 12px;
+  color: var(--c-text-1, #fff);
   font-size: 13px;
+  font-family: inherit;
   outline: none;
-  transition: border-color 0.2s, background-color 0.2s;
+  transition: all 0.2s ease;
 }
 
 .nickname-clean-input:focus {
-  border-color: var(--c-accent);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--c-accent, #1db954);
+  box-shadow: 0 0 0 1px rgba(29, 185, 84, 0.3);
 }
 
-.small-btn {
-  padding: 8px 14px;
+.input-clear-btn {
+  position: absolute;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: var(--c-text-3);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.input-clear-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--c-text-1);
+}
+
+.nickname-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.profile-save-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--r-md, 8px);
   font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
   white-space: nowrap;
+}
+
+/* When disabled (not dirty or saving) */
+.profile-save-btn:disabled {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.3) !important;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.profile-save-btn:disabled svg {
+  color: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* When active/dirty */
+.profile-save-btn.is-active:not(:disabled) {
+  background: var(--c-accent, #1db954);
+  border-color: var(--c-accent, #1db954);
+  color: #000;
+  box-shadow: 0 2px 10px rgba(29, 185, 84, 0.35);
+}
+
+.profile-save-btn.is-active:not(:disabled) svg {
+  color: #000;
+}
+
+.profile-save-btn.is-active:not(:disabled):hover {
+  background: var(--c-accent-light, #1ed760);
+  border-color: var(--c-accent-light, #1ed760);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(29, 185, 84, 0.45);
+}
+
+.profile-save-btn.is-active:not(:disabled):active {
+  transform: translateY(0);
+}
+
+.profile-cancel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-md, 8px);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--c-text-2);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.profile-cancel-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--c-text-1);
 }
 
 /* Privacy Subgroup */

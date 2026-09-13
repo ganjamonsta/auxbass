@@ -55,9 +55,57 @@ export const useUIStore = defineStore('ui', () => {
     info: (title, message) => showToast({ type: 'info', title, message }),
   }
 
+  // Sidebar collapse & overlay drawer state
+  const isSidebarCollapsed = ref(false)
+  const isSidebarOverlayOpen = ref(false)
+  const isAutoCollapsed = ref(false)
+  const userCollapsedPreference = ref(null) // null = auto, true/false = explicit user choice
+
+  const openSidebarOverlay = () => {
+    isSidebarOverlayOpen.value = true
+  }
+
+  const closeSidebarOverlay = () => {
+    isSidebarOverlayOpen.value = false
+  }
+
+  const toggleSidebarOverlay = () => {
+    isSidebarOverlayOpen.value = !isSidebarOverlayOpen.value
+  }
+
+  const setSidebarCollapsed = (collapsed, manual = false) => {
+    isSidebarCollapsed.value = collapsed
+    if (manual) {
+      userCollapsedPreference.value = collapsed
+    }
+    if (!collapsed) {
+      isSidebarOverlayOpen.value = false
+    }
+  }
+
+  const toggleSidebarCollapse = () => {
+    if (isSidebarCollapsed.value) {
+      // If already collapsed to icons, clicking burger button toggles the overlay drawer
+      toggleSidebarOverlay()
+    } else {
+      // If expanded in normal desktop grid, collapse to icons
+      setSidebarCollapsed(true, true)
+    }
+  }
+
   return {
     libraryTab,
     setLibraryTab,
+    // Sidebar state
+    isSidebarCollapsed,
+    isSidebarOverlayOpen,
+    isAutoCollapsed,
+    userCollapsedPreference,
+    openSidebarOverlay,
+    closeSidebarOverlay,
+    toggleSidebarOverlay,
+    setSidebarCollapsed,
+    toggleSidebarCollapse,
     // Toast
     toasts,
     showToast,

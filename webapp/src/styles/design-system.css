@@ -119,6 +119,7 @@
   --player-height: 64px;
   --desktop-player-height: 100px;
   --sidebar-width: 280px;
+  --sidebar-collapsed-width: 72px;
   --now-playing-width: 320px;
 }
 

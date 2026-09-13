@@ -1030,6 +1030,8 @@ onMounted(() => {
   margin: 0 auto;
   min-height: calc(100vh - 120px);
   width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .loading-container {
@@ -1345,10 +1347,21 @@ onMounted(() => {
   padding-bottom: 4px;
   overflow-x: auto;
   scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .user-tabs-bar::-webkit-scrollbar {
   display: none;
+}
+
+.user-tabs-bar::after {
+  content: '';
+  flex-shrink: 0;
+  width: 8px;
 }
 
 .user-tab-btn {
@@ -1369,6 +1382,7 @@ onMounted(() => {
   user-select: none;
   transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
 }
 
 .user-tab-btn:hover {
@@ -1404,6 +1418,9 @@ onMounted(() => {
 /* Profile Sections (Overview mode) */
 .profile-section {
   margin-bottom: 36px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .section-header {
@@ -1411,6 +1428,9 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .section-title {
@@ -1418,6 +1438,10 @@ onMounted(() => {
   font-weight: 800;
   color: var(--c-text-1, #fff);
   letter-spacing: -0.015em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .section-link {
@@ -1428,6 +1452,8 @@ onMounted(() => {
   color: var(--c-text-3, rgba(255, 255, 255, 0.5));
   cursor: pointer;
   transition: color 0.15s ease;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .section-link:hover {
@@ -1439,6 +1465,10 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 18px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 @media (min-width: 1200px) {
@@ -1451,6 +1481,8 @@ onMounted(() => {
 /* Feed Cards */
 .feed-card {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -1459,6 +1491,7 @@ onMounted(() => {
   border-radius: 12px;
   padding: 12px;
   transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-sizing: border-box;
 }
 
 .feed-card:hover {
@@ -1470,6 +1503,8 @@ onMounted(() => {
 
 .feed-card-cover {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   aspect-ratio: 1;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.05);
@@ -1480,11 +1515,14 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  box-sizing: border-box;
 }
 
 .feed-card-cover img {
   width: 100%;
   height: 100%;
+  max-width: 100%;
+  min-width: 0;
   object-fit: cover;
   display: block;
 }
@@ -1494,6 +1532,7 @@ onMounted(() => {
   flex-direction: column;
   gap: 3px;
   min-width: 0;
+  width: 100%;
 }
 
 .feed-card-title {
@@ -1503,6 +1542,8 @@ onMounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .feed-card-subtitle {
@@ -1511,6 +1552,8 @@ onMounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .play-overlay {
@@ -1547,16 +1590,21 @@ onMounted(() => {
 /* Skeletons */
 .feed-card-skeleton {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.03);
   border-radius: 12px;
   padding: 12px;
+  box-sizing: border-box;
 }
 
 .skeleton-feed-cover {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   aspect-ratio: 1;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.05);
@@ -1627,12 +1675,17 @@ onMounted(() => {
 
 .tab-pane {
   min-height: 200px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 /* Responsive Mobile / Tablet Breakpoints */
 @media (max-width: 768px) {
   .user-profile-view {
-    padding: 16px 16px 32px;
+    padding: 16px 16px calc(var(--player-height, 70px) + var(--nav-height, 64px) + 32px);
+    max-width: 100%;
+    overflow-x: hidden;
   }
 
   .profile-hero-card {
@@ -1641,6 +1694,8 @@ onMounted(() => {
     text-align: center;
     padding: 24px 20px;
     gap: 18px;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   .hero-avatar {
@@ -1652,6 +1707,8 @@ onMounted(() => {
 
   .hero-body {
     align-items: center;
+    width: 100%;
+    max-width: 100%;
   }
 
   .hero-meta-top {
@@ -1660,19 +1717,51 @@ onMounted(() => {
 
   .hero-name {
     font-size: 28px;
+    max-width: 100%;
   }
 
   .hero-subline {
     justify-content: center;
+    max-width: 100%;
   }
 
   .hero-actions-bar {
     justify-content: center;
   }
 
+  .user-tabs-bar {
+    gap: 8px;
+    margin-bottom: 20px;
+    padding-bottom: 6px;
+    margin-left: -16px;
+    margin-right: -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+    width: calc(100% + 32px);
+    max-width: calc(100% + 32px);
+  }
+
+  .user-tab-btn {
+    height: 38px;
+    padding: 0 14px;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .user-tab-badge {
+    font-size: 10px;
+    padding: 1px 6px;
+  }
+
+  .profile-section {
+    margin-bottom: 28px;
+  }
+
   .overview-grid {
-    grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
     gap: 12px;
+    width: 100%;
+    max-width: 100%;
   }
 
   .feed-card {
@@ -1690,6 +1779,27 @@ onMounted(() => {
 }
 
 @media (max-width: 480px) {
+  .user-profile-view {
+    padding: 14px 14px calc(var(--player-height, 70px) + var(--nav-height, 64px) + 32px);
+  }
+
+  .user-tabs-bar {
+    margin-left: -14px;
+    margin-right: -14px;
+    padding-left: 14px;
+    padding-right: 14px;
+    width: calc(100% + 28px);
+    max-width: calc(100% + 28px);
+    gap: 6px;
+  }
+
+  .user-tab-btn {
+    height: 36px;
+    padding: 0 12px;
+    font-size: 12.5px;
+    gap: 6px;
+  }
+
   .hero-avatar {
     width: 108px;
     height: 108px;
@@ -1701,9 +1811,47 @@ onMounted(() => {
     font-size: 24px;
   }
 
+  .section-title {
+    font-size: 18px;
+  }
+
+  .profile-section {
+    margin-bottom: 22px;
+  }
+
   .overview-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .feed-card {
+    padding: 8px;
+    border-radius: 10px;
+  }
+
+  .feed-card-cover {
+    margin-bottom: 8px;
+    border-radius: 7px;
+  }
+
+  .feed-card-title {
+    font-size: 13px;
+  }
+
+  .feed-card-subtitle {
+    font-size: 11px;
+  }
+
+  .feed-card-skeleton {
+    padding: 8px;
+    border-radius: 10px;
+  }
+
+  .skeleton-feed-cover {
+    margin-bottom: 8px;
+    border-radius: 7px;
   }
 }
 

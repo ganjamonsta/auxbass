@@ -296,17 +296,73 @@ const handleLibraryTabClick = (tabId) => {
   })
 }
 
-// Responsive detection
+// Responsive detection & auto-collapse calculation
 const isDesktop = ref(window.innerWidth >= 1024)
-const updateDesktopState = () => {
-  isDesktop.value = window.innerWidth >= 1024
+
+const checkCenterSpace = () => {
+  const width = window.innerWidth
+  const hasNowPlaying = !!(playerStore.currentTrack && authStore.isAuthenticated)
+  const occupiedSidebars = 280 + (hasNowPlaying ? 320 : 0)
+  const centerSpace = width - occupiedSidebars
+  // Space is tight if center is less than 780px OR screen width < 1200px
+  return centerSpace < 780 || width < 1200
+}
+
+const updateLayoutState = () => {
+  const width = window.innerWidth
+  isDesktop.value = width >= 1024
+
+  if (!isDesktop.value) {
+    uiStore.closeSidebarOverlay()
+    return
+  }
+
+  const isTight = checkCenterSpace()
+  uiStore.isAutoCollapsed = isTight
+
+  // If user hasn't explicitly overridden during session, auto-collapse when tight and expand when spacious
+  if (uiStore.userCollapsedPreference === null) {
+    uiStore.setSidebarCollapsed(isTight)
+  } else {
+    // If it is tight, auto-collapse takes priority to prevent broken UI
+    if (isTight && !uiStore.isSidebarCollapsed) {
+      uiStore.setSidebarCollapsed(true)
+    }
+  }
+}
+
+// Watch track changes to re-evaluate center space when NowPlayingSidebar appears/disappears
+watch(() => playerStore.currentTrack, () => {
+  if (isDesktop.value) {
+    updateLayoutState()
+  }
+})
+
+// Auto-close overlay drawer on route change
+watch(() => route.path, () => {
+  if (uiStore.isSidebarOverlayOpen) {
+    uiStore.closeSidebarOverlay()
+  }
+})
+
+// Keyboard shortcuts: Esc to close overlay, Ctrl+B / Cmd+B to toggle sidebar
+const handleGlobalKeyDown = (e) => {
+  if (e.key === 'Escape' && uiStore.isSidebarOverlayOpen) {
+    uiStore.closeSidebarOverlay()
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b' && isDesktop.value) {
+    e.preventDefault()
+    uiStore.toggleSidebarCollapse()
+  }
 }
 
 // App classes for layout
 const appClasses = computed(() => ({
-  'has-player': playerStore.currentTrack,
+  'has-player': !!playerStore.currentTrack,
   'desktop-layout': isDesktop.value && authStore.isAuthenticated,
-  'has-now-playing': isDesktop.value && playerStore.currentTrack && authStore.isAuthenticated
+  'has-now-playing': isDesktop.value && !!playerStore.currentTrack && authStore.isAuthenticated,
+  'sidebar-collapsed': isDesktop.value && authStore.isAuthenticated && uiStore.isSidebarCollapsed,
+  'sidebar-overlay-open': isDesktop.value && authStore.isAuthenticated && uiStore.isSidebarOverlayOpen
 }))
 
 // Computed property for like state based on libraryStore.likedTracks + currentTrack
@@ -591,8 +647,10 @@ onMounted(async () => {
   // Initialize PWA installation check & banner schedule
   pwaInstall.init()
   
-  // Add resize listener for responsive detection
-  window.addEventListener('resize', updateDesktopState)
+  // Add resize & keyboard listeners for responsive detection and shortcuts
+  window.addEventListener('resize', updateLayoutState)
+  window.addEventListener('keydown', handleGlobalKeyDown)
+  updateLayoutState()
   
   // Listen for auth:logout events from API interceptor
   window.addEventListener('auth:logout', handleAuthLogout)
@@ -646,7 +704,8 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', updateDesktopState)
+  window.removeEventListener('resize', updateLayoutState)
+  window.removeEventListener('keydown', handleGlobalKeyDown)
   window.removeEventListener('auth:logout', handleAuthLogout)
   window.removeEventListener('player:error', handlePlayerError)
   window.removeEventListener('player:stall-recovered', handleStallRecovered)
@@ -703,6 +762,11 @@ html, body {
   width: 100%;
   overflow: hidden;
   position: relative;
+  transition: grid-template-columns 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.app.desktop-layout.sidebar-collapsed {
+  --sidebar-width: var(--sidebar-collapsed-width, 72px);
 }
 
 .app.desktop-layout.has-now-playing {
@@ -751,13 +815,16 @@ html, body {
   flex-direction: column;
   overflow: hidden;
   min-height: 0;
+  min-width: 0;
 }
 
 .main-content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   min-height: 0;
+  min-width: 0;
   position: relative;
 }
 
