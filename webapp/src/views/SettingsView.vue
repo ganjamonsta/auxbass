@@ -75,12 +75,12 @@
         </h2>
         <span class="status-pill sc-status" :class="{ connected: scAccount?.connected }">
           <Check v-if="scAccount?.connected" :size="12" />
-          {{ scAccount?.connected ? 'Подключён' : 'Не привязан' }}
+          {{ loadingScAccount && !scAccount ? 'Проверка...' : (scAccount?.connected ? 'Подключён' : 'Не привязан') }}
         </span>
       </div>
 
       <div class="settings-card sc-card">
-        <div v-if="loadingScAccount" class="service-loading-box">
+        <div v-if="loadingScAccount && !scAccount" class="service-loading-box">
           <div class="spinner small"></div>
           <span>Проверка аккаунта...</span>
         </div>
@@ -185,7 +185,7 @@
         </h2>
         <span class="status-pill sp-status" :class="{ connected: spAccount?.connected }">
           <Check v-if="spAccount?.connected" :size="12" />
-          {{ spAccount?.connected ? 'Подключен' : 'Не подключен' }}
+          {{ loadingSpAccount && !spAccount ? 'Проверка...' : (spAccount?.connected ? 'Подключен' : 'Не подключен') }}
         </span>
       </div>
 
@@ -801,6 +801,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
 import { useTasksStore } from '@/stores/tasks'
+import { useExternalAccountsStore } from '@/stores/externalAccounts'
 import api, { authApi, ingestionApi } from '@/api/client'
 import { 
   Megaphone, Check, Folder, Heart, ListMusic, Cloud, RefreshCw, Lock, 
@@ -818,6 +819,7 @@ const route = useRoute()
 const authStore = useAuthStore()
 const playerStore = usePlayerStore()
 const tasksStore = useTasksStore()
+const externalAccountsStore = useExternalAccountsStore()
 const pwaInstall = usePwaInstall()
 
 const goToMyProfile = () => {
@@ -915,8 +917,8 @@ const privacySettings = ref({
 })
 
 // ─── SoundCloud Integration State ───
-const scAccount = ref(null)
-const loadingScAccount = ref(false)
+const scAccount = computed(() => externalAccountsStore.scAccount)
+const loadingScAccount = computed(() => externalAccountsStore.loadingSc)
 const isConnectingSc = ref(false)
 const isDisconnectingSc = ref(false)
 const scUsernameInput = ref('')
@@ -924,15 +926,11 @@ const scTokenInput = ref('')
 const showTokenField = ref(false)
 const scConnectError = ref('')
 
-const fetchScAccount = async () => {
-  loadingScAccount.value = true
+const fetchScAccount = async (force = false) => {
   try {
-    const res = await ingestionApi.getSoundCloudAccount()
-    scAccount.value = res.data
+    await externalAccountsStore.fetchSoundCloud(force)
   } catch (e) {
     console.error('Failed to fetch SoundCloud account:', e)
-  } finally {
-    loadingScAccount.value = false
   }
 }
 
@@ -942,11 +940,10 @@ const handleConnectSc = async () => {
   isConnectingSc.value = true
   scConnectError.value = ''
   try {
-    const res = await ingestionApi.connectSoundCloudAccount({
+    await externalAccountsStore.connectSoundCloud({
       username_or_url: cleanUser,
       auth_token: scTokenInput.value.trim() || undefined,
     })
-    scAccount.value = res.data
     scUsernameInput.value = ''
     scTokenInput.value = ''
     showTokenField.value = false
@@ -962,8 +959,7 @@ const handleDisconnectSc = async () => {
   if (!confirm('Отвязать аккаунт SoundCloud?')) return
   isDisconnectingSc.value = true
   try {
-    await ingestionApi.disconnectSoundCloudAccount()
-    scAccount.value = { connected: false }
+    await externalAccountsStore.disconnectSoundCloud()
   } catch (e) {
     console.error('Failed to disconnect SoundCloud:', e)
   } finally {
@@ -976,8 +972,8 @@ const goToSoundCloudLikes = () => {
 }
 
 // ─── Spotify Integration State ───
-const spAccount = ref(null)
-const loadingSpAccount = ref(false)
+const spAccount = computed(() => externalAccountsStore.spAccount)
+const loadingSpAccount = computed(() => externalAccountsStore.loadingSp)
 const isConnectingSp = ref(false)
 const isDisconnectingSp = ref(false)
 const spUsernameInput = ref('')
@@ -985,15 +981,11 @@ const spTokenInput = ref('')
 const showSpTokenField = ref(false)
 const spConnectError = ref('')
 
-const fetchSpAccount = async () => {
-  loadingSpAccount.value = true
+const fetchSpAccount = async (force = false) => {
   try {
-    const res = await ingestionApi.getSpotifyAccount()
-    spAccount.value = res.data
+    await externalAccountsStore.fetchSpotify(force)
   } catch (e) {
     console.error('Failed to fetch Spotify account:', e)
-  } finally {
-    loadingSpAccount.value = false
   }
 }
 
@@ -1003,11 +995,10 @@ const handleConnectSp = async () => {
   isConnectingSp.value = true
   spConnectError.value = ''
   try {
-    const res = await ingestionApi.connectSpotifyAccount({
+    await externalAccountsStore.connectSpotify({
       username_or_url: cleanUser,
       auth_token: spTokenInput.value.trim() || undefined,
     })
-    spAccount.value = res.data
     spUsernameInput.value = ''
     spTokenInput.value = ''
     showSpTokenField.value = false
@@ -1023,8 +1014,7 @@ const handleDisconnectSp = async () => {
   if (!confirm('Отвязать аккаунт Spotify?')) return
   isDisconnectingSp.value = true
   try {
-    await ingestionApi.disconnectSpotifyAccount()
-    spAccount.value = { connected: false }
+    await externalAccountsStore.disconnectSpotify()
   } catch (e) {
     console.error('Failed to disconnect Spotify:', e)
   } finally {

@@ -1178,6 +1178,7 @@ import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { useUIStore } from '@/stores/ui'
 import { useTasksStore } from '@/stores/tasks'
+import { useExternalAccountsStore } from '@/stores/externalAccounts'
 import { 
   useContextMenu, 
   useDebouncedSearch, 
@@ -1219,6 +1220,7 @@ const libraryStore = useLibraryStore()
 const playerStore = usePlayerStore()
 const uiStore = useUIStore()
 const tasksStore = useTasksStore()
+const externalAccountsStore = useExternalAccountsStore()
 const { openMenu } = useContextMenu()
 const { handleDirectDownload, handleHdNotice } = useTrackActions()
 
@@ -1280,8 +1282,8 @@ const isLoadingMoreSoundCloud = ref(false)
 const importingTrackUrl = ref(null)
 
 const scSubTab = ref('search') // 'search' | 'likes'
-const scAccount = ref(null)
-const isScAccountLoading = ref(false)
+const scAccount = computed(() => externalAccountsStore.scAccount)
+const isScAccountLoading = computed(() => externalAccountsStore.loadingSc)
 const scLikes = ref([])
 const isScLikesLoading = ref(false)
 const scLikesCursor = ref(null)
@@ -1289,15 +1291,11 @@ const isLoadingMoreScLikes = ref(false)
 const isSyncingAllLikes = ref(false)
 const syncJobProgress = ref(null)
 
-const fetchScAccountForSearch = async () => {
-  isScAccountLoading.value = true
+const fetchScAccountForSearch = async (force = false) => {
   try {
-    const res = await ingestionApi.getSoundCloudAccount()
-    scAccount.value = res.data
+    await externalAccountsStore.fetchSoundCloud(force)
   } catch (e) {
     console.error('Failed to get SC account:', e)
-  } finally {
-    isScAccountLoading.value = false
   }
 }
 
@@ -1312,7 +1310,7 @@ const fetchScLikes = async (reset = true) => {
     scLikes.value = res.data?.items || []
     scLikesCursor.value = res.data?.next_cursor || null
     if (res.data?.account) {
-      scAccount.value = res.data.account
+      externalAccountsStore.setSoundCloudAccount(res.data.account)
     }
   } catch (e) {
     console.error('Failed to fetch SC likes:', e)
@@ -1549,18 +1547,14 @@ const isSpotifySearching = ref(false)
 const isLoadingMoreSpotify = ref(false)
 
 const spSubTab = ref('search') // 'search' | 'exportify'
-const spAccount = ref(null)
-const isSpAccountLoading = ref(false)
+const spAccount = computed(() => externalAccountsStore.spAccount)
+const isSpAccountLoading = computed(() => externalAccountsStore.loadingSp)
 
-const fetchSpAccountForSearch = async () => {
-  isSpAccountLoading.value = true
+const fetchSpAccountForSearch = async (force = false) => {
   try {
-    const res = await ingestionApi.getSpotifyAccount()
-    spAccount.value = res.data
+    await externalAccountsStore.fetchSpotify(force)
   } catch (e) {
     console.error('Failed to get Spotify account:', e)
-  } finally {
-    isSpAccountLoading.value = false
   }
 }
 
@@ -1575,7 +1569,7 @@ const fetchSpLikes = async (reset = true) => {
     spLikes.value = res.data?.items || []
     spLikesCursor.value = res.data?.next_cursor || null
     if (res.data?.account) {
-      spAccount.value = res.data.account
+      externalAccountsStore.setSpotifyAccount(res.data.account)
     }
   } catch (e) {
     console.error('Failed to fetch Spotify likes:', e)
@@ -2242,6 +2236,8 @@ watch(
 
 onActivated(() => {
   applyRouteQuery()
+  fetchScAccountForSearch()
+  fetchSpAccountForSearch()
 })
 
 onUnmounted(() => {

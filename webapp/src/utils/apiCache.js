@@ -49,6 +49,7 @@ class ApiCache {
     if (
       url.includes('/ingestion/jobs') ||
       url.includes('/ingestion/recent') ||
+      url.includes('/ingestion/account') ||
       url.includes('/auth/') ||
       url.includes('/status') ||
       url.includes('/health') ||
@@ -236,6 +237,10 @@ class ApiCache {
           this.invalidatePattern(`/social/user/${id}`)
           this.invalidatePattern(`/playlists/user/${id}`)
         }
+        break
+
+      case 'externalAccount':
+        this.invalidatePattern('/ingestion/account')
         break
     }
   }

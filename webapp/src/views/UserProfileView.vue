@@ -27,177 +27,179 @@
 
     <!-- Normal Profile View -->
     <template v-else>
-      <!-- Compact Spotify-style Profile Hero -->
+      <!-- Modern Spotify / Apple Music Profile Hero Card -->
       <div class="profile-hero-card">
         <div class="hero-ambient-glow" :style="ambientGlowStyle"></div>
 
-        <div class="hero-content">
-          <!-- Avatar -->
-          <div 
-            class="hero-avatar" 
-            :class="{ 'is-clickable': isSelf }"
-            :style="avatarGradientStyle"
-            @click="isSelf && openEditProfileModal()"
-            :title="isSelf ? 'Нажмите, чтобы изменить аватарку' : ''"
-          >
-            <img 
-              v-if="userAvatar" 
-              :src="userAvatar" 
-              alt="Avatar" 
-              class="hero-avatar-img" 
-            />
-            <span v-else>{{ getInitials(user) }}</span>
-            <div v-if="isSelf" class="hero-avatar-edit-overlay">
-              <Camera :size="20" />
-            </div>
-          </div>
-
-          <!-- Meta Info -->
-          <div class="hero-meta">
-            <div class="hero-title-row">
-              <h1 class="hero-name">{{ user.display_name }}</h1>
-              <span v-if="isSelf" class="self-badge">Вы</span>
-            </div>
-            <div v-if="user.username" class="hero-handle">
-              @{{ user.username }}
-              <span v-if="isSelf && user.hide_telegram_id" class="hidden-handle-badge" title="Скрыт от других пользователей">
-                <EyeOff :size="11" /> скрыт
-              </span>
-            </div>
-
-            <!-- Stats Bar -->
-            <div class="hero-stats-row">
-              <button class="hero-stat-pill" @click="activeTab = 'tracks'" title="Смотреть треки">
-                <span class="stat-num">{{ user.track_count }}</span>
-                <span class="stat-label">{{ getTracksWord(user.track_count) }}</span>
-              </button>
-              <span class="stat-separator">•</span>
-              <button class="hero-stat-pill" @click="activeTab = 'playlists'" title="Смотреть плейлисты">
-                <span class="stat-num">{{ user.playlist_count }}</span>
-                <span class="stat-label">{{ getPlaylistsWord(user.playlist_count) }}</span>
-              </button>
-              <span class="stat-separator">•</span>
-              <div 
-                class="hero-stat-pill"
-                :class="{ 'clickable-stat': isSelf }"
-                @click="isSelf && router.push('/friends')"
-                :title="isSelf ? 'Перейти к кентам' : ''"
-              >
-                <span class="stat-num">{{ user.followers_count }}</span>
-                <span class="stat-label">подписчиков</span>
-              </div>
-            </div>
+        <!-- Left: Full-Height Avatar -->
+        <div 
+          class="hero-avatar" 
+          :class="{ 'is-clickable': isSelf }"
+          :style="avatarGradientStyle"
+          @click="isSelf && openEditProfileModal()"
+          :title="isSelf ? 'Нажмите, чтобы изменить аватарку' : ''"
+        >
+          <img 
+            v-if="userAvatar" 
+            :src="userAvatar" 
+            alt="Avatar" 
+            class="hero-avatar-img" 
+          />
+          <span v-else class="hero-avatar-initials">{{ getInitials(user) }}</span>
+          <div v-if="isSelf" class="hero-avatar-edit-overlay">
+            <Camera :size="26" />
+            <span class="edit-avatar-text">Изменить</span>
           </div>
         </div>
 
-        <!-- Action Buttons Bar -->
-        <div class="hero-actions-bar">
-          <!-- Play library button -->
-          <button 
-            v-if="user.track_count > 0"
-            class="hero-play-btn" 
-            @click="handlePlayUserLibrary"
-            title="Слушать медиатеку"
-          >
-            <Play :size="16" fill="currentColor" />
-            <span>Слушать</span>
-          </button>
+        <!-- Right: Info, Nickname, Stats, Actions -->
+        <div class="hero-body">
+          <div class="hero-meta-top">
+            <span class="hero-type-label">ПРОФИЛЬ</span>
+            <span v-if="isSelf" class="self-badge">Вы</span>
+            <span v-if="isSelf && user.hide_telegram_id" class="hidden-handle-badge" title="Скрыт от других пользователей">
+              <EyeOff :size="11" /> скрыт
+            </span>
+          </div>
 
-          <!-- Shuffle button -->
-          <button 
-            v-if="user.track_count > 1"
-            class="hero-icon-btn" 
-            @click="handleShuffleUserLibrary"
-            title="Перемешать медиатеку"
-          >
-            <Shuffle :size="16" />
-          </button>
+          <h1 class="hero-name" :title="user.display_name">{{ user.display_name }}</h1>
 
-          <!-- Follow button -->
-          <button
-            v-if="!isSelf"
-            class="hero-pill-btn follow-btn"
-            :class="{ 'is-following': isFollowing }"
-            :disabled="followLoading"
-            @click="toggleFollow"
-          >
-            <Check v-if="isFollowing" :size="16" />
-            <UserPlus v-else :size="16" />
-            <span>{{ isFollowing ? 'Подписан' : 'Подписаться' }}</span>
-          </button>
+          <div class="hero-subline">
+            <span v-if="user.username" class="hero-handle">@{{ user.username }}</span>
+            <span v-if="user.username" class="stat-separator">•</span>
+            <!-- Stats -->
+            <button class="hero-stat-pill" @click="selectTab('tracks')" title="Смотреть треки">
+              <span class="stat-num">{{ user.track_count }}</span>
+              <span class="stat-label">{{ getTracksWord(user.track_count) }}</span>
+            </button>
+            <span class="stat-separator">•</span>
+            <button class="hero-stat-pill" @click="selectTab('playlists')" title="Смотреть плейлисты">
+              <span class="stat-num">{{ user.playlist_count }}</span>
+              <span class="stat-label">{{ getPlaylistsWord(user.playlist_count) }}</span>
+            </button>
+            <span class="stat-separator">•</span>
+            <div 
+              class="hero-stat-pill"
+              :class="{ 'clickable-stat': isSelf }"
+              @click="isSelf && router.push('/friends')"
+              :title="isSelf ? 'Перейти к кентам' : ''"
+            >
+              <span class="stat-num">{{ user.followers_count }}</span>
+              <span class="stat-label">подписчиков</span>
+            </div>
+          </div>
 
-          <!-- Edit Profile (if self) -->
-          <button
-            v-if="isSelf"
-            class="hero-pill-btn edit-profile-btn"
-            @click="openEditProfileModal"
-            title="Редактировать профиль"
-          >
-            <Edit3 :size="16" />
-            <span>Изменить</span>
-          </button>
+          <!-- Action Buttons Bar -->
+          <div class="hero-actions-bar">
+            <!-- Play library button -->
+            <button 
+              v-if="user.track_count > 0"
+              class="hero-play-btn" 
+              @click="handlePlayUserLibrary"
+              title="Слушать медиатеку"
+            >
+              <Play :size="17" fill="currentColor" />
+              <span>Слушать</span>
+            </button>
 
-          <!-- Settings (if self) -->
-          <button
-            v-if="isSelf"
-            class="hero-pill-btn"
-            @click="router.push('/settings')"
-            title="Настройки аккаунта"
-          >
-            <Settings :size="16" />
-            <span>Настройки</span>
-          </button>
+            <!-- Shuffle button -->
+            <button 
+              v-if="user.track_count > 1"
+              class="hero-icon-btn" 
+              @click="handleShuffleUserLibrary"
+              title="Перемешать медиатеку"
+            >
+              <Shuffle :size="16" />
+            </button>
 
-          <!-- Share button -->
-          <button class="hero-pill-btn share-btn" @click="handleShare" title="Поделиться профилем">
-            <Share2 :size="16" />
-            <span>Поделиться</span>
-          </button>
+            <!-- Follow button -->
+            <button
+              v-if="!isSelf"
+              class="hero-pill-btn follow-btn"
+              :class="{ 'is-following': isFollowing }"
+              :disabled="followLoading"
+              @click="toggleFollow"
+            >
+              <Check v-if="isFollowing" :size="16" />
+              <UserPlus v-else :size="16" />
+              <span>{{ isFollowing ? 'Подписан' : 'Подписаться' }}</span>
+            </button>
+
+            <!-- Edit Profile (if self) -->
+            <button
+              v-if="isSelf"
+              class="hero-pill-btn edit-profile-btn"
+              @click="openEditProfileModal"
+              title="Редактировать профиль"
+            >
+              <Edit3 :size="16" />
+              <span>Изменить</span>
+            </button>
+
+            <!-- Settings (if self) -->
+            <button
+              v-if="isSelf"
+              class="hero-pill-btn"
+              @click="router.push('/settings')"
+              title="Настройки аккаунта"
+            >
+              <Settings :size="16" />
+              <span>Настройки</span>
+            </button>
+
+            <!-- Share button -->
+            <button class="hero-pill-btn share-btn" @click="handleShare" title="Поделиться профилем">
+              <Share2 :size="16" />
+              <span>Поделиться</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      <!-- Tabs -->
-      <div class="neu-tab-bar user-tabs">
+      <!-- Modern Single-Line Tab Bar -->
+      <div class="user-tabs-bar">
         <button
-          class="neu-tab"
+          class="user-tab-btn"
           :class="{ active: activeTab === 'overview' }"
-          @click="activeTab = 'overview'"
+          @click="selectTab('overview')"
         >
-          <Sparkles :size="15" />
-          <span class="neu-tab-content" data-text="Обзор">Обзор</span>
+          <Sparkles :size="16" />
+          <span>Обзор</span>
         </button>
+
         <button
-          class="neu-tab"
+          class="user-tab-btn"
           :class="{ active: activeTab === 'tracks' }"
-          @click="activeTab = 'tracks'"
+          @click="selectTab('tracks')"
         >
-          <Music :size="15" />
-          <span class="neu-tab-content" :data-text="`Треки (${user.track_count})`">
-            Треки <span class="tab-count">{{ user.track_count }}</span>
-          </span>
+          <Music :size="16" />
+          <span>Треки</span>
+          <span v-if="user.track_count > 0" class="user-tab-badge">{{ user.track_count }}</span>
         </button>
+
         <button
-          class="neu-tab"
+          class="user-tab-btn"
           :class="{ active: activeTab === 'playlists' }"
-          @click="activeTab = 'playlists'"
+          @click="selectTab('playlists')"
         >
-          <Folder :size="15" />
-          <span class="neu-tab-content" :data-text="`Плейлисты (${user.playlist_count})`">
-            Плейлисты <span class="tab-count">{{ user.playlist_count }}</span>
-          </span>
+          <Folder :size="16" />
+          <span>Плейлисты</span>
+          <span v-if="user.playlist_count > 0" class="user-tab-badge">{{ user.playlist_count }}</span>
         </button>
+
         <button
           v-if="overviewAlbums.length > 0 || activeTab === 'albums'"
-          class="neu-tab"
+          class="user-tab-btn"
           :class="{ active: activeTab === 'albums' }"
-          @click="activeTab = 'albums'"
+          @click="selectTab('albums')"
         >
-          <Disc3 :size="15" />
-          <span class="neu-tab-content" data-text="Альбомы">Альбомы</span>
+          <Disc3 :size="16" />
+          <span>Альбомы</span>
+          <span v-if="overviewAlbums.length > 0" class="user-tab-badge">{{ overviewAlbums.length }}</span>
         </button>
       </div>
 
-      <!-- Overview Tab Content (Home-like strips for Playlists, Albums, and Top Tracks) -->
+      <!-- Overview Tab Content -->
       <div v-show="activeTab === 'overview'" class="tab-pane overview-pane">
         <!-- Loading overview skeletons -->
         <div v-if="loadingOverview" class="overview-loading">
@@ -205,8 +207,8 @@
             <div class="section-header">
               <div class="skeleton-section-title"></div>
             </div>
-            <div class="horizontal-scroll">
-              <div v-for="i in 4" :key="i" class="feed-card-skeleton">
+            <div class="overview-grid">
+              <div v-for="i in 6" :key="i" class="feed-card-skeleton">
                 <div class="skeleton-feed-cover"></div>
                 <div class="skeleton-feed-title"></div>
                 <div class="skeleton-feed-sub"></div>
@@ -216,15 +218,15 @@
         </div>
 
         <template v-else>
-          <!-- Strip 1: Playlists -->
+          <!-- Section 1: Playlists Grid -->
           <section v-if="overviewPlaylists.length > 0" class="profile-section">
             <div class="section-header">
               <h2 class="section-title">Плейлисты</h2>
-              <button class="section-link" @click="activeTab = 'playlists'">Все {{ user.playlist_count || overviewPlaylists.length }}</button>
+              <button class="section-link" @click="selectTab('playlists')">Все {{ user.playlist_count || overviewPlaylists.length }}</button>
             </div>
-            <div class="horizontal-scroll">
+            <div class="overview-grid">
               <div 
-                v-for="pl in overviewPlaylists.slice(0, 10)" 
+                v-for="pl in overviewPlaylists.slice(0, 12)" 
                 :key="pl.id" 
                 class="feed-card"
                 @click="goToPlaylist(pl)"
@@ -238,7 +240,7 @@
                     alt=""
                     loading="lazy"
                   />
-                  <Folder v-else :size="32" />
+                  <Folder v-else :size="36" />
                   <button 
                     v-if="pl.track_count > 0" 
                     class="play-overlay" 
@@ -248,21 +250,23 @@
                     <Play :size="18" fill="currentColor" />
                   </button>
                 </div>
-                <div class="feed-card-title">{{ pl.name }}</div>
-                <div class="feed-card-subtitle">{{ pl.track_count }} {{ getTracksWord(pl.track_count) }}</div>
+                <div class="feed-card-info">
+                  <div class="feed-card-title">{{ pl.name }}</div>
+                  <div class="feed-card-subtitle">{{ pl.track_count }} {{ getTracksWord(pl.track_count) }}</div>
+                </div>
               </div>
             </div>
           </section>
 
-          <!-- Strip 2: Albums -->
+          <!-- Section 2: Albums Grid -->
           <section v-if="overviewAlbums.length > 0" class="profile-section">
             <div class="section-header">
               <h2 class="section-title">Альбомы</h2>
-              <button class="section-link" @click="activeTab = 'albums'">Все {{ overviewAlbums.length }}</button>
+              <button class="section-link" @click="selectTab('albums')">Все {{ overviewAlbums.length }}</button>
             </div>
-            <div class="horizontal-scroll">
+            <div class="overview-grid">
               <div 
-                v-for="album in overviewAlbums.slice(0, 10)" 
+                v-for="album in overviewAlbums.slice(0, 12)" 
                 :key="album.id" 
                 class="feed-card"
                 @click="goToAlbum(album)"
@@ -276,7 +280,7 @@
                     alt=""
                     loading="lazy"
                   />
-                  <Disc3 v-else :size="32" />
+                  <Disc3 v-else :size="36" />
                   <button 
                     class="play-overlay" 
                     @click.stop="shuffleAlbum(album)"
@@ -285,8 +289,10 @@
                     <Play :size="18" fill="currentColor" />
                   </button>
                 </div>
-                <div class="feed-card-title">{{ album.name || album.title }}</div>
-                <div class="feed-card-subtitle">{{ album.artist || 'Альбом' }}</div>
+                <div class="feed-card-info">
+                  <div class="feed-card-title">{{ album.name || album.title }}</div>
+                  <div class="feed-card-subtitle">{{ album.artist || 'Альбом' }}</div>
+                </div>
               </div>
             </div>
           </section>
@@ -295,7 +301,7 @@
           <section v-if="overviewTracks.length > 0" class="profile-section">
             <div class="section-header">
               <h2 class="section-title">Треки</h2>
-              <button class="section-link" @click="activeTab = 'tracks'">Все {{ user.track_count || overviewTracks.length }}</button>
+              <button class="section-link" @click="selectTab('tracks')">Все {{ user.track_count || overviewTracks.length }}</button>
             </div>
             <div class="profile-tracks-list">
               <TrackItem
@@ -315,7 +321,7 @@
             <button 
               v-if="(user.track_count || overviewTracks.length) > 5" 
               class="profile-view-more-btn"
-              @click="activeTab = 'tracks'"
+              @click="selectTab('tracks')"
             >
               <span>Показать все {{ user.track_count }} треков</span>
               <ChevronRight :size="16" />
@@ -494,7 +500,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePlayerStore } from '@/stores/player'
@@ -570,6 +576,31 @@ const loadingOverview = ref(false)
 const virtualTrackListRef = ref(null)
 const playlistsGridRef = ref(null)
 const albumsGridRef = ref(null)
+
+const selectTab = async (tabKey) => {
+  activeTab.value = tabKey
+  await nextTick()
+  window.dispatchEvent(new Event('resize'))
+  if (tabKey === 'tracks') {
+    virtualTrackListRef.value?.updateScroll?.()
+  } else if (tabKey === 'playlists') {
+    playlistsGridRef.value?.updateScroll?.()
+  } else if (tabKey === 'albums') {
+    albumsGridRef.value?.updateScroll?.()
+  }
+}
+
+watch(activeTab, async (newTab) => {
+  await nextTick()
+  window.dispatchEvent(new Event('resize'))
+  if (newTab === 'tracks') {
+    virtualTrackListRef.value?.updateScroll?.()
+  } else if (newTab === 'playlists') {
+    playlistsGridRef.value?.updateScroll?.()
+  } else if (newTab === 'albums') {
+    albumsGridRef.value?.updateScroll?.()
+  }
+})
 
 const userAvatar = computed(() => {
   if (isSelf.value && authStore.userAvatarUrl) {
@@ -999,10 +1030,11 @@ onMounted(() => {
 
 <style scoped>
 .user-profile-view {
-  padding: 16px;
-  max-width: 1000px;
+  padding: 24px 32px 48px;
+  max-width: 1400px;
   margin: 0 auto;
   min-height: calc(100vh - 120px);
+  width: 100%;
 }
 
 .loading-container {
@@ -1039,16 +1071,19 @@ onMounted(() => {
   max-width: 320px;
 }
 
-/* Profile Hero Card */
+/* Modern Profile Hero Card */
 .profile-hero-card {
   position: relative;
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: 24px;
   background: var(--c-bg-2, #181818);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  padding: 18px 20px;
-  margin-bottom: 20px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 28px 32px;
+  margin-bottom: 28px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  gap: 32px;
 }
 
 .hero-ambient-glow {
@@ -1056,41 +1091,40 @@ onMounted(() => {
   top: -60px;
   left: -40px;
   right: -40px;
-  height: 200px;
+  height: 240px;
   pointer-events: none;
-  opacity: 0.9;
-  filter: blur(20px);
-}
-
-.hero-content {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
-  z-index: 1;
+  opacity: 0.95;
+  filter: blur(28px);
 }
 
 .hero-avatar {
   position: relative;
-  width: 68px;
-  height: 68px;
-  min-width: 68px;
+  width: 176px;
+  height: 176px;
+  min-width: 176px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
-  font-weight: 700;
+  font-size: 56px;
+  font-weight: 800;
   color: #fff;
   flex-shrink: 0;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
-  border: 2px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  border: 3px solid rgba(255, 255, 255, 0.14);
   overflow: hidden;
+  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+  z-index: 1;
 }
 
 .hero-avatar.is-clickable {
   cursor: pointer;
+}
+
+.hero-avatar.is-clickable:hover {
+  transform: scale(1.02);
+  border-color: var(--c-accent, #1db954);
+  box-shadow: 0 12px 36px rgba(29, 185, 84, 0.3);
 }
 
 .hero-avatar-img {
@@ -1100,53 +1134,67 @@ onMounted(() => {
   border-radius: 50%;
 }
 
+.hero-avatar-initials {
+  user-select: none;
+}
+
 .hero-avatar-edit-overlay {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   color: #fff;
   opacity: 0;
   transition: opacity 0.2s ease;
+}
+
+.edit-avatar-text {
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .hero-avatar.is-clickable:hover .hero-avatar-edit-overlay {
   opacity: 1;
 }
 
-.hero-meta {
+.hero-body {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  z-index: 1;
 }
 
-.hero-title-row {
+.hero-meta-top {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.hero-name {
-  font-size: 20px;
+.hero-type-label {
+  font-size: 11px;
   font-weight: 800;
-  color: var(--c-text-1, #fff);
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.12em;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
+  text-transform: uppercase;
 }
 
-.hero-handle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--c-accent, #1db954);
-  font-weight: 500;
-  margin: 2px 0 6px;
+.self-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--r-full, 9999px);
+  background: var(--c-accent, #1db954);
+  color: #000;
 }
 
 .hidden-handle-badge {
@@ -1161,11 +1209,32 @@ onMounted(() => {
   color: var(--c-text-3, rgba(255, 255, 255, 0.5));
 }
 
-.hero-stats-row {
+.hero-name {
+  font-size: 38px;
+  font-weight: 800;
+  color: var(--c-text-1, #fff);
+  margin: 0;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.025em;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+
+.hero-subline {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
+  font-size: 13.5px;
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+}
+
+.hero-handle {
+  font-size: 13.5px;
+  color: var(--c-accent, #1db954);
+  font-weight: 600;
 }
 
 .hero-stat-pill {
@@ -1174,79 +1243,61 @@ onMounted(() => {
   padding: 0;
   display: inline-flex;
   align-items: baseline;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+  gap: 5px;
+  font-size: 13.5px;
+  color: var(--c-text-2, rgba(255, 255, 255, 0.75));
   cursor: pointer;
   transition: color 0.15s ease;
 }
 
-.hero-stat-pill:hover:not(.no-click) {
+.hero-stat-pill:hover {
   color: var(--c-accent, #1db954);
-}
-
-.hero-stat-pill.no-click {
-  cursor: default;
-}
-
-.hero-stat-pill.clickable-stat {
-  cursor: pointer;
 }
 
 .stat-num {
   font-weight: 700;
   color: var(--c-text-1, #fff);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .stat-separator {
-  color: rgba(255, 255, 255, 0.2);
-  font-size: 10px;
-}
-
-.self-badge {
-  display: inline-block;
+  color: rgba(255, 255, 255, 0.25);
   font-size: 11px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: var(--r-full, 9999px);
-  background: var(--c-accent, #1db954);
-  color: #000;
 }
 
 .hero-actions-bar {
-  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  z-index: 1;
+  margin-top: 4px;
 }
 
 .hero-play-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 18px;
+  padding: 10px 22px;
   border-radius: 9999px;
   background: var(--c-accent, #1db954);
   color: #000;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 14px;
   border: none;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 14px rgba(29, 185, 84, 0.4);
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 4px 16px rgba(29, 185, 84, 0.4);
 }
 
 .hero-play-btn:hover {
-  transform: scale(1.03);
+  transform: scale(1.04);
   background: #1ed760;
+  box-shadow: 0 6px 20px rgba(29, 185, 84, 0.5);
 }
 
 .hero-icon-btn {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1259,7 +1310,7 @@ onMounted(() => {
 }
 
 .hero-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.15);
   transform: scale(1.05);
 }
 
@@ -1267,19 +1318,20 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
+  padding: 9px 18px;
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.07);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--c-text-1, #fff);
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .hero-pill-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.14);
+  transform: translateY(-1px);
 }
 
 .hero-pill-btn.follow-btn.is-following {
@@ -1287,33 +1339,88 @@ onMounted(() => {
   color: var(--c-text-2, rgba(255, 255, 255, 0.7));
 }
 
-.user-tabs {
-  margin-bottom: 20px;
+/* Modern Tab Bar */
+.user-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 28px;
+  padding-bottom: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
-.tab-count {
+.user-tabs-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.user-tab-btn {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 20px;
+  border-radius: 9999px;
+  background: var(--c-bg-2, #181818);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.user-tab-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--c-text-1, #fff);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.user-tab-btn.active {
+  background: var(--c-accent, #1db954);
+  color: #000;
+  font-weight: 700;
+  border-color: var(--c-accent, #1db954);
+  box-shadow: 0 4px 16px rgba(29, 185, 84, 0.4);
+}
+
+.user-tab-badge {
   font-size: 11px;
-  opacity: 0.7;
-  margin-left: 2px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  transition: background 0.2s;
+}
+
+.user-tab-btn.active .user-tab-badge {
+  background: rgba(0, 0, 0, 0.18);
+  color: #000;
 }
 
 /* Profile Sections (Overview mode) */
 .profile-section {
-  margin-bottom: 28px;
+  margin-bottom: 36px;
 }
 
 .section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .section-title {
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 800;
   color: var(--c-text-1, #fff);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
 }
 
 .section-link {
@@ -1330,57 +1437,75 @@ onMounted(() => {
   color: var(--c-accent, #1db954);
 }
 
-/* Horizontal Scroll */
-.horizontal-scroll {
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 4px;
+/* Responsive Overview Grid */
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 18px;
 }
 
-.horizontal-scroll::-webkit-scrollbar {
-  display: none;
+@media (min-width: 1200px) {
+  .overview-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 20px;
+  }
 }
 
 /* Feed Cards */
 .feed-card {
-  width: 128px;
-  flex-shrink: 0;
+  width: 100%;
   cursor: pointer;
   display: flex;
   flex-direction: column;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 12px;
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.feed-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.1);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
 }
 
 .feed-card-cover {
-  width: 128px;
-  height: 128px;
-  border-radius: 10px;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.05);
   overflow: hidden;
   position: relative;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
 }
 
 .feed-card-cover img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
+}
+
+.feed-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
 }
 
 .feed-card-title {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--c-text-1, #fff);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 2px;
 }
 
 .feed-card-subtitle {
@@ -1395,8 +1520,8 @@ onMounted(() => {
   position: absolute;
   right: 8px;
   bottom: 8px;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: var(--c-accent, #1db954);
   color: #000;
@@ -1405,40 +1530,40 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
   opacity: 0;
-  transform: translateY(6px);
-  transition: all 0.2s ease;
+  transform: translateY(8px) scale(0.9);
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  z-index: 2;
 }
 
 .feed-card:hover .play-overlay {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateY(0) scale(1);
 }
 
-@media (max-width: 768px) {
-  .play-overlay {
-    opacity: 0.9;
-    transform: translateY(0);
-    width: 32px;
-    height: 32px;
-  }
+.play-overlay:hover {
+  transform: scale(1.08) !important;
+  background: #1ed760;
 }
 
 /* Skeletons */
 .feed-card-skeleton {
-  width: 128px;
-  flex-shrink: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  padding: 12px;
 }
 
 .skeleton-feed-cover {
-  width: 128px;
-  height: 128px;
-  border-radius: 10px;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.05);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -1485,25 +1610,104 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 10px 16px;
+  padding: 12px 16px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 10px;
+  border-radius: 12px;
   color: var(--c-text-2, rgba(255, 255, 255, 0.7));
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-  margin-top: 8px;
+  margin-top: 12px;
 }
 
 .profile-view-more-btn:hover {
   background: rgba(255, 255, 255, 0.08);
   color: var(--c-text-1, #fff);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .tab-pane {
   min-height: 200px;
+}
+
+/* Responsive Mobile / Tablet Breakpoints */
+@media (max-width: 768px) {
+  .user-profile-view {
+    padding: 16px 16px 32px;
+  }
+
+  .profile-hero-card {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 24px 20px;
+    gap: 18px;
+  }
+
+  .hero-avatar {
+    width: 130px;
+    height: 130px;
+    min-width: 130px;
+    font-size: 42px;
+  }
+
+  .hero-body {
+    align-items: center;
+  }
+
+  .hero-meta-top {
+    justify-content: center;
+  }
+
+  .hero-name {
+    font-size: 28px;
+  }
+
+  .hero-subline {
+    justify-content: center;
+  }
+
+  .hero-actions-bar {
+    justify-content: center;
+  }
+
+  .overview-grid {
+    grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));
+    gap: 12px;
+  }
+
+  .feed-card {
+    padding: 10px;
+  }
+
+  .play-overlay {
+    opacity: 0.9;
+    transform: translateY(0);
+    width: 32px;
+    height: 32px;
+    right: 6px;
+    bottom: 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-avatar {
+    width: 108px;
+    height: 108px;
+    min-width: 108px;
+    font-size: 36px;
+  }
+
+  .hero-name {
+    font-size: 24px;
+  }
+
+  .overview-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
 }
 
 .btn-pill-secondary {

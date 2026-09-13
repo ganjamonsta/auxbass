@@ -329,6 +329,7 @@ import {
 import { ingestionApi } from '../api/client'
 import { useRouter } from 'vue-router'
 import { useTasksStore } from '@/stores/tasks'
+import { useExternalAccountsStore } from '@/stores/externalAccounts'
 
 const props = defineProps({
   show: {
@@ -340,6 +341,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'imported'])
 const router = useRouter()
 const tasksStore = useTasksStore()
+const externalAccountsStore = useExternalAccountsStore()
 
 const inputRef = ref(null)
 const urlInput = ref('')
@@ -353,19 +355,12 @@ const selectedUrls = ref(new Set())
 let pollTimer = null
 
 // Connected SoundCloud account shortcut
-const scAccount = ref(null)
+const scAccount = computed(() => externalAccountsStore.scAccount)
 
 const checkScAccount = async () => {
   try {
-    const res = await ingestionApi.getSoundCloudAccount()
-    if (res.data?.connected) {
-      scAccount.value = res.data
-    } else {
-      scAccount.value = null
-    }
-  } catch (_) {
-    scAccount.value = null
-  }
+    await externalAccountsStore.fetchSoundCloud()
+  } catch (_) {}
 }
 
 const handleLoadMyLikes = () => {
