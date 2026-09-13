@@ -858,7 +858,7 @@ async def update_track(
         if new_album:
             try:
                 from bot.services.albums import album_service
-                album_id = await album_service.get_or_create_album(
+                album_id = await album_service.find_or_create_album(
                     album_name=new_album,
                     artist_name=track.artist or "Unknown Artist",
                 )

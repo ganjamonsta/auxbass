@@ -82,7 +82,7 @@ async def test_non_uploader_can_edit_library_track(test_db):
             mock_svc = AsyncMock()
             mock_ch.return_value = mock_svc
             
-            with patch("bot.services.albums.album_service.get_or_create_album", new_callable=AsyncMock) as mock_album:
+            with patch("bot.services.albums.album_service.find_or_create_album", new_callable=AsyncMock) as mock_album:
                 mock_album.return_value = 42
                 with patch("bot.services.albums.album_service.assign_track_to_album", new_callable=AsyncMock) as mock_assign:
                     res = await update_track(
