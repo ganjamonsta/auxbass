@@ -27,6 +27,21 @@ export const useExternalAccountsStore = defineStore('externalAccounts', () => {
   const isSpConnected = computed(() => !!spAccount.value?.connected)
   const hasLastSpotifyImport = computed(() => !!lastSpotifyImport.value && (lastSpotifyImport.value.found !== false) && !!lastSpotifyImport.value.file_id)
 
+  const recentSpotifyImports = computed(() => {
+    if (!lastSpotifyImport.value) return []
+    if (Array.isArray(lastSpotifyImport.value.recent_files) && lastSpotifyImport.value.recent_files.length > 0) {
+      return lastSpotifyImport.value.recent_files.slice(0, 3)
+    }
+    if (lastSpotifyImport.value.file_id) {
+      return [lastSpotifyImport.value]
+    }
+    return []
+  })
+
+  const hasImportSubitems = computed(() => {
+    return isScConnected.value || recentSpotifyImports.value.length > 0
+  })
+
   async function fetchSoundCloud(force = false) {
     if (loadingSc.value && !force) return scAccount.value
     loadingSc.value = true
@@ -168,6 +183,8 @@ export const useExternalAccountsStore = defineStore('externalAccounts', () => {
     isScConnected,
     isSpConnected,
     hasLastSpotifyImport,
+    recentSpotifyImports,
+    hasImportSubitems,
     fetchSoundCloud,
     connectSoundCloud,
     disconnectSoundCloud,

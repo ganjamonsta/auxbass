@@ -87,7 +87,7 @@
 
         <router-link 
           to="/settings#import" 
-          class="rail-nav-item import-rail-item" 
+          class="rail-nav-item" 
           :class="{ active: isImportActive }"
           @click="handleImportClick"
           title="Импорт"
@@ -99,34 +99,23 @@
         <!-- SoundCloud Rail Item -->
         <div 
           v-if="externalAccountsStore.isScConnected"
-          class="rail-nav-item sc-rail-item clickable"
+          class="rail-nav-item clickable"
           :class="{ active: isSoundCloudActive }"
           @click="goToSoundCloud"
           :title="`SoundCloud (@${externalAccountsStore.scAccount?.username || 'me'})`"
         >
-          <div class="sc-rail-avatar-wrap">
-            <img 
-              v-if="externalAccountsStore.scAccount?.avatar_url" 
-              :src="externalAccountsStore.scAccount.avatar_url" 
-              class="sc-rail-avatar" 
-              alt=""
-              referrerpolicy="no-referrer"
-            />
-            <span v-else class="sc-rail-badge">SC</span>
-          </div>
+          <Radio :size="20" />
           <div class="rail-active-indicator"></div>
         </div>
 
         <!-- Spotify Last Import Rail Item -->
         <div 
           v-if="externalAccountsStore.hasLastSpotifyImport"
-          class="rail-nav-item sp-rail-item clickable"
+          class="rail-nav-item clickable"
           @click="openLastSpotifyImport"
-          :title="`Последний импорт Spotify: ${externalAccountsStore.lastSpotifyImport.filename} (${externalAccountsStore.lastSpotifyImport.total_tracks} треков)`"
+          :title="`Импорт Spotify: ${externalAccountsStore.lastSpotifyImport.filename}`"
         >
-          <div class="sp-rail-icon-wrap">
-            <FileSpreadsheet :size="18" />
-          </div>
+          <FileSpreadsheet :size="20" />
           <div class="rail-active-indicator"></div>
         </div>
       </nav>
@@ -319,62 +308,47 @@
           <span v-if="cachedTracksCount > 0" class="nav-count offline-count">{{ cachedTracksCount }}</span>
         </router-link>
 
-        <!-- Import Section link -->
+        <!-- Import Root Item -->
         <router-link 
           to="/settings#import" 
-          class="nav-item import-highlight-item" 
+          class="nav-item" 
           :class="{ active: isImportActive }"
           @click="handleImportClick"
           title="Импорт"
         >
-          <Upload :size="20" class="import-icon" />
+          <Upload :size="20" />
           <span>Импорт</span>
         </router-link>
 
-        <!-- Connected SoundCloud Shortcut -->
-        <div 
-          v-if="externalAccountsStore.isScConnected"
-          class="nav-item sc-sidebar-item clickable"
-          :class="{ active: isSoundCloudActive }"
-          @click="goToSoundCloud"
-          title="Открыть SoundCloud"
-        >
-          <div class="sc-sidebar-icon-wrap">
-            <img 
-              v-if="externalAccountsStore.scAccount?.avatar_url" 
-              :src="externalAccountsStore.scAccount.avatar_url" 
-              class="sc-sidebar-avatar"
-              alt=""
-              referrerpolicy="no-referrer"
-            />
-            <span v-else class="sc-sidebar-badge">SC</span>
-          </div>
-          <div class="sc-sidebar-texts">
-            <span class="sc-sidebar-title">SoundCloud</span>
-            <span class="sc-sidebar-user">@{{ externalAccountsStore.scAccount?.username || 'me' }}</span>
-          </div>
-          <span v-if="externalAccountsStore.scAccount?.likes_count" class="nav-count sc-likes-count" title="Количество лайков">
-            ❤️ {{ formatRailCount(externalAccountsStore.scAccount.likes_count) }}
-          </span>
-        </div>
-
-        <!-- Last Saved Spotify Import File Shortcut -->
-        <div 
-          v-if="externalAccountsStore.hasLastSpotifyImport"
-          class="nav-item sp-sidebar-item clickable"
-          @click="openLastSpotifyImport"
-          :title="`Открыть последний импорт: ${externalAccountsStore.lastSpotifyImport.filename} (${externalAccountsStore.lastSpotifyImport.total_tracks} треков, сохранён в канале)`"
-        >
-          <div class="sp-sidebar-icon-wrap">
-            <FileSpreadsheet :size="16" class="sp-sidebar-icon" />
-          </div>
-          <div class="sp-sidebar-texts">
-            <span class="sp-sidebar-title">{{ externalAccountsStore.lastSpotifyImport.filename }}</span>
-            <span class="sp-sidebar-sub">
-              <Cloud :size="11" /> {{ externalAccountsStore.lastSpotifyImport.total_tracks }} треков
+        <!-- Import Sub-links -->
+        <div v-if="hasImportSubitems" class="sidebar-subnav">
+          <!-- SoundCloud Subitem -->
+          <div 
+            v-if="externalAccountsStore.isScConnected"
+            class="nav-subitem clickable" 
+            :class="{ active: isSoundCloudActive }"
+            @click="goToSoundCloud"
+            :title="`SoundCloud (@${externalAccountsStore.scAccount?.username || 'me'})`"
+          >
+            <Radio :size="15" />
+            <span>SoundCloud</span>
+            <span v-if="externalAccountsStore.scAccount?.likes_count" class="sub-count" title="Количество лайков">
+              {{ formatRailCount(externalAccountsStore.scAccount.likes_count) }}
             </span>
           </div>
-          <span class="nav-count sp-file-badge">CSV</span>
+
+          <!-- Spotify Recent Imports -->
+          <div 
+            v-for="file in externalAccountsStore.recentSpotifyImports" 
+            :key="file.file_id || file.id"
+            class="nav-subitem clickable" 
+            @click="openSpotifyImportFile(file)"
+            :title="`Открыть импорт: ${file.filename} (${file.total_tracks} треков)`"
+          >
+            <FileSpreadsheet :size="15" />
+            <span class="file-name-subitem">{{ formatImportFilename(file.filename) }}</span>
+            <span v-if="file.total_tracks" class="sub-count" title="Количество треков">{{ file.total_tracks }}</span>
+          </div>
         </div>
       </nav>
 
@@ -495,7 +469,8 @@ import {
   Settings, 
   LogOut,
   FileSpreadsheet,
-  Cloud
+  Cloud,
+  Radio
 } from 'lucide-vue-next'
 import { getCacheStats } from '@/utils/audioCacheDb'
 import { useExternalAccountsStore } from '@/stores/externalAccounts'
@@ -648,6 +623,19 @@ const isSoundCloudActive = computed(() => {
 
 const goToSoundCloud = () => {
   router.push({ path: '/search', query: { tab: 'soundcloud', mode: 'likes' } })
+}
+
+const hasImportSubitems = computed(() => {
+  return externalAccountsStore.isScConnected || (externalAccountsStore.recentSpotifyImports && externalAccountsStore.recentSpotifyImports.length > 0)
+})
+
+const formatImportFilename = (name) => {
+  if (!name) return 'Spotify CSV'
+  return name.replace(/\.csv$/i, '').replace(/[_-]/g, ' ')
+}
+
+const openSpotifyImportFile = (file) => {
+  tasksStore.openExportifyModal({ fileId: file.file_id, loadLastSaved: true })
 }
 
 const openLastSpotifyImport = () => {
@@ -1274,200 +1262,11 @@ onUnmounted(() => {
   font-weight: 600;
 }
 
-/* Connected SoundCloud Sidebar Item */
-.sc-sidebar-item {
-  margin-top: 4px;
-  border-radius: 10px;
-  background: rgba(255, 85, 0, 0.06);
-  border: 1px solid rgba(255, 85, 0, 0.16);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  padding: 8px 12px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-}
-
-.sc-sidebar-item:hover {
-  background: rgba(255, 85, 0, 0.12);
-  border-color: rgba(255, 85, 0, 0.35);
-  transform: translateY(-1px);
-}
-
-.sc-sidebar-item.active {
-  background: rgba(255, 85, 0, 0.18);
-  border-color: rgba(255, 85, 0, 0.5);
-  box-shadow: 0 0 12px rgba(255, 85, 0, 0.2);
-}
-
-.sc-sidebar-icon-wrap {
-  width: 24px;
-  height: 24px;
-  border-radius: 7px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  background: rgba(255, 85, 0, 0.2);
-}
-
-.sc-sidebar-avatar {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.sc-sidebar-badge {
-  font-size: 10px;
-  font-weight: 800;
-  background: #ff5500;
-  color: #fff;
-  padding: 1px 4px;
-  border-radius: 4px;
-}
-
-.sc-sidebar-texts {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1;
-}
-
-.sc-sidebar-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #fff;
-  white-space: nowrap;
+.file-name-subitem {
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.sc-sidebar-user {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sc-likes-count {
-  background: rgba(255, 85, 0, 0.18);
-  color: #ff884d;
-  font-weight: 600;
-  font-size: 11px;
-}
-
-/* Last Saved Spotify Import Item */
-.sp-sidebar-item {
-  margin-top: 4px;
-  border-radius: 10px;
-  background: rgba(29, 185, 84, 0.06);
-  border: 1px solid rgba(29, 185, 84, 0.18);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  padding: 8px 12px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-}
-
-.sp-sidebar-item:hover {
-  background: rgba(29, 185, 84, 0.12);
-  border-color: rgba(29, 185, 84, 0.35);
-  transform: translateY(-1px);
-}
-
-.sp-sidebar-icon-wrap {
-  width: 24px;
-  height: 24px;
-  border-radius: 7px;
-  background: rgba(29, 185, 84, 0.16);
-  color: var(--c-accent, #1db954);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.sp-sidebar-texts {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1;
-}
-
-.sp-sidebar-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #fff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sp-sidebar-sub {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.sp-file-badge {
-  background: rgba(29, 185, 84, 0.16);
-  color: var(--c-accent, #1db954);
-  font-weight: 700;
-  font-size: 10px;
-  letter-spacing: 0.05em;
-}
-
-/* Rail mode styling for shortcuts */
-.sc-rail-item, .sp-rail-item {
-  position: relative;
-}
-
-.sc-rail-avatar-wrap {
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 85, 0, 0.15);
-}
-
-.sc-rail-avatar {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.sc-rail-badge {
-  font-size: 9px;
-  font-weight: 800;
-  background: #ff5500;
-  color: #fff;
-  padding: 1px 3px;
-  border-radius: 3px;
-}
-
-.sc-rail-item.active .sc-rail-avatar-wrap,
-.sc-rail-item:hover .sc-rail-avatar-wrap {
-  box-shadow: 0 0 10px rgba(255, 85, 0, 0.7);
-}
-
-.sp-rail-icon-wrap {
-  color: var(--c-accent, #1db954);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.sp-rail-item:hover .sp-rail-icon-wrap {
-  color: #22e366;
-  filter: drop-shadow(0 0 6px rgba(29, 185, 84, 0.6));
+  max-width: 125px;
 }
 
 .nav-item svg {

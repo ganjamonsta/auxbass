@@ -545,13 +545,15 @@ const processFile = async (file) => {
   }
 }
 
-const loadLastSavedImport = async () => {
+const loadLastSavedImport = async (fileId = null) => {
   isParsing.value = true
   loadingSavedFile.value = true
   parseError.value = null
 
+  const targetFileId = fileId || tasksStore.exportifyModalOptions?.fileId || null
+
   try {
-    const res = await ingestionApi.previewLastSpotifyImport()
+    const res = await ingestionApi.previewLastSpotifyImport(targetFileId ? { file_id: targetFileId } : undefined)
     previewData.value = res.data
 
     const cleanName = (res.data.filename || 'Spotify Playlist').replace(/\.csv$/i, '').replace(/[_-]/g, ' ')
@@ -779,7 +781,7 @@ watch(
           startPollingJob(activeJob.value.id)
         }
       } else if (tasksStore.exportifyModalOptions?.loadLastSaved) {
-        loadLastSavedImport()
+        loadLastSavedImport(tasksStore.exportifyModalOptions?.fileId)
       } else {
         externalAccountsStore.fetchLastSpotifyImport()
       }

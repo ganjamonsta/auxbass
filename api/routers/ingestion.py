@@ -1488,15 +1488,18 @@ async def get_last_spotify_import(
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get metadata for the last saved Spotify import file in Telegram."""
-    import_file = await db.scalar(
+    """Get metadata for the last saved Spotify import file(s) in Telegram."""
+    recent_q = (
         select(UserImportFile)
         .where(UserImportFile.user_id == user.id, UserImportFile.provider == "spotify")
         .order_by(UserImportFile.id.desc())
-        .limit(1)
+        .limit(3)
     )
-    if not import_file:
-        return {"found": False}
+    all_recent = (await db.scalars(recent_q)).all()
+    if not all_recent:
+        return {"found": False, "recent_files": []}
+
+    import_file = all_recent[0]
 
     summary = {}
     if import_file.summary_json:
@@ -1517,21 +1520,36 @@ async def get_last_spotify_import(
         "message_id": import_file.message_id,
         "created_at": import_file.created_at.isoformat() if import_file.created_at else None,
         "summary": summary,
+        "recent_files": [
+            {
+                "id": f.id,
+                "filename": f.filename,
+                "file_id": f.file_id,
+                "file_size": f.file_size,
+                "total_tracks": f.total_tracks,
+                "created_at": f.created_at.isoformat() if f.created_at else None,
+            }
+            for f in all_recent
+        ],
     }
 
 
 @router.get("/spotify/last-import/preview", response_model=ExportifyPreviewResponse)
 async def preview_last_spotify_import(
+    file_id: Optional[str] = Query(None),
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Download last saved Spotify CSV from Telegram and return fresh track preview."""
-    import_file = await db.scalar(
+    """Download saved Spotify CSV from Telegram and return fresh track preview."""
+    q = (
         select(UserImportFile)
         .where(UserImportFile.user_id == user.id, UserImportFile.provider == "spotify")
-        .order_by(UserImportFile.id.desc())
-        .limit(1)
     )
+    if file_id:
+        q = q.where(UserImportFile.file_id == file_id)
+    q = q.order_by(UserImportFile.id.desc()).limit(1)
+
+    import_file = await db.scalar(q)
     if not import_file:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Сохранённый файл импорта не найден.")
 

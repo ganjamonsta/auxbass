@@ -754,22 +754,22 @@
           <div class="setting-info">
             <div class="app-version-header">
               <span class="setting-name">Версия и кэш</span>
-              <span class="version-badge">v{{ appUpdate.clientVersion }}</span>
+              <span class="version-badge">v{{ clientVersion }}</span>
             </div>
             <span class="setting-desc">
-              Сборка: <code class="build-code">{{ appUpdate.clientBuildId ? appUpdate.clientBuildId.substring(0, 16) : 'актуальная' }}</code>
-              <span v-if="appUpdate.updateAvailable" class="update-pending-tag"> • Доступно обновление!</span>
+              Сборка: <code class="build-code">{{ clientBuildIdShort }}</code>
+              <span v-if="updateAvailable" class="update-pending-tag"> • Доступно обновление!</span>
             </span>
           </div>
           <button 
             class="action-btn secondary update-action-btn"
-            :class="{ 'highlight': appUpdate.updateAvailable }"
-            :disabled="appUpdate.isUpdating"
+            :class="{ 'highlight': updateAvailable }"
+            :disabled="isUpdating"
             @click="handleForceUpdate"
             title="Очистить кэш браузера и перезагрузить свежий интерфейс"
           >
-            <RefreshCw :size="14" :class="{ 'spin-anim': appUpdate.isUpdating }" />
-            <span>{{ appUpdate.isUpdating ? 'Обновление…' : (appUpdate.updateAvailable ? 'Обновить' : 'Сбросить кэш') }}</span>
+            <RefreshCw :size="14" :class="{ 'spin-anim': isUpdating }" />
+            <span>{{ isUpdating ? 'Обновление…' : (updateAvailable ? 'Обновить' : 'Сбросить кэш') }}</span>
           </button>
         </div>
       </div>
@@ -911,11 +911,22 @@ const playerStore = usePlayerStore()
 const tasksStore = useTasksStore()
 const externalAccountsStore = useExternalAccountsStore()
 const pwaInstall = usePwaInstall()
-const appUpdate = useAppUpdate()
+const {
+  clientBuildId,
+  clientVersion,
+  updateAvailable,
+  isUpdating,
+  forceAppRefresh,
+} = useAppUpdate()
 const uiStore = useUIStore()
 
+const clientBuildIdShort = computed(() => {
+  const id = clientBuildId?.value
+  return typeof id === 'string' && id ? id.substring(0, 16) : 'актуальная'
+})
+
 const handleForceUpdate = async () => {
-  await appUpdate.forceAppRefresh()
+  await forceAppRefresh()
 }
 
 const goToMyProfile = () => {
