@@ -164,8 +164,15 @@
     <!-- 12. About Section -->
     <section id="about" class="settings-section about-section">
       <div class="settings-card about-card">
-        <h3 class="about-title">{{ authStore.appName }} <span class="about-ver">v2.0</span></h3>
+        <h3 class="about-title">{{ authStore.appName }} <span class="about-ver">v{{ clientVersion }}</span></h3>
         <p class="about-desc">Музыкальный плеер с хранением и стримингом в Telegram</p>
+        
+        <a href="https://t.me/auxsystem" target="_blank" rel="noopener noreferrer" class="about-tg-link">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.19-.08-.05-.19-.02-.27 0-.11.03-1.9 1.21-5.36 3.55-.51.35-.97.52-1.38.51-.45-.01-1.31-.25-1.95-.46-.78-.26-1.4-.4-1.35-.85.03-.23.32-.47.88-.71 3.44-1.5 5.73-2.49 6.87-2.96 3.26-1.34 3.94-1.58 4.38-1.59.1 0 .31.02.45.13.12.1.15.24.16.35.01.03.01.12 0 .22z"/>
+          </svg>
+          <span>Новости и обновления</span>
+        </a>
       </div>
     </section>
   </div>
@@ -181,10 +188,12 @@ import api from '@/api/client'
 import { getCacheStats, getCachedAudioStats } from '@/utils/audioCacheDb'
 import { clearAudioCache } from '@/stores/playerCache'
 import { formatDurationLong as formatDuration } from '@/utils'
+import { useAppUpdate } from '@/composables/useAppUpdate'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const playerStore = usePlayerStore()
+const { clientVersion } = useAppUpdate()
 
 const STATS_STORAGE_KEY = 'tg_player_library_stats'
 
@@ -702,7 +711,27 @@ input:checked + .toggle-slider:before {
 .about-desc {
   font-size: 12px;
   color: var(--c-text-3);
-  margin: 4px 0 0 0;
+  margin: 4px 0 16px 0;
+}
+
+.about-tg-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(42, 171, 238, 0.1);
+  color: #2aabee;
+  padding: 8px 16px;
+  border-radius: var(--r-full, 9999px);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid rgba(42, 171, 238, 0.25);
+  transition: all 0.2s;
+}
+
+.about-tg-link:hover {
+  background: rgba(42, 171, 238, 0.2);
 }
 
 @media (max-width: 540px) {
