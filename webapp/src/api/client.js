@@ -332,6 +332,7 @@ export const socialApi = {
   getUserLibrary: (userId, params = {}) => api.get(`/social/user/${userId}/library`, { params }),
   getUserAlbums: (userId, params = {}) => api.get(`/social/user/${userId}/albums`, { params }),
   getUser: (userId, params = {}, options = {}) => api.get(`/social/user/${userId}`, { params, ...options }),
+  getFeed: (scope = 'following', page = 1, perPage = 30) => api.get('/social/feed', { params: { scope, page, per_page: perPage } }),
 }
 
 // Ingestion (External imports from SoundCloud, Spotify, etc.)

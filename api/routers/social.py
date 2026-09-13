@@ -9,7 +9,7 @@ from datetime import datetime
 
 import aiohttp
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
-from sqlalchemy import select, func, delete, or_
+from sqlalchemy import select, func, delete, or_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel
@@ -439,6 +439,106 @@ async def search_friends_libraries(
         "total": total,
         "page": page,
         "per_page": per_page,
+    }
+
+
+# ============== Updates Feed (Social & Global) ==============
+@router.get("/feed")
+async def get_social_feed(
+    scope: str = Query("following", pattern="^(following|global)$"),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(30, ge=1, le=100),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get recent track upload feed.
+    scope='following': uploads from users current user follows.
+    scope='global': all public uploads across the platform.
+    """
+    base_track_filter = [
+        Track.is_public == True,
+        Track.is_unavailable == False,
+        func.coalesce(User.hide_profile, False) == False,
+    ]
+    
+    if scope == "following":
+        following_result = await db.execute(
+            select(UserFollow.following_id)
+            .where(UserFollow.follower_id == user.id)
+        )
+        following_ids = [row[0] for row in following_result.all()]
+        if not following_ids:
+            return {
+                "items": [],
+                "total": 0,
+                "page": page,
+                "per_page": per_page,
+                "has_more": False,
+            }
+        base_track_filter.append(Track.uploader_id.in_(following_ids))
+    
+    # Total count
+    count_query = (
+        select(func.count(Track.id))
+        .join(User, User.id == Track.uploader_id)
+        .where(*base_track_filter)
+    )
+    total = await db.scalar(count_query) or 0
+    
+    offset = (page - 1) * per_page
+    query = (
+        select(Track, User)
+        .join(User, User.id == Track.uploader_id)
+        .where(*base_track_filter)
+        .options(
+            selectinload(Track.enrichment),
+            selectinload(Track.track_tags),
+            selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
+        )
+        .order_by(desc(Track.created_at))
+        .offset(offset)
+        .limit(per_page)
+    )
+    result = await db.execute(query)
+    rows = result.unique().all()
+    
+    # Batch query viewer's library entries for all tracks in this page
+    track_ids = [track.id for track, uploader in rows]
+    viewer_entries_map = {}
+    if track_ids:
+        viewer_entries_result = await db.execute(
+            select(UserLibrary)
+            .where(UserLibrary.user_id == user.id, UserLibrary.track_id.in_(track_ids))
+        )
+        for entry in viewer_entries_result.scalars().all():
+            viewer_entries_map[entry.track_id] = entry
+            
+    items = []
+    for track, uploader in rows:
+        viewer_entry = viewer_entries_map.get(track.id)
+        track_resp = track_to_response(track, viewer_entry)
+        track_dict = track_resp.model_dump() if hasattr(track_resp, 'model_dump') else track_resp.dict()
+        
+        owner_show_tg = (user.id == uploader.id or not getattr(uploader, 'hide_telegram_id', False))
+        avatar = getattr(uploader, 'custom_avatar_url', None) or getattr(uploader, 'photo_url', None)
+        track_dict['uploader'] = {
+            'id': uploader.id,
+            'display_name': uploader.display_name,
+            'avatar_url': avatar,
+            'username': uploader.username if owner_show_tg else None,
+        }
+        track_dict['created_at'] = track.created_at.isoformat() if track.created_at else None
+        track_dict['action_type'] = 'upload'
+        items.append(track_dict)
+        
+    has_more = (offset + len(items)) < total
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "has_more": has_more,
     }
 
 

@@ -97,6 +97,54 @@ export function formatRelativeDate(date) {
 }
 
 /**
+ * Format timestamp for activity feed
+ * @param {string|Date} date - Date to format
+ * @returns {string} Human-friendly relative timestamp
+ */
+export function formatFeedTimestamp(date) {
+  if (!date) return ''
+  
+  const rawStr = typeof date === 'string' && !date.endsWith('Z') && !date.includes('+')
+    ? date + 'Z' 
+    : date
+  const d = new Date(rawStr)
+  if (isNaN(d.getTime())) return ''
+  
+  const now = new Date()
+  const diffMs = now - d
+  const diffSeconds = Math.floor(diffMs / 1000)
+  const diffMinutes = Math.floor(diffSeconds / 60)
+  const diffHours = Math.floor(diffMinutes / 60)
+  const diffDays = Math.floor(diffHours / 24)
+  
+  if (diffSeconds < 60) {
+    return 'Только что'
+  }
+  if (diffMinutes < 60) {
+    return `${diffMinutes} мин. назад`
+  }
+  if (diffHours < 24) {
+    return `${diffHours} ч. назад`
+  }
+  
+  const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  if (diffDays === 1) {
+    return `Вчера в ${timeStr}`
+  }
+  if (diffDays < 7) {
+    return `${diffDays} дн. назад`
+  }
+  
+  const isSameYear = d.getFullYear() === now.getFullYear()
+  const dateStr = d.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'short',
+    ...(isSameYear ? {} : { year: 'numeric' })
+  })
+  return `${dateStr} в ${timeStr}`
+}
+
+/**
  * Truncate text with ellipsis
  * @param {string} text - Text to truncate
  * @param {number} maxLength - Maximum length
