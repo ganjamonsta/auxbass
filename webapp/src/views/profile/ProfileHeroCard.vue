@@ -374,13 +374,13 @@ const getSpotifyUrl = (acc) => {
   border-radius: var(--r-xl, 24px);
   background: var(--c-bg-2, #181818);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 24px 28px;
+  padding: 0 28px 0 0;
   margin-bottom: 24px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: space-between;
-  gap: 24px;
+  gap: 28px;
 }
 
 /* Ambient glow */
@@ -478,25 +478,27 @@ const getSpotifyUrl = (acc) => {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   1. LEFT COLUMN: Monolithic Unified Control Unit
+   1. LEFT COLUMN: Monolithic Unified Control Unit (Stretched to Edges)
    ═══════════════════════════════════════════════════════════ */
 .hero-monolith-tabs {
   position: relative;
   z-index: 2;
-  width: 215px;
+  width: 220px;
   flex-shrink: 0;
+  align-self: stretch;
   display: flex;
   flex-direction: column;
-  background: rgba(13, 13, 17, 0.76);
+  justify-content: center;
+  background: rgba(12, 12, 16, 0.74);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border-radius: var(--r-lg, 16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 5px;
-  gap: 3px;
+  border-radius: var(--r-xl, 24px) 0 0 var(--r-xl, 24px);
+  border: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 16px 12px;
+  gap: 6px;
   box-shadow: 
-    5px 5px 14px var(--sh-dark, rgba(0, 0, 0, 0.55)),
-    -2px -2px 6px var(--sh-light, rgba(255, 255, 255, 0.03)),
+    4px 0 16px rgba(0, 0, 0, 0.35),
     inset 1px 1px 2px rgba(255, 255, 255, 0.04);
 }
 
@@ -504,9 +506,9 @@ const getSpotifyUrl = (acc) => {
   display: flex;
   align-items: center;
   width: 100%;
-  height: 38px;
-  padding: 0 12px 0 10px;
-  border-radius: var(--r-md, 11px);
+  height: 40px;
+  padding: 0 14px 0 12px;
+  border-radius: var(--r-md, 12px);
   background: transparent;
   border: 1px solid transparent;
   color: var(--c-text-2, #b0b0b0);
@@ -623,6 +625,7 @@ const getSpotifyUrl = (acc) => {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  padding: 24px 0;
   gap: 10px;
 }
 
@@ -842,6 +845,8 @@ const getSpotifyUrl = (acc) => {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-self: center;
+  margin: 20px 0;
   background: rgba(18, 18, 22, 0.6);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -1046,22 +1051,27 @@ const getSpotifyUrl = (acc) => {
 @media (max-width: 860px) {
   .profile-hero-card {
     display: grid;
-    grid-template-columns: 46px 1fr;
+    grid-template-columns: 48px 1fr;
     grid-template-areas:
       "tabs body"
       "details details";
     gap: 16px 12px;
-    padding: 16px 14px 14px;
-    align-items: start;
+    padding: 0 14px 14px 0;
+    align-items: stretch;
   }
 
   .hero-monolith-tabs {
     grid-area: tabs;
-    width: 46px;
-    flex-direction: column;
-    padding: 3px;
-    gap: 3px;
-    border-radius: var(--r-md, 12px);
+    width: 48px;
+    height: 100%;
+    align-self: stretch;
+    border-radius: 23px 0 0 0;
+    border: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 14px 3px 10px;
+    gap: 4px;
+    justify-content: flex-start;
   }
 
   .monolith-tab-btn {
@@ -1089,7 +1099,7 @@ const getSpotifyUrl = (acc) => {
     min-width: 0;
     align-items: flex-start;
     text-align: left;
-    padding-right: 38px; /* space for share corner button */
+    padding: 14px 38px 0 0;
     gap: 8px;
   }
 
@@ -1106,6 +1116,8 @@ const getSpotifyUrl = (acc) => {
   .hero-tab-details-panel {
     grid-area: details;
     width: 100%;
+    margin: 0;
+    padding-left: 14px;
   }
 
   .hero-share-corner-btn {
@@ -1122,15 +1134,15 @@ const getSpotifyUrl = (acc) => {
 
 @media (max-width: 480px) {
   .profile-hero-card {
-    padding: 14px 12px 12px;
-    gap: 14px 10px;
-    grid-template-columns: 42px 1fr;
+    padding: 0 12px 12px 0;
+    gap: 12px 10px;
+    grid-template-columns: 44px 1fr;
   }
 
   .hero-monolith-tabs {
-    width: 42px;
-    padding: 2px;
-    gap: 2px;
+    width: 44px;
+    padding: 12px 3px 8px;
+    gap: 3px;
   }
 
   .monolith-tab-btn {
