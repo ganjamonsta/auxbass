@@ -51,32 +51,50 @@ async def run_server(host: str, port: int):
 
 
 async def run_bot():
-    """Запуск Telegram бота"""
+    """Запуск Telegram бота с авто-перезапуском при сетевых сбоях"""
     settings = get_settings()
     
-    bot = Bot(
-        token=settings.bot_token,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML)
-    )
+    # Изначально бот ещё не в сети
+    fastapi_app.state.bot_online = False
     
-    init_channel_service(bot)
-    await start_channel_service()
-    
-    storage = MemoryStorage()
-    dp = Dispatcher(storage=storage)
-    
-    dp.include_router(menu_router)
-    dp.include_router(inline_router)
-    dp.include_router(ingestion_router)
-    dp.include_router(audio_router)
-    dp.include_router(download_router)
-    dp.include_router(channel_pins_router)
-    
-    logger.info("🤖 Telegram Bot запускается (long polling)...")
-    try:
-        await dp.start_polling(bot)
-    finally:
-        await bot.session.close()
+    while True:
+        bot = None
+        try:
+            bot = Bot(
+                token=settings.bot_token,
+                default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+            )
+            
+            init_channel_service(bot)
+            await start_channel_service()
+            
+            storage = MemoryStorage()
+            dp = Dispatcher(storage=storage)
+            
+            dp.include_router(menu_router)
+            dp.include_router(inline_router)
+            dp.include_router(ingestion_router)
+            dp.include_router(audio_router)
+            dp.include_router(download_router)
+            dp.include_router(channel_pins_router)
+            
+            logger.info("🤖 Telegram Bot запускается (long polling)...")
+            fastapi_app.state.bot_online = True
+            await dp.start_polling(bot)
+        except asyncio.CancelledError:
+            logger.info("🤖 Остановка Telegram Bot...")
+            break
+        except Exception as e:
+            fastapi_app.state.bot_online = False
+            logger.error(f"⚠️ Ошибка в Telegram Bot: {e}. Перезапуск через 5 сек...")
+            await asyncio.sleep(5)
+        finally:
+            fastapi_app.state.bot_online = False
+            if bot:
+                try:
+                    await bot.session.close()
+                except Exception:
+                    pass
 
 
 async def main():
@@ -93,34 +111,34 @@ async def main():
     logger.info(f"База данных: {settings.database_url}")
     logger.info(f"Порт: {port}")
     
+    # Инициализация состояния приложения
+    fastapi_app.state.bot_online = False
+    
     # Инициализация БД и фоновых воркеров
     await init_db()
     
     logger.info("Запуск enrichment worker...")
     await enrichment_worker.start(idle_interval=60, busy_interval=5)
     
-    # Запускаем задачи одновременно
+    # Запускаем задачи: веб-сервер и бот
     server_task = asyncio.create_task(run_server(host, port))
     bot_task = asyncio.create_task(run_bot())
     
-    tasks = [server_task, bot_task]
-    
     try:
-        # Ожидаем завершения или ошибки в любой из задач
-        done, pending = await asyncio.wait(
-            tasks,
-            return_when=asyncio.FIRST_EXCEPTION
-        )
-        for task in done:
-            if task.exception():
-                logger.error(f"Задача упала с ошибкой: {task.exception()}")
+        # Сервер определяет время жизни контейнера
+        await server_task
     except (KeyboardInterrupt, asyncio.CancelledError):
         logger.info("Получен сигнал завершения...")
     finally:
         logger.info("Остановка сервисов...")
-        for task in tasks:
-            if not task.done():
-                task.cancel()
+        if not bot_task.done():
+            bot_task.cancel()
+            try:
+                await bot_task
+            except asyncio.CancelledError:
+                pass
+        if not server_task.done():
+            server_task.cancel()
         await stop_channel_service()
         await enrichment_worker.stop()
         await close_db()

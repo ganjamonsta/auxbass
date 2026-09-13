@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AUX Player — Ведутся технические работы</title>
+  <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: #0c0c0e;
+      color: #ffffff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Ambient background glow */
+    .bg-glow-1 {
+      position: fixed;
+      top: -100px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 500px;
+      height: 350px;
+      background: radial-gradient(circle, rgba(29, 185, 84, 0.15) 0%, rgba(12, 12, 14, 0) 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .bg-glow-2 {
+      position: fixed;
+      bottom: -150px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(245, 158, 11, 0.1) 0%, rgba(12, 12, 14, 0) 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .card {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 440px;
+      background: linear-gradient(180deg, rgba(28, 28, 32, 0.95) 0%, rgba(18, 18, 22, 0.98) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 24px;
+      padding: 36px 24px 28px;
+      text-align: center;
+      box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.8),
+                  0 0 0 1px rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    /* Pulse Icon */
+    .icon-wrapper {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 22px;
+    }
+
+    .pulse-ring {
+      position: absolute;
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(245, 158, 11, 0.28) 0%, rgba(245, 158, 11, 0) 70%);
+      animation: pulse 2.4s infinite ease-out;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.7); opacity: 0.8; }
+      50% { transform: scale(1.25); opacity: 0.3; }
+      100% { transform: scale(0.7); opacity: 0.8; }
+    }
+
+    .icon-badge {
+      width: 68px;
+      height: 68px;
+      border-radius: 22px;
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(217, 119, 6, 0.12));
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      color: #fbbf24;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      z-index: 2;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .gear-spin {
+      animation: spin 12s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    /* Status Pill */
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: 5px 14px;
+      border-radius: 9999px;
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      margin-bottom: 14px;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #fbbf24;
+      box-shadow: 0 0 8px #fbbf24;
+      animation: blink 1.6s infinite ease-in-out;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 1; }
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 10px;
+      letter-spacing: -0.4px;
+    }
+
+    p.subtitle {
+      font-size: 13.5px;
+      line-height: 1.55;
+      color: rgba(255, 255, 255, 0.68);
+      margin-bottom: 24px;
+    }
+
+    /* Auto-reconnect progress */
+    .timer-box {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 14px;
+      padding: 12px 16px;
+      margin-bottom: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .timer-track {
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .timer-fill {
+      width: 0%;
+      height: 100%;
+      background: #1db954;
+      transition: width 0.4s linear;
+    }
+
+    .timer-info {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.6);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .timer-info strong {
+      color: #fff;
+    }
+
+    /* Actions */
+    .btn-retry {
+      width: 100%;
+      height: 44px;
+      border-radius: 12px;
+      background: #1db954;
+      color: #000000;
+      font-size: 14px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 16px rgba(29, 185, 84, 0.3);
+    }
+
+    .btn-retry:hover {
+      background: #1ed760;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(29, 185, 84, 0.45);
+    }
+
+    .btn-retry:active {
+      transform: translateY(0);
+    }
+
+    .btn-retry:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .footer-note {
+      margin-top: 20px;
+      font-size: 11.5px;
+      color: rgba(255, 255, 255, 0.4);
+      line-height: 1.4;
+    }
+
+    .footer-note a {
+      color: #1db954;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .footer-note a:hover {
+      text-decoration: underline;
+    }
+
+    .spin {
+      animation: spin 0.8s linear infinite;
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-glow-1"></div>
+  <div class="bg-glow-2"></div>
+
+  <main class="card">
+    <!-- Icon -->
+    <div class="icon-wrapper">
+      <div class="pulse-ring"></div>
+      <div class="icon-badge">
+        <svg class="gear-spin" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+        </svg>
+      </div>
+    </div>
+
+    <!-- Status badge -->
+    <div class="status-pill">
+      <span class="status-dot"></span>
+      <span>Технические работы</span>
+    </div>
+
+    <!-- Title & Description -->
+    <h1>AUX Player оффлайн</h1>
+    <p class="subtitle">
+      Сервер обновляется или находится на плановом обслуживании.<br>
+      Страница откроет плеер сразу же, как только контейнер запустится.
+    </p>
+
+    <!-- Timer / Progress -->
+    <div class="timer-box">
+      <div class="timer-track">
+        <div id="timerFill" class="timer-fill"></div>
+      </div>
+      <div class="timer-info">
+        <span>Проверка доступности:</span>
+        <span>через <strong id="countdownSec">5</strong> сек</span>
+      </div>
+    </div>
+
+    <!-- Retry button -->
+    <button id="retryBtn" class="btn-retry" onclick="manualCheck()">
+      <svg id="retryIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+      </svg>
+      <span id="retryText">Проверить сейчас</span>
+    </button>
+
+    <div class="footer-note">
+      Музыкальная коллекция в полной безопасности.<br>
+      Новости и статус: <a href="https://t.me/ganjacraft" target="_blank" rel="noopener">Telegram @ganjacraft</a>
+    </div>
+  </main>
+
+  <script>
+    const CHECK_INTERVAL = 5;
+    let secondsLeft = CHECK_INTERVAL;
+    let isChecking = false;
+
+    const timerFill = document.getElementById('timerFill');
+    const countdownSec = document.getElementById('countdownSec');
+    const retryBtn = document.getElementById('retryBtn');
+    const retryIcon = document.getElementById('retryIcon');
+    const retryText = document.getElementById('retryText');
+
+    async function checkServer() {
+      if (isChecking) return;
+      isChecking = true;
+      retryBtn.disabled = true;
+      retryIcon.classList.add('spin');
+      retryText.textContent = 'Проверка...';
+
+      try {
+        // Ping health or root
+        const res = await fetch('/api/health?_t=' + Date.now(), {
+          method: 'GET',
+          cache: 'no-store'
+        });
+
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}));
+          // If server is back up and not in maintenance mode, reload into app!
+          if (data.status !== 'maintenance') {
+            retryText.textContent = 'Сервер запущен! Загрузка...';
+            setTimeout(() => {
+              window.location.reload();
+            }, 600);
+            return;
+          }
+        }
+      } catch (err) {
+        // Still down
+      } finally {
+        isChecking = false;
+        retryBtn.disabled = false;
+        retryIcon.classList.remove('spin');
+        retryText.textContent = 'Проверить сейчас';
+        secondsLeft = CHECK_INTERVAL;
+        updateProgress();
+      }
+    }
+
+    function updateProgress() {
+      countdownSec.textContent = secondsLeft;
+      const progress = ((CHECK_INTERVAL - secondsLeft) / CHECK_INTERVAL) * 100;
+      timerFill.style.width = progress + '%';
+    }
+
+    function manualCheck() {
+      secondsLeft = CHECK_INTERVAL;
+      checkServer();
+    }
+
+    // Auto-ping loop
+    setInterval(() => {
+      secondsLeft--;
+      if (secondsLeft <= 0) {
+        secondsLeft = CHECK_INTERVAL;
+        checkServer();
+      } else {
+        updateProgress();
+      }
+    }, 1000);
+
+    updateProgress();
+  </script>
+</body>
+</html>

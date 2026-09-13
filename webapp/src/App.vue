@@ -238,6 +238,9 @@
       <!-- Profile Context Menu -->
       <ProfileMenu v-model="showProfileMenu" placement="header" />
     </template>
+
+    <!-- Offline & Maintenance Overlay -->
+    <OfflineScreen />
   </div>
 </template>
 
@@ -275,6 +278,7 @@ const MaintenanceBanner = defineAsyncComponent(() => import('@/components/Mainte
 const NetworkBanner = defineAsyncComponent(() => import('@/components/NetworkBanner.vue'))
 const ExportifyImportModal = defineAsyncComponent(() => import('@/components/ExportifyImportModal.vue'))
 const ImportModal = defineAsyncComponent(() => import('@/components/ImportModal.vue'))
+const OfflineScreen = defineAsyncComponent(() => import('@/components/OfflineScreen.vue'))
 
 const route = useRoute()
 const router = useRouter()

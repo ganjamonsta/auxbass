@@ -25,6 +25,15 @@ const OFFLINE_GRACE_PERIOD = 3000      // Ждём 3с прежде чем по�
 /** @type {'online' | 'offline' | 'slow' | 'reconnecting'} */
 const connectionState = ref('online')
 
+/** Флаг: бэкенд недоступен (502/503 или сбой сети) */
+const isBackendDown = ref(false)
+
+/** Флаг: бот в сети (из /api/health) */
+const isBotOnline = ref(true)
+
+/** Флаг: режим техобслуживания */
+const isMaintenance = ref(false)
+
 /** Задержка последнего API ping (ms), -1 если не определена */
 const latency = ref(-1)
 
@@ -59,10 +68,13 @@ const isOnline = computed(() => connectionState.value !== 'offline')
 const isOffline = computed(() => connectionState.value === 'offline')
 const isSlow = computed(() => connectionState.value === 'slow')
 const isReconnecting = computed(() => connectionState.value === 'reconnecting')
-const hasIssues = computed(() => connectionState.value !== 'online')
+const hasIssues = computed(() => connectionState.value !== 'online' || isBackendDown.value || !isBotOnline.value || isMaintenance.value)
 
 /** Текст для баннера */
 const statusMessage = computed(() => {
+  if (isMaintenance.value) return 'Технические работы'
+  if (isBackendDown.value) return 'Сервер недоступен'
+  if (!isBotOnline.value) return 'Бот оффлайн'
   switch (connectionState.value) {
     case 'offline': return 'Нет соединения'
     case 'reconnecting': return 'Переподключение...'
@@ -73,6 +85,9 @@ const statusMessage = computed(() => {
 
 /** Текст для индикатора в плеере (краткий) */
 const statusShort = computed(() => {
+  if (isMaintenance.value) return 'Техобслуживание'
+  if (isBackendDown.value) return 'Сервер оффлайн'
+  if (!isBotOnline.value) return 'Бот оффлайн'
   switch (connectionState.value) {
     case 'offline': return 'Нет сети'
     case 'reconnecting': return 'Подключение...'
@@ -84,18 +99,16 @@ const statusShort = computed(() => {
 // ============== Приватные методы ==============
 
 /**
- * Проверка latency через HEAD-запрос к API.
- * Быстрый и безнагрузочный — не создаёт тела ответа.
+ * Проверка latency и статуса сервера через /api/health.
  */
 const checkLatency = async () => {
   const start = Date.now()
   try {
-    // Используем HEAD к auth/status — лёгкий endpoint
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), LATENCY_WARN_THRESHOLD + 1000)
     
-    await fetch('/api/auth/status', {
-      method: 'HEAD',
+    const resp = await fetch('/api/health', {
+      method: 'GET',
       signal: controller.signal,
       cache: 'no-store',
     })
@@ -106,6 +119,22 @@ const checkLatency = async () => {
     latency.value = elapsed
     lastSuccessfulRequest.value = Date.now()
     consecutiveFailures = 0
+
+    if (resp.ok) {
+      isBackendDown.value = false
+      try {
+        const data = await resp.json()
+        isBotOnline.value = data.bot_online !== false
+        isMaintenance.value = data.maintenance === true || data.status === 'maintenance'
+      } catch (_) {
+        isBotOnline.value = true
+        isMaintenance.value = false
+      }
+    } else {
+      if (resp.status === 502 || resp.status === 503 || resp.status === 504) {
+        isBackendDown.value = true
+      }
+    }
     
     // Обновить состояние на основе latency
     if (connectionState.value === 'offline' || connectionState.value === 'reconnecting') {
@@ -124,12 +153,13 @@ const checkLatency = async () => {
   } catch (e) {
     latency.value = -1
     consecutiveFailures++
+    isBackendDown.value = true
     
     if (consecutiveFailures >= MAX_FAILURES_BEFORE_SLOW) {
       if (navigator.onLine) {
         // Браузер считает что онлайн, но API не отвечает
         connectionState.value = 'slow'
-        console.warn(`[NetworkMonitor] API unreachable (${consecutiveFailures} failures), marking as slow`)
+        console.warn(`[NetworkMonitor] API unreachable (${consecutiveFailures} failures), marking as slow/down`)
       } else {
         connectionState.value = 'offline'
       }
@@ -281,6 +311,7 @@ const stopLatencyChecks = () => {
 const recordSuccessfulRequest = () => {
   lastSuccessfulRequest.value = Date.now()
   consecutiveFailures = 0
+  isBackendDown.value = false
   
   if (connectionState.value === 'reconnecting' || connectionState.value === 'slow') {
     connectionState.value = 'online'
@@ -292,9 +323,14 @@ const recordSuccessfulRequest = () => {
  * Записать неудачный API-запрос.
  */
 const recordFailedRequest = (error) => {
+  const status = error?.response?.status
+  if (status === 502 || status === 503 || status === 504) {
+    isBackendDown.value = true
+  }
   // Сетевая ошибка (не HTTP error, а реальный network failure)
   if (!error?.response && error?.code !== 'ECONNABORTED') {
     consecutiveFailures++
+    isBackendDown.value = true
     if (consecutiveFailures >= MAX_FAILURES_BEFORE_SLOW && navigator.onLine) {
       connectionState.value = 'slow'
     } else if (!navigator.onLine) {
@@ -317,6 +353,9 @@ export function useNetworkMonitor() {
   return {
     // Reactive state (readonly для внешних потребителей)
     connectionState: readonly(connectionState),
+    isBackendDown: readonly(isBackendDown),
+    isBotOnline: readonly(isBotOnline),
+    isMaintenance: readonly(isMaintenance),
     latency: readonly(latency),
     offlineSince: readonly(offlineSince),
     connectionType: readonly(connectionType),

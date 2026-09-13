@@ -280,7 +280,19 @@ if WEBAPP_DIST.exists():
 
 @app.get("/api/health")
 async def health():
-    return {"status": "healthy", "version": "2.0.0"}
+    maintenance_file = Path(__file__).parent.parent / ".maintenance"
+    is_maintenance = (
+        os.environ.get("MAINTENANCE_MODE", "false").strip().lower() in ("true", "1", "yes")
+        or maintenance_file.exists()
+    )
+    bot_online = getattr(app.state, "bot_online", True)
+    
+    return {
+        "status": "maintenance" if is_maintenance else "healthy",
+        "bot_online": bot_online,
+        "maintenance": is_maintenance,
+        "version": "2.0.0"
+    }
 
 
 # SPA Fallback - must be LAST route
