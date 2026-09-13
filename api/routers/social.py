@@ -26,11 +26,11 @@ from shared.models import (
 from api.routers.auth import get_current_user, require_premium
 
 logger = logging.getLogger(__name__)
-from api.routers.library import track_to_response, build_track_search_filter
+from api.utils.responses import track_to_response, build_track_search_filter
 from api.schemas.common import TelegramUser, PaginatedResponse
 from api.schemas.tracks import TrackResponse
 from bot.services.ingestion.pipeline import provider_registry, _find_existing_tracks_batch
-from api.routers.ingestion import SoundCloudTrackItem, SoundCloudPlaylistItem
+from api.schemas.social import SoundCloudTrackItem, SoundCloudPlaylistItem
 
 
 router = APIRouter(tags=["Social"])

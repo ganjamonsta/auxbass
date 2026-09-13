@@ -24,7 +24,8 @@ from shared.models import Track, UserLibrary, ChannelMessage, ChannelMessageStat
 from shared.matching import normalize_title, normalize_artist
 
 from .auth import get_current_user
-from .library import is_streamable, HD_MIME_TYPES
+from api.utils.responses import is_streamable, HD_MIME_TYPES
+from api.utils.bot_helpers import get_http_session, close_http_session
 from api.schemas.player import StreamUrlResponse, DownloadPlaylistRequest
 from api.schemas.common import TelegramUser
 
@@ -34,45 +35,9 @@ logger = logging.getLogger("uvicorn.error")
 router = APIRouter()
 settings = get_settings()
 
-# ============== Global HTTP Session Pool ==============
-# Reuses TCP connections instead of creating new ones per request
-# This saves ~100-200ms per request on TLS handshake
-_http_session: Optional[aiohttp.ClientSession] = None
+# get_http_session and close_http_session are now imported from api.utils.bot_helpers
+# (see imports above). Kept as module-level names for backwards compat.
 
-
-async def get_http_session() -> aiohttp.ClientSession:
-    """Get or create global aiohttp session with connection pooling"""
-    global _http_session
-    if _http_session is None or _http_session.closed:
-        # Connection pool: keep up to 100 connections, 10 per host
-        connector = aiohttp.TCPConnector(
-            limit=100,
-            limit_per_host=10,
-            ttl_dns_cache=300,  # Cache DNS for 5 minutes
-            keepalive_timeout=60,  # Keep connections alive for 60s
-        )
-        # Timeouts:
-        # - total=None: No limit on total request time (needed for large file streaming)
-        # - connect=10: 10 seconds to establish connection
-        # - sock_read=60: 60 seconds max between data chunks (detects stalled connections)
-        timeout = aiohttp.ClientTimeout(
-            total=None,       # No total limit - files can be large!
-            connect=10,       # Connection timeout
-            sock_read=60,     # Read timeout between chunks
-        )
-        _http_session = aiohttp.ClientSession(
-            connector=connector,
-            timeout=timeout,
-        )
-    return _http_session
-
-
-async def close_http_session():
-    """Close global HTTP session (call on app shutdown)"""
-    global _http_session
-    if _http_session and not _http_session.closed:
-        await _http_session.close()
-        _http_session = None
 
 
 # Cache for Telegram file paths (not full URLs!)

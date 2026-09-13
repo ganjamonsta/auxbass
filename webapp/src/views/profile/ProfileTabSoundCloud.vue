@@ -1,0 +1,764 @@
+<template>
+  <div class="sc-pane">
+    <!-- SC Profile Strip -->
+    <div v-if="scAccount" class="ext-profile-strip sc-profile-strip">
+      <div class="ext-strip-avatar">
+        <img v-if="scAccount.avatar_url" :src="scAccount.avatar_url" alt="" referrerpolicy="no-referrer" />
+        <span v-else class="sc-badge-large">SC</span>
+      </div>
+      <div class="ext-strip-info">
+        <div class="ext-strip-platform">
+          <span class="sc-badge-inline">SoundCloud</span>
+          <span class="ext-verified-badge" title="Подключенный аккаунт">Подключен</span>
+        </div>
+        <h2 class="ext-strip-name">{{ scAccount.display_name || scAccount.username }}</h2>
+        <div class="ext-strip-sub">
+          <span class="ext-strip-handle">@{{ scAccount.username }}</span>
+          <span v-if="scAccount.permalink_url" class="stat-separator">•</span>
+          <a 
+            v-if="scAccount.permalink_url" 
+            :href="scAccount.permalink_url" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            class="ext-strip-link"
+          >
+            <span>Открыть на SoundCloud</span>
+            <ExternalLink :size="13" />
+          </a>
+        </div>
+      </div>
+      <div class="ext-strip-stats">
+        <div class="ext-stat-box">
+          <span class="ext-stat-num">{{ scPlaylists.length }}</span>
+          <span class="ext-stat-lbl">плейлистов</span>
+        </div>
+        <div class="ext-stat-box">
+          <span class="ext-stat-num">{{ scTracks.length }}</span>
+          <span class="ext-stat-lbl">релизов</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- If viewing a selected SoundCloud Playlist drawer/detail -->
+    <div v-if="selectedScPlaylist" class="sc-playlist-detail-view">
+      <div class="sc-playlist-detail-header">
+        <button class="btn-back-pill" @click="closeScPlaylist">
+          <ArrowLeft :size="16" />
+          <span>Назад ко всем плейлистам</span>
+        </button>
+        <div class="sc-playlist-detail-meta">
+          <div class="sc-playlist-detail-cover">
+            <img 
+              v-if="selectedScPlaylist.artwork_url" 
+              :src="selectedScPlaylist.artwork_url" 
+              alt="" 
+              referrerpolicy="no-referrer" 
+            />
+            <Folder v-else :size="48" />
+          </div>
+          <div class="sc-playlist-detail-text">
+            <span class="sc-badge-inline">Плейлист SoundCloud</span>
+            <h2 class="sc-detail-title">{{ selectedScPlaylist.title }}</h2>
+            <div class="sc-detail-sub">
+              <span>{{ scPlaylistTracks.length || selectedScPlaylist.track_count }} {{ getTracksWord(scPlaylistTracks.length || selectedScPlaylist.track_count) }}</span>
+              <span v-if="selectedScPlaylist.permalink_url" class="stat-separator">•</span>
+              <a 
+                v-if="selectedScPlaylist.permalink_url" 
+                :href="selectedScPlaylist.permalink_url" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                class="ext-strip-link"
+              >
+                <span>SoundCloud</span>
+                <ExternalLink :size="12" />
+              </a>
+            </div>
+            <div v-if="isSelf" class="sc-detail-actions-row">
+              <button 
+                class="sc-sync-btn"
+                :disabled="isSyncingScPlaylist || loadingScPlaylistTracks || scPlaylistTracks.length === 0"
+                @click="$emit('syncPlaylist', selectedScPlaylist)"
+                title="Создать плейлист в TG Player и загрузить треки в Telegram-канал"
+              >
+                <div v-if="isSyncingScPlaylist" class="spinner small"></div>
+                <CloudDownload v-else :size="15" />
+                <span>{{ isSyncingScPlaylist ? 'Синхронизация плейлиста...' : `Синхронизировать в TG Player (${scPlaylistTracks.length || selectedScPlaylist.track_count})` }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading playlist tracks -->
+      <div v-if="loadingScPlaylistTracks" class="loading-container">
+        <div class="spinner"></div>
+      </div>
+
+      <!-- Playlist tracklist -->
+      <div v-else class="sc-playlist-tracks-list">
+        <ExternalTrackItem
+          v-for="item in scPlaylistTracks"
+          :key="item.url"
+          :item="item"
+          variant="soundcloud"
+          :showBadges="true"
+          :isImporting="importingTrackUrl === item.url"
+          :isDownloading="tasksStore.isTrackDownloading(item.url)"
+          :isQueued="tasksStore.isTrackQueued(item.url)"
+          :isInLibrary="isTrackInLibrary(item)"
+          @play="$emit('quickPlay', $event)"
+          @add="$emit('quickAdd', $event)"
+        />
+        <div v-if="scPlaylistTracks.length === 0" class="empty-state">
+          <div class="empty-icon"><Music :size="40" /></div>
+          <p>В этом плейлисте нет треков</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Normal Subtabs: Playlists vs Releases -->
+    <div v-else class="sc-main-content">
+      <div class="sc-subtabs-bar">
+        <button 
+          class="sc-subtab-btn" 
+          :class="{ active: scSubTab === 'playlists' }"
+          @click="scSubTab = 'playlists'"
+        >
+          <Folder :size="15" />
+          <span>Плейлисты</span>
+          <span class="subtab-count">{{ scPlaylists.length }}</span>
+        </button>
+        <button 
+          class="sc-subtab-btn" 
+          :class="{ active: scSubTab === 'tracks' }"
+          @click="scSubTab = 'tracks'"
+        >
+          <Music :size="15" />
+          <span>Релизы и треки</span>
+          <span class="subtab-count">{{ scTracks.length }}</span>
+        </button>
+      </div>
+
+      <!-- Subtab 1: Playlists -->
+      <div v-if="scSubTab === 'playlists'" class="sc-subtab-content">
+        <div v-if="loadingScPlaylists" class="loading-container">
+          <div class="spinner"></div>
+        </div>
+        <div v-else-if="scPlaylists.length > 0" class="overview-grid">
+          <div 
+            v-for="pl in scPlaylists" 
+            :key="pl.id" 
+            class="feed-card ext-card sc-card"
+            @click="openScPlaylist(pl)"
+          >
+            <div class="feed-card-cover sc-cover-box">
+              <img 
+                v-if="pl.artwork_url" 
+                :src="pl.artwork_url" 
+                alt=""
+                loading="lazy"
+                referrerpolicy="no-referrer"
+              />
+              <Folder v-else :size="36" />
+              <div class="play-overlay" title="Смотреть треки">
+                <Play :size="18" fill="currentColor" />
+              </div>
+            </div>
+            <div class="feed-card-info">
+              <div class="feed-card-title">{{ pl.title }}</div>
+              <div class="feed-card-subtitle">{{ pl.track_count }} {{ getTracksWord(pl.track_count) }}</div>
+            </div>
+          </div>
+        </div>
+        <div v-else class="empty-state">
+          <div class="empty-icon"><Folder :size="44" /></div>
+          <h3>Нет плейлистов SoundCloud</h3>
+          <p>Пользователь не создал или скрыл свои плейлисты на SoundCloud</p>
+        </div>
+      </div>
+
+      <!-- Subtab 2: Releases / Tracks -->
+      <div v-if="scSubTab === 'tracks'" class="sc-subtab-content">
+        <div v-if="loadingScTracks" class="loading-container">
+          <div class="spinner"></div>
+        </div>
+        <div v-else-if="scTracks.length > 0" class="sc-tracks-wrapper">
+          <div class="ext-tracks-list">
+            <ExternalTrackItem
+              v-for="item in scTracks"
+              :key="item.url"
+              :item="item"
+              variant="soundcloud"
+              :showBadges="true"
+              :isImporting="importingTrackUrl === item.url"
+              :isDownloading="tasksStore.isTrackDownloading(item.url)"
+              :isQueued="tasksStore.isTrackQueued(item.url)"
+              :isInLibrary="isTrackInLibrary(item)"
+              @play="$emit('quickPlay', $event)"
+              @add="$emit('quickAdd', $event)"
+            />
+          </div>
+          <div v-if="scTracksCursor" class="load-more-box">
+            <button 
+              class="btn-pill-secondary" 
+              :disabled="loadingMoreScTracks" 
+              @click="$emit('loadMore')"
+            >
+              <div v-if="loadingMoreScTracks" class="spinner small"></div>
+              <span v-else>Загрузить ещё релизы</span>
+            </button>
+          </div>
+        </div>
+        <div v-else class="empty-state">
+          <div class="empty-icon"><Music :size="44" /></div>
+          <h3>Нет релизов на SoundCloud</h3>
+          <p>Пользователь ещё не загружал собственные авторские треки на SoundCloud</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref } from 'vue'
+import { useTasksStore } from '@/stores/tasks'
+import { socialApi } from '@/api/client'
+import { useUIStore } from '@/stores/ui'
+import { getTracksWord } from './profileUtils'
+import ExternalTrackItem from '@/components/ExternalTrackItem.vue'
+import {
+  Folder,
+  Music,
+  Play,
+  ExternalLink,
+  ArrowLeft,
+  CloudDownload,
+} from 'lucide-vue-next'
+
+const props = defineProps({
+  userId: { type: Number, required: true },
+  isSelf: { type: Boolean, default: false },
+  scAccount: { type: Object, default: null },
+  scPlaylists: { type: Array, default: () => [] },
+  scTracks: { type: Array, default: () => [] },
+  loadingScPlaylists: { type: Boolean, default: false },
+  loadingScTracks: { type: Boolean, default: false },
+  scTracksCursor: { type: String, default: null },
+  loadingMoreScTracks: { type: Boolean, default: false },
+  importingTrackUrl: { type: String, default: null },
+  isSyncingScPlaylist: { type: Boolean, default: false },
+})
+
+defineEmits(['loadMore', 'syncPlaylist', 'quickPlay', 'quickAdd'])
+
+const tasksStore = useTasksStore()
+const uiStore = useUIStore()
+
+// Local SC-tab state
+const scSubTab = ref('playlists')
+const selectedScPlaylist = ref(null)
+const scPlaylistTracks = ref([])
+const loadingScPlaylistTracks = ref(false)
+
+const isTrackInLibrary = (item) => {
+  if (!item) return false
+  return item.in_library || tasksStore.isTrackCompleted(item.url)
+}
+
+const openScPlaylist = async (pl) => {
+  selectedScPlaylist.value = pl
+  scPlaylistTracks.value = []
+  loadingScPlaylistTracks.value = true
+  try {
+    const res = await socialApi.getUserExternalPlaylistTracks(props.userId, pl.id)
+    scPlaylistTracks.value = res.data?.tracks || []
+  } catch (err) {
+    console.error('Failed to load SC playlist tracks:', err)
+    uiStore.toast?.error('Ошибка', 'Не удалось загрузить треки плейлиста')
+  } finally {
+    loadingScPlaylistTracks.value = false
+  }
+}
+
+const closeScPlaylist = () => {
+  selectedScPlaylist.value = null
+  scPlaylistTracks.value = []
+}
+
+// Expose for parent access if needed
+defineExpose({ scPlaylistTracks })
+</script>
+
+<style scoped>
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 80px 0;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.empty-icon {
+  color: var(--c-accent);
+  opacity: 0.8;
+  margin-bottom: 8px;
+}
+
+.empty-state h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--c-text-1, #fff);
+}
+
+.empty-state p {
+  color: var(--c-text-2);
+  font-size: 14px;
+  max-width: 320px;
+}
+
+/* Profile Strip */
+.ext-profile-strip {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--c-bg-2, #181818);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 24px 28px;
+  margin-bottom: 28px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.sc-profile-strip {
+  background: linear-gradient(135deg, rgba(255, 85, 0, 0.08) 0%, rgba(20, 20, 20, 0.8) 100%);
+  border-color: rgba(255, 85, 0, 0.2);
+}
+
+.ext-strip-avatar {
+  width: 80px;
+  height: 80px;
+  min-width: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ext-strip-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sc-badge-large {
+  font-size: 24px;
+  font-weight: 800;
+  color: #ff5500;
+}
+
+.ext-strip-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ext-strip-platform {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sc-badge-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ff5500;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 4px;
+  padding: 1px 5px;
+  line-height: 1.2;
+  letter-spacing: 0.5px;
+}
+
+.ext-verified-badge {
+  font-size: 11px;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
+  font-weight: 500;
+}
+
+.ext-strip-name {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--c-text-1, #fff);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ext-strip-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+}
+
+.ext-strip-handle {
+  font-weight: 500;
+}
+
+.stat-separator {
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 11px;
+}
+
+.ext-strip-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+  text-decoration: none;
+  font-size: 12px;
+  transition: color 0.2s ease;
+}
+
+.ext-strip-link:hover {
+  color: var(--c-text-1, #fff);
+  text-decoration: underline;
+}
+
+.ext-strip-stats {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.ext-stat-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 8px 16px;
+  min-width: 70px;
+}
+
+.ext-stat-num {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--c-text-1, #fff);
+}
+
+.ext-stat-lbl {
+  font-size: 11px;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
+}
+
+/* Subtabs */
+.sc-subtabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.sc-subtab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sc-subtab-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--c-text-1, #fff);
+}
+
+.sc-subtab-btn.active {
+  background: rgba(255, 85, 0, 0.15);
+  border-color: #ff5500;
+  color: #fff;
+}
+
+.subtab-count {
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 6px;
+  border-radius: 9999px;
+}
+
+.sc-subtab-btn.active .subtab-count {
+  background: #ff5500;
+  color: #fff;
+}
+
+/* Grid & Cards */
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 18px;
+}
+
+.feed-card {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 12px;
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.feed-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.1);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+}
+
+.feed-card-cover {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  position: relative;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+.feed-card-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.feed-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.feed-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--c-text-1, #fff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.feed-card-subtitle {
+  font-size: 12px;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.play-overlay {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--c-accent, #1db954);
+  color: #000;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transform: translateY(8px) scale(0.9);
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  z-index: 2;
+}
+
+.feed-card:hover .play-overlay {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.sc-cover-box {
+  background: linear-gradient(135deg, rgba(255, 85, 0, 0.2) 0%, rgba(20, 20, 20, 0.8) 100%) !important;
+}
+
+/* Playlist Detail */
+.sc-playlist-detail-view {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.sc-playlist-detail-header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.btn-back-pill {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--c-text-1, #fff);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-back-pill:hover {
+  background: rgba(255, 255, 255, 0.14);
+  transform: translateX(-2px);
+}
+
+.sc-playlist-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.sc-playlist-detail-cover {
+  width: 100px;
+  height: 100px;
+  min-width: 100px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sc-playlist-detail-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sc-playlist-detail-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sc-detail-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--c-text-1, #fff);
+  margin: 0;
+}
+
+.sc-detail-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+}
+
+.sc-detail-actions-row {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sc-sync-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #ff5500 0%, #cc4400 100%);
+  color: #fff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(255, 85, 0, 0.35);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sc-sync-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ff6600 0%, #dd4400 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(255, 85, 0, 0.45);
+}
+
+.sc-sync-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Lists */
+.ext-tracks-list,
+.sc-playlist-tracks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.load-more-box {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.btn-pill-secondary {
+  padding: 10px 24px;
+  border-radius: var(--r-full, 9999px);
+  background: var(--c-bg-3, #222);
+  color: var(--c-text-1, #fff);
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+</style>

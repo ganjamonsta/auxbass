@@ -28,7 +28,7 @@ from bot.services.enrichment.lastfm import lastfm_client
 from bot.services.enrichment.deezer import deezer_client
 
 from api.routers.auth import get_current_user
-from api.routers.library import track_to_response, streamable_track_filter
+from api.utils.responses import track_to_response, streamable_track_filter, album_to_response
 from api.schemas.artists import (
     ArtistResponse,
     ArtistDetailResponse,
@@ -714,7 +714,7 @@ async def get_artist_info(
         db_tags_map = await get_artists_tags(db, [normalized_search], limit_per_artist=6)
         artist_tags = db_tags_map.get(normalized_search) or None
     
-    from api.routers.albums import album_to_response
+
     album_items = [album_to_response(album, track_count=album_track_counts.get(album.id, 0)) 
                    for album in albums]
     
@@ -866,7 +866,7 @@ async def get_artist(
     except Exception as e:
         logger.warning(f"Failed to get artist tags: {e}")
     
-    from api.routers.albums import album_to_response
+
     album_items = [album_to_response(album, track_count=album_track_counts.get(album.id, 0)) for album in albums]
     
     return ArtistDetailResponse(

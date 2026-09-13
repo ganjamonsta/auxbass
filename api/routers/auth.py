@@ -805,7 +805,7 @@ async def upload_avatar(
     target_chat_id = user_channel.channel_id if user_channel else user.id
     caption = f"👤 <b>Аватар профиля</b>: {db_user.display_name}\n\n#profile #avatar"
 
-    from api.routers.images import _get_bot
+    from api.utils.bot_helpers import get_bot as _get_bot
     bot = _get_bot()
     sent_msg = None
     try:

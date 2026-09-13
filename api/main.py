@@ -29,8 +29,9 @@ from api.routers.tracks import router as tracks_router
 from api.routers.albums import router as albums_router
 from api.routers.artists import router as artists_router
 from api.routers.playlists import router as playlists_router
-from api.routers.images import router as images_router, close_image_bot
-from api.routers.player import router as player_router, close_http_session
+from api.routers.images import router as images_router
+from api.routers.player import router as player_router
+from api.utils.bot_helpers import close_bot as close_image_bot, close_http_session
 from api.routers.social import router as social_router
 from api.routers.tags import router as tags_router
 from api.routers.ingestion import router as ingestion_router

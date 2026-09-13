@@ -1,43 +1,16 @@
 import logging
+import re
 from typing import Optional
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
-from aiogram import Bot
-from aiogram.client.default import DefaultBotProperties
-from aiogram.enums import ParseMode
 
 from shared.config import get_settings
-from api.routers.player import get_http_session
+from api.utils.bot_helpers import get_bot as _get_bot, close_bot as close_image_bot, get_http_session
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Images"])
 settings = get_settings()
-
-# Shared bot instance for image proxy (avoids creating a new Bot per request)
-_image_bot: Optional[Bot] = None
-
-
-def _get_bot() -> Bot:
-    """Get or create shared bot instance for image proxy."""
-    global _image_bot
-    if _image_bot is None:
-        _image_bot = Bot(
-            token=settings.bot_token,
-            default=DefaultBotProperties(parse_mode=ParseMode.HTML)
-        )
-    return _image_bot
-
-
-async def close_image_bot():
-    """Close shared bot session on shutdown."""
-    global _image_bot
-    if _image_bot is not None:
-        try:
-            await _image_bot.session.close()
-        except Exception as e:
-            logger.warning(f"Error closing image bot session: {e}")
-        _image_bot = None
 
 
 @router.get("/images/{file_id}")

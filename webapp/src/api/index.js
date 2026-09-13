@@ -1,16 +1,14 @@
 /**
- * Legacy API Client — Backward Compatibility Re-export
+ * TG Player API — Unified Re-export
  * 
- * All API modules have been extracted to separate files under @/api/.
- * New code should import from '@/api' directly:
+ * Import API modules from here:
  *   import { tracksApi, playlistsApi } from '@/api'
- * 
- * This file re-exports everything for backward compatibility.
+ *   import api from '@/api'  // raw axios instance
  */
 
 // Core axios instance (default export)
 export { default } from './core'
-export { authStorage } from './core'
+export { authStorage, cacheable, nonCacheable } from './core'
 
 // Domain API modules
 export { authApi } from './auth'

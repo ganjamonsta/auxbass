@@ -23,7 +23,7 @@ from shared.models import (
     PlaylistSubscription, TrackEnrichment, UserChannel, TrackTag
 )
 from shared.config import get_settings
-from api.routers.images import _get_bot
+from api.utils.bot_helpers import get_bot as _get_bot
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ def _safe_cover_path(url: str) -> 'Optional[Path]':
 
 
 from api.routers.auth import get_current_user, require_premium
-from api.routers.library import track_to_response, streamable_track_filter
+from api.utils.responses import track_to_response, streamable_track_filter
 from api.schemas.common import TelegramUser, PaginatedResponse
 from api.schemas.tracks import TrackResponse
 from api.schemas.playlists import (

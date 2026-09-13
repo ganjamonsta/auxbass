@@ -20,7 +20,7 @@ from shared.models import (
 from shared.matching import normalize_artist, normalize_title, fuzzy_match_title
 
 from api.routers.auth import get_current_user
-from api.routers.library import streamable_track_filter
+from api.utils.responses import streamable_track_filter, album_to_response, track_to_response
 from api.schemas.albums import (
     AlbumResponse,
     AlbumDetailResponse,
@@ -34,25 +34,6 @@ router = APIRouter(tags=["Albums"])
 
 # Minimum tracks in user's library to show album (filters out singles)
 MIN_USER_TRACKS_FOR_ALBUM = 2
-
-
-def album_to_response(album: Album, track_count: Optional[int] = None, tags: Optional[List[str]] = None) -> AlbumResponse:
-    """Convert Album model to response"""
-    # Get actual track count if not provided
-    actual_count = track_count if track_count is not None else len(album.tracks) if album.tracks else 0
-    
-    return AlbumResponse(
-        id=album.id,
-        name=album.name,
-        artist=album.artist,
-        cover_url=album.cover_url,
-        release_date=album.release_date,
-        track_count=actual_count,
-        total_tracks=album.total_tracks,
-        deezer_album_id=album.deezer_album_id,
-        has_full_tracklist=bool(album.full_tracklist),
-        tags=tags,
-    )
 
 
 async def get_albums_tags(
@@ -362,7 +343,7 @@ async def get_album(
     if not album:
         raise HTTPException(status_code=404, detail="Album not found")
     
-    from api.routers.library import track_to_response
+
     
     if scope == "global":
         # Get all public tracks from this album
@@ -736,7 +717,7 @@ async def find_missing_track(
             )
         )
         
-        from api.routers.library import track_to_response
+
         
         return {
             "found": True,
