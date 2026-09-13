@@ -374,13 +374,13 @@ const getSpotifyUrl = (acc) => {
   border-radius: var(--r-xl, 24px);
   background: var(--c-bg-2, #181818);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 0 28px 0 0;
+  padding: 0 20px 0 0;
   margin-bottom: 24px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
   display: flex;
   align-items: stretch;
   justify-content: space-between;
-  gap: 28px;
+  gap: 20px;
 }
 
 /* Ambient glow */
@@ -486,10 +486,10 @@ const getSpotifyUrl = (acc) => {
 .hero-monolith-tabs {
   position: relative;
   z-index: 2;
-  width: 215px;
-  min-width: 215px;
-  max-width: 215px;
-  flex: 0 0 215px;
+  width: 205px;
+  min-width: 205px;
+  max-width: 205px;
+  flex: 0 0 205px;
   align-self: stretch;
   display: flex;
   flex-direction: column;
@@ -513,14 +513,14 @@ const getSpotifyUrl = (acc) => {
   flex: 1;
   width: 100%;
   min-height: 40px;
-  padding: 0 16px 0 14px;
+  padding: 0 12px 0 10px;
   border-radius: 0;
   background: transparent;
   border: none;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   border-left: 4px solid transparent;
   color: var(--c-text-2, #aaa);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   text-align: left;
@@ -576,7 +576,7 @@ const getSpotifyUrl = (acc) => {
   width: 1px;
   height: 16px;
   background: rgba(255, 255, 255, 0.08);
-  margin: 0 10px;
+  margin: 0 8px;
   flex-shrink: 0;
   transition: background 0.15s, box-shadow 0.15s;
 }
@@ -597,11 +597,11 @@ const getSpotifyUrl = (acc) => {
 .tab-edge-badge {
   font-size: 11px;
   font-weight: 700;
-  padding: 1.5px 7px;
+  padding: 1.5px 6px;
   border-radius: var(--r-full, 9999px);
   background: rgba(255, 255, 255, 0.07);
   color: var(--c-text-3, #999);
-  margin-left: 6px;
+  margin-left: 5px;
   flex-shrink: 0;
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -626,8 +626,10 @@ const getSpotifyUrl = (acc) => {
   box-shadow: 0 0 8px rgba(255, 85, 0, 0.6);
 }
 
-.monolith-tab-btn.sc-tab.active .tab-edge-icon {
-  color: #ff5500;
+.monolith-tab-btn.sc-tab .sc-badge-inline,
+.monolith-tab-btn.sc-tab.active .sc-badge-inline {
+  color: #ffffff !important;
+  background: #ff5500 !important;
 }
 
 .monolith-tab-btn.sc-tab.active .tab-edge-badge {
@@ -863,15 +865,15 @@ const getSpotifyUrl = (acc) => {
 .hero-tab-details-panel {
   position: relative;
   z-index: 2;
-  width: 250px;
-  min-width: 250px;
-  max-width: 250px;
-  flex: 0 0 250px;
+  width: 240px;
+  min-width: 240px;
+  max-width: 240px;
+  flex: 0 0 240px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-self: center;
-  margin: 20px 0;
+  margin: 16px 0;
   background: rgba(18, 18, 22, 0.6);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -1056,30 +1058,432 @@ const getSpotifyUrl = (acc) => {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   RESPONSIVE LAYOUT
+   RESPONSIVE LAYOUT (Container Query + Media Query Fallback)
    ═══════════════════════════════════════════════════════════ */
-@media (max-width: 1080px) {
-  .hero-tab-details-panel {
-    width: 220px;
-    min-width: 220px;
-    max-width: 220px;
-    flex: 0 0 220px;
-    padding: 12px 14px;
+
+/* ─── TIER 1: Medium Width (Right sidebar open or window < 1200px) ─── */
+@container userprofile (max-width: 980px) {
+  .profile-hero-card {
+    display: grid;
+    grid-template-columns: 205px 1fr;
+    grid-template-areas:
+      "tabs body"
+      "details details";
+    gap: 0;
+    padding: 0;
+    align-items: stretch;
   }
 
   .hero-monolith-tabs {
-    width: 185px;
-    min-width: 185px;
-    max-width: 185px;
-    flex: 0 0 185px;
+    grid-area: tabs;
+    width: 205px !important;
+    min-width: 205px !important;
+    max-width: 205px !important;
+    flex: 0 0 205px !important;
+    height: 100%;
+    align-self: stretch;
+    border-radius: var(--r-xl, 24px) 0 0 0;
+    border: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: none;
+    padding: 0;
+    gap: 0;
+  }
+
+  .hero-body {
+    grid-area: body;
+    min-width: 0;
+    align-items: flex-start;
+    text-align: left;
+    padding: 20px 48px 20px 20px;
+    gap: 8px;
+  }
+
+  .hero-meta-top,
+  .hero-subline,
+  .hero-actions-bar {
+    justify-content: flex-start;
   }
 
   .hero-name {
-    font-size: 28px;
+    font-size: 26px;
+  }
+
+  /* Seamless bottom details overlay */
+  .hero-tab-details-panel {
+    grid-area: details;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    flex: none !important;
+    margin: 0;
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0 0 var(--r-xl, 24px) var(--r-xl, 24px);
+    background: linear-gradient(180deg, rgba(14, 14, 18, 0.82) 0%, rgba(10, 10, 14, 0.94) 100%);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: none;
+    padding: 12px 20px;
+    align-self: stretch;
+    min-height: 84px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .hero-tab-details-panel .tab-panel-inner {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .hero-tab-details-panel .panel-header {
+    margin-bottom: 6px;
+  }
+
+  .hero-tab-details-panel .panel-stats-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 8px;
+  }
+
+  .hero-tab-details-panel .panel-stat-cell {
+    padding: 4px 8px;
+    align-items: center;
+    text-align: center;
+  }
+
+  .hero-tab-details-panel .panel-stat-num {
+    font-size: 15px;
+  }
+
+  .hero-tab-details-panel .panel-stat-lbl {
+    font-size: 10.5px;
+  }
+
+  .hero-tab-details-panel .panel-highlight-row {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .hero-tab-details-panel .panel-big-num {
+    font-size: 22px;
+  }
+
+  .hero-tab-details-panel .panel-big-lbl {
+    font-size: 13px;
+  }
+
+  .hero-tab-details-panel .panel-sub-desc {
+    margin-top: 3px;
+    font-size: 12px;
+  }
+
+  .hero-tab-details-panel .panel-quick-actions {
+    margin-top: 6px;
+    gap: 6px;
+  }
+
+  .hero-tab-details-panel .panel-action-btn {
+    height: 26px;
+    padding: 0 10px;
+    font-size: 11.5px;
+  }
+
+  .hero-tab-details-panel .tab-panel-sc .panel-sc-counts {
+    margin-top: 2px;
+  }
+
+  .hero-tab-details-panel .panel-sc-link-btn {
+    align-self: flex-start;
+    height: 26px;
+    padding: 0 10px;
+    font-size: 11px;
+    margin-top: 4px;
   }
 }
 
-@media (max-width: 860px) {
+/* ─── TIER 2: Mobile / Compact (< 720px) ─── */
+@container userprofile (max-width: 720px) {
+  .profile-hero-card {
+    grid-template-columns: 48px 1fr;
+  }
+
+  .hero-monolith-tabs {
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    flex: 0 0 48px !important;
+    justify-content: flex-start;
+    overflow: hidden;
+  }
+
+  .monolith-tab-btn {
+    flex: 0 0 42px !important;
+    width: 100% !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
+    padding: 0 !important;
+    justify-content: center;
+    align-items: center;
+    border-radius: 0;
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-left: 3.5px solid transparent;
+    box-sizing: border-box;
+  }
+
+  .monolith-tab-btn.active {
+    border-left: 3.5px solid var(--c-accent, #1db954);
+    background: linear-gradient(90deg, rgba(29, 185, 84, 0.2) 0%, rgba(24, 24, 30, 0.8) 100%);
+  }
+
+  .monolith-tab-btn.sc-tab.active {
+    border-left-color: #ff5500;
+    background: linear-gradient(90deg, rgba(255, 85, 0, 0.22) 0%, rgba(28, 22, 22, 0.8) 100%);
+  }
+
+  .monolith-tab-btn.sc-tab .tab-edge-icon {
+    width: auto;
+    height: auto;
+  }
+
+  .tab-edge-divider,
+  .tab-edge-label,
+  .tab-edge-badge {
+    display: none !important;
+  }
+
+  .tab-edge-icon {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+  }
+
+  .hero-body {
+    padding: 16px 44px 16px 14px;
+    gap: 8px;
+  }
+
+  .hero-name {
+    font-size: 24px;
+  }
+
+  .hero-tab-details-panel {
+    padding: 12px 16px;
+  }
+
+  .hero-tab-details-panel .panel-stats-grid {
+    gap: 6px;
+  }
+
+  .hero-tab-details-panel .panel-stat-cell {
+    padding: 4px 6px;
+  }
+
+  .hero-tab-details-panel .panel-stat-num {
+    font-size: 14px;
+  }
+
+  .hero-tab-details-panel .panel-stat-lbl {
+    font-size: 10px;
+  }
+}
+
+/* ─── TIER 3: Extra Small Mobile (< 480px) ─── */
+@container userprofile (max-width: 480px) {
+  .profile-hero-card {
+    grid-template-columns: 44px 1fr;
+  }
+
+  .hero-monolith-tabs {
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    flex: 0 0 44px !important;
+  }
+
+  .monolith-tab-btn {
+    flex: 0 0 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+  }
+
+  .hero-name {
+    font-size: 22px;
+  }
+
+  .hero-body {
+    padding: 14px 40px 14px 10px;
+    gap: 6px;
+  }
+
+  .hero-tab-details-panel {
+    padding: 10px 12px;
+    min-height: 80px;
+  }
+
+  .hero-tab-details-panel .panel-stats-grid {
+    gap: 4px;
+  }
+
+  .hero-tab-details-panel .panel-stat-cell {
+    padding: 3px 4px;
+  }
+
+  .hero-tab-details-panel .panel-stat-num {
+    font-size: 13px;
+  }
+
+  .hero-tab-details-panel .panel-stat-lbl {
+    font-size: 9.5px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MEDIA QUERY FALLBACKS (for browsers or contexts without CQ)
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 1200px) and (min-width: 769px) {
+  .profile-hero-card {
+    display: grid;
+    grid-template-columns: 205px 1fr;
+    grid-template-areas:
+      "tabs body"
+      "details details";
+    gap: 0;
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .hero-monolith-tabs {
+    grid-area: tabs;
+    width: 205px !important;
+    min-width: 205px !important;
+    max-width: 205px !important;
+    flex: 0 0 205px !important;
+    height: 100%;
+    align-self: stretch;
+    border-radius: var(--r-xl, 24px) 0 0 0;
+    border: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: none;
+    padding: 0;
+    gap: 0;
+  }
+
+  .hero-body {
+    grid-area: body;
+    min-width: 0;
+    align-items: flex-start;
+    text-align: left;
+    padding: 20px 48px 20px 20px;
+    gap: 8px;
+  }
+
+  .hero-name {
+    font-size: 26px;
+  }
+
+  .hero-tab-details-panel {
+    grid-area: details;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    flex: none !important;
+    margin: 0;
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0 0 var(--r-xl, 24px) var(--r-xl, 24px);
+    background: linear-gradient(180deg, rgba(14, 14, 18, 0.82) 0%, rgba(10, 10, 14, 0.94) 100%);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: none;
+    padding: 12px 20px;
+    align-self: stretch;
+    min-height: 84px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .hero-tab-details-panel .tab-panel-inner {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .hero-tab-details-panel .panel-stats-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 8px;
+  }
+
+  .hero-tab-details-panel .panel-stat-cell {
+    padding: 4px 8px;
+    align-items: center;
+    text-align: center;
+  }
+
+  .hero-tab-details-panel .panel-stat-num {
+    font-size: 15px;
+  }
+
+  .hero-tab-details-panel .panel-stat-lbl {
+    font-size: 10.5px;
+  }
+
+  .hero-tab-details-panel .panel-highlight-row {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .hero-tab-details-panel .panel-big-num {
+    font-size: 22px;
+  }
+
+  .hero-tab-details-panel .panel-big-lbl {
+    font-size: 13px;
+  }
+
+  .hero-tab-details-panel .panel-sub-desc {
+    margin-top: 3px;
+    font-size: 12px;
+  }
+
+  .hero-tab-details-panel .panel-quick-actions {
+    margin-top: 6px;
+    gap: 6px;
+  }
+
+  .hero-tab-details-panel .panel-action-btn {
+    height: 26px;
+    padding: 0 10px;
+    font-size: 11.5px;
+  }
+
+  .hero-tab-details-panel .tab-panel-sc .panel-sc-counts {
+    margin-top: 2px;
+  }
+
+  .hero-tab-details-panel .panel-sc-link-btn {
+    align-self: flex-start;
+    height: 26px;
+    padding: 0 10px;
+    font-size: 11px;
+    margin-top: 4px;
+  }
+}
+
+@media (max-width: 768px) {
   .profile-hero-card {
     display: grid;
     grid-template-columns: 48px 1fr;
@@ -1127,10 +1531,6 @@ const getSpotifyUrl = (acc) => {
     box-sizing: border-box;
   }
 
-  .monolith-tab-btn:last-child {
-    border-bottom: none;
-  }
-
   .monolith-tab-btn.active {
     border-left: 3.5px solid var(--c-accent, #1db954);
     background: linear-gradient(90deg, rgba(29, 185, 84, 0.2) 0%, rgba(24, 24, 30, 0.8) 100%);
@@ -1139,16 +1539,6 @@ const getSpotifyUrl = (acc) => {
   .monolith-tab-btn.sc-tab.active {
     border-left-color: #ff5500;
     background: linear-gradient(90deg, rgba(255, 85, 0, 0.22) 0%, rgba(28, 22, 22, 0.8) 100%);
-  }
-
-  .monolith-tab-btn.sc-tab .tab-edge-icon {
-    width: auto;
-    height: auto;
-  }
-
-  .monolith-tab-btn.sc-tab .sc-badge-inline {
-    padding: 1px 4px;
-    font-size: 9px;
   }
 
   .tab-edge-divider,
@@ -1172,17 +1562,10 @@ const getSpotifyUrl = (acc) => {
     gap: 8px;
   }
 
-  .hero-meta-top,
-  .hero-subline,
-  .hero-actions-bar {
-    justify-content: flex-start;
-  }
-
   .hero-name {
     font-size: 24px;
   }
 
-  /* Mobile details overlay - uniform seamless bottom panel */
   .hero-tab-details-panel {
     grid-area: details;
     width: 100% !important;
@@ -1213,10 +1596,6 @@ const getSpotifyUrl = (acc) => {
     width: 100%;
   }
 
-  .hero-tab-details-panel .panel-header {
-    margin-bottom: 6px;
-  }
-
   .hero-tab-details-panel .panel-stats-grid {
     grid-template-columns: repeat(4, 1fr) !important;
     gap: 6px;
@@ -1235,60 +1614,6 @@ const getSpotifyUrl = (acc) => {
   .hero-tab-details-panel .panel-stat-lbl {
     font-size: 10px;
   }
-
-  .hero-tab-details-panel .panel-highlight-row {
-    flex-direction: row;
-    align-items: baseline;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  .hero-tab-details-panel .panel-big-num {
-    font-size: 22px;
-  }
-
-  .hero-tab-details-panel .panel-big-lbl {
-    font-size: 13px;
-  }
-
-  .hero-tab-details-panel .panel-sub-desc {
-    margin-top: 3px;
-    font-size: 11.5px;
-  }
-
-  .hero-tab-details-panel .panel-quick-actions {
-    margin-top: 6px;
-    gap: 6px;
-  }
-
-  .hero-tab-details-panel .panel-action-btn {
-    height: 26px;
-    padding: 0 10px;
-    font-size: 11.5px;
-  }
-
-  .hero-tab-details-panel .tab-panel-sc .panel-sc-counts {
-    margin-top: 2px;
-  }
-
-  .hero-tab-details-panel .panel-sc-link-btn {
-    align-self: flex-start;
-    height: 26px;
-    padding: 0 10px;
-    font-size: 11px;
-    margin-top: 4px;
-  }
-
-  .hero-share-corner-btn {
-    top: 14px;
-    right: 14px;
-    width: 34px;
-    height: 34px;
-  }
-
-  .hero-actions-bar {
-    gap: 8px;
-  }
 }
 
 @media (max-width: 480px) {
@@ -1301,8 +1626,6 @@ const getSpotifyUrl = (acc) => {
     min-width: 44px !important;
     max-width: 44px !important;
     flex: 0 0 44px !important;
-    padding: 0;
-    gap: 0;
   }
 
   .monolith-tab-btn {

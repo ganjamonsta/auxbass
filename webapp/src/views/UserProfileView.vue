@@ -826,6 +826,8 @@ onMounted(() => {
   min-height: calc(100vh - 120px);
   width: 100%;
   box-sizing: border-box;
+  container-type: inline-size;
+  container-name: userprofile;
 }
 
 .loading-container {
