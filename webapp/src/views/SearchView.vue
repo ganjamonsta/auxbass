@@ -165,7 +165,7 @@
         />
 
         <!-- Global Empty Results (All categories empty) -->
-        <NoResultsBox v-if="noResults" :text="`Ничего не найдено по запросу «${searchQuery}»`" hint="Попробуйте ввести другой тег, название трека, исполнителя или плейлиста" />
+        <NoResultsBox v-if="noResults && activeFilter === 'all'" :text="`Ничего не найдено по запросу «${searchQuery}»`" hint="Попробуйте ввести другой тег, название трека, исполнителя или плейлиста" />
       </template>
     </div>
 
@@ -835,26 +835,14 @@ const topTracks = computed(() => {
 
 const noResults = computed(() => {
   if (isLoading.value || isFriendsLoading.value || isGlobalLoading.value) return false
+  if (!searchQuery.value?.trim()) return false
   if (activeFilter.value === 'all') {
-    return topTracks.value.length === 0 && artistsResults.value.length === 0 && albumsResults.value.length === 0 && playlistsResults.value.length === 0 && soundcloudResults.value.length === 0 && spotifyResults.value.length === 0
-  }
-  if (activeFilter.value === 'tracks') {
-    return allTracksList.value.length === 0
-  }
-  if (activeFilter.value === 'soundcloud') {
-    return soundcloudResults.value.length === 0
-  }
-  if (activeFilter.value === 'spotify') {
-    return spotifyResults.value.length === 0
-  }
-  if (activeFilter.value === 'artists') {
-    return artistsResults.value.length === 0
-  }
-  if (activeFilter.value === 'albums') {
-    return albumsResults.value.length === 0
-  }
-  if (activeFilter.value === 'playlists') {
-    return playlistsResults.value.length === 0
+    return topTracks.value.length === 0 && 
+           artistsResults.value.length === 0 && 
+           albumsResults.value.length === 0 && 
+           playlistsResults.value.length === 0 && 
+           soundcloudResults.value.length === 0 && 
+           spotifyResults.value.length === 0
   }
   return false
 })
