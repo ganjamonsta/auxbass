@@ -39,6 +39,10 @@
         :ambientGlowStyle="ambientGlowStyle"
         :scAccount="scAccount"
         :spAccount="spAccount"
+        :activeTab="activeTab"
+        :albumsCount="overviewAlbums.length"
+        :scPlaylistsCount="scPlaylists.length"
+        :scTracksCount="scTracks.length"
         @play="handlePlayUserLibrary"
         @shuffle="handleShuffleUserLibrary"
         @follow="toggleFollow"
@@ -53,63 +57,6 @@
         @restore="handleRestoreJob"
         @cancel="handleCancelJob"
       />
-
-      <!-- Modern Single-Line Tab Bar -->
-      <div class="user-tabs-bar">
-        <button
-          class="user-tab-btn"
-          :class="{ active: activeTab === 'overview' }"
-          @click="selectTab('overview')"
-        >
-          <Sparkles :size="16" />
-          <span>Обзор</span>
-        </button>
-
-        <button
-          class="user-tab-btn"
-          :class="{ active: activeTab === 'tracks' }"
-          @click="selectTab('tracks')"
-        >
-          <Music :size="16" />
-          <span>Треки</span>
-          <span v-if="user.track_count > 0" class="user-tab-badge">{{ user.track_count }}</span>
-        </button>
-
-        <button
-          class="user-tab-btn"
-          :class="{ active: activeTab === 'playlists' }"
-          @click="selectTab('playlists')"
-        >
-          <Folder :size="16" />
-          <span>Плейлисты</span>
-          <span v-if="user.playlist_count > 0" class="user-tab-badge">{{ user.playlist_count }}</span>
-        </button>
-
-        <button
-          v-if="overviewAlbums.length > 0 || activeTab === 'albums'"
-          class="user-tab-btn"
-          :class="{ active: activeTab === 'albums' }"
-          @click="selectTab('albums')"
-        >
-          <Disc3 :size="16" />
-          <span>Альбомы</span>
-          <span v-if="overviewAlbums.length > 0" class="user-tab-badge">{{ overviewAlbums.length }}</span>
-        </button>
-
-        <!-- SoundCloud Tab -->
-        <button
-          v-if="scAccount && (scAccount.show_playlists || scAccount.show_tracks || isSelf)"
-          class="user-tab-btn sc-tab-btn"
-          :class="{ active: activeTab === 'soundcloud' }"
-          @click="selectTab('soundcloud')"
-        >
-          <span class="sc-badge-inline">SC</span>
-          <span>SoundCloud</span>
-          <span v-if="scPlaylists.length + scTracks.length > 0" class="user-tab-badge sc-badge-num">
-            {{ scPlaylists.length + scTracks.length }}
-          </span>
-        </button>
-      </div>
 
       <!-- Overview Tab Content -->
       <div v-show="activeTab === 'overview'" class="tab-pane">
@@ -260,10 +207,6 @@ import ProfileEditModal from './profile/ProfileEditModal.vue'
 import {
   Lock,
   UserX,
-  Music,
-  Folder,
-  Disc3,
-  Sparkles,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -927,134 +870,11 @@ onMounted(() => {
   margin-top: 8px;
 }
 
-/* Tab Bar */
-.user-tabs-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 28px;
-  padding-bottom: 4px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
-}
-
-.user-tabs-bar::-webkit-scrollbar {
-  display: none;
-}
-
-.user-tabs-bar::after {
-  content: '';
-  flex-shrink: 0;
-  width: 8px;
-}
-
-.user-tab-btn {
-  display: inline-flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-  height: 42px;
-  padding: 0 20px;
-  border-radius: 9999px;
-  background: var(--c-bg-2, #181818);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  user-select: none;
-  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  flex-shrink: 0;
-}
-
-.user-tab-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--c-text-1, #fff);
-  border-color: rgba(255, 255, 255, 0.15);
-  transform: translateY(-1px);
-}
-
-.user-tab-btn.active {
-  background: var(--c-accent, #1db954);
-  color: #000;
-  font-weight: 700;
-  border-color: var(--c-accent, #1db954);
-  box-shadow: 0 4px 16px rgba(29, 185, 84, 0.4);
-}
-
-.user-tab-badge {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.1);
-  color: inherit;
-  transition: background 0.2s;
-}
-
-.user-tab-btn.active .user-tab-badge {
-  background: rgba(0, 0, 0, 0.18);
-  color: #000;
-}
-
 .tab-pane {
   min-height: 200px;
   width: 100%;
   max-width: 100%;
   min-width: 0;
-}
-
-/* SC/SP Tab Variants */
-.sc-badge-inline {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #ff5500;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 800;
-  border-radius: 4px;
-  padding: 1px 5px;
-  line-height: 1.2;
-  letter-spacing: 0.5px;
-}
-
-.user-tab-btn.sc-tab-btn {
-  border-color: rgba(255, 85, 0, 0.25);
-}
-
-.user-tab-btn.sc-tab-btn.active {
-  background: #ff5500;
-  color: #fff;
-  border-color: #ff5500;
-  box-shadow: 0 4px 16px rgba(255, 85, 0, 0.4);
-}
-
-.sc-badge-num {
-  background: rgba(255, 85, 0, 0.2) !important;
-  color: #ff7733 !important;
-}
-
-.user-tab-btn.sc-tab-btn.active .sc-badge-num {
-  background: rgba(0, 0, 0, 0.25) !important;
-  color: #fff !important;
-}
-
-.sp-badge-num {
-  background: rgba(29, 185, 84, 0.2) !important;
-  color: #1db954 !important;
-}
-
-.user-tab-btn.sp-tab-btn.active .sp-badge-num {
-  background: rgba(0, 0, 0, 0.25) !important;
-  color: #000 !important;
 }
 
 /* Responsive */
@@ -1063,51 +883,11 @@ onMounted(() => {
     padding: 16px 16px calc(var(--player-height, 70px) + var(--nav-height, 64px) + 32px);
     max-width: 100%;
   }
-
-  .user-tabs-bar {
-    gap: 8px;
-    margin-bottom: 20px;
-    padding-bottom: 6px;
-    margin-left: -16px;
-    margin-right: -16px;
-    padding-left: 16px;
-    padding-right: 16px;
-    width: calc(100% + 32px);
-    max-width: calc(100% + 32px);
-  }
-
-  .user-tab-btn {
-    height: 38px;
-    padding: 0 14px;
-    font-size: 13px;
-  }
-
-  .user-tab-badge {
-    font-size: 10px;
-    padding: 1px 6px;
-  }
 }
 
 @media (max-width: 480px) {
   .user-profile-view {
     padding: 14px 14px calc(var(--player-height, 70px) + var(--nav-height, 64px) + 32px);
-  }
-
-  .user-tabs-bar {
-    margin-left: -14px;
-    margin-right: -14px;
-    padding-left: 14px;
-    padding-right: 14px;
-    width: calc(100% + 28px);
-    max-width: calc(100% + 28px);
-    gap: 6px;
-  }
-
-  .user-tab-btn {
-    height: 36px;
-    padding: 0 12px;
-    font-size: 12.5px;
-    gap: 6px;
   }
 }
 

@@ -18,6 +18,80 @@
       <Camera :size="17" />
     </button>
 
+    <!-- Left: Neomorphic Hardware Audio-Rack Tabs -->
+    <div class="hero-neomorph-rack">
+      <!-- 1. Overview Tab -->
+      <button
+        class="rack-tab-btn"
+        :class="{ active: activeTab === 'overview' }"
+        @click="$emit('selectTab', 'overview')"
+        title="Обзор"
+      >
+        <div class="rack-active-led"></div>
+        <Sparkles :size="15" class="rack-icon" />
+        <span class="rack-label">Обзор</span>
+      </button>
+
+      <!-- 2. Tracks Tab -->
+      <button
+        class="rack-tab-btn"
+        :class="{ active: activeTab === 'tracks' }"
+        @click="$emit('selectTab', 'tracks')"
+        title="Треки"
+      >
+        <div class="rack-active-led"></div>
+        <Music :size="15" class="rack-icon" />
+        <span class="rack-label">Треки</span>
+        <span v-if="user.track_count > 0" class="rack-badge">{{ user.track_count }}</span>
+      </button>
+
+      <!-- 3. Playlists Tab -->
+      <button
+        class="rack-tab-btn"
+        :class="{ active: activeTab === 'playlists' }"
+        @click="$emit('selectTab', 'playlists')"
+        title="Плейлисты"
+      >
+        <div class="rack-active-led"></div>
+        <Folder :size="15" class="rack-icon" />
+        <span class="rack-label">Плейлисты</span>
+        <span v-if="user.playlist_count > 0" class="rack-badge">{{ user.playlist_count }}</span>
+      </button>
+
+      <!-- 4. Albums Tab -->
+      <button
+        v-if="albumsCount > 0 || activeTab === 'albums'"
+        class="rack-tab-btn"
+        :class="{ active: activeTab === 'albums' }"
+        @click="$emit('selectTab', 'albums')"
+        title="Альбомы"
+      >
+        <div class="rack-active-led"></div>
+        <Disc3 :size="15" class="rack-icon" />
+        <span class="rack-label">Альбомы</span>
+        <span v-if="albumsCount > 0" class="rack-badge">{{ albumsCount }}</span>
+      </button>
+
+      <!-- 5. SoundCloud Tab -->
+      <button
+        v-if="scAccount && (scAccount.show_playlists || scAccount.show_tracks || isSelf)"
+        class="rack-tab-btn sc-rack-tab"
+        :class="{ active: activeTab === 'soundcloud' }"
+        @click="$emit('selectTab', 'soundcloud')"
+        title="SoundCloud"
+      >
+        <div class="rack-active-led sc-led"></div>
+        <span class="sc-badge-inline rack-sc-badge">SC</span>
+        <span class="rack-label">SoundCloud</span>
+        <span v-if="scPlaylistsCount + scTracksCount > 0" class="rack-badge sc-badge-num">
+          {{ scPlaylistsCount + scTracksCount }}
+        </span>
+      </button>
+    </div>
+
+    <!-- Vertical Hardware Seam / Divider -->
+    <div class="hero-rack-divider"></div>
+
     <!-- Left: Full-Height Avatar -->
     <div 
       class="hero-avatar" 
@@ -184,6 +258,10 @@ import {
   Edit3,
   Radio,
   ExternalLink,
+  Sparkles,
+  Music,
+  Folder,
+  Disc3,
 } from 'lucide-vue-next'
 
 defineProps({
@@ -197,6 +275,10 @@ defineProps({
   ambientGlowStyle: { type: Object, default: () => ({}) },
   scAccount: { type: Object, default: null },
   spAccount: { type: Object, default: null },
+  activeTab: { type: String, default: 'overview' },
+  albumsCount: { type: Number, default: 0 },
+  scPlaylistsCount: { type: Number, default: 0 },
+  scTracksCount: { type: Number, default: 0 },
 })
 
 defineEmits(['play', 'shuffle', 'follow', 'edit', 'share', 'selectTab'])
@@ -233,7 +315,7 @@ const getSpotifyUrl = (acc) => {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
   display: flex;
   align-items: center;
-  gap: 32px;
+  gap: 22px;
 }
 
 .hero-ambient-glow {
@@ -580,6 +662,174 @@ const getSpotifyUrl = (acc) => {
   transform: scale(1.18);
 }
 
+/* ==========================================================================
+   Neomorphic Hardware Audio-Rack Tabs (Left Flank)
+   ========================================================================== */
+.hero-neomorph-rack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 165px;
+  min-width: 165px;
+  padding: 8px 7px;
+  background: linear-gradient(155deg, rgba(16, 19, 24, 0.88) 0%, rgba(9, 10, 13, 0.96) 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 
+    inset 2px 2px 6px rgba(0, 0, 0, 0.75),
+    inset -1px -1px 3px rgba(255, 255, 255, 0.04),
+    0 2px 8px rgba(0, 0, 0, 0.35);
+  flex-shrink: 0;
+  z-index: 2;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-sizing: border-box;
+}
+
+.hero-rack-divider {
+  width: 1px;
+  height: 180px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.01) 0%, rgba(255, 255, 255, 0.12) 40%, rgba(255, 255, 255, 0.12) 60%, rgba(255, 255, 255, 0.01) 100%);
+  box-shadow: 1px 0 0 rgba(0, 0, 0, 0.85);
+  flex-shrink: 0;
+  margin: 0 4px;
+}
+
+.rack-tab-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 9px 0 7px;
+  border-radius: 9px;
+  background: linear-gradient(180deg, rgba(36, 40, 48, 0.85) 0%, rgba(22, 25, 30, 0.95) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.55);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: var(--c-text-2, rgba(255, 255, 255, 0.72));
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+  user-select: none;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.rack-tab-btn:hover {
+  background: linear-gradient(180deg, rgba(46, 52, 62, 0.9) 0%, rgba(30, 34, 42, 0.98) 100%);
+  border-top-color: rgba(255, 255, 255, 0.24);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.rack-tab-btn:active {
+  transform: scale(0.98) translateY(1px);
+}
+
+/* Active State: Debossed / Inset with Cyber LED Glow */
+.rack-tab-btn.active {
+  background: linear-gradient(180deg, rgba(12, 14, 18, 0.96) 0%, rgba(18, 21, 26, 0.96) 100%);
+  border: 1px solid rgba(0, 0, 0, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 
+    inset 0 3px 6px rgba(0, 0, 0, 0.85),
+    inset 0 0 14px rgba(0, 255, 176, 0.14),
+    0 1px 0 rgba(255, 255, 255, 0.03);
+  color: #ffffff;
+  transform: translateY(1px);
+}
+
+/* Hardware LED Indicator Strip */
+.rack-active-led {
+  width: 3px;
+  height: 14px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.rack-tab-btn.active .rack-active-led {
+  background: #00ffb0;
+  box-shadow: 0 0 8px #00ffb0, 0 0 16px rgba(0, 255, 176, 0.7);
+}
+
+.rack-icon {
+  color: inherit;
+  opacity: 0.75;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.rack-tab-btn:hover .rack-icon {
+  opacity: 1;
+}
+
+.rack-tab-btn.active .rack-icon {
+  color: #00ffb0;
+  opacity: 1;
+  filter: drop-shadow(0 0 6px rgba(0, 255, 176, 0.6));
+}
+
+.rack-label {
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+/* Digital Readout Count Badge */
+.rack-badge {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+  transition: all 0.2s ease;
+}
+
+.rack-tab-btn.active .rack-badge {
+  color: #00ffb0;
+  background: rgba(0, 255, 176, 0.08);
+  border-color: rgba(0, 255, 176, 0.3);
+  text-shadow: 0 0 6px rgba(0, 255, 176, 0.4);
+}
+
+/* SoundCloud Rack Variant */
+.rack-sc-badge {
+  font-size: 9px !important;
+  padding: 1px 4px !important;
+  line-height: 1.2 !important;
+  border-radius: 3px !important;
+}
+
+.rack-tab-btn.sc-rack-tab.active {
+  box-shadow: 
+    inset 0 3px 6px rgba(0, 0, 0, 0.85),
+    inset 0 0 14px rgba(255, 85, 0, 0.16),
+    0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.rack-tab-btn.sc-rack-tab.active .rack-active-led {
+  background: #ff5500;
+  box-shadow: 0 0 8px #ff5500, 0 0 16px rgba(255, 85, 0, 0.7);
+}
+
+.rack-tab-btn.sc-rack-tab.active .rack-badge {
+  color: #ff7733;
+  background: rgba(255, 85, 0, 0.1);
+  border-color: rgba(255, 85, 0, 0.35);
+  text-shadow: 0 0 6px rgba(255, 85, 0, 0.4);
+}
+
 /* Mobile backdrop & edit button base */
 .hero-mobile-backdrop {
   display: none;
@@ -599,6 +849,35 @@ const getSpotifyUrl = (acc) => {
     gap: 18px;
     max-width: 100%;
     box-sizing: border-box;
+  }
+
+  .hero-rack-divider {
+    display: none;
+  }
+
+  .hero-neomorph-rack {
+    order: 4;
+    flex-direction: row;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding: 6px;
+    margin-top: 12px;
+    justify-content: flex-start;
+    border-radius: 14px;
+  }
+
+  .hero-neomorph-rack::-webkit-scrollbar {
+    display: none;
+  }
+
+  .rack-tab-btn {
+    flex-shrink: 0;
+    height: 38px;
+    padding: 0 12px 0 10px;
   }
 
   /* Backdrop: Large avatar on mobile */
