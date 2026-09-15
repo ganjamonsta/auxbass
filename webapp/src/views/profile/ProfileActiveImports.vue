@@ -368,8 +368,5 @@ defineEmits(['restore', 'cancel'])
   background: #22c55e;
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
+/* @keyframes spin — defined in design-system.css */
 </style>

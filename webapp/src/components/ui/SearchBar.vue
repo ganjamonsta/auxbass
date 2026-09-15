@@ -130,7 +130,5 @@ defineExpose({
   flex-shrink: 0;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+/* @keyframes spin — defined in design-system.css */
 </style>

@@ -425,9 +425,7 @@ const copyInlineCommand = async () => {
   animation: spin 0.8s linear infinite;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+/* @keyframes spin — defined in design-system.css */
 
 .btn-icon-wrapper {
   width: 40px;

@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { tracksApi, playlistsApi, playerApi, artistsApi } from '../api/client'
 import apiCache from '../utils/apiCache'
 import { getAllCachedTracks } from '../utils/audioCacheDb'
+import { setCachedUrl } from './playerCache'
 
 export const useLibraryStore = defineStore('library', () => {
   // LocalStorage keys for instant hydration (SWR) - scoped by user ID to prevent cross-account leakage
@@ -158,12 +159,7 @@ export const useLibraryStore = defineStore('library', () => {
               const urlData = response.data.urls || []
               for (const item of urlData) {
                 if (item.url && !item.error) {
-                  // Store in a way player.js can access (via window for simplicity)
-                  window._prefetchedUrls = window._prefetchedUrls || new Map()
-                  window._prefetchedUrls.set(item.track_id, {
-                    url: item.url,
-                    expires_at: item.expires_at
-                  })
+                  setCachedUrl(item.track_id, item.url, item.expires_at)
                 }
               }
               console.log(`[Prefetch] Pre-generated ${urlData.filter(u => u.url).length} stream URLs`)
@@ -254,9 +250,9 @@ export const useLibraryStore = defineStore('library', () => {
   }
   
   // Get current artists based on scope
-  const currentArtists = () => {
+  const currentArtists = computed(() => {
     return artistScope.value === 'global' ? globalArtists.value : artists.value
-  }
+  })
 
   // Current artist detail for ArtistCard view
   const currentArtist = ref(null)
@@ -972,7 +968,6 @@ export const useLibraryStore = defineStore('library', () => {
     if (!trackId) return false
     return Array.isArray(tracks.value) && tracks.value.some(t => t?.id === trackId)
   }
-  const isTrackInLibrary = isInLibrary
   
   // Fetch top users
   const fetchTopUsers = async () => {
@@ -1108,7 +1103,6 @@ export const useLibraryStore = defineStore('library', () => {
     addTrackOptimistic,
     removeFromLibrary,
     isInLibrary,
-    isTrackInLibrary,
     
     // Search
     search,

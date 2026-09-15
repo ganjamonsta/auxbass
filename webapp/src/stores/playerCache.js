@@ -12,19 +12,7 @@ const URL_CACHE_MARGIN = 60 // Refresh URL 60 seconds before expiry
  * Get cached URL for a track
  */
 export const getCachedUrl = (trackId) => {
-  // Check local cache first
-  let cached = urlCache.get(trackId)
-  
-  // Also check prefetched URLs from library.js (stored on window)
-  if (!cached && window._prefetchedUrls) {
-    cached = window._prefetchedUrls.get(trackId)
-    if (cached) {
-      // Move to local cache for consistency
-      urlCache.set(trackId, cached)
-      window._prefetchedUrls.delete(trackId)
-      console.log(`[Cache] Using prefetched URL for track ${trackId}`)
-    }
-  }
+  const cached = urlCache.get(trackId)
   
   if (!cached) return null
   

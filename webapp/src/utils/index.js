@@ -1,10 +1,38 @@
 /**
- * TG Player - Utilities Index
- * Re-exports all utility functions
+ * Utils barrel
+ * Re-exports all utils for convenient `import { ... } from '@/utils'` usage
  */
 
-export * from './formatters'
-export * from './styles'
-export * from './lrcParser'
-export * from './touch'
+export {
+  formatDuration,
+  formatDurationLong,
+  formatFileSize,
+  formatPlayCount,
+  formatRelativeDate,
+  formatFeedTimestamp,
+  truncateText,
+  splitArtists,
+  hasMultipleArtists,
+  extractFeaturedArtists,
+  getAllTrackArtists,
+  getDisplayTitle,
+  getDisplayArtist,
+  CoverSize,
+  getCoverUrl,
+  getCoverSrcSet
+} from './formatters'
 
+export {
+  getArtistAvatarStyle,
+  getArtistInitials,
+  getGenreStyle,
+  getTrackCoverStyle,
+  getTrackInitials,
+  getPlaylistCoverStyle
+} from './styles'
+
+export {
+  triggerHaptic,
+  suppressNextClick,
+  suppressNextContextMenu
+} from './touch'

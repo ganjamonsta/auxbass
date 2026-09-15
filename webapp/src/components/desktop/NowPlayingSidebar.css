@@ -144,10 +144,10 @@
 }
 
 .vinyl-disc.spinning {
-  animation: spin 3s linear infinite;
+  animation: spin-vinyl 3s linear infinite;
 }
 
-@keyframes spin {
+@keyframes spin-vinyl {
   from { transform: translate(-50%, -50%) translateX(60px) rotate(0deg); }
   to { transform: translate(-50%, -50%) translateX(60px) rotate(360deg); }
 }

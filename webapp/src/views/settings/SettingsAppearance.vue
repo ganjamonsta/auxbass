@@ -476,9 +476,7 @@ const handleInstallClick = () => {
   animation: spin 1s linear infinite;
 }
 
-@keyframes spin {
-  100% { transform: rotate(360deg); }
-}
+/* @keyframes spin — defined in design-system.css */
 
 @media (max-width: 540px) {
   .pwa-install-card {

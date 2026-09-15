@@ -359,9 +359,7 @@ const handleCancel = (jobId) => {
   background: #22c55e;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+/* @keyframes spin — defined in design-system.css */
 
 /* Animations */
 .task-widget-slide-enter-active,

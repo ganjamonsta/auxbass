@@ -1277,9 +1277,7 @@
   border-width: 4px;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+/* @keyframes spin — already defined in § 9 above */
 
 /* ─── Loading More (Infinite Scroll) ─── */
 .loading-more {

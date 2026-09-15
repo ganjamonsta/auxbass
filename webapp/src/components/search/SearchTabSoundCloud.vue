@@ -1157,10 +1157,7 @@ const displayedPlaylists = computed(() => {
   animation: spin 1s linear infinite;
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
+/* @keyframes spin — defined in design-system.css */
 
 .sc-sync-progress-banner {
   padding: 10px 14px;

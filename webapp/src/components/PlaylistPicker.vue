@@ -533,9 +533,7 @@ const handleSelect = async (playlist) => {
   animation: spin 0.6s linear infinite;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+/* @keyframes spin — defined in design-system.css */
 
 /* Empty States */
 .empty-state {

@@ -3,7 +3,6 @@
  * Re-exports all composables for convenient imports
  */
 
-export { useSearch } from './useSearch'
 export { usePullToRefresh } from './usePullToRefresh'
 export { useModals } from './useModals'
 export { useVirtualScroll } from './useVirtualScroll'

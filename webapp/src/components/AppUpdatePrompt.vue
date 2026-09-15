@@ -240,10 +240,7 @@ const handleRefresh = async () => {
   animation: spin 1s linear infinite;
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
+/* @keyframes spin — defined in design-system.css */
 
 @keyframes sparkle-float {
   0%, 100% { transform: rotate(0deg) scale(1); }

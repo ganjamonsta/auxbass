@@ -1074,10 +1074,7 @@ onUnmounted(() => {
 }
 
 /* Animations */
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
+/* @keyframes spin — defined in design-system.css */
 
 .spin {
   animation: spin 1s linear infinite;

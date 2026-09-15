@@ -1,4 +1,6 @@
 export { useAuthStore } from './auth'
 export { useLibraryStore } from './library'
 export { usePlayerStore } from './player'
+export { useUIStore } from './ui'
+export { useTasksStore } from './tasks'
 export { useExternalAccountsStore } from './externalAccounts'

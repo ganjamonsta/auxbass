@@ -861,9 +861,7 @@ const save = async () => {
   cursor: not-allowed;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+/* @keyframes spin — defined in design-system.css */
 
 /* Mobile compact styles */
 @media (max-width: 480px) {

@@ -1021,9 +1021,7 @@ const handleSubmit = async () => {
   padding-bottom: 0;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+/* @keyframes spin — defined in design-system.css */
 
 .spinning {
   animation: spin 0.8s linear infinite;

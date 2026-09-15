@@ -852,9 +852,7 @@ onUnmounted(() => {
   background: #22c55e;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+/* @keyframes spin — defined in design-system.css */
 
 /* Menu Items */
 .profile-menu-items {

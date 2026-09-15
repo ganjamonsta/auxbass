@@ -504,9 +504,7 @@ onUnmounted(() => {
   animation: spin 10s linear infinite;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+/* @keyframes spin — defined in design-system.css */
 
 /* Transitions */
 .banner-enter-active {

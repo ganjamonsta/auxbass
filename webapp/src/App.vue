@@ -259,7 +259,7 @@ import { useNetworkMonitor } from '@/composables/useNetworkMonitor'
 import { usePullToRefresh } from '@/composables/usePullToRefresh'
 import { usePwaInstall } from '@/composables/usePwaInstall'
 import { initAppUpdateListeners } from '@/composables/useAppUpdate'
-import { Music, Disc3, User, Folder, Library } from 'lucide-vue-next'
+import { Library } from 'lucide-vue-next'
 import { tracksApi } from '@/api/client'
 
 // Heavy and conditional components loaded asynchronously on demand
@@ -702,12 +702,6 @@ onMounted(async () => {
     }
   }
   
-  // Initialize Telegram WebApp
-  if (telegram) {
-    telegram.ready()
-    telegram.expand()
-  }
-
   // Initialize PWA installation check & banner schedule
   pwaInstall.init()
   
@@ -815,23 +809,7 @@ onUnmounted(() => {
 
 <style>
 /* App.vue layout styles — tokens are in design-system.css */
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html, body {
-  height: 100%;
-  width: 100%;
-  background: var(--c-bg-1);
-  color: var(--c-text-1);
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  overflow: hidden;
-}
+/* Global resets (*, html, body) are in style.css — not duplicated here */
 
 .app {
   display: flex;
@@ -1007,9 +985,7 @@ html, body {
   animation: spin 0.8s linear infinite;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+/* @keyframes spin — defined in design-system.css */
 
 /* Desktop adjustments */
 @media (min-width: 768px) {
