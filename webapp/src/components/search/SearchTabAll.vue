@@ -104,6 +104,40 @@
       </div>
     </section>
 
+    <!-- Matching YouTube Music Global Search Overview -->
+    <section v-if="youtubeResults && youtubeResults.length > 0" class="result-section youtube-section">
+      <div class="result-header">
+        <div class="header-left">
+          <span class="yt-badge">YT</span>
+          <h3 class="result-title">YouTube Music (Каталог)</h3>
+          <span class="result-count">{{ youtubeResults.length }}</span>
+        </div>
+        <button 
+          v-if="youtubeResults.length > 5" 
+          class="section-view-all" 
+          @click="$emit('switchFilter', 'youtube')"
+        >
+          <span>Все {{ youtubeResults.length }}</span>
+          <ArrowRight :size="14" />
+        </button>
+      </div>
+      
+      <div class="sc-results-list">
+        <ExternalTrackItem
+          v-for="item in youtubeResults.slice(0, 5)"
+          :key="item.url"
+          :item="item"
+          variant="youtube"
+          :is-importing="importingTrackUrl === item.url"
+          :is-downloading="tasksStore.isTrackDownloading(item.url)"
+          :is-queued="tasksStore.isTrackQueued(item.url)"
+          :is-in-library="isTrackInLibrary(item)"
+          @play="$emit('quickPlayYouTube', item)"
+          @add="$emit('quickAddYouTube', item)"
+        />
+      </div>
+    </section>
+
     <!-- Matching Artists Overview -->
     <section v-if="artistsResults.length > 0" class="result-section">
       <div class="result-header">
@@ -253,6 +287,7 @@ const props = defineProps({
   totalTracksCount: { type: Number, required: true },
   soundcloudResults: { type: Array, required: true },
   spotifyResults: { type: Array, required: true },
+  youtubeResults: { type: Array, default: () => [] },
   artistsResults: { type: Array, required: true },
   albumsResults: { type: Array, required: true },
   playlistsResults: { type: Array, required: true },
@@ -271,6 +306,8 @@ const emit = defineEmits([
   'quickAddSoundCloud',
   'quickPlaySpotify',
   'quickAddSpotify',
+  'quickPlayYouTube',
+  'quickAddYouTube',
   'goToArtist',
   'goToAlbum',
   'goToPlaylist'
@@ -409,6 +446,19 @@ const getPlaylistCoverStyle = (playlist) => {
   justify-content: center;
   background: #1ed760;
   color: #000;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.yt-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ff0033;
+  color: #fff;
   font-size: 10px;
   font-weight: 800;
   padding: 1px 5px;

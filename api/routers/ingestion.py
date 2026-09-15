@@ -508,7 +508,11 @@ async def quick_import_track(
                 cover_url=req.cover_url,
                 genre=req.genre,
                 tags=req.tags,
-                source_provider="soundcloud" if "soundcloud" in req.url else None,
+                source_provider=(
+                    "soundcloud" if "soundcloud" in req.url
+                    else ("youtube" if any(x in req.url for x in ("youtube", "youtu.be"))
+                    else ("spotify" if "spotify" in req.url else None))
+                ),
             )
 
             # Auto-forward to user's Telegram backup channel if active

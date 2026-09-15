@@ -26,7 +26,7 @@
     </div>
 
     <!-- Search Results Mode -->
-    <div v-if="searchQuery.trim() || activeFilter === 'soundcloud' || activeFilter === 'spotify'" class="search-results-container">
+    <div v-if="searchQuery.trim() || activeFilter === 'soundcloud' || activeFilter === 'spotify' || activeFilter === 'youtube'" class="search-results-container">
       <!-- Loading initial search results skeleton -->
       <div v-if="isInitialLoading" class="search-skeleton-list">
         <TrackSkeleton v-for="n in 8" :key="n" />
@@ -40,6 +40,7 @@
           :totalTracksCount="totalTracksCount"
           :soundcloudResults="soundcloudResults"
           :spotifyResults="spotifyResults"
+          :youtubeResults="youtubeResults"
           :artistsResults="artistsResults"
           :albumsResults="albumsResults"
           :playlistsResults="playlistsResults"
@@ -55,6 +56,8 @@
           @quickAddSoundCloud="handleQuickAddSoundCloud"
           @quickPlaySpotify="handleQuickPlaySpotify"
           @quickAddSpotify="handleQuickAddSpotify"
+          @quickPlayYouTube="handleQuickPlayYouTube"
+          @quickAddYouTube="handleQuickAddYouTube"
           @goToArtist="goToArtist"
           @goToAlbum="goToAlbum"
           @goToPlaylist="goToPlaylist"
@@ -169,6 +172,20 @@
           @quickAddSpotify="handleQuickAddSpotify"
         />
 
+        <!-- ==================== TAB: YOUTUBE ==================== -->
+        <SearchTabYouTube
+          v-else-if="activeFilter === 'youtube'"
+          :youtubeResults="youtubeResults"
+          :searchQuery="searchQuery"
+          :isYouTubeSearching="isYouTubeSearching"
+          :isLoadingMoreYouTube="isLoadingMoreYouTube"
+          :importingTrackUrl="importingTrackUrl"
+          @resetToAllSearch="resetToAllSearch"
+          @loadMoreYouTube="loadMoreYouTube"
+          @quickPlayYouTube="handleQuickPlayYouTube"
+          @quickAddYouTube="handleQuickAddYouTube"
+        />
+
         <!-- ==================== TAB: ALBUMS ==================== -->
         <SearchTabAlbums
           v-else-if="activeFilter === 'albums'"
@@ -212,6 +229,7 @@ import SearchTabAll from '@/components/search/SearchTabAll.vue'
 import SearchTabTracks from '@/components/search/SearchTabTracks.vue'
 import SearchTabSoundCloud from '@/components/search/SearchTabSoundCloud.vue'
 import SearchTabSpotify from '@/components/search/SearchTabSpotify.vue'
+import SearchTabYouTube from '@/components/search/SearchTabYouTube.vue'
 import SearchTabArtists from '@/components/search/SearchTabArtists.vue'
 import SearchTabAlbums from '@/components/search/SearchTabAlbums.vue'
 import SearchTabPlaylists from '@/components/search/SearchTabPlaylists.vue'
@@ -1036,17 +1054,93 @@ const handleQuickAddSpotify = (spTrack) => {
   tasksStore.enqueueTrack(spTrack, 'spotify')
 }
 
+// ─── YouTube Music External Search State ───
+const youtubeResults = ref([])
+const isYouTubeSearching = ref(false)
+const isLoadingMoreYouTube = ref(false)
+
+const searchYouTube = async (query, limit = 30) => {
+  const cleanQ = query.replace(/^#/, '').trim()
+  if (!cleanQ || cleanQ.length < 2) {
+    youtubeResults.value = []
+    return
+  }
+
+  isYouTubeSearching.value = true
+  try {
+    const res = await ingestionApi.search(cleanQ, 'youtube', limit)
+    youtubeResults.value = res.data || []
+  } catch (e) {
+    console.error('Failed to search YouTube:', e)
+    youtubeResults.value = []
+  } finally {
+    isYouTubeSearching.value = false
+  }
+}
+
+const loadMoreYouTube = async () => {
+  const cleanQ = searchQuery.value.replace(/^#/, '').trim()
+  if (!cleanQ || isLoadingMoreYouTube.value) return
+  isLoadingMoreYouTube.value = true
+  try {
+    const targetLimit = Math.min(60, youtubeResults.value.length + 30)
+    const res = await ingestionApi.search(cleanQ, 'youtube', targetLimit)
+    youtubeResults.value = res.data || []
+  } catch (e) {
+    console.error('Failed to load more from YouTube:', e)
+  } finally {
+    isLoadingMoreYouTube.value = false
+  }
+}
+
+const handleQuickPlayYouTube = async (ytTrack) => {
+  if (importingTrackUrl.value) return
+  importingTrackUrl.value = ytTrack.url
+
+  try {
+    const res = await ingestionApi.quickImport({
+      url: ytTrack.url,
+      title: ytTrack.title,
+      artist: ytTrack.artist,
+      duration: ytTrack.duration,
+      cover_url: ytTrack.cover_url,
+      add_to_library: false,
+    })
+
+    const track = res.data?.track
+    if (track) {
+      if (track.in_library) {
+        ytTrack.in_library = true
+      }
+      ytTrack.already_in_tg = true
+      ytTrack.track_id = track.id
+      playerStore.playTrack(track, [track], 0)
+    }
+  } catch (e) {
+    console.error('Failed to quick play YouTube track:', e)
+    const errorMsg = e.response?.data?.detail || 'Не удалось загрузить трек'
+    uiStore.toast?.error('Ошибка воспроизведения', errorMsg)
+  } finally {
+    importingTrackUrl.value = null
+  }
+}
+
+const handleQuickAddYouTube = (ytTrack) => {
+  tasksStore.enqueueTrack(ytTrack, 'youtube')
+}
+
 // Local database search loading state (fast, < 150ms)
 const isLocalSearching = computed(() => {
   return isTracksSearching.value || isArtistsSearching.value || isAlbumsSearching.value || isPlaylistsSearching.value
 })
 
 // Combined search loading state:
-// When viewing SoundCloud or Spotify tab, reflect external loading state.
+// When viewing SoundCloud or Spotify or YouTube tab, reflect external loading state.
 // Otherwise reflect local search state so search input spinner never freezes for 3-5s.
 const isLoading = computed(() => {
   if (activeFilter.value === 'soundcloud') return isSoundCloudSearching.value
   if (activeFilter.value === 'spotify') return isSpotifySearching.value
+  if (activeFilter.value === 'youtube') return isYouTubeSearching.value
   return isLocalSearching.value
 })
 
@@ -1069,6 +1163,7 @@ const filterChips = [
   { id: 'tracks', label: 'Треки' },
   { id: 'soundcloud', label: 'SoundCloud' },
   { id: 'spotify', label: 'Spotify' },
+  { id: 'youtube', label: 'YouTube Music' },
   { id: 'artists', label: 'Артисты' },
   { id: 'albums', label: 'Альбомы' },
   { id: 'playlists', label: 'Плейлисты' },
@@ -1103,6 +1198,9 @@ const getChipBadge = (chipId) => {
       return spLikes.value.length
     }
     return spotifyResults.value.length > 0 ? spotifyResults.value.length : (spAccount.value?.connected ? '★' : null)
+  }
+  if (chipId === 'youtube') {
+    return youtubeResults.value.length > 0 ? youtubeResults.value.length : null
   }
   if (chipId === 'artists') {
     return artistsResults.value.length > 0 ? artistsResults.value.length : null
@@ -1141,7 +1239,8 @@ const noResults = computed(() => {
            albumsResults.value.length === 0 && 
            playlistsResults.value.length === 0 && 
            soundcloudResults.value.length === 0 && 
-           spotifyResults.value.length === 0
+           spotifyResults.value.length === 0 &&
+           youtubeResults.value.length === 0
   }
   return false
 })
@@ -1329,9 +1428,13 @@ const performSearch = (q) => {
       if (activeFilter.value === 'all' || activeFilter.value === 'spotify') {
         searchSpotify(query, externalLimit)
       }
+      if (activeFilter.value === 'all' || activeFilter.value === 'youtube') {
+        searchYouTube(query, externalLimit)
+      }
     } else {
       soundcloudResults.value = []
       spotifyResults.value = []
+      youtubeResults.value = []
     }
   } else {
     clearTrackSearch()
@@ -1340,6 +1443,7 @@ const performSearch = (q) => {
     playlistsResults.value = []
     soundcloudResults.value = []
     spotifyResults.value = []
+    youtubeResults.value = []
   }
 }
 
@@ -1348,7 +1452,7 @@ watch(debouncedQuery, (newVal) => {
   performSearch(newVal)
 })
 
-// On-demand external search when switching to dedicated SoundCloud or Spotify tabs
+// On-demand external search when switching to dedicated SoundCloud, Spotify or YouTube tabs
 watch(activeFilter, (newFilter) => {
   const query = (searchQuery.value || '').trim()
   if (!query || query.startsWith('#')) return
@@ -1356,6 +1460,8 @@ watch(activeFilter, (newFilter) => {
     searchSoundCloud(query, 30)
   } else if (newFilter === 'spotify' && spotifyResults.value.length < 30) {
     searchSpotify(query, 30)
+  } else if (newFilter === 'youtube' && youtubeResults.value.length < 30) {
+    searchYouTube(query, 30)
   }
 })
 
@@ -1367,6 +1473,7 @@ const handleClear = () => {
   playlistsResults.value = []
   soundcloudResults.value = []
   spotifyResults.value = []
+  youtubeResults.value = []
   if (tags.value.length === 0) {
     loadTags()
   }
@@ -1444,6 +1551,10 @@ const setFilter = (chipId) => {
     newQuery.tab = 'spotify'
     newQuery.mode = spSubTab.value || 'search'
     router.replace({ path: '/search', query: newQuery })
+  } else if (chipId === 'youtube') {
+    newQuery.tab = 'youtube'
+    delete newQuery.mode
+    router.replace({ path: '/search', query: newQuery })
   } else {
     delete newQuery.tab
     delete newQuery.mode
@@ -1511,9 +1622,11 @@ const applyRouteQuery = () => {
     } else {
       spSubTab.value = 'search'
     }
+  } else if (route.query.tab === 'youtube') {
+    activeFilter.value = 'youtube'
   } else if (!route.query.tab) {
     // When navigated to /search without a tab parameter, reset any external provider filter
-    if (activeFilter.value === 'soundcloud' || activeFilter.value === 'spotify') {
+    if (activeFilter.value === 'soundcloud' || activeFilter.value === 'spotify' || activeFilter.value === 'youtube') {
       activeFilter.value = 'all'
     }
   }

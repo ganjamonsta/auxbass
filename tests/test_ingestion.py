@@ -1,6 +1,7 @@
 """
 Tests for External Music Ingestion Framework (SoundCloud, Providers, Registry, Jobs)
 """
+import os
 import pytest
 import asyncio
 from bot.services.ingestion.base import EntityType, SourceEntity, TrackMetadata
@@ -754,6 +755,136 @@ async def test_playlist_custom_cover_url_creation():
         assert pl.id is not None
         assert pl.custom_cover_url == "https://i1.sndcdn.com/artworks-123456-t500x500.jpg"
         assert pl.name == "SoundCloud Test Playlist"
+
+
+def test_youtube_url_matching():
+    from bot.services.ingestion.providers.youtube import YouTubeMusicProvider
+    yt = YouTubeMusicProvider()
+    assert yt.can_handle("https://music.youtube.com/watch?v=dQw4w9WgXcQ")
+    assert yt.can_handle("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+    assert yt.can_handle("https://youtu.be/dQw4w9WgXcQ")
+    assert yt.can_handle("https://music.youtube.com/playlist?list=PL1234567890")
+    assert yt.can_handle("https://www.youtube.com/playlist?list=PL1234567890")
+    assert not yt.can_handle("https://soundcloud.com/artist/track")
+    assert not yt.can_handle("https://open.spotify.com/track/123")
+
+
+def test_youtube_artist_and_title_parsing():
+    from bot.services.ingestion.providers.youtube import _parse_artist_and_title
+
+    # 1. Topic channel with "Artist - Topic"
+    a, t = _parse_artist_and_title("Brain Stew", uploader="Green Day - Topic")
+    assert a == "Green Day"
+    assert t == "Brain Stew"
+
+    # 2. "Artist - Title" format in title
+    a, t = _parse_artist_and_title("Green Day - Basket Case (Official Music Video)", uploader="Reprise Records")
+    assert a == "Green Day"
+    assert t == "Basket Case"
+
+    # 3. Explicit track and artist fields
+    a, t = _parse_artist_and_title("Whatever", track_field="Holiday", artist_field="Green Day")
+    assert a == "Green Day"
+    assert t == "Holiday"
+
+
+@pytest.mark.asyncio
+async def test_youtube_search_mock(monkeypatch):
+    from bot.services.ingestion.providers.youtube import YouTubeMusicProvider
+    yt = YouTubeMusicProvider()
+
+    async def mock_to_thread(func):
+        return [
+            {
+                "id": "dQw4w9WgXcQ",
+                "title": "Rick Astley - Never Gonna Give You Up",
+                "uploader": "Rick Astley",
+                "duration": 213,
+                "thumbnails": [
+                    {"url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg", "width": 480, "height": 360}
+                ],
+            }
+        ]
+
+    monkeypatch.setattr(asyncio, "to_thread", mock_to_thread)
+    results = await yt.search("Never Gonna Give You Up", limit=1)
+    assert len(results) == 1
+    assert results[0].artist == "Rick Astley"
+    assert results[0].title == "Never Gonna Give You Up"
+    assert results[0].duration == 213
+    assert results[0].external_id == "dQw4w9WgXcQ"
+    assert "https://www.youtube.com/watch?v=dQw4w9WgXcQ" in results[0].url
+
+
+@pytest.mark.asyncio
+async def test_audio_resolver_soundcloud_drm_falls_back_to_youtube(monkeypatch, tmp_path):
+    """
+    Simulates:
+    1. SoundCloud search returns a candidate that throws 'This video is DRM protected'
+    2. AudioResolver catches this, logs fallback to YouTube Music
+    3. YouTube candidate search returns valid stream candidate
+    4. AudioResolver downloads the YouTube audio successfully
+    """
+    from bot.services.ingestion.audio_resolver import AudioResolver
+    from bot.services.ingestion.base import TrackMetadata
+    resolver = AudioResolver()
+
+    meta = TrackMetadata(
+        provider_name="spotify",
+        url="https://open.spotify.com/track/spotify123",
+        title="Brain Stew",
+        artist="Green Day",
+        duration=193,
+    )
+
+    # Mock SoundCloud candidates search
+    async def mock_sc_candidates(query, limit=10):
+        return [
+            {
+                "title": "Green Day - Brain Stew (SoundCloud Go+ DRM)",
+                "duration": 193,
+                "webpage_url": "https://soundcloud.com/greenday/brain-stew-drm",
+            }
+        ]
+
+    # Mock YouTube candidates search
+    async def mock_yt_candidates(query, limit=6):
+        return [
+            {
+                "id": "yt_video_123",
+                "title": "Green Day - Brain Stew (Official Audio)",
+                "duration": 193,
+                "webpage_url": "https://www.youtube.com/watch?v=yt_video_123",
+            }
+        ]
+
+    monkeypatch.setattr(resolver, "_search_candidates", mock_sc_candidates)
+    monkeypatch.setattr(resolver, "_search_youtube_candidates", mock_yt_candidates)
+
+    # Mock _download_stream: fail if soundcloud url (DRM), succeed if youtube url
+    download_calls = []
+
+    async def mock_download_stream(url, temp_dir, progress_hook=None):
+        download_calls.append(url)
+        if "soundcloud.com" in url:
+            raise Exception("ERROR: [soundcloud] 1162789264: This video is DRM protected")
+        # Create a dummy audio file in temp_dir
+        fake_audio = os.path.join(temp_dir, "resolved_audio.mp3")
+        with open(fake_audio, "wb") as f:
+            f.write(b"ID3" + b"\x00" * 1024)
+        return fake_audio
+
+    monkeypatch.setattr(resolver, "_download_stream", mock_download_stream)
+
+    result = await resolver.resolve_and_download(meta, str(tmp_path))
+
+    # Assert that SoundCloud candidate was tried first
+    assert any("soundcloud.com" in c for c in download_calls)
+    # Assert that YouTube candidate was tried and succeeded as fallback
+    assert any("youtube.com" in c for c in download_calls)
+    assert result.audio_path.endswith(".mp3")
+    assert result.metadata.title == "Brain Stew"
+
 
 
 

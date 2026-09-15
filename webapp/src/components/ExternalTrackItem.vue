@@ -1,10 +1,10 @@
 <template>
   <div
     class="sc-track-item"
-    :class="{ 'sp-item': variant === 'spotify' }"
+    :class="{ 'sp-item': variant === 'spotify', 'yt-item': variant === 'youtube' }"
     @click="$emit('play', item)"
   >
-    <div class="sc-track-cover" :class="{ 'sp-cover': variant === 'spotify' }">
+    <div class="sc-track-cover" :class="{ 'sp-cover': variant === 'spotify', 'yt-cover': variant === 'youtube' }">
       <img
         v-if="item.cover_url && !coverError"
         :src="item.cover_url"
@@ -49,6 +49,7 @@
         class="sc-add-btn" 
         :class="{ 
           'sp-add': variant === 'spotify',
+          'yt-add': variant === 'youtube',
           loading: isDownloading,
           queued: isQueued
         }"
@@ -79,7 +80,7 @@ defineProps({
   },
   variant: {
     type: String,
-    default: 'soundcloud', // 'soundcloud' | 'spotify'
+    default: 'soundcloud', // 'soundcloud' | 'spotify' | 'youtube'
   },
   showBadges: {
     type: Boolean,
@@ -132,6 +133,11 @@ const coverError = ref(false)
 .sc-track-item.sp-item:hover {
   background: rgba(29, 185, 84, 0.08);
   border-color: rgba(29, 185, 84, 0.25);
+}
+
+.sc-track-item.yt-item:hover {
+  background: rgba(255, 0, 51, 0.08);
+  border-color: rgba(255, 0, 51, 0.25);
 }
 
 .sc-track-cover {
@@ -337,6 +343,25 @@ const coverError = ref(false)
 }
 
 .sc-add-btn.sp-add.queued {
+  background: rgba(56, 189, 248, 0.16);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+  cursor: default;
+}
+
+.sc-add-btn.yt-add:hover:not(:disabled) {
+  background: #ff0033;
+  border-color: #ff0033;
+  color: #fff;
+}
+
+.sc-add-btn.yt-add.loading {
+  background: rgba(255, 0, 51, 0.18);
+  border-color: rgba(255, 0, 51, 0.45);
+  cursor: wait;
+}
+
+.sc-add-btn.yt-add.queued {
   background: rgba(56, 189, 248, 0.16);
   border-color: rgba(56, 189, 248, 0.4);
   color: #38bdf8;

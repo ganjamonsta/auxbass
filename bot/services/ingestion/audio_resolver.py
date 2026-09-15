@@ -1,14 +1,15 @@
 """
 TG Player - Unified Audio Sourcing Engine
 Finds and downloads unencrypted high-quality audio streams matching
-metadata (artist, title, duration) for Spotify tracks and SoundCloud DRM fallbacks.
+metadata (artist, title, duration) for Spotify tracks, SoundCloud DRM fallbacks,
+and YouTube Music fallback audio sourcing.
 """
 import os
 import re
 import logging
 import asyncio
 import tempfile
-from typing import Optional, List, Set, Callable
+from typing import Optional, List, Set, Callable, Tuple
 
 import aiohttp
 import yt_dlp
@@ -29,6 +30,7 @@ class AudioResolver:
     """
     Resolves an unencrypted audio stream for any given TrackMetadata,
     matching duration, artist, and title, and downloads it in 320kbps MP3.
+    Features candidate retry loop and automatic fallback to YouTube Music on DRM.
     """
 
     MAX_DURATION_DIFF_SECONDS = 15
@@ -43,41 +45,92 @@ class AudioResolver:
         """
         Find an alternative unencrypted audio stream matching the track,
         download it at 320kbps MP3, and tag it with original metadata and cover.
+        Tries SoundCloud candidates with retry loop, then falls back to YouTube Music.
         """
         os.makedirs(temp_dir, exist_ok=True)
-        exclude_set = exclude_urls or set()
+        exclude_set = set(exclude_urls or set())
         if track_meta.url:
             exclude_set.add(track_meta.url)
 
-        # 1. Search candidates via SoundCloud
         search_query = f"{track_meta.artist} {track_meta.title}".strip()
-        candidates = await self._search_candidates(search_query, limit=10)
+        downloaded_audio_path = None
+        matched_candidate_title = None
+        matched_candidate_url = None
 
-        # 2. Score and pick best candidate
-        best_candidate = self._pick_best_candidate(track_meta, candidates, exclude_set)
+        # =========================================================================
+        # PHASE 1: Try SoundCloud candidates (with retry loop over multiple entries)
+        # =========================================================================
+        sc_candidates = await self._search_candidates(search_query, limit=10)
+        ranked_sc = self._rank_candidates(track_meta, sc_candidates, exclude_set)
 
-        if not best_candidate:
-            # Fallback search with title only if artist had multiple collaborators
+        if not ranked_sc:
             first_artist = track_meta.artist.split(",")[0].split(" feat")[0].split(" ft")[0].strip()
             if first_artist != track_meta.artist:
                 alt_query = f"{first_artist} {track_meta.title}".strip()
-                more_candidates = await self._search_candidates(alt_query, limit=10)
-                best_candidate = self._pick_best_candidate(track_meta, more_candidates, exclude_set)
+                more_sc = await self._search_candidates(alt_query, limit=10)
+                ranked_sc = self._rank_candidates(track_meta, more_sc, exclude_set)
 
-        if not best_candidate:
+        for cand in ranked_sc:
+            cand_url = cand.get("webpage_url") or cand.get("url")
+            cand_title = cand.get("title") or "SoundCloud Track"
+            try:
+                logger.info(
+                    f"[AudioResolver] Trying SoundCloud candidate for '{track_meta.artist} - {track_meta.title}': "
+                    f"'{cand_title}' ({cand_url})"
+                )
+                downloaded_audio_path = await self._download_stream(cand_url, temp_dir, progress_hook=progress_hook)
+                matched_candidate_title = cand_title
+                matched_candidate_url = cand_url
+                break
+            except Exception as e:
+                err_clean = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', str(e))
+                logger.warning(f"[AudioResolver] SoundCloud candidate '{cand_title}' failed: {err_clean}. Trying next candidate...")
+
+        # =========================================================================
+        # PHASE 2: Fallback to YouTube Music / YouTube
+        # =========================================================================
+        if not downloaded_audio_path:
+            logger.info(
+                f"[AudioResolver] SoundCloud candidates unavailable or DRM-protected for "
+                f"'{track_meta.artist} - {track_meta.title}'. Falling back to YouTube Music..."
+            )
+            yt_candidates = await self._search_youtube_candidates(search_query, limit=6)
+            ranked_yt = self._rank_candidates(track_meta, yt_candidates, exclude_set)
+
+            if not ranked_yt and first_artist != track_meta.artist:
+                alt_query = f"{first_artist} {track_meta.title}".strip()
+                more_yt = await self._search_youtube_candidates(alt_query, limit=6)
+                ranked_yt = self._rank_candidates(track_meta, more_yt, exclude_set)
+
+            for cand in ranked_yt:
+                cand_url = cand.get("webpage_url") or cand.get("url")
+                if not cand_url and cand.get("id"):
+                    cand_url = f"https://www.youtube.com/watch?v={cand['id']}"
+                cand_title = cand.get("title") or "YouTube Track"
+                try:
+                    logger.info(
+                        f"[AudioResolver] Trying YouTube candidate for '{track_meta.artist} - {track_meta.title}': "
+                        f"'{cand_title}' ({cand_url})"
+                    )
+                    downloaded_audio_path = await self._download_stream(cand_url, temp_dir, progress_hook=progress_hook)
+                    matched_candidate_title = cand_title
+                    matched_candidate_url = cand_url
+                    break
+                except Exception as e:
+                    err_clean = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', str(e))
+                    logger.warning(f"[AudioResolver] YouTube candidate '{cand_title}' failed: {err_clean}. Trying next candidate...")
+
+        if not downloaded_audio_path or not os.path.exists(downloaded_audio_path):
             raise ValueError(
                 f"Не удалось найти доступный незашифрованный аудиопоток для '{track_meta.artist} - {track_meta.title}'."
             )
 
         logger.info(
-            f"[AudioResolver] Matched '{track_meta.artist} - {track_meta.title}' "
-            f"-> candidate '{best_candidate.get('title')}' ({best_candidate.get('url')})"
+            f"[AudioResolver] Successfully sourced audio for '{track_meta.artist} - {track_meta.title}' "
+            f"via '{matched_candidate_title}' ({matched_candidate_url})"
         )
 
-        # 3. Download audio stream
-        audio_path = await self._download_stream(best_candidate["url"], temp_dir, progress_hook=progress_hook)
-
-        # 4. Download high-quality cover artwork if available
+        # Download high-quality cover artwork if available
         cover_path = None
         if track_meta.cover_url:
             cover_path = os.path.join(temp_dir, "cover.jpg")
@@ -94,10 +147,10 @@ class AudioResolver:
                 logger.warning(f"[AudioResolver] Failed to download cover for {track_meta.title}: {e}")
                 cover_path = None
 
-        file_size = os.path.getsize(audio_path)
+        file_size = os.path.getsize(downloaded_audio_path)
 
         return DownloadedAudio(
-            audio_path=audio_path,
+            audio_path=downloaded_audio_path,
             cover_path=cover_path,
             metadata=track_meta,
             file_size=file_size,
@@ -120,22 +173,52 @@ class AudioResolver:
         try:
             return await asyncio.to_thread(_search)
         except Exception as e:
-            logger.warning(f"[AudioResolver] Candidate search failed for '{query}': {e}")
+            logger.warning(f"[AudioResolver] SoundCloud candidate search failed for '{query}': {e}")
             return []
 
-    def _pick_best_candidate(
+    async def _search_youtube_candidates(self, query: str, limit: int = 6) -> List[dict]:
+        """Search YouTube / YouTube Music for potential candidate streams."""
+        def _search_yt():
+            ydl_opts = {
+                "quiet": True,
+                "no_warnings": True,
+                "extract_flat": True,
+                "skip_download": True,
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                try:
+                    res = ydl.extract_info(f"ytmsearch{limit}:{query}", download=False)
+                    entries = res.get("entries") or []
+                    if entries:
+                        return entries
+                except Exception as ytm_err:
+                    logger.debug(f"[AudioResolver] ytmsearch failed, falling back to ytsearch: {ytm_err}")
+
+                res = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
+                return res.get("entries") or []
+
+        try:
+            return await asyncio.to_thread(_search_yt)
+        except Exception as e:
+            logger.warning(f"[AudioResolver] YouTube candidate search failed for '{query}': {e}")
+            return []
+
+    def _rank_candidates(
         self,
         target: TrackMetadata,
         candidates: List[dict],
         exclude_urls: Set[str],
-    ) -> Optional[dict]:
-        """Score candidates based on duration match and title similarity."""
-        valid_candidates = []
+    ) -> List[dict]:
+        """Score candidates based on duration match and title similarity, returning sorted list."""
+        valid_candidates: List[Tuple[float, dict]] = []
 
         for c in candidates:
             if not isinstance(c, dict):
                 continue
             cand_url = c.get("webpage_url") or c.get("url") or ""
+            if not cand_url and c.get("id"):
+                cand_url = f"https://www.youtube.com/watch?v={c['id']}"
+
             if not cand_url or cand_url in exclude_urls:
                 continue
 
@@ -159,12 +242,18 @@ class AudioResolver:
             total_penalty = diff + (1.0 - title_score) * 20
             valid_candidates.append((total_penalty, c))
 
-        if not valid_candidates:
-            return None
-
-        # Sort by best (lowest penalty)
         valid_candidates.sort(key=lambda x: x[0])
-        return valid_candidates[0][1]
+        return [c for _, c in valid_candidates]
+
+    def _pick_best_candidate(
+        self,
+        target: TrackMetadata,
+        candidates: List[dict],
+        exclude_urls: Set[str],
+    ) -> Optional[dict]:
+        """Score candidates and return the single best one (for backwards compatibility)."""
+        ranked = self._rank_candidates(target, candidates, exclude_urls)
+        return ranked[0] if ranked else None
 
     async def _download_stream(
         self,
