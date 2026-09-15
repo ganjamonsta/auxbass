@@ -152,6 +152,11 @@
                   <FolderOpen :size="18" />
                   <span>Открыть</span>
                 </button>
+                <button class="menu-item" @click="exec('togglePin')">
+                  <PinOff v-if="uiStore.isPlaylistPinned(menuData?.id)" :size="18" />
+                  <Pin v-else :size="18" />
+                  <span>{{ uiStore.isPlaylistPinned(menuData?.id) ? 'Открепить от сайдбара' : 'Закрепить в сайдбаре' }}</span>
+                </button>
                 <button class="menu-item" @click="exec('playAll')">
                   <Play :size="18" fill="currentColor" />
                   <span>Воспроизвести все</span>
@@ -345,7 +350,7 @@ import TagChips from '@/components/TagChips.vue'
 import { 
   X, User, Disc3, Play, ListMusic, Plus, Minus, Pencil, Check,
   Trash2, FolderOpen, Shuffle, Music, Mic2, ChevronRight, ChevronDown,
-  ThumbsDown, Heart, Share2
+  ThumbsDown, Heart, Share2, Pin, PinOff
 } from 'lucide-vue-next'
 
 const router = useRouter()

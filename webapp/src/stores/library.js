@@ -38,9 +38,27 @@ export const useLibraryStore = defineStore('library', () => {
     } catch (_) {}
   }
 
+  const cleanCoverUrl = (url) => {
+    if (!url || typeof url !== 'string') return null
+    return url.replace(/[?&]_cb=\d+/, '').replace(/\?$/, '')
+  }
+
+  const sanitizePlaylists = (list) => {
+    if (!Array.isArray(list)) return []
+    return list.map((p) => {
+      const covers = (p.covers || (p.cover_url ? [p.cover_url] : [])).map(cleanCoverUrl).filter(Boolean)
+      const cover_url = cleanCoverUrl(p.cover_url) || covers[0] || null
+      return {
+        ...p,
+        cover_url,
+        covers
+      }
+    })
+  }
+
   // State - My Library with instant local cache hydration
   const tracks = ref([])
-  const playlists = ref(loadFromStorage(CACHE_KEY_PLAYLISTS, []))
+  const playlists = ref(sanitizePlaylists(loadFromStorage(CACHE_KEY_PLAYLISTS, [])))
   const artists = ref([])
   const artistsTotal = ref(0)
   const globalArtists = ref([])  // All artists from global library
@@ -185,22 +203,10 @@ export const useLibraryStore = defineStore('library', () => {
   // Fetch playlists
   const fetchPlaylists = async (force = false) => {
     try {
-      const response = await playlistsApi.getAll(force ? { _t: Date.now() } : {}, { bypassCache: true })
+      const response = await playlistsApi.getAll({}, { bypassCache: Boolean(force) })
       const raw = response.data?.items || response.data || []
 
-      // Cache-bust covers so UI reloads fresh images after updates
-      const stamp = Date.now()
-      const bust = (url) => {
-        if (!url) return null
-        const sep = url.includes('?') ? '&' : '?'
-        return `${url}${sep}_cb=${stamp}`
-      }
-
-      playlists.value = raw.map((p) => ({
-        ...p,
-        cover_url: bust(p.cover_url),
-        covers: (p.covers || (p.cover_url ? [p.cover_url] : [])).map(bust)
-      }))
+      playlists.value = sanitizePlaylists(raw)
       saveToStorage(CACHE_KEY_PLAYLISTS, playlists.value.slice(0, 25))
     } catch (error) {
       console.error('Failed to fetch playlists:', error)
@@ -210,7 +216,7 @@ export const useLibraryStore = defineStore('library', () => {
   // Fetch single playlist with tracks
   const fetchPlaylist = async (id, force = false) => {
     try {
-      const response = await playlistsApi.getOne(id, force ? { _t: Date.now() } : {}, { bypassCache: force })
+      const response = await playlistsApi.getOne(id, {}, { bypassCache: Boolean(force) })
       return response.data
     } catch (error) {
       console.error('Failed to fetch playlist:', error)

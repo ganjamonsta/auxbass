@@ -108,12 +108,69 @@ export const useUIStore = defineStore('ui', () => {
     }
   }
 
+  // Pinned sidebar playlists (array of playlist IDs)
+  const PINNED_PLAYLISTS_KEY = 'tg_player_pinned_playlists'
+  const loadPinnedPlaylists = () => {
+    try {
+      const saved = localStorage.getItem(PINNED_PLAYLISTS_KEY)
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  }
+  const pinnedPlaylistIds = ref(loadPinnedPlaylists())
+
+  const savePinnedPlaylists = () => {
+    try {
+      localStorage.setItem(PINNED_PLAYLISTS_KEY, JSON.stringify(pinnedPlaylistIds.value))
+    } catch (_) {}
+  }
+
+  const isPlaylistPinned = (playlistId) => {
+    if (!playlistId) return false
+    return pinnedPlaylistIds.value.includes(Number(playlistId))
+  }
+
+  const pinPlaylist = (playlistId) => {
+    const numId = Number(playlistId)
+    if (!numId) return
+    if (!pinnedPlaylistIds.value.includes(numId)) {
+      pinnedPlaylistIds.value = [numId, ...pinnedPlaylistIds.value]
+      savePinnedPlaylists()
+    }
+  }
+
+  const unpinPlaylist = (playlistId) => {
+    const numId = Number(playlistId)
+    if (!numId) return
+    pinnedPlaylistIds.value = pinnedPlaylistIds.value.filter(id => id !== numId)
+    savePinnedPlaylists()
+  }
+
+  const togglePinPlaylist = (playlistId) => {
+    const numId = Number(playlistId)
+    if (!numId) return false
+    if (isPlaylistPinned(numId)) {
+      unpinPlaylist(numId)
+      return false
+    } else {
+      pinPlaylist(numId)
+      return true
+    }
+  }
+
   return {
     libraryTab,
     setLibraryTab,
     // Settings view active section
     settingsSection,
     setSettingsSection,
+    // Pinned Playlists
+    pinnedPlaylistIds,
+    isPlaylistPinned,
+    pinPlaylist,
+    unpinPlaylist,
+    togglePinPlaylist,
     // Left Sidebar state
     isSidebarCollapsed,
     isAutoCollapsed,

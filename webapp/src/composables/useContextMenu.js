@@ -361,7 +361,8 @@ export function useContextMenu() {
       try {
         const tracks = await loadPlaylistTracks(playlist)
         if (tracks?.length) {
-          playerStore.play(tracks[0], tracks)
+          playerStore.recordPlaylistPlayed(playlist.id)
+          playerStore.play(tracks[0], tracks, { type: 'playlist', id: playlist.id, name: playlist.name })
           uiStore.toast.success('Воспроизведение', `Играет: ${playlist.name}`)
         } else {
           uiStore.toast.info('Пусто', 'В плейлисте нет треков')
@@ -377,6 +378,7 @@ export function useContextMenu() {
       if (!playlist?.id) return closeMenu()
       
       try {
+        playerStore.recordPlaylistPlayed(playlist.id)
         await playerStore.playShuffleAll('playlist', playlist.id)
         uiStore.toast.success('Перемешивание', `Играет: ${playlist.name}`)
       } catch (error) {
@@ -384,6 +386,17 @@ export function useContextMenu() {
         uiStore.toast.error('Ошибка', 'Не удалось воспроизвести')
       }
       closeMenu()
+    },
+
+    togglePin: (playlist) => {
+      closeMenu()
+      if (!playlist?.id) return
+      const isPinned = uiStore.togglePinPlaylist(playlist.id)
+      if (isPinned) {
+        uiStore.toast.success('Закреплено', `Плейлист «${playlist.name}» закреплен в сайдбаре`)
+      } else {
+        uiStore.toast.info('Откреплено', `Плейлист «${playlist.name}» откреплен от сайдбара`)
+      }
     },
 
     addToQueue: async (playlist) => {

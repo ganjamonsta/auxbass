@@ -20,7 +20,7 @@ from aiogram.types import BufferedInputFile
 from shared.database import get_db
 from shared.models import (
     Playlist, PlaylistTrack, Track, UserLibrary, AlbumTrack, User,
-    PlaylistSubscription, TrackEnrichment, UserChannel, TrackTag
+    PlaylistSubscription, TrackEnrichment, UserChannel, TrackTag, utcnow
 )
 from shared.config import get_settings
 from api.utils.bot_helpers import get_bot as _get_bot
@@ -342,6 +342,7 @@ async def get_my_playlists(
             is_owner=is_owner,
             is_subscribed=is_subscribed,
             created_at=playlist.created_at,
+            updated_at=playlist.updated_at,
         ))
     
     return PlaylistsListResponse(
@@ -396,6 +397,7 @@ async def get_all_my_playlists(
             is_owner=True,
             is_subscribed=False,
             created_at=playlist.created_at,
+            updated_at=playlist.updated_at,
         ))
     
     return PlaylistsListResponse(
@@ -540,6 +542,7 @@ async def get_global_playlists(
             is_owner=is_owner,
             is_subscribed=is_subscribed,
             created_at=playlist.created_at,
+            updated_at=playlist.updated_at,
         ))
     
     return PlaylistsListResponse(
@@ -585,6 +588,7 @@ async def create_playlist(
         is_owner=True,
         is_subscribed=False,
         created_at=playlist.created_at,
+        updated_at=playlist.updated_at,
     )
 
 
@@ -695,6 +699,7 @@ async def get_playlist(
         is_owner=playlist.owner_id == user.id,
         is_subscribed=is_subscribed,
         created_at=playlist.created_at,
+        updated_at=playlist.updated_at,
         tracks=tracks_response,
     )
 
@@ -776,6 +781,7 @@ async def update_playlist(
         covers=covers,
         is_public=playlist.is_public,
         created_at=playlist.created_at,
+        updated_at=playlist.updated_at,
     )
 
 
@@ -968,6 +974,7 @@ async def add_track_to_playlist(
         track_id=data.track_id,
         position=max_pos + 1,
     )
+    playlist.updated_at = utcnow()
     db.add(pt)
     await db.commit()
     
@@ -998,6 +1005,7 @@ async def remove_track_from_playlist(
     if not pt:
         raise HTTPException(status_code=404, detail="Track not in playlist")
     
+    playlist.updated_at = utcnow()
     await db.delete(pt)
     await db.commit()
     
@@ -1028,6 +1036,7 @@ async def reorder_playlist(
             .values(position=position)
         )
     
+    playlist.updated_at = utcnow()
     await db.commit()
     
     return {"status": "reordered"}

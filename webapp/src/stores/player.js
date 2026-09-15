@@ -13,7 +13,7 @@
  *   - playerStorage.js      — localStorage persistence (unchanged)
  */
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { playerApi, tracksApi, playlistsApi, albumsApi } from '../api/client'
 import { useNetworkMonitor } from '../composables/useNetworkMonitor'
 
@@ -128,6 +128,49 @@ export const usePlayerStore = defineStore('player', () => {
   const lazyShuffleIds = ref([])
   const lazyShuffleIndex = ref(-1)
   const lazyShuffleContext = ref(null)
+
+  // Playback Context & Recent Playlists
+  const RECENT_PLAYLISTS_KEY = 'tg_player_recent_playlists'
+  const loadRecentPlaylists = () => {
+    try {
+      const saved = localStorage.getItem(RECENT_PLAYLISTS_KEY)
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  }
+
+  const recentPlaylists = ref(loadRecentPlaylists())
+  const playbackContext = ref(savedState?.playbackContext || null)
+
+  const recordPlaylistPlayed = (playlistId) => {
+    const numId = Number(playlistId)
+    if (!numId) return
+    const now = Date.now()
+    const filtered = recentPlaylists.value.filter(item => item.id !== numId)
+    recentPlaylists.value = [{ id: numId, lastPlayedAt: now }, ...filtered].slice(0, 30)
+    try {
+      localStorage.setItem(RECENT_PLAYLISTS_KEY, JSON.stringify(recentPlaylists.value))
+    } catch (_) {}
+    window.dispatchEvent(new CustomEvent('playlists:recent-updated', { detail: { id: numId } }))
+  }
+
+  const setPlaybackContext = (ctx) => {
+    playbackContext.value = ctx || null
+    if (ctx?.type === 'playlist' && ctx.id) {
+      recordPlaylistPlayed(ctx.id)
+    }
+  }
+
+  const currentPlaylistId = computed(() => {
+    if (lazyShuffleContext.value?.type === 'playlist') {
+      return Number(lazyShuffleContext.value.id)
+    }
+    if (playbackContext.value?.type === 'playlist') {
+      return Number(playbackContext.value.id)
+    }
+    return null
+  })
 
   // Private flags
   let stateSaveInterval = null
@@ -263,6 +306,7 @@ export const usePlayerStore = defineStore('player', () => {
       queueIndex: queueIndex.value,
       progress: progress.value,
       duration: duration.value,
+      playbackContext: playbackContext.value,
     })
   }
 
@@ -564,11 +608,15 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   // ===================== PLAY =====================
-  const play = async (track, newQueue = null) => {
+  const play = async (track, newQueue = null, context = null) => {
     stateRestored.value = true // Prevent late cache restoration from clobbering active playback
     initAudio()
     markUserInteraction()
     cancelIrrelevantPreloads(_collectRelevantIds())
+
+    if (context) {
+      setPlaybackContext(context)
+    }
 
     // Update queue
     if (newQueue) {
@@ -750,6 +798,9 @@ export const usePlayerStore = defineStore('player', () => {
         id: contextId, 
         name: context === 'artist' ? (contextName || contextId) : contextName,
         search: options?.search || null
+      }
+      if (context === 'playlist' && contextId) {
+        recordPlaylistPlayed(contextId)
       }
       shuffle.value = true
       saveSettings({ shuffle: true, volume: volume.value, isMuted: isMuted.value, repeat: repeat.value })
@@ -1120,6 +1171,9 @@ export const usePlayerStore = defineStore('player', () => {
     currentTrack.value = savedState.currentTrack
     duration.value = savedState.duration ?? 0
     progress.value = savedState.progress ?? 0
+    if (savedState.playbackContext) {
+      playbackContext.value = savedState.playbackContext
+    }
 
     initAudio(); updateMediaSession(); startStateSaving()
 
@@ -1195,6 +1249,11 @@ export const usePlayerStore = defineStore('player', () => {
     lazyShuffleContext,
     lazyShuffleIndex,
     lazyShuffleIds,
+    playbackContext,
+    currentPlaylistId,
+    recentPlaylists,
+    recordPlaylistPlayed,
+    setPlaybackContext,
     play,
     playTrack: play,
     playShuffleAll,

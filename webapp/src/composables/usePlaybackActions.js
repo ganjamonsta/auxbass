@@ -18,9 +18,10 @@ import { usePlayerStore } from '@/stores/player'
 
 /**
  * @param {Ref<Array>|ComputedRef<Array>|Function} tracksSource - Tracks array, ref, or getter
+ * @param {Ref<Object>|ComputedRef<Object>|Function|Object} contextSource - Optional context (e.g. { type: 'playlist', id, name })
  * @returns {Object} Playback action methods
  */
-export function usePlaybackActions(tracksSource) {
+export function usePlaybackActions(tracksSource, contextSource = null) {
   const playerStore = usePlayerStore()
   
   // Loading state for shuffle operations
@@ -38,12 +39,22 @@ export function usePlaybackActions(tracksSource) {
   }
 
   /**
+   * Get playback context if available
+   */
+  const getContext = () => {
+    if (typeof contextSource === 'function') {
+      return contextSource() || null
+    }
+    return unref(contextSource) || null
+  }
+
+  /**
    * Play all tracks from the beginning
    */
-  const playAll = () => {
+  const playAll = (overrideContext = null) => {
     const tracks = getTracks()
     if (tracks.length > 0) {
-      playerStore.playTrack(tracks[0], tracks, 0)
+      playerStore.playTrack(tracks[0], tracks, overrideContext || getContext())
     }
   }
 
@@ -91,11 +102,11 @@ export function usePlaybackActions(tracksSource) {
    * Play specific track in context of all tracks
    * @param {Object} track - Track to play
    * @param {number} index - Optional index in tracks array
+   * @param {Object} overrideContext - Optional context override
    */
-  const playTrack = (track, index = -1) => {
+  const playTrack = (track, index = -1, overrideContext = null) => {
     const tracks = getTracks()
-    const trackIndex = index >= 0 ? index : tracks.findIndex(t => t.id === track.id)
-    playerStore.playTrack(track, tracks, trackIndex >= 0 ? trackIndex : 0)
+    playerStore.playTrack(track, tracks, overrideContext || getContext())
   }
 
   /**

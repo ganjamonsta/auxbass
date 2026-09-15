@@ -64,8 +64,8 @@ api.interceptors.request.use((config) => {
 // Handle errors (including 401 for expired tokens)
 api.interceptors.response.use(
   (response) => {
-    // Cache successful GET responses (unless explicitly bypassed)
-    if (response.config.method === 'get' && !response.config.bypassCache && response.status === 200) {
+    // Cache successful GET responses (including fresh responses from bypassCache)
+    if (response.config.method === 'get' && response.status === 200) {
       const cacheKey = apiCache.generateKey(response.config.url, response.config.params)
       apiCache.set(cacheKey, response.data)
     }

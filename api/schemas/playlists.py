@@ -38,6 +38,7 @@ class PlaylistResponse(BaseModel):
     is_subscribed: bool = False  # Whether current user is subscribed
     is_owner: bool = False  # Whether current user is the owner
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

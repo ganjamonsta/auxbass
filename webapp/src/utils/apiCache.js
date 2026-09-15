@@ -31,8 +31,9 @@ class ApiCache {
    * Generate cache key from URL and params
    */
   generateKey(url, params = {}) {
-    // Sort params to ensure consistent keys
-    const sortedParams = Object.keys(params)
+    // Sort params to ensure consistent keys, excluding transient/cache-busting query params
+    const sortedParams = Object.keys(params || {})
+      .filter(key => key !== '_t' && key !== '_cb' && key !== '_')
       .sort()
       .map(key => `${key}=${JSON.stringify(params[key])}`)
       .join('&')

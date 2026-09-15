@@ -128,18 +128,24 @@
       <!-- Playlists Mini Section -->
       <div v-if="displayedPlaylists.length > 0" class="rail-playlists">
         <div 
-          v-for="playlist in displayedPlaylists.slice(0, 4)" 
+          v-for="playlist in displayedPlaylists.slice(0, 5)" 
           :key="playlist.id"
           class="rail-playlist-thumb"
-          :class="{ active: $route.params.id == playlist.id && $route.name === 'playlist-detail' }"
+          :class="{ 
+            active: $route.params.id == playlist.id && $route.name === 'playlist-detail',
+            'is-playing': isPlaylistPlaying(playlist.id),
+            'is-pinned': playlist.isPinned
+          }"
           @click="$router.push(`/playlist/${playlist.id}`)"
           @contextmenu.prevent="openMenu('playlist', playlist, 'sidebar', $event)"
-          :title="playlist.name"
+          :title="playlist.name + (playlist.isPinned ? ' (Закреплен)' : '') + (isPlaylistPlaying(playlist.id) ? ' • Играет сейчас' : '')"
         >
-          <img v-if="playlist.covers?.length" :key="playlist.covers[0]" :src="getCoverUrl(playlist.covers[0], CoverSize.SMALL)" alt="" />
+          <img v-if="playlist.covers?.length" :src="getCoverUrl(playlist.covers[0], CoverSize.SMALL)" alt="" />
           <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
             <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
           </svg>
+          <div v-if="playlist.isPinned" class="rail-pin-dot" title="Закреплен"></div>
+          <div v-if="isPlaylistPlaying(playlist.id)" class="rail-playing-ring"></div>
         </div>
       </div>
 
@@ -375,20 +381,35 @@
             v-for="playlist in displayedPlaylists" 
             :key="playlist.id"
             class="nav-item playlist-item"
-            :class="{ active: $route.params.id == playlist.id && $route.name === 'playlist-detail' }"
+            :class="{ 
+              active: $route.params.id == playlist.id && $route.name === 'playlist-detail',
+              'is-playing': isPlaylistPlaying(playlist.id),
+              'is-pinned': playlist.isPinned
+            }"
             @click="$router.push(`/playlist/${playlist.id}`)"
             @contextmenu.prevent="openMenu('playlist', playlist, 'sidebar', $event)"
           >
             <div class="playlist-cover" :style="getPlaylistCoverStyle(playlist)">
-              <img v-if="playlist.covers?.length" :key="playlist.covers[0]" :src="getCoverUrl(playlist.covers[0], CoverSize.SMALL)" alt="" />
+              <img v-if="playlist.covers?.length" :src="getCoverUrl(playlist.covers[0], CoverSize.SMALL)" alt="" />
               <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
               </svg>
+              <!-- Live Equalizer overlay when playing -->
+              <div v-if="isPlaylistPlaying(playlist.id)" class="cover-playing-overlay">
+                <span class="mini-eq-bar bar-1"></span>
+                <span class="mini-eq-bar bar-2"></span>
+                <span class="mini-eq-bar bar-3"></span>
+              </div>
             </div>
             <div class="playlist-info">
-              <span class="playlist-name">{{ playlist.name }}</span>
+              <div class="playlist-name-row">
+                <span class="playlist-name" :title="playlist.name">{{ playlist.name }}</span>
+                <Pin v-if="playlist.isPinned" class="playlist-pin-icon" :size="11" />
+              </div>
+              <span class="playlist-subtitle" :class="{ 'playing-text': isPlaylistPlaying(playlist.id) }">
+                {{ getPlaylistSubtitle(playlist) }}
+              </span>
             </div>
-            <span class="nav-count">{{ playlist.track_count }}</span>
           </div>
           
           <div 
@@ -482,7 +503,8 @@ import {
   FileSpreadsheet,
   Cloud,
   Radio,
-  Trash2
+  Trash2,
+  Pin
 } from 'lucide-vue-next'
 import { getCacheStats } from '@/utils/audioCacheDb'
 import { useExternalAccountsStore } from '@/stores/externalAccounts'
@@ -534,18 +556,110 @@ const { openMenu } = useContextMenu()
 // Stats
 const likedCount = computed(() => libraryStore.likedTracks?.length || 0)
 
-// Playlists
+// Playlists Smart List
 const playlists = computed(() => libraryStore.playlists || [])
-
 const userPlaylists = computed(() => playlists.value)
 
+// Check if a playlist is currently playing
+const isPlaylistPlaying = (playlistId) => {
+  return playerStore.isPlaying && playerStore.currentPlaylistId === Number(playlistId)
+}
+
+// Compute the smart order of playlists:
+// 1. Pinned (in user's pin order)
+// 2. Recently played (by lastPlayedAt desc)
+// 3. Fallback: remaining playlists sorted by updated_at or created_at desc
+const sortedPlaylists = computed(() => {
+  const all = [...userPlaylists.value]
+  if (!all.length) return []
+
+  const byId = new Map(all.map(p => [Number(p.id), p]))
+  const result = []
+  const seenIds = new Set()
+
+  // 1. Pinned playlists (preserve pinned order)
+  const pinnedIds = uiStore.pinnedPlaylistIds || []
+  for (const pid of pinnedIds) {
+    const numId = Number(pid)
+    const p = byId.get(numId)
+    if (p && !seenIds.has(numId)) {
+      result.push({ ...p, isPinned: true, isRecent: false })
+      seenIds.add(numId)
+    }
+  }
+
+  // 2. Recently played playlists (ordered by lastPlayedAt DESC)
+  const recents = playerStore.recentPlaylists || []
+  for (const item of recents) {
+    const numId = Number(item.id)
+    const p = byId.get(numId)
+    if (p && !seenIds.has(numId)) {
+      result.push({ ...p, isPinned: false, isRecent: true, lastPlayedAt: item.lastPlayedAt })
+      seenIds.add(numId)
+    }
+  }
+
+  // 3. Fallback: remaining playlists sorted by updated_at or created_at DESC
+  const remaining = all.filter(p => !seenIds.has(Number(p.id)))
+  remaining.sort((a, b) => {
+    const dateA = new Date(a.updated_at || a.created_at || 0).getTime()
+    const dateB = new Date(b.updated_at || b.created_at || 0).getTime()
+    return dateB - dateA
+  })
+
+  for (const p of remaining) {
+    result.push({ ...p, isPinned: false, isRecent: false })
+  }
+
+  return result
+})
+
+const DISPLAY_LIMIT = 8
 const displayedPlaylists = computed(() => {
-  return userPlaylists.value.slice(0, 5)
+  return sortedPlaylists.value.slice(0, DISPLAY_LIMIT)
 })
 
 const hasMorePlaylists = computed(() => {
-  return userPlaylists.value.length > 5
+  return userPlaylists.value.length > DISPLAY_LIMIT
 })
+
+const formatTrackCount = (count) => {
+  const n = count || 0
+  const rem10 = n % 10
+  const rem100 = n % 100
+  if (rem10 === 1 && rem100 !== 11) return `${n} трек`
+  if (rem10 >= 2 && rem10 <= 4 && (rem100 < 10 || rem100 >= 20)) return `${n} трека`
+  return `${n} треков`
+}
+
+const formatTimeAgo = (timestamp) => {
+  if (!timestamp) return 'Недавно'
+  const diff = Date.now() - timestamp
+  const minutes = Math.floor(diff / (1000 * 60))
+  if (minutes < 5) return 'Только что'
+  if (minutes < 60) return `${minutes}м назад`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}ч назад`
+  const days = Math.floor(hours / 24)
+  if (days === 1) return 'Вчера'
+  if (days < 7) return `${days}д назад`
+  return 'Недавно'
+}
+
+const getPlaylistSubtitle = (playlist) => {
+  if (isPlaylistPlaying(playlist.id)) {
+    return 'Играет сейчас'
+  }
+  const countStr = formatTrackCount(playlist.track_count)
+  if (playlist.isPinned) {
+    return `Закреплен • ${countStr}`
+  }
+  if (playlist.isRecent && playlist.lastPlayedAt) {
+    const timeAgo = formatTimeAgo(playlist.lastPlayedAt)
+    return `${timeAgo} • ${countStr}`
+  }
+  return countStr
+}
 
 // Navigation
 const goToLibraryTab = (tab) => {

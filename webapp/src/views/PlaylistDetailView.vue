@@ -61,6 +61,15 @@
         <button class="action-btn share-btn" @click="handleSharePlaylist" title="Поделиться">
           <Share2 :size="18" />
         </button>
+        <!-- Pin button -->
+        <button 
+          class="action-btn pin-btn" 
+          :class="{ active: uiStore.isPlaylistPinned(playlist.id) }"
+          @click="togglePin" 
+          :title="uiStore.isPlaylistPinned(playlist.id) ? 'Открепить от сайдбара' : 'Закрепить в сайдбаре'"
+        >
+          <Pin :size="18" :fill="uiStore.isPlaylistPinned(playlist.id) ? 'currentColor' : 'none'" />
+        </button>
       </div>
 
       <ExpandableSearch
@@ -140,7 +149,7 @@ import EditPlaylistModal from '@/components/EditPlaylistModal.vue'
 import ExpandableSearch from '@/components/ui/ExpandableSearch.vue'
 import api, { playlistsApi } from '@/api/client'
 import apiCache from '@/utils/apiCache'
-import { Music, Check, Plus, Globe, Play, Shuffle, Edit3, Share2, Search } from 'lucide-vue-next'
+import { Music, Check, Plus, Globe, Play, Shuffle, Edit3, Share2, Search, Pin } from 'lucide-vue-next'
 import { getCoverUrl, CoverSize } from '@/utils'
 
 // Universal context menu
@@ -205,15 +214,21 @@ useTrackSync(() => playlist.value?.tracks)
 const showEditModal = ref(false)
 const subscribing = ref(false)
 
-// Cache-bust helper to force image reload in UI when cover changes
-const addCacheBust = (url) => {
-  if (!url) return null
-  const sep = url.includes('?') ? '&' : '?'
-  return `${url}${sep}_cb=${Date.now()}`
-}
-
 // Unified playback actions - use shufflePlayFull for lazy loading all playlist tracks
-const { playAll, shufflePlayFull, isShuffling, playTrack } = usePlaybackActions(() => playlist.value?.tracks)
+const { playAll, shufflePlayFull, isShuffling, playTrack } = usePlaybackActions(
+  () => playlist.value?.tracks,
+  () => playlist.value ? { type: 'playlist', id: playlist.value.id, name: playlist.value.name } : null
+)
+
+const togglePin = () => {
+  if (!playlist.value?.id) return
+  const isPinned = uiStore.togglePinPlaylist(playlist.value.id)
+  if (isPinned) {
+    uiStore.toast.success('Закреплено', 'Плейлист закреплен в сайдбаре')
+  } else {
+    uiStore.toast.info('Откреплено', 'Плейлист откреплен от сайдбара')
+  }
+}
 
 // Shuffle play handler using lazy loading
 const shufflePlay = () => {
@@ -249,8 +264,7 @@ const loadPlaylist = async (force = false) => {
   loading.value = true
   try {
     const response = await api.get(`/playlists/${route.params.id}`, {
-      params: force ? { _t: Date.now() } : {},
-      bypassCache: force
+      bypassCache: Boolean(force)
     })
     playlist.value = response.data
   } catch (error) {
@@ -275,7 +289,7 @@ const handleSavePlaylist = async ({ name, isPublic, covers, tracks: savedTracks 
   
   // Update covers array (track collage covers from save response)
   if (covers?.length) {
-    playlist.value.covers = covers.map(addCacheBust)
+    playlist.value.covers = covers
   }
   
   showEditModal.value = false

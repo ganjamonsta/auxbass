@@ -55,6 +55,9 @@ class TestTrackSchemas:
         assert response.play_count == 0
 
 
+from api.schemas.playlists import PlaylistResponse
+
+
 class TestStreamUrlResponse:
     """Tests for StreamUrlResponse schema"""
     
@@ -66,3 +69,30 @@ class TestStreamUrlResponse:
         )
         assert response.track_id == 42
         assert "/api/player/audio/" in response.url
+
+
+class TestPlaylistSchemas:
+    """Tests for Playlist schemas"""
+
+    def test_playlist_response_with_updated_at(self):
+        now = datetime.now()
+        pl = PlaylistResponse(
+            id=1,
+            name="Test Playlist",
+            created_at=now,
+            updated_at=now,
+        )
+        assert pl.id == 1
+        assert pl.name == "Test Playlist"
+        assert pl.created_at == now
+        assert pl.updated_at == now
+
+    def test_playlist_response_default_updated_at(self):
+        now = datetime.now()
+        pl = PlaylistResponse(
+            id=2,
+            name="Another Playlist",
+            created_at=now,
+        )
+        assert pl.id == 2
+        assert pl.updated_at is None
