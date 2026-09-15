@@ -2,7 +2,10 @@
 TG Player API v2 - Schemas Module
 """
 from .common import TelegramUser, PaginatedResponse, StatusResponse
-from .tracks import TrackResponse, TracksListResponse, TrackUpdate, TrackCreate
+from .tracks import (
+    TrackResponse, TracksListResponse, TrackUpdate, TrackCreate,
+    CoverSuggestion, SetCoverRequest
+)
 from .albums import AlbumResponse, AlbumsListResponse, AlbumDetailResponse
 from .artists import ArtistResponse, ArtistsListResponse, ArtistDetailResponse, ArtistInfoResponse, ArtistTracksResponse
 from .library import LibraryStatsResponse
@@ -18,6 +21,8 @@ __all__ = [
     "TracksListResponse",
     "TrackUpdate",
     "TrackCreate",
+    "CoverSuggestion",
+    "SetCoverRequest",
     
     # Albums
     "AlbumResponse",

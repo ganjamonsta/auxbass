@@ -105,7 +105,7 @@
             'passed': activeLineIndex > idx,
             'upcoming': activeLineIndex < idx
           }"
-          @click="seekToLine(line)"
+          @click.left="seekToLine(line)"
         >
           <span class="line-text">{{ line.text || '♪' }}</span>
         </div>

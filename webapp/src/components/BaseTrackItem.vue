@@ -56,8 +56,8 @@
         class="progress" 
         :class="{ 'is-seeking': isSeeking }"
         draggable="false"
-        @click.stop="seek" 
-        @mousedown.stop.prevent="startDrag"
+        @click.left.stop="seek" 
+        @mousedown.left.stop.prevent="startDrag"
         @touchstart.stop.prevent="startTouchDrag"
         @dragstart.stop.prevent
       >
@@ -147,6 +147,7 @@ const handleDragStart = (event) => {
 }
 
 const seek = (event) => {
+  if (event && event.button !== 0) return
   if (!isCurrentTrack.value) return
   const rect = event.currentTarget.getBoundingClientRect()
   const percent = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width))
@@ -154,6 +155,7 @@ const seek = (event) => {
 }
 
 const startDrag = (event) => {
+  if (event && event.button !== 0) return
   if (!isCurrentTrack.value) return
   
   isSeeking.value = true

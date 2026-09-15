@@ -6,7 +6,7 @@
 
       <div 
         class="scrubber-track"
-        @mousedown="handleMouseDown"
+        @mousedown.left="handleMouseDown"
       >
         <!-- Buffered section -->
         <div class="buffered-bar" :style="{ width: bufferedPercent + '%' }"></div>
@@ -224,7 +224,8 @@ const repeatTooltip = computed(() => {
   return 'Повтор выключен'
 })
 
-const handleMouseDown = () => {
+const handleMouseDown = (e) => {
+  if (e && e.button !== 0) return
   isDragging.value = true
 }
 

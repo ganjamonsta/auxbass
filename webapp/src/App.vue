@@ -180,10 +180,7 @@
       <!-- Global context menu (universal for all element types) -->
       <ContextMenu />
       
-      <!-- Maintenance status banner -->
-      <MaintenanceBanner />
-
-      <!-- Network status banner -->
+      <!-- Network status banner (unified for offline, server down, reconnecting, maintenance) -->
       <NetworkBanner />
       
       <!-- Server update prompt banner -->
@@ -242,8 +239,6 @@
       <ProfileMenu v-model="showProfileMenu" placement="header" />
     </template>
 
-    <!-- Offline & Maintenance Overlay -->
-    <OfflineScreen />
   </div>
 </template>
 
@@ -280,11 +275,9 @@ const PwaInstallModal = defineAsyncComponent(() => import('@/components/PwaInsta
 const PwaInstallBanner = defineAsyncComponent(() => import('@/components/PwaInstallBanner.vue'))
 const AppUpdatePrompt = defineAsyncComponent(() => import('@/components/AppUpdatePrompt.vue'))
 const ChannelBanner = defineAsyncComponent(() => import('@/components/ChannelBanner.vue'))
-const MaintenanceBanner = defineAsyncComponent(() => import('@/components/MaintenanceBanner.vue'))
 const NetworkBanner = defineAsyncComponent(() => import('@/components/NetworkBanner.vue'))
 const ExportifyImportModal = defineAsyncComponent(() => import('@/components/ExportifyImportModal.vue'))
 const ImportModal = defineAsyncComponent(() => import('@/components/ImportModal.vue'))
-const OfflineScreen = defineAsyncComponent(() => import('@/components/OfflineScreen.vue'))
 
 const route = useRoute()
 const router = useRouter()
@@ -615,6 +608,9 @@ const handlePlayerError = (e) => {
       break
     case 'playback_error':
       uiStore.toast.warning('Ошибка воспроизведения', message || `Проблема с «${trackTitle}»`)
+      break
+    case 'offline_unavailable':
+      uiStore.toast.info('Оффлайн-режим', `«${trackTitle}» не сохранён для оффлайн-прослушивания`)
       break
     case 'auth_expired':
       // Silent — will auto-skip, not worth showing toast

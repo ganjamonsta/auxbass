@@ -21,6 +21,16 @@ export const tracksApi = {
   getOne: cacheable((id) => api.get(`/tracks/${id}`)),
   update: nonCacheable((id, data) => api.put(`/tracks/${id}`, data), 'track'),
   delete: nonCacheable((id) => api.delete(`/tracks/${id}`), 'track'),
+  getCoverSuggestions: (id, query = null) => api.get(`/tracks/${id}/cover-suggestions`, { params: query ? { query } : {} }),
+  setCover: nonCacheable((id, coverUrl) => api.post(`/tracks/${id}/set-cover`, { cover_url: coverUrl }), 'track'),
+  uploadCover: nonCacheable((id, file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post(`/tracks/${id}/cover`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  }, 'track'),
+  deleteCover: nonCacheable((id) => api.delete(`/tracks/${id}/cover`), 'track'),
   getArtists: cacheable((scope = 'library') => api.get('/artists', { params: { scope, limit: 500 } })),
   getArtistImage: cacheable((artistName) => api.get(`/artists/${encodeURIComponent(artistName)}/image`)),
   getArtistDetail: cacheable((artistName, scope = 'library') => api.get(`/artists/${encodeURIComponent(artistName)}`, { params: { scope } })),

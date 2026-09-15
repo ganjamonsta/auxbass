@@ -43,6 +43,15 @@ export async function resolveAudioSource(trackId, getStreamUrl) {
     return { type: 'cached-url', src: cachedUrl }
   }
 
+  // If user is offline, do NOT make a failing network request!
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    console.log(`[Play] Device is offline and track ${trackId} is not cached in IndexedDB`)
+    return {
+      type: 'offline-unavailable',
+      reason: 'Трек не сохранён для оффлайн-прослушивания'
+    }
+  }
+
   // === PRIORITY 3: Fresh URL from API ===
   try {
     console.log('[Play] Fetching new stream URL from API')

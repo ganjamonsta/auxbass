@@ -67,6 +67,27 @@ class TrackUpdate(BaseModel):
     artist: Optional[str] = None
     album: Optional[str] = None  # Album name
     genre: Optional[str] = None  # Genre (stored in enrichment)
+    cover_url: Optional[str] = None  # Custom cover URL or /api/images/...
+
+
+class CoverSuggestion(BaseModel):
+    """Cover suggestion from external databases"""
+    id: str
+    cover_url: str
+    thumbnail_url: Optional[str] = None
+    source: str  # "deezer" | "itunes"
+    title: Optional[str] = None
+    artist: Optional[str] = None
+    album: Optional[str] = None
+    year: Optional[str] = None
+    width: Optional[int] = 1000
+    height: Optional[int] = 1000
+
+
+class SetCoverRequest(BaseModel):
+    """Request to set cover from URL"""
+    cover_url: str
+
 
 
 class TrackCreate(BaseModel):

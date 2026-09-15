@@ -68,6 +68,7 @@ export async function handleStallTimeout({
     try {
       const currentTime = audio.currentTime
       const src = audio.src
+      const isBlobOrOffline = (src && src.startsWith('blob:')) || (typeof navigator !== 'undefined' && !navigator.onLine)
 
       if (attempt === 1 && src) {
         // Attempt 1: reload at same position
@@ -77,8 +78,16 @@ export async function handleStallTimeout({
         if (generation !== currentGeneration) return
         onRecovered(track, attempt)
         return
+      } else if (isBlobOrOffline) {
+        // If blob or offline, do not attempt to fetch from API - reload at current position
+        audio.load()
+        audio.currentTime = currentTime
+        await audio.play()
+        if (generation !== currentGeneration) return
+        onRecovered(track, attempt)
+        return
       } else {
-        // Attempt 2: fresh URL
+        // Attempt 2: fresh URL for network streams
         const response = await getStreamUrl(track.id)
         if (generation !== currentGeneration) return
         const newUrl = response.data.url

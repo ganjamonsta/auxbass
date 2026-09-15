@@ -74,10 +74,10 @@ const hasIssues = computed(() => connectionState.value !== 'online' || isBackend
 /** Текст для баннера */
 const statusMessage = computed(() => {
   if (isMaintenance.value) return 'Технические работы'
-  if (isBackendDown.value) return 'Сервер недоступен'
-  if (!isBotOnline.value) return 'Бот оффлайн'
+  if (isBackendDown.value) return 'Сервер временно оффлайн'
+  if (!isBotOnline.value) return 'Telegram-бот переподключается'
   switch (connectionState.value) {
-    case 'offline': return 'Нет соединения'
+    case 'offline': return 'Оффлайн-режим'
     case 'reconnecting': return 'Переподключение...'
     case 'slow': return 'Медленное соединение'
     default: return ''
@@ -90,7 +90,7 @@ const statusShort = computed(() => {
   if (isBackendDown.value) return 'Сервер оффлайн'
   if (!isBotOnline.value) return 'Бот оффлайн'
   switch (connectionState.value) {
-    case 'offline': return 'Нет сети'
+    case 'offline': return 'Оффлайн'
     case 'reconnecting': return 'Подключение...'
     case 'slow': return 'Медленная сеть'
     default: return ''
@@ -155,15 +155,16 @@ const checkLatency = async () => {
   } catch (e) {
     latency.value = -1
     consecutiveFailures++
-    isBackendDown.value = true
     
-    if (consecutiveFailures >= MAX_FAILURES_BEFORE_SLOW) {
-      if (navigator.onLine) {
-        // Браузер считает что онлайн, но API не отвечает
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      connectionState.value = 'offline'
+      offlineSince.value = offlineSince.value || Date.now()
+      isBackendDown.value = false
+    } else {
+      if (consecutiveFailures >= MAX_FAILURES_BEFORE_SLOW) {
+        isBackendDown.value = true
         connectionState.value = 'slow'
         console.warn(`[NetworkMonitor] API unreachable (${consecutiveFailures} failures), marking as slow/down`)
-      } else {
-        connectionState.value = 'offline'
       }
     }
     
@@ -315,7 +316,7 @@ const recordSuccessfulRequest = () => {
   consecutiveFailures = 0
   isBackendDown.value = false
   
-  if (connectionState.value === 'reconnecting' || connectionState.value === 'slow') {
+  if (connectionState.value !== 'online') {
     connectionState.value = 'online'
     offlineSince.value = null
   }
@@ -325,19 +326,28 @@ const recordSuccessfulRequest = () => {
  * Записать неудачный API-запрос.
  */
 const recordFailedRequest = (error) => {
+  // If browser itself is offline, this is client offline, NOT a backend crash!
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    connectionState.value = 'offline'
+    offlineSince.value = offlineSince.value || Date.now()
+    return
+  }
+
   const status = error?.response?.status
   if (status === 502 || status === 503 || status === 504) {
-    isBackendDown.value = true
-  }
-  // Сетевая ошибка (не HTTP error, а реальный network failure)
-  if (!error?.response && error?.code !== 'ECONNABORTED') {
     consecutiveFailures++
-    isBackendDown.value = true
-    if (consecutiveFailures >= MAX_FAILURES_BEFORE_SLOW && navigator.onLine) {
+    if (consecutiveFailures >= 2) {
+      isBackendDown.value = true
+    }
+    return
+  }
+
+  // Network error (no response) while navigator.onLine is true
+  if (!error?.response && error?.code !== 'ECONNABORTED' && error?.code !== 'ERR_CANCELED') {
+    consecutiveFailures++
+    if (consecutiveFailures >= MAX_FAILURES_BEFORE_SLOW) {
+      isBackendDown.value = true
       connectionState.value = 'slow'
-    } else if (!navigator.onLine) {
-      connectionState.value = 'offline'
-      offlineSince.value = offlineSince.value || Date.now()
     }
   }
 }

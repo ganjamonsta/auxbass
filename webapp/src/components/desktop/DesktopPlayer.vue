@@ -5,7 +5,7 @@
       <div 
         class="volume-knob"
         :class="{ adjusting: isAdjustingVolume }"
-        @mousedown="startVolumeAdjust"
+        @mousedown.left="startVolumeAdjust"
         @wheel.prevent="handleVolumeWheel"
         :style="{ '--rotation': volumeRotation + 'deg' }"
         :title="`Громкость: ${Math.round(volume * 100)}%`"
@@ -81,7 +81,7 @@
     <!-- Center - Neon Waveform Display -->
     <div class="lcd-panel">
       <div class="lcd-frame">
-        <div class="lcd-screen" @click="handleLcdClick">
+        <div class="lcd-screen" @click.left="handleLcdClick">
           <!-- Title row -->
           <div class="lcd-title-row">
             <!-- Network issue indicator -->
@@ -124,8 +124,8 @@
             <div 
               class="waveform-container" 
               ref="waveformContainer"
-              @click="handleWaveformClick"
-              @mousedown="startSeek"
+              @click.left="handleWaveformClick"
+              @mousedown.left="startSeek"
               @mousemove="handleWaveformHover"
               @mouseleave="handleWaveformLeave"
               title="Перемотка трека"
@@ -306,6 +306,7 @@ const isLiked = computed(() => {
 
 // Handle LCD click - open full player (but not on waveform, mode buttons, or VFD display)
 const handleLcdClick = (e) => {
+  if (e.button !== 0) return
   if (isSeeking.value || e.target.closest('.waveform-container') || e.target.closest('.vfd-display') || e.target.closest('.lcd-mode-chips')) {
     return
   }
@@ -327,6 +328,7 @@ const volumeArcLength = computed(() => {
 })
 
 const startVolumeAdjust = (e) => {
+  if (e.button !== 0) return
   isAdjustingVolume.value = true
   startY.value = e.clientY
   startVolume.value = volume.value
@@ -498,6 +500,7 @@ const drawWaveform = () => {
 
 // Waveform seeking and hover interactions
 const handleWaveformClick = (e) => {
+  if (e.button !== 0) return
   const container = waveformContainer.value
   if (!container || !duration.value) return
   const rect = container.getBoundingClientRect()
@@ -520,6 +523,7 @@ const handleWaveformLeave = () => {
 }
 
 const startSeek = (e) => {
+  if (e.button !== 0) return
   isSeeking.value = true
   handleProgressSeek(e)
   document.addEventListener('mousemove', onSeekMove)

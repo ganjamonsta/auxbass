@@ -554,6 +554,54 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
+  // Set track cover from URL (auto-match)
+  const setTrackCover = async (id, coverUrl) => {
+    try {
+      const response = await tracksApi.setCover(id, coverUrl)
+      try {
+        await notifyTrackChange(id, response.data)
+      } catch (e) {
+        console.error('notifyTrackChange failed:', e)
+      }
+      return response.data
+    } catch (error) {
+      console.error('Failed to set track cover:', error)
+      throw error
+    }
+  }
+
+  // Upload custom track cover file
+  const uploadTrackCover = async (id, file) => {
+    try {
+      const response = await tracksApi.uploadCover(id, file)
+      try {
+        await notifyTrackChange(id, response.data)
+      } catch (e) {
+        console.error('notifyTrackChange failed:', e)
+      }
+      return response.data
+    } catch (error) {
+      console.error('Failed to upload track cover:', error)
+      throw error
+    }
+  }
+
+  // Delete track cover
+  const deleteTrackCover = async (id) => {
+    try {
+      const response = await tracksApi.deleteCover(id)
+      try {
+        await notifyTrackChange(id, response.data)
+      } catch (e) {
+        console.error('notifyTrackChange failed:', e)
+      }
+      return response.data
+    } catch (error) {
+      console.error('Failed to delete track cover:', error)
+      throw error
+    }
+  }
+
   // Delete track
   const deleteTrack = async (id) => {
     try {
@@ -1031,6 +1079,9 @@ export const useLibraryStore = defineStore('library', () => {
     notifyTrackChange,
     notifyTrackRemoved,
     updateTrack,
+    setTrackCover,
+    uploadTrackCover,
+    deleteTrackCover,
     deleteTrack,
     toggleLike,
     toggleDislike,

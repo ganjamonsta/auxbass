@@ -141,9 +141,9 @@ router.beforeEach(async (to, from, next) => {
     return
   }
   
-  // If user is offline and navigating to online-only root tabs, auto-redirect to downloaded
+  // If user is offline and navigating to tabs that strictly require live API, redirect to downloaded
   const isOffline = typeof navigator !== 'undefined' && !navigator.onLine
-  if (isOffline && authStore.isAuthenticated && (to.name === 'home' || to.name === 'library' || to.name === 'search' || to.name === 'friends')) {
+  if (isOffline && authStore.isAuthenticated && (to.name === 'search' || to.name === 'friends')) {
     next({ name: 'downloaded' })
     return
   }

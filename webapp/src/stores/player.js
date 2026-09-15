@@ -45,7 +45,7 @@ import {
   executeBatchPreload,
   cacheTrackInBackground,
 } from './playerPreload'
-import { requestStoragePersistence } from '../utils/audioCacheDb'
+import { requestStoragePersistence, hasCachedTrack } from '../utils/audioCacheDb'
 
 import {
   updateMediaSession as _updateMS,
@@ -167,6 +167,25 @@ export const usePlayerStore = defineStore('player', () => {
 
   // ===================== HELPERS =====================
   const isLazyShuffleMode = () => lazyShuffleIds.value.length > 0 && lazyShuffleIndex.value >= 0
+
+  /**
+   * Search ahead in queue for the next track cached in IndexedDB (used during offline mode)
+   */
+  const findNextCachedTrackInQueue = async () => {
+    if (!queue.value || !queue.value.length) return null
+    const isShuff = shuffle.value && shuffleOrder.value && shuffleOrder.value.length > 0
+    const startIndex = (isShuff ? shuffleIndex.value : queueIndex.value) + 1
+    const total = isShuff ? shuffleOrder.value.length : queue.value.length
+
+    for (let i = startIndex; i < total; i++) {
+      const idx = isShuff ? shuffleOrder.value[i] : i
+      const candidate = queue.value[idx]
+      if (candidate?.id && await hasCachedTrack(candidate.id)) {
+        return candidate
+      }
+    }
+    return null
+  }
 
   const clearLazyShuffle = () => {
     lazyShuffleIds.value = []
@@ -400,9 +419,10 @@ export const usePlayerStore = defineStore('player', () => {
       const errorCode = el.error?.code
       if (errorCode === 1 || isSkipping) return
 
-      // Network retry
+      // Network retry (only if device is online)
       const track = currentTrack.value
-      if (errorCode === 2 && getAudioRetryCount() < getMaxAudioRetries() && track) {
+      const isOfflineNow = typeof navigator !== 'undefined' && !navigator.onLine
+      if (errorCode === 2 && !isOfflineNow && getAudioRetryCount() < getMaxAudioRetries() && track) {
         incrementAudioRetry()
         loading.value = true
         try {
@@ -533,6 +553,11 @@ export const usePlayerStore = defineStore('player', () => {
         }
         break
       }
+      case 'offline-unavailable': {
+        const err = new Error(source.reason || 'offline-unavailable')
+        err.code = 'offline-unavailable'
+        throw err
+      }
       case 'error':
         throw source.error || new Error(source.reason)
     }
@@ -616,6 +641,25 @@ export const usePlayerStore = defineStore('player', () => {
       const isObjDetail = typeof rawDetail === 'object' && rawDetail !== null
       const errCode = isObjDetail ? rawDetail.code : error.response?.data?.code
       const detail = (isObjDetail ? rawDetail.message : rawDetail) || error.message || 'Ошибка воспроизведения'
+
+      // Handle offline track unavailable: skip gracefully without cascading errors
+      if (error.code === 'offline-unavailable' || error.message?.includes('offline-unavailable') || error.message?.includes('не сохранён для оффлайн')) {
+        isPlaying.value = false
+        loading.value = false
+        lastError.value = {
+          type: 'offline_unavailable',
+          track,
+          message: 'Трек не сохранён для оффлайн-прослушивания'
+        }
+        window.dispatchEvent(new CustomEvent('player:error', { detail: lastError.value }))
+
+        // Auto-skip to the next available cached track in the queue
+        const nextCached = await findNextCachedTrackInQueue()
+        if (nextCached) {
+          setTimeout(() => play(nextCached), 400)
+        }
+        return
+      }
 
       // Check if bot lacks access to backup channel (e.g. new bot or bot kicked)
       if (errCode === 'channel_bot_missing' || (typeof detail === 'string' && (detail.includes('Бот не имеет доступа к вашему каналу') || detail.includes('channel_bot_missing')))) {

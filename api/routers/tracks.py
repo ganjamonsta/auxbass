@@ -9,15 +9,17 @@ from typing import Optional, List
 from datetime import datetime, timezone
 from collections import defaultdict
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy import select, func, desc, asc, or_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+import aiohttp
+from aiogram.types import BufferedInputFile
 
 from shared.database import get_db
 from shared.models import (
     Track, TrackEnrichment, TrackLyrics, Album, AlbumTrack, User, UserLibrary,
-    EnrichmentStatus, LibrarySource, utcnow
+    UserChannel, EnrichmentStatus, LibrarySource, utcnow
 )
 from shared.matching import normalize_artist
 
@@ -26,6 +28,9 @@ from shared.matching import normalize_artist
 # TODO: Extract channel forwarding logic into shared/ layer.
 from bot.services.channels import get_channel_service
 from bot.services.lyrics import lrclib_client
+from bot.services.enrichment.cover_search import search_cover_suggestions
+from api.utils.bot_helpers import get_bot as _get_bot, get_http_session
+from api.routers.images import _is_safe_url
 
 from api.routers.auth import get_current_user, require_premium, get_optional_user
 from api.utils.responses import track_to_response, build_track_search_filter, streamable_track_filter
@@ -33,6 +38,8 @@ from api.schemas.tracks import (
     TrackResponse,
     TracksListResponse,
     TrackUpdate,
+    CoverSuggestion,
+    SetCoverRequest,
     TrackLyricsResponse,
     TrackLyricsUpdate,
     TrackLyricsOffsetUpdate,
@@ -42,6 +49,16 @@ from api.utils import raise_not_found
 
 
 logger = logging.getLogger(__name__)
+
+# Image magic bytes for cover validation
+_COVER_MAGIC_BYTES = {
+    b'\xff\xd8\xff': 'jpg',
+    b'\x89PNG': 'png',
+    b'GIF87a': 'gif',
+    b'GIF89a': 'gif',
+    b'RIFF': 'webp',
+}
+
 
 router = APIRouter(tags=["Tracks"])
 
@@ -788,14 +805,8 @@ async def get_track(
     return track_to_response(track, lib_entry)
 
 
-@router.put("/{track_id}")
-async def update_track(
-    track_id: int,
-    data: TrackUpdate,
-    user: TelegramUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Update track metadata (uploader or any user who has the track in their library)"""
+async def _get_track_for_user(track_id: int, user_id: int, db: AsyncSession):
+    """Retrieve track and verify that user is uploader OR has track in their UserLibrary."""
     result = await db.execute(
         select(Track)
         .where(Track.id == track_id)
@@ -805,19 +816,91 @@ async def update_track(
         )
     )
     track = result.scalar_one_or_none()
-    
     if not track:
         raise_not_found("Track not found")
 
-    # Check permission: user must be uploader OR have track in UserLibrary
     lib_result = await db.execute(
         select(UserLibrary)
-        .where(UserLibrary.user_id == user.id, UserLibrary.track_id == track_id)
+        .where(UserLibrary.user_id == user_id, UserLibrary.track_id == track_id)
     )
     lib_entry = lib_result.scalar_one_or_none()
 
-    if track.uploader_id != user.id and not lib_entry:
+    if track.uploader_id != user_id and not lib_entry:
         raise HTTPException(status_code=403, detail="Track not found in your library")
+
+    return track, lib_entry
+
+
+async def _upload_cover_bytes_to_telegram(
+    user_id: int,
+    content: bytes,
+    filename_prefix: str,
+    caption: str,
+    db: AsyncSession,
+) -> str:
+    """Upload cover bytes to user's Telegram channel or PM fallback."""
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Размер изображения превышает 10 МБ")
+
+    if len(content) < 12:
+        raise HTTPException(status_code=400, detail="Файл слишком мал для изображения")
+
+    header = content[:12]
+    detected_ext = None
+    for magic, ext in _COVER_MAGIC_BYTES.items():
+        if header.startswith(magic):
+            if magic == b'RIFF' and header[8:12] != b'WEBP':
+                continue
+            detected_ext = ext
+            break
+    if not detected_ext:
+        raise HTTPException(status_code=400, detail="Неверный формат изображения. Разрешены JPG, PNG, GIF, WebP.")
+
+    safe_filename = f"{filename_prefix}.{detected_ext}"
+    bot = _get_bot()
+
+    user_channel = await db.scalar(
+        select(UserChannel).where(UserChannel.user_id == user_id, UserChannel.is_active == True)
+    )
+    target_chat_id = user_channel.channel_id if user_channel else user_id
+
+    try:
+        sent_msg = await bot.send_photo(
+            chat_id=target_chat_id,
+            photo=BufferedInputFile(file=content, filename=safe_filename),
+            caption=caption,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to upload track cover to target {target_chat_id}: {e}")
+        if user_channel and target_chat_id != user_id:
+            try:
+                sent_msg = await bot.send_photo(
+                    chat_id=user_id,
+                    photo=BufferedInputFile(file=content, filename=safe_filename),
+                    caption=caption,
+                )
+            except Exception as err:
+                logger.error(f"Failed to upload track cover to Telegram PM fallback: {err}")
+                raise HTTPException(status_code=502, detail="Не удалось загрузить обложку в Telegram")
+        else:
+            raise HTTPException(status_code=502, detail="Не удалось загрузить обложку в Telegram")
+
+    photos = sent_msg.photo or []
+    if not photos:
+        raise HTTPException(status_code=502, detail="Telegram не вернул файл обложки")
+
+    return f"/api/images/{photos[-1].file_id}"
+
+
+@router.put("/{track_id}")
+async def update_track(
+    track_id: int,
+    data: TrackUpdate,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update track metadata (uploader or any user who has the track in their library)"""
+    track, lib_entry = await _get_track_for_user(track_id, user.id, db)
     
     # Validate and update metadata
     changed = False
@@ -871,6 +954,16 @@ async def update_track(
                 delete(AlbumTrack).where(AlbumTrack.track_id == track.id)
             )
             changed = True
+
+    # Update cover URL if provided
+    if data.cover_url is not None:
+        new_cover = data.cover_url.strip() or None
+        if not track.enrichment:
+            track.enrichment = TrackEnrichment(track_id=track.id)
+            db.add(track.enrichment)
+        if track.enrichment.cover_url != new_cover:
+            track.enrichment.cover_url = new_cover
+            changed = True
     
     if changed:
         track.updated_at = utcnow()
@@ -888,27 +981,168 @@ async def update_track(
             logger.debug(f"Failed to update channel message for track {track_id}: {e}")
 
     # Re-fetch track with all relations to return fresh data
-    result = await db.execute(
-        select(Track)
-        .where(Track.id == track_id)
-        .options(
-            selectinload(Track.enrichment),
-            selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
-        )
-    )
-    track = result.scalar_one_or_none()
-    
-    if not track:
-        raise HTTPException(status_code=500, detail="Track disappeared after update")
-    
-    # Reload lib_entry
-    lib_result = await db.execute(
-        select(UserLibrary)
-        .where(UserLibrary.user_id == user.id, UserLibrary.track_id == track_id)
-    )
-    lib_entry = lib_result.scalar_one_or_none()
-    
+    track, lib_entry = await _get_track_for_user(track_id, user.id, db)
     return track_to_response(track, lib_entry)
+
+
+@router.get("/{track_id}/cover-suggestions", response_model=List[CoverSuggestion])
+async def get_track_cover_suggestions(
+    track_id: int,
+    query: Optional[str] = None,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get auto-matched high-res cover suggestions from Deezer and Apple Music."""
+    track = await db.get(Track, track_id)
+    if not track:
+        raise_not_found("Track not found")
+
+    search_query = query.strip() if query and query.strip() else f"{track.artist or ''} {track.title or ''}".strip()
+    if not search_query:
+        return []
+
+    raw_suggestions = await search_cover_suggestions(search_query, limit_per_source=8)
+    return [CoverSuggestion(**item) for item in raw_suggestions]
+
+
+@router.post("/{track_id}/set-cover", response_model=TrackResponse)
+async def set_track_cover(
+    track_id: int,
+    data: SetCoverRequest,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Set track cover from external URL or existing proxy URL, uploading to Telegram storage."""
+    track, lib_entry = await _get_track_for_user(track_id, user.id, db)
+
+    cover_url = data.cover_url.strip() if data.cover_url else ""
+    if not cover_url:
+        raise HTTPException(status_code=400, detail="cover_url не может быть пустым")
+
+    if cover_url.startswith("/api/images/"):
+        final_cover_url = cover_url
+    elif cover_url.startswith("http://") or cover_url.startswith("https://"):
+        if not _is_safe_url(cover_url):
+            raise HTTPException(status_code=400, detail="Недопустимый URL обложки")
+
+        http_session = await get_http_session()
+        try:
+            async with http_session.get(
+                cover_url,
+                timeout=aiohttp.ClientTimeout(total=15),
+                headers={"User-Agent": "TGPlayer/2.0"}
+            ) as resp:
+                if resp.status != 200:
+                    raise HTTPException(status_code=502, detail=f"Не удалось скачать обложку: статус {resp.status}")
+                content = await resp.read()
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to fetch external cover {cover_url}: {e}")
+            raise HTTPException(status_code=502, detail="Ошибка загрузки изображения по ссылке")
+
+        caption = f"🖼 <b>Обложка трека</b>: {track.artist or 'Неизвестен'} — {track.title or 'Без названия'}\n\n#track_{track.id} #cover"
+        final_cover_url = await _upload_cover_bytes_to_telegram(
+            user_id=user.id,
+            content=content,
+            filename_prefix=f"track_cover_{track.id}",
+            caption=caption,
+            db=db,
+        )
+    else:
+        raise HTTPException(status_code=400, detail="Неподдерживаемый формат URL обложки")
+
+    if not track.enrichment:
+        track.enrichment = TrackEnrichment(track_id=track.id)
+        db.add(track.enrichment)
+
+    track.enrichment.cover_url = final_cover_url
+    track.enrichment_status = EnrichmentStatus.COMPLETED
+    track.updated_at = utcnow()
+
+    await db.commit()
+
+    try:
+        from bot.services.channels import get_channel_service
+        ch_svc = get_channel_service()
+        await ch_svc.update_channel_message(track_id)
+    except Exception as e:
+        logger.debug(f"Failed to update channel message for track {track_id}: {e}")
+
+    track, lib_entry = await _get_track_for_user(track_id, user.id, db)
+    return track_to_response(track, lib_entry)
+
+
+@router.post("/{track_id}/cover", response_model=TrackResponse)
+async def upload_track_cover(
+    track_id: int,
+    file: UploadFile = File(...),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Upload custom image file as track cover, saved directly to Telegram storage."""
+    track, lib_entry = await _get_track_for_user(track_id, user.id, db)
+
+    content_type = file.content_type or ""
+    if not content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Разрешены только файлы изображений")
+
+    content = await file.read()
+    caption = f"🖼 <b>Обложка трека</b>: {track.artist or 'Неизвестен'} — {track.title or 'Без названия'}\n\n#track_{track.id} #cover"
+    final_cover_url = await _upload_cover_bytes_to_telegram(
+        user_id=user.id,
+        content=content,
+        filename_prefix=f"track_cover_{track.id}",
+        caption=caption,
+        db=db,
+    )
+
+    if not track.enrichment:
+        track.enrichment = TrackEnrichment(track_id=track.id)
+        db.add(track.enrichment)
+
+    track.enrichment.cover_url = final_cover_url
+    track.enrichment_status = EnrichmentStatus.COMPLETED
+    track.updated_at = utcnow()
+
+    await db.commit()
+
+    try:
+        from bot.services.channels import get_channel_service
+        ch_svc = get_channel_service()
+        await ch_svc.update_channel_message(track_id)
+    except Exception as e:
+        logger.debug(f"Failed to update channel message for track {track_id}: {e}")
+
+    track, lib_entry = await _get_track_for_user(track_id, user.id, db)
+    return track_to_response(track, lib_entry)
+
+
+@router.delete("/{track_id}/cover", response_model=TrackResponse)
+async def delete_track_cover(
+    track_id: int,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete custom cover of a track."""
+    track, lib_entry = await _get_track_for_user(track_id, user.id, db)
+
+    if track.enrichment and track.enrichment.cover_url:
+        track.enrichment.cover_url = None
+        track.enrichment_status = EnrichmentStatus.COMPLETED
+        track.updated_at = utcnow()
+        await db.commit()
+
+        try:
+            from bot.services.channels import get_channel_service
+            ch_svc = get_channel_service()
+            await ch_svc.update_channel_message(track_id)
+        except Exception as e:
+            logger.debug(f"Failed to update channel message for track {track_id}: {e}")
+
+    track, lib_entry = await _get_track_for_user(track_id, user.id, db)
+    return track_to_response(track, lib_entry)
+
 
 
 @router.delete("/{track_id}")
