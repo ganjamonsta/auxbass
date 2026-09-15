@@ -14,11 +14,6 @@
       <span class="fallback-backdrop-initials">{{ initials }}</span>
     </div>
 
-    <!-- Top-right absolute share button -->
-    <button class="hero-share-corner-btn" @click="$emit('share')" title="Поделиться профилем">
-      <Share2 :size="18" />
-    </button>
-
     <!-- ═══ 1. LEFT COLUMN: Monolithic Unified Tabs Unit ═══ -->
     <nav class="hero-monolith-tabs" aria-label="Разделы профиля">
       <!-- Overview -->
@@ -61,7 +56,7 @@
 
       <!-- Albums -->
       <button
-        v-if="overviewAlbumsCount > 0 || activeTab === 'albums'"
+        v-if="(user.album_count || overviewAlbumsCount) > 0 || activeTab === 'albums'"
         class="monolith-tab-btn"
         :class="{ active: activeTab === 'albums' }"
         @click="$emit('selectTab', 'albums')"
@@ -70,7 +65,7 @@
         <span class="tab-edge-icon"><Disc3 :size="16" /></span>
         <span class="tab-edge-divider"></span>
         <span class="tab-edge-label">Альбомы</span>
-        <span v-if="overviewAlbumsCount > 0" class="tab-edge-badge">{{ overviewAlbumsCount }}</span>
+        <span v-if="(user.album_count || overviewAlbumsCount) > 0" class="tab-edge-badge">{{ user.album_count || overviewAlbumsCount }}</span>
       </button>
 
       <!-- SoundCloud Tab -->
@@ -140,19 +135,23 @@
       <!-- Action Buttons Bar -->
       <div class="hero-actions-bar">
         <!-- Unified Play & Shuffle Capsule -->
-        <div class="action-buttons hero-play-capsule" v-if="user.track_count > 0">
+        <div 
+          v-if="user.track_count > 0 || (activeTab === 'soundcloud' && scTracksCount > 0)" 
+          class="action-buttons hero-play-capsule"
+        >
           <button 
             class="action-btn play-btn" 
+            :class="{ 'sc-play-btn': activeTab === 'soundcloud' }"
             @click="$emit('play')"
-            title="Слушать медиатеку"
+            :title="activeTab === 'soundcloud' ? 'Слушать релизы SoundCloud' : 'Слушать медиатеку'"
           >
             <Play :size="19" fill="currentColor" />
           </button>
           <button 
-            v-if="user.track_count > 1"
+            v-if="(activeTab === 'soundcloud' && scTracksCount > 1) || (activeTab !== 'soundcloud' && user.track_count > 1)"
             class="action-btn shuffle-btn" 
             @click="$emit('shuffle')"
-            title="Перемешать медиатеку"
+            :title="activeTab === 'soundcloud' ? 'Перемешать релизы SoundCloud' : 'Перемешать медиатеку'"
           >
             <Shuffle :size="17" />
           </button>
@@ -181,10 +180,19 @@
           <Edit3 :size="18" />
         </button>
 
+        <!-- Share button (unified with action pills) -->
+        <button
+          class="hero-pill-btn share-profile-btn"
+          @click="$emit('share')"
+          title="Поделиться профилем"
+        >
+          <Share2 :size="18" />
+        </button>
+
         <!-- Settings (if self) -->
         <button
           v-if="isSelf"
-          class="hero-pill-btn"
+          class="hero-pill-btn settings-btn"
           @click="$router.push('/settings')"
           title="Настройки аккаунта"
         >
@@ -202,17 +210,17 @@
           <span class="panel-header-title">Сводка медиатеки</span>
         </div>
         <div class="panel-stats-grid">
-          <button class="panel-stat-cell" @click="$emit('selectTab', 'tracks')" title="Смотреть треки">
+          <button class="panel-stat-cell active-metric" @click="$emit('selectTab', 'tracks')" title="Смотреть треки">
             <span class="panel-stat-num">{{ user.track_count }}</span>
             <span class="panel-stat-lbl">{{ getTracksWord(user.track_count) }}</span>
           </button>
+          <div class="panel-stat-cell" title="Общий хронометраж">
+            <span class="panel-stat-num">{{ formatDurationLong(totalDuration || user.total_duration) }}</span>
+            <span class="panel-stat-lbl">хронометраж</span>
+          </div>
           <button class="panel-stat-cell" @click="$emit('selectTab', 'playlists')" title="Смотреть плейлисты">
-            <span class="panel-stat-num">{{ user.playlist_count }}</span>
-            <span class="panel-stat-lbl">{{ getPlaylistsWord(user.playlist_count) }}</span>
-          </button>
-          <button class="panel-stat-cell" @click="$emit('selectTab', 'albums')" title="Смотреть альбомы">
-            <span class="panel-stat-num">{{ overviewAlbumsCount }}</span>
-            <span class="panel-stat-lbl">альбомов</span>
+            <span class="panel-stat-num">{{ user.playlist_count }} / {{ user.album_count || overviewAlbumsCount }}</span>
+            <span class="panel-stat-lbl">плейлистов / альб.</span>
           </button>
           <div 
             class="panel-stat-cell" 
@@ -230,29 +238,24 @@
       <div v-else-if="activeTab === 'tracks'" class="tab-panel-inner tab-panel-tracks">
         <div class="panel-header">
           <Music :size="13" class="panel-header-icon" />
-          <span class="panel-header-title">Медиатека треков</span>
+          <span class="panel-header-title">Коллекция треков</span>
         </div>
         <div class="panel-stats-grid">
-          <button class="panel-stat-cell active-metric" @click="$emit('play')" title="Слушать все треки">
+          <div class="panel-stat-cell active-metric" title="Всего треков в медиатеке">
             <span class="panel-stat-num">{{ user.track_count }}</span>
             <span class="panel-stat-lbl">в базе</span>
-          </button>
-          <button class="panel-stat-cell" @click="$emit('selectTab', 'playlists')" title="Смотреть плейлисты">
-            <span class="panel-stat-num">{{ user.playlist_count }}</span>
-            <span class="panel-stat-lbl">{{ getPlaylistsWord(user.playlist_count) }}</span>
-          </button>
-          <button class="panel-stat-cell" @click="$emit('selectTab', 'albums')" title="Смотреть альбомы">
-            <span class="panel-stat-num">{{ overviewAlbumsCount }}</span>
-            <span class="panel-stat-lbl">альбомов</span>
-          </button>
-          <div 
-            class="panel-stat-cell" 
-            :class="{ 'is-clickable': isSelf }"
-            @click="isSelf && $router.push('/friends')"
-            :title="isSelf ? 'Перейти к кентам' : ''"
-          >
-            <span class="panel-stat-num">{{ user.followers_count }}</span>
-            <span class="panel-stat-lbl">слушателей</span>
+          </div>
+          <div class="panel-stat-cell" title="Общее время звучания">
+            <span class="panel-stat-num">{{ formatDurationLong(totalDuration || user.total_duration) }}</span>
+            <span class="panel-stat-lbl">всего музыки</span>
+          </div>
+          <div class="panel-stat-cell" title="Средняя длина трека">
+            <span class="panel-stat-num">{{ averageTrackLength }}</span>
+            <span class="panel-stat-lbl">средняя длина</span>
+          </div>
+          <div class="panel-stat-cell" title="Облако Telegram">
+            <span class="panel-stat-num">TG Cloud</span>
+            <span class="panel-stat-lbl">безлимитно</span>
           </div>
         </div>
       </div>
@@ -261,27 +264,31 @@
       <div v-else-if="activeTab === 'playlists'" class="tab-panel-inner tab-panel-playlists">
         <div class="panel-header">
           <Folder :size="13" class="panel-header-icon" />
-          <span class="panel-header-title">Плейлисты</span>
+          <span class="panel-header-title">Подборки</span>
         </div>
         <div class="panel-stats-grid">
-          <button class="panel-stat-cell active-metric" title="Плейлисты профиля">
+          <div class="panel-stat-cell active-metric" title="Публичные плейлисты профиля">
             <span class="panel-stat-num">{{ user.playlist_count }}</span>
-            <span class="panel-stat-lbl">подборок</span>
-          </button>
-          <button class="panel-stat-cell" @click="$emit('selectTab', 'tracks')" title="Смотреть треки">
-            <span class="panel-stat-num">{{ user.track_count }}</span>
-            <span class="panel-stat-lbl">{{ getTracksWord(user.track_count) }}</span>
-          </button>
-          <button class="panel-stat-cell" @click="$emit('selectTab', 'albums')" title="Смотреть альбомы">
-            <span class="panel-stat-num">{{ overviewAlbumsCount }}</span>
-            <span class="panel-stat-lbl">альбомов</span>
-          </button>
-          <div 
-            class="panel-stat-cell" 
-            :class="{ 'is-clickable': isSelf }"
-            @click="isSelf && $router.push('/friends')"
-            :title="isSelf ? 'Перейти к кентам' : ''"
+            <span class="panel-stat-lbl">плейлистов</span>
+          </div>
+          <div class="panel-stat-cell" title="Всего треков в плейлистах">
+            <span class="panel-stat-num">{{ totalPlaylistTracks > 0 ? totalPlaylistTracks : '—' }}</span>
+            <span class="panel-stat-lbl">треков в них</span>
+          </div>
+          <div class="panel-stat-cell" title="Крупнейший плейлист">
+            <span class="panel-stat-num">{{ maxPlaylistTrackCount > 0 ? maxPlaylistTrackCount : '—' }}</span>
+            <span class="panel-stat-lbl">в крупнейшем</span>
+          </div>
+          <button 
+            v-if="isSelf" 
+            class="panel-stat-cell panel-stat-action"
+            @click="$emit('createPlaylist')"
+            title="Создать новый плейлист"
           >
+            <span class="panel-stat-num action-text">+ Создать</span>
+            <span class="panel-stat-lbl">плейлист</span>
+          </button>
+          <div v-else class="panel-stat-cell" title="Подписчики">
             <span class="panel-stat-num">{{ user.followers_count }}</span>
             <span class="panel-stat-lbl">подписчиков</span>
           </div>
@@ -292,30 +299,25 @@
       <div v-else-if="activeTab === 'albums'" class="tab-panel-inner tab-panel-albums">
         <div class="panel-header">
           <Disc3 :size="13" class="panel-header-icon" />
-          <span class="panel-header-title">Альбомы</span>
+          <span class="panel-header-title">Альбомы и релизы</span>
         </div>
         <div class="panel-stats-grid">
-          <button class="panel-stat-cell active-metric" title="Сохраненные альбомы">
-            <span class="panel-stat-num">{{ overviewAlbumsCount }}</span>
-            <span class="panel-stat-lbl">сохранено</span>
-          </button>
-          <button class="panel-stat-cell" @click="$emit('selectTab', 'tracks')" title="Смотреть треки">
-            <span class="panel-stat-num">{{ user.track_count }}</span>
-            <span class="panel-stat-lbl">{{ getTracksWord(user.track_count) }}</span>
-          </button>
-          <button class="panel-stat-cell" @click="$emit('selectTab', 'playlists')" title="Смотреть плейлисты">
-            <span class="panel-stat-num">{{ user.playlist_count }}</span>
-            <span class="panel-stat-lbl">{{ getPlaylistsWord(user.playlist_count) }}</span>
-          </button>
-          <div 
-            class="panel-stat-cell" 
-            :class="{ 'is-clickable': isSelf }"
-            @click="isSelf && $router.push('/friends')"
-            :title="isSelf ? 'Перейти к кентам' : ''"
-          >
-            <span class="panel-stat-num">{{ user.followers_count }}</span>
-            <span class="panel-stat-lbl">подписчиков</span>
+          <div class="panel-stat-cell active-metric" title="Сохраненные альбомы">
+            <span class="panel-stat-num">{{ user.album_count || overviewAlbumsCount }}</span>
+            <span class="panel-stat-lbl">альбомов</span>
           </div>
+          <div class="panel-stat-cell" title="Число уникальных исполнителей">
+            <span class="panel-stat-num">{{ uniqueAlbumArtistsCount > 0 ? uniqueAlbumArtistsCount : '—' }}</span>
+            <span class="panel-stat-lbl">исполнителей</span>
+          </div>
+          <div class="panel-stat-cell" title="Всего треков в альбомах">
+            <span class="panel-stat-num">{{ totalAlbumTracksCount > 0 ? totalAlbumTracksCount : '—' }}</span>
+            <span class="panel-stat-lbl">треков в них</span>
+          </div>
+          <button class="panel-stat-cell" @click="$emit('selectTab', 'tracks')" title="Смотреть треки медиатеки">
+            <span class="panel-stat-num">{{ user.track_count }}</span>
+            <span class="panel-stat-lbl">всех треков</span>
+          </button>
         </div>
       </div>
 
@@ -326,9 +328,9 @@
           <span class="panel-header-title">SoundCloud</span>
         </div>
         <div class="panel-stats-grid">
-          <div class="panel-stat-cell active-metric sc-metric" title="Треков в SoundCloud">
+          <div class="panel-stat-cell active-metric sc-metric" title="Релизов на SoundCloud">
             <span class="panel-stat-num">{{ scTracksCount }}</span>
-            <span class="panel-stat-lbl">треков SC</span>
+            <span class="panel-stat-lbl">релизов SC</span>
           </div>
           <div class="panel-stat-cell active-metric sc-metric" title="Плейлистов в SoundCloud">
             <span class="panel-stat-num">{{ scPlaylistsCount }}</span>
@@ -360,7 +362,9 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { getTracksWord, getPlaylistsWord } from './profileUtils'
+import { formatDurationLong, formatDuration } from '@/utils/formatters'
 import {
   UserPlus,
   Check,
@@ -379,7 +383,7 @@ import {
   Disc3,
 } from 'lucide-vue-next'
 
-defineProps({
+const props = defineProps({
   user: { type: Object, required: true },
   isSelf: { type: Boolean, default: false },
   isFollowing: { type: Boolean, default: false },
@@ -394,9 +398,22 @@ defineProps({
   overviewAlbumsCount: { type: Number, default: 0 },
   scPlaylistsCount: { type: Number, default: 0 },
   scTracksCount: { type: Number, default: 0 },
+  totalDuration: { type: Number, default: 0 },
+  totalPlaylistTracks: { type: Number, default: 0 },
+  maxPlaylistTrackCount: { type: Number, default: 0 },
+  uniqueAlbumArtistsCount: { type: Number, default: 0 },
+  totalAlbumTracksCount: { type: Number, default: 0 },
 })
 
-defineEmits(['play', 'shuffle', 'follow', 'edit', 'share', 'selectTab'])
+defineEmits(['play', 'shuffle', 'follow', 'edit', 'share', 'selectTab', 'createPlaylist'])
+
+const averageTrackLength = computed(() => {
+  const dur = props.totalDuration || props.user?.total_duration || 0
+  const cnt = props.user?.track_count || 0
+  if (!cnt || !dur) return '—'
+  const avg = Math.round(dur / cnt)
+  return formatDuration(avg)
+})
 
 const ensureAbsoluteUrl = (url, fallback) => {
   if (!url) return fallback
@@ -495,40 +512,12 @@ const getSpotifyUrl = (acc) => {
   opacity: 0.3;
 }
 
+/* Hero card backdrop initials */
 .fallback-backdrop-initials {
   font-size: 96px;
   font-weight: 800;
   color: rgba(255, 255, 255, 0.12);
   user-select: none;
-}
-
-/* Top-right share button */
-.hero-share-corner-btn {
-  position: absolute;
-  top: 18px;
-  right: 18px;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: rgba(22, 22, 26, 0.6);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: var(--c-text-2, #aaa);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 4;
-  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-}
-
-.hero-share-corner-btn:hover {
-  color: #fff;
-  background: rgba(40, 40, 48, 0.85);
-  border-color: rgba(255, 255, 255, 0.25);
-  transform: scale(1.06);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1014,6 +1003,32 @@ const getSpotifyUrl = (acc) => {
   display: inline-flex;
   align-items: center;
   gap: 2px;
+}
+
+.action-btn.play-btn.sc-play-btn {
+  background: #ff5500;
+  color: #fff;
+}
+
+.action-btn.play-btn.sc-play-btn:hover {
+  background: #ff6a1a;
+  box-shadow: 0 0 16px rgba(255, 85, 0, 0.5);
+}
+
+.panel-stat-cell.panel-stat-action {
+  background: rgba(29, 185, 84, 0.08);
+  border-color: rgba(29, 185, 84, 0.25);
+  cursor: pointer;
+}
+
+.panel-stat-cell.panel-stat-action:hover {
+  background: rgba(29, 185, 84, 0.16);
+  border-color: rgba(29, 185, 84, 0.45);
+  transform: translateY(-1px);
+}
+
+.panel-stat-cell .action-text {
+  color: var(--c-accent-light, #1ed760);
 }
 
 div.panel-stat-cell:not(.is-clickable) {

@@ -40,15 +40,21 @@
         :scAccount="scAccount"
         :spAccount="spAccount"
         :activeTab="activeTab"
-        :overviewAlbumsCount="overviewAlbums.length"
+        :overviewAlbumsCount="user?.album_count || overviewAlbums.length"
         :scPlaylistsCount="scPlaylists.length"
         :scTracksCount="scTracks.length"
-        @play="handlePlayUserLibrary"
-        @shuffle="handleShuffleUserLibrary"
+        :totalDuration="user?.total_duration || 0"
+        :totalPlaylistTracks="totalPlaylistTracks"
+        :maxPlaylistTrackCount="maxPlaylistTrackCount"
+        :uniqueAlbumArtistsCount="uniqueAlbumArtistsCount"
+        :totalAlbumTracksCount="totalAlbumTracksCount"
+        @play="handleHeroPlay"
+        @shuffle="handleHeroShuffle"
         @follow="toggleFollow"
         @edit="showEditProfileModal = true"
         @share="handleShare"
         @selectTab="selectTab"
+        @createPlaylist="handleCreatePlaylist"
       />
 
       <!-- Active Background Imports Panel (when viewing self) -->
@@ -304,6 +310,24 @@ const userInitials = computed(() => getInitials(user.value, isSelf.value, authSt
 const avatarGradientStyle = computed(() => computeAvatarGradient(user.value?.display_name || user.value?.username))
 const ambientGlowStyle = computed(() => computeAmbientGlow(user.value?.display_name || user.value?.username))
 
+const totalPlaylistTracks = computed(() => {
+  return overviewPlaylists.value.reduce((acc, pl) => acc + (pl.track_count || 0), 0)
+})
+
+const maxPlaylistTrackCount = computed(() => {
+  if (!overviewPlaylists.value.length) return 0
+  return Math.max(...overviewPlaylists.value.map(pl => pl.track_count || 0))
+})
+
+const uniqueAlbumArtistsCount = computed(() => {
+  const artists = overviewAlbums.value.map(a => a.artist).filter(Boolean)
+  return new Set(artists).size
+})
+
+const totalAlbumTracksCount = computed(() => {
+  return overviewAlbums.value.reduce((acc, a) => acc + (a.track_count || a.total_tracks || 0), 0)
+})
+
 // ─── Refs ───
 const virtualTrackListRef = ref(null)
 const playlistsGridRef = ref(null)
@@ -547,6 +571,27 @@ const handleShuffleUserLibrary = async () => {
   } catch (e) {
     console.error('Failed to shuffle user library:', e)
   }
+}
+
+const handleHeroPlay = () => {
+  if (activeTab.value === 'soundcloud' && scTracks.value?.length > 0) {
+    handleQuickPlayExternalTrack(scTracks.value[0])
+  } else {
+    handlePlayUserLibrary()
+  }
+}
+
+const handleHeroShuffle = () => {
+  if (activeTab.value === 'soundcloud' && scTracks.value?.length > 0) {
+    const randomIndex = Math.floor(Math.random() * scTracks.value.length)
+    handleQuickPlayExternalTrack(scTracks.value[randomIndex])
+  } else {
+    handleShuffleUserLibrary()
+  }
+}
+
+const handleCreatePlaylist = () => {
+  router.push('/library?tab=playlists')
 }
 
 // ─── Track/Playlist/Album Fetch & Actions ───

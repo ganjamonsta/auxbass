@@ -1,48 +1,5 @@
 <template>
   <div class="sc-pane">
-    <!-- SC Profile Strip -->
-    <div v-if="scAccount" class="ext-profile-strip sc-profile-strip">
-      <div class="ext-strip-avatar">
-        <img v-if="scAccount.avatar_url" :src="getCoverUrl(scAccount.avatar_url, CoverSize.SMALL)" alt="" referrerpolicy="no-referrer" />
-        <span v-else class="sc-badge-large">SC</span>
-      </div>
-      <div class="ext-strip-info">
-        <div class="ext-strip-platform">
-          <span class="sc-badge-inline">SoundCloud</span>
-          <span class="ext-verified-badge" title="Подключенный аккаунт">Подключен</span>
-        </div>
-        <h2 class="ext-strip-name">{{ scAccount.display_name || scAccount.username }}</h2>
-        <div class="ext-strip-sub">
-          <span class="ext-strip-handle">@{{ scAccount.username }}</span>
-          <span v-if="scAccount.profile_url || scAccount.permalink_url" class="stat-separator">•</span>
-          <a 
-            v-if="scAccount.profile_url || scAccount.permalink_url" 
-            :href="scAccount.profile_url || scAccount.permalink_url" 
-            target="_blank" 
-            rel="noopener noreferrer" 
-            class="ext-strip-link"
-          >
-            <span>Открыть на SoundCloud</span>
-            <ExternalLink :size="13" />
-          </a>
-        </div>
-      </div>
-      <div class="ext-strip-stats">
-        <div class="ext-stat-box" v-if="scAccount.likes_count">
-          <span class="ext-stat-num">{{ scAccount.likes_count }}</span>
-          <span class="ext-stat-lbl">лайков</span>
-        </div>
-        <div class="ext-stat-box">
-          <span class="ext-stat-num">{{ scPlaylists.length }}</span>
-          <span class="ext-stat-lbl">плейлистов</span>
-        </div>
-        <div class="ext-stat-box">
-          <span class="ext-stat-num">{{ scTracks.length }}</span>
-          <span class="ext-stat-lbl">релизов</span>
-        </div>
-      </div>
-    </div>
-
     <!-- If viewing a selected SoundCloud Playlist drawer/detail -->
     <div v-if="selectedScPlaylist" class="sc-playlist-detail-view">
       <div class="sc-playlist-detail-header">
@@ -120,37 +77,54 @@
       </div>
     </div>
 
-    <!-- Normal Subtabs: Playlists vs Releases -->
+    <!-- Normal Subtabs: Playlists vs Releases vs Likes -->
     <div v-else class="sc-main-content">
       <div class="sc-subtabs-bar">
-        <button 
-          class="sc-subtab-btn" 
-          :class="{ active: scSubTab === 'playlists' }"
-          @click="scSubTab = 'playlists'"
-        >
-          <Folder :size="15" />
-          <span>Плейлисты</span>
-          <span class="subtab-count">{{ scPlaylists.length }}</span>
-        </button>
-        <button 
-          class="sc-subtab-btn" 
-          :class="{ active: scSubTab === 'tracks' }"
-          @click="scSubTab = 'tracks'"
-        >
-          <Music :size="15" />
-          <span>Релизы и треки</span>
-          <span class="subtab-count">{{ scTracks.length }}</span>
-        </button>
-        <button 
-          v-if="isSelf"
-          class="sc-subtab-btn sc-likes-tab-btn" 
-          :class="{ active: scSubTab === 'likes' }"
-          @click="selectLikesSubTab"
-        >
-          <Heart :size="15" />
-          <span>Лайки</span>
-          <span v-if="scAccount.likes_count || scLikes.length" class="subtab-count">{{ scAccount.likes_count || scLikes.length }}</span>
-        </button>
+        <div class="sc-subtabs-group">
+          <button 
+            class="sc-subtab-btn" 
+            :class="{ active: scSubTab === 'playlists' }"
+            @click="scSubTab = 'playlists'"
+          >
+            <Folder :size="15" />
+            <span>Плейлисты</span>
+            <span class="subtab-count">{{ scPlaylists.length }}</span>
+          </button>
+          <button 
+            class="sc-subtab-btn" 
+            :class="{ active: scSubTab === 'tracks' }"
+            @click="scSubTab = 'tracks'"
+          >
+            <Music :size="15" />
+            <span>Релизы и треки</span>
+            <span class="subtab-count">{{ scTracks.length }}</span>
+          </button>
+          <button 
+            v-if="isSelf"
+            class="sc-subtab-btn sc-likes-tab-btn" 
+            :class="{ active: scSubTab === 'likes' }"
+            @click="selectLikesSubTab"
+          >
+            <Heart :size="15" />
+            <span>Лайки</span>
+            <span v-if="scAccount?.likes_count || scLikes.length" class="subtab-count">{{ scAccount?.likes_count || scLikes.length }}</span>
+          </button>
+        </div>
+
+        <div class="sc-subtabs-actions">
+          <a 
+            v-if="scAccountUrl" 
+            :href="scAccountUrl" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            class="sc-open-external-btn"
+            title="Открыть профиль на SoundCloud"
+          >
+            <span class="sc-badge-inline">SC</span>
+            <span>В SoundCloud</span>
+            <ExternalLink :size="12" />
+          </a>
+        </div>
       </div>
 
       <!-- Subtab 1: Playlists -->
@@ -280,7 +254,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTasksStore } from '@/stores/tasks'
 import { socialApi, ingestionApi } from '@/api/client'
@@ -324,6 +298,14 @@ const scSubTab = ref('playlists')
 const selectedScPlaylist = ref(null)
 const scPlaylistTracks = ref([])
 const loadingScPlaylistTracks = ref(false)
+
+const scAccountUrl = computed(() => {
+  if (!props.scAccount) return null
+  const raw = props.scAccount.profile_url || props.scAccount.permalink_url || (props.scAccount.username ? `https://soundcloud.com/${props.scAccount.username}` : null)
+  if (!raw) return null
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw
+  return `https://${raw}`
+})
 
 // Likes state
 const scLikes = ref([])
@@ -441,163 +423,21 @@ defineExpose({ scPlaylistTracks, openScPlaylist, closeScPlaylist })
   max-width: 320px;
 }
 
-/* Profile Strip */
-.ext-profile-strip {
-  position: relative;
-  overflow: hidden;
-  border-radius: 20px;
-  background: var(--c-bg-2, #181818);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 24px 28px;
-  margin-bottom: 28px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-  display: flex;
-  align-items: center;
-  gap: 24px;
-}
-
-.sc-profile-strip {
-  background: linear-gradient(135deg, rgba(255, 85, 0, 0.08) 0%, rgba(20, 20, 20, 0.8) 100%);
-  border-color: rgba(255, 85, 0, 0.2);
-}
-
-.ext-strip-avatar {
-  width: 80px;
-  height: 80px;
-  min-width: 80px;
-  border-radius: 50%;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.05);
-  border: 2px solid rgba(255, 255, 255, 0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.ext-strip-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.sc-badge-large {
-  font-size: 24px;
-  font-weight: 800;
-  color: #ff5500;
-}
-
-.ext-strip-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.ext-strip-platform {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.sc-badge-inline {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #ff5500;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 800;
-  border-radius: 4px;
-  padding: 1px 5px;
-  line-height: 1.2;
-  letter-spacing: 0.5px;
-}
-
-.ext-verified-badge {
-  font-size: 11px;
-  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
-  font-weight: 500;
-}
-
-.ext-strip-name {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--c-text-1, #fff);
-  margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.ext-strip-sub {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
-}
-
-.ext-strip-handle {
-  font-weight: 500;
-}
-
-.stat-separator {
-  color: rgba(255, 255, 255, 0.25);
-  font-size: 11px;
-}
-
-.ext-strip-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
-  text-decoration: none;
-  font-size: 12px;
-  transition: color 0.2s ease;
-}
-
-.ext-strip-link:hover {
-  color: var(--c-text-1, #fff);
-  text-decoration: underline;
-}
-
-.ext-strip-stats {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-shrink: 0;
-}
-
-.ext-stat-box {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 8px 16px;
-  min-width: 70px;
-}
-
-.ext-stat-num {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--c-text-1, #fff);
-}
-
-.ext-stat-lbl {
-  font-size: 11px;
-  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
-}
-
 /* Subtabs */
 .sc-subtabs-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 20px;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 22px;
+  flex-wrap: wrap;
+}
+
+.sc-subtabs-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .sc-subtab-btn {
@@ -613,30 +453,79 @@ defineExpose({ scPlaylistTracks, openScPlaylist, closeScPlaylist })
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .sc-subtab-btn:hover {
   background: rgba(255, 255, 255, 0.08);
   color: var(--c-text-1, #fff);
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
 }
 
 .sc-subtab-btn.active {
-  background: rgba(255, 85, 0, 0.15);
-  border-color: #ff5500;
+  background: rgba(255, 85, 0, 0.14);
+  border-color: rgba(255, 85, 0, 0.45);
   color: #fff;
+  box-shadow: 0 4px 14px rgba(255, 85, 0, 0.15);
 }
 
 .subtab-count {
   font-size: 11px;
-  background: rgba(255, 255, 255, 0.1);
-  padding: 1px 6px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1.5px 7px;
   border-radius: 9999px;
+  transition: background 0.2s, color 0.2s;
 }
 
 .sc-subtab-btn.active .subtab-count {
   background: #ff5500;
   color: #fff;
+}
+
+.sc-subtabs-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sc-open-external-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--r-full, 9999px);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 85, 0, 0.25);
+  color: var(--c-text-2, rgba(255, 255, 255, 0.85));
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sc-open-external-btn:hover {
+  background: rgba(255, 85, 0, 0.12);
+  border-color: #ff5500;
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(255, 85, 0, 0.2);
+}
+
+.sc-badge-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ff5500;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 4px;
+  padding: 1px 5px;
+  line-height: 1.2;
+  letter-spacing: 0.5px;
 }
 
 /* Grid & Cards */

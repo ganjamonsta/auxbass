@@ -49,7 +49,9 @@ class UserProfileResponse(BaseModel):
     hide_telegram_id: bool = False
     is_following: bool = False
     track_count: int = 0
+    total_duration: int = 0
     playlist_count: int = 0
+    album_count: int = 0
     followers_count: int = 0
     following_count: int = 0
     
@@ -119,9 +121,22 @@ async def get_user_stats(db: AsyncSession, user_id: int) -> dict:
         .where(UserLibrary.user_id == user_id)
     ) or 0
     
+    total_duration = await db.scalar(
+        select(func.coalesce(func.sum(Track.duration), 0))
+        .join(UserLibrary, UserLibrary.track_id == Track.id)
+        .where(UserLibrary.user_id == user_id)
+    ) or 0
+    
     playlist_count = await db.scalar(
         select(func.count(Playlist.id))
         .where(Playlist.owner_id == user_id, Playlist.is_public == True)
+    ) or 0
+    
+    album_count = await db.scalar(
+        select(func.count(func.distinct(AlbumTrack.album_id)))
+        .join(Track, Track.id == AlbumTrack.track_id)
+        .join(UserLibrary, UserLibrary.track_id == Track.id)
+        .where(UserLibrary.user_id == user_id)
     ) or 0
     
     followers_count = await db.scalar(
@@ -136,7 +151,9 @@ async def get_user_stats(db: AsyncSession, user_id: int) -> dict:
     
     return {
         "track_count": track_count,
+        "total_duration": int(total_duration),
         "playlist_count": playlist_count,
+        "album_count": album_count,
         "followers_count": followers_count,
         "following_count": following_count,
     }
