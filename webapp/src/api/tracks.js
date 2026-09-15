@@ -56,6 +56,7 @@ export const tracksApi = {
   // Library management (mutations)
   addToLibrary: nonCacheable((trackId) => api.post(`/tracks/${trackId}/add-to-library`), 'track'),
   removeFromLibrary: nonCacheable((trackId) => api.delete(`/tracks/${trackId}/remove-from-library`), 'track'),
+  reSource: nonCacheable((id, customUrl = null) => api.post(`/tracks/${id}/re-source`, null, { params: customUrl ? { custom_url: customUrl } : {} }), 'track'),
 
   // Tags (user-generated with voting)
   getTrackTags: (trackId) => api.get(`/tracks/${trackId}/tags`),

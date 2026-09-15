@@ -7,7 +7,7 @@
     <div class="sc-track-cover" :class="{ 'sp-cover': variant === 'spotify', 'yt-cover': variant === 'youtube' }">
       <img
         v-if="item.cover_url && !coverError"
-        :src="item.cover_url"
+        :src="getCoverUrl(item.cover_url, CoverSize.SMALL)"
         alt=""
         loading="lazy"
         referrerpolicy="no-referrer"
@@ -58,10 +58,10 @@
         :title="isDownloading ? 'Загружается...' : isQueued ? 'В очереди на добавление' : 'Добавить в медиатеку'"
       >
         <div v-if="isDownloading" class="spinner micro"></div>
-        <Clock v-else-if="isQueued" :size="14" />
-        <Plus v-else :size="16" />
+        <Clock v-else-if="isQueued" :size="15" />
+        <Plus v-else :size="15" />
       </button>
-      <span v-else class="sc-added-indicator" title="Уже в медиатеке">
+      <span v-else class="sc-added-badge" title="Уже в медиатеке">
         <Check :size="16" />
       </span>
     </div>
@@ -71,7 +71,7 @@
 <script setup>
 import { ref } from 'vue'
 import { Music, Play, Check, CloudDownload, Clock, Plus } from 'lucide-vue-next'
-import { formatDuration } from '@/utils'
+import { formatDuration, getCoverUrl, CoverSize } from '@/utils'
 
 defineProps({
   item: {

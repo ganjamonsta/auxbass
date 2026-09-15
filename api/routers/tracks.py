@@ -914,10 +914,17 @@ async def update_track(
 @router.delete("/{track_id}")
 async def delete_track(
     track_id: int,
+    force_purge: bool = Query(False, description="Purge track completely from global DB and all playlists"),
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete track from library and channel (channel = mirror of library)"""
+    """Delete track from library and channel (channel = mirror of library).
+    If no other user has this track, or if force_purge=True, deletes track completely from global DB.
+    """
+    track = await db.get(Track, track_id)
+    if not track:
+        raise_not_found("Track not found")
+
     result = await db.execute(
         select(UserLibrary)
         .where(UserLibrary.track_id == track_id)
@@ -925,11 +932,12 @@ async def delete_track(
     )
     entry = result.scalar_one_or_none()
     
-    if not entry:
+    if not entry and not force_purge and track.uploader_id != user.id:
         raise_not_found("Track not found in your library")
     
-    await db.delete(entry)
-    await db.commit()
+    if entry:
+        await db.delete(entry)
+        await db.commit()
     
     # Channel = mirror of library: delete from channel too
     deleted_from_channel = False
@@ -939,7 +947,140 @@ async def delete_track(
     except Exception as e:
         logger.warning(f"Failed to delete track {track_id} from channel: {e}")
     
-    return {"status": "deleted", "track_id": track_id, "deleted_from_channel": deleted_from_channel}
+    # Check remaining users who have this track in their library
+    other_users_count = await db.scalar(
+        select(func.count(UserLibrary.id))
+        .where(UserLibrary.track_id == track_id)
+    )
+    
+    purged_from_global = False
+    if other_users_count == 0 or force_purge:
+        # No users have this track left (orphaned) OR force purge requested
+        await db.delete(track)
+        await db.commit()
+        purged_from_global = True
+        logger.info(
+            f"Track {track_id} ('{track.artist} - {track.title}') purged from global tracks table "
+            f"(force_purge={force_purge}, remaining_users={other_users_count})"
+        )
+
+    return {
+        "status": "deleted",
+        "track_id": track_id,
+        "deleted_from_channel": deleted_from_channel,
+        "purged_from_global": purged_from_global,
+    }
+
+
+@router.post("/{track_id}/re-source", response_model=TrackResponse)
+async def re_source_track_audio(
+    track_id: int,
+    custom_url: Optional[str] = Query(None, description="Optional specific YouTube or SoundCloud URL to source audio from"),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Re-download and replace audio stream for an existing track.
+    Useful when a track has bad audio, live rip, or corrupted stream.
+    Replaces Telegram file_id, duration, and file_size in-place without breaking playlists or likes.
+    """
+    query = (
+        select(Track)
+        .options(
+            selectinload(Track.enrichment),
+            selectinload(Track.lyrics),
+        )
+        .where(Track.id == track_id)
+    )
+    res = await db.execute(query)
+    track = res.scalar_one_or_none()
+    if not track:
+        raise_not_found("Track not found")
+
+    lib_res = await db.execute(
+        select(UserLibrary)
+        .where(UserLibrary.track_id == track_id, UserLibrary.user_id == user.id)
+    )
+    lib_entry = lib_res.scalar_one_or_none()
+    if not lib_entry and track.uploader_id != user.id and not getattr(user, "is_admin", False):
+        raise HTTPException(status_code=403, detail="You can only re-source tracks from your library")
+
+    import os
+    import tempfile
+    from aiogram.types import FSInputFile
+    from bot.services.ingestion.audio_resolver import audio_resolver
+    from bot.services.ingestion.base import TrackMetadata
+    from bot.services.ingestion.registry import provider_registry
+    from api.routers.ingestion import _get_active_bot
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        if custom_url:
+            prov = provider_registry.find_provider(custom_url)
+            if not prov:
+                raise HTTPException(status_code=400, detail=f"No provider found for URL: {custom_url}")
+            meta = TrackMetadata(
+                provider_name=prov.name,
+                url=custom_url,
+                title=track.title or "Track",
+                artist=track.artist or "Artist",
+                duration=track.duration,
+                cover_url=track.cover_url,
+            )
+            downloaded = await prov.download_track(meta, temp_dir)
+        else:
+            meta = TrackMetadata(
+                provider_name="system",
+                url="",
+                title=track.title or "Track",
+                artist=track.artist or "Artist",
+                duration=track.duration,
+                cover_url=track.cover_url,
+            )
+            downloaded = await audio_resolver.resolve_and_download(meta, temp_dir=temp_dir)
+
+        bot = _get_active_bot()
+        target_chat = user.id
+        try:
+            channel_service = get_channel_service()
+            user_ch = await channel_service.get_user_channel(user.id)
+            if user_ch and user_ch.is_active:
+                target_chat = user_ch.channel_id
+        except Exception:
+            pass
+
+        safe_filename = f"{track.artist} - {track.title}.mp3".replace("/", "-")
+        audio_input = FSInputFile(downloaded.audio_path, filename=safe_filename)
+        thumb_input = None
+        if downloaded.cover_path and os.path.exists(downloaded.cover_path):
+            thumb_input = FSInputFile(downloaded.cover_path)
+
+        try:
+            sent_msg = await bot.send_audio(
+                chat_id=target_chat,
+                audio=audio_input,
+                title=track.title,
+                performer=track.artist,
+                duration=downloaded.metadata.duration if downloaded.metadata else track.duration,
+                thumbnail=thumb_input,
+            )
+        except Exception as upload_err:
+            logger.error(f"Telegram upload failed during re-source for track {track_id}: {upload_err}")
+            raise HTTPException(status_code=502, detail=f"Telegram upload failed: {upload_err}")
+
+        if not sent_msg or not sent_msg.audio:
+            raise HTTPException(status_code=500, detail="Failed to upload re-sourced audio to Telegram")
+
+        track.file_id = sent_msg.audio.file_id
+        track.file_unique_id = sent_msg.audio.file_unique_id
+        track.duration = sent_msg.audio.duration or track.duration
+        track.file_size = sent_msg.audio.file_size or downloaded.file_size
+        track.is_unavailable = False
+        track.updated_at = utcnow()
+        await db.commit()
+        await db.refresh(track)
+
+    logger.info(f"Successfully re-sourced audio for track {track_id} ('{track.artist} - {track.title}')")
+    return track_to_response(track, lib_entry)
 
 
 @router.post("/{track_id}/like")

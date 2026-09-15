@@ -517,7 +517,10 @@ export const CoverSize = {
  */
 export function getCoverUrl(url, size = CoverSize.MEDIUM) {
   if (!url) return null
-  
+
+  // If already proxied, avoid double proxying
+  if (url.startsWith('/api/images/proxy')) return url
+
   // Map size presets to Deezer dimensions
   const sizeMap = {
     [CoverSize.SMALL]: '250x250',   // 250x250 for crispness on Retina/HiDPI screens
@@ -525,17 +528,17 @@ export function getCoverUrl(url, size = CoverSize.MEDIUM) {
     [CoverSize.LARGE]: '1000x1000', // 1000x1000 for album/playlist detail headers
     [CoverSize.XL]: '1000x1000'     // 1000x1000 for full player and sidebar
   }
-  
+
   const targetSize = sizeMap[size] || sizeMap[CoverSize.MEDIUM]
-  
+
+  let targetUrl = url
+
   // Check if this is a Deezer cover or artist image URL
-  if (url.includes('dzcdn.net/images/')) {
+  if (targetUrl.includes('dzcdn.net/images/')) {
     // Replace any size pattern (e.g., 1000x1000, 500x500, etc.) with target size
-    return url.replace(/\/\d+x\d+(-|$)/, `/${targetSize}$1`)
-  }
-  
-  // Check if this is a Last.fm image URL (e.g., /i/u/300x300/, /i/u/174s/, /i/u/64s/)
-  if (url.includes('lastfm') && url.includes('/i/u/')) {
+    targetUrl = targetUrl.replace(/\/\d+x\d+(-|$)/, `/${targetSize}$1`)
+  } else if (targetUrl.includes('lastfm') && targetUrl.includes('/i/u/')) {
+    // Check if this is a Last.fm image URL (e.g., /i/u/300x300/, /i/u/174s/, /i/u/64s/)
     const lastfmSizeMap = {
       [CoverSize.SMALL]: '300x300',
       [CoverSize.MEDIUM]: '770x0',
@@ -543,10 +546,16 @@ export function getCoverUrl(url, size = CoverSize.MEDIUM) {
       [CoverSize.XL]: '770x0'
     }
     const targetLastfm = lastfmSizeMap[size] || '770x0'
-    return url.replace(/\/i\/u\/([^\/]+)\//, `/i/u/${targetLastfm}/`)
+    targetUrl = targetUrl.replace(/\/i\/u\/([^\/]+)\//, `/i/u/${targetLastfm}/`)
   }
-  
-  return url
+
+  // Proxy external HTTP/HTTPS images (e.g., SoundCloud, Spotify, Deezer, YouTube CDNs)
+  // through the backend proxy so users in Russia without VPN can view all artwork seamlessly
+  if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
+    return `/api/images/proxy?url=${encodeURIComponent(targetUrl)}`
+  }
+
+  return targetUrl
 }
 
 /**

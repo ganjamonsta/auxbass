@@ -731,7 +731,8 @@ const handleSyncScPlaylist = async (playlist) => {
       tracksPayload,
       playlist.title,
       true,
-      playlist.title
+      playlist.title,
+      playlist.artwork_url
     )
 
     if (res.data) {

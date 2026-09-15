@@ -11,20 +11,30 @@ import tempfile
 from datetime import datetime, timezone
 from typing import Optional, Callable, Any, List, Dict
 
+import aiohttp
 from aiogram import Bot
-from aiogram.types import FSInputFile
+from aiogram.types import FSInputFile, BufferedInputFile
 from aiogram.exceptions import TelegramRetryAfter, TelegramBadRequest
 from sqlalchemy import select, and_, or_, func
 
 from shared.config import get_settings
 from shared.database import get_session
-from shared.models import Track, Playlist, PlaylistTrack, UserLibrary, LibrarySource, ForwardSourceType
+from shared.models import (
+    Track,
+    Playlist,
+    PlaylistTrack,
+    UserLibrary,
+    LibrarySource,
+    ForwardSourceType,
+    UserChannel,
+)
 from shared.matching import (
     normalize_artist,
     normalize_title,
     clean_track_metadata,
     fuzzy_match_artist,
     fuzzy_match_title,
+    extract_version_markers,
 )
 
 from bot.services.tracks import track_service
@@ -76,6 +86,12 @@ def _score_candidate(
 
     # If duration is provided on both sides, reject if difference > 7s
     if duration and t.duration and dur_diff is not None and dur_diff > 7:
+        return -1
+
+    # Version markers compatibility check (strictly distinguish live, acoustic, remix, studio)
+    t_markers = extract_version_markers(t.title)
+    req_markers = extract_version_markers(clean_title)
+    if t_markers != req_markers:
         return -1
 
     score = 0
@@ -347,6 +363,33 @@ class IngestionPipeline:
                     await session.refresh(playlist)
                     job.playlist_id = playlist.id
 
+            # Upload playlist cover to user's Telegram channel if available
+            if job.playlist_id:
+                async with get_session() as session:
+                    playlist = await session.get(Playlist, job.playlist_id)
+                    if playlist:
+                        cover_candidate = job.cover_url or playlist.custom_cover_url
+                        if not cover_candidate and getattr(job, "custom_tracks", None):
+                            cover_candidate = job.custom_tracks[0].get("cover_url")
+                        if not cover_candidate and tracks_meta and tracks_meta[0].cover_url:
+                            cover_candidate = tracks_meta[0].cover_url
+
+                        if cover_candidate and cover_candidate.startswith("http"):
+                            try:
+                                tg_cover_url = await self._upload_playlist_cover(
+                                    session=session,
+                                    playlist_id=playlist.id,
+                                    user_id=job.user_id,
+                                    playlist_name=playlist.name,
+                                    cover_url=cover_candidate,
+                                )
+                                if tg_cover_url:
+                                    playlist.custom_cover_url = tg_cover_url
+                                    await session.commit()
+                                    job.cover_url = tg_cover_url
+                            except Exception as e:
+                                logger.warning(f"[Ingestion] Could not upload playlist cover: {e}")
+
             # 3. Target chat for bot upload
             # If buffer chat is configured, send there to avoid spamming the user's DM.
             # Otherwise send to the user's chat.
@@ -491,6 +534,12 @@ class IngestionPipeline:
                         job.current_step = "Сохранение в медиатеку"
                         job.updated_at = datetime.now(timezone.utc)
 
+                        track_cover_url = None
+                        if sent_msg and sent_msg.audio and sent_msg.audio.thumbnail:
+                            track_cover_url = f"/api/images/{sent_msg.audio.thumbnail.file_id}"
+                        elif effective_meta.cover_url:
+                            track_cover_url = effective_meta.cover_url
+
                         save_result = await track_service.save_track(
                             user_id=job.user_id,
                             file_id=sent_msg.audio.file_id,
@@ -505,7 +554,7 @@ class IngestionPipeline:
                             forward_source_name=job.provider_name,
                             library_source=LibrarySource.UPLOADED,
                             enrich=True,
-                            cover_url=effective_meta.cover_url,
+                            cover_url=track_cover_url,
                             genre=effective_meta.extra.get("genre"),
                             tags=effective_meta.extra.get("tags"),
                             album_name=effective_meta.album,
@@ -594,4 +643,79 @@ class IngestionPipeline:
                     session.add(pt)
                     await session.commit()
         except Exception as e:
-            logger.warning(f"[Ingestion] Failed to link track {track_id} to playlist {playlist_id}: {e}")
+            logger.warning(f"[Ingestion] Failed to add track {track_id} to playlist {playlist_id}: {e}")
+
+    async def _upload_playlist_cover(
+        self,
+        session,
+        playlist_id: int,
+        user_id: int,
+        playlist_name: str,
+        cover_url: str,
+    ) -> Optional[str]:
+        """Download playlist cover from external URL and upload to user's Telegram channel or PM."""
+        if not cover_url or not cover_url.startswith("http"):
+            return None
+
+        content = None
+        detected_ext = "jpg"
+        try:
+            async with aiohttp.ClientSession() as http_client:
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
+                }
+                async with http_client.get(cover_url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    if resp.status != 200:
+                        logger.warning(f"[Ingestion] Failed to download playlist cover from {cover_url[:60]}: HTTP {resp.status}")
+                        return None
+                    content = await resp.read()
+                    ct = resp.headers.get("Content-Type", "").lower()
+                    if "png" in ct:
+                        detected_ext = "png"
+                    elif "webp" in ct:
+                        detected_ext = "webp"
+        except Exception as e:
+            logger.warning(f"[Ingestion] Error downloading playlist cover {cover_url[:60]}: {e}")
+            return None
+
+        if not content or len(content) < 12:
+            return None
+
+        # Resolve target chat: user's backup channel if active, otherwise user PM
+        user_channel = await session.scalar(
+            select(UserChannel).where(UserChannel.user_id == user_id, UserChannel.is_active == True)
+        )
+        target_chat_id = user_channel.channel_id if user_channel else user_id
+        safe_filename = f"cover_{playlist_id}.{detected_ext}"
+        caption = f"🖼 <b>Обложка плейлиста</b>: {playlist_name}\n\n#playlist_{playlist_id} #cover"
+
+        sent_msg = None
+        try:
+            sent_msg = await self.bot.send_photo(
+                chat_id=target_chat_id,
+                photo=BufferedInputFile(file=content, filename=safe_filename),
+                caption=caption,
+            )
+        except Exception as e:
+            logger.warning(f"[Ingestion] Failed to upload playlist cover to target {target_chat_id}: {e}")
+            if user_channel and target_chat_id != user_id:
+                try:
+                    sent_msg = await self.bot.send_photo(
+                        chat_id=user_id,
+                        photo=BufferedInputFile(file=content, filename=safe_filename),
+                        caption=caption,
+                    )
+                except Exception as err:
+                    logger.error(f"[Ingestion] Failed to upload playlist cover to user PM fallback: {err}")
+                    return None
+            else:
+                return None
+
+        photos = sent_msg.photo if sent_msg else []
+        if not photos:
+            return None
+
+        file_id = photos[-1].file_id
+        logger.info(f"[Ingestion] Uploaded playlist {playlist_id} cover to Telegram: file_id={file_id[:20]}...")
+        return f"/api/images/{file_id}"

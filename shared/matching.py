@@ -7,7 +7,7 @@ Used by: enrichment, album assembly, search, deduplication.
 import html
 import re
 import unicodedata
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Set
 from functools import lru_cache
 
 
@@ -868,6 +868,55 @@ def get_all_track_artists(
             unique.append(a)
     
     return unique
+
+
+# Patterns to detect track version classifications (live, acoustic, remix, instrumental, etc.)
+VERSION_MARKER_PATTERNS = {
+    "live": re.compile(
+        r'\b(live|concert|tour|unplugged|bullet in a bible|live at|live from|live in|bbc session|radio 1 session|tiny desk|audiotree)\b',
+        re.IGNORECASE,
+    ),
+    "acoustic": re.compile(
+        r'\b(acoustic|stripped|unplugged)\b',
+        re.IGNORECASE,
+    ),
+    "instrumental": re.compile(
+        r'\b(instrumental|karaoke|backing track|minus)\b',
+        re.IGNORECASE,
+    ),
+    "remix": re.compile(
+        r'\b(remix|refix|re-fix|dub|vip|bootleg|rework|flip)\b|\b(?<!original\s)(?<!album\s)mix\b',
+        re.IGNORECASE,
+    ),
+    "cover": re.compile(
+        r'\b(cover|tribute)\b',
+        re.IGNORECASE,
+    ),
+    "orchestral": re.compile(
+        r'\b(orchestral|symphonic|orchestra)\b',
+        re.IGNORECASE,
+    ),
+    "speed": re.compile(
+        r'\b(sped up|speed up|slowed|nightcore|daycore|chopped and screwed)\b',
+        re.IGNORECASE,
+    ),
+}
+
+
+def extract_version_markers(text: Optional[str]) -> Set[str]:
+    """Extract version categories (live, acoustic, instrumental, remix, etc.) from track title or tags.
+    
+    Returns a set of normalized marker strings, or an empty set if the track is a studio original.
+    Note: 'Original Mix' and 'Album Version' explicitly denote original studio recordings.
+    """
+    if not text:
+        return set()
+    clean_text = re.sub(r'\b(original|album)\s+(mix|version)\b', '', text, flags=re.IGNORECASE)
+    markers = set()
+    for marker_name, pattern in VERSION_MARKER_PATTERNS.items():
+        if pattern.search(clean_text):
+            markers.add(marker_name)
+    return markers
 
 
 # Patterns to strip out promo channels, websites, bitrates, and rip tags

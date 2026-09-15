@@ -886,6 +886,260 @@ async def test_audio_resolver_soundcloud_drm_falls_back_to_youtube(monkeypatch, 
     assert result.metadata.title == "Brain Stew"
 
 
+def test_version_markers_extraction():
+    from shared.matching import extract_version_markers
+
+    assert extract_version_markers("Wake Me Up When September Ends") == set()
+    assert "live" in extract_version_markers("Wake Me Up When September Ends (Live at Milton Keynes)")
+    assert "live" in extract_version_markers("Wake Me Up When September Ends - Live from Bullet in a Bible")
+    assert "acoustic" in extract_version_markers("Wake Me Up When September Ends (Acoustic Version)")
+    assert "remix" in extract_version_markers("Wake Me Up When September Ends (Steve Aoki Remix)")
+    assert "instrumental" in extract_version_markers("Wake Me Up When September Ends (Instrumental)")
+
+
+def test_audio_resolver_version_alignment_prefers_studio_for_studio_target():
+    from bot.services.ingestion.audio_resolver import AudioResolver
+
+    resolver = AudioResolver()
+    target = TrackMetadata(
+        provider_name="spotify",
+        url="https://open.spotify.com/track/wake_me_up",
+        title="Wake Me Up When September Ends",
+        artist="Green Day",
+        duration=285,  # 4:45 studio
+    )
+
+    candidates = [
+        # Candidate 1: Live version, duration matches closely (4:42 vs 4:45)
+        {
+            "id": "live_1",
+            "title": "Green Day - Wake Me Up When September Ends (Live at Milton Keynes)",
+            "duration": 282,
+            "uploader": "Green Day",
+            "webpage_url": "https://www.youtube.com/watch?v=live_1",
+        },
+        # Candidate 2: Studio album version from Topic channel (4:45)
+        {
+            "id": "studio_1",
+            "title": "Wake Me Up When September Ends",
+            "duration": 285,
+            "uploader": "Green Day - Topic",
+            "webpage_url": "https://www.youtube.com/watch?v=studio_1",
+        },
+        # Candidate 3: Official Music Video (7:14, rejected by duration diff > 15s)
+        {
+            "id": "mv_1",
+            "title": "Green Day - Wake Me Up When September Ends (Official Music Video)",
+            "duration": 434,
+            "uploader": "Green Day",
+            "webpage_url": "https://www.youtube.com/watch?v=mv_1",
+        },
+    ]
+
+    ranked = resolver._rank_candidates(target, candidates, set())
+    assert len(ranked) >= 2
+    # Studio Topic track MUST be ranked first!
+    assert ranked[0]["id"] == "studio_1"
+    # Live track should be ranked after, with a huge penalty
+    assert ranked[1]["id"] == "live_1"
+    assert ranked[1]["_penalty"] > 200.0
+
+
+def test_audio_resolver_version_alignment_prefers_live_for_live_target():
+    from bot.services.ingestion.audio_resolver import AudioResolver
+
+    resolver = AudioResolver()
+    # User explicitly wants the Live version!
+    target = TrackMetadata(
+        provider_name="youtube",
+        url="https://www.youtube.com/watch?v=live_target",
+        title="Wake Me Up When September Ends (Live)",
+        artist="Green Day",
+        duration=282,
+    )
+
+    candidates = [
+        # Candidate 1: Studio album version
+        {
+            "id": "studio_1",
+            "title": "Wake Me Up When September Ends",
+            "duration": 285,
+            "uploader": "Green Day - Topic",
+            "webpage_url": "https://www.youtube.com/watch?v=studio_1",
+        },
+        # Candidate 2: Live recording
+        {
+            "id": "live_1",
+            "title": "Green Day - Wake Me Up When September Ends (Live at Milton Keynes)",
+            "duration": 282,
+            "uploader": "Green Day",
+            "webpage_url": "https://www.youtube.com/watch?v=live_1",
+        },
+    ]
+
+    ranked = resolver._rank_candidates(target, candidates, set())
+    assert len(ranked) == 2
+    # Because target is Live, the Live candidate MUST be preferred!
+    assert ranked[0]["id"] == "live_1"
+
+
+def test_pipeline_score_candidate_distinguishes_live_and_studio():
+    from bot.services.ingestion.pipeline import _score_candidate
+    from shared.matching import clean_track_metadata, normalize_artist, normalize_title
+    from bot.services.ingestion.pipeline import _robust_norm_title
+    from shared.models import Track
+
+    # DB track is a Live recording
+    live_track = Track(
+        id=1,
+        title="Wake Me Up When September Ends (Live at Milton Keynes)",
+        artist="Green Day",
+        normalized_artist="green day",
+        duration=282,
+    )
+
+    # 1. User wants Studio version -> Must NOT match the live track in DB!
+    clean_t, clean_a = clean_track_metadata("Wake Me Up When September Ends", "Green Day")
+    score_studio = _score_candidate(
+        live_track,
+        clean_title=clean_t,
+        clean_artist=clean_a,
+        norm_title=normalize_title(clean_t),
+        norm_artist=normalize_artist(clean_a),
+        robust_title=_robust_norm_title(clean_t),
+        duration=285,
+    )
+    assert score_studio == -1, "Studio request must not match live recording in DB"
+
+    # 2. User wants Live version -> Must match!
+    clean_live_t, clean_live_a = clean_track_metadata("Wake Me Up When September Ends (Live)", "Green Day")
+    score_live = _score_candidate(
+        live_track,
+        clean_title=clean_live_t,
+        clean_artist=clean_live_a,
+        norm_title=normalize_title(clean_live_t),
+        norm_artist=normalize_artist(clean_live_a),
+        robust_title=_robust_norm_title(clean_live_t),
+        duration=282,
+    )
+    assert score_live > 0, "Live request should match live recording in DB"
+
+
+@pytest.mark.asyncio
+async def test_upload_playlist_cover_to_telegram_channel():
+    """Test that playlist cover is downloaded and sent to user's Telegram channel."""
+    from unittest.mock import MagicMock, AsyncMock, patch
+    from bot.services.ingestion.pipeline import IngestionPipeline
+    from aiogram.types import PhotoSize, Message
+
+    mock_bot = MagicMock()
+    mock_photo = MagicMock(spec=PhotoSize)
+    mock_photo.file_id = "test_cover_file_id_12345"
+    mock_msg = MagicMock(spec=Message)
+    mock_msg.photo = [mock_photo]
+    mock_bot.send_photo = AsyncMock(return_value=mock_msg)
+
+    pipeline = IngestionPipeline(mock_bot)
+
+    mock_channel = MagicMock()
+    mock_channel.channel_id = -1001234567890
+    mock_channel.is_active = True
+
+    mock_session = MagicMock()
+    mock_session.scalar = AsyncMock(return_value=mock_channel)
+
+    # Mock image download
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.headers = {"Content-Type": "image/jpeg"}
+    mock_resp.read = AsyncMock(return_value=b"\xff\xd8\xff\xe0" + b"A" * 100)
+
+    mock_cm = AsyncMock()
+    mock_cm.__aenter__.return_value = mock_resp
+    mock_cm.__aexit__.return_value = None
+
+    mock_http = MagicMock()
+    mock_http.get.return_value = mock_cm
+
+    mock_http_cm = AsyncMock()
+    mock_http_cm.__aenter__.return_value = mock_http
+    mock_http_cm.__aexit__.return_value = None
+
+    with patch("aiohttp.ClientSession", return_value=mock_http_cm):
+        result = await pipeline._upload_playlist_cover(
+            session=mock_session,
+            playlist_id=42,
+            user_id=123,
+            playlist_name="My Cool Playlist",
+            cover_url="https://i1.sndcdn.com/artworks-123-t500x500.jpg",
+        )
+
+        assert result == "/api/images/test_cover_file_id_12345"
+        mock_bot.send_photo.assert_called_once()
+        call_kwargs = mock_bot.send_photo.call_args[1]
+        assert call_kwargs["chat_id"] == -1001234567890
+        assert "My Cool Playlist" in call_kwargs["caption"]
+        assert "#playlist_42" in call_kwargs["caption"]
+
+
+@pytest.mark.asyncio
+async def test_upload_playlist_cover_fallback_to_pm():
+    """Test that playlist cover falls back to user PM if channel send fails."""
+    from unittest.mock import MagicMock, AsyncMock, patch
+    from bot.services.ingestion.pipeline import IngestionPipeline
+    from aiogram.types import PhotoSize, Message
+
+    mock_bot = MagicMock()
+    mock_photo = MagicMock(spec=PhotoSize)
+    mock_photo.file_id = "fallback_pm_file_id"
+    mock_msg = MagicMock(spec=Message)
+    mock_msg.photo = [mock_photo]
+
+    # First call fails (channel), second call succeeds (PM)
+    mock_bot.send_photo = AsyncMock(side_effect=[Exception("Channel forbidden"), mock_msg])
+
+    pipeline = IngestionPipeline(mock_bot)
+
+    mock_channel = MagicMock()
+    mock_channel.channel_id = -1001234567890
+    mock_channel.is_active = True
+
+    mock_session = MagicMock()
+    mock_session.scalar = AsyncMock(return_value=mock_channel)
+
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.headers = {"Content-Type": "image/jpeg"}
+    mock_resp.read = AsyncMock(return_value=b"\xff\xd8\xff\xe0" + b"A" * 100)
+
+    mock_cm = AsyncMock()
+    mock_cm.__aenter__.return_value = mock_resp
+    mock_cm.__aexit__.return_value = None
+
+    mock_http = MagicMock()
+    mock_http.get.return_value = mock_cm
+
+    mock_http_cm = AsyncMock()
+    mock_http_cm.__aenter__.return_value = mock_http
+    mock_http_cm.__aexit__.return_value = None
+
+    with patch("aiohttp.ClientSession", return_value=mock_http_cm):
+        result = await pipeline._upload_playlist_cover(
+            session=mock_session,
+            playlist_id=99,
+            user_id=777,
+            playlist_name="Fallback Playlist",
+            cover_url="https://i.scdn.co/image/spotify123",
+        )
+
+        assert result == "/api/images/fallback_pm_file_id"
+        assert mock_bot.send_photo.call_count == 2
+        # Second call must be to user PM
+        second_call = mock_bot.send_photo.call_args_list[1][1]
+        assert second_call["chat_id"] == 777
+
+
+
 
 
 

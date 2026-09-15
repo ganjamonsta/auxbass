@@ -162,6 +162,7 @@ class ExportifyStartRequest(BaseModel):
     create_playlist: bool = False
     playlist_name: Optional[str] = None
     target_playlist_id: Optional[int] = None
+    cover_url: Optional[str] = None
 
 
 class PreviewRequest(BaseModel):
@@ -186,6 +187,7 @@ class StartImportRequest(BaseModel):
     tracks: Optional[List[Dict[str, Any]]] = None
     create_playlist: bool = False
     playlist_name: Optional[str] = None
+    cover_url: Optional[str] = None
 
 
 class JobResponse(BaseModel):
@@ -345,15 +347,15 @@ async def start_import(
     total_tracks = len(custom_tracks) if custom_tracks else (len(selected_urls) if selected_urls else entity.track_count)
     job_title = req.title or (f"SoundCloud Likes ({total_tracks})" if (selected_urls and len(selected_urls) > 1 and entity.entity_type == EntityType.TRACK) else entity.title)
 
+    cover_candidate = req.cover_url or entity.cover_url or (custom_tracks[0].get("cover_url") if custom_tracks and custom_tracks[0].get("cover_url") else None)
     playlist_id = None
     if req.create_playlist:
         p_name = req.playlist_name or req.title or entity.title or f"{provider.name.title()} Playlist"
-        cover = entity.cover_url or (custom_tracks[0].get("cover_url") if custom_tracks and custom_tracks[0].get("cover_url") else None)
         new_pl = Playlist(
             owner_id=user.id,
             name=p_name,
             description=f"Синхронизировано из {provider.name.title()} ({url})",
-            custom_cover_url=cover,
+            custom_cover_url=cover_candidate,
             is_public=False,
         )
         db.add(new_pl)
@@ -369,7 +371,7 @@ async def start_import(
         title=job_title,
         total_tracks=total_tracks,
         author=entity.author,
-        cover_url=entity.cover_url,
+        cover_url=cover_candidate,
         selected_urls=selected_urls,
         custom_tracks=custom_tracks,
     )
@@ -1580,6 +1582,7 @@ async def start_exportify_import(
     playlist_id = None
     target_title = req.title or "Spotify Import"
 
+    cover = req.cover_url or (req.tracks[0].cover_url if req.tracks and req.tracks[0].cover_url else None)
     if req.target_playlist_id:
         target_pl = await db.scalar(
             select(Playlist).where(Playlist.id == req.target_playlist_id, Playlist.owner_id == user.id)
@@ -1590,7 +1593,6 @@ async def start_exportify_import(
         target_title = target_pl.name
     elif req.create_playlist:
         p_name = req.playlist_name or req.title or "Spotify Playlist"
-        cover = req.tracks[0].cover_url if req.tracks and req.tracks[0].cover_url else None
         new_pl = Playlist(
             owner_id=user.id,
             name=p_name,
@@ -1613,7 +1615,7 @@ async def start_exportify_import(
         entity_type=EntityType.PLAYLIST.value if playlist_id else EntityType.TRACKS.value,
         title=target_title,
         total_tracks=len(req.tracks),
-        cover_url=req.tracks[0].cover_url if req.tracks else None,
+        cover_url=cover,
         custom_tracks=custom_tracks_data,
     )
     if playlist_id:

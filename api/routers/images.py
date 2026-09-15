@@ -1,7 +1,12 @@
+import asyncio
+import ipaddress
 import logging
 import re
 from typing import Optional
-from fastapi import APIRouter, HTTPException
+from urllib.parse import urlparse
+
+import aiohttp
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
 
 from shared.config import get_settings
@@ -11,6 +16,96 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Images"])
 settings = get_settings()
+
+# Private / reserved network blocks for SSRF protection
+_PRIVATE_NETWORKS = [
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),
+    ipaddress.ip_network("fe80::/10"),
+]
+
+
+def _is_safe_url(url_str: str) -> bool:
+    """Validate external image URL against SSRF and invalid protocols."""
+    try:
+        parsed = urlparse(url_str)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+        if hostname.lower() in ("localhost", "0.0.0.0"):
+            return False
+        # If hostname is an IP, check against private networks
+        try:
+            ip = ipaddress.ip_address(hostname)
+            for net in _PRIVATE_NETWORKS:
+                if ip in net:
+                    return False
+        except ValueError:
+            # Hostname is a domain name, not a raw IP
+            pass
+        return True
+    except Exception:
+        return False
+
+
+@router.get("/images/proxy")
+async def proxy_external_image(url: str = Query(..., description="External image URL to proxy")):
+    """Proxy external cover art (SoundCloud, Spotify, Deezer, etc.) to ensure availability in restricted regions."""
+    url = url.strip()
+    if not url or not _is_safe_url(url):
+        raise HTTPException(status_code=400, detail="Invalid or disallowed image URL")
+
+    session = await get_http_session()
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
+    }
+
+    try:
+        timeout = aiohttp.ClientTimeout(total=10, connect=5)
+        async with session.get(url, headers=headers, timeout=timeout) as resp:
+            if resp.status != 200:
+                logger.warning(f"External image proxy failed ({resp.status}) for URL {url[:60]}")
+                raise HTTPException(status_code=resp.status, detail="Failed to fetch external image")
+
+            raw_ct = resp.headers.get("Content-Type", "").lower()
+            if raw_ct.startswith("image/"):
+                content_type = raw_ct.split(";")[0].strip()
+            else:
+                path_lower = urlparse(url).path.lower()
+                if path_lower.endswith(".png"):
+                    content_type = "image/png"
+                elif path_lower.endswith(".webp"):
+                    content_type = "image/webp"
+                elif path_lower.endswith(".gif"):
+                    content_type = "image/gif"
+                else:
+                    content_type = "image/jpeg"
+
+            content = await resp.read()
+            # Enforce max 10MB limit
+            if len(content) > 10 * 1024 * 1024:
+                raise HTTPException(status_code=400, detail="Image exceeds size limit")
+
+            return Response(
+                content=content,
+                media_type=content_type,
+                headers={"Cache-Control": "public, max-age=604800, immutable"},  # Cache 7 days
+            )
+    except HTTPException:
+        raise
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Timeout fetching external image")
+    except Exception as e:
+        logger.warning(f"Error proxying external image {url[:60]}: {e}")
+        raise HTTPException(status_code=502, detail="Failed to proxy image")
 
 
 @router.get("/images/{file_id}")

@@ -159,6 +159,10 @@ async def _save_audio_item(
     file_name = getattr(audio_obj, "file_name", None)
     mime_type = getattr(audio_obj, "mime_type", None)
 
+    # Extract thumbnail if Telegram audio has one
+    thumb = getattr(audio_obj, "thumbnail", None)
+    thumb_cover_url = f"/api/images/{thumb.file_id}" if (thumb and getattr(thumb, "file_id", None)) else None
+
     # Save to library
     res = await track_service.save_track(
         user_id=user_id,
@@ -175,6 +179,7 @@ async def _save_audio_item(
         forward_source_id=forward_info["source_id"],
         forward_source_name=forward_info["source_name"],
         enrich=True,
+        cover_url=thumb_cover_url,
     )
 
     # Forward to channel in background if configured

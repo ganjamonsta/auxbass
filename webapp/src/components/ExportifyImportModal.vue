@@ -430,7 +430,7 @@
                     @click.stop="handlePreviewTrack(track, $event)"
                     :title="isTrackPlaying(track) ? 'Пауза' : 'Слушать аудио'"
                   >
-                    <img v-if="track.cover_url" :src="track.cover_url" alt="" loading="lazy" />
+                    <img v-if="track.cover_url" :src="getCoverUrl(track.cover_url, CoverSize.SMALL)" alt="" loading="lazy" />
                     <Music v-else :size="14" />
 
                     <div class="thumb-play-overlay">
@@ -558,7 +558,7 @@ import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { useTasksStore } from '@/stores/tasks'
 import { useExternalAccountsStore } from '@/stores/externalAccounts'
-import { formatDuration } from '@/utils'
+import { formatDuration, getCoverUrl, CoverSize } from '@/utils'
 
 const props = defineProps({
   show: {

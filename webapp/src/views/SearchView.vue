@@ -607,8 +607,9 @@ const handleSyncPlaylist = async (playlist) => {
       urls,
       tracksPayload,
       playlist.title,
-      true,            // create_playlist = true
-      playlist.title   // playlist_name
+      true,                 // create_playlist = true
+      playlist.title,       // playlist_name
+      playlist.artwork_url  // cover_url
     )
     const jobId = res.data?.id
     if (res.data) {

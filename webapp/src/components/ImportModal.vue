@@ -36,10 +36,15 @@
               <span class="pill-name">SoundCloud</span>
               <span class="pill-status ready">Работает</span>
             </div>
-            <div class="service-pill sp">
+            <div class="service-pill sp active">
               <span class="sp-dot"></span>
               <span class="pill-name">Spotify</span>
-              <span class="pill-status soon">Этап 2</span>
+              <span class="pill-status ready">Работает</span>
+            </div>
+            <div class="service-pill yt active">
+              <span class="yt-dot"></span>
+              <span class="pill-name">YouTube</span>
+              <span class="pill-status ready">Работает</span>
             </div>
           </div>
 
@@ -50,7 +55,7 @@
                 ref="inputRef"
                 v-model="urlInput"
                 type="url"
-                placeholder="Вставьте ссылку на трек, плейлист или лайки..."
+                placeholder="Вставьте ссылку на трек или плейлист (YouTube, SoundCloud, Spotify)..."
                 class="url-input"
                 :disabled="resolving"
                 @keydown.enter="handlePreview"
@@ -66,7 +71,7 @@
             </div>
 
             <div class="hints-row">
-              <span>Пример: <code>soundcloud.com/artist/sets/playlist</code> или <code>.../user/likes</code></span>
+              <span>Поддерживаются: <code>youtube.com</code>, <code>music.youtube.com</code>, <code>soundcloud.com</code>, <code>spotify.com</code></span>
             </div>
 
             <div v-if="scAccount?.connected" class="sc-quick-actions-bar">
@@ -88,7 +93,7 @@
                 <!-- Overview Card -->
                 <div class="preview-card">
                   <div class="preview-cover">
-                    <img v-if="preview.cover_url" :src="preview.cover_url" alt="Cover" />
+                    <img v-if="preview.cover_url" :src="getCoverUrl(preview.cover_url, CoverSize.MEDIUM)" alt="Cover" />
                     <Music v-else :size="32" class="placeholder-icon" />
                   </div>
                   <div class="preview-info">
@@ -166,7 +171,7 @@
                       <span class="track-idx">{{ idx + 1 }}</span>
 
                       <div class="track-thumb">
-                        <img v-if="track.cover_url" :src="track.cover_url" alt="Thumb" loading="lazy" />
+                        <img v-if="track.cover_url" :src="getCoverUrl(track.cover_url, CoverSize.SMALL)" alt="Thumb" loading="lazy" />
                         <Music v-else :size="14" class="thumb-fallback" />
                       </div>
 
@@ -201,7 +206,7 @@
           <div v-else class="progress-body">
             <div class="progress-card">
               <div class="progress-cover">
-                <img v-if="activeJob.cover_url" :src="activeJob.cover_url" alt="Cover" />
+                <img v-if="activeJob.cover_url" :src="getCoverUrl(activeJob.cover_url, CoverSize.MEDIUM)" alt="Cover" />
                 <Music v-else :size="32" class="placeholder-icon" />
               </div>
               <div class="progress-details">
@@ -330,7 +335,7 @@ import { ingestionApi } from '../api/client'
 import { useRouter } from 'vue-router'
 import { useTasksStore } from '@/stores/tasks'
 import { useExternalAccountsStore } from '@/stores/externalAccounts'
-import { formatDuration } from '@/utils'
+import { formatDuration, getCoverUrl, CoverSize } from '@/utils'
 
 const props = defineProps({
   show: {
@@ -389,7 +394,12 @@ const isValidUrl = computed(() => {
   return (
     trimmed.startsWith('http://') ||
     trimmed.startsWith('https://')
-  ) && (trimmed.includes('soundcloud.com') || trimmed.includes('spotify.com'))
+  ) && (
+    trimmed.includes('soundcloud.com') ||
+    trimmed.includes('spotify.com') ||
+    trimmed.includes('youtube.com') ||
+    trimmed.includes('youtu.be')
+  )
 })
 
 const selectedCount = computed(() => selectedUrls.value.size)
@@ -773,6 +783,18 @@ onUnmounted(() => {
   color: #fff;
 }
 
+.service-pill.sp.active {
+  background: rgba(29, 185, 84, 0.12);
+  border-color: rgba(29, 185, 84, 0.35);
+  color: #fff;
+}
+
+.service-pill.yt.active {
+  background: rgba(255, 0, 51, 0.12);
+  border-color: rgba(255, 0, 51, 0.35);
+  color: #fff;
+}
+
 .sc-dot {
   width: 8px;
   height: 8px;
@@ -785,6 +807,13 @@ onUnmounted(() => {
   height: 8px;
   border-radius: 50%;
   background: #1db954;
+}
+
+.yt-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff0033;
 }
 
 .pill-status {
@@ -934,6 +963,14 @@ onUnmounted(() => {
   font-weight: 700;
   letter-spacing: 0.5px;
   color: #ff5500;
+}
+
+.preview-badge.spotify {
+  color: #1ed760;
+}
+
+.preview-badge.youtube {
+  color: #ff0033;
 }
 
 .preview-title {

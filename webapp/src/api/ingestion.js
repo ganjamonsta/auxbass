@@ -2,13 +2,14 @@ import api, { nonCacheable } from './core'
 
 export const ingestionApi = {
   preview: (url) => api.post('/ingestion/preview', { url }),
-  start: nonCacheable((url, selectedUrls = null, tracks = null, title = null, createPlaylist = false, playlistName = null) => api.post('/ingestion/start', {
+  start: nonCacheable((url, selectedUrls = null, tracks = null, title = null, createPlaylist = false, playlistName = null, coverUrl = null) => api.post('/ingestion/start', {
     url,
     selected_urls: selectedUrls,
     tracks,
     title,
     create_playlist: createPlaylist,
     playlist_name: playlistName,
+    cover_url: coverUrl,
   }), 'track'),
   getJob: (jobId) => api.get(`/ingestion/jobs/${jobId}`, { bypassCache: true }),
   cancelJob: (jobId) => api.post(`/ingestion/jobs/${jobId}/cancel`),

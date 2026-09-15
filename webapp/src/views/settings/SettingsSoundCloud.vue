@@ -22,7 +22,7 @@
         <div class="service-profile-header">
           <img 
             v-if="scAccount.avatar_url" 
-            :src="scAccount.avatar_url" 
+            :src="getCoverUrl(scAccount.avatar_url, CoverSize.SMALL)" 
             alt="SoundCloud avatar" 
             class="service-avatar sc-avatar" 
             referrerpolicy="no-referrer"
@@ -182,6 +182,7 @@ import { useRouter } from 'vue-router'
 import { Check, Heart, Music, Folder, Unlink, Lock, Radio, ExternalLink, Key, ChevronDown, AlertCircle } from 'lucide-vue-next'
 import { useExternalAccountsStore } from '@/stores/externalAccounts'
 import { useUIStore } from '@/stores/ui'
+import { getCoverUrl, CoverSize } from '@/utils'
 
 const router = useRouter()
 const externalAccountsStore = useExternalAccountsStore()

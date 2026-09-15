@@ -146,7 +146,7 @@
             <div class="feed-card-cover sc-cover-box">
               <img 
                 v-if="pl.artwork_url" 
-                :src="pl.artwork_url" 
+                :src="getCoverUrl(pl.artwork_url, CoverSize.MEDIUM)" 
                 alt=""
                 loading="lazy"
                 referrerpolicy="no-referrer"

@@ -3,7 +3,7 @@
     <!-- SC Profile Strip -->
     <div v-if="scAccount" class="ext-profile-strip sc-profile-strip">
       <div class="ext-strip-avatar">
-        <img v-if="scAccount.avatar_url" :src="scAccount.avatar_url" alt="" referrerpolicy="no-referrer" />
+        <img v-if="scAccount.avatar_url" :src="getCoverUrl(scAccount.avatar_url, CoverSize.SMALL)" alt="" referrerpolicy="no-referrer" />
         <span v-else class="sc-badge-large">SC</span>
       </div>
       <div class="ext-strip-info">
@@ -54,7 +54,7 @@
           <div class="sc-playlist-detail-cover">
             <img 
               v-if="selectedScPlaylist.artwork_url" 
-              :src="selectedScPlaylist.artwork_url" 
+              :src="getCoverUrl(selectedScPlaylist.artwork_url, CoverSize.MEDIUM)" 
               alt="" 
               referrerpolicy="no-referrer" 
             />
@@ -168,7 +168,7 @@
             <div class="feed-card-cover sc-cover-box">
               <img 
                 v-if="pl.artwork_url" 
-                :src="pl.artwork_url" 
+                :src="getCoverUrl(pl.artwork_url, CoverSize.MEDIUM)" 
                 alt=""
                 loading="lazy"
                 referrerpolicy="no-referrer"
@@ -286,6 +286,7 @@ import { useTasksStore } from '@/stores/tasks'
 import { socialApi, ingestionApi } from '@/api/client'
 import { useUIStore } from '@/stores/ui'
 import { getTracksWord } from './profileUtils'
+import { getCoverUrl, CoverSize } from '@/utils'
 import ExternalTrackItem from '@/components/ExternalTrackItem.vue'
 import {
   Folder,

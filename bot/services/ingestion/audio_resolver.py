@@ -18,6 +18,7 @@ from shared.matching import (
     clean_track_metadata,
     fuzzy_match_artist,
     fuzzy_match_title,
+    extract_version_markers,
     ARTIST_MATCH_THRESHOLD,
     TITLE_MATCH_THRESHOLD,
 )
@@ -70,7 +71,17 @@ class AudioResolver:
                 more_sc = await self._search_candidates(alt_query, limit=10)
                 ranked_sc = self._rank_candidates(track_meta, more_sc, exclude_set)
 
+        is_studio = not bool(extract_version_markers(track_meta.title))
+
         for cand in ranked_sc:
+            # If user wanted studio version, do not settle for a mismatched candidate if YouTube can have studio
+            if is_studio and cand.get("_penalty", 0) > 150:
+                logger.info(
+                    f"[AudioResolver] Skipping mismatched SoundCloud candidate '{cand.get('title')}' "
+                    f"(penalty={cand.get('_penalty')}), checking other candidates or YouTube..."
+                )
+                continue
+
             cand_url = cand.get("webpage_url") or cand.get("url")
             cand_title = cand.get("title") or "SoundCloud Track"
             try:
@@ -91,13 +102,22 @@ class AudioResolver:
         # =========================================================================
         if not downloaded_audio_path:
             logger.info(
-                f"[AudioResolver] SoundCloud candidates unavailable or DRM-protected for "
+                f"[AudioResolver] SoundCloud candidates unavailable, DRM-protected, or version-mismatched for "
                 f"'{track_meta.artist} - {track_meta.title}'. Falling back to YouTube Music..."
             )
             yt_candidates = await self._search_youtube_candidates(search_query, limit=6)
             ranked_yt = self._rank_candidates(track_meta, yt_candidates, exclude_set)
 
-            if not ranked_yt and first_artist != track_meta.artist:
+            # Targeted studio search if no clean candidate was found in standard query
+            best_penalty = ranked_yt[0].get("_penalty", 999.0) if ranked_yt else 999.0
+            if is_studio and best_penalty > 100.0:
+                studio_query = f"{first_artist} {track_meta.title} audio".strip()
+                logger.info(f"[AudioResolver] Searching targeted studio audio for '{studio_query}'...")
+                more_yt = await self._search_youtube_candidates(studio_query, limit=6)
+                ranked_more = self._rank_candidates(track_meta, more_yt, exclude_set)
+                if ranked_more and ranked_more[0].get("_penalty", 999.0) < best_penalty:
+                    ranked_yt = ranked_more
+            elif not ranked_yt and first_artist != track_meta.artist:
                 alt_query = f"{first_artist} {track_meta.title}".strip()
                 more_yt = await self._search_youtube_candidates(alt_query, limit=6)
                 ranked_yt = self._rank_candidates(track_meta, more_yt, exclude_set)
@@ -209,8 +229,14 @@ class AudioResolver:
         candidates: List[dict],
         exclude_urls: Set[str],
     ) -> List[dict]:
-        """Score candidates based on duration match and title similarity, returning sorted list."""
+        """Score candidates based on duration match, title similarity, and version alignment (live vs studio)."""
         valid_candidates: List[Tuple[float, dict]] = []
+
+        target_markers = extract_version_markers(target.title)
+        if target.extra and target.extra.get("tags"):
+            tags_list = target.extra.get("tags")
+            if isinstance(tags_list, list):
+                target_markers |= extract_version_markers(" ".join(str(t) for t in tags_list if t))
 
         for c in candidates:
             if not isinstance(c, dict):
@@ -224,6 +250,7 @@ class AudioResolver:
 
             cand_dur = int(c.get("duration") or 0)
             cand_title = c.get("title") or ""
+            cand_uploader = (c.get("uploader") or c.get("channel") or "")
 
             # Check duration difference
             if target.duration and cand_dur:
@@ -238,9 +265,34 @@ class AudioResolver:
             if title_score < 0.35 and target.title.lower() not in cand_title.lower():
                 continue
 
+            cand_markers = extract_version_markers(cand_title)
+
+            # Version alignment: distinguish studio vs live/acoustic/remix
+            version_penalty = 0.0
+            version_bonus = 0.0
+
+            if target_markers != cand_markers:
+                # Version mismatch (e.g. user wants studio, candidate is live, or vice-versa)
+                version_penalty = 250.0
+            else:
+                # Both versions agree (e.g. both are live, or both are studio)
+                if target_markers:
+                    version_bonus -= 15.0
+
+            # Studio official upload bonuses (Artist - Topic or Official Audio)
+            if not target_markers:
+                if cand_uploader.lower().endswith(" - topic"):
+                    version_bonus -= 30.0  # Official album upload by YouTube Music
+                elif "(official audio)" in cand_title.lower() or "[official audio]" in cand_title.lower():
+                    version_bonus -= 20.0
+                elif "(audio)" in cand_title.lower() or "[audio]" in cand_title.lower():
+                    version_bonus -= 10.0
+
             # Total penalty: lower is better
-            total_penalty = diff + (1.0 - title_score) * 20
-            valid_candidates.append((total_penalty, c))
+            total_penalty = diff + (1.0 - title_score) * 20 + version_penalty + version_bonus
+            c_with_score = dict(c)
+            c_with_score["_penalty"] = total_penalty
+            valid_candidates.append((total_penalty, c_with_score))
 
         valid_candidates.sort(key=lambda x: x[0])
         return [c for _, c in valid_candidates]

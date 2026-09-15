@@ -61,7 +61,7 @@
       <div class="sc-likes-user-bar">
         <img 
           v-if="scAccount.avatar_url" 
-          :src="scAccount.avatar_url" 
+          :src="getCoverUrl(scAccount.avatar_url, CoverSize.SMALL)" 
           alt="" 
           class="sc-likes-avatar"
           referrerpolicy="no-referrer" 
@@ -447,10 +447,10 @@
             <div class="sc-playlist-cover-wrap">
               <img 
                 v-if="selectedScPlaylist.artwork_url" 
-                :src="selectedScPlaylist.artwork_url" 
+                :src="getCoverUrl(selectedScPlaylist.artwork_url, CoverSize.MEDIUM)" 
                 alt="" 
                 class="sc-playlist-cover"
-                referrerpolicy="no-referrer"
+                referrerpolicy="no-referrer" 
               />
               <div v-else class="sc-playlist-cover-placeholder">
                 <Disc3 :size="40" />
@@ -568,10 +568,10 @@
               <div class="sc-card-artwork-box">
                 <img 
                   v-if="pl.artwork_url" 
-                  :src="pl.artwork_url" 
+                  :src="getCoverUrl(pl.artwork_url, CoverSize.MEDIUM)" 
                   alt="" 
                   class="sc-card-artwork"
-                  referrerpolicy="no-referrer"
+                  referrerpolicy="no-referrer" 
                   loading="lazy" 
                 />
                 <div v-else class="sc-card-artwork-placeholder">
@@ -649,7 +649,7 @@ import {
 import ExternalTrackItem from '@/components/ExternalTrackItem.vue'
 import NoResultsBox from '@/components/NoResultsBox.vue'
 import { useTasksStore } from '@/stores/tasks'
-import { formatDuration } from '@/utils'
+import { formatDuration, getCoverUrl, CoverSize } from '@/utils'
 
 const props = defineProps({
   soundcloudResults: { type: Array, required: true },
