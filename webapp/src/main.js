@@ -27,6 +27,20 @@ if (tg) {
   tg.ready()
   tg.expand()
   
+  // Disable native vertical swipe down to prevent closing the Mini App while scrolling or using in-app pull-to-refresh
+  if (typeof tg.disableVerticalSwipes === 'function') {
+    try {
+      tg.disableVerticalSwipes()
+    } catch (_) {}
+  }
+  
+  // Enable closing confirmation so accidental gestures don't abruptly close the app and stop playback
+  if (typeof tg.enableClosingConfirmation === 'function') {
+    try {
+      tg.enableClosingConfirmation()
+    } catch (_) {}
+  }
+  
   // Apply Telegram theme initially
   updateViewportHeight()
   

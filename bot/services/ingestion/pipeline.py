@@ -462,18 +462,25 @@ class IngestionPipeline:
 
                     # B. Download audio to temporary directory
                     with tempfile.TemporaryDirectory() as temp_dir:
-                        job.current_step = "Скачивание аудиопотока"
+                        if job_manager.download_semaphore.locked():
+                            job.current_step = "Ожидание очереди загрузки..."
+                        else:
+                            job.current_step = "Скачивание аудиопотока"
                         job.download_percent = 0
                         job.updated_at = datetime.now(timezone.utc)
+                        if progress_callback:
+                            await progress_callback(job)
 
                         def on_download_progress(pct: int):
                             job.download_percent = pct
                             job.current_step = f"Скачивание аудио ({pct}%)"
                             job.updated_at = datetime.now(timezone.utc)
 
-                        downloaded = await provider.download_track(
-                            track_meta, temp_dir, progress_hook=on_download_progress
-                        )
+                        async with job_manager.download_semaphore:
+                            job.current_step = "Скачивание аудиопотока"
+                            downloaded = await provider.download_track(
+                                track_meta, temp_dir, progress_hook=on_download_progress
+                            )
 
                         # Check Telegram 50MB limit
                         if downloaded.file_size > 50 * 1024 * 1024:

@@ -138,6 +138,7 @@ class EnrichmentWorker:
         # Process each track (outside of main session to avoid long locks)
         for track in tracks:
             await self._enrich_track(track.id, track.title, track.artist, track.duration)
+            await asyncio.sleep(0.4)  # Pacing to protect 1-vCPU server and prevent API rate-limits
         
         self._stats["processed"] += len(tracks)
         return True

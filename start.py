@@ -23,6 +23,7 @@ from bot.handlers.ingestion import router as ingestion_router
 from bot.handlers.audio import router as audio_router
 from bot.handlers.download import router as download_router
 from bot.handlers.channel_pins import router as channel_pins_router
+from bot.handlers.channel_events import router as channel_events_router
 
 from bot.services.enrichment import enrichment_worker
 from bot.services.channels import init_channel_service, start_channel_service, stop_channel_service
@@ -77,6 +78,7 @@ async def run_bot():
             dp.include_router(audio_router)
             dp.include_router(download_router)
             dp.include_router(channel_pins_router)
+            dp.include_router(channel_events_router)
             
             logger.info("🤖 Telegram Bot запускается (long polling)...")
             fastapi_app.state.bot_online = True

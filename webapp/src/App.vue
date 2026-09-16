@@ -536,6 +536,34 @@ const goBack = () => {
   }
 }
 
+// === Native Telegram BackButton Integration ===
+const syncTelegramBackButton = () => {
+  const tgBackButton = telegram?.BackButton || window.Telegram?.WebApp?.BackButton
+  if (!tgBackButton) return
+
+  if (showFullPlayer.value || showBackButton.value) {
+    try {
+      tgBackButton.show()
+    } catch (_) {}
+  } else {
+    try {
+      tgBackButton.hide()
+    } catch (_) {}
+  }
+}
+
+watch([showBackButton, showFullPlayer], () => {
+  syncTelegramBackButton()
+}, { immediate: true })
+
+const handleTelegramBackClick = () => {
+  if (showFullPlayer.value) {
+    showFullPlayer.value = false
+  } else if (showBackButton.value) {
+    goBack()
+  }
+}
+
 // Toggle like for current track
 const handleToggleLike = async () => {
   if (playerStore.currentTrack?.id) {
@@ -776,6 +804,15 @@ onMounted(async () => {
       }
     }
   })
+
+  // Hook up native Telegram BackButton
+  const tgBackButton = telegram?.BackButton || window.Telegram?.WebApp?.BackButton
+  if (tgBackButton) {
+    try {
+      tgBackButton.onClick(handleTelegramBackClick)
+      syncTelegramBackButton()
+    } catch (_) {}
+  }
 })
 
 const handleWindowFocus = () => {
@@ -806,6 +843,15 @@ onUnmounted(() => {
   window.removeEventListener('player:network-recovered', handleNetworkRecovered)
   window.removeEventListener('player:channel-access-required', handleChannelAccessRequired)
   networkMonitor.stopMonitoring()
+
+  // Clean up Telegram BackButton listener
+  const tgBackButton = telegram?.BackButton || window.Telegram?.WebApp?.BackButton
+  if (tgBackButton) {
+    try {
+      tgBackButton.offClick(handleTelegramBackClick)
+    } catch (_) {}
+  }
+
   // Reset zoom on unmount
   document.body.style.zoom = ''
   document.documentElement.style.zoom = ''

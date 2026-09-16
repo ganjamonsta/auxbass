@@ -84,12 +84,19 @@ class IngestionJob:
 class IngestionJobManager:
     """Manages active and historical ingestion jobs."""
 
-    def __init__(self, max_history_per_user: int = 20):
+    def __init__(self, max_history_per_user: int = 20, max_concurrent_downloads: int = 1):
         self._jobs: Dict[str, IngestionJob] = {}
         self._user_jobs: Dict[int, List[str]] = {}
         self._active_tasks: Dict[str, asyncio.Task] = {}
         self._lock = asyncio.Lock()
         self._max_history = max_history_per_user
+        # Global semaphore to limit heavy yt-dlp & ffmpeg processes to protect 1-vCPU server
+        self._download_semaphore = asyncio.Semaphore(max_concurrent_downloads)
+
+    @property
+    def download_semaphore(self) -> asyncio.Semaphore:
+        """Global concurrency limiter for heavy audio downloads & transcoding."""
+        return self._download_semaphore
 
     async def create_job(
         self,

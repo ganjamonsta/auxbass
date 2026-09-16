@@ -22,27 +22,29 @@
       </div>
 
       <div v-else class="code-input-section">
-        <p>Введите код из бота:</p>
+        <p>Введите 8-значный код из бота:</p>
         <div class="code-inputs">
-          <input
-            v-for="(_, i) in 6"
-            :key="i"
-            ref="codeInputs"
-            type="text"
-            maxlength="1"
-            pattern="[0-9]"
-            inputmode="numeric"
-            class="code-digit"
-            @input="onCodeInput($event, i)"
-            @keydown="onCodeKeydown($event, i)"
-            @paste="onPaste"
-          />
+          <template v-for="(_, i) in 8" :key="i">
+            <span v-if="i === 4" class="code-divider">—</span>
+            <input
+              ref="codeInputs"
+              type="text"
+              maxlength="1"
+              pattern="[0-9]"
+              inputmode="numeric"
+              class="code-digit"
+              :value="codeDigits[i]"
+              @input="onCodeInput($event, i)"
+              @keydown="onCodeKeydown($event, i)"
+              @paste="onPaste"
+            />
+          </template>
         </div>
         <p v-if="error" class="error">{{ error }}</p>
         <button 
           class="primary-btn" 
           @click="verifyCode" 
-          :disabled="loading || code.length !== 6"
+          :disabled="loading || code.length !== 8"
         >
           {{ loading ? 'Проверка...' : 'Войти' }}
         </button>
@@ -67,7 +69,7 @@ const authStore = useAuthStore()
 
 const showCodeInput = ref(false)
 const codeInputs = ref([])
-const codeDigits = ref(['', '', '', '', '', ''])
+const codeDigits = ref(['', '', '', '', '', '', '', ''])
 const loading = ref(false)
 const error = ref('')
 const appName = ref('TG Player')
@@ -91,30 +93,36 @@ const onCodeInput = async (event, index) => {
   codeDigits.value[index] = value
 
   // Move to next input
-  if (value && index < 5) {
+  if (value && index < 7) {
     await nextTick()
     codeInputs.value[index + 1]?.focus()
   }
 
-  // Auto-submit when all digits entered
-  if (code.value.length === 6) {
+  // Auto-submit when all 8 digits entered
+  if (code.value.length === 8) {
     verifyCode()
   }
 }
 
 const onCodeKeydown = (event, index) => {
-  // Handle backspace
-  if (event.key === 'Backspace' && !codeDigits.value[index] && index > 0) {
-    codeInputs.value[index - 1]?.focus()
+  // Handle backspace navigation
+  if (event.key === 'Backspace') {
+    if (!codeDigits.value[index] && index > 0) {
+      codeDigits.value[index - 1] = ''
+      codeInputs.value[index - 1]?.focus()
+    } else {
+      codeDigits.value[index] = ''
+    }
   }
 }
 
 const onPaste = async (event) => {
   event.preventDefault()
-  const pastedData = event.clipboardData.getData('text').trim()
+  // Clean pasted string: allow digits even if copied with spaces or dashes (e.g. 1234-5678)
+  const pastedData = event.clipboardData.getData('text').replace(/\D/g, '')
   
-  if (/^\d{6}$/.test(pastedData)) {
-    for (let i = 0; i < 6; i++) {
+  if (pastedData.length >= 8) {
+    for (let i = 0; i < 8; i++) {
       codeDigits.value[i] = pastedData[i]
       if (codeInputs.value[i]) {
         codeInputs.value[i].value = pastedData[i]
@@ -126,7 +134,7 @@ const onPaste = async (event) => {
 }
 
 const verifyCode = async () => {
-  if (code.value.length !== 6 || loading.value) return
+  if (code.value.length !== 8 || loading.value) return
   
   loading.value = true
   error.value = ''
@@ -141,7 +149,7 @@ const verifyCode = async () => {
   } catch (err) {
     error.value = 'Неверный или истёкший код'
     // Clear inputs
-    codeDigits.value = ['', '', '', '', '', '']
+    codeDigits.value = ['', '', '', '', '', '', '', '']
     codeInputs.value.forEach(input => {
       if (input) input.value = ''
     })
@@ -266,25 +274,47 @@ h1 {
 .code-inputs {
   display: flex;
   justify-content: center;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
   margin-bottom: 24px;
 }
 
+.code-divider {
+  color: var(--c-text-2);
+  font-size: 18px;
+  font-weight: 600;
+  user-select: none;
+  padding: 0 2px;
+}
+
 .code-digit {
-  width: 48px;
-  height: 56px;
+  width: 36px;
+  height: 48px;
   text-align: center;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 600;
   background: var(--c-bg-3);
   border: 2px solid var(--c-bg-4);
-  border-radius: 12px;
+  border-radius: 10px;
   color: var(--c-text-1);
+  padding: 0;
 }
 
 .code-digit:focus {
   outline: none;
   border-color: var(--c-accent);
+}
+
+@media (max-width: 400px) {
+  .code-inputs {
+    gap: 4px;
+  }
+  .code-digit {
+    width: 32px;
+    height: 44px;
+    font-size: 18px;
+    border-radius: 8px;
+  }
 }
 
 .error {
