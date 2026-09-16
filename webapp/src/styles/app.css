@@ -141,74 +141,9 @@
   border: 1px solid rgba(255, 255, 255, 0.02);
 }
 
-.search-scope-btn {
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: none;
-  background: var(--c-bg-3);
-  color: var(--c-text-3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.search-scope-btn:active { transform: scale(0.9); }
-
-.search-scope-btn.global {
-  background: var(--c-accent);
-  color: #000;
-  box-shadow: 0 2px 8px var(--c-accent-glow);
-}
-
-.search-content {
-  flex: 1;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-
-.search-tag {
-  background: var(--c-accent);
-  color: #000;
-  padding: 5px 12px;
-  border-radius: 14px;
-  font-size: 13px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  white-space: nowrap;
-  box-shadow: 0 2px 6px var(--c-accent-glow);
-}
-
-.search-input-inline {
-  flex: 1;
-  min-width: 60px;
-  border: none;
-  background: transparent;
-  color: var(--c-text-1);
-  font-size: 16px;
-  outline: none;
-  padding: 0;
-  height: 36px;
-}
-
-.search-input-inline::placeholder { color: var(--c-text-3); }
 .search-toggle { flex-shrink: 0; }
 
 /* Compact Header */
-.compact-header {
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-  background: var(--c-bg-2);
-  gap: 10px;
-}
-
 .header-title {
   flex: 1;
   font-size: 18px;
@@ -232,35 +167,6 @@
 }
 
 /* ========== Active Filter ========== */
-.active-filter {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  margin: 6px 10px;
-  background: var(--c-accent);
-  border-radius: var(--r-sm);
-  color: black;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.active-filter .global-badge { font-size: 16px; }
-
-.clear-filter-btn {
-  width: 28px;
-  height: 28px;
-  margin-left: auto;
-  border: none;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: black;
-}
-
 /* ========== Expanded Section (fullscreen overlay) ========== */
 .expanded-section {
   position: fixed;
@@ -299,25 +205,6 @@
   gap: 12px;
   align-content: start;
 }
-
-.empty-section {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 20px;
-  text-align: center;
-  color: var(--c-text-2);
-}
-
-.empty-section .empty-icon {
-  font-size: 48px;
-  margin-bottom: 12px;
-  opacity: 0.5;
-}
-
-.empty-section p { margin-bottom: 16px; }
 
 /* ========== Tab Bar (Mobile Nav — rubber buttons) ========== */
 .tab-bar {

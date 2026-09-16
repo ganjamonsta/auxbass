@@ -23,31 +23,3 @@
 }
 
 /* Pull to refresh (visual-only — logic is in App.vue) */
-.pull-indicator {
-  position: absolute;
-  top: -60px;
-  left: 0;
-  right: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  color: var(--c-text-3);
-  font-size: 13px;
-  transition: transform 0.1s ease-out;
-  z-index: 10;
-}
-
-.pull-spinner {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--c-accent);
-}
-
-.pull-spinner.active svg {
-  animation: spin 1s linear infinite;
-}

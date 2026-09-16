@@ -135,43 +135,9 @@
    ═══════════════════════════════════════════════════════════ */
 
 /* Raised shadows (convex effect) */
-.sh-raised-xs { box-shadow: 2px 2px 4px var(--sh-dark), -1px -1px 2px var(--sh-light); }
-.sh-raised-sm { box-shadow: 3px 3px 6px var(--sh-dark), -2px -2px 4px var(--sh-light); }
-.sh-raised-md { box-shadow: 5px 5px 10px var(--sh-dark), -3px -3px 6px var(--sh-light); }
-.sh-raised-lg { box-shadow: 8px 8px 16px var(--sh-dark), -4px -4px 8px var(--sh-light); }
-.sh-raised-xl { box-shadow: 12px 12px 24px var(--sh-dark), -6px -6px 12px var(--sh-light); }
-
 /* Inset shadows (concave/pressed effect) */
-.sh-inset-xs { box-shadow: inset 1px 1px 2px var(--sh-inset-dark), inset -1px -1px 2px var(--sh-inset-light); }
-.sh-inset-sm { box-shadow: inset 2px 2px 4px var(--sh-inset-dark), inset -1px -1px 3px var(--sh-inset-light); }
-.sh-inset-md { box-shadow: inset 3px 3px 6px var(--sh-inset-dark), inset -2px -2px 4px var(--sh-inset-light); }
-.sh-inset-lg { box-shadow: inset 4px 4px 8px var(--sh-inset-dark), inset -2px -2px 6px var(--sh-inset-light); }
-
 /* Glow shadows (accent highlight) */
-.sh-glow-accent { box-shadow: 0 0 12px var(--c-accent-glow); }
-.sh-glow-secondary { box-shadow: 0 0 12px var(--c-secondary-glow); }
-
 /* Combined shadows */
-.sh-card {
-  box-shadow: 
-    5px 5px 10px var(--sh-dark),
-    -3px -3px 6px var(--sh-light);
-  border: 1px solid rgba(255, 255, 255, 0.02);
-}
-
-.sh-card-active {
-  box-shadow: 
-    inset 2px 2px 4px var(--sh-inset-dark),
-    inset -1px -1px 3px var(--sh-inset-light);
-}
-
-.sh-card-glow {
-  box-shadow: 
-    5px 5px 10px var(--sh-dark),
-    -3px -3px 6px var(--sh-light),
-    0 0 20px var(--c-accent-glow);
-}
-
 /* ═══════════════════════════════════════════════════════════
    § 3. SURFACE COMPONENTS
    Cards, panels, containers
@@ -188,85 +154,11 @@
 }
 
 /* Inset/recessed surface */
-.neu-well {
-  background: var(--c-bg-0);
-  border-radius: var(--r-md);
-  box-shadow: 
-    inset 3px 3px 6px var(--sh-inset-dark),
-    inset -2px -2px 4px var(--sh-inset-light);
-}
-
 /* Floating panel (modals, sheets) */
-.neu-panel {
-  background: var(--c-bg-2);
-  border-radius: var(--r-xl);
-  box-shadow: 
-    12px 12px 24px var(--sh-dark),
-    -6px -6px 12px var(--sh-light),
-    0 0 40px rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-}
-
 /* Bottom sheet */
-.neu-sheet {
-  background: var(--c-bg-2);
-  border-radius: var(--r-xl) var(--r-xl) 0 0;
-  box-shadow: 
-    0 -8px 24px var(--sh-dark),
-    0 -2px 8px var(--sh-light);
-  border: 1px solid rgba(255, 255, 255, 0.03);
-  border-bottom: none;
-}
-
 /* Interactive card */
-.neu-card {
-  background: var(--c-bg-2);
-  border-radius: var(--r-md);
-  padding: var(--sp-3);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  box-shadow: 
-    4px 4px 8px var(--sh-dark),
-    -2px -2px 4px var(--sh-light);
-  border: 1px solid rgba(255, 255, 255, 0.02);
-}
-
-.neu-card:active {
-  transform: scale(0.97);
-  box-shadow: 
-    inset 2px 2px 4px var(--sh-inset-dark),
-    inset -1px -1px 2px var(--sh-inset-light);
-}
-
 .neu-card.active,
-.neu-card.playing {
-  box-shadow: 
-    4px 4px 8px var(--sh-dark),
-    -2px -2px 4px var(--sh-light),
-    0 0 16px var(--c-accent-glow);
-}
-
 /* Cover/thumbnail container */
-.neu-cover {
-  border-radius: var(--r-md);
-  overflow: hidden;
-  box-shadow: 
-    4px 4px 8px var(--sh-dark),
-    -2px -2px 4px var(--sh-light);
-}
-
-.neu-cover-lg {
-  border-radius: var(--r-xl);
-  box-shadow: 
-    8px 8px 16px var(--sh-dark),
-    -4px -4px 8px var(--sh-light);
-  border: 2px solid rgba(255, 255, 255, 0.03);
-}
-
-.neu-cover-round {
-  border-radius: var(--r-full);
-}
-
 /* ═══════════════════════════════════════════════════════════
    § 4. INTERACTIVE ELEMENTS
    Buttons, controls, touchables
@@ -311,215 +203,17 @@
 .neu-btn-icon.xl { width: 64px; height: 64px; }
 
 /* Primary action button */
-.neu-btn-primary {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--sp-2);
-  padding: 14px 24px;
-  border-radius: var(--r-lg);
-  background: linear-gradient(145deg, #22e066 0%, #159b43 100%);
-  color: var(--c-accent-text, #000);
-  font-weight: 600;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  cursor: pointer;
-  box-shadow: 
-    4px 6px 14px rgba(0, 0, 0, 0.5),
-    -2px -2px 6px rgba(255, 255, 255, 0.15),
-    inset 0 1px 1px rgba(255, 255, 255, 0.6),
-    0 0 20px var(--c-accent-glow);
-  transition: all 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.neu-btn-primary:active {
-  transform: scale(0.95) translateY(1px);
-  background: linear-gradient(145deg, #18b850 0%, #128038 100%);
-  box-shadow: 
-    inset 3px 3px 6px rgba(0, 0, 0, 0.5),
-    0 0 12px var(--c-accent-glow);
-}
-
 /* Secondary button */
-.neu-btn-secondary {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--sp-2);
-  padding: 14px 24px;
-  border-radius: var(--r-lg);
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
-  color: var(--c-text-1);
-  font-weight: 600;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  cursor: pointer;
-  box-shadow: 
-    3px 4px 10px rgba(0, 0, 0, 0.4),
-    -1px -1px 4px rgba(255, 255, 255, 0.04),
-    inset 0 1px 1px rgba(255, 255, 255, 0.18);
-  transition: all 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.neu-btn-secondary:active {
-  transform: scale(0.95) translateY(1px);
-  background: rgba(0, 0, 0, 0.25);
-  box-shadow: 
-    inset 2px 2px 5px rgba(0, 0, 0, 0.6),
-    inset -1px -1px 2px rgba(255, 255, 255, 0.04);
-}
-
 /* Tactile Glass button */
-.neu-btn-glass {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--sp-2);
-  padding: 10px 18px;
-  border-radius: var(--r-md);
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  color: var(--c-text-1);
-  font-weight: 500;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  cursor: pointer;
-  box-shadow: 
-    2px 3px 8px rgba(0, 0, 0, 0.35),
-    -1px -1px 3px rgba(255, 255, 255, 0.04),
-    inset 0 1px 1px rgba(255, 255, 255, 0.2);
-  transition: all 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.neu-btn-glass:active {
-  transform: scale(0.95);
-  background: rgba(0, 0, 0, 0.3);
-  box-shadow: 
-    inset 2px 2px 4px rgba(0, 0, 0, 0.6),
-    inset -1px -1px 2px rgba(255, 255, 255, 0.05);
-}
-
 /* Nokia rubber button style */
-.neu-btn-rubber {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  color: var(--c-text-1);
-  transition: all 0.15s ease;
-  position: relative;
-  background: var(--rubber-bg);
-  box-shadow: 
-    0 2px 4px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--rubber-border);
-}
-
-.neu-btn-rubber::before {
-  content: '';
-  position: absolute;
-  inset: 4px;
-  background: 
-    radial-gradient(circle at 20% 30%, rgba(255,255,255,0.08) 0%, transparent 40%),
-    radial-gradient(circle at 80% 30%, rgba(255,255,255,0.08) 0%, transparent 40%);
-  border-radius: 4px;
-  pointer-events: none;
-}
-
-.neu-btn-rubber:active {
-  transform: scale(0.95) translateY(1px);
-  background: var(--rubber-pressed);
-  box-shadow: 
-    0 1px 2px rgba(0, 0, 0, 0.5),
-    inset 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.neu-btn-rubber:active svg {
-  color: var(--c-accent);
-}
-
 /* Flat touchable */
-.neu-touch {
-  display: flex;
-  align-items: center;
-  padding: var(--sp-3);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.neu-touch:active {
-  transform: scale(0.98);
-  opacity: 0.8;
-}
-
 /* ═══════════════════════════════════════════════════════════
    § 5. FORM CONTROLS
    Inputs, sliders, toggles
    ═══════════════════════════════════════════════════════════ */
 
 /* Text input */
-.neu-input {
-  width: 100%;
-  padding: 14px 18px;
-  border: none;
-  border-radius: var(--r-lg);
-  background: var(--c-bg-0);
-  color: var(--c-text-1);
-  font-size: 16px;
-  box-shadow: 
-    inset 3px 3px 6px var(--sh-inset-dark),
-    inset -2px -2px 4px var(--sh-inset-light);
-  outline: none;
-  transition: box-shadow 0.2s ease;
-}
-
-.neu-input:focus {
-  box-shadow: 
-    inset 3px 3px 6px var(--sh-inset-dark),
-    inset -2px -2px 4px var(--sh-inset-light),
-    0 0 0 2px var(--c-accent-glow);
-}
-
-.neu-input::placeholder {
-  color: var(--c-text-3);
-}
-
 /* Search input with icon */
-.neu-search {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-3) var(--sp-4);
-  background: var(--c-bg-2);
-  border-radius: var(--r-full);
-  box-shadow: 
-    inset 3px 3px 6px var(--sh-inset-dark),
-    inset -2px -2px 4px var(--sh-inset-light);
-  border: 1px solid rgba(255, 255, 255, 0.02);
-}
-
-.neu-search input {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  background: transparent;
-  color: var(--c-text-1);
-  font-size: 16px;
-  outline: none;
-}
-
-.neu-search input::placeholder {
-  color: var(--c-text-3);
-}
-
-.neu-search svg {
-  flex-shrink: 0;
-  color: var(--c-text-3);
-}
-
 /* Range slider */
 .neu-slider {
   -webkit-appearance: none;
@@ -554,47 +248,6 @@
 }
 
 /* Toggle switch */
-.neu-toggle {
-  position: relative;
-  width: 52px;
-  height: 28px;
-  background: var(--c-bg-0);
-  border-radius: var(--r-full);
-  cursor: pointer;
-  box-shadow: 
-    inset 2px 2px 4px var(--sh-inset-dark),
-    inset -1px -1px 3px var(--sh-inset-light);
-  transition: background 0.2s ease;
-}
-
-.neu-toggle::after {
-  content: '';
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 22px;
-  height: 22px;
-  border-radius: var(--r-full);
-  background: var(--c-bg-3);
-  box-shadow: 
-    2px 2px 4px var(--sh-dark),
-    -1px -1px 2px var(--sh-light);
-  transition: transform 0.2s ease;
-}
-
-.neu-toggle.on {
-  background: var(--c-accent-dark);
-}
-
-.neu-toggle.on::after {
-  transform: translateX(24px);
-  background: var(--c-accent);
-  box-shadow: 
-    2px 2px 4px var(--sh-dark),
-    -1px -1px 2px var(--sh-light),
-    0 0 8px var(--c-accent-glow);
-}
-
 /* ═══════════════════════════════════════════════════════════
    § 6. TYPOGRAPHY
    Text styles
@@ -602,23 +255,6 @@
 
 .text-primary { color: var(--c-text-1); }
 .text-secondary { color: var(--c-text-2); }
-.text-muted { color: var(--c-text-3); }
-.text-disabled { color: var(--c-text-4); }
-.text-accent { color: var(--c-accent); }
-
-.text-xs { font-size: 10px; }
-.text-sm { font-size: 12px; }
-.text-base { font-size: 14px; }
-.text-lg { font-size: 16px; }
-.text-xl { font-size: 18px; }
-.text-2xl { font-size: 22px; }
-.text-3xl { font-size: 28px; }
-
-.font-normal { font-weight: 400; }
-.font-medium { font-weight: 500; }
-.font-semibold { font-weight: 600; }
-.font-bold { font-weight: 700; }
-
 .truncate {
   white-space: nowrap;
   overflow: hidden;
@@ -638,43 +274,11 @@
    ═══════════════════════════════════════════════════════════ */
 
 .flex { display: flex; }
-.flex-col { flex-direction: column; }
 .flex-wrap { flex-wrap: wrap; }
-.items-center { align-items: center; }
-.items-start { align-items: flex-start; }
-.items-end { align-items: flex-end; }
-.justify-center { justify-content: center; }
-.justify-between { justify-content: space-between; }
-.justify-end { justify-content: flex-end; }
-.flex-1 { flex: 1 1 0; min-width: 0; }
-.flex-shrink-0 { flex-shrink: 0; }
-
-.gap-1 { gap: var(--sp-1); }
-.gap-2 { gap: var(--sp-2); }
-.gap-3 { gap: var(--sp-3); }
-.gap-4 { gap: var(--sp-4); }
-.gap-6 { gap: var(--sp-6); }
-
 .p-1 { padding: var(--sp-1); }
 .p-2 { padding: var(--sp-2); }
-.p-3 { padding: var(--sp-3); }
 .p-4 { padding: var(--sp-4); }
 .p-6 { padding: var(--sp-6); }
-
-.px-2 { padding-left: var(--sp-2); padding-right: var(--sp-2); }
-.px-3 { padding-left: var(--sp-3); padding-right: var(--sp-3); }
-.px-4 { padding-left: var(--sp-4); padding-right: var(--sp-4); }
-
-.py-2 { padding-top: var(--sp-2); padding-bottom: var(--sp-2); }
-.py-3 { padding-top: var(--sp-3); padding-bottom: var(--sp-3); }
-.py-4 { padding-top: var(--sp-4); padding-bottom: var(--sp-4); }
-
-.m-auto { margin: auto; }
-.mx-auto { margin-left: auto; margin-right: auto; }
-
-.w-full { width: 100%; }
-.h-full { height: 100%; }
-.min-w-0 { min-width: 0; }
 
 /* ═══════════════════════════════════════════════════════════
    § 8. STATE MODIFIERS
@@ -690,11 +294,6 @@
     inset 3px 3px 6px var(--sh-inset-dark),
     inset -2px -2px 4px var(--sh-inset-light),
     0 0 12px var(--c-accent-glow);
-}
-
-.is-disabled {
-  opacity: 0.4;
-  pointer-events: none;
 }
 
 .is-loading {
@@ -717,10 +316,6 @@
 }
 
 /* Glow effect for active/playing items */
-.glow-accent {
-  filter: drop-shadow(0 0 6px var(--c-accent-glow));
-}
-
 /* ═══════════════════════════════════════════════════════════
    § 9. ANIMATIONS
    Reusable keyframes and transitions
@@ -756,15 +351,7 @@
 }
 
 /* Transition classes */
-.transition-fast { transition: all 0.1s ease; }
-.transition-base { transition: all 0.15s ease; }
-.transition-slow { transition: all 0.25s ease; }
-
 /* Animation utilities */
-.anim-spin { animation: spin 1s linear infinite; }
-.anim-pulse { animation: pulse 2s ease-in-out infinite; }
-.anim-equalizer { animation: equalizer 0.8s ease-in-out infinite; }
-
 /* Vue transitions */
 .fade-enter-active,
 .fade-leave-active {
@@ -817,28 +404,6 @@
 }
 
 /* LED progress dots */
-.neu-led-bar {
-  display: flex;
-  gap: 3px;
-}
-
-.neu-led-dot {
-  flex: 1;
-  height: 4px;
-  background: var(--lcd-dot-off);
-  border-radius: 2px;
-  transition: all 0.15s ease;
-}
-
-.neu-led-dot.active {
-  background: var(--c-accent);
-  box-shadow: 0 0 6px var(--c-accent-glow);
-}
-
-.neu-led-dot.buffered {
-  background: rgba(0, 188, 212, 0.35);
-}
-
 /* ═══════════════════════════════════════════════════════════
    § 11. EQUALIZER BARS
    ═══════════════════════════════════════════════════════════ */
@@ -849,131 +414,21 @@
   gap: 3px;
 }
 
-.equalizer-bar {
-  width: 4px;
-  background: var(--c-accent);
-  border-radius: 2px;
-  animation: equalizer 0.8s ease-in-out infinite;
-  box-shadow: 0 0 6px var(--c-accent-glow);
-}
-
-.equalizer-bar:nth-child(1) { height: 10px; animation-delay: 0s; }
-.equalizer-bar:nth-child(2) { height: 18px; animation-delay: 0.2s; }
-.equalizer-bar:nth-child(3) { height: 14px; animation-delay: 0.4s; }
-
-.equalizer-mini .equalizer-bar {
-  width: 2px;
-}
-.equalizer-mini .equalizer-bar:nth-child(1) { height: 8px; }
-.equalizer-mini .equalizer-bar:nth-child(2) { height: 14px; }
-.equalizer-mini .equalizer-bar:nth-child(3) { height: 10px; }
-
 /* ═══════════════════════════════════════════════════════════
    § 12. DIVIDERS & SEPARATORS
    ═══════════════════════════════════════════════════════════ */
-
-.neu-divider {
-  height: 1px;
-  background: linear-gradient(90deg, 
-    transparent 0%, 
-    var(--c-bg-4) 20%, 
-    var(--c-bg-4) 80%, 
-    transparent 100%);
-  margin: var(--sp-2) 0;
-}
-
-.neu-divider-solid {
-  height: 1px;
-  background: var(--c-bg-4);
-}
 
 /* ═══════════════════════════════════════════════════════════
    § 13. SCROLLBAR
    ═══════════════════════════════════════════════════════════ */
 
-.scroll-thin {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
-}
-
-.scroll-thin::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.scroll-thin::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.scroll-thin::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.25);
-  border-radius: 3px;
-}
-
-.scroll-thin::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.4);
-}
-
-.scroll-hidden {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.scroll-hidden::-webkit-scrollbar {
-  display: none;
-}
-
 /* ═══════════════════════════════════════════════════════════
    § 14. BADGES & TAGS
    ═══════════════════════════════════════════════════════════ */
 
-.neu-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 10px;
-  border-radius: var(--r-full);
-  font-size: 12px;
-  font-weight: 600;
-  background: var(--c-bg-3);
-  color: var(--c-text-2);
-}
-
-.neu-badge-accent {
-  background: var(--c-accent);
-  color: var(--c-accent-text, #000);
-  box-shadow: 0 2px 8px var(--c-accent-glow);
-}
-
-.neu-badge-secondary {
-  background: var(--c-secondary);
-  color: white;
-  box-shadow: 0 2px 8px var(--c-secondary-glow);
-}
-
 /* ═══════════════════════════════════════════════════════════
    § 15. GRADIENT PRESETS
    ═══════════════════════════════════════════════════════════ */
-
-.gradient-accent {
-  background: linear-gradient(135deg, var(--c-accent) 0%, var(--c-accent-dark) 100%);
-}
-
-.gradient-secondary {
-  background: linear-gradient(135deg, var(--c-secondary) 0%, #0891b2 100%);
-}
-
-.gradient-purple {
-  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
-}
-
-.gradient-blue {
-  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-}
-
-.gradient-surface {
-  background: linear-gradient(180deg, var(--c-bg-2) 0%, var(--c-bg-0) 100%);
-}
 
 /* ═══════════════════════════════════════════════════════════
    § 16. TAB BARS & CHIPS
@@ -1069,188 +524,9 @@
 }
 
 /* Simple pill tabs (without inset container) */
-.neu-tabs-simple {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding-bottom: 2px;
-}
-
-.neu-tabs-simple::-webkit-scrollbar {
-  display: none;
-}
-
-.neu-pill {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-width: max-content;
-  padding: 8px 16px;
-  background: var(--c-bg-2);
-  border: none;
-  border-radius: var(--r-full);
-  color: var(--c-text-2);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-  transition: all 0.15s ease;
-  box-shadow:
-    3px 3px 6px var(--sh-dark),
-    -2px -2px 4px var(--sh-light);
-}
-
-.neu-pill:hover {
-  color: var(--c-text-1);
-}
-
-.neu-pill:active {
-  transform: scale(0.97);
-  box-shadow:
-    inset 2px 2px 4px var(--sh-inset-dark),
-    inset -1px -1px 2px var(--sh-inset-light);
-}
-
-.neu-pill.active {
-  background: var(--accent, var(--c-accent));
-  color: var(--accent-text, var(--c-accent-text, #000));
-  font-weight: 600;
-  box-shadow:
-    3px 3px 6px var(--sh-dark),
-    -2px -2px 4px var(--sh-light),
-    0 0 10px var(--accent-glow, var(--c-accent-glow));
-}
-
 /* Compact scope switcher */
-.neu-scope-bar {
-  display: flex;
-  gap: 6px;
-  padding: 4px;
-  background: var(--c-bg-0);
-  border-radius: var(--r-md);
-  box-shadow:
-    inset 2px 2px 4px var(--sh-inset-dark),
-    inset -1px -1px 3px var(--sh-inset-light);
-}
-
-.neu-scope-btn {
-  flex: 1;
-  padding: 10px 14px;
-  background: transparent;
-  border: none;
-  border-radius: calc(var(--r-md) - 2px);
-  color: var(--c-text-2);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.neu-scope-btn:hover {
-  color: var(--c-text-1);
-}
-
-.neu-scope-btn.active {
-  background: var(--c-bg-2);
-  color: var(--c-text-1);
-  font-weight: 600;
-  box-shadow:
-    2px 2px 4px var(--sh-dark),
-    -1px -1px 2px var(--sh-light);
-}
-
 /* Segmented control (iOS style) */
-.neu-segmented {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  background: var(--c-bg-0);
-  border-radius: var(--r-sm);
-  box-shadow:
-    inset 2px 2px 4px var(--sh-inset-dark),
-    inset -1px -1px 3px var(--sh-inset-light);
-}
-
-.neu-segment {
-  flex: 1;
-  padding: 8px 12px;
-  background: transparent;
-  border: none;
-  border-radius: calc(var(--r-sm) - 2px);
-  color: var(--c-text-2);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-}
-
-.neu-segment.active {
-  background: var(--accent, var(--c-accent));
-  color: var(--accent-text, var(--c-accent-text, #000));
-  font-weight: 600;
-  box-shadow:
-    2px 2px 4px var(--sh-dark),
-    0 0 8px var(--accent-glow, var(--c-accent-glow));
-}
-
 /* Sort chip with order toggle */
-.neu-sort-chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  background: var(--c-bg-2);
-  border: none;
-  border-radius: var(--r-full);
-  color: var(--c-text-2);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  user-select: none;
-  transition: all 0.15s ease;
-  box-shadow:
-    3px 3px 6px var(--sh-dark),
-    -2px -2px 4px var(--sh-light);
-}
-
-.neu-sort-chip:hover {
-  color: var(--c-text-1);
-}
-
-.neu-sort-chip:active {
-  transform: scale(0.97);
-}
-
-.neu-sort-chip.active {
-  background: var(--accent, var(--c-accent));
-  color: var(--accent-text, var(--c-accent-text, #000));
-}
-
-.neu-sort-chip .order-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: var(--r-full);
-  font-size: 12px;
-  transition: transform 0.15s ease;
-}
-
-.neu-sort-chip .order-icon:hover {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.neu-sort-chip:not(.active) .order-icon {
-  background: var(--c-bg-4);
-}
 /* ═══════════════════════════════════════════════════════════
    § UNIFIED COMPONENTS - Shared across all views
    ═══════════════════════════════════════════════════════════ */
@@ -1294,10 +570,6 @@
 }
 
 /* Skeleton grid for loading more items */
-.loading-more-grid {
-  margin-top: 16px;
-}
-
 .loading-more-tracks {
   margin-top: 8px;
 }
@@ -1346,99 +618,9 @@
 
 /* ─── Neumorphic Action Buttons (for standalone use) ─── */
 /* Use .neu-action-btn for neumorphic buttons, .action-btn is reserved for component-specific styles */
-.neu-action-buttons {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.neu-action-btn {
-  position: relative;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  border: none;
-  background: var(--c-bg-3);
-  color: var(--c-text-1);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-  box-shadow:
-    4px 4px 8px var(--sh-dark),
-    -2px -2px 4px var(--sh-light);
-}
-
-.neu-action-btn:hover {
-  background: var(--c-bg-4);
-}
-
-.neu-action-btn:active {
-  transform: scale(0.95);
-  box-shadow:
-    2px 2px 4px var(--sh-dark),
-    -1px -1px 2px var(--sh-light);
-}
-
-.neu-action-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.neu-action-btn:disabled:active {
-  transform: none;
-}
-
 /* Play button - accent color */
-.neu-action-btn.play-btn {
-  background: var(--c-accent);
-  color: var(--c-accent-text, #000);
-  box-shadow:
-    4px 4px 8px var(--sh-dark),
-    0 0 12px var(--c-accent-glow);
-}
-
-.neu-action-btn.play-btn:hover {
-  background: var(--c-accent-light);
-}
-
-.neu-action-btn.play-btn svg {
-  margin-left: 2px; /* Optical centering for play icon */
-}
-
 /* Small action buttons */
-.neu-action-btn.small {
-  width: 36px;
-  height: 36px;
-}
-
-.neu-action-btn.small svg {
-  width: 16px;
-  height: 16px;
-}
-
 /* ─── View Header ─── */
-.view-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 24px;
-}
-
-.view-header h1 {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--c-text-1);
-  margin: 0;
-}
-
-.view-header .count {
-  font-size: 14px;
-  color: var(--c-text-2);
-}
-
 .header-left {
   display: flex;
   align-items: baseline;
@@ -1446,19 +628,6 @@
 }
 
 /* ─── Sort Options Row ─── */
-.sort-options {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.sort-options .stats {
-  color: var(--c-text-2);
-  font-size: 14px;
-}
-
 /* ─── Unified Hero Header (Detail Views: Liked, Playlist, Album, Artist) ─── */
 .hero-header {
   display: flex;
@@ -1704,40 +873,8 @@
 }
 
 .btn-unfollow,
-.unfollow-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 36px;
-  padding: 0 18px;
-  border-radius: var(--r-full);
-  background: var(--c-bg-3);
-  color: var(--c-text-2);
-  font-size: 13px;
-  font-weight: 500;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  box-shadow:
-    2px 2px 4px var(--sh-dark),
-    -1px -1px 2px var(--sh-light);
-}
-
 .btn-unfollow:hover,
-.unfollow-btn:hover {
-  background: var(--c-bg-4);
-  color: var(--c-text-1);
-}
-
 .btn-unfollow:active,
-.unfollow-btn:active {
-  transform: scale(0.97);
-  box-shadow:
-    inset 2px 2px 4px var(--sh-inset-dark),
-    inset -1px -1px 2px var(--sh-inset-light);
-}
-
 /* ─── Unified No Channel Prompt ─── */
 .no-channel-prompt {
   display: flex;

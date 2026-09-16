@@ -3,10 +3,6 @@
    Neumorphic — consistent with design-system.css
    ================================ */
 
-.home-feed {
-  padding: 0 0 8px 0;
-}
-
 /* ─── Quick Access Grid ─── */
 .quick-grid {
   display: flex;
@@ -74,16 +70,6 @@
 .quick-icon.allpl-icon {
   background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
   box-shadow: 0 3px 8px rgba(59, 130, 246, 0.3);
-}
-
-.quick-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--c-text-1);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100px;
 }
 
 /* ─── Feed Sections ─── */
@@ -233,11 +219,6 @@
 }
 
 /* ─── Genre Card ─── */
-.genre-card .feed-card-cover { position: relative; }
-.genre-cover { color: rgba(255, 255, 255, 0.9); }
-.genre-cover svg { width: 32px; height: 32px; }
-.genre-icon { opacity: 0.9; }
-
 .shuffle-badge {
   position: absolute;
   bottom: 6px;
@@ -255,51 +236,4 @@
 .shuffle-badge svg { width: 13px; height: 13px; }
 
 /* ─── Add Card ─── */
-.add-card { width: 100px; }
-
-.add-card .add-cover {
-  width: 100px;
-  height: 100px;
-  background: var(--c-bg-2);
-  border: 2px dashed var(--c-bg-4);
-  color: var(--c-text-3);
-  box-shadow: 
-    inset 2px 2px 4px var(--sh-inset-dark),
-    inset -1px -1px 3px var(--sh-inset-light);
-  box-sizing: border-box;
-}
-
-.add-card .add-cover svg { width: 32px; height: 32px; opacity: 0.6; }
-
-.add-card:active .add-cover {
-  background: var(--c-bg-3);
-  border-style: solid;
-}
-
 /* ─── Tracks Preview ─── */
-.feed-tracks-preview { padding: 0 16px; }
-
-.see-all-btn {
-  display: block;
-  width: calc(100% - 24px);
-  margin: 12px auto;
-  padding: 12px;
-  border: none;
-  border-radius: var(--r-md);
-  background: var(--c-bg-3);
-  color: var(--c-text-1);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  box-shadow: 
-    3px 3px 6px var(--sh-dark),
-    -2px -2px 4px var(--sh-light);
-}
-
-.see-all-btn:active {
-  transform: scale(0.98);
-  box-shadow: 
-    inset 2px 2px 4px var(--sh-inset-dark),
-    inset -1px -1px 2px var(--sh-inset-light);
-}
