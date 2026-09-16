@@ -1,7 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-// Lazy-loaded views
-const HomeView = () => import('@/views/HomeView.vue')
+import HomeView from '@/views/HomeView.vue'
+
+// Lazy-loaded secondary views
 const LibraryView = () => import('@/views/LibraryView.vue')
 const SearchView = () => import('@/views/SearchView.vue')
 const FriendsView = () => import('@/views/FriendsView.vue')
@@ -118,17 +119,15 @@ const router = createRouter({
   routes
 })
 
-// Navigation guard
-router.beforeEach(async (to, from, next) => {
+// Navigation guard - non-blocking for instant UI appearance
+router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
   
-  // Initialize auth on first navigation
+  // Initialize auth in background without blocking initial navigation
   if (!authStore.initialized && authStore.isAuthenticated) {
-    try {
-      await authStore.initialize()
-    } catch (e) {
-      // Auth failed, continue to check
-    }
+    authStore.initialize().catch((e) => {
+      console.warn('[Router] Background auth init failed:', e)
+    })
   }
   
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {

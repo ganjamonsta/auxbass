@@ -1,7 +1,7 @@
 <template>
   <div class="app spotify-theme" :class="appClasses">
-    <!-- Auth checking state -->
-    <div v-if="authStore.loading && !authStore.initialized" class="auth-loading">
+    <!-- Auth checking state (only for sessions without local credentials) -->
+    <div v-if="!authStore.isAuthenticated && authStore.loading && !authStore.initialized" class="auth-loading">
       <div class="auth-spinner"></div>
     </div>
 
@@ -713,17 +713,23 @@ onMounted(async () => {
   // Listen for auth:logout events from API interceptor
   window.addEventListener('auth:logout', handleAuthLogout)
   
-  // Initialize auth if not already initialized
+  // Initialize auth in background if not already initialized
   if (authStore.isAuthenticated && !authStore.initialized) {
-    await authStore.initialize()
+    authStore.initialize().catch(err => console.warn('[App] Background auth initialize error:', err))
   }
 
-  // Preload external accounts, last import, and active background jobs
-  if (authStore.isAuthenticated) {
-    externalAccountsStore.fetchSoundCloud()
-    externalAccountsStore.fetchLastSpotifyImport()
-    tasksStore.checkRecentJobs()
-  }
+  // Defer secondary background checks so they don't compete with initial view data rendering
+  const scheduleSecondaryInit = typeof window !== 'undefined' && window.requestIdleCallback
+    ? window.requestIdleCallback
+    : (cb) => setTimeout(cb, 1500)
+
+  scheduleSecondaryInit(() => {
+    if (authStore.isAuthenticated) {
+      externalAccountsStore.fetchSoundCloud().catch(() => {})
+      externalAccountsStore.fetchLastSpotifyImport().catch(() => {})
+      tasksStore.checkRecentJobs().catch(() => {})
+    }
+  })
 
   window.addEventListener('focus', handleWindowFocus)
 

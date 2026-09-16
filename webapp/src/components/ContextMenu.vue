@@ -152,7 +152,7 @@
                   <FolderOpen :size="18" />
                   <span>Открыть</span>
                 </button>
-                <button class="menu-item" @click="exec('togglePin')">
+                <button v-if="isDesktop" class="menu-item" @click="exec('togglePin')">
                   <PinOff v-if="uiStore.isPlaylistPinned(menuData?.id)" :size="18" />
                   <Pin v-else :size="18" />
                   <span>{{ uiStore.isPlaylistPinned(menuData?.id) ? 'Открепить от сайдбара' : 'Закрепить в сайдбаре' }}</span>

@@ -240,10 +240,19 @@ app.mount("/api/avatars", StaticFiles(directory=AVATARS_DIR), name="avatars")
 
 WEBAPP_DIST = Path(__file__).parent.parent / "webapp" / "dist"
 
+class ImmutableStaticFiles(StaticFiles):
+    """StaticFiles with long-term immutable Cache-Control for hashed Vite assets"""
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
+
 # Serve static assets (js, css, images, etc.)
 if WEBAPP_DIST.exists():
     if (WEBAPP_DIST / "assets").exists():
-        app.mount("/assets", StaticFiles(directory=WEBAPP_DIST / "assets"), name="assets")
+        app.mount("/assets", ImmutableStaticFiles(directory=WEBAPP_DIST / "assets"), name="assets")
     if (WEBAPP_DIST / "icons").exists():
         app.mount("/icons", StaticFiles(directory=WEBAPP_DIST / "icons"), name="icons")
     

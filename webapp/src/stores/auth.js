@@ -13,9 +13,25 @@ const loadCachedChannelStatus = () => {
   return { hasChannel: false, canSave: false, channelInfo: null }
 }
 
+const getInitialUser = () => {
+  const saved = authStorage.getUser()
+  if (saved) return saved
+  const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user
+  if (tgUser?.id) {
+    return {
+      id: tgUser.id,
+      first_name: tgUser.first_name || '',
+      last_name: tgUser.last_name || '',
+      username: tgUser.username || '',
+      photo_url: tgUser.photo_url || null,
+    }
+  }
+  return null
+}
+
 export const useAuthStore = defineStore('auth', () => {
   // State
-  const user = ref(authStorage.getUser())
+  const user = ref(getInitialUser())
   const loading = ref(false)
   const initialized = ref(false)
   const error = ref(null)

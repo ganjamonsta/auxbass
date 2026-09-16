@@ -618,7 +618,7 @@
 }
 
 .subitem-delete-btn {
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
   width: 20px;
@@ -628,14 +628,19 @@
   border: none;
   color: rgba(255, 255, 255, 0.4);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
   margin-left: 2px;
   flex-shrink: 0;
   padding: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .import-file-subitem:hover .subitem-delete-btn {
-  display: flex;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .subitem-delete-btn:hover {
