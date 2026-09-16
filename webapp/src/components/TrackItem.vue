@@ -474,6 +474,13 @@ const handleTagClick = (tag) => {
   transform: scale(1.05);
 }
 
+@media (max-width: 768px) {
+  .track-tag-badge {
+    display: none !important;
+    pointer-events: none !important;
+  }
+}
+
 /* ─── Duration ─── */
 .track-duration {
   font-size: 12px;
@@ -731,14 +738,4 @@ const handleTagClick = (tag) => {
   margin: 0 4px;
 }
 
-/* ─── Track Tag Badge (inline) ─── */
-.track-tag-badge {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--c-accent, #1db954);
-  opacity: 0.6;
-  white-space: nowrap;
-  flex-shrink: 0;
-  margin-left: 4px;
-}
 </style>
