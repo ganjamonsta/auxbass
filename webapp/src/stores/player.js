@@ -16,6 +16,7 @@ import { defineStore } from 'pinia'
 import { ref, watch, computed } from 'vue'
 import { playerApi, tracksApi, playlistsApi, albumsApi } from '../api/client'
 import { useNetworkMonitor } from '../composables/useNetworkMonitor'
+import { useAuthStore } from './auth'
 
 // --- Extracted modules ---
 import {
@@ -711,16 +712,29 @@ export const usePlayerStore = defineStore('player', () => {
 
       // Check if bot lacks access to backup channel (e.g. new bot or bot kicked)
       if (errCode === 'channel_bot_missing' || (typeof detail === 'string' && (detail.includes('Бот не имеет доступа к вашему каналу') || detail.includes('channel_bot_missing')))) {
-        isPlaying.value = false
-        loading.value = false
-        lastError.value = {
-          type: 'channel_bot_missing',
-          track,
-          message: detail,
-          channel_title: isObjDetail ? rawDetail.channel_title : null,
-          bot_username: isObjDetail ? rawDetail.bot_username : null
+        const authStore = useAuthStore()
+        const isCurrentUsersTrack = !track.uploader_id || (authStore.user?.id && track.uploader_id === authStore.user.id)
+        
+        if (isCurrentUsersTrack) {
+          isPlaying.value = false
+          loading.value = false
+          lastError.value = {
+            type: 'channel_bot_missing',
+            track,
+            message: detail,
+            channel_title: isObjDetail ? rawDetail.channel_title : null,
+            bot_username: isObjDetail ? rawDetail.bot_username : null
+          }
+          window.dispatchEvent(new CustomEvent('player:channel-access-required', { detail: lastError.value }))
+          return
         }
-        window.dispatchEvent(new CustomEvent('player:channel-access-required', { detail: lastError.value }))
+        // If it's a foreign track, do not prompt user to configure their own channel!
+        console.warn(`[Player] Track ${track.id} channel error belongs to user ${track.uploader_id}, skipping...`)
+        try { await tracksApi.markUnavailable(track.id); track.is_unavailable = true } catch (_) {}
+        if (onTrackUnavailableCallback && !isSkipping) {
+          onTrackUnavailableCallback(track, 'Трек временно недоступен у автора', false)
+        }
+        setTimeout(() => next(), 50)
         return
       }
 

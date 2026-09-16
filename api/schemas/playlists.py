@@ -27,6 +27,7 @@ class PlaylistResponse(BaseModel):
     name: str
     description: Optional[str] = None
     track_count: int = 0
+    unavailable_track_count: int = 0
     total_duration: int = 0
     cover_url: Optional[str] = None
     custom_cover_url: Optional[str] = None

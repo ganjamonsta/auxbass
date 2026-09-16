@@ -563,23 +563,42 @@ async def get_stream_url(
             file_path = await get_telegram_file_path(new_file_id)
         
         if not file_path:
-            if err_code == "channel_access_denied":
-                bot_user = settings.bot_username or "TG Player"
-                logger.warning(
-                    f"[Stream Request] Track {track_id} cannot be refreshed: "
-                    f"bot lacks access to channel '{ch_title}'"
-                )
-                raise HTTPException(
-                    status_code=503,
-                    detail={
-                        "message": f"Бот не имеет доступа к вашему каналу «{ch_title or 'Резервный'}». Добавьте @{bot_user} администратором в канал, чтобы слушать треки.",
-                        "code": "channel_bot_missing",
-                        "channel_title": ch_title or "Резервный канал",
-                        "bot_username": settings.bot_username or "",
-                    }
-                )
+            # If current track file_id is dead, let's see if another copy exists in DB
+            alt_track = await find_streamable_alternative(original_track, db)
+            if alt_track and alt_track.id != track.id:
+                alt_path = await get_telegram_file_path(alt_track.file_id)
+                if alt_path:
+                    logger.info(
+                        f"[Stream Request] 🔄 Auto-substitution for stale track {track_id} -> track {alt_track.id}"
+                    )
+                    track = alt_track
+                    file_path = alt_path
 
-            # Still no luck - mark as unavailable
+        if not file_path:
+            # If bot lacks access to the channel:
+            # ONLY complain about missing channel if this is the CURRENT USER's channel/track
+            if err_code == "channel_access_denied":
+                if original_track.uploader_id == user.id:
+                    bot_user = settings.bot_username or "TG Player"
+                    logger.warning(
+                        f"[Stream Request] Track {track_id} cannot be refreshed: "
+                        f"bot lacks access to owner's channel '{ch_title}'"
+                    )
+                    raise HTTPException(
+                        status_code=503,
+                        detail={
+                            "message": f"Бот не имеет доступа к вашему каналу «{ch_title or 'Резервный'}». Добавьте @{bot_user} администратором в канал, чтобы слушать треки.",
+                            "code": "channel_bot_missing",
+                            "channel_title": ch_title or "Резервный канал",
+                            "bot_username": settings.bot_username or "",
+                        }
+                    )
+                else:
+                    logger.warning(
+                        f"[Stream Request] Track {track_id} channel '{ch_title}' is inaccessible (uploaded by other user {original_track.uploader_id})"
+                    )
+
+            # Still no luck - mark track as unavailable
             if not track.is_unavailable:
                 track.is_unavailable = True
                 await db.commit()
@@ -587,9 +606,10 @@ async def get_stream_url(
             else:
                 logger.warning(f"[Stream Request] Track {track_id} file unavailable from Telegram (already marked)")
             
+            detail_msg = "Файл недоступен у автора трека." if original_track.uploader_id != user.id else "Файл недоступен. Отправьте этот трек боту повторно, чтобы обновить ссылку."
             raise HTTPException(
                 status_code=503,
-                detail="Файл недоступен. Отправьте этот трек боту повторно, чтобы обновить ссылку."
+                detail=detail_msg
             )
     
     # Generate secure temporary token with cached file_path
@@ -910,8 +930,8 @@ async def get_batch_stream_urls(
             track.file_id = new_file_id
             track.is_unavailable = False
             tracks_to_update.append(track_id)
-        elif not file_path and track and not track.is_unavailable and not is_hd_or_large and err_code != "channel_access_denied":
-            # Mark as unavailable ONLY for regular files whose telegram path is truly gone
+        elif not file_path and track and not track.is_unavailable and not is_hd_or_large:
+            # Mark as unavailable for tracks whose telegram path is truly gone or channel is dead
             track.is_unavailable = True
             tracks_to_mark_unavailable.append(track_id)
     

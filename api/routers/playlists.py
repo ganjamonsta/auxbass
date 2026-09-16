@@ -12,7 +12,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
-from sqlalchemy import select, func, delete, update, union_all, asc, desc, or_, String
+from sqlalchemy import select, func, delete, update, union_all, asc, desc, or_, String, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from aiogram.types import BufferedInputFile
@@ -151,18 +151,19 @@ async def get_playlist_info(
     db: AsyncSession, 
     playlist_id: int,
     custom_cover_url: Optional[str] = None,
-) -> tuple[int, int, Optional[str], List[str]]:
+) -> tuple[int, int, int, Optional[str], List[str]]:
     """
-    Get track count, duration, cover, and covers array for a playlist.
-    Returns: (track_count, total_duration, cover_url, covers)
+    Get track count, total duration, unavailable track count, cover, and covers array for a playlist.
+    Returns: (track_count, total_duration, unavailable_track_count, cover_url, covers)
     If custom_cover_url is set, it overrides the track collage.
     Otherwise, cover is built from track covers (collage of up to 4 track covers).
     """
-    # Count and duration
+    # Count, duration, and unavailable count
     result = await db.execute(
         select(
             func.count(PlaylistTrack.id),
-            func.coalesce(func.sum(Track.duration), 0)
+            func.coalesce(func.sum(Track.duration), 0),
+            func.coalesce(func.sum(case((Track.is_unavailable == True, 1), else_=0)), 0)
         )
         .join(Track, Track.id == PlaylistTrack.track_id)
         .where(PlaylistTrack.playlist_id == playlist_id)
@@ -170,15 +171,16 @@ async def get_playlist_info(
     row = result.one()
     track_count = row[0] or 0
     total_duration = row[1] or 0
+    unavailable_count = row[2] or 0
     
     if custom_cover_url:
-        return track_count, total_duration, custom_cover_url, [custom_cover_url]
+        return track_count, total_duration, unavailable_count, custom_cover_url, [custom_cover_url]
     
     p_cover = await db.scalar(
         select(Playlist.custom_cover_url).where(Playlist.id == playlist_id)
     )
     if p_cover:
-        return track_count, total_duration, p_cover, [p_cover]
+        return track_count, total_duration, unavailable_count, p_cover, [p_cover]
     
     # Get track covers for collage (up to 4)
     covers_result = await db.execute(
@@ -201,7 +203,7 @@ async def get_playlist_info(
     covers = track_covers[:4]
     cover_url = track_covers[0] if track_covers else None
     
-    return track_count, total_duration, cover_url, covers
+    return track_count, total_duration, unavailable_count, cover_url, covers
 
 
 @router.get("", response_model=PlaylistsListResponse)
@@ -312,7 +314,7 @@ async def get_my_playlists(
 
     items = []
     for playlist, owner, tc in rows:
-        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.custom_cover_url)
+        track_count, total_duration, unavailable_count, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.custom_cover_url)
         
         is_owner = playlist.owner_id == user.id
         is_subscribed = False
@@ -331,6 +333,7 @@ async def get_my_playlists(
             name=playlist.name,
             description=playlist.description,
             track_count=track_count,
+            unavailable_track_count=unavailable_count,
             total_duration=total_duration,
             cover_url=cover_url,
             custom_cover_url=playlist.custom_cover_url,
@@ -381,12 +384,13 @@ async def get_all_my_playlists(
     
     items = []
     for playlist, owner in rows:
-        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.custom_cover_url)
+        track_count, total_duration, unavailable_count, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.custom_cover_url)
         items.append(PlaylistResponse(
             id=playlist.id,
             name=playlist.name,
             description=playlist.description,
             track_count=track_count,
+            unavailable_track_count=unavailable_count,
             total_duration=total_duration,
             cover_url=cover_url,
             custom_cover_url=playlist.custom_cover_url,
@@ -425,26 +429,34 @@ async def get_global_playlists(
     
     Shows all public playlists with pagination, search and sort.
     """
-    # Track count subquery
+    # Track count subqueries: total tracks & available tracks
     track_count_subq = (
         select(
             PlaylistTrack.playlist_id,
-            func.count(PlaylistTrack.id).label('track_count')
+            func.count(PlaylistTrack.id).label('track_count'),
+            func.coalesce(func.sum(case((Track.is_unavailable == False, 1), else_=0)), 0).label('available_count')
         )
+        .join(Track, Track.id == PlaylistTrack.track_id)
         .group_by(PlaylistTrack.playlist_id)
         .subquery()
     )
     
-    # Base query
+    # Base query: owner profile not hidden, playlist is public, and has >= 1 available track
     query = (
         select(Playlist, User, func.coalesce(track_count_subq.c.track_count, 0).label('tc'))
         .join(User, User.id == Playlist.owner_id)
-        .outerjoin(track_count_subq, track_count_subq.c.playlist_id == Playlist.id)
+        .join(track_count_subq, track_count_subq.c.playlist_id == Playlist.id)
         .where(Playlist.is_public == True)
+        .where(User.hide_profile == False)
+        .where(track_count_subq.c.available_count > 0)
     )
     count_query = (
         select(func.count(Playlist.id))
+        .join(User, User.id == Playlist.owner_id)
+        .join(track_count_subq, track_count_subq.c.playlist_id == Playlist.id)
         .where(Playlist.is_public == True)
+        .where(User.hide_profile == False)
+        .where(track_count_subq.c.available_count > 0)
     )
     
     # Apply search
@@ -512,7 +524,7 @@ async def get_global_playlists(
 
     items = []
     for playlist, owner, tc in rows:
-        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.custom_cover_url)
+        track_count, total_duration, unavailable_count, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.custom_cover_url)
         
         is_owner = playlist.owner_id == user.id
         is_subscribed = False
@@ -531,6 +543,7 @@ async def get_global_playlists(
             name=playlist.name,
             description=playlist.description,
             track_count=track_count,
+            unavailable_track_count=unavailable_count,
             total_duration=total_duration,
             cover_url=cover_url,
             custom_cover_url=playlist.custom_cover_url,
@@ -632,6 +645,7 @@ async def get_playlist(
     tracks_response = [track_to_response(track, lib_entry) for track, lib_entry in rows]
     
     track_count = len(tracks_response)
+    unavailable_count = sum(1 for row in rows if row[0].is_unavailable)
     total_duration = sum(t.duration or 0 for t in [row[0] for row in rows])
     
     # Build covers array from custom cover or track covers (up to 4 for collage)
@@ -688,6 +702,7 @@ async def get_playlist(
         name=playlist.name,
         description=playlist.description,
         track_count=track_count,
+        unavailable_track_count=unavailable_count,
         total_duration=total_duration,
         cover_url=cover_url,
         custom_cover_url=playlist.custom_cover_url,
@@ -1155,7 +1170,7 @@ async def get_user_public_playlists(
     
     items = []
     for playlist in playlists:
-        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.custom_cover_url)
+        track_count, total_duration, unavailable_count, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.custom_cover_url)
         # Check if current user is subscribed
         is_subscribed = False
         if not is_own:
@@ -1173,6 +1188,7 @@ async def get_user_public_playlists(
             name=playlist.name,
             description=playlist.description,
             track_count=track_count,
+            unavailable_track_count=unavailable_count,
             total_duration=total_duration,
             cover_url=cover_url,
             custom_cover_url=playlist.custom_cover_url,

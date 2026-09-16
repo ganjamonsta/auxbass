@@ -19,7 +19,6 @@
           <span v-if="playlist.is_public" class="public-badge"><Globe :size="14" /> Публичный</span>
           <span v-if="playlist.owner_name && !isOwner" class="owner-info" :class="{ 'clickable': !!playlist.owner_id }" @click="goToOwner">от {{ playlist.owner_name }}</span>
         </p>
-        <!-- Playlist tags -->
         <TagChips
           v-if="playlist.tags?.length"
           :tags="playlist.tags"
@@ -29,6 +28,16 @@
           class="playlist-tags"
           @tagClick="handleTagClick"
         />
+        <!-- Stale / unavailable tracks warning -->
+        <div v-if="playlist.unavailable_track_count > 0" class="playlist-stale-banner">
+          <AlertCircle :size="14" />
+          <span v-if="isOwner">
+            {{ playlist.unavailable_track_count }} {{ playlist.unavailable_track_count === 1 ? 'трек недоступен' : 'треков недоступно' }} в Telegram. Отправьте их боту повторно, чтобы вернуть звук.
+          </span>
+          <span v-else>
+            {{ playlist.unavailable_track_count }} {{ playlist.unavailable_track_count === 1 ? 'трек устарел' : 'треков устарело' }} у автора и может пропускаться.
+          </span>
+        </div>
       </div>
     </div>
 
@@ -149,7 +158,7 @@ import EditPlaylistModal from '@/components/EditPlaylistModal.vue'
 import ExpandableSearch from '@/components/ui/ExpandableSearch.vue'
 import api, { playlistsApi } from '@/api/client'
 import apiCache from '@/utils/apiCache'
-import { Music, Check, Plus, Globe, Play, Shuffle, Edit3, Share2, Search, Pin } from 'lucide-vue-next'
+import { Music, Check, Plus, Globe, Play, Shuffle, Edit3, Share2, Search, Pin, AlertCircle } from 'lucide-vue-next'
 import { getCoverUrl, CoverSize } from '@/utils'
 
 // Universal context menu
@@ -511,5 +520,19 @@ watch(
 
 .playlist-tags {
   margin-top: 8px;
+}
+
+.playlist-stale-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 6px 12px;
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid rgba(234, 179, 8, 0.25);
+  border-radius: 8px;
+  color: #eab308;
+  font-size: 12px;
+  line-height: 1.4;
 }
 </style>
