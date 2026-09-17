@@ -330,7 +330,9 @@ export function useVirtualScroll(options = {}) {
   // Reset data and reload from offset 0
   const reset = async (params = null) => {
     if (params !== null) {
-      extraParams.value = params
+      extraParams.value = typeof params === 'object' && params !== null 
+        ? { ...extraParams.value, ...params }
+        : params
     }
     loadedPages.clear()
     pendingPages.clear()

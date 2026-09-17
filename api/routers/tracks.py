@@ -44,6 +44,7 @@ from api.schemas.tracks import (
     TrackLyricsUpdate,
     TrackLyricsOffsetUpdate,
 )
+from api.schemas.library import LibrarySyncStateResponse
 from api.schemas.common import TelegramUser
 from api.utils import raise_not_found
 
@@ -1725,6 +1726,17 @@ async def get_all_tracks(
         page=effective_page,
         per_page=effective_limit,
     )
+
+
+@router.get("/sync-state", response_model=LibrarySyncStateResponse)
+async def get_tracks_sync_state(
+    since: Optional[datetime] = Query(None, description="ISO timestamp of last sync"),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Alias for /api/library/sync-state under /api/tracks/sync-state"""
+    from api.routers.library import get_library_sync_state
+    return await get_library_sync_state(since=since, user=user, db=db)
 
 
 # ============== Lyrics Endpoints ==============

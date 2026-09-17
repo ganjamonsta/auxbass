@@ -19,6 +19,16 @@
           @next="onNextSort"
           @toggle-order="onToggleOrder"
         />
+        <button 
+          class="refresh-btn" 
+          :class="{ 'is-refreshing': isRefreshing }"
+          @click="refreshTracks" 
+          :disabled="isRefreshing"
+          title="Обновить список треков"
+          aria-label="Обновить список треков"
+        >
+          <RefreshCw :size="15" class="refresh-icon" :class="{ 'spin-anim': isRefreshing }" />
+        </button>
       </div>
 
       <!-- Expandable Search -->
@@ -153,8 +163,9 @@ import TrackSkeleton from '@/components/TrackSkeleton.vue'
 import SortChips from '@/components/SortChips.vue'
 import ExpandableSearch from '@/components/ui/ExpandableSearch.vue'
 import api from '@/api/client'
+import apiCache from '@/utils/apiCache'
 import { getAllCachedTracks } from '@/utils/audioCacheDb'
-import { Music, Shuffle, Search } from 'lucide-vue-next'
+import { Music, Shuffle, Search, RefreshCw } from 'lucide-vue-next'
 
 // Universal context menu
 const { openMenu } = useContextMenu()
@@ -271,16 +282,21 @@ const hasMore = computed(() => tracks.value.length < searchTotal.value)
 // Sync local track arrays with track changes/removals
 useTrackSync(tracks, { isLibraryList: true })
 
+const isRefreshing = ref(false)
+
 // Fetch function for VirtualTrackList (without search)
-const fetchTracks = async ({ offset, limit }) => {
+const fetchTracks = async ({ offset, limit, _cb }) => {
   try {
+    const shouldBypass = isRefreshing.value || Boolean(_cb)
     const response = await api.get('/tracks', {
       params: {
         offset,
         limit,
         sort_by: sortBy.value,
-        sort_order: sortOrder.value
-      }
+        sort_order: sortOrder.value,
+        ...(_cb ? { _cb } : {})
+      },
+      bypassCache: shouldBypass
     })
     return response.data
   } catch (err) {
@@ -296,6 +312,41 @@ const fetchTracks = async ({ offset, limit }) => {
     } catch (_) {
       return { items: [], total: 0, offset, limit }
     }
+  }
+}
+
+// Force refresh tracks list and library sync
+const refreshTracks = async () => {
+  if (isRefreshing.value) return
+  isRefreshing.value = true
+  try {
+    // 1. Invalidate frontend API cache for all tracks & library
+    apiCache.invalidatePattern('/tracks')
+    apiCache.invalidatePattern('/library')
+    apiCache.invalidatePattern('/artists')
+    apiCache.invalidatePattern('/albums')
+
+    // 2. Refresh search or virtual list
+    if (props.searchQuery) {
+      page.value = 1
+      await loadSearchTracks()
+    } else {
+      if (virtualTrackListRef.value) {
+        await virtualTrackListRef.value.reset({ _cb: Date.now() })
+      }
+    }
+
+    // 3. Re-fetch library store data & sync state
+    await libraryStore.checkSyncState(true)
+    libraryStore.fetchTracks({ refresh: true, bypassCache: true }).catch(() => {})
+    libraryStore.fetchPlaylists(true).catch(() => {})
+
+    uiStore.toast?.success('Список обновлён', 'Данные медиатеки синхронизированы')
+  } catch (err) {
+    console.error('Refresh tracks failed:', err)
+    uiStore.toast?.error('Ошибка обновления', 'Не удалось обновить список треков')
+  } finally {
+    isRefreshing.value = false
   }
 }
 
@@ -510,6 +561,50 @@ onUnmounted(() => {
 
 .shuffle-icon {
   flex-shrink: 0;
+}
+
+.refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--c-bg-3, #282828);
+  border: 1px solid var(--c-border-subtle, rgba(255, 255, 255, 0.1));
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: var(--c-bg-4, #383838);
+  color: var(--c-text-1, #fff);
+  border-color: var(--c-border, rgba(255, 255, 255, 0.2));
+  transform: scale(1.05);
+}
+
+.refresh-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.refresh-icon {
+  flex-shrink: 0;
+}
+
+.spin-anim {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* Loading state - uses .spinner from design-system.css */

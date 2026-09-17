@@ -31,6 +31,8 @@ from api.schemas.tracks import (
 )
 from api.schemas.library import (
     LibraryStatsResponse,
+    LibrarySyncStateResponse,
+    LibrarySyncStats,
 )
 from api.schemas.common import TelegramUser
 
@@ -57,6 +59,8 @@ from api.utils.responses import (
 async def get_my_tracks(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=100),
+    offset: Optional[int] = Query(None, ge=0),
+    limit: Optional[int] = Query(None, ge=1, le=100),
     search: Optional[str] = None,
     artist: Optional[str] = None,
     album_id: Optional[int] = None,
@@ -71,6 +75,7 @@ async def get_my_tracks(
     Get tracks from user's personal library.
     
     Supports filtering by search, artist, album, and source.
+    Supports both page/per_page and offset/limit pagination.
     """
     # Base query - join through UserLibrary to get user's tracks
     base_conds = [UserLibrary.user_id == user.id]
@@ -129,6 +134,10 @@ async def get_my_tracks(
     # Get total count
     total = await db.scalar(count_query) or 0
     
+    # Ensure string sorting parameters even when called directly in tests
+    effective_sort_by = sort_by if isinstance(sort_by, str) else getattr(sort_by, 'default', 'added_at') or 'added_at'
+    effective_sort_order = sort_order if isinstance(sort_order, str) else getattr(sort_order, 'default', 'desc') or 'desc'
+
     # Apply sorting
     if album_id:
         # When filtering by album, sort by track number
@@ -137,19 +146,26 @@ async def get_my_tracks(
             Track.title.asc()
         )
     else:
-        if sort_by == "added_at":
+        if effective_sort_by == "added_at":
             sort_column = UserLibrary.added_at
         else:
-            sort_column = getattr(Track, sort_by, UserLibrary.added_at)
+            sort_column = getattr(Track, effective_sort_by, UserLibrary.added_at)
         
-        if sort_order == "desc":
+        if effective_sort_order == "desc":
             query = query.order_by(desc(sort_column))
         else:
             query = query.order_by(asc(sort_column))
     
-    # Pagination
-    offset = (page - 1) * per_page
-    query = query.offset(offset).limit(per_page)
+    # Pagination: support both offset/limit and page/per_page
+    effective_limit = limit or per_page
+    if offset is not None:
+        effective_offset = offset
+        effective_page = (offset // effective_limit) + 1
+    else:
+        effective_offset = (page - 1) * effective_limit
+        effective_page = page
+    
+    query = query.offset(effective_offset).limit(effective_limit)
     
     result = await db.execute(query)
     rows = result.unique().all()
@@ -159,8 +175,10 @@ async def get_my_tracks(
     return TracksListResponse(
         items=items,
         total=total,
-        page=page,
-        per_page=per_page,
+        offset=effective_offset,
+        limit=effective_limit,
+        page=effective_page,
+        per_page=effective_limit,
     )
 
 
@@ -323,6 +341,99 @@ async def get_library_stats(
         album_count=album_count,
         artist_count=artist_count,
         by_source=by_source,
+    )
+
+
+@router.get("/sync-state", response_model=LibrarySyncStateResponse)
+async def get_library_sync_state(
+    since: Optional[datetime] = Query(None, description="ISO timestamp of last sync"),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Lightweight sync state check for webapp.
+    Allows frontend to detect new tracks and metadata updates in near real-time.
+    """
+    stats_query = (
+        select(
+            func.count(UserLibrary.id).label("total_tracks"),
+            func.max(UserLibrary.track_id).label("last_track_id"),
+            func.max(UserLibrary.added_at).label("last_added_at"),
+            func.max(Track.updated_at).label("last_updated_at"),
+            func.count(
+                func.distinct(
+                    func.nullif(
+                        func.coalesce(Track.normalized_artist, func.lower(func.trim(Track.artist))),
+                        ''
+                    )
+                )
+            ).label("artist_count"),
+        )
+        .select_from(UserLibrary)
+        .join(Track, UserLibrary.track_id == Track.id)
+        .where(UserLibrary.user_id == user.id)
+        .where(UserLibrary.is_disliked == False)
+    )
+    res = await db.execute(stats_query)
+    row = res.one()
+
+    total_tracks = row.total_tracks or 0
+    last_track_id = row.last_track_id
+    last_added_at = row.last_added_at
+    last_updated_at = row.last_updated_at
+    artist_count = row.artist_count or 0
+
+    if total_tracks == 0:
+        return LibrarySyncStateResponse(
+            total_tracks=0,
+            last_track_id=None,
+            last_added_at=None,
+            last_updated_at=None,
+            updated_tracks=[],
+            stats=LibrarySyncStats(total_tracks=0, artist_count=0, album_count=0),
+        )
+
+    # Album count (albums that have tracks in user's library)
+    album_count = await db.scalar(
+        select(func.count(func.distinct(AlbumTrack.album_id)))
+        .select_from(UserLibrary)
+        .join(AlbumTrack, AlbumTrack.track_id == UserLibrary.track_id)
+        .where(UserLibrary.user_id == user.id)
+    ) or 0
+
+    sync_stats = LibrarySyncStats(
+        total_tracks=total_tracks,
+        artist_count=artist_count,
+        album_count=album_count,
+    )
+
+    updated_tracks: List[TrackResponse] = []
+    if since and isinstance(since, datetime):
+        since_naive = since.replace(tzinfo=None) if since.tzinfo else since
+        updated_query = (
+            select(Track, UserLibrary)
+            .join(UserLibrary, UserLibrary.track_id == Track.id)
+            .where(UserLibrary.user_id == user.id)
+            .where(UserLibrary.is_disliked == False)
+            .where(Track.updated_at > since_naive)
+            .options(
+                selectinload(Track.enrichment),
+                selectinload(Track.track_tags),
+                selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
+            )
+            .order_by(desc(Track.updated_at))
+            .limit(30)
+        )
+        up_res = await db.execute(updated_query)
+        updated_tracks = [track_to_response(t, lib) for t, lib in up_res.unique().all()]
+
+    return LibrarySyncStateResponse(
+        total_tracks=total_tracks,
+        last_track_id=last_track_id,
+        last_added_at=last_added_at,
+        last_updated_at=last_updated_at,
+        updated_tracks=updated_tracks,
+        stats=sync_stats,
     )
 
 

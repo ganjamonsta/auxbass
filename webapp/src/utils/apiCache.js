@@ -48,6 +48,7 @@ class ApiCache {
     if (!url) return false
     // Explicit blacklist for dynamic/job polling/auth endpoints
     if (
+      url.includes('/sync-state') ||
       url.includes('/ingestion/jobs') ||
       url.includes('/ingestion/recent') ||
       url.includes('/ingestion/account') ||

@@ -109,3 +109,45 @@ def test_inline_regex_parsing():
     al_pattern = r'^(?:album|al)[:_](\d+)$'
     assert re.match(al_pattern, "album:42", re.IGNORECASE).group(1) == "42"
     assert re.match(al_pattern, "al:1", re.IGNORECASE).group(1) == "1"
+
+
+def test_track_album_name_property():
+    """Verify that Track has album and album_name properties that don't raise AttributeError."""
+    track = Track(title="Test Track", artist="Test Artist")
+    assert track.album is None
+    assert track.album_name is None
+
+    from shared.models import TrackEnrichment
+    enr = TrackEnrichment(album_name="Test Album")
+    track.enrichment = enr
+    assert track.album == "Test Album"
+    assert track.album_name == "Test Album"
+
+
+@pytest.mark.asyncio
+async def test_deliver_single_track_with_album():
+    from unittest.mock import AsyncMock, MagicMock, patch
+    from bot.services.delivery import deliver_single_track
+    from shared.models import TrackEnrichment
+
+    bot = AsyncMock()
+    track = Track(id=1, file_id="file123", title="Hero of My Story 3style3", artist="Bladee")
+    track.enrichment = TrackEnrichment(album_name="333")
+
+    session_mock = AsyncMock()
+    session_mock.scalar = AsyncMock(return_value=track)
+
+    class DummyContext:
+        async def __aenter__(self):
+            return session_mock
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+    with patch("bot.services.delivery.get_session", return_value=DummyContext()):
+        res = await deliver_single_track(bot=bot, chat_id=123, track_id=1)
+        assert res is True
+        bot.send_audio.assert_called_once()
+        call_kwargs = bot.send_audio.call_args.kwargs
+        assert "Bladee — Hero of My Story 3style3" in call_kwargs["caption"]
+        assert "💿 <i>333</i>" in call_kwargs["caption"]
+

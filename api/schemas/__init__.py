@@ -38,4 +38,6 @@ __all__ = [
     
     # Library
     "LibraryStatsResponse",
+    "LibrarySyncStateResponse",
+    "LibrarySyncStats",
 ]

@@ -64,7 +64,9 @@ async def deliver_single_track(
     """Send a single audio track to chat using Telegram file_id"""
     async with get_session() as session:
         track = await session.scalar(
-            select(Track).where(Track.id == track_id)
+            select(Track)
+            .options(selectinload(Track.enrichment))
+            .where(Track.id == track_id)
         )
         if not track or not track.file_id:
             logger.warning(f"Track {track_id} not found or missing file_id")
@@ -72,8 +74,16 @@ async def deliver_single_track(
             return False
 
         caption = f"🎧 <b>{track.artist or 'Неизвестен'} — {track.title or 'Без названия'}</b>"
-        if track.album_name:
-            caption += f"\n💿 <i>{track.album_name}</i>"
+        album_name = None
+        if track.enrichment and track.enrichment.album_name:
+            album_name = track.enrichment.album_name
+        elif getattr(track, "album_name", None):
+            album_name = track.album_name
+        elif getattr(track, "album", None):
+            album_name = track.album
+
+        if album_name:
+            caption += f"\n💿 <i>{album_name}</i>"
         caption += "\n\n🎵 <i>TG Player</i>"
 
         try:

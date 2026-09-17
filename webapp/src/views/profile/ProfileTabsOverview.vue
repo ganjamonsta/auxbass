@@ -6,7 +6,19 @@
         <div class="section-header">
           <div class="skeleton-section-title"></div>
         </div>
-        <div class="overview-grid">
+        <div class="horizontal-scroll">
+          <div v-for="i in 6" :key="i" class="feed-card-skeleton">
+            <div class="skeleton-feed-cover"></div>
+            <div class="skeleton-feed-title"></div>
+            <div class="skeleton-feed-sub"></div>
+          </div>
+        </div>
+      </section>
+      <section class="profile-section">
+        <div class="section-header">
+          <div class="skeleton-section-title"></div>
+        </div>
+        <div class="horizontal-scroll">
           <div v-for="i in 6" :key="i" class="feed-card-skeleton">
             <div class="skeleton-feed-cover"></div>
             <div class="skeleton-feed-title"></div>
@@ -17,15 +29,38 @@
     </div>
 
     <template v-else>
-      <!-- Section 1: Playlists Grid -->
+      <!-- Section 1: Playlists (Horizontal Scroll) -->
       <section v-if="overviewPlaylists.length > 0" class="profile-section">
         <div class="section-header">
           <h2 class="section-title clickable" @click="$emit('selectTab', 'playlists')" title="Перейти в плейлисты">Плейлисты</h2>
-          <button class="section-link" @click="$emit('selectTab', 'playlists')">Все {{ user.playlist_count || overviewPlaylists.length }}</button>
+          <div class="section-actions">
+            <button class="section-link" @click="$emit('selectTab', 'playlists')">Все {{ user.playlist_count || overviewPlaylists.length }}</button>
+            <button 
+              class="scroll-arrow-btn" 
+              :disabled="!playlistsScroll.canScrollLeft.value"
+              @click="playlistsScroll.scroll('left')"
+              title="Назад"
+              aria-label="Назад"
+            >
+              <ChevronLeft :size="16" />
+            </button>
+            <button 
+              class="scroll-arrow-btn" 
+              :disabled="!playlistsScroll.canScrollRight.value"
+              @click="playlistsScroll.scroll('right')"
+              title="Вперед"
+              aria-label="Вперед"
+            >
+              <ChevronRight :size="16" />
+            </button>
+          </div>
         </div>
-        <div class="overview-grid">
+        <div 
+          class="horizontal-scroll"
+          :ref="playlistsScroll.containerRef"
+        >
           <div 
-            v-for="pl in overviewPlaylists.slice(0, 12)" 
+            v-for="pl in overviewPlaylists.slice(0, 20)" 
             :key="pl.id" 
             class="feed-card"
             @click="goToPlaylist(pl)"
@@ -39,7 +74,7 @@
                 alt=""
                 loading="lazy"
               />
-              <Folder v-else :size="36" />
+              <Folder v-else :size="32" />
               <button 
                 v-if="pl.track_count > 0" 
                 class="play-overlay" 
@@ -57,15 +92,38 @@
         </div>
       </section>
 
-      <!-- Section 2: Albums Grid -->
+      <!-- Section 2: Albums (Horizontal Scroll) -->
       <section v-if="overviewAlbums.length > 0" class="profile-section">
         <div class="section-header">
           <h2 class="section-title clickable" @click="$emit('selectTab', 'albums')" title="Перейти в альбомы">Альбомы</h2>
-          <button class="section-link" @click="$emit('selectTab', 'albums')">Все {{ overviewAlbums.length }}</button>
+          <div class="section-actions">
+            <button class="section-link" @click="$emit('selectTab', 'albums')">Все {{ user.album_count || overviewAlbums.length }}</button>
+            <button 
+              class="scroll-arrow-btn" 
+              :disabled="!albumsScroll.canScrollLeft.value"
+              @click="albumsScroll.scroll('left')"
+              title="Назад"
+              aria-label="Назад"
+            >
+              <ChevronLeft :size="16" />
+            </button>
+            <button 
+              class="scroll-arrow-btn" 
+              :disabled="!albumsScroll.canScrollRight.value"
+              @click="albumsScroll.scroll('right')"
+              title="Вперед"
+              aria-label="Вперед"
+            >
+              <ChevronRight :size="16" />
+            </button>
+          </div>
         </div>
-        <div class="overview-grid">
+        <div 
+          class="horizontal-scroll"
+          :ref="albumsScroll.containerRef"
+        >
           <div 
-            v-for="album in overviewAlbums.slice(0, 12)" 
+            v-for="album in overviewAlbums.slice(0, 20)" 
             :key="album.id" 
             class="feed-card"
             @click="goToAlbum(album)"
@@ -79,7 +137,7 @@
                 alt=""
                 loading="lazy"
               />
-              <Disc3 v-else :size="36" />
+              <Disc3 v-else :size="32" />
               <button 
                 class="play-overlay" 
                 @click.stop="shuffleAlbum(album)"
@@ -134,11 +192,34 @@
             <span class="sc-badge-inline">SC</span>
             <h2 class="section-title">Плейлисты SoundCloud</h2>
           </div>
-          <button class="section-link" @click="$emit('selectTab', 'soundcloud')">Все {{ scPlaylists.length }}</button>
+          <div class="section-actions">
+            <button class="section-link" @click="$emit('selectTab', 'soundcloud')">Все {{ scPlaylists.length }}</button>
+            <button 
+              class="scroll-arrow-btn" 
+              :disabled="!scPlaylistsScroll.canScrollLeft.value"
+              @click="scPlaylistsScroll.scroll('left')"
+              title="Назад"
+              aria-label="Назад"
+            >
+              <ChevronLeft :size="16" />
+            </button>
+            <button 
+              class="scroll-arrow-btn" 
+              :disabled="!scPlaylistsScroll.canScrollRight.value"
+              @click="scPlaylistsScroll.scroll('right')"
+              title="Вперед"
+              aria-label="Вперед"
+            >
+              <ChevronRight :size="16" />
+            </button>
+          </div>
         </div>
-        <div class="overview-grid">
+        <div 
+          class="horizontal-scroll"
+          :ref="scPlaylistsScroll.containerRef"
+        >
           <div 
-            v-for="pl in scPlaylists.slice(0, 6)" 
+            v-for="pl in scPlaylists.slice(0, 20)" 
             :key="pl.id" 
             class="feed-card ext-card sc-card"
             @click="$emit('openScPlaylist', pl)"
@@ -151,10 +232,10 @@
                 loading="lazy"
                 referrerpolicy="no-referrer"
               />
-              <Folder v-else :size="36" />
-              <div class="play-overlay" title="Открыть плейлист">
+              <Folder v-else :size="32" />
+              <button class="play-overlay" title="Открыть плейлист" @click.stop="$emit('openScPlaylist', pl)">
                 <Play :size="18" fill="currentColor" />
-              </div>
+              </button>
             </div>
             <div class="feed-card-info">
               <div class="feed-card-title">{{ pl.title }}</div>
@@ -204,12 +285,14 @@
 </template>
 
 <script setup>
+import { ref, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { useTasksStore } from '@/stores/tasks'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useTrackActions } from '@/composables'
+import { useHorizontalScroll } from '@/composables/useHorizontalScroll'
 import { getCoverUrl, CoverSize } from '@/utils'
 import { getTracksWord, computePlaylistCoverGradient } from './profileUtils'
 import TrackItem from '@/components/TrackItem.vue'
@@ -219,6 +302,7 @@ import {
   Folder,
   Disc3,
   Play,
+  ChevronLeft,
   ChevronRight,
 } from 'lucide-vue-next'
 
@@ -243,6 +327,23 @@ const libraryStore = useLibraryStore()
 const tasksStore = useTasksStore()
 const { openMenu } = useContextMenu()
 const { handleDirectDownload, handleLikeTrack, handleAddToLibrary } = useTrackActions()
+
+// Horizontal scroll instances
+const playlistsScroll = useHorizontalScroll()
+const albumsScroll = useHorizontalScroll()
+const scPlaylistsScroll = useHorizontalScroll()
+
+watch(
+  () => [props.overviewPlaylists, props.overviewAlbums, props.scPlaylists],
+  () => {
+    nextTick(() => {
+      playlistsScroll.updateScrollState()
+      albumsScroll.updateScrollState()
+      scPlaylistsScroll.updateScrollState()
+    })
+  },
+  { deep: true }
+)
 
 const isTrackInLibrary = (item) => {
   if (!item) return false
@@ -324,7 +425,7 @@ const handleAlbumContextMenu = (album, event) => {
 
 /* Sections */
 .profile-section {
-  margin-bottom: 36px;
+  margin-bottom: 32px;
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -334,7 +435,7 @@ const handleAlbumContextMenu = (album, event) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   width: 100%;
 }
 
@@ -357,6 +458,52 @@ const handleAlbumContextMenu = (album, event) => {
 
 .section-title.clickable:hover {
   color: var(--c-accent, #1db954);
+}
+
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.scroll-arrow-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--c-text-1, #fff);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  padding: 0;
+  user-select: none;
+}
+
+.scroll-arrow-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: scale(1.06);
+}
+
+.scroll-arrow-btn:active:not(:disabled) {
+  transform: scale(0.94);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.scroll-arrow-btn:disabled {
+  opacity: 0.2;
+  cursor: default;
+  pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  .scroll-arrow-btn {
+    display: none;
+  }
 }
 
 .section-link {
@@ -393,55 +540,92 @@ const handleAlbumContextMenu = (album, event) => {
   color: #1db954;
 }
 
-/* Grid */
-.overview-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 18px;
+/* Horizontal Scroll */
+.horizontal-scroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 8px;
   width: 100%;
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.2s ease;
 }
 
-@media (min-width: 1200px) {
-  .overview-grid {
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 20px;
-  }
+.horizontal-scroll:hover {
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.horizontal-scroll::-webkit-scrollbar {
+  height: 5px;
+}
+
+.horizontal-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.horizontal-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.horizontal-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.horizontal-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.38);
 }
 
 /* Feed Cards */
 .feed-card {
-  width: 100%;
+  flex: 0 0 var(--card-min-width, 136px);
+  width: var(--card-min-width, 136px);
   min-width: 0;
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: 12px;
-  padding: 12px;
-  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
-  box-sizing: border-box;
+  user-select: none;
 }
 
-.feed-card:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.1);
-  transform: translateY(-4px);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+@media (min-width: 1024px) {
+  .feed-card {
+    flex: 0 0 var(--card-min-width, 160px);
+    width: var(--card-min-width, 160px);
+  }
 }
 
 .feed-card-cover {
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: 8px;
+  width: var(--card-min-width, 136px);
+  height: var(--card-min-width, 136px);
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.05);
   overflow: hidden;
   position: relative;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease;
+}
+
+@media (min-width: 1024px) {
+  .feed-card-cover {
+    border-radius: 12px;
+    margin-bottom: 10px;
+    width: var(--card-min-width, 160px);
+    height: var(--card-min-width, 160px);
+  }
+
+  .feed-card:hover .feed-card-cover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+  }
 }
 
 .feed-card-cover img {
@@ -453,33 +637,47 @@ const handleAlbumContextMenu = (album, event) => {
 .feed-card-info {
   display: flex;
   flex-direction: column;
-  gap: 3px;
   min-width: 0;
 }
 
 .feed-card-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--c-text-1, #fff);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+@media (min-width: 1024px) {
+  .feed-card-title {
+    font-size: 14px;
+    margin-top: 2px;
+  }
 }
 
 .feed-card-subtitle {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--c-text-3, rgba(255, 255, 255, 0.5));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 500;
 }
 
-.play-overlay {
+@media (min-width: 1024px) {
+  .feed-card-subtitle {
+    font-size: 12.5px;
+  }
+}
+
+.feed-card .play-overlay {
   position: absolute;
-  right: 8px;
   bottom: 8px;
-  width: 40px;
-  height: 40px;
+  right: 8px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   background: var(--c-accent, #1db954);
   color: #000;
@@ -488,16 +686,27 @@ const handleAlbumContextMenu = (album, event) => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5);
   opacity: 0;
-  transform: translateY(8px) scale(0.9);
-  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: none;
+  transform: translateY(6px);
+  transition: all 0.2s ease;
   z-index: 2;
+}
+
+@media (min-width: 1024px) {
+  .feed-card .play-overlay {
+    width: 42px;
+    height: 42px;
+    bottom: 10px;
+    right: 10px;
+  }
 }
 
 .feed-card:hover .play-overlay {
   opacity: 1;
-  transform: translateY(0) scale(1);
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 .play-overlay:hover {
@@ -563,38 +772,52 @@ const handleAlbumContextMenu = (album, event) => {
 
 /* Skeletons */
 .feed-card-skeleton {
+  flex: 0 0 var(--card-min-width, 136px);
+  width: var(--card-min-width, 136px);
   display: flex;
   flex-direction: column;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.03);
-  border-radius: 12px;
-  padding: 12px;
+  gap: 6px;
+}
+
+@media (min-width: 1024px) {
+  .feed-card-skeleton {
+    flex: 0 0 var(--card-min-width, 160px);
+    width: var(--card-min-width, 160px);
+  }
 }
 
 .skeleton-feed-cover {
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.05);
-  margin-bottom: 10px;
+  width: var(--card-min-width, 136px);
+  height: var(--card-min-width, 136px);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
   animation: pulse 1.5s ease-in-out infinite;
+}
+
+@media (min-width: 1024px) {
+  .skeleton-feed-cover {
+    width: var(--card-min-width, 160px);
+    height: var(--card-min-width, 160px);
+    border-radius: 12px;
+  }
 }
 
 .skeleton-feed-title {
-  height: 14px;
+  height: 13px;
   width: 80%;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.05);
-  margin-bottom: 6px;
+  background: rgba(255, 255, 255, 0.08);
   animation: pulse 1.5s ease-in-out infinite;
+  animation-delay: 0.1s;
 }
 
 .skeleton-feed-sub {
-  height: 12px;
+  height: 10px;
   width: 50%;
-  border-radius: 4px;
+  border-radius: 3px;
   background: rgba(255, 255, 255, 0.05);
   animation: pulse 1.5s ease-in-out infinite;
+  animation-delay: 0.2s;
 }
 
 .skeleton-section-title {
@@ -616,17 +839,19 @@ const handleAlbumContextMenu = (album, event) => {
     margin-bottom: 28px;
   }
 
-  .overview-grid {
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 12px;
-  }
-
   .feed-card {
-    padding: 10px;
+    flex: 0 0 128px;
+    width: 128px;
   }
 
-  .play-overlay {
+  .feed-card-cover {
+    width: 128px;
+    height: 128px;
+  }
+
+  .feed-card .play-overlay {
     opacity: 0.9;
+    pointer-events: auto;
     transform: translateY(0);
     width: 32px;
     height: 32px;
@@ -644,27 +869,24 @@ const handleAlbumContextMenu = (album, event) => {
     margin-bottom: 22px;
   }
 
-  .overview-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-  }
-
   .feed-card {
-    padding: 8px;
-    border-radius: 10px;
+    flex: 0 0 118px;
+    width: 118px;
   }
 
   .feed-card-cover {
-    margin-bottom: 8px;
-    border-radius: 7px;
+    width: 118px;
+    height: 118px;
+    margin-bottom: 6px;
+    border-radius: 8px;
   }
 
   .feed-card-title {
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .feed-card-subtitle {
-    font-size: 11px;
+    font-size: 10.5px;
   }
 }
 </style>

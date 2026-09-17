@@ -89,8 +89,129 @@ export const useLibraryStore = defineStore('library', () => {
   const selectedUser = ref(null)
   const selectedUserTracks = ref([])
 
+  // State - Real-time Library Sync
+  const lastSyncTimestamp = ref(null)
+  const lastKnownTrackId = ref(null)
+  const lastKnownTotal = ref(null)
+  const isSyncing = ref(false)
+  let syncTimer = null
+  let visibilityListenerAttached = false
+
+  // Check library sync state (polls lightweight /sync-state endpoint)
+  const checkSyncState = async (force = false) => {
+    if (isSyncing.value) return
+    isSyncing.value = true
+    try {
+      const params = {}
+      if (lastSyncTimestamp.value && !force) {
+        params.since = lastSyncTimestamp.value
+      }
+
+      const res = await tracksApi.getSyncState(params)
+      const data = res.data
+      if (!data) return
+
+      const prevTrackId = lastKnownTrackId.value
+      const prevTotal = lastKnownTotal.value
+
+      lastSyncTimestamp.value = data.last_updated_at || new Date().toISOString()
+      lastKnownTrackId.value = data.last_track_id
+      lastKnownTotal.value = data.total_tracks
+
+      // Update total tracks count in store if changed
+      if (data.total_tracks !== undefined && total.value !== data.total_tracks) {
+        total.value = data.total_tracks
+      }
+
+      // If stats are returned, update artists and total
+      if (data.stats) {
+        if (data.stats.artist_count !== undefined) {
+          artistsTotal.value = data.stats.artist_count
+        }
+      }
+
+      // Check if new tracks were added to user's library (e.g. via bot)
+      const isInitialRun = prevTrackId === null
+      const hasNewTracks = !isInitialRun && (
+        (data.last_track_id && prevTrackId && data.last_track_id > prevTrackId) ||
+        (data.total_tracks && prevTotal && data.total_tracks > prevTotal)
+      )
+
+      if (hasNewTracks) {
+        console.log(`[LibrarySync] New tracks detected! (prev ID: ${prevTrackId} -> new ID: ${data.last_track_id})`)
+        apiCache.invalidatePattern('/tracks')
+        apiCache.invalidatePattern('/library')
+        apiCache.invalidatePattern('/artists')
+        apiCache.invalidatePattern('/albums')
+
+        // Dispatch track:added:library event to trigger VirtualTrackList reset
+        window.dispatchEvent(new CustomEvent('track:added:library', {
+          detail: { trackId: data.last_track_id }
+        }))
+
+        // Refresh playlists and overview
+        fetchPlaylists(true)
+
+        // Show subtle notification toast
+        try {
+          const { useUIStore } = await import('./ui')
+          const uiStore = useUIStore()
+          uiStore.toast?.success('Медиатека обновлена', 'Добавлены новые треки')
+        } catch (_) {}
+      }
+
+      // Check for updated/enriched tracks (title cleanups, cover avatar assignments, album updates)
+      if (data.updated_tracks && data.updated_tracks.length > 0) {
+        console.log(`[LibrarySync] Received ${data.updated_tracks.length} enriched/updated tracks`)
+        for (const updatedTrack of data.updated_tracks) {
+          await notifyTrackChange(updatedTrack.id, updatedTrack)
+        }
+      }
+    } catch (err) {
+      console.debug('[LibrarySync] Sync check error:', err?.message || err)
+    } finally {
+      isSyncing.value = false
+    }
+  }
+
+  // Start periodic background polling for sync
+  const startSyncPolling = () => {
+    if (syncTimer) return
+    checkSyncState()
+
+    const getInterval = () => (typeof document !== 'undefined' && document.hidden ? 45000 : 12000)
+
+    const scheduleNext = () => {
+      const delay = getInterval()
+      syncTimer = setTimeout(async () => {
+        await checkSyncState()
+        scheduleNext()
+      }, delay)
+    }
+
+    scheduleNext()
+
+    if (!visibilityListenerAttached && typeof document !== 'undefined') {
+      const onVisibilityChange = () => {
+        if (!document.hidden) {
+          checkSyncState()
+        }
+      }
+      document.addEventListener('visibilitychange', onVisibilityChange)
+      visibilityListenerAttached = true
+    }
+  }
+
+  const stopSyncPolling = () => {
+    if (syncTimer) {
+      clearTimeout(syncTimer)
+      syncTimer = null
+    }
+  }
+
   // Lightweight init: only fetch primary user collections, non-blocking
   const init = async () => {
+    startSyncPolling()
     return Promise.allSettled([
       fetchPlaylists(),
       fetchLikedTracks(),
@@ -98,17 +219,23 @@ export const useLibraryStore = defineStore('library', () => {
     ])
   }
 
-  // Refresh active data (pull-to-refresh)
+  // Refresh active data (pull-to-refresh & force refresh)
   const refresh = async () => {
     refreshing.value = true
     try {
+      apiCache.invalidatePattern('/tracks')
+      apiCache.invalidatePattern('/library')
+      apiCache.invalidatePattern('/artists')
+      apiCache.invalidatePattern('/albums')
+      await checkSyncState(true)
       await Promise.allSettled([
-        fetchTracks(),
-        fetchPlaylists(),
+        fetchTracks({ refresh: true, bypassCache: true }),
+        fetchPlaylists(true),
         fetchLikedTracks(),
         fetchHistory(20),
         fetchRecentUploads(15),
       ])
+      window.dispatchEvent(new CustomEvent('track:added:library'))
     } finally {
       refreshing.value = false
     }
@@ -1107,6 +1234,12 @@ export const useLibraryStore = defineStore('library', () => {
     // Search
     search,
     clearSearch,
+
+    // Real-time library sync
+    checkSyncState,
+    startSyncPolling,
+    stopSyncPolling,
+    isSyncing,
     
     // Cache management
     clearApiCache: () => apiCache.clear(),

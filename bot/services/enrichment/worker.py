@@ -233,6 +233,7 @@ class EnrichmentWorker:
                                 track.normalized_artist = normalize_artist(result.canonical_artist)
                     
                     track.enrichment_status = EnrichmentStatus.COMPLETED
+                    track.updated_at = utcnow()
                     self._stats["success"] += 1
                     
                     logger.info(f"Enriched track {track_id}: {track.title} - {track.artist} (provider: {track.forward_source_name or 'upload'})")
@@ -244,6 +245,7 @@ class EnrichmentWorker:
                     )
                     if enrichment and (enrichment.cover_url or enrichment.genre or enrichment.tags):
                         track.enrichment_status = EnrichmentStatus.COMPLETED
+                        track.updated_at = utcnow()
                         self._stats["success"] += 1
                         logger.info(f"Track {track_id} preserved with provider metadata ({track.forward_source_name or 'custom'})")
                     else:

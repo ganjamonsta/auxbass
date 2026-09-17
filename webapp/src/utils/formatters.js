@@ -371,11 +371,17 @@ export function getAllTrackArtists(artistString, title = null, fileName = null) 
   const seen = new Set()
   const unique = []
   
-  for (const artist of [...fromArtist, ...fromTitle, ...fromFileName]) {
-    const lower = artist.toLowerCase()
+  for (const rawArtist of [...fromArtist, ...fromTitle, ...fromFileName]) {
+    if (!rawArtist || typeof rawArtist !== 'string') continue
+    const cleaned = rawArtist
+      .replace(/\s*\(\.(?:mp3|flac|wav|ogg|m4a|aac|opus)\)/gi, '')
+      .replace(/\.(?:mp3|flac|wav|ogg|m4a|aac|opus)$/gi, '')
+      .trim()
+    if (!cleaned) continue
+    const lower = cleaned.toLowerCase()
     if (!seen.has(lower)) {
       seen.add(lower)
-      unique.push(artist)
+      unique.push(cleaned)
     }
   }
   

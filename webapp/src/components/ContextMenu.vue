@@ -19,253 +19,407 @@
             @click.stop
             @contextmenu.stop.prevent
           >
-            <!-- Header -->
-            <div class="menu-header">
-              <div class="menu-cover" :style="coverStyle">
-                <component :is="coverIcon" v-if="!hasCover" :size="20" />
-              </div>
-              <div class="menu-info">
-                <div class="menu-title">{{ title }}</div>
-                <div class="menu-subtitle">{{ subtitle }}</div>
-              </div>
-              <button class="menu-close" @click="closeMenu">
-                <X :size="20" />
-              </button>
-            </div>
-
-            <!-- Tags (for tracks with enrichment tags) -->
-            <TagChips
-              v-if="menuType === 'track' && menuData?.tags?.length"
-              :tags="menuData.tags"
-              :max="5"
-              :clickable="true"
-              size="sm"
-              class="menu-tags"
-              @tagClick="handleTagClick"
-            />
-
-            <!-- Menu Items -->
-            <div class="menu-items">
-              <!-- ═══ TRACK MENU ═══ -->
-              <template v-if="menuType === 'track'">
-                <!-- Navigation -->
-                <!-- Single artist: direct navigation -->
-                <button v-if="hasArtist && parsedArtists.length === 1" class="menu-item" @click="exec('goToArtist')">
-                  <User :size="18" />
-                  <span>Перейти к артисту</span>
+            <!-- Mobile Subview: Artists Selection -->
+            <template v-if="!isDesktop && mobileSubmenu === 'artists'">
+              <div class="menu-header mobile-sub-header">
+                <button class="menu-back-btn" @click="mobileSubmenu = null">
+                  <ChevronLeft :size="18" />
+                  <span>Назад</span>
                 </button>
-                <!-- Multiple artists: expandable submenu -->
-                <template v-else-if="hasArtist && parsedArtists.length > 1">
-                  <button class="menu-item has-submenu" @click="showArtistSubmenu = !showArtistSubmenu">
+                <div class="menu-info">
+                  <div class="menu-title">Исполнители</div>
+                  <div class="menu-subtitle">{{ title }}</div>
+                </div>
+                <button class="menu-close" @click="closeMenu">
+                  <X :size="20" />
+                </button>
+              </div>
+              <div class="menu-items">
+                <button 
+                  v-for="artist in currentSubmenuArtists" 
+                  :key="artist"
+                  class="menu-item"
+                  @click="goToSpecificArtist(artist)"
+                >
+                  <User :size="18" />
+                  <span>{{ artist }}</span>
+                </button>
+              </div>
+            </template>
+
+            <!-- Mobile Subview: Share Options -->
+            <template v-else-if="!isDesktop && mobileSubmenu === 'share'">
+              <div class="menu-header mobile-sub-header">
+                <button class="menu-back-btn" @click="mobileSubmenu = null">
+                  <ChevronLeft :size="18" />
+                  <span>Назад</span>
+                </button>
+                <div class="menu-info">
+                  <div class="menu-title">Поделиться</div>
+                  <div class="menu-subtitle">{{ title }}</div>
+                </div>
+                <button class="menu-close" @click="closeMenu">
+                  <X :size="20" />
+                </button>
+              </div>
+              <div class="menu-items">
+                <button class="menu-item" @click="handleShareAction('copy')">
+                  <Link2 :size="18" />
+                  <span>{{ shareCopyLabel }}</span>
+                </button>
+                <button class="menu-item" @click="handleShareAction('telegram')">
+                  <Send :size="18" />
+                  <span>Отправить в чат Telegram</span>
+                </button>
+                <button class="menu-item" @click="handleShareAction('download')">
+                  <CloudDownload :size="18" />
+                  <span>Скачать в Telegram</span>
+                </button>
+                <div class="menu-divider" />
+                <button class="menu-item" @click="handleShareAction('more')">
+                  <Share2 :size="18" />
+                  <span>Ещё варианты...</span>
+                </button>
+              </div>
+            </template>
+
+            <!-- Main Menu View -->
+            <template v-else>
+              <!-- Header -->
+              <div class="menu-header">
+                <div class="menu-cover" :style="coverStyle">
+                  <component :is="coverIcon" v-if="!hasCover" :size="20" />
+                </div>
+                <div class="menu-info">
+                  <div class="menu-title">{{ title }}</div>
+                  <div class="menu-subtitle">{{ subtitle }}</div>
+                </div>
+                <button class="menu-close" @click="closeMenu">
+                  <X :size="20" />
+                </button>
+              </div>
+
+              <!-- Tags (for tracks with enrichment tags) -->
+              <TagChips
+                v-if="menuType === 'track' && menuData?.tags?.length"
+                :tags="menuData.tags"
+                :max="5"
+                :clickable="true"
+                size="sm"
+                class="menu-tags"
+                @tagClick="handleTagClick"
+              />
+
+              <!-- Menu Items -->
+              <div class="menu-items">
+                <!-- ═══ TRACK MENU ═══ -->
+                <template v-if="menuType === 'track'">
+                  <!-- Navigation -->
+                  <!-- Multiple artists: Spotify-style flyout submenu -->
+                  <button 
+                    v-if="hasArtist && parsedArtists.length > 1"
+                    class="menu-item has-submenu" 
+                    :class="{ 'is-submenu-active': isDesktop && activeSubmenu === 'artists' }"
+                    @mouseenter="handleTriggerMouseEnter('artists', $event)"
+                    @mouseleave="handleTriggerMouseLeave('artists')"
+                    @click="handleArtistTriggerClick"
+                  >
                     <User :size="18" />
                     <span>Перейти к артисту</span>
-                    <ChevronDown v-if="showArtistSubmenu" :size="16" class="submenu-arrow" />
-                    <ChevronRight v-else :size="16" class="submenu-arrow" />
+                    <ChevronRight :size="16" class="submenu-arrow" />
                   </button>
-                  <Transition name="submenu">
-                    <div v-if="showArtistSubmenu" class="submenu">
-                      <button 
-                        v-for="artist in parsedArtists" 
-                        :key="artist"
-                        class="menu-item submenu-item"
-                        @click="goToSpecificArtist(artist)"
-                      >
-                        <User :size="16" />
-                        <span>{{ artist }}</span>
-                      </button>
-                    </div>
-                  </Transition>
-                </template>
-                <button v-if="hasAlbum" class="menu-item" @click="exec('goToAlbum')">
-                  <Disc3 :size="18" />
-                  <span>{{ albumButtonText }}</span>
-                </button>
-                <div v-if="hasArtist || hasAlbum" class="menu-divider" />
+                  <!-- Single artist: direct navigation -->
+                  <button 
+                    v-else-if="hasArtist && parsedArtists.length === 1" 
+                    class="menu-item" 
+                    @mouseenter="handleRegularItemMouseEnter"
+                    @click="exec('goToArtist')"
+                  >
+                    <User :size="18" />
+                    <span>Перейти к артисту</span>
+                  </button>
 
-                <!-- Queue (hide for current track in player) -->
-                <template v-if="menuContext !== 'player'">
-                  <button class="menu-item" @click="exec('playNext')">
-                    <Play :size="18" fill="currentColor" />
-                    <span>Включить следующим</span>
+                  <button v-if="hasAlbum" class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('goToAlbum')">
+                    <Disc3 :size="18" />
+                    <span>{{ albumButtonText }}</span>
                   </button>
-                  <button class="menu-item" @click="exec('addToQueue')">
+                  <div v-if="hasArtist || hasAlbum" class="menu-divider" />
+
+                  <!-- Queue (hide for current track in player) -->
+                  <template v-if="menuContext !== 'player'">
+                    <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('playNext')">
+                      <Play :size="18" fill="currentColor" />
+                      <span>Включить следующим</span>
+                    </button>
+                    <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('addToQueue')">
+                      <ListMusic :size="18" />
+                      <span>Добавить в очередь</span>
+                    </button>
+                  </template>
+
+                  <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('addToPlaylist')">
+                    <Plus :size="18" />
+                    <span>Добавить в плейлист</span>
+                  </button>
+                  <div class="menu-divider" />
+
+                  <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('edit')">
+                    <Pencil :size="18" />
+                    <span>Редактировать</span>
+                  </button>
+
+                  <!-- Share submenu (Spotify-style) -->
+                  <button 
+                    class="menu-item has-submenu" 
+                    :class="{ 'is-submenu-active': isDesktop && activeSubmenu === 'share' }"
+                    @mouseenter="handleTriggerMouseEnter('share', $event)"
+                    @mouseleave="handleTriggerMouseLeave('share')"
+                    @click="handleShareTriggerClick"
+                  >
+                    <Share2 :size="18" />
+                    <span>Поделиться</span>
+                    <ChevronRight :size="16" class="submenu-arrow" />
+                  </button>
+
+                  <!-- HD version available for current playing track -->
+                  <button v-if="hasHDVersion" class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('downloadHD')">
+                    <Disc3 :size="18" />
+                    <span>Скачать HD версию</span>
+                  </button>
+                  <div class="menu-divider" />
+
+                  <!-- Remove from playlist (in playlist context) -->
+                  <button v-if="inPlaylistContext" class="menu-item danger" @mouseenter="handleRegularItemMouseEnter" @click="exec('removeFromPlaylist', playlistId)">
+                    <Minus :size="18" />
+                    <span>Убрать из плейлиста</span>
+                  </button>
+
+                  <!-- Dislike action -->
+                  <button class="menu-item" :class="{ 'disliked-active': isDisliked }" @mouseenter="handleRegularItemMouseEnter" @click="exec('toggleDislike')">
+                    <ThumbsDown :size="18" :fill="isDisliked ? 'currentColor' : 'none'" />
+                    <span>{{ isDisliked ? 'Убрать дизлайк' : 'Не нравится' }}</span>
+                  </button>
+
+                  <div class="menu-divider" />
+
+                  <!-- Owner can delete -->
+                  <button v-if="isTrackOwner" class="menu-item danger" @mouseenter="handleRegularItemMouseEnter" @click="exec('delete')">
+                    <Trash2 :size="18" />
+                    <span>Удалить полностью</span>
+                  </button>
+                  <!-- In library but not owner - remove from library -->
+                  <button v-else-if="isInLibrary" class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('removeFromLibrary')">
+                    <Minus :size="18" />
+                    <span>Убрать из библиотеки</span>
+                  </button>
+                  <!-- Not in library - add -->
+                  <button v-else class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('addToLibrary')">
+                    <Plus :size="18" />
+                    <span>Добавить в библиотеку</span>
+                  </button>
+                </template>
+
+                <!-- ═══ PLAYLIST MENU ═══ -->
+                <template v-else-if="menuType === 'playlist'">
+                  <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('open')">
+                    <FolderOpen :size="18" />
+                    <span>Открыть</span>
+                  </button>
+                  <button v-if="isDesktop" class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('togglePin')">
+                    <PinOff v-if="uiStore.isPlaylistPinned(menuData?.id)" :size="18" />
+                    <Pin v-else :size="18" />
+                    <span>{{ uiStore.isPlaylistPinned(menuData?.id) ? 'Открепить от сайдбара' : 'Закрепить в сайдбаре' }}</span>
+                  </button>
+                  <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('playAll')">
+                    <Play :size="18" fill="currentColor" />
+                    <span>Воспроизвести все</span>
+                  </button>
+                  <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('shuffle')">
+                    <Shuffle :size="18" />
+                    <span>Перемешать</span>
+                  </button>
+                  <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('addToQueue')">
+                    <ListMusic :size="18" />
+                    <span>Добавить в очередь</span>
+                  </button>
+
+                  <!-- Share submenu (Spotify-style) -->
+                  <button 
+                    class="menu-item has-submenu" 
+                    :class="{ 'is-submenu-active': isDesktop && activeSubmenu === 'share' }"
+                    @mouseenter="handleTriggerMouseEnter('share', $event)"
+                    @mouseleave="handleTriggerMouseLeave('share')"
+                    @click="handleShareTriggerClick"
+                  >
+                    <Share2 :size="18" />
+                    <span>Поделиться</span>
+                    <ChevronRight :size="16" class="submenu-arrow" />
+                  </button>
+
+                  <!-- Only for user playlists that user owns -->
+                  <template v-if="isPlaylistOwner">
+                    <div class="menu-divider" />
+                    <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('rename')">
+                      <Pencil :size="18" />
+                      <span>Переименовать</span>
+                    </button>
+                    <button class="menu-item danger" @mouseenter="handleRegularItemMouseEnter" @click="exec('delete')">
+                      <Trash2 :size="18" />
+                      <span>Удалить плейлист</span>
+                    </button>
+                  </template>
+                  <!-- For public playlists from other users: subscribe/unsubscribe -->
+                  <template v-else-if="menuData?.is_public">
+                    <div class="menu-divider" />
+                    <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('toggleSubscription')">
+                      <Check v-if="menuData?.is_subscribed" :size="18" />
+                      <Plus v-else :size="18" />
+                      <span>{{ menuData?.is_subscribed ? 'Убрать из медиатеки' : 'Добавить в медиатеку' }}</span>
+                    </button>
+                  </template>
+                </template>
+
+                <!-- ═══ LIKED / FAVORITES MENU ═══ -->
+                <template v-else-if="menuType === 'liked'">
+                  <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('open')">
+                    <FolderOpen :size="18" />
+                    <span>Открыть</span>
+                  </button>
+                  <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('playAll')">
+                    <Play :size="18" fill="currentColor" />
+                    <span>Воспроизвести все</span>
+                  </button>
+                  <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('shuffle')">
+                    <Shuffle :size="18" />
+                    <span>Перемешать</span>
+                  </button>
+                  <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('addToQueue')">
                     <ListMusic :size="18" />
                     <span>Добавить в очередь</span>
                   </button>
                 </template>
 
-                <button class="menu-item" @click="exec('addToPlaylist')">
-                  <Plus :size="18" />
-                  <span>Добавить в плейлист</span>
-                </button>
-                <div class="menu-divider" />
-
-                <button class="menu-item" @click="exec('edit')">
-                  <Pencil :size="18" />
-                  <span>Редактировать</span>
-                </button>
-                <button class="menu-item" @click="exec('share')">
-                  <Share2 :size="18" />
-                  <span>Поделиться</span>
-                </button>
-                <!-- HD version available for current playing track (streamable version playing, HD original exists) -->
-                <button v-if="hasHDVersion" class="menu-item" @click="exec('downloadHD')">
-                  <Disc3 :size="18" />
-                  <span>Скачать HD версию</span>
-                </button>
-                <div class="menu-divider" />
-
-                <!-- Remove from playlist (in playlist context) -->
-                <button v-if="inPlaylistContext" class="menu-item danger" @click="exec('removeFromPlaylist', playlistId)">
-                  <Minus :size="18" />
-                  <span>Убрать из плейлиста</span>
-                </button>
-
-                <!-- Dislike action -->
-                <button class="menu-item" :class="{ 'disliked-active': isDisliked }" @click="exec('toggleDislike')">
-                  <ThumbsDown :size="18" :fill="isDisliked ? 'currentColor' : 'none'" />
-                  <span>{{ isDisliked ? 'Убрать дизлайк' : 'Не нравится' }}</span>
-                </button>
-
-                <div class="menu-divider" />
-
-                <!-- Owner can delete -->
-                <button v-if="isTrackOwner" class="menu-item danger" @click="exec('delete')">
-                  <Trash2 :size="18" />
-                  <span>Удалить полностью</span>
-                </button>
-                <!-- In library but not owner - remove from library -->
-                <button v-else-if="isInLibrary" class="menu-item" @click="exec('removeFromLibrary')">
-                  <Minus :size="18" />
-                  <span>Убрать из библиотеки</span>
-                </button>
-                <!-- Not in library - add -->
-                <button v-else class="menu-item" @click="exec('addToLibrary')">
-                  <Plus :size="18" />
-                  <span>Добавить в библиотеку</span>
-                </button>
-              </template>
-
-              <!-- ═══ PLAYLIST MENU ═══ -->
-              <template v-else-if="menuType === 'playlist'">
-                <button class="menu-item" @click="exec('open')">
-                  <FolderOpen :size="18" />
-                  <span>Открыть</span>
-                </button>
-                <button v-if="isDesktop" class="menu-item" @click="exec('togglePin')">
-                  <PinOff v-if="uiStore.isPlaylistPinned(menuData?.id)" :size="18" />
-                  <Pin v-else :size="18" />
-                  <span>{{ uiStore.isPlaylistPinned(menuData?.id) ? 'Открепить от сайдбара' : 'Закрепить в сайдбаре' }}</span>
-                </button>
-                <button class="menu-item" @click="exec('playAll')">
-                  <Play :size="18" fill="currentColor" />
-                  <span>Воспроизвести все</span>
-                </button>
-                <button class="menu-item" @click="exec('shuffle')">
-                  <Shuffle :size="18" />
-                  <span>Перемешать</span>
-                </button>
-                <button class="menu-item" @click="exec('addToQueue')">
-                  <ListMusic :size="18" />
-                  <span>Добавить в очередь</span>
-                </button>
-                <button class="menu-item" @click="exec('share')">
-                  <Share2 :size="18" />
-                  <span>Поделиться</span>
-                </button>
-
-                <!-- Only for user playlists that user owns -->
-                <template v-if="isPlaylistOwner">
-                  <div class="menu-divider" />
-                  <button class="menu-item" @click="exec('rename')">
-                    <Pencil :size="18" />
-                    <span>Переименовать</span>
+                <!-- ═══ ALBUM MENU ═══ -->
+                <template v-else-if="menuType === 'album'">
+                  <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('open')">
+                    <FolderOpen :size="18" />
+                    <span>Открыть альбом</span>
                   </button>
-                  <button class="menu-item danger" @click="exec('delete')">
-                    <Trash2 :size="18" />
-                    <span>Удалить плейлист</span>
+                  <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('playAll')">
+                    <Play :size="18" fill="currentColor" />
+                    <span>Воспроизвести все</span>
+                  </button>
+                  <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('shuffle')">
+                    <Shuffle :size="18" />
+                    <span>Перемешать</span>
+                  </button>
+                  <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('addToQueue')">
+                    <ListMusic :size="18" />
+                    <span>Добавить в очередь</span>
+                  </button>
+
+                  <!-- Share submenu (Spotify-style) -->
+                  <button 
+                    class="menu-item has-submenu" 
+                    :class="{ 'is-submenu-active': isDesktop && activeSubmenu === 'share' }"
+                    @mouseenter="handleTriggerMouseEnter('share', $event)"
+                    @mouseleave="handleTriggerMouseLeave('share')"
+                    @click="handleShareTriggerClick"
+                  >
+                    <Share2 :size="18" />
+                    <span>Поделиться</span>
+                    <ChevronRight :size="16" class="submenu-arrow" />
+                  </button>
+                  <div class="menu-divider" />
+
+                  <!-- Multi-artist or single artist navigation for album -->
+                  <button 
+                    v-if="hasAlbumArtist && parsedAlbumArtists.length > 1"
+                    class="menu-item has-submenu" 
+                    :class="{ 'is-submenu-active': isDesktop && activeSubmenu === 'artists' }"
+                    @mouseenter="handleTriggerMouseEnter('artists', $event)"
+                    @mouseleave="handleTriggerMouseLeave('artists')"
+                    @click="handleArtistTriggerClick"
+                  >
+                    <User :size="18" />
+                    <span>Перейти к артисту</span>
+                    <ChevronRight :size="16" class="submenu-arrow" />
+                  </button>
+                  <button v-else-if="hasAlbumArtist" class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('goToArtist')">
+                    <User :size="18" />
+                    <span>Перейти к артисту</span>
                   </button>
                 </template>
-                <!-- For public playlists from other users: subscribe/unsubscribe -->
-                <template v-else-if="menuData?.is_public">
-                  <div class="menu-divider" />
-                  <button class="menu-item" @click="exec('toggleSubscription')">
-                    <Check v-if="menuData?.is_subscribed" :size="18" />
-                    <Plus v-else :size="18" />
-                    <span>{{ menuData?.is_subscribed ? 'Убрать из медиатеки' : 'Добавить в медиатеку' }}</span>
+
+                <!-- ═══ ARTIST MENU ═══ -->
+                <template v-else-if="menuType === 'artist'">
+                  <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('open')">
+                    <User :size="18" />
+                    <span>Открыть артиста</span>
+                  </button>
+                  <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('playAll')">
+                    <Play :size="18" fill="currentColor" />
+                    <span>Воспроизвести все</span>
+                  </button>
+                  <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('shuffle')">
+                    <Shuffle :size="18" />
+                    <span>Перемешать</span>
+                  </button>
+                  <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('addToQueue')">
+                    <ListMusic :size="18" />
+                    <span>Добавить в очередь</span>
                   </button>
                 </template>
-              </template>
+              </div>
+            </template>
+          </div>
+        </Transition>
 
-              <!-- ═══ LIKED / FAVORITES MENU ═══ -->
-              <template v-else-if="menuType === 'liked'">
-                <button class="menu-item" @click="exec('open')">
-                  <FolderOpen :size="18" />
-                  <span>Открыть</span>
-                </button>
-                <button class="menu-item" @click="exec('playAll')">
-                  <Play :size="18" fill="currentColor" />
-                  <span>Воспроизвести все</span>
-                </button>
-                <button class="menu-item" @click="exec('shuffle')">
-                  <Shuffle :size="18" />
-                  <span>Перемешать</span>
-                </button>
-                <button class="menu-item" @click="exec('addToQueue')">
-                  <ListMusic :size="18" />
-                  <span>Добавить в очередь</span>
-                </button>
-              </template>
+        <!-- Desktop Floating Flyout Submenu (Spotify-style) -->
+        <Transition name="flyout-scale">
+          <div
+            v-if="isDesktop && activeSubmenu"
+            ref="flyoutSubmenuEl"
+            class="flyout-submenu"
+            :style="{ left: submenuPosition.x + 'px', top: submenuPosition.y + 'px' }"
+            @mouseenter="handleSubmenuMouseEnter"
+            @mouseleave="handleSubmenuMouseLeave"
+            @click.stop
+            @contextmenu.stop.prevent
+          >
+            <!-- Artists Submenu -->
+            <template v-if="activeSubmenu === 'artists'">
+              <button 
+                v-for="artist in currentSubmenuArtists" 
+                :key="artist"
+                class="submenu-item"
+                @click="goToSpecificArtist(artist)"
+              >
+                <User :size="15" />
+                <span class="submenu-text">{{ artist }}</span>
+              </button>
+            </template>
 
-              <!-- ═══ ALBUM MENU ═══ -->
-              <template v-else-if="menuType === 'album'">
-                <button class="menu-item" @click="exec('open')">
-                  <FolderOpen :size="18" />
-                  <span>Открыть альбом</span>
-                </button>
-                <button class="menu-item" @click="exec('playAll')">
-                  <Play :size="18" fill="currentColor" />
-                  <span>Воспроизвести все</span>
-                </button>
-                <button class="menu-item" @click="exec('shuffle')">
-                  <Shuffle :size="18" />
-                  <span>Перемешать</span>
-                </button>
-                <button class="menu-item" @click="exec('addToQueue')">
-                  <ListMusic :size="18" />
-                  <span>Добавить в очередь</span>
-                </button>
-                <button class="menu-item" @click="exec('share')">
-                  <Share2 :size="18" />
-                  <span>Поделиться</span>
-                </button>
-                <div class="menu-divider" />
-                <button v-if="hasAlbumArtist" class="menu-item" @click="exec('goToArtist')">
-                  <User :size="18" />
-                  <span>Перейти к артисту</span>
-                </button>
-              </template>
-
-              <!-- ═══ ARTIST MENU ═══ -->
-              <template v-else-if="menuType === 'artist'">
-                <button class="menu-item" @click="exec('open')">
-                  <User :size="18" />
-                  <span>Открыть артиста</span>
-                </button>
-                <button class="menu-item" @click="exec('playAll')">
-                  <Play :size="18" fill="currentColor" />
-                  <span>Воспроизвести все</span>
-                </button>
-                <button class="menu-item" @click="exec('shuffle')">
-                  <Shuffle :size="18" />
-                  <span>Перемешать</span>
-                </button>
-                <button class="menu-item" @click="exec('addToQueue')">
-                  <ListMusic :size="18" />
-                  <span>Добавить в очередь</span>
-                </button>
-              </template>
-            </div>
+            <!-- Share Submenu -->
+            <template v-else-if="activeSubmenu === 'share'">
+              <button class="submenu-item" @click="handleShareAction('copy')">
+                <Link2 :size="15" />
+                <span class="submenu-text">{{ shareCopyLabel }}</span>
+              </button>
+              <button class="submenu-item" @click="handleShareAction('telegram')">
+                <Send :size="15" />
+                <span class="submenu-text">Отправить в чат Telegram</span>
+              </button>
+              <button class="submenu-item" @click="handleShareAction('download')">
+                <CloudDownload :size="15" />
+                <span class="submenu-text">Скачать в Telegram</span>
+              </button>
+              <div class="submenu-divider" />
+              <button class="submenu-item" @click="handleShareAction('more')">
+                <Share2 :size="15" />
+                <span class="submenu-text">Ещё...</span>
+              </button>
+            </template>
           </div>
         </Transition>
       </div>
@@ -343,6 +497,7 @@ import { useContextMenu } from '@/composables/useContextMenu'
 import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import { usePlayerStore } from '@/stores/player'
+import { useShare } from '@/composables/useShare'
 import { getAllTrackArtists } from '@/utils/formatters'
 import PlaylistPicker from '@/components/PlaylistPicker.vue'
 import EditTrackModal from '@/components/EditTrackModal.vue'
@@ -350,14 +505,21 @@ import TagChips from '@/components/TagChips.vue'
 import { 
   X, User, Disc3, Play, ListMusic, Plus, Minus, Pencil, Check,
   Trash2, FolderOpen, Shuffle, Music, Mic2, ChevronRight, ChevronDown,
-  ThumbsDown, Heart, Share2, Pin, PinOff
+  ChevronLeft, ThumbsDown, Heart, Share2, Pin, PinOff, Link2, Send, CloudDownload
 } from 'lucide-vue-next'
 
 const router = useRouter()
 const uiStore = useUIStore()
+const { copyLink, shareToTelegramChat, downloadToTelegram, openShare } = useShare()
 
-// State for artist submenu
-const showArtistSubmenu = ref(false)
+// Submenu state (Spotify-style)
+const activeSubmenu = ref(null) // 'artists' | 'share' | null (desktop flyout)
+const mobileSubmenu = ref(null) // 'artists' | 'share' | null (mobile subview)
+const submenuPosition = ref({ x: 0, y: 0 })
+const currentTriggerEl = ref(null)
+const flyoutSubmenuEl = ref(null)
+let openSubmenuTimer = null
+let closeSubmenuTimer = null
 
 const isDisliked = computed(() => menuType.value === 'track' && !!menuData.value?.is_disliked)
 
@@ -414,6 +576,14 @@ const handleOverlayClick = () => {
 // Handle keyboard events
 const handleKeyDown = (e) => {
   if (e.key === 'Escape') {
+    if (activeSubmenu.value) {
+      activeSubmenu.value = null
+      return
+    }
+    if (mobileSubmenu.value) {
+      mobileSubmenu.value = null
+      return
+    }
     closeMenu()
   }
 }
@@ -427,6 +597,8 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('resize', checkDesktop)
   window.removeEventListener('keydown', handleKeyDown)
+  if (openSubmenuTimer) clearTimeout(openSubmenuTimer)
+  if (closeSubmenuTimer) clearTimeout(closeSubmenuTimer)
 })
 
 const {
@@ -435,7 +607,7 @@ const {
   menuData,
   menuContext,
   menuPosition,
-  closeMenu,
+  closeMenu: rawCloseMenu,
   executeAction,
   showPlaylistPicker,
   showEditModal,
@@ -454,6 +626,14 @@ const {
   closeRenameModal,
   confirmRename,
 } = useContextMenu()
+
+const closeMenu = () => {
+  activeSubmenu.value = null
+  mobileSubmenu.value = null
+  if (openSubmenuTimer) { clearTimeout(openSubmenuTimer); openSubmenuTimer = null }
+  if (closeSubmenuTimer) { clearTimeout(closeSubmenuTimer); closeSubmenuTimer = null }
+  rawCloseMenu()
+}
 
 const createPlaylistInput = ref(null)
 
@@ -476,9 +656,14 @@ watch(isOpen, (open) => {
   if (open) {
     menuOpenTimestamp = Date.now()
     overlayTouchStarted = false
+    activeSubmenu.value = null
+    mobileSubmenu.value = null
   } else {
-    showArtistSubmenu.value = false
+    activeSubmenu.value = null
+    mobileSubmenu.value = null
     overlayTouchStarted = false
+    if (openSubmenuTimer) { clearTimeout(openSubmenuTimer); openSubmenuTimer = null }
+    if (closeSubmenuTimer) { clearTimeout(closeSubmenuTimer); closeSubmenuTimer = null }
   }
 })
 
@@ -487,11 +672,184 @@ const exec = (action, extra = null) => {
   executeAction(action, extra)
 }
 
-// Go to specific artist (for multi-artist tracks)
+// Go to specific artist (for multi-artist tracks or albums)
 const goToSpecificArtist = (artistName) => {
   executeAction('goToArtistByName', artistName)
 }
 
+// Submenu positioning & interactions (Spotify desktop flyout)
+const computeSubmenuPosition = (triggerEl, submenuType) => {
+  if (!triggerEl) return
+  const rect = triggerEl.getBoundingClientRect()
+  const submenuWidth = 240
+  const padding = 8
+
+  // Default placement: immediately to the right of the main menu sheet
+  let x = rect.right + 4
+  // If overflows right screen edge, flip to the left
+  if (x + submenuWidth + padding > window.innerWidth) {
+    x = Math.max(padding, rect.left - submenuWidth - 4)
+  }
+
+  // Align top with trigger item
+  let y = rect.top - 4
+  const count = submenuType === 'artists' ? (currentSubmenuArtists.value.length || 1) : 4
+  const estimatedHeight = Math.min(340, count * 40 + 16)
+  if (y + estimatedHeight + padding > window.innerHeight) {
+    y = Math.max(padding, window.innerHeight - estimatedHeight - padding)
+  }
+
+  submenuPosition.value = { x, y }
+
+  nextTick(() => {
+    if (flyoutSubmenuEl.value) {
+      const el = flyoutSubmenuEl.value
+      const actualWidth = el.offsetWidth || submenuWidth
+      const actualHeight = el.offsetHeight || estimatedHeight
+      let curX = submenuPosition.value.x
+      let curY = submenuPosition.value.y
+      if (curX + actualWidth + padding > window.innerWidth) {
+        curX = Math.max(padding, rect.left - actualWidth - 4)
+      }
+      if (curY + actualHeight + padding > window.innerHeight) {
+        curY = Math.max(padding, window.innerHeight - actualHeight - padding)
+      }
+      submenuPosition.value = { x: curX, y: curY }
+    }
+  })
+}
+
+const handleTriggerMouseEnter = (type, event) => {
+  if (!isDesktop.value) return
+  if (closeSubmenuTimer) {
+    clearTimeout(closeSubmenuTimer)
+    closeSubmenuTimer = null
+  }
+  if (openSubmenuTimer) {
+    clearTimeout(openSubmenuTimer)
+  }
+  const el = event.currentTarget
+  currentTriggerEl.value = el
+  openSubmenuTimer = setTimeout(() => {
+    computeSubmenuPosition(el, type)
+    activeSubmenu.value = type
+  }, 60)
+}
+
+const handleTriggerMouseLeave = (type) => {
+  if (!isDesktop.value) return
+  if (openSubmenuTimer) {
+    clearTimeout(openSubmenuTimer)
+    openSubmenuTimer = null
+  }
+  closeSubmenuTimer = setTimeout(() => {
+    if (activeSubmenu.value === type) {
+      activeSubmenu.value = null
+    }
+  }, 180)
+}
+
+const handleSubmenuMouseEnter = () => {
+  if (closeSubmenuTimer) {
+    clearTimeout(closeSubmenuTimer)
+    closeSubmenuTimer = null
+  }
+}
+
+const handleSubmenuMouseLeave = () => {
+  if (!isDesktop.value) return
+  closeSubmenuTimer = setTimeout(() => {
+    activeSubmenu.value = null
+  }, 180)
+}
+
+const handleRegularItemMouseEnter = () => {
+  if (!isDesktop.value) return
+  if (openSubmenuTimer) {
+    clearTimeout(openSubmenuTimer)
+    openSubmenuTimer = null
+  }
+  if (activeSubmenu.value) {
+    activeSubmenu.value = null
+  }
+}
+
+const handleShareTriggerClick = (event) => {
+  if (isDesktop.value) {
+    computeSubmenuPosition(event.currentTarget, 'share')
+    activeSubmenu.value = activeSubmenu.value === 'share' ? null : 'share'
+  } else {
+    mobileSubmenu.value = 'share'
+  }
+}
+
+const handleArtistTriggerClick = (event) => {
+  if (isDesktop.value) {
+    computeSubmenuPosition(event.currentTarget, 'artists')
+    activeSubmenu.value = activeSubmenu.value === 'artists' ? null : 'artists'
+  } else {
+    mobileSubmenu.value = 'artists'
+  }
+}
+
+// Share Payload Builder
+const getSharePayload = () => {
+  const data = menuData.value
+  if (!data) return {}
+
+  if (menuType.value === 'track') {
+    return {
+      type: 'track',
+      id: data.id,
+      title: data.title || data.file_name || 'Трек',
+      subtitle: data.artist || 'Неизвестен',
+      coverUrl: data.cover_url || ''
+    }
+  } else if (menuType.value === 'playlist') {
+    return {
+      type: 'playlist',
+      id: data.id,
+      title: data.name || 'Плейлист',
+      subtitle: `${data.track_count || data.tracks_count || 0} треков`,
+      coverUrl: data.custom_cover_url || ''
+    }
+  } else if (menuType.value === 'album') {
+    return {
+      type: 'album',
+      id: data.id,
+      title: data.name || 'Альбом',
+      subtitle: data.album_artist || data.artist || 'Альбом',
+      coverUrl: data.cover_url || ''
+    }
+  }
+  return {
+    type: menuType.value,
+    id: data.id,
+    title: data.name || data.title || '',
+    subtitle: '',
+    coverUrl: data.cover_url || ''
+  }
+}
+
+const handleShareAction = async (action) => {
+  const payload = getSharePayload()
+  closeMenu()
+
+  switch (action) {
+    case 'copy':
+      await copyLink(payload)
+      break
+    case 'telegram':
+      await shareToTelegramChat(payload)
+      break
+    case 'download':
+      await downloadToTelegram(payload)
+      break
+    case 'more':
+      openShare(payload)
+      break
+  }
+}
 // Calculate position for desktop mode (under cursor, within screen bounds)
 watch([isOpen, menuPosition], ([open, pos]) => {
   if (open && isDesktop.value && pos.x > 0) {
@@ -523,6 +881,30 @@ watch([isOpen, menuPosition], ([open, pos]) => {
       adjustedPosition.value = { x, y }
     })
   }
+})
+
+// Share labels
+const shareCopyLabel = computed(() => {
+  switch (menuType.value) {
+    case 'track': return 'Скопировать ссылку на трек'
+    case 'playlist': return 'Скопировать ссылку на плейлист'
+    case 'album': return 'Скопировать ссылку на альбом'
+    default: return 'Скопировать ссылку'
+  }
+})
+
+// Album multi-artist support
+const parsedAlbumArtists = computed(() => {
+  const data = menuData.value
+  if (!data) return []
+  const artistStr = data.album_artist || data.artist
+  if (!artistStr) return []
+  return getAllTrackArtists(artistStr)
+})
+
+const currentSubmenuArtists = computed(() => {
+  if (menuType.value === 'album') return parsedAlbumArtists.value
+  return parsedArtists.value
 })
 
 // ═══════════════════════════════════════════════════════════
@@ -858,48 +1240,128 @@ const getTracksWord = (count) => {
   margin: 8px 16px;
 }
 
-/* Submenu styles */
+/* Submenu styles (Spotify style) */
 .menu-item.has-submenu {
   justify-content: flex-start;
+  position: relative;
 }
 
 .menu-item.has-submenu .submenu-arrow {
   margin-left: auto;
   opacity: 0.5;
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
-.submenu {
-  background: rgba(0, 0, 0, 0.2);
-  border-left: 2px solid var(--c-accent);
-  margin-left: 16px;
+.menu-item.has-submenu:hover .submenu-arrow,
+.menu-item.is-submenu-active .submenu-arrow {
+  opacity: 1;
+}
+
+.menu-item.is-submenu-active {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+/* Floating Submenu (Spotify Desktop Flyout) */
+.flyout-submenu {
+  position: fixed;
+  width: 240px;
+  background: var(--c-bg-2, #1f1f1f);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  padding: 5px;
+  z-index: calc(var(--z-contextmenu, 1100) + 20);
+  max-height: 380px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .submenu-item {
-  padding-left: 24px !important;
-  font-size: 14px !important;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 12px;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 5px;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.submenu-item:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.submenu-item:active {
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .submenu-item svg {
-  opacity: 0.7;
+  opacity: 0.75;
+  flex-shrink: 0;
 }
 
-/* Submenu animation */
-.submenu-enter-active,
-.submenu-leave-active {
-  transition: all 0.2s ease;
-  overflow: hidden;
-}
-
-.submenu-enter-from,
-.submenu-leave-to {
-  opacity: 0;
-  max-height: 0;
-}
-
-.submenu-enter-to,
-.submenu-leave-from {
+.submenu-item:hover svg {
   opacity: 1;
-  max-height: 200px;
+}
+
+.submenu-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.submenu-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 5px 6px;
+}
+
+/* Mobile subview header & back button */
+.mobile-sub-header {
+  padding: 12px 16px !important;
+}
+
+.menu-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: white;
+  padding: 6px 12px 6px 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.menu-back-btn:active {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* Flyout scale animation */
+.flyout-scale-enter-active,
+.flyout-scale-leave-active {
+  transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.12s ease;
+  transform-origin: top left;
+}
+
+.flyout-scale-enter-from,
+.flyout-scale-leave-to {
+  transform: scale(0.95);
+  opacity: 0;
 }
 
 /* Modal */

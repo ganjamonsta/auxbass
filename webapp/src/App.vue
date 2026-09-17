@@ -756,6 +756,7 @@ onMounted(async () => {
       externalAccountsStore.fetchSoundCloud().catch(() => {})
       externalAccountsStore.fetchLastSpotifyImport().catch(() => {})
       tasksStore.checkRecentJobs().catch(() => {})
+      libraryStore.startSyncPolling()
     }
   })
 
@@ -818,6 +819,7 @@ onMounted(async () => {
 const handleWindowFocus = () => {
   if (authStore.isAuthenticated) {
     tasksStore.checkRecentJobs()
+    libraryStore.checkSyncState()
   }
 }
 
@@ -829,6 +831,9 @@ watch(
       externalAccountsStore.fetchSoundCloud()
       externalAccountsStore.fetchLastSpotifyImport()
       tasksStore.checkRecentJobs()
+      libraryStore.startSyncPolling()
+    } else {
+      libraryStore.stopSyncPolling()
     }
   }
 )
@@ -843,6 +848,7 @@ onUnmounted(() => {
   window.removeEventListener('player:network-recovered', handleNetworkRecovered)
   window.removeEventListener('player:channel-access-required', handleChannelAccessRequired)
   networkMonitor.stopMonitoring()
+  libraryStore.stopSyncPolling()
 
   // Clean up Telegram BackButton listener
   const tgBackButton = telegram?.BackButton || window.Telegram?.WebApp?.BackButton

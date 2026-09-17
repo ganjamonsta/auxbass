@@ -379,7 +379,7 @@ const loadOverviewData = async (id) => {
     const [tracksRes, playlistsRes, albumsRes] = await Promise.allSettled([
       socialApi.getUserLibrary(id, { page: 1, per_page: 8 }),
       playlistsApi.getUserPlaylists(id),
-      socialApi.getUserAlbums(id, { page: 1, per_page: 10 })
+      socialApi.getUserAlbums(id, { page: 1, per_page: 20 })
     ])
 
     if (tracksRes.status === 'fulfilled') {

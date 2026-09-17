@@ -323,6 +323,17 @@
               <CloudDownload :size="16" class="import-icon" />
               <span class="import-text">Импорт</span>
             </button>
+
+            <button 
+              class="overview-refresh-btn" 
+              :class="{ 'is-refreshing': isOverviewRefreshing }"
+              @click="handleForceRefresh"
+              :disabled="isOverviewRefreshing"
+              title="Обновить медиатеку"
+              aria-label="Обновить медиатеку"
+            >
+              <RefreshCw :size="16" class="refresh-icon" :class="{ 'spin-anim': isOverviewRefreshing }" />
+            </button>
           </div>
 
           <!-- Recent Tracks List -->
@@ -408,7 +419,8 @@ import {
   Shuffle, 
   ChevronRight,
   ChevronLeft,
-  CloudDownload 
+  CloudDownload,
+  RefreshCw
 } from 'lucide-vue-next'
 import { useHorizontalScroll } from '@/composables/useHorizontalScroll'
 
@@ -420,6 +432,22 @@ const libraryStore = useLibraryStore()
 const playerStore = usePlayerStore()
 const tasksStore = useTasksStore()
 const { openMenu } = useContextMenu()
+
+const isOverviewRefreshing = ref(false)
+
+const handleForceRefresh = async () => {
+  if (isOverviewRefreshing.value) return
+  isOverviewRefreshing.value = true
+  try {
+    await libraryStore.refresh()
+    await loadOverviewData(true)
+    uiStore.toast?.success('Медиатека обновлена', 'Данные успешно синхронизированы')
+  } catch (err) {
+    console.error('Failed to force refresh library:', err)
+  } finally {
+    isOverviewRefreshing.value = false
+  }
+}
 
 const handleImportFinished = () => {
   loadOverviewData(true)
@@ -1205,6 +1233,41 @@ onUnmounted(() => {
 
 .import-icon {
   color: #ff5500;
+}
+
+.overview-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  flex-shrink: 0;
+}
+
+.overview-refresh-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px) scale(1.05);
+}
+
+.overview-refresh-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.overview-refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.overview-refresh-btn .spin-anim {
+  animation: spin 1s linear infinite;
 }
 
 .shuffle-all-btn {

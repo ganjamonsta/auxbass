@@ -10,6 +10,7 @@ export const tracksApi = {
       ...options
     })
   },
+  getSyncState: (params = {}) => api.get('/library/sync-state', { params, bypassCache: true }),
   // Bypass cache when sort_by is 'random' to get fresh shuffled order each time
   // Add timestamp to ensure truly random results on every call
   getAllIds: (params = {}) => api.get('/tracks/ids', { 

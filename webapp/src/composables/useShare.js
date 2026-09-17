@@ -61,8 +61,9 @@ export function useShare() {
    * Inside Telegram WebApp: calls Telegram.WebApp.switchInlineQuery
    * Outside Telegram: opens t.me share url or telegram link
    */
-  const shareToTelegramChat = async () => {
-    const { type, id, title } = sharePayload.value
+  const shareToTelegramChat = async (customPayload = null) => {
+    const payload = customPayload || sharePayload.value
+    const { type, id, title } = payload
     const botUser = getBotUsername()
     const query = getInlineQuery(type, id)
 
@@ -80,7 +81,7 @@ export function useShare() {
 
     // Fallback for browser outside Telegram
     const deepLink = getDeepLink(type, id)
-    const shareMessage = sharePayload.value.text || (title ? `Послушай «${title}» в TG Player!` : 'Слушай в TG Player!')
+    const shareMessage = payload.text || (title ? `Послушай «${title}» в TG Player!` : 'Слушай в TG Player!')
     const tgShareUrl = `https://t.me/share/url?url=${encodeURIComponent(deepLink)}&text=${encodeURIComponent(shareMessage)}`
 
     if (window.Telegram?.WebApp?.openTelegramLink) {
@@ -96,8 +97,9 @@ export function useShare() {
   /**
    * Copy direct deep link to clipboard
    */
-  const copyLink = async () => {
-    const { type, id } = sharePayload.value
+  const copyLink = async (customPayload = null) => {
+    const payload = customPayload || sharePayload.value
+    const { type, id } = payload
     const deepLink = getDeepLink(type, id)
 
     if (window.Telegram?.WebApp?.HapticFeedback) {
@@ -122,10 +124,11 @@ export function useShare() {
   /**
    * Share via native OS Web Share API or Telegram share url
    */
-  const shareWeb = async () => {
-    const { type, id, title } = sharePayload.value
+  const shareWeb = async (customPayload = null) => {
+    const payload = customPayload || sharePayload.value
+    const { type, id, title } = payload
     const deepLink = getDeepLink(type, id)
-    const shareText = sharePayload.value.text || (title ? `Послушай «${title}» в TG Player!` : 'TG Player')
+    const shareText = payload.text || (title ? `Послушай «${title}» в TG Player!` : 'TG Player')
 
     if (navigator.share) {
       try {
@@ -156,8 +159,9 @@ export function useShare() {
   /**
    * Download item directly to the user's private chat with the bot
    */
-  const downloadToTelegram = async () => {
-    const { type, id } = sharePayload.value
+  const downloadToTelegram = async (customPayload = null) => {
+    const payload = customPayload || sharePayload.value
+    const { type, id } = payload
     if (!id) return
 
     isDownloading.value = true

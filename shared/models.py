@@ -283,7 +283,15 @@ class Track(Base):
     @property
     def album(self) -> Optional[str]:
         """Get album name from enrichment (Last.fm/Deezer data)"""
-        return self.enrichment.album_name if self.enrichment else None
+        try:
+            return self.enrichment.album_name if self.enrichment else None
+        except Exception:
+            return None
+
+    @property
+    def album_name(self) -> Optional[str]:
+        """Alias for album name from enrichment"""
+        return self.album
     
     @property
     def cover_url(self) -> Optional[str]:
