@@ -10,6 +10,7 @@ import aiohttp
 from typing import Optional, List, Dict, Any, Tuple, Callable
 
 import yt_dlp
+from yt_dlp.utils import download_range_func
 
 from shared.matching import clean_track_metadata
 from ..base import (
@@ -18,6 +19,7 @@ from ..base import (
     TrackMetadata,
     DownloadedAudio,
     EntityType,
+    calculate_preview_range,
 )
 
 logger = logging.getLogger(__name__)
@@ -257,10 +259,26 @@ class YouTubeMusicProvider(BaseMusicProvider):
         track_meta: TrackMetadata,
         temp_dir: str,
         progress_hook: Optional[Callable[[int], None]] = None,
+        chunk_only: bool = False,
+        chunk_duration: int = 30,
+        chunk_start: Optional[int] = None,
     ) -> DownloadedAudio:
-        """Download track to MP3 320kbps and fetch high quality cover artwork."""
+        """Download track to MP3 320kbps (or 192kbps for fast 30s preview chunk) and fetch high quality cover artwork."""
         os.makedirs(temp_dir, exist_ok=True)
         out_template = os.path.join(temp_dir, "audio.%(ext)s")
+
+        # Calculate preview range avoiding empty intros
+        start_sec, end_sec = (0, chunk_duration)
+        if chunk_only:
+            if chunk_start is not None:
+                start_sec = max(0, chunk_start)
+                end_sec = start_sec + chunk_duration
+            else:
+                start_sec, end_sec = calculate_preview_range(track_meta.duration, chunk_seconds=chunk_duration)
+            logger.info(
+                f"[YouTube] Downloading {chunk_duration}s preview chunk for "
+                f"'{track_meta.artist} - {track_meta.title}' (range: {start_sec}s..{end_sec}s)"
+            )
 
         def _yt_progress(d):
             if not progress_hook:
@@ -291,12 +309,16 @@ class YouTubeMusicProvider(BaseMusicProvider):
                     {
                         "key": "FFmpegExtractAudio",
                         "preferredcodec": "mp3",
-                        "preferredquality": "320",
+                        "preferredquality": "192" if chunk_only else "320",
                     }
                 ],
                 "quiet": True,
                 "no_warnings": True,
             }
+            if chunk_only:
+                ydl_opts["download_ranges"] = download_range_func(None, [(start_sec, end_sec)])
+                ydl_opts["force_keyframes_at_cuts"] = True
+
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 return ydl.extract_info(track_meta.url, download=True)
 
@@ -330,6 +352,12 @@ class YouTubeMusicProvider(BaseMusicProvider):
             except Exception as e:
                 logger.warning(f"[YouTube] Cover download failed for {track_meta.title}: {e}")
                 cover_path = None
+
+        if chunk_only:
+            if track_meta.duration and track_meta.duration > chunk_duration:
+                track_meta.extra["full_duration"] = track_meta.duration
+            track_meta.duration = chunk_duration
+            track_meta.extra["is_chunk"] = True
 
         return DownloadedAudio(
             audio_path=expected_audio,

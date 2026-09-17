@@ -66,7 +66,13 @@ def _score_candidate(
     norm_artist: str,
     robust_title: str,
     duration: Optional[int],
+    allow_chunk: bool = False,
 ) -> int:
+    is_cand_chunk = bool(getattr(t, "is_chunk", False))
+    # Chunks should never be matched when searching for full tracks
+    if is_cand_chunk and not allow_chunk:
+        return -1
+
     t_clean_title, t_clean_artist = clean_track_metadata(t.title, t.artist)
     t_norm_artist = t.normalized_artist or normalize_artist(t_clean_artist)
     t_norm_title = normalize_title(t_clean_title)
@@ -84,9 +90,10 @@ def _score_candidate(
 
     dur_diff = abs(t.duration - duration) if (t.duration and duration) else None
 
-    # If duration is provided on both sides, reject if difference > 7s
-    if duration and t.duration and dur_diff is not None and dur_diff > 7:
-        return -1
+    # Strict duration check only applies to full tracks (chunks have 30s duration by design)
+    if not is_cand_chunk:
+        if duration and t.duration and dur_diff is not None and dur_diff > 7:
+            return -1
 
     # Version markers compatibility check (strictly distinguish live, acoustic, remix, studio)
     t_markers = extract_version_markers(t.title)
@@ -106,8 +113,10 @@ def _score_candidate(
     else:
         return -1
 
-    # If duration matched closely, add bonus
-    if dur_diff is not None:
+    # Prefer full tracks over chunks
+    if is_cand_chunk:
+        score = max(1, score - 15)
+    elif dur_diff is not None:
         score += max(0, 10 - dur_diff)
 
     return score
@@ -118,11 +127,14 @@ async def _find_existing_track(
     artist: str,
     duration: Optional[int],
     session: Optional[Any] = None,
+    allow_chunk: bool = False,
+    url: Optional[str] = None,
 ) -> Optional[Track]:
     """
-    Check if track with matching title & artist already exists in global library.
+    Check if track with matching title & artist (or exact source URL) already exists in global library.
     Uses multi-level tolerant recognition (exact -> normalized -> version-stripped -> fuzzy)
     with strict duration tolerance (<= 7s) to prevent duplicate downloads and channel spam.
+    When allow_chunk=False (default), 30s preview chunks are never returned.
     """
     clean_title, clean_artist = clean_track_metadata(title, artist)
     norm_artist = normalize_artist(clean_artist)
@@ -130,6 +142,18 @@ async def _find_existing_track(
     robust_title = _robust_norm_title(clean_title)
 
     async def _execute_lookup(s):
+        # 0. Check direct source_url match first if URL provided
+        if url:
+            url_query = select(Track).where(
+                Track.source_url == url,
+                Track.is_unavailable == False,
+            )
+            if not allow_chunk:
+                url_query = url_query.where(Track.is_chunk == False)
+            url_track = await s.scalar(url_query)
+            if url_track:
+                return url_track
+
         # 1. Search candidates by normalized artist or artist match
         query = select(Track).where(
             and_(
@@ -140,6 +164,8 @@ async def _find_existing_track(
                 Track.is_unavailable == False,
             )
         )
+        if not allow_chunk:
+            query = query.where(Track.is_chunk == False)
         result = await s.execute(query)
         candidates = result.scalars().all()
 
@@ -154,6 +180,8 @@ async def _find_existing_track(
                     Track.is_unavailable == False,
                 )
             )
+            if not allow_chunk:
+                query2 = query2.where(Track.is_chunk == False)
             result2 = await s.execute(query2)
             candidates = result2.scalars().all()
 
@@ -164,7 +192,7 @@ async def _find_existing_track(
         best_score = -1
 
         for t in candidates:
-            score = _score_candidate(t, clean_title, clean_artist, norm_title, norm_artist, robust_title, duration)
+            score = _score_candidate(t, clean_title, clean_artist, norm_title, norm_artist, robust_title, duration, allow_chunk=allow_chunk)
             if score > best_score:
                 best_score = score
                 best_candidate = t
@@ -209,6 +237,7 @@ async def _find_existing_tracks_batch(
                 and_(
                     Track.normalized_artist.in_(norm_artists),
                     Track.is_unavailable == False,
+                    Track.is_chunk == False,
                 )
             )
             res = await s.execute(query)

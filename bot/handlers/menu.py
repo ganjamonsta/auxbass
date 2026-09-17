@@ -11,6 +11,7 @@ import logging
 from typing import Optional
 
 from aiogram import Router, F
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import (
     CallbackQuery,
     Message,
@@ -69,6 +70,21 @@ class MenuStates(StatesGroup):
 
 
 # ───────────────────────── Helpers ─────────────────────────
+
+async def _safe_edit_text(message: Message, text: str, **kwargs) -> bool:
+    """Safely edit message text, suppressing 'message is not modified' Telegram errors.
+
+    Returns:
+        True if the message was updated, False if it was not modified.
+    """
+    try:
+        await message.edit_text(text, **kwargs)
+        return True
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e).lower():
+            return False
+        raise
+
 
 async def _get_channel_status_text(user_id: int) -> tuple[str, Optional[object]]:
     """Build channel section text."""
@@ -345,7 +361,8 @@ async def cmd_login(message: Message):
 @router.callback_query(F.data == "menu:main")
 async def cb_main_menu(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    await callback.message.edit_text(
+    await _safe_edit_text(
+        callback.message,
         "🎵 <b>TG Player — Меню</b>\n\n"
         "Отправляй треки в чат для добавления в библиотеку.",
         reply_markup=get_main_menu_keyboard(),
@@ -404,10 +421,8 @@ async def _show_channel_section(
     else:
         kb = get_channel_not_connected_keyboard()
 
-    if edit and isinstance(target, CallbackQuery):
-        await target.message.edit_text(text, reply_markup=kb)
-    elif isinstance(target, CallbackQuery):
-        await target.message.edit_text(text, reply_markup=kb)
+    if isinstance(target, CallbackQuery):
+        await _safe_edit_text(target.message, text, reply_markup=kb)
     else:
         await target.answer(text, reply_markup=kb)
 
@@ -523,7 +538,8 @@ async def fsm_channel_forward(message: Message, state: FSMContext):
 
 @router.callback_query(F.data == "ch:help")
 async def cb_channel_help(callback: CallbackQuery):
-    await callback.message.edit_text(
+    await _safe_edit_text(
+        callback.message,
         "❓ <b>Зачем нужен канал?</b>\n\n"
         "Канал Telegram — это ваше бесплатное вечное хранилище музыки.\n\n"
         "• Все треки хранятся в вашем личном канале с хэштегами\n"
@@ -542,7 +558,8 @@ async def cb_channel_help(callback: CallbackQuery):
 
 @router.callback_query(F.data == "ch:import_help")
 async def cb_channel_import_help(callback: CallbackQuery):
-    await callback.message.edit_text(
+    await _safe_edit_text(
+        callback.message,
         "📥 <b>Быстрый импорт через экспорт чата</b>\n\n"
         "Если в вашем канале уже есть сотни или тысячи треков:\n\n"
         "1. Откройте <b>Telegram Desktop</b> на компьютере\n"
@@ -645,7 +662,8 @@ async def cb_channel_settings(callback: CallbackQuery):
         await callback.answer("Канал не найден", show_alert=True)
         return
 
-    await callback.message.edit_text(
+    await _safe_edit_text(
+        callback.message,
         f"⚙️ <b>Настройки канала</b>\n\n"
         f"📢 {channel.channel_title or 'Канал'}\n"
         f"#️⃣ Авто-хэштеги: {'Включены' if channel.include_hashtags else 'Выключены'}",
@@ -656,7 +674,8 @@ async def cb_channel_settings(callback: CallbackQuery):
 
 @router.callback_query(F.data == "ch:disconnect_confirm")
 async def cb_channel_disconnect_confirm(callback: CallbackQuery):
-    await callback.message.edit_text(
+    await _safe_edit_text(
+        callback.message,
         "⚠️ <b>Отключить канал?</b>\n\n"
         "Треки останутся в канале, но новые не будут отправляться.",
         reply_markup=get_channel_disconnect_confirm_keyboard(),
@@ -667,7 +686,8 @@ async def cb_channel_disconnect_confirm(callback: CallbackQuery):
 @router.callback_query(F.data == "ch:disconnect")
 async def cb_channel_disconnect(callback: CallbackQuery):
     await channel_service.disable_channel(callback.from_user.id)
-    await callback.message.edit_text(
+    await _safe_edit_text(
+        callback.message,
         "✅ Канал отключён.",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="◀️ Главное меню", callback_data="menu:main")],
@@ -690,21 +710,26 @@ async def cb_channel_op_cancel(callback: CallbackQuery):
 async def cb_stats(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     text = await _get_stats_text(callback.from_user.id)
-    await callback.message.edit_text(text, reply_markup=get_stats_menu_keyboard())
+    await _safe_edit_text(callback.message, text, reply_markup=get_stats_menu_keyboard())
     await callback.answer()
 
 
 @router.callback_query(F.data == "stats:refresh")
 async def cb_stats_refresh(callback: CallbackQuery):
     text = await _get_stats_text(callback.from_user.id)
-    await callback.message.edit_text(text, reply_markup=get_stats_menu_keyboard())
-    await callback.answer("Обновлено!")
+    modified = await _safe_edit_text(
+        callback.message, text, reply_markup=get_stats_menu_keyboard()
+    )
+    if modified:
+        await callback.answer("Обновлено!")
+    else:
+        await callback.answer("Данные актуальны!")
 
 
 @router.callback_query(F.data == "cancel")
 async def cb_cancel(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    await callback.message.edit_text("❌ Отменено.")
+    await _safe_edit_text(callback.message, "❌ Отменено.")
     await callback.answer()
 
 

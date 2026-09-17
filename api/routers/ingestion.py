@@ -73,6 +73,7 @@ class QuickImportRequest(BaseModel):
     genre: Optional[str] = None
     tags: Optional[List[str]] = None
     add_to_library: bool = False
+    preview_only: bool = False
 
 
 class QuickImportResponse(BaseModel):
@@ -490,20 +491,50 @@ async def quick_import_track(
     await _ensure_user_in_db(user)
 
     # 1. Deduplication check
-    existing_track = None
-    if req.title and req.artist:
-        existing_track = await _find_existing_track(req.title, req.artist, req.duration)
+    existing_full = None
+    existing_chunk = None
 
-    if existing_track:
+    if req.title and req.artist:
+        # Check if full track already exists
+        existing_full = await _find_existing_track(
+            req.title, req.artist, req.duration, session=db, allow_chunk=False, url=req.url
+        )
+        if not existing_full:
+            # Check if 30s preview chunk already exists
+            existing_chunk = await _find_existing_track(
+                req.title, req.artist, req.duration, session=db, allow_chunk=True, url=req.url
+            )
+
+    # Case A: If user requested preview_only and we already have full track or chunk in DB -> instant response!
+    if req.preview_only and (existing_full or existing_chunk):
+        reused_track = existing_full or existing_chunk
+        track_obj = await db.scalar(
+            select(Track)
+            .where(Track.id == reused_track.id)
+            .options(
+                selectinload(Track.enrichment),
+                selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
+            )
+        )
+        lib_entry = await db.scalar(
+            select(UserLibrary)
+            .where(UserLibrary.user_id == user.id, UserLibrary.track_id == reused_track.id)
+        )
+        return QuickImportResponse(
+            track=track_to_response(track_obj, lib_entry),
+            already_existed=True,
+        )
+
+    # Case B: If user wants full track (add_to_library=True) and full track already exists in DB
+    if not req.preview_only and existing_full:
         if req.add_to_library:
-            # Link to library if not already linked
             await track_service.save_track(
                 user_id=user.id,
-                file_id=existing_track.file_id,
-                file_unique_id=existing_track.file_unique_id,
-                title=existing_track.title,
-                artist=existing_track.artist,
-                duration=existing_track.duration,
+                file_id=existing_full.file_id,
+                file_unique_id=existing_full.file_unique_id,
+                title=existing_full.title,
+                artist=existing_full.artist,
+                duration=existing_full.duration,
                 library_source=LibrarySource.UPLOADED,
                 enrich=False,
                 add_to_library=True,
@@ -517,19 +548,17 @@ async def quick_import_track(
                 ),
             )
 
-            # Auto-forward to user's Telegram backup channel if active
             try:
                 from bot.services.channels import get_channel_service
                 ch_svc = get_channel_service()
                 if ch_svc:
-                    await ch_svc.forward_track_to_channel(user.id, existing_track.id)
+                    await ch_svc.forward_track_to_channel(user.id, existing_full.id)
             except Exception as e:
                 logger.debug(f"Quick-import channel forward failed for existing track: {e}")
 
-        # Refresh track with relationships
         track_obj = await db.scalar(
             select(Track)
-            .where(Track.id == existing_track.id)
+            .where(Track.id == existing_full.id)
             .options(
                 selectinload(Track.enrichment),
                 selectinload(Track.album_tracks).selectinload(AlbumTrack.album),
@@ -537,14 +566,14 @@ async def quick_import_track(
         )
         lib_entry = await db.scalar(
             select(UserLibrary)
-            .where(UserLibrary.user_id == user.id, UserLibrary.track_id == existing_track.id)
+            .where(UserLibrary.user_id == user.id, UserLibrary.track_id == existing_full.id)
         )
         return QuickImportResponse(
             track=track_to_response(track_obj, lib_entry),
             already_existed=True,
         )
 
-    # 2. Download via provider
+    # 2. Download via provider (either 30s preview chunk or full track)
     provider = provider_registry.find_provider(req.url)
     if not provider:
         raise HTTPException(
@@ -570,9 +599,16 @@ async def quick_import_track(
         extra=extra_data,
     )
 
+    is_chunk_download = bool(req.preview_only)
+
     with tempfile.TemporaryDirectory() as temp_dir:
         try:
-            downloaded = await provider.download_track(track_meta, temp_dir)
+            downloaded = await provider.download_track(
+                track_meta,
+                temp_dir,
+                chunk_only=is_chunk_download,
+                chunk_duration=30,
+            )
         except Exception as e:
             raw_err = str(e)
             clean_err = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', raw_err)
@@ -602,7 +638,8 @@ async def quick_import_track(
 
         effective_meta = downloaded.metadata or track_meta
 
-        safe_filename = f"{effective_meta.artist} - {effective_meta.title}.mp3".replace("/", "-")
+        prefix = "[Preview] " if is_chunk_download else ""
+        safe_filename = f"{prefix}{effective_meta.artist} - {effective_meta.title}.mp3".replace("/", "-")
         audio_input = FSInputFile(downloaded.audio_path, filename=safe_filename)
         thumb_input = None
         if downloaded.cover_path and os.path.exists(downloaded.cover_path):
@@ -612,7 +649,7 @@ async def quick_import_track(
             sent_msg = await bot.send_audio(
                 chat_id=target_chat,
                 audio=audio_input,
-                title=effective_meta.title,
+                title=f"{effective_meta.title}{' (Preview)' if is_chunk_download else ''}",
                 performer=effective_meta.artist,
                 duration=effective_meta.duration,
                 thumbnail=thumb_input,
@@ -631,6 +668,17 @@ async def quick_import_track(
                 detail="Failed to upload audio to Telegram",
             )
 
+        # If upgrading an existing chunk track to full, update chunk track directly in DB first
+        if not is_chunk_download and existing_chunk and existing_chunk.is_chunk:
+            existing_chunk.file_id = sent_msg.audio.file_id
+            existing_chunk.file_unique_id = sent_msg.audio.file_unique_id
+            existing_chunk.duration = sent_msg.audio.duration or effective_meta.duration
+            existing_chunk.file_size = sent_msg.audio.file_size or downloaded.file_size
+            existing_chunk.is_chunk = False
+            existing_chunk.file_name = safe_filename
+            await db.commit()
+            logger.info(f"Directly upgraded chunk track ID {existing_chunk.id} in DB to full track")
+
         save_res = await track_service.save_track(
             user_id=user.id,
             file_id=sent_msg.audio.file_id,
@@ -644,8 +692,10 @@ async def quick_import_track(
             forward_source_type=ForwardSourceType.BOT,
             forward_source_name=provider.name,
             library_source=LibrarySource.UPLOADED,
-            enrich=True,
-            add_to_library=req.add_to_library,
+            enrich=not is_chunk_download,
+            add_to_library=req.add_to_library and not is_chunk_download,
+            is_chunk=is_chunk_download,
+            source_url=req.url,
             cover_url=effective_meta.cover_url,
             genre=effective_meta.extra.get("genre"),
             tags=effective_meta.extra.get("tags"),
@@ -653,8 +703,8 @@ async def quick_import_track(
             source_provider=provider.name,
         )
 
-        # Auto-forward to user's Telegram backup channel ONLY if add_to_library is True
-        if req.add_to_library:
+        # Auto-forward to user's Telegram backup channel ONLY if add_to_library is True and not chunk
+        if req.add_to_library and not is_chunk_download:
             try:
                 from bot.services.channels import get_channel_service
                 ch_svc = get_channel_service()

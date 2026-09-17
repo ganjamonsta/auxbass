@@ -147,6 +147,8 @@ async def _ensure_sqlite_columns(conn):
             ("normalized_artist", "TEXT"),
             ("is_public", "INTEGER DEFAULT 1"),
             ("is_unavailable", "INTEGER DEFAULT 0"),
+            ("is_chunk", "INTEGER DEFAULT 0"),
+            ("source_url", "TEXT"),
             ("play_count", "INTEGER DEFAULT 0"),
             ("last_played_at", "TIMESTAMP"),
             ("forward_source_type", "TEXT"),
@@ -221,6 +223,9 @@ async def _ensure_sqlite_columns(conn):
         )
         await conn.exec_driver_sql(
             "CREATE INDEX IF NOT EXISTS idx_tracks_public ON tracks(is_public);"
+        )
+        await conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS idx_tracks_is_chunk ON tracks(is_chunk);"
         )
     except Exception:
         pass

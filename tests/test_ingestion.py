@@ -432,7 +432,7 @@ async def test_soundcloud_drm_fallback_to_audio_resolver(monkeypatch):
 
     # Mock audio_resolver.resolve_and_download to return valid audio
     called = {}
-    async def mock_resolve_and_download(track_meta, temp_dir, exclude_urls=None, progress_hook=None):
+    async def mock_resolve_and_download(track_meta, temp_dir, exclude_urls=None, progress_hook=None, **kwargs):
         called["resolved"] = True
         called["exclude_urls"] = exclude_urls
         return DownloadedAudio(
@@ -864,7 +864,7 @@ async def test_audio_resolver_soundcloud_drm_falls_back_to_youtube(monkeypatch, 
     # Mock _download_stream: fail if soundcloud url (DRM), succeed if youtube url
     download_calls = []
 
-    async def mock_download_stream(url, temp_dir, progress_hook=None):
+    async def mock_download_stream(url, temp_dir, progress_hook=None, **kwargs):
         download_calls.append(url)
         if "soundcloud.com" in url:
             raise Exception("ERROR: [soundcloud] 1162789264: This video is DRM protected")
@@ -1137,6 +1137,119 @@ async def test_upload_playlist_cover_fallback_to_pm():
         # Second call must be to user PM
         second_call = mock_bot.send_photo.call_args_list[1][1]
         assert second_call["chat_id"] == 777
+
+
+def test_calculate_preview_range():
+    """Test smart 30s preview range calculation avoiding empty intros."""
+    from bot.services.ingestion.base import calculate_preview_range
+
+    # None or 0 duration
+    assert calculate_preview_range(None) == (0, 30)
+    assert calculate_preview_range(0) == (0, 30)
+
+    # Exactly 30s or shorter
+    assert calculate_preview_range(30) == (0, 30)
+    assert calculate_preview_range(25) == (0, 30)
+
+    # Short tracks (50s): skips 10s intro
+    start, end = calculate_preview_range(50)
+    assert end - start == 30
+    assert start == 10
+    assert end == 40
+
+    # 100s track: starts at 20s
+    start, end = calculate_preview_range(100)
+    assert end - start == 30
+    assert start == 20
+    assert end == 50
+
+    # Normal 200s (3m 20s) track: ~25% into track -> 50s..80s
+    start, end = calculate_preview_range(200)
+    assert end - start == 30
+    assert start == 50
+    assert end == 80
+
+    # Long 300s (5 min) track: capped at 60s
+    start, end = calculate_preview_range(300)
+    assert end - start == 30
+    assert start == 60
+    assert end == 90
+
+
+def test_quick_import_preview_only_schema_and_track_response():
+    """Test that QuickImportRequest supports preview_only and TrackResponse supports is_chunk and source_url."""
+    from api.routers.ingestion import QuickImportRequest
+    from api.schemas.tracks import TrackResponse
+    from datetime import datetime, timezone
+
+    req = QuickImportRequest(
+        url="https://soundcloud.com/artist/track",
+        preview_only=True,
+    )
+    assert req.preview_only is True
+
+    req_full = QuickImportRequest(
+        url="https://soundcloud.com/artist/track",
+    )
+    assert req_full.preview_only is False
+
+    now = datetime.now(timezone.utc)
+    resp = TrackResponse(
+        id=123,
+        telegram_file_id="tg_chunk_file_id",
+        title="Test Song",
+        artist="Test Artist",
+        duration=30,
+        is_chunk=True,
+        source_url="https://soundcloud.com/artist/track",
+        added_at=now,
+    )
+    assert resp.is_chunk is True
+    assert resp.source_url == "https://soundcloud.com/artist/track"
+    assert resp.duration == 30
+
+
+def test_score_candidate_chunk_filtering():
+    """Test that candidate scoring rejects chunk tracks for library searches but allows for preview lookup."""
+    from bot.services.ingestion.pipeline import _score_candidate
+    from shared.models import Track
+
+    chunk_track = Track(
+        id=1,
+        title="Awesome Song",
+        artist="DJ Cool",
+        duration=30,
+        is_chunk=True,
+        file_id="chunk_id",
+        file_unique_id="chunk_uid",
+    )
+
+    # When searching for full track (allow_chunk=False): must be rejected
+    score_for_full = _score_candidate(
+        t=chunk_track,
+        clean_title="Awesome Song",
+        clean_artist="DJ Cool",
+        norm_title="awesome song",
+        norm_artist="dj cool",
+        robust_title="awesome song",
+        duration=210,
+        allow_chunk=False,
+    )
+    assert score_for_full == -1
+
+    # When searching for preview chunk (allow_chunk=True): should match
+    score_for_preview = _score_candidate(
+        t=chunk_track,
+        clean_title="Awesome Song",
+        clean_artist="DJ Cool",
+        norm_title="awesome song",
+        norm_artist="dj cool",
+        robust_title="awesome song",
+        duration=210,
+        allow_chunk=True,
+    )
+    assert score_for_preview > 0
+
 
 
 

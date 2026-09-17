@@ -872,9 +872,34 @@
   transform: scale(0.97);
 }
 
-.btn-unfollow,
-.btn-unfollow:hover,
-.btn-unfollow:active,
+.btn-unfollow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--r-full);
+  background: var(--c-bg-3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--c-text-2);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 2px 2px 5px var(--sh-dark);
+}
+
+.btn-unfollow:hover {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  transform: translateY(-1px);
+}
+
+.btn-unfollow:active {
+  transform: scale(0.97);
+}
+
 /* ─── Unified No Channel Prompt ─── */
 .no-channel-prompt {
   display: flex;

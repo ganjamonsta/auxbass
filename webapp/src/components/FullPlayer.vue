@@ -72,6 +72,9 @@
         <span v-if="playerStore.hdTrackInfo" class="hd-badge" title="HD версия доступна для скачивания">
           HD
         </span>
+        <span v-else-if="track?.is_chunk" class="chunk-badge" title="30-секундный ознакомительный фрагмент">
+          ✂️ 30s превью
+        </span>
         <button 
           class="like-btn" 
           :class="{ liked: isLiked }" 

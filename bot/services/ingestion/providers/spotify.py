@@ -195,14 +195,22 @@ class SpotifyProvider(BaseMusicProvider):
         track_meta: TrackMetadata,
         temp_dir: str,
         progress_hook: Optional[Callable[[int], None]] = None,
+        chunk_only: bool = False,
+        chunk_duration: int = 30,
+        chunk_start: Optional[int] = None,
     ) -> DownloadedAudio:
         """
         Download track using the Audio Sourcing Engine.
-        Matches unencrypted audio streams, applies 320kbps MP3 conversion,
+        Matches unencrypted audio streams, applies 320kbps MP3 conversion (or 192kbps 30s preview),
         and saves official high-resolution artwork.
         """
         return await audio_resolver.resolve_and_download(
-            track_meta, temp_dir, progress_hook=progress_hook
+            track_meta,
+            temp_dir,
+            progress_hook=progress_hook,
+            chunk_only=chunk_only,
+            chunk_duration=chunk_duration,
+            chunk_start=chunk_start,
         )
 
     async def search(self, query: str, limit: int = 30) -> List[TrackMetadata]:

@@ -437,6 +437,20 @@ const handleAlbumContextMenu = (album, event) => {
   justify-content: space-between;
   margin-bottom: 14px;
   width: 100%;
+  padding-right: var(--content-padding, 24px);
+  box-sizing: border-box;
+}
+
+@media (min-width: 1024px) {
+  .section-header {
+    padding-right: var(--content-padding, 32px);
+  }
+}
+
+@media (max-width: 768px) {
+  .section-header {
+    padding-right: var(--content-padding, 16px);
+  }
 }
 
 .section-title {
@@ -548,11 +562,24 @@ const handleAlbumContextMenu = (album, event) => {
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   padding-bottom: 8px;
+  padding-right: var(--content-padding, 24px);
   width: 100%;
   box-sizing: border-box;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
   transition: scrollbar-color 0.2s ease;
+}
+
+@media (min-width: 1024px) {
+  .horizontal-scroll {
+    padding-right: var(--content-padding, 32px);
+  }
+}
+
+@media (max-width: 768px) {
+  .horizontal-scroll {
+    padding-right: var(--content-padding, 16px);
+  }
 }
 
 .horizontal-scroll:hover {
@@ -738,10 +765,26 @@ const handleAlbumContextMenu = (album, event) => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  max-width: var(--content-max-width, 1400px);
+  margin-right: var(--content-padding, 24px);
+  box-sizing: border-box;
+}
+
+@media (min-width: 1024px) {
+  .profile-tracks-list {
+    margin-right: var(--content-padding, 32px);
+  }
+}
+
+@media (max-width: 768px) {
+  .profile-tracks-list {
+    margin-right: var(--content-padding, 16px);
+  }
 }
 
 .profile-view-more-btn {
   width: 100%;
+  max-width: var(--content-max-width, 1400px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -756,6 +799,20 @@ const handleAlbumContextMenu = (album, event) => {
   cursor: pointer;
   transition: all 0.2s;
   margin-top: 12px;
+  margin-right: var(--content-padding, 24px);
+  box-sizing: border-box;
+}
+
+@media (min-width: 1024px) {
+  .profile-view-more-btn {
+    margin-right: var(--content-padding, 32px);
+  }
+}
+
+@media (max-width: 768px) {
+  .profile-view-more-btn {
+    margin-right: var(--content-padding, 16px);
+  }
 }
 
 .profile-view-more-btn:hover {
@@ -768,6 +825,21 @@ const handleAlbumContextMenu = (album, event) => {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  max-width: var(--content-max-width, 1400px);
+  margin-right: var(--content-padding, 24px);
+  box-sizing: border-box;
+}
+
+@media (min-width: 1024px) {
+  .ext-tracks-overview-list {
+    margin-right: var(--content-padding, 32px);
+  }
+}
+
+@media (max-width: 768px) {
+  .ext-tracks-overview-list {
+    margin-right: var(--content-padding, 16px);
+  }
 }
 
 /* Skeletons */

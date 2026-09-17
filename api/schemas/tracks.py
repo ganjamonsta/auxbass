@@ -31,6 +31,8 @@ class TrackResponse(BaseModel):
     # Streaming compatibility
     is_streamable: bool = True  # False for HD formats (FLAC, WAV, etc.) or files > 20MB without alt
     is_unavailable: bool = False  # True if file deleted/invalid in Telegram
+    is_chunk: bool = False  # True if 30s preview chunk, False for full tracks
+    source_url: Optional[str] = None  # Original external URL
     streamable_id: Optional[int] = None  # MP3 alternative if this is HD
     hd_id: Optional[int] = None  # HD alternative if this is MP3
     

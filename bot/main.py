@@ -10,6 +10,9 @@ from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import ErrorEvent
+from aiogram.exceptions import TelegramBadRequest
+from aiogram.filters import ExceptionTypeFilter
 
 from shared.config import get_settings
 from shared.database import init_db, close_db
@@ -74,6 +77,18 @@ async def main():
     # Initialize dispatcher with FSM storage
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
+    
+    # Safely suppress harmless Telegram "message is not modified" errors
+    @dp.error(ExceptionTypeFilter(TelegramBadRequest))
+    async def handle_telegram_bad_request(event: ErrorEvent):
+        if "message is not modified" in str(event.exception).lower():
+            if event.update.callback_query:
+                try:
+                    await event.update.callback_query.answer()
+                except Exception:
+                    pass
+            return True
+        return False
     
     # Register routers — menu_router first (handles /start, /menu, all menu callbacks)
     dp.include_router(menu_router)

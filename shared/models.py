@@ -189,10 +189,12 @@ class Track(Base):
     # Who uploaded this track
     uploader_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"))
     
-    # Visibility
+    # Visibility & Chunk / Preview status
     is_public: Mapped[bool] = mapped_column(Boolean, default=True)
     is_unavailable: Mapped[bool] = mapped_column(Boolean, default=False)  # File deleted from Telegram
-    
+    is_chunk: Mapped[bool] = mapped_column(Boolean, default=False)  # True if 30s preview chunk, not full track
+    source_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)  # Original external URL for full upgrade
+
     # Enrichment
     enrichment_status: Mapped[EnrichmentStatus] = enum_column(
         EnrichmentStatus, 

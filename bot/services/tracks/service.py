@@ -115,12 +115,15 @@ class TrackService:
         tags: Optional[List[str]] = None,
         album_name: Optional[str] = None,
         source_provider: Optional[str] = None,
+        is_chunk: bool = False,
+        source_url: Optional[str] = None,
     ) -> SaveTrackResult:
         """
         Save a new track or add existing one to user's library.
         
         Track is global - if file_unique_id exists, we add it to user's library.
         If track is new, schedules enrichment.
+        Supports 30s preview chunks and seamless upgrade to full tracks.
         
         Args:
             user_id: Telegram user ID
@@ -135,6 +138,8 @@ class TrackService:
             library_source: How track was added
             forward_source_*: Forwarding source info
             enrich: Whether to schedule enrichment
+            is_chunk: True if 30s preview chunk
+            source_url: Original streaming URL for future upgrade
             
         Returns:
             SaveTrackResult with track_id, is_new, and was_in_library flags
@@ -152,21 +157,37 @@ class TrackService:
 
             if existing_track:
                 track = existing_track
-                # Update file_id if needed (can change when user re-sends file)
-                if track.file_id != file_id:
+                # Seamless upgrade: if existing track was a preview chunk and full track arrived
+                if track.is_chunk and not is_chunk:
                     track.file_id = file_id
-                    logger.info(f"Updated file_id for track {track.id}: {title} - {artist}")
-
-                # Backfill mime_type if we now know it
-                if mime_type_normalized and track.mime_type != mime_type_normalized:
-                    track.mime_type = mime_type_normalized
-                    logger.info(f"Updated mime_type for track {track.id} to {mime_type_normalized}")
-                
-                # Clear is_unavailable flag if it was set
-                # This "resurrects" tracks that became unavailable due to stale file_id
-                if track.is_unavailable:
+                    track.file_unique_id = file_unique_id
+                    track.duration = duration
+                    track.file_size = file_size
+                    if mime_type_normalized:
+                        track.mime_type = mime_type_normalized
+                    if file_name:
+                        track.file_name = file_name
+                    track.is_chunk = False
                     track.is_unavailable = False
-                    logger.info(f"Track {track.id} is now available again (file re-uploaded)")
+                    logger.info(f"Upgraded chunk track {track.id} to full track: {title} - {artist}")
+                else:
+                    # Update file_id if needed (can change when user re-sends file)
+                    if track.file_id != file_id:
+                        track.file_id = file_id
+                        logger.info(f"Updated file_id for track {track.id}: {title} - {artist}")
+
+                    # Backfill mime_type if we now know it
+                    if mime_type_normalized and track.mime_type != mime_type_normalized:
+                        track.mime_type = mime_type_normalized
+                        logger.info(f"Updated mime_type for track {track.id} to {mime_type_normalized}")
+                    
+                    # Clear is_unavailable flag if it was set
+                    if track.is_unavailable:
+                        track.is_unavailable = False
+                        logger.info(f"Track {track.id} is now available again (file re-uploaded)")
+
+                if source_url and not track.source_url:
+                    track.source_url = source_url
 
                 # If track enrichment exists or provider metadata supplied, backfill missing fields
                 if cover_url or genre or tags or album_name:
@@ -228,7 +249,9 @@ class TrackService:
                     forward_source_id=forward_source_id,
                     forward_source_name=effective_source_name,
                     forward_source_username=forward_source_username,
-                    enrichment_status=EnrichmentStatus.PENDING if enrich else EnrichmentStatus.COMPLETED,
+                    is_chunk=is_chunk,
+                    source_url=source_url,
+                    enrichment_status=EnrichmentStatus.PENDING if (enrich and not is_chunk) else EnrichmentStatus.COMPLETED,
                 )
                 session.add(track)
                 await session.flush()
@@ -285,7 +308,7 @@ class TrackService:
             else:
                 logger.info(f"Track {track_id} registered globally without adding to user {user_id}'s library")
         
-        if is_new and enrich:
+        if is_new and enrich and not is_chunk:
             enrichment_worker.notify_new_track()
         
         return SaveTrackResult(

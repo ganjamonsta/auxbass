@@ -11,8 +11,12 @@ import time
 from typing import Optional, List, Dict, Any, Tuple, Callable
 
 import yt_dlp
+from yt_dlp.utils import download_range_func
 
-from ..base import BaseMusicProvider, SourceEntity, TrackMetadata, DownloadedAudio, EntityType
+from ..base import (
+    BaseMusicProvider, SourceEntity, TrackMetadata, DownloadedAudio, EntityType,
+    calculate_preview_range,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -296,10 +300,26 @@ class SoundCloudProvider(BaseMusicProvider):
         track_meta: TrackMetadata,
         temp_dir: str,
         progress_hook: Optional[Callable[[int], None]] = None,
+        chunk_only: bool = False,
+        chunk_duration: int = 30,
+        chunk_start: Optional[int] = None,
     ) -> DownloadedAudio:
-        """Download track to MP3 and fetch high quality cover artwork."""
+        """Download track to MP3 and fetch high quality cover artwork. Supports 30s preview chunks."""
         os.makedirs(temp_dir, exist_ok=True)
         out_template = os.path.join(temp_dir, "audio.%(ext)s")
+
+        # Calculate preview range avoiding empty intros
+        start_sec, end_sec = (0, chunk_duration)
+        if chunk_only:
+            if chunk_start is not None:
+                start_sec = max(0, chunk_start)
+                end_sec = start_sec + chunk_duration
+            else:
+                start_sec, end_sec = calculate_preview_range(track_meta.duration, chunk_seconds=chunk_duration)
+            logger.info(
+                f"[SoundCloud] Downloading {chunk_duration}s preview chunk for "
+                f"'{track_meta.artist} - {track_meta.title}' (range: {start_sec}s..{end_sec}s)"
+            )
 
         def _yt_progress(d):
             if not progress_hook:
@@ -330,12 +350,16 @@ class SoundCloudProvider(BaseMusicProvider):
                     {
                         "key": "FFmpegExtractAudio",
                         "preferredcodec": "mp3",
-                        "preferredquality": "320",
+                        "preferredquality": "192" if chunk_only else "320",
                     }
                 ],
                 "quiet": True,
                 "no_warnings": True,
             }
+            if chunk_only:
+                ydl_opts["download_ranges"] = download_range_func(None, [(start_sec, end_sec)])
+                ydl_opts["force_keyframes_at_cuts"] = True
+
             try:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     return ydl.extract_info(track_meta.url, download=True)
@@ -357,7 +381,8 @@ class SoundCloudProvider(BaseMusicProvider):
                 from ..audio_resolver import audio_resolver
                 try:
                     return await audio_resolver.resolve_and_download(
-                        track_meta, temp_dir, exclude_urls={track_meta.url}, progress_hook=progress_hook
+                        track_meta, temp_dir, exclude_urls={track_meta.url}, progress_hook=progress_hook,
+                        chunk_only=chunk_only, chunk_duration=chunk_duration, chunk_start=chunk_start,
                     )
                 except Exception as resolve_err:
                     logger.warning(f"AudioResolver fallback failed for '{track_meta.title}': {resolve_err}")
@@ -423,6 +448,12 @@ class SoundCloudProvider(BaseMusicProvider):
             except Exception as e:
                 logger.warning(f"Could not download cover for track {track_meta.title}: {e}")
                 cover_path = None
+
+        if chunk_only:
+            if track_meta.duration and track_meta.duration > chunk_duration:
+                track_meta.extra["full_duration"] = track_meta.duration
+            track_meta.duration = chunk_duration
+            track_meta.extra["is_chunk"] = True
 
         return DownloadedAudio(
             audio_path=expected_audio,

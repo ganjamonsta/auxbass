@@ -2,7 +2,7 @@
   <div class="library-tracks">
     <!-- Action Bar: Shuffle, Sort & Expandable Search -->
     <div v-if="!hideToolbar" class="library-toolbar" :class="{ 'search-active': isSearchOpen }">
-      <!-- Action controls (hidden when search is open) -->
+      <!-- Left action controls (hidden when search is open) -->
       <div v-if="!isSearchOpen" class="toolbar-controls">
         <button class="shuffle-all-btn" @click="shuffleAll" :disabled="!total || shuffling">
           <div v-if="shuffling" class="spinner small"></div>
@@ -19,7 +19,12 @@
           @next="onNextSort"
           @toggle-order="onToggleOrder"
         />
+      </div>
+
+      <!-- Right action controls: Refresh & Expandable Search -->
+      <div class="toolbar-actions-right" :class="{ 'search-active': isSearchOpen }">
         <button 
+          v-if="!isSearchOpen"
           class="refresh-btn" 
           :class="{ 'is-refreshing': isRefreshing }"
           @click="refreshTracks" 
@@ -27,19 +32,19 @@
           title="Обновить список треков"
           aria-label="Обновить список треков"
         >
-          <RefreshCw :size="15" class="refresh-icon" :class="{ 'spin-anim': isRefreshing }" />
+          <RefreshCw :size="16" class="refresh-icon" :class="{ 'spin-anim': isRefreshing }" />
         </button>
-      </div>
 
-      <!-- Expandable Search -->
-      <ExpandableSearch
-        v-model="localQuery"
-        v-model:open="isSearchOpen"
-        placeholder="Название или исполнитель..."
-        title="Поиск по трекам"
-        @input="onSearchInput"
-        @clear="onSearchClear"
-      />
+        <!-- Expandable Search -->
+        <ExpandableSearch
+          v-model="localQuery"
+          v-model:open="isSearchOpen"
+          placeholder="Название или исполнитель..."
+          title="Поиск по трекам"
+          @input="onSearchInput"
+          @clear="onSearchClear"
+        />
+      </div>
     </div>
 
     <!-- Virtual track list (without search) -->
@@ -563,26 +568,40 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
+.toolbar-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.toolbar-actions-right.search-active {
+  flex: 1;
+  width: 100%;
+}
+
 .refresh-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background: var(--c-bg-3, #282828);
-  border: 1px solid var(--c-border-subtle, rgba(255, 255, 255, 0.1));
-  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+  background: var(--c-bg-2, rgba(255, 255, 255, 0.08));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--c-text-2, rgba(255, 255, 255, 0.8));
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   flex-shrink: 0;
 }
 
 .refresh-btn:hover:not(:disabled) {
-  background: var(--c-bg-4, #383838);
+  background: rgba(255, 255, 255, 0.15);
   color: var(--c-text-1, #fff);
-  border-color: var(--c-border, rgba(255, 255, 255, 0.2));
-  transform: scale(1.05);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px) scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .refresh-btn:active:not(:disabled) {
@@ -595,7 +614,13 @@ onUnmounted(() => {
 }
 
 .refresh-icon {
+  color: var(--c-text-2, rgba(255, 255, 255, 0.75));
+  transition: color 0.2s ease;
   flex-shrink: 0;
+}
+
+.refresh-btn:hover:not(:disabled) .refresh-icon {
+  color: var(--c-text-1, #fff);
 }
 
 .spin-anim {

@@ -841,6 +841,7 @@ const handleQuickPlaySoundCloud = async (scTrack) => {
       genre: scTrack.genre,
       tags: scTrack.tags,
       add_to_library: false,
+      preview_only: true,
     })
 
     const track = res.data?.track
@@ -848,7 +849,8 @@ const handleQuickPlaySoundCloud = async (scTrack) => {
       if (track.in_library) {
         scTrack.in_library = true
       }
-      scTrack.already_in_tg = true
+      scTrack.is_chunk = track.is_chunk
+      scTrack.already_in_tg = !track.is_chunk
       scTrack.track_id = track.id
       playerStore.playTrack(track, [track], 0)
     }
@@ -1031,6 +1033,7 @@ const handleQuickPlaySpotify = async (spTrack) => {
       duration: spTrack.duration,
       cover_url: spTrack.cover_url,
       add_to_library: false,
+      preview_only: true,
     })
 
     const track = res.data?.track
@@ -1038,7 +1041,8 @@ const handleQuickPlaySpotify = async (spTrack) => {
       if (track.in_library) {
         spTrack.in_library = true
       }
-      spTrack.already_in_tg = true
+      spTrack.is_chunk = track.is_chunk
+      spTrack.already_in_tg = !track.is_chunk
       spTrack.track_id = track.id
       playerStore.playTrack(track, [track], 0)
     }
@@ -1106,6 +1110,7 @@ const handleQuickPlayYouTube = async (ytTrack) => {
       duration: ytTrack.duration,
       cover_url: ytTrack.cover_url,
       add_to_library: false,
+      preview_only: true,
     })
 
     const track = res.data?.track
@@ -1113,7 +1118,8 @@ const handleQuickPlayYouTube = async (ytTrack) => {
       if (track.in_library) {
         ytTrack.in_library = true
       }
-      ytTrack.already_in_tg = true
+      ytTrack.is_chunk = track.is_chunk
+      ytTrack.already_in_tg = !track.is_chunk
       ytTrack.track_id = track.id
       playerStore.playTrack(track, [track], 0)
     }

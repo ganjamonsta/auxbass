@@ -84,6 +84,8 @@ async def deliver_single_track(
 
         if album_name:
             caption += f"\n💿 <i>{album_name}</i>"
+        if getattr(track, "is_chunk", False):
+            caption += "\n✂️ <i>[Превью 30 сек]</i>"
         caption += "\n\n🎵 <i>TG Player</i>"
 
         try:

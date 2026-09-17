@@ -38,6 +38,14 @@
               <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-8 12H9.5v-2h-2v2H6V9h1.5v2.5h2V9H11v6zm2-6h4c.55 0 1 .45 1 1v4c0 .55-.45 1-1 1h-4V9zm1.5 4.5h2v-3h-2v3z"/>
             </svg>
           </span>
+          <!-- 30s Preview indicator -->
+          <span 
+            v-if="track?.is_chunk" 
+            class="lcd-indicator chunk-indicator active" 
+            title="30-секундное ознакомительное превью"
+          >
+            30s
+          </span>
           <span 
             class="lcd-indicator like-indicator" 
             :class="{ active: isLiked }" 
@@ -373,6 +381,16 @@ const formatTime = (seconds) => {
 .lcd-indicator.hd-indicator.active {
   color: #ffd700;
   text-shadow: 0 0 8px rgba(255, 215, 0, 0.8);
+}
+
+.lcd-indicator.chunk-indicator.active {
+  color: #facc15;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: default;
+  text-shadow: 0 0 6px rgba(250, 204, 21, 0.8);
+  width: auto;
+  padding: 0 4px;
 }
 
 .lcd-indicator.like-indicator:hover {

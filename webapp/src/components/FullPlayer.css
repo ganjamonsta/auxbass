@@ -301,6 +301,21 @@
   }
 }
 
+/* Chunk / Preview Badge */
+.chunk-badge {
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: rgba(234, 179, 8, 0.2);
+  color: #facc15;
+  border: 1px solid rgba(234, 179, 8, 0.4);
+  border-radius: 4px;
+  margin-left: 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .track-artist {
   font-size: 15px;
   color: var(--c-text-2);

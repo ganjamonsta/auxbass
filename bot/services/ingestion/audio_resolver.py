@@ -13,6 +13,7 @@ from typing import Optional, List, Set, Callable, Tuple
 
 import aiohttp
 import yt_dlp
+from yt_dlp.utils import download_range_func
 
 from shared.matching import (
     clean_track_metadata,
@@ -22,7 +23,7 @@ from shared.matching import (
     ARTIST_MATCH_THRESHOLD,
     TITLE_MATCH_THRESHOLD,
 )
-from .base import TrackMetadata, DownloadedAudio
+from .base import TrackMetadata, DownloadedAudio, calculate_preview_range
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +43,13 @@ class AudioResolver:
         temp_dir: str,
         exclude_urls: Optional[Set[str]] = None,
         progress_hook: Optional[Callable[[int], None]] = None,
+        chunk_only: bool = False,
+        chunk_duration: int = 30,
+        chunk_start: Optional[int] = None,
     ) -> DownloadedAudio:
         """
         Find an alternative unencrypted audio stream matching the track,
-        download it at 320kbps MP3, and tag it with original metadata and cover.
+        download it at 320kbps MP3 (or 192kbps 30s chunk), and tag it with original metadata and cover.
         Tries SoundCloud candidates with retry loop, then falls back to YouTube Music.
         """
         os.makedirs(temp_dir, exist_ok=True)
@@ -89,7 +93,11 @@ class AudioResolver:
                     f"[AudioResolver] Trying SoundCloud candidate for '{track_meta.artist} - {track_meta.title}': "
                     f"'{cand_title}' ({cand_url})"
                 )
-                downloaded_audio_path = await self._download_stream(cand_url, temp_dir, progress_hook=progress_hook)
+                downloaded_audio_path = await self._download_stream(
+                    cand_url, temp_dir, progress_hook=progress_hook,
+                    chunk_only=chunk_only, chunk_duration=chunk_duration,
+                    chunk_start=chunk_start, total_duration=track_meta.duration,
+                )
                 matched_candidate_title = cand_title
                 matched_candidate_url = cand_url
                 break
@@ -132,7 +140,11 @@ class AudioResolver:
                         f"[AudioResolver] Trying YouTube candidate for '{track_meta.artist} - {track_meta.title}': "
                         f"'{cand_title}' ({cand_url})"
                     )
-                    downloaded_audio_path = await self._download_stream(cand_url, temp_dir, progress_hook=progress_hook)
+                    downloaded_audio_path = await self._download_stream(
+                        cand_url, temp_dir, progress_hook=progress_hook,
+                        chunk_only=chunk_only, chunk_duration=chunk_duration,
+                        chunk_start=chunk_start, total_duration=track_meta.duration,
+                    )
                     matched_candidate_title = cand_title
                     matched_candidate_url = cand_url
                     break
@@ -168,6 +180,12 @@ class AudioResolver:
                 cover_path = None
 
         file_size = os.path.getsize(downloaded_audio_path)
+
+        if chunk_only:
+            if track_meta.duration and track_meta.duration > chunk_duration:
+                track_meta.extra["full_duration"] = track_meta.duration
+            track_meta.duration = chunk_duration
+            track_meta.extra["is_chunk"] = True
 
         return DownloadedAudio(
             audio_path=downloaded_audio_path,
@@ -312,9 +330,26 @@ class AudioResolver:
         url: str,
         temp_dir: str,
         progress_hook: Optional[Callable[[int], None]] = None,
+        chunk_only: bool = False,
+        chunk_duration: int = 30,
+        chunk_start: Optional[int] = None,
+        total_duration: Optional[int] = None,
     ) -> str:
-        """Download candidate audio stream to MP3 at 320kbps."""
+        """Download candidate audio stream to MP3 at 320kbps (or 192kbps 30s preview chunk)."""
         out_template = os.path.join(temp_dir, "resolved_audio.%(ext)s")
+
+        # Calculate preview range avoiding empty intros
+        start_sec, end_sec = (0, chunk_duration)
+        if chunk_only:
+            if chunk_start is not None:
+                start_sec = max(0, chunk_start)
+                end_sec = start_sec + chunk_duration
+            else:
+                start_sec, end_sec = calculate_preview_range(total_duration, chunk_seconds=chunk_duration)
+            logger.info(
+                f"[AudioResolver] Downloading {chunk_duration}s preview chunk for stream {url} "
+                f"(range: {start_sec}s..{end_sec}s)"
+            )
 
         def _yt_progress(d):
             if not progress_hook:
@@ -345,12 +380,16 @@ class AudioResolver:
                     {
                         "key": "FFmpegExtractAudio",
                         "preferredcodec": "mp3",
-                        "preferredquality": "320",
+                        "preferredquality": "192" if chunk_only else "320",
                     }
                 ],
                 "quiet": True,
                 "no_warnings": True,
             }
+            if chunk_only:
+                ydl_opts["download_ranges"] = download_range_func(None, [(start_sec, end_sec)])
+                ydl_opts["force_keyframes_at_cuts"] = True
+
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
 

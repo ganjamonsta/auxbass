@@ -29,6 +29,7 @@
     <template v-else>
       <!-- Hero Card with integrated edge tabs & details panel -->
       <ProfileHeroCard
+        class="profile-hero-wrapper"
         :user="user"
         :isSelf="isSelf"
         :isFollowing="isFollowing"
@@ -60,12 +61,13 @@
       <!-- Active Background Imports Panel (when viewing self) -->
       <ProfileActiveImports
         v-if="isSelf"
+        class="profile-imports-wrapper"
         @restore="handleRestoreJob"
         @cancel="handleCancelJob"
       />
 
       <!-- Overview Tab Content -->
-      <div v-show="activeTab === 'overview'" class="tab-pane">
+      <div v-show="activeTab === 'overview'" class="tab-pane tab-pane-overview">
         <ProfileTabsOverview
           :user="user"
           :isSelf="isSelf"
@@ -85,7 +87,7 @@
       </div>
 
       <!-- Tracks Tab Content -->
-      <div v-show="activeTab === 'tracks'" class="tab-pane">
+      <div v-show="activeTab === 'tracks'" class="tab-pane tab-pane-bounded">
         <VirtualTrackList
           v-if="hasOpenedTracks || activeTab === 'tracks'"
           :key="'user-tracks-' + userId"
@@ -110,7 +112,7 @@
       </div>
 
       <!-- Playlists Tab Content -->
-      <div v-show="activeTab === 'playlists'" class="tab-pane">
+      <div v-show="activeTab === 'playlists'" class="tab-pane tab-pane-bounded">
         <VirtualGrid
           v-if="hasOpenedPlaylists || activeTab === 'playlists'"
           :key="'user-playlists-' + userId"
@@ -131,7 +133,7 @@
       </div>
 
       <!-- Albums Tab Content -->
-      <div v-show="activeTab === 'albums'" class="tab-pane">
+      <div v-show="activeTab === 'albums'" class="tab-pane tab-pane-bounded">
         <VirtualGrid
           v-if="hasOpenedAlbums || activeTab === 'albums'"
           :key="'user-albums-' + userId"
@@ -152,7 +154,7 @@
       </div>
 
       <!-- SoundCloud Tab Content -->
-      <div v-show="activeTab === 'soundcloud'" class="tab-pane">
+      <div v-show="activeTab === 'soundcloud'" class="tab-pane tab-pane-bounded">
         <ProfileTabSoundCloud
           v-if="hasOpenedSoundCloud || activeTab === 'soundcloud'"
           ref="scTabRef"
@@ -866,14 +868,37 @@ onMounted(() => {
 
 <style scoped>
 .user-profile-view {
-  padding: 24px 32px 48px;
-  max-width: 1400px;
-  margin: 0 auto;
-  min-height: calc(100vh - 120px);
+  padding: 24px 0 48px var(--content-padding, 24px);
   width: 100%;
+  max-width: 100%;
+  min-height: calc(100vh - 120px);
   box-sizing: border-box;
   container-type: inline-size;
   container-name: userprofile;
+}
+
+@media (min-width: 1024px) {
+  .user-profile-view {
+    padding: 24px 0 48px var(--content-padding, 32px);
+  }
+}
+
+.profile-hero-wrapper,
+.profile-imports-wrapper,
+.tab-pane-bounded,
+.user-tabs-bar {
+  max-width: var(--content-max-width, 1400px);
+  margin-right: var(--content-padding, 24px);
+  box-sizing: border-box;
+}
+
+@media (min-width: 1024px) {
+  .profile-hero-wrapper,
+  .profile-imports-wrapper,
+  .tab-pane-bounded,
+  .user-tabs-bar {
+    margin-right: var(--content-padding, 32px);
+  }
 }
 
 .loading-container {
@@ -890,6 +915,15 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   gap: 12px;
+  max-width: var(--content-max-width, 1400px);
+  margin-right: var(--content-padding, 24px);
+  box-sizing: border-box;
+}
+
+@media (min-width: 1024px) {
+  .empty-state {
+    margin-right: var(--content-padding, 32px);
+  }
 }
 
 .empty-icon {
@@ -1055,8 +1089,15 @@ onMounted(() => {
 /* Responsive */
 @media (max-width: 768px) {
   .user-profile-view {
-    padding: 16px 16px calc(var(--player-height, 70px) + var(--nav-height, 64px) + 32px);
+    padding: 16px 0 calc(var(--player-height, 70px) + var(--nav-height, 64px) + 32px) var(--content-padding, 16px);
     max-width: 100%;
+  }
+
+  .profile-hero-wrapper,
+  .profile-imports-wrapper,
+  .tab-pane-bounded,
+  .empty-state {
+    margin-right: var(--content-padding, 16px);
   }
 
   .user-tabs-bar {
@@ -1085,7 +1126,14 @@ onMounted(() => {
 
 @media (max-width: 480px) {
   .user-profile-view {
-    padding: 14px 14px calc(var(--player-height, 70px) + var(--nav-height, 64px) + 32px);
+    padding: 14px 0 calc(var(--player-height, 70px) + var(--nav-height, 64px) + 32px) var(--content-padding, 14px);
+  }
+
+  .profile-hero-wrapper,
+  .profile-imports-wrapper,
+  .tab-pane-bounded,
+  .empty-state {
+    margin-right: var(--content-padding, 14px);
   }
 
   .user-tabs-bar {

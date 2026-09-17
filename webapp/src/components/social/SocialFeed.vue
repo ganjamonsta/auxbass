@@ -11,7 +11,7 @@
           title="Обновления друзей, на которых вы подписаны"
         >
           <Users :size="15" />
-          <span class="neu-tab-content" data-text="Подписки">Подписки</span>
+          <span class="neu-tab-content" data-text="Моя лента">Моя лента</span>
         </button>
 
         <button 
@@ -86,6 +86,7 @@
           v-for="drop in groupedDrops" 
           :key="drop.id"
           class="feed-drop-card"
+          :class="{ 'is-active-drop': isDropPlaying(drop) }"
         >
           <!-- Drop Header: Uploader Info & Actions -->
           <div class="drop-header">
@@ -98,7 +99,7 @@
                 v-if="drop.uploader.avatar_url" 
                 :src="drop.uploader.avatar_url" 
                 class="uploader-avatar-img" 
-                alt="Avatar"
+                alt="Avatar" 
               />
               <span v-else class="uploader-initials">
                 {{ getInitials(drop.uploader) }}
@@ -109,6 +110,12 @@
               <div class="uploader-name-row">
                 <span class="uploader-name">{{ drop.uploader.display_name }}</span>
                 <span v-if="drop.uploader.id === authStore.user?.id" class="self-tag">Вы</span>
+                <!-- Mini equalizer indicator if tracks from this drop are playing -->
+                <div v-if="isDropPlaying(drop)" class="drop-eq-indicator" title="Сейчас играет">
+                  <span class="eq-col col-1"></span>
+                  <span class="eq-col col-2"></span>
+                  <span class="eq-col col-3"></span>
+                </div>
               </div>
               <div class="drop-meta-row">
                 <span v-if="drop.uploader.username" class="uploader-handle">@{{ drop.uploader.username }} • </span>
@@ -284,6 +291,11 @@ const toggleDropExpand = (drop) => {
 
 const isCurrentlyPlaying = (track) => {
   return playerStore.currentTrack?.id === track.id && playerStore.isPlaying
+}
+
+const isDropPlaying = (drop) => {
+  if (!playerStore.isPlaying || !playerStore.currentTrack) return false
+  return drop.tracks.some(t => t.id === playerStore.currentTrack.id)
 }
 
 const getInitials = (user) => {
@@ -547,46 +559,59 @@ onMounted(() => {
 
 .feed-drop-card {
   background: var(--c-bg-2);
-  border-radius: var(--r-xl);
-  padding: 14px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: var(--r-2xl);
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
   box-shadow: 
-    3px 3px 10px var(--sh-dark),
-    -2px -2px 5px var(--sh-light);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    4px 6px 18px var(--sh-dark),
+    -2px -2px 6px var(--sh-light);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
 }
 
 .feed-drop-card:hover {
-  border-color: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    6px 10px 22px var(--sh-dark),
+    0 0 14px rgba(255, 255, 255, 0.02);
+}
+
+.feed-drop-card.is-active-drop {
+  border-color: rgba(34, 197, 94, 0.35);
+  box-shadow: 
+    4px 6px 20px var(--sh-dark),
+    0 0 16px rgba(34, 197, 94, 0.12);
 }
 
 /* Drop Header */
 .drop-header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   margin-bottom: 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .uploader-avatar-box {
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--r-full);
-  background: linear-gradient(135deg, var(--c-accent), #8b5cf6);
+  background: linear-gradient(135deg, var(--c-accent), #3b82f6, #8b5cf6);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
   overflow: hidden;
-  box-shadow: 2px 2px 6px var(--sh-dark);
-  transition: transform 0.15s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: transform 0.18s ease, border-color 0.18s ease;
 }
 
 .uploader-avatar-box:hover {
-  transform: scale(1.05);
+  transform: scale(1.06);
+  border-color: rgba(34, 197, 94, 0.4);
 }
 
 .uploader-avatar-img {
@@ -610,16 +635,17 @@ onMounted(() => {
 .uploader-name-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .uploader-name {
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--c-text-1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: color 0.15s ease;
 }
 
 .uploader-name:hover {
@@ -633,15 +659,42 @@ onMounted(() => {
   color: #fff;
   padding: 1px 6px;
   border-radius: var(--r-full);
+  line-height: 1;
+  box-shadow: 0 0 6px var(--c-accent-glow);
+}
+
+/* Mini equalizer soundbars in drop header */
+.drop-eq-indicator {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 13px;
+  margin-left: 4px;
+}
+
+.eq-col {
+  width: 3px;
+  background: var(--c-accent);
+  border-radius: 1px;
+  animation: dropEqPulse 0.8s ease-in-out infinite alternate;
+}
+
+.col-1 { height: 50%; animation-delay: 0.1s; }
+.col-2 { height: 100%; animation-delay: 0.3s; }
+.col-3 { height: 35%; animation-delay: 0.2s; }
+
+@keyframes dropEqPulse {
+  0% { height: 25%; opacity: 0.6; }
+  100% { height: 100%; opacity: 1; }
 }
 
 .drop-meta-row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   font-size: 12px;
   color: var(--c-text-2);
-  margin-top: 2px;
+  margin-top: 3px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -649,6 +702,7 @@ onMounted(() => {
 
 .uploader-handle {
   color: var(--c-text-3);
+  font-weight: 500;
 }
 
 .drop-action-text {
@@ -669,33 +723,38 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 7px 14px;
   border-radius: var(--r-full);
   background: rgba(34, 197, 94, 0.12);
-  border: 1px solid rgba(34, 197, 94, 0.25);
+  border: 1px solid rgba(34, 197, 94, 0.3);
   color: var(--c-accent);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.18s ease;
   white-space: nowrap;
+  box-shadow: 2px 2px 6px var(--sh-dark);
 }
 
 .btn-play-drop:hover {
   background: var(--c-accent);
   color: #fff;
   transform: translateY(-1px);
+  box-shadow: 0 0 12px var(--c-accent-glow);
 }
 
 .btn-play-drop:active {
   transform: scale(0.96);
 }
 
-/* Drop tracks */
+/* Drop tracks box */
 .drop-tracks-box {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: var(--r-xl);
+  padding: 4px;
 }
 
 .btn-expand-drop {

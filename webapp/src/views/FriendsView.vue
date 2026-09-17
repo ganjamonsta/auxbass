@@ -2,45 +2,103 @@
   <div class="friends-view">
     <!-- No channel - show setup prompt -->
     <div v-if="!authStore.hasChannel" class="no-channel-prompt">
-      <div class="prompt-icon"><Users :size="48" /></div>
-      <h2>Подписки</h2>
-      <p>Подключите Telegram-канал, чтобы находить друзей и подписываться на их музыку</p>
+      <div class="prompt-icon"><Users :size="52" /></div>
+      <h2>Социальная сеть AuxBass</h2>
+      <p>Подключите Telegram-канал, чтобы подписываться на других пользователей, слушать их медиатеки и следить за свежими треками друзей.</p>
       <button class="setup-btn" @click="goToChannelSetup">
-        Подключить канал
+        <Sparkles :size="16" />
+        <span>Подключить канал</span>
       </button>
     </div>
 
     <!-- Has channel - show friends hub -->
     <template v-else>
-      <!-- My Profile banner -->
-      <div v-if="authStore.user" class="my-profile-banner" @click="router.push(`/user/${authStore.user.id}`)">
-        <div class="user-avatar my-avatar">
-          <img v-if="authStore.userAvatarUrl" :src="authStore.userAvatarUrl" class="card-avatar-img" alt="Avatar" />
-          <template v-else>{{ getInitials(authStore.user) }}</template>
-        </div>
-        <div class="user-info">
-          <div class="user-name">
-            {{ authStore.userDisplayName }}
-            <span class="self-badge">Вы</span>
+      <!-- ═══ Social Hub Hero Header ═══ -->
+      <div 
+        v-if="authStore.user" 
+        class="social-hub-header" 
+        @click="goToMyProfile"
+        title="Перейти в свой профиль"
+      >
+        <!-- Background Ambient Glow -->
+        <div class="hub-ambient-glow"></div>
+
+        <div class="hub-user-main">
+          <!-- Avatar with glowing ring -->
+          <div class="hub-avatar-wrapper">
+            <div class="hub-avatar">
+              <img 
+                v-if="authStore.userAvatarUrl" 
+                :src="authStore.userAvatarUrl" 
+                class="hub-avatar-img" 
+                alt="Avatar" 
+              />
+              <span v-else class="hub-avatar-initials">{{ getInitials(authStore.user) }}</span>
+            </div>
+            <div class="hub-avatar-ring"></div>
           </div>
-          <div class="user-meta">
-            <span v-if="authStore.user.username">@{{ authStore.user.username }} • </span>
-            <span>Мой публичный профиль</span>
+
+          <!-- User info & quick stats -->
+          <div class="hub-user-details">
+            <div class="hub-user-name-line">
+              <span class="hub-user-name">{{ authStore.userDisplayName }}</span>
+              <span class="hub-self-badge">Вы</span>
+            </div>
+
+            <div class="hub-user-meta">
+              <span v-if="authStore.user.username" class="hub-handle">@{{ authStore.user.username }}</span>
+              <span v-if="authStore.user.username" class="meta-separator">•</span>
+              <span class="hub-status-text">Мой публичный профиль</span>
+            </div>
+
+            <!-- Header Quick Stats Pills -->
+            <div class="hub-stats-row" @click.stop>
+              <button 
+                class="hub-stat-chip" 
+                :class="{ active: activeTab === 'following' }"
+                @click="activeTab = 'following'"
+                title="Посмотреть подписки"
+              >
+                <Users :size="12" class="chip-icon" />
+                <span class="chip-num">{{ following.length }}</span>
+                <span class="chip-label">подписок</span>
+              </button>
+
+              <button 
+                class="hub-stat-chip"
+                :class="{ active: activeTab === 'followers' }"
+                @click="activeTab = 'followers'"
+                title="Посмотреть подписчиков"
+              >
+                <UserCheck :size="12" class="chip-icon" />
+                <span class="chip-num">{{ followers.length }}</span>
+                <span class="chip-label">подписчиков</span>
+              </button>
+
+              <div v-if="mutualCount > 0" class="hub-stat-chip mutual-chip" title="Взаимные подписки">
+                <Sparkles :size="12" class="chip-icon" />
+                <span class="chip-num">{{ mutualCount }}</span>
+                <span class="chip-label">взаимно</span>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="my-profile-arrow">
-          <ChevronRight :size="20" />
+
+        <!-- Open Profile Action Button -->
+        <div class="hub-action-btn">
+          <span>Профиль</span>
+          <ChevronRight :size="18" />
         </div>
       </div>
 
-      <!-- Unified Tab switcher -->
+      <!-- ═══ Unified Tab Navigation ═══ -->
       <div class="neu-tab-bar friends-tabs">
         <button 
           class="neu-tab" 
           :class="{ active: activeTab === 'feed' }"
           @click="activeTab = 'feed'"
         >
-          <Flame :size="15" />
+          <Flame :size="16" />
           <span class="neu-tab-content" data-text="Лента">Лента</span>
         </button>
 
@@ -49,7 +107,7 @@
           :class="{ active: activeTab === 'following' }"
           @click="activeTab = 'following'"
         >
-          <Users :size="15" />
+          <Users :size="16" />
           <span class="neu-tab-content" data-text="Подписки">
             Подписки
             <span v-if="following.length" class="tab-badge">{{ following.length }}</span>
@@ -61,7 +119,7 @@
           :class="{ active: activeTab === 'followers' }"
           @click="activeTab = 'followers'"
         >
-          <User :size="15" />
+          <User :size="16" />
           <span class="neu-tab-content" data-text="Подписчики">
             Подписчики
             <span v-if="followers.length" class="tab-badge">{{ followers.length }}</span>
@@ -74,253 +132,303 @@
           :class="{ active: activeTab === 'search' }"
           @click="activeTab = 'search'"
         >
-          <Search :size="15" />
+          <Search :size="16" />
           <span class="neu-tab-content" data-text="Поиск">Поиск</span>
         </button>
       </div>
 
-      <!-- Tab 1: Activity Feed -->
+      <!-- ══════════════════════════════════════════
+           TAB 1: Activity Feed
+           ══════════════════════════════════════════ -->
       <div v-show="activeTab === 'feed'" class="tab-content">
         <SocialFeed @navigate-tab="handleNavigateTab" />
       </div>
 
-      <!-- Tab 2: Following List -->
+      <!-- ══════════════════════════════════════════
+           TAB 2: Following List
+           ══════════════════════════════════════════ -->
       <div v-show="activeTab === 'following'" class="tab-content">
-        <!-- Local search filter for friends -->
-        <div v-if="following.length > 3" class="friends-filter-bar">
-          <SearchBar
-            v-model="followingSearch"
-            placeholder="Фильтр по имени или @username..."
-          />
+        <!-- Control Toolbar: Filter, Sort & View Mode Switcher -->
+        <div v-if="following.length > 0" class="social-toolbar">
+          <div class="toolbar-search-box">
+            <Search :size="15" class="search-input-icon" />
+            <input 
+              v-model="followingSearch" 
+              type="text" 
+              class="toolbar-search-input"
+              placeholder="Фильтр по имени или @username..."
+            />
+            <button 
+              v-if="followingSearch" 
+              class="clear-search-btn" 
+              @click="followingSearch = ''"
+              title="Очистить"
+            >
+              <X :size="14" />
+            </button>
+          </div>
+
+          <div class="toolbar-controls-right">
+            <!-- Sort Filter -->
+            <div class="sort-selector">
+              <button 
+                class="toolbar-btn sort-btn" 
+                @click="cycleSort"
+                :title="`Сортировка: ${sortLabel}`"
+              >
+                <ArrowUpDown :size="14" />
+                <span class="sort-text">{{ sortLabel }}</span>
+              </button>
+            </div>
+
+            <!-- View Switcher (Grid vs List) -->
+            <div class="view-mode-toggle">
+              <button 
+                class="view-toggle-btn" 
+                :class="{ active: viewMode === 'grid' }"
+                @click="viewMode = 'grid'"
+                title="Сетка карточек"
+              >
+                <LayoutGrid :size="15" />
+              </button>
+              <button 
+                class="view-toggle-btn" 
+                :class="{ active: viewMode === 'list' }"
+                @click="viewMode = 'list'"
+                title="Компактный список"
+              >
+                <List :size="15" />
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div v-if="loading" class="loading">
+        <!-- Loading State -->
+        <div v-if="loading" class="loading-state">
           <div class="spinner"></div>
         </div>
 
-        <div v-else-if="following.length === 0" class="empty-state">
-          <span class="empty-icon"><Users :size="48" /></span>
-          <p>Вы пока ни на кого не подписаны</p>
+        <!-- Empty: No following at all -->
+        <div v-else-if="following.length === 0" class="empty-glass-card">
+          <div class="empty-icon-glow">
+            <Users :size="48" />
+          </div>
+          <h3>Вы пока ни на кого не подписаны</h3>
+          <p>Подписывайтесь на других пользователей, чтобы видеть их новые треки в своей персональной ленте и слушать их плейлисты.</p>
           <button v-if="canUseSocial" class="btn-pill-primary" @click="activeTab = 'search'">
-            Найти друзей
+            <Search :size="15" />
+            <span>Найти друзей</span>
           </button>
-          <p v-else class="hint">Подключите канал для поиска друзей</p>
         </div>
 
-        <div v-else-if="filteredFollowing.length === 0" class="empty-state">
-          <span class="empty-icon"><Search :size="40" /></span>
-          <p>Друзей с таким именем не найдено</p>
-        </div>
-
-        <div v-else class="users-grid">
-          <div 
-            v-for="user in filteredFollowing" 
-            :key="user.id"
-            class="user-card"
-            @click="viewUserProfile(user)"
-          >
-            <div class="user-card-main">
-              <div class="user-avatar">
-                <img v-if="getUserAvatar(user)" :src="getUserAvatar(user)" class="card-avatar-img" alt="Avatar" />
-                <template v-else>{{ getInitials(user) }}</template>
-              </div>
-              <div class="user-info">
-                <div class="user-name-line">
-                  <span class="user-name">{{ user.display_name }}</span>
-                  <span v-if="user.username" class="user-handle">@{{ user.username }}</span>
-                </div>
-                <div class="user-stats-row">
-                  <span class="user-stat-chip">{{ user.track_count }} {{ getTracksWord(user.track_count) }}</span>
-                  <span v-if="user.playlist_count" class="stat-dot">•</span>
-                  <span v-if="user.playlist_count" class="user-stat-chip">{{ user.playlist_count }} плейл.</span>
-                  <span v-if="user.followers_count" class="stat-dot">•</span>
-                  <span v-if="user.followers_count" class="user-stat-chip">{{ user.followers_count }} подп.</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Card Actions -->
-            <div class="user-card-actions">
-              <!-- Quick Play Library -->
-              <button 
-                v-if="user.track_count > 0"
-                class="btn-user-listen"
-                @click.stop="handlePlayUserTracks(user)"
-                title="Слушать медиатеку пользователя"
-              >
-                <Play :size="14" fill="currentColor" />
-                <span>Слушать</span>
-              </button>
-
-              <!-- Unfollow Button -->
-              <button 
-                class="btn-unfollow" 
-                @click.stop="unfollowUser(user)"
-                title="Отписаться"
-              >
-                <Check :size="14" />
-                <span>Подписан</span>
-              </button>
-            </div>
+        <!-- Empty: No matches after local filter -->
+        <div v-else-if="displayedFollowing.length === 0" class="empty-glass-card">
+          <div class="empty-icon-glow">
+            <Search :size="42" />
           </div>
+          <h3>Никого не найдено</h3>
+          <p>Среди ваших подписок нет пользователей, соответствующих запросу «{{ followingSearch }}».</p>
+          <button class="btn-pill-secondary" @click="followingSearch = ''">
+            Сбросить фильтр
+          </button>
+        </div>
+
+        <!-- Following Cards Grid / List -->
+        <div v-else :class="['users-collection', `view-${viewMode}`]">
+          <UserSocialCard
+            v-for="user in displayedFollowing"
+            :key="user.id"
+            :user="user"
+            :layout="viewMode"
+            :isSelf="user.id === authStore.user?.id"
+            :isMutual="mutualUserIds.has(user.id)"
+            :isLoading="actionLoadingId === user.id"
+            @click="viewUserProfile(user)"
+            @play="handlePlayUserTracks(user)"
+            @follow="followUser(user)"
+            @unfollow="unfollowUser(user)"
+          />
         </div>
       </div>
 
-      <!-- Tab 3: Followers List -->
+      <!-- ══════════════════════════════════════════
+           TAB 3: Followers List
+           ══════════════════════════════════════════ -->
       <div v-show="activeTab === 'followers'" class="tab-content">
-        <!-- Local search filter for followers -->
-        <div v-if="followers.length > 3" class="friends-filter-bar">
-          <SearchBar
-            v-model="followersSearch"
-            placeholder="Фильтр подписчиков..."
-          />
-        </div>
+        <!-- Control Toolbar: Filter, Sort & View Mode Switcher -->
+        <div v-if="followers.length > 0" class="social-toolbar">
+          <div class="toolbar-search-box">
+            <Search :size="15" class="search-input-icon" />
+            <input 
+              v-model="followersSearch" 
+              type="text" 
+              class="toolbar-search-input"
+              placeholder="Фильтр подписчиков..."
+            />
+            <button 
+              v-if="followersSearch" 
+              class="clear-search-btn" 
+              @click="followersSearch = ''"
+              title="Очистить"
+            >
+              <X :size="14" />
+            </button>
+          </div>
 
-        <div v-if="loading" class="loading">
-          <div class="spinner"></div>
-        </div>
-
-        <div v-else-if="followers.length === 0" class="empty-state">
-          <span class="empty-icon"><User :size="48" /></span>
-          <p>Пока никто не подписался на вас</p>
-        </div>
-
-        <div v-else-if="filteredFollowers.length === 0" class="empty-state">
-          <span class="empty-icon"><Search :size="40" /></span>
-          <p>Подписчиков с таким именем не найдено</p>
-        </div>
-
-        <div v-else class="users-grid">
-          <div 
-            v-for="user in filteredFollowers" 
-            :key="user.id"
-            class="user-card"
-            @click="viewUserProfile(user)"
-          >
-            <div class="user-card-main">
-              <div class="user-avatar">
-                <img v-if="getUserAvatar(user)" :src="getUserAvatar(user)" class="card-avatar-img" alt="Avatar" />
-                <template v-else>{{ getInitials(user) }}</template>
-              </div>
-              <div class="user-info">
-                <div class="user-name-line">
-                  <span class="user-name">{{ user.display_name }}</span>
-                  <span v-if="user.username" class="user-handle">@{{ user.username }}</span>
-                </div>
-                <div class="user-stats-row">
-                  <span class="user-stat-chip">{{ user.track_count }} {{ getTracksWord(user.track_count) }}</span>
-                  <span v-if="user.playlist_count" class="stat-dot">•</span>
-                  <span v-if="user.playlist_count" class="user-stat-chip">{{ user.playlist_count }} плейл.</span>
-                </div>
-              </div>
+          <div class="toolbar-controls-right">
+            <!-- Sort Filter -->
+            <div class="sort-selector">
+              <button 
+                class="toolbar-btn sort-btn" 
+                @click="cycleSort"
+                :title="`Сортировка: ${sortLabel}`"
+              >
+                <ArrowUpDown :size="14" />
+                <span class="sort-text">{{ sortLabel }}</span>
+              </button>
             </div>
 
-            <!-- Card Actions -->
-            <div class="user-card-actions">
+            <!-- View Switcher (Grid vs List) -->
+            <div class="view-mode-toggle">
               <button 
-                v-if="user.track_count > 0"
-                class="btn-user-listen"
-                @click.stop="handlePlayUserTracks(user)"
-                title="Слушать медиатеку пользователя"
+                class="view-toggle-btn" 
+                :class="{ active: viewMode === 'grid' }"
+                @click="viewMode = 'grid'"
+                title="Сетка карточек"
               >
-                <Play :size="14" fill="currentColor" />
-                <span>Слушать</span>
-              </button>
-
-              <button 
-                v-if="!user.is_following"
-                class="btn-follow" 
-                @click.stop="followUser(user)"
-              >
-                Подписаться
+                <LayoutGrid :size="15" />
               </button>
               <button 
-                v-else
-                class="btn-unfollow" 
-                @click.stop="unfollowUser(user)"
+                class="view-toggle-btn" 
+                :class="{ active: viewMode === 'list' }"
+                @click="viewMode = 'list'"
+                title="Компактный список"
               >
-                <Check :size="14" /> Подписан
+                <List :size="15" />
               </button>
             </div>
           </div>
+        </div>
+
+        <!-- Loading State -->
+        <div v-if="loading" class="loading-state">
+          <div class="spinner"></div>
+        </div>
+
+        <!-- Empty: No followers yet -->
+        <div v-else-if="followers.length === 0" class="empty-glass-card">
+          <div class="empty-icon-glow">
+            <User :size="48" />
+          </div>
+          <h3>У вас пока нет подписчиков</h3>
+          <p>Делитесь ссылкой на свой публичный профиль с друзьями, загружайте интересные треки, и другие слушатели подпишутся на вашу волну!</p>
+          <button class="btn-pill-primary" @click="goToMyProfile">
+            <Sparkles :size="15" />
+            <span>Открыть мой профиль</span>
+          </button>
+        </div>
+
+        <!-- Empty: No matches after local filter -->
+        <div v-else-if="displayedFollowers.length === 0" class="empty-glass-card">
+          <div class="empty-icon-glow">
+            <Search :size="42" />
+          </div>
+          <h3>Подписчик не найден</h3>
+          <p>Среди ваших подписчиков нет совпадений по запросу «{{ followersSearch }}».</p>
+          <button class="btn-pill-secondary" @click="followersSearch = ''">
+            Сбросить фильтр
+          </button>
+        </div>
+
+        <!-- Followers Cards Grid / List -->
+        <div v-else :class="['users-collection', `view-${viewMode}`]">
+          <UserSocialCard
+            v-for="user in displayedFollowers"
+            :key="user.id"
+            :user="user"
+            :layout="viewMode"
+            :isSelf="user.id === authStore.user?.id"
+            :isMutual="mutualUserIds.has(user.id)"
+            :isLoading="actionLoadingId === user.id"
+            @click="viewUserProfile(user)"
+            @play="handlePlayUserTracks(user)"
+            @follow="followUser(user)"
+            @unfollow="unfollowUser(user)"
+          />
         </div>
       </div>
 
-      <!-- Tab 4: Search -->
+      <!-- ══════════════════════════════════════════
+           TAB 4: Search & Discover
+           ══════════════════════════════════════════ -->
       <div v-show="activeTab === 'search'" class="tab-content">
-        <div class="search-section">
-          <SearchBar
-            v-model="searchQuery"
-            placeholder="Поиск по имени или @username..."
-            @input="debouncedSearch"
-          />
-        </div>
-
-        <div v-if="searching" class="loading">
-          <div class="spinner"></div>
-        </div>
-
-        <div v-else-if="searchQuery && searchResults.length === 0" class="empty-state">
-          <span class="empty-icon"><Search :size="48" /></span>
-          <p>Никого не найдено</p>
-        </div>
-
-        <div v-else-if="searchResults.length" class="users-grid">
-          <div 
-            v-for="user in searchResults" 
-            :key="user.id"
-            class="user-card"
-            @click="viewUserProfile(user)"
-          >
-            <div class="user-card-main">
-              <div class="user-avatar">
-                <img v-if="getUserAvatar(user)" :src="getUserAvatar(user)" class="card-avatar-img" alt="Avatar" />
-                <template v-else>{{ getInitials(user) }}</template>
-              </div>
-              <div class="user-info">
-                <div class="user-name-line">
-                  <span class="user-name">{{ user.display_name }}</span>
-                  <span v-if="user.username" class="user-handle">@{{ user.username }}</span>
-                </div>
-                <div class="user-stats-row">
-                  <span class="user-stat-chip">{{ user.track_count }} {{ getTracksWord(user.track_count) }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Card Actions -->
-            <div class="user-card-actions">
-              <button 
-                v-if="user.track_count > 0"
-                class="btn-user-listen"
-                @click.stop="handlePlayUserTracks(user)"
-                title="Слушать медиатеку пользователя"
-              >
-                <Play :size="14" fill="currentColor" />
-                <span>Слушать</span>
-              </button>
-
-              <button 
-                v-if="!user.is_following"
-                class="btn-follow" 
-                @click.stop="followUser(user)"
-              >
-                Подписаться
-              </button>
-              <button 
-                v-else
-                class="btn-unfollow" 
-                @click.stop="unfollowUser(user)"
-              >
-                <Check :size="14" /> Подписан
-              </button>
-            </div>
+        <!-- Search Input Bar -->
+        <div class="search-input-wrapper">
+          <div class="search-bar-inner">
+            <Search :size="18" class="search-icon-active" />
+            <input 
+              v-model="searchQuery" 
+              type="text" 
+              class="search-text-input"
+              placeholder="Введите никнейм или @username друга для поиска..."
+              @input="debouncedSearch"
+              autofocus
+            />
+            <button 
+              v-if="searchQuery" 
+              class="clear-search-btn" 
+              @click="clearSearch"
+              title="Очистить поиск"
+            >
+              <X :size="16" />
+            </button>
           </div>
         </div>
 
-        <div v-else-if="!searchQuery" class="search-hint">
-          <span class="hint-icon"><Lightbulb :size="24" /></span>
-          <p>Введите имя или username друга для поиска</p>
+        <!-- Searching Spinner -->
+        <div v-if="searching" class="loading-state">
+          <div class="spinner"></div>
+        </div>
+
+        <!-- Search Empty Results -->
+        <div v-else-if="searchQuery.trim().length >= 2 && searchResults.length === 0" class="empty-glass-card">
+          <div class="empty-icon-glow">
+            <Search :size="46" />
+          </div>
+          <h3>Никого не нашлось</h3>
+          <p>Пользователя с именем или юзернеймом «{{ searchQuery }}» не найдено в AuxBass.</p>
+        </div>
+
+        <!-- Search Results Collection -->
+        <div v-else-if="searchResults.length > 0" class="search-results-section">
+          <div class="results-header">
+            <span class="results-count">Найдено: {{ searchResults.length }}</span>
+          </div>
+
+          <div :class="['users-collection', `view-${viewMode}`]">
+            <UserSocialCard
+              v-for="user in searchResults"
+              :key="user.id"
+              :user="user"
+              :layout="viewMode"
+              :isSelf="user.id === authStore.user?.id"
+              :isMutual="mutualUserIds.has(user.id)"
+              :isLoading="actionLoadingId === user.id"
+              @click="viewUserProfile(user)"
+              @play="handlePlayUserTracks(user)"
+              @follow="followUser(user)"
+              @unfollow="unfollowUser(user)"
+            />
+          </div>
+        </div>
+
+        <!-- Default Hint State when search query is empty -->
+        <div v-else class="search-discovery-hint">
+          <div class="discovery-icon-box">
+            <Lightbulb :size="32" />
+          </div>
+          <h3>Найдите друзей и музыкантов</h3>
+          <p>Вводите Telegram-юзернейм (например, @durov) или имя пользователя, чтобы находить интересные медиатеки и слушать музыку вместе.</p>
         </div>
       </div>
     </template>
@@ -333,17 +441,21 @@ import { useRouter, useRoute } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useAuthStore } from '@/stores/auth'
 import { socialApi } from '@/api/client'
-import SearchBar from '@/components/ui/SearchBar.vue'
 import SocialFeed from '@/components/social/SocialFeed.vue'
+import UserSocialCard from '@/components/social/UserSocialCard.vue'
 import { 
   Users, 
   User, 
   Search, 
-  Check, 
-  Play, 
   Flame, 
   Lightbulb, 
-  ChevronRight 
+  ChevronRight,
+  LayoutGrid,
+  List,
+  Sparkles,
+  ArrowUpDown,
+  X,
+  UserCheck
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -356,11 +468,39 @@ const goToChannelSetup = () => {
   router.push({ name: 'settings', query: { section: 'channel' } })
 }
 
+const goToMyProfile = () => {
+  if (authStore.user?.id) {
+    router.push(`/user/${authStore.user.id}`)
+  }
+}
+
 // Check if user can use social features
 const canUseSocial = computed(() => authStore.hasChannel)
 
 // Tab state (default to feed!)
 const activeTab = ref(route.query.tab || 'feed')
+
+// View mode: 'grid' or 'list' (load preference from localStorage)
+const viewMode = ref(localStorage.getItem('auxbass_friends_view_mode') || 'grid')
+
+watch(viewMode, (newVal) => {
+  localStorage.setItem('auxbass_friends_view_mode', newVal)
+})
+
+// Sort mode: 'default' | 'tracks' | 'name'
+const sortBy = ref('default')
+
+const sortLabel = computed(() => {
+  if (sortBy.value === 'tracks') return 'По трекам'
+  if (sortBy.value === 'name') return 'По имени'
+  return 'По умолчанию'
+})
+
+const cycleSort = () => {
+  if (sortBy.value === 'default') sortBy.value = 'tracks'
+  else if (sortBy.value === 'tracks') sortBy.value = 'name'
+  else sortBy.value = 'default'
+}
 
 // Data
 const following = ref([])
@@ -368,6 +508,8 @@ const followers = ref([])
 const searchResults = ref([])
 const loading = ref(false)
 const searching = ref(false)
+const actionLoadingId = ref(null)
+
 const searchQuery = ref('')
 const followingSearch = ref('')
 const followersSearch = ref('')
@@ -375,66 +517,75 @@ const followersSearch = ref('')
 // Debounce timer
 let searchTimer = null
 
-const filteredFollowing = computed(() => {
-  if (!followingSearch.value.trim()) return following.value
-  const q = followingSearch.value.toLowerCase().trim()
-  return following.value.filter(u => 
-    (u.display_name && u.display_name.toLowerCase().includes(q)) ||
-    (u.username && u.username.toLowerCase().includes(q))
-  )
+// Mutual follows detection
+const mutualUserIds = computed(() => {
+  const followerIds = new Set(followers.value.map(u => u.id))
+  return new Set(following.value.filter(u => followerIds.has(u.id)).map(u => u.id))
 })
 
-const filteredFollowers = computed(() => {
-  if (!followersSearch.value.trim()) return followers.value
-  const q = followersSearch.value.toLowerCase().trim()
-  return followers.value.filter(u => 
-    (u.display_name && u.display_name.toLowerCase().includes(q)) ||
-    (u.username && u.username.toLowerCase().includes(q))
-  )
-})
+const mutualCount = computed(() => mutualUserIds.value.size)
 
-const getUserAvatar = (user) => {
-  if (!user) return null
-  if (user.id === authStore.user?.id && authStore.userAvatarUrl) {
-    return authStore.userAvatarUrl
+// Filter & Sort for Following
+const displayedFollowing = computed(() => {
+  let list = [...following.value]
+  
+  if (followingSearch.value.trim()) {
+    const q = followingSearch.value.toLowerCase().trim()
+    list = list.filter(u => 
+      (u.display_name && u.display_name.toLowerCase().includes(q)) ||
+      (u.username && u.username.toLowerCase().includes(q)) ||
+      (u.custom_nickname && u.custom_nickname.toLowerCase().includes(q))
+    )
   }
-  return user.avatar_url || user.custom_avatar_url || user.photo_url || null
-}
+
+  if (sortBy.value === 'tracks') {
+    list.sort((a, b) => (b.track_count || 0) - (a.track_count || 0))
+  } else if (sortBy.value === 'name') {
+    list.sort((a, b) => (a.display_name || '').localeCompare(b.display_name || '', 'ru'))
+  }
+
+  return list
+})
+
+// Filter & Sort for Followers
+const displayedFollowers = computed(() => {
+  let list = [...followers.value]
+  
+  if (followersSearch.value.trim()) {
+    const q = followersSearch.value.toLowerCase().trim()
+    list = list.filter(u => 
+      (u.display_name && u.display_name.toLowerCase().includes(q)) ||
+      (u.username && u.username.toLowerCase().includes(q)) ||
+      (u.custom_nickname && u.custom_nickname.toLowerCase().includes(q))
+    )
+  }
+
+  if (sortBy.value === 'tracks') {
+    list.sort((a, b) => (b.track_count || 0) - (a.track_count || 0))
+  } else if (sortBy.value === 'name') {
+    list.sort((a, b) => (a.display_name || '').localeCompare(b.display_name || '', 'ru'))
+  }
+
+  return list
+})
 
 const getInitials = (user) => {
   if (user?.id === authStore.user?.id && authStore.userDisplayName) {
     return authStore.userDisplayName.charAt(0).toUpperCase()
   }
   if (!user) return '?'
-  if (user.custom_nickname) {
-    return user.custom_nickname.charAt(0).toUpperCase()
-  }
-  if (user.display_name) {
-    return user.display_name.charAt(0).toUpperCase()
-  }
-  if (user.first_name) {
-    return user.first_name.charAt(0).toUpperCase()
-  }
-  if (user.username) {
-    return user.username.charAt(0).toUpperCase()
-  }
+  if (user.custom_nickname) return user.custom_nickname.charAt(0).toUpperCase()
+  if (user.display_name) return user.display_name.charAt(0).toUpperCase()
+  if (user.first_name) return user.first_name.charAt(0).toUpperCase()
+  if (user.username) return user.username.charAt(0).toUpperCase()
   return '?'
-}
-
-const getTracksWord = (count) => {
-  const n = Math.abs(count) % 100
-  const n1 = n % 10
-  if (n > 10 && n < 20) return 'треков'
-  if (n1 > 1 && n1 < 5) return 'трека'
-  if (n1 === 1) return 'трек'
-  return 'треков'
 }
 
 const loadFollowing = async () => {
   loading.value = true
   try {
     const response = await socialApi.getFollowing()
-    following.value = response.data.items || []
+    following.value = response.data?.items || []
   } catch (error) {
     console.error('Failed to load following:', error)
   } finally {
@@ -446,7 +597,7 @@ const loadFollowers = async () => {
   loading.value = true
   try {
     const response = await socialApi.getFollowers()
-    followers.value = response.data.items || []
+    followers.value = response.data?.items || []
   } catch (error) {
     console.error('Failed to load followers:', error)
   } finally {
@@ -459,16 +610,21 @@ const debouncedSearch = () => {
   searchTimer = setTimeout(searchUsers, 300)
 }
 
+const clearSearch = () => {
+  searchQuery.value = ''
+  searchResults.value = []
+}
+
 const searchUsers = async () => {
-  if (!searchQuery.value || searchQuery.value.length < 2) {
+  if (!searchQuery.value || searchQuery.value.trim().length < 2) {
     searchResults.value = []
     return
   }
   
   searching.value = true
   try {
-    const response = await socialApi.searchUsers(searchQuery.value)
-    searchResults.value = response.data.items || []
+    const response = await socialApi.searchUsers(searchQuery.value.trim())
+    searchResults.value = response.data?.items || []
   } catch (error) {
     console.error('Search failed:', error)
   } finally {
@@ -481,6 +637,8 @@ const followUser = async (user) => {
     authStore.promptChannelSetup()
     return
   }
+
+  actionLoadingId.value = user.id
   try {
     await socialApi.follow(user.id)
     user.is_following = true
@@ -493,6 +651,8 @@ const followUser = async (user) => {
     } else {
       console.error('Failed to follow:', error)
     }
+  } finally {
+    actionLoadingId.value = null
   }
 }
 
@@ -501,6 +661,8 @@ const unfollowUser = async (user) => {
     authStore.promptChannelSetup()
     return
   }
+
+  actionLoadingId.value = user.id
   try {
     await socialApi.unfollow(user.id)
     user.is_following = false
@@ -511,6 +673,8 @@ const unfollowUser = async (user) => {
     } else {
       console.error('Failed to unfollow:', error)
     }
+  } finally {
+    actionLoadingId.value = null
   }
 }
 
@@ -527,7 +691,9 @@ const handlePlayUserTracks = async (user) => {
 }
 
 const viewUserProfile = (user) => {
-  router.push(`/user/${user.id}`)
+  if (user?.id) {
+    router.push(`/user/${user.id}`)
+  }
 }
 
 const handleNavigateTab = (tabName) => {
@@ -544,8 +710,9 @@ watch(activeTab, (tab) => {
 })
 
 onMounted(() => {
-  // Always load following in background so badges & lists are ready
+  // Always load following and followers in background so counts & badges are ready
   loadFollowing()
+  loadFollowers()
   
   if (route.query.viewUser) {
     router.replace(`/user/${route.query.viewUser}`)
@@ -566,6 +733,7 @@ const handleResetState = (event) => {
     followingSearch.value = ''
     followersSearch.value = ''
     loadFollowing()
+    loadFollowers()
   }
 }
 </script>
@@ -573,55 +741,258 @@ const handleResetState = (event) => {
 <style scoped>
 .friends-view {
   padding: 16px;
-  max-width: 900px;
+  max-width: 1040px;
   margin: 0 auto;
+  width: 100%;
 }
 
-/* My profile banner */
-.my-profile-banner {
+/* ══════════════════════════════════════════════
+   SOCIAL HUB HERO HEADER
+   ══════════════════════════════════════════════ */
+.social-hub-header {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 18px;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px;
   background: var(--c-bg-2);
-  border-radius: var(--r-xl);
+  border-radius: var(--r-2xl);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   box-shadow: 
-    3px 3px 10px var(--sh-dark),
-    -2px -2px 5px var(--sh-light);
-  border: 1px solid rgba(255, 255, 255, 0.03);
-  margin-bottom: 20px;
+    4px 6px 18px var(--sh-dark),
+    -2px -2px 6px var(--sh-light);
+  margin-bottom: 22px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.social-hub-header:hover {
+  background: var(--c-bg-3);
+  border-color: rgba(34, 197, 94, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 
+    6px 10px 24px var(--sh-dark),
+    0 0 20px rgba(34, 197, 94, 0.1);
+}
+
+.social-hub-header:active {
+  transform: scale(0.995);
+}
+
+/* Ambient glow spotlight behind the avatar */
+.hub-ambient-glow {
+  position: absolute;
+  top: -50px;
+  left: -20px;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle, rgba(34, 197, 94, 0.22) 0%, transparent 70%);
+  pointer-events: none;
+  filter: blur(20px);
+}
+
+.hub-user-main {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+  flex: 1;
+}
+
+.hub-avatar-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.hub-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: var(--r-full);
+  background: linear-gradient(135deg, var(--c-accent), #3b82f6, #8b5cf6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  z-index: 1;
+}
+
+.hub-avatar-ring {
+  position: absolute;
+  inset: -3px;
+  border-radius: var(--r-full);
+  border: 2px solid var(--c-accent);
+  opacity: 0.5;
+  filter: drop-shadow(0 0 6px var(--c-accent-glow));
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.social-hub-header:hover .hub-avatar-ring {
+  opacity: 0.9;
+  transform: scale(1.04);
+}
+
+.hub-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hub-avatar-initials {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.hub-user-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.hub-user-name-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hub-user-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--c-text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hub-self-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--r-full);
+  background: var(--c-accent);
+  color: #fff;
+  line-height: 1;
+  box-shadow: 0 0 8px var(--c-accent-glow);
+}
+
+.hub-user-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--c-text-2);
+}
+
+.hub-handle {
+  color: var(--c-text-3);
+  font-weight: 500;
+}
+
+.meta-separator {
+  color: var(--c-text-3);
+  font-size: 10px;
+}
+
+.hub-status-text {
+  color: var(--c-text-2);
+}
+
+/* Hub Quick Stats Row */
+.hub-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.hub-stat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: var(--c-bg-1);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--r-full);
+  font-size: 12px;
+  color: var(--c-text-2);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.my-profile-banner:hover {
-  background: var(--c-bg-3);
-  transform: translateY(-1px);
+.hub-stat-chip:hover {
+  background: var(--c-bg-4);
+  color: var(--c-text-1);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
-.my-profile-banner:active {
-  transform: scale(0.99);
+.hub-stat-chip.active {
+  background: rgba(34, 197, 94, 0.14);
+  border-color: rgba(34, 197, 94, 0.35);
+  color: var(--c-accent);
 }
 
-.my-profile-arrow {
-  margin-left: auto;
-  color: var(--c-text-2);
+.chip-icon {
+  color: var(--c-accent);
+}
+
+.chip-num {
+  font-weight: 700;
+  color: var(--c-text-1);
+}
+
+.chip-label {
+  color: var(--c-text-3);
+}
+
+.mutual-chip {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.25);
+  cursor: default;
+}
+
+.mutual-chip .chip-icon {
+  color: #60a5fa;
+}
+
+.mutual-chip .chip-num {
+  color: #93c5fd;
+}
+
+/* Hub Action Button */
+.hub-action-btn {
   display: flex;
   align-items: center;
-}
-
-.self-badge {
-  display: inline-block;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 1px 7px;
+  gap: 6px;
+  padding: 8px 16px;
   border-radius: var(--r-full);
-  background: var(--c-accent);
-  color: #fff;
-  margin-left: 6px;
-  vertical-align: middle;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--c-text-2);
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
 }
 
+.social-hub-header:hover .hub-action-btn {
+  background: var(--c-accent);
+  border-color: var(--c-accent);
+  color: #fff;
+  box-shadow: 0 0 12px var(--c-accent-glow);
+}
+
+/* ══════════════════════════════════════════════
+   TABS NAVIGATION
+   ══════════════════════════════════════════════ */
 .friends-tabs {
   margin-bottom: 20px;
 }
@@ -632,255 +1003,335 @@ const handleResetState = (event) => {
   justify-content: center;
   min-width: 18px;
   height: 18px;
-  padding: 0 5px;
+  padding: 0 6px;
   margin-left: 6px;
   font-size: 11px;
   font-weight: 700;
   border-radius: var(--r-full);
   background: rgba(255, 255, 255, 0.08);
   color: var(--c-text-2);
+  transition: all 0.2s ease;
 }
 
 .neu-tab.active .tab-badge {
   background: var(--c-accent);
   color: #fff;
+  box-shadow: 0 0 8px var(--c-accent-glow);
 }
 
-.friends-filter-bar {
-  margin-bottom: 16px;
-}
-
-.search-section {
-  margin-bottom: 16px;
-}
-
-.search-hint {
-  text-align: center;
-  padding: 48px 24px;
-  color: var(--c-text-2);
-}
-
-.hint-icon {
-  font-size: 32px;
-  display: flex;
-  justify-content: center;
-  margin-bottom: 12px;
-  color: var(--c-accent);
-}
-
-/* Users Grid */
-.users-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.user-card {
+/* ══════════════════════════════════════════════
+   TOOLBAR: FILTER, SORT & VIEW SWITCHER
+   ══════════════════════════════════════════════ */
+.social-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.toolbar-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 240px;
+  padding: 8px 14px;
   background: var(--c-bg-2);
-  border-radius: var(--r-xl);
+  border-radius: var(--r-full);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: inset 1px 1px 3px var(--sh-dark);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.toolbar-search-box:focus-within {
+  border-color: rgba(34, 197, 94, 0.4);
+  box-shadow: inset 1px 1px 3px var(--sh-dark), 0 0 10px rgba(34, 197, 94, 0.15);
+}
+
+.search-input-icon {
+  color: var(--c-text-3);
+  flex-shrink: 0;
+}
+
+.toolbar-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--c-text-1);
+  font-size: 13px;
+}
+
+.toolbar-search-input::placeholder {
+  color: var(--c-text-3);
+}
+
+.clear-search-btn {
+  background: transparent;
+  border: none;
+  color: var(--c-text-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: var(--r-full);
+  transition: color 0.15s ease;
+}
+
+.clear-search-btn:hover {
+  color: var(--c-text-1);
+}
+
+.toolbar-controls-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  background: var(--c-bg-2);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: var(--r-full);
+  color: var(--c-text-2);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 2px 2px 5px var(--sh-dark);
+  transition: all 0.15s ease;
+}
+
+.toolbar-btn:hover {
+  background: var(--c-bg-3);
+  color: var(--c-text-1);
+}
+
+.view-mode-toggle {
+  display: flex;
+  align-items: center;
+  background: var(--c-bg-2);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: var(--r-full);
+  padding: 3px;
+  box-shadow: 2px 2px 5px var(--sh-dark);
+}
+
+.view-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-full);
+  background: transparent;
+  border: none;
+  color: var(--c-text-3);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.view-toggle-btn:hover {
+  color: var(--c-text-1);
+}
+
+.view-toggle-btn.active {
+  background: var(--c-bg-4);
+  color: var(--c-accent);
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.2);
+}
+
+/* ══════════════════════════════════════════════
+   USERS COLLECTION (GRID & LIST)
+   ══════════════════════════════════════════════ */
+.users-collection.view-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 16px;
+}
+
+.users-collection.view-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ══════════════════════════════════════════════
+   SEARCH TAB
+   ══════════════════════════════════════════════ */
+.search-input-wrapper {
+  margin-bottom: 20px;
+}
+
+.search-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  background: var(--c-bg-2);
+  border-radius: var(--r-full);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   box-shadow: 
     3px 3px 8px var(--sh-dark),
     -2px -2px 4px var(--sh-light);
-  border: 1px solid rgba(255, 255, 255, 0.02);
-  cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.user-card:hover {
-  background: var(--c-bg-3);
-  border-color: rgba(255, 255, 255, 0.05);
-  transform: translateY(-1px);
+.search-bar-inner:focus-within {
+  border-color: var(--c-accent);
+  box-shadow: 
+    3px 3px 10px var(--sh-dark),
+    0 0 14px var(--c-accent-glow);
 }
 
-.user-card:active {
-  transform: scale(0.99);
+.search-icon-active {
+  color: var(--c-accent);
+  flex-shrink: 0;
 }
 
-.user-card-main {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
+.search-text-input {
   flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 15px;
+  color: var(--c-text-1);
 }
 
-.user-avatar {
-  width: 48px;
-  height: 48px;
+.search-text-input::placeholder {
+  color: var(--c-text-3);
+}
+
+.results-header {
+  margin-bottom: 14px;
+}
+
+.results-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text-2);
+}
+
+.search-discovery-hint {
+  text-align: center;
+  padding: 60px 24px;
+  color: var(--c-text-2);
+}
+
+.discovery-icon-box {
+  width: 68px;
+  height: 68px;
   border-radius: var(--r-full);
-  background: linear-gradient(135deg, var(--c-accent), #8b5cf6);
+  background: var(--c-bg-2);
+  border: 1px solid rgba(255, 255, 255, 0.04);
   display: flex;
   align-items: center;
   justify-content: center;
+  margin: 0 auto 16px;
+  color: var(--c-accent);
+  box-shadow: 
+    3px 3px 10px var(--sh-dark),
+    0 0 16px rgba(34, 197, 94, 0.15);
+}
+
+.search-discovery-hint h3 {
   font-size: 18px;
   font-weight: 700;
-  color: #fff;
-  flex-shrink: 0;
-  overflow: hidden;
-  box-shadow: 2px 2px 6px var(--sh-dark);
-}
-
-.card-avatar-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.user-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.user-name-line {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.user-name {
-  font-weight: 600;
   color: var(--c-text-1);
-  font-size: 15px;
+  margin: 0 0 8px;
 }
 
-.user-handle {
-  font-size: 13px;
-  color: var(--c-text-3);
-}
-
-.user-stats-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-  font-size: 12px;
+.search-discovery-hint p {
+  font-size: 14px;
   color: var(--c-text-2);
+  max-width: 440px;
+  margin: 0 auto;
+  line-height: 1.5;
 }
 
-.user-stat-chip {
-  color: var(--c-text-2);
+/* ══════════════════════════════════════════════
+   EMPTY STATES & LOADING
+   ══════════════════════════════════════════════ */
+.empty-glass-card {
+  text-align: center;
+  padding: 56px 24px;
+  background: var(--c-bg-2);
+  border-radius: var(--r-2xl);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  box-shadow: 
+    4px 6px 16px var(--sh-dark),
+    -2px -2px 5px var(--sh-light);
+  margin-top: 8px;
 }
 
-.stat-dot {
-  color: var(--c-text-3);
-  font-size: 10px;
-}
-
-/* User Card Actions */
-.user-card-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.btn-user-listen {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 7px 12px;
-  border-radius: var(--r-full);
-  background: rgba(34, 197, 94, 0.1);
-  border: 1px solid rgba(34, 197, 94, 0.25);
-  color: var(--c-accent);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.btn-user-listen:hover {
-  background: var(--c-accent);
-  color: #fff;
-  transform: translateY(-1px);
-}
-
-.btn-user-listen:active {
-  transform: scale(0.96);
-}
-
-.btn-follow {
-  padding: 7px 16px;
-  border-radius: var(--r-full);
-  background: var(--c-accent);
-  border: none;
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.btn-follow:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-.btn-unfollow {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 7px 14px;
+.empty-icon-glow {
+  width: 72px;
+  height: 72px;
   border-radius: var(--r-full);
   background: var(--c-bg-3);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  color: var(--c-text-2);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 18px;
+  color: var(--c-accent);
+  box-shadow: 
+    inset 2px 2px 5px var(--sh-dark),
+    inset -1px -1px 3px var(--sh-light);
 }
 
-.btn-unfollow:hover {
-  background: var(--c-bg-4);
+.empty-glass-card h3 {
+  font-size: 18px;
+  font-weight: 700;
   color: var(--c-text-1);
+  margin: 0 0 8px;
 }
 
-/* Empty state */
-.empty-state {
-  text-align: center;
-  padding: 48px 24px;
+.empty-glass-card p {
+  font-size: 14px;
   color: var(--c-text-2);
+  max-width: 420px;
+  margin: 0 auto 22px;
+  line-height: 1.5;
 }
 
-.empty-icon {
-  font-size: 48px;
+.loading-state {
   display: flex;
+  align-items: center;
   justify-content: center;
-  margin-bottom: 16px;
-  color: var(--c-text-3);
+  padding: 50px 0;
 }
 
-.loading {
-  display: flex;
-  justify-content: center;
-  padding: 32px;
-}
-
-/* No channel prompt */
+/* ══════════════════════════════════════════════
+   NO CHANNEL SETUP PROMPT
+   ══════════════════════════════════════════════ */
 .no-channel-prompt {
   text-align: center;
   padding: 64px 24px;
   background: var(--c-bg-2);
-  border-radius: var(--r-xl);
+  border-radius: var(--r-2xl);
   border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: 
+    4px 6px 18px var(--sh-dark),
+    -2px -2px 6px var(--sh-light);
 }
 
 .prompt-icon {
   color: var(--c-accent);
   margin-bottom: 16px;
+  filter: drop-shadow(0 0 14px var(--c-accent-glow));
 }
 
 .setup-btn {
-  margin-top: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
   padding: 10px 24px;
   border-radius: var(--r-full);
   background: var(--c-accent);
@@ -889,5 +1340,34 @@ const handleResetState = (event) => {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+  box-shadow: 
+    2px 2px 8px var(--sh-dark),
+    0 0 12px var(--c-accent-glow);
+  transition: all 0.18s ease;
+}
+
+.setup-btn:hover {
+  background: var(--c-accent-light);
+  transform: translateY(-1px);
+  box-shadow: 
+    2px 4px 12px var(--sh-dark),
+    0 0 16px var(--c-accent-glow);
+}
+
+/* Responsive queries */
+@media (max-width: 640px) {
+  .social-hub-header {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px;
+  }
+
+  .hub-action-btn {
+    align-self: flex-end;
+  }
+
+  .users-collection.view-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

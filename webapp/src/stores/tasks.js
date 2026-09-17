@@ -152,12 +152,14 @@ export const useTasksStore = defineStore('tasks', () => {
         genre: item.genre,
         tags: item.tags,
         add_to_library: true,
+        preview_only: false,
       })
 
       const trackObj = res.data?.track
       if (trackObj && item.rawTrack) {
         item.rawTrack.in_library = true
         item.rawTrack.already_in_tg = true
+        item.rawTrack.is_chunk = false
         item.rawTrack.track_id = trackObj.id
       }
 
