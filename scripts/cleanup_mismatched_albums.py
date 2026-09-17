@@ -30,6 +30,12 @@ KNOWN_ARTIST_ALIASES = {
     ('korn', 'koян'),
     ('koян', 'korn'),
     ('#####', '#####'),
+    ('twenty one pilots stressed out', 'twenty one pilots'),
+    ('twenty one pilots', 'twenty one pilots stressed out'),
+    ('purity', 'purity filter'),
+    ('purity filter', 'purity'),
+    ('ghidemora', 'ghidemora archive'),
+    ('ghidemora archive', 'ghidemora'),
 }
 
 
@@ -67,9 +73,6 @@ def find_mismatched_albums(conn: sqlite3.Connection) -> List[Tuple[int, str, str
             
             # Check known aliases
             if (norm_alb_artist, norm_trk_artist) in KNOWN_ARTIST_ALIASES or (norm_trk_artist, norm_alb_artist) in KNOWN_ARTIST_ALIASES:
-                score = 1.0
-            # Substring tolerance (e.g. 'Korn' in 'Korn feat. Downlink')
-            elif norm_alb_artist and norm_trk_artist and (norm_alb_artist in norm_trk_artist or norm_trk_artist in norm_alb_artist):
                 score = 1.0
             else:
                 score = fuzzy_match_artist(artist, str(track_artist))

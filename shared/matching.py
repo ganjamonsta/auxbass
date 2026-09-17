@@ -653,8 +653,8 @@ def fuzzy_match_artist(artist1: str, artist2: str) -> float:
     # or "Пьеха Стас, Григорий Лепс" vs "Григорий Лепс")
     raw1_clean = remove_featuring(artist1)
     raw2_clean = remove_featuring(artist2)
-    sub1 = {re.sub(r'[^\w\s]', '', s.lower()).strip() for s in re.split(r'\s*[,&+]\s*|\s+(?:x|and|with)\s+', raw1_clean, flags=re.IGNORECASE) if s.strip()}
-    sub2 = {re.sub(r'[^\w\s]', '', s.lower()).strip() for s in re.split(r'\s*[,&+]\s*|\s+(?:x|and|with)\s+', raw2_clean, flags=re.IGNORECASE) if s.strip()}
+    sub1 = {re.sub(r'[^\w\s]', '', s.lower()).strip() for s in re.split(r'\s*[,&+×/]\s*|\s+(?:x|and|with)\s+', raw1_clean, flags=re.IGNORECASE) if s.strip()}
+    sub2 = {re.sub(r'[^\w\s]', '', s.lower()).strip() for s in re.split(r'\s*[,&+×/]\s*|\s+(?:x|and|with)\s+', raw2_clean, flags=re.IGNORECASE) if s.strip()}
     if sub1 and sub2:
         if sub1 == sub2:
             return 1.0

@@ -777,8 +777,8 @@ const handleSyncScPlaylist = async (playlist) => {
       urls,
       tracksPayload,
       playlist.title,
-      true,
-      playlist.title,
+      false,
+      null,
       playlist.artwork_url
     )
 

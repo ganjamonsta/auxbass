@@ -596,8 +596,8 @@ const activeFilter = ref('all') // 'all' | 'new' | 'in_library' | 'in_tg' | 'sel
 const displayLimit = ref(60)
 
 // Destination
-const destinationChoice = ref('new')
-const destinationMode = ref('new') // 'none' | 'new' | 'existing'
+const destinationChoice = ref('none')
+const destinationMode = ref('none') // 'none' | 'new' | 'existing'
 const playlistName = ref('')
 const selectedExistingPlaylistId = ref(null)
 
@@ -748,7 +748,7 @@ const processFile = async (file) => {
     // Set default playlist name based on file name
     const cleanName = file.name.replace(/\.csv$/i, '').replace(/[_-]/g, ' ')
     playlistName.value = cleanName.charAt(0).toUpperCase() + cleanName.slice(1)
-    destinationChoice.value = 'new'
+    destinationChoice.value = 'none'
 
     // Select only new tracks by default!
     selectOnlyNew()
@@ -780,7 +780,7 @@ const loadLastSavedImport = async (fileId = null) => {
 
     const cleanName = (res.data.filename || 'Spotify Playlist').replace(/\.csv$/i, '').replace(/[_-]/g, ' ')
     playlistName.value = cleanName.charAt(0).toUpperCase() + cleanName.slice(1)
-    destinationChoice.value = 'new'
+    destinationChoice.value = 'none'
 
     selectOnlyNew()
   } catch (err) {
@@ -957,7 +957,7 @@ const resetPreview = () => {
   selectedUrls.value = new Set()
   parseError.value = null
   showFileSwitcher.value = false
-  destinationChoice.value = 'new'
+  destinationChoice.value = 'none'
   resetFilters()
 }
 

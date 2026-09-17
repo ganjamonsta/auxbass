@@ -19,7 +19,7 @@ from shared.models import (
 )
 from shared.matching import (
     normalize_artist, normalize_title, fuzzy_match_title,
-    normalize_album, fuzzy_match_artist, ARTIST_MATCH_THRESHOLD
+    normalize_album, fuzzy_match_artist, ARTIST_MATCH_THRESHOLD, TITLE_MATCH_THRESHOLD
 )
 
 from api.routers.auth import get_current_user
@@ -504,10 +504,10 @@ async def get_album(
                     item_num = item.get("track_number", 0)
                     
                     matched_track = None
-                    if item_num and item_num in tracks_by_pos:
-                        matched_track = tracks_by_pos[item_num]
-                    elif clean_item_title in tracks_by_exact_title:
+                    if clean_item_title in tracks_by_exact_title:
                         matched_track = tracks_by_exact_title[clean_item_title]
+                    elif item_num and item_num in tracks_by_pos and fuzzy_match_title(tracks_by_pos[item_num].title or "", item_title) >= TITLE_MATCH_THRESHOLD:
+                        matched_track = tracks_by_pos[item_num]
                     else:
                         best_match_score = 0.0
                         for track, at in rows:
@@ -591,10 +591,10 @@ async def get_album(
                     item_num = item.get("track_number", 0)
                     
                     matched_track = None
-                    if item_num and item_num in all_tracks_by_pos:
-                        matched_track = all_tracks_by_pos[item_num]
-                    elif norm_item_title in all_tracks_by_title:
+                    if norm_item_title in all_tracks_by_title:
                         matched_track = all_tracks_by_title[norm_item_title]
+                    elif item_num and item_num in all_tracks_by_pos and fuzzy_match_title(all_tracks_by_pos[item_num].title or "", item_title) >= TITLE_MATCH_THRESHOLD:
+                        matched_track = all_tracks_by_pos[item_num]
                     else:
                         best_match_score = 0.0
                         for norm_title, track in all_tracks_by_title.items():
