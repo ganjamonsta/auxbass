@@ -875,14 +875,14 @@ async def get_batch_stream_urls(
                     alt_path = await get_telegram_file_path(alt.file_id)
                     if alt_path:
                         logger.info(f"[Batch] Using MP3 alternative {alt.id} for HD/large track {track.id}")
-                        return alt_path, None, True  # (file_path, new_file_id, is_hd_or_large)
+                        return alt_path, None, True, None  # (file_path, new_file_id, is_hd_or_large, err_code)
                 # HD/large with no alternative or path: not streamable, but NOT unavailable!
-                return None, None, True
+                return None, None, True, None
 
             # Normal streamable track: try direct get_telegram_file_path
             file_path = await get_telegram_file_path(track.file_id)
             if file_path:
-                return file_path, None, False  # (file_path, new_file_id, is_hd_or_large)
+                return file_path, None, False, None  # (file_path, new_file_id, is_hd_or_large, err_code)
             
             # File path is None - try to refresh file_id from channel
             logger.info(f"[Batch] Track {track.id} file_id stale, attempting refresh from channel...")

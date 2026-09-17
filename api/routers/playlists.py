@@ -783,18 +783,24 @@ async def update_playlist(
     
     await db.commit()
     
-    track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.custom_cover_url)
+    track_count, total_duration, unavailable_count, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.custom_cover_url)
     
+    owner = await db.get(User, user.id)
     return PlaylistResponse(
         id=playlist.id,
         name=playlist.name,
         description=playlist.description,
         track_count=track_count,
+        unavailable_track_count=unavailable_count,
         total_duration=total_duration,
         cover_url=cover_url,
         custom_cover_url=playlist.custom_cover_url,
         covers=covers,
         is_public=playlist.is_public,
+        owner_id=owner.id if owner else user.id,
+        owner_name=owner.display_name if owner else (user.username or user.first_name),
+        is_owner=True,
+        is_subscribed=False,
         created_at=playlist.created_at,
         updated_at=playlist.updated_at,
     )
@@ -885,7 +891,7 @@ async def upload_playlist_cover(
     playlist.custom_cover_url = f"/api/images/{file_id}"
     await db.commit()
 
-    track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist_id, playlist.custom_cover_url)
+    track_count, total_duration, unavailable_count, cover_url, covers = await get_playlist_info(db, playlist_id, playlist.custom_cover_url)
     return {
         "status": "success",
         "custom_cover_url": playlist.custom_cover_url,
@@ -916,7 +922,7 @@ async def delete_playlist_cover(
     playlist.custom_cover_url = None
     await db.commit()
     
-    track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist_id)
+    track_count, total_duration, unavailable_count, cover_url, covers = await get_playlist_info(db, playlist_id)
     return {
         "status": "deleted",
         "custom_cover_url": None,
@@ -1090,7 +1096,7 @@ async def get_public_playlists(
 
     items = []
     for playlist, owner in rows:
-        track_count, total_duration, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.custom_cover_url)
+        track_count, total_duration, unavailable_count, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.custom_cover_url)
         
         # Check if current user is subscribed or is owner
         is_owner = playlist.owner_id == user.id
@@ -1110,6 +1116,7 @@ async def get_public_playlists(
             name=playlist.name,
             description=playlist.description,
             track_count=track_count,
+            unavailable_track_count=unavailable_count,
             total_duration=total_duration,
             cover_url=cover_url,
             custom_cover_url=playlist.custom_cover_url,
@@ -1121,6 +1128,7 @@ async def get_public_playlists(
             is_owner=is_owner,
             is_subscribed=is_subscribed,
             created_at=playlist.created_at,
+            updated_at=playlist.updated_at,
         ))
     
     return PlaylistsListResponse(
@@ -1168,6 +1176,9 @@ async def get_user_public_playlists(
     )
     playlists = result.scalars().all()
     
+    playlist_ids = [playlist.id for playlist in playlists]
+    playlist_tags_map = await get_playlists_tags(db, playlist_ids)
+
     items = []
     for playlist in playlists:
         track_count, total_duration, unavailable_count, cover_url, covers = await get_playlist_info(db, playlist.id, playlist.custom_cover_url)
@@ -1193,12 +1204,14 @@ async def get_user_public_playlists(
             cover_url=cover_url,
             custom_cover_url=playlist.custom_cover_url,
             covers=covers,
+            tags=playlist_tags_map.get(playlist.id),
             is_public=playlist.is_public,
             owner_id=owner.id,
             owner_name=owner.display_name,
             is_owner=is_own,
             is_subscribed=is_subscribed,
             created_at=playlist.created_at,
+            updated_at=playlist.updated_at,
         ))
     
     return PlaylistsListResponse(
