@@ -80,6 +80,12 @@ def search_deezer_album(title: str, artist: str) -> Optional[int]:
                 cand_title = normalize_string(item.get('title', ''))
                 cand_artist = normalize_string(item.get('artist', {}).get('name', ''))
                 if norm_title == cand_title or (cand_title and norm_title in cand_title):
+                    # STRICT: Verify artist to prevent assigning completely different artists
+                    if artist and cand_artist:
+                        raw_cand_artist = item.get('artist', {}).get('name', '')
+                        from shared.matching import fuzzy_match_artist, ARTIST_MATCH_THRESHOLD
+                        if fuzzy_match_artist(artist, raw_cand_artist) < ARTIST_MATCH_THRESHOLD:
+                            continue
                     return item.get('id')
     except Exception as e:
         print(f"    [Deezer Search Error] {query}: {e}")

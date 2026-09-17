@@ -103,7 +103,12 @@ def remove_parenthetical(text: str) -> str:
     
     # Multiple passes for nested brackets
     for _ in range(3):
-        text = re.sub(r'\s*[\(\[][^\(\)\[\]]*[\)\]]', '', text)
+        new_text = re.sub(r'\s*[\(\[][^\(\)\[\]]*[\)\]]', '', text)
+        if not new_text.strip():
+            # If removing brackets empties the entire string (e.g. "[AMATORY]"), unwrap the brackets
+            text = re.sub(r'^\s*[\(\[]\s*(.*?)\s*[\)\]]\s*$', r'\1', text)
+            break
+        text = new_text
     
     return text.strip()
 
@@ -294,11 +299,15 @@ def normalize_artist(artist: str) -> str:
     # Separators: comma, ampersand, plus, x, and, with
     artist = re.split(r'\s*[,&+]\s*|\s+(?:x|and|with)\s+', artist, flags=re.IGNORECASE)[0]
     
-    # Replace $ with s (A$AP -> ASAP)
+    # Stylistic letter replacements (KoЯn -> Korn, VØJ -> VOJ, A$AP -> ASAP)
+    artist = artist.replace('Я', 'r').replace('я', 'r')
+    artist = artist.replace('Ø', 'o').replace('ø', 'o')
     artist = artist.replace('$', 's')
     
-    # Remove remaining special characters
-    artist = re.sub(r'[^\w\s]', '', artist)
+    # Remove remaining special characters, keeping raw symbols if stripping empties it (e.g. '#####')
+    clean = re.sub(r'[^\w\s]', '', artist)
+    if clean.strip():
+        artist = clean
     
     # Normalize whitespace
     artist = ' '.join(artist.split())
@@ -508,7 +517,7 @@ def extract_version_info(title: str) -> Optional[str]:
 def versions_conflict(v1: Optional[str], v2: Optional[str]) -> bool:
     """
     Check if two version/remix descriptors conflict (i.e. refer to different versions).
-    Returns True only if BOTH are present and distinct.
+    Returns True only if BOTH are present and distinctly incompatible.
     """
     if not v1 or not v2:
         return False
@@ -519,6 +528,26 @@ def versions_conflict(v1: Optional[str], v2: Optional[str]) -> bool:
     norm_v1 = re.sub(r'\brmx\b', 'remix', v1)
     norm_v2 = re.sub(r'\brmx\b', 'remix', v2)
     if norm_v1 == norm_v2:
+        return False
+
+    # Check if both belong to the same non-remix performance category (e.g. live, acoustic, instrumental)
+    for cat in ('live', 'acoustic', 'instrumental', 'slowed', 'reverb', 'sped up'):
+        if cat in norm_v1 and cat in norm_v2:
+            return False
+
+    generic_keywords = {'remix', 'mix', 'edit', 'version', 'ver', 'live', 'acoustic', 'instrumental', 'vip', 'cover', 'flip'}
+    words1 = set(norm_v1.split())
+    words2 = set(norm_v2.split())
+
+    # Category conflict check (e.g., 'live' vs 'remix', 'acoustic' vs 'vip')
+    major_categories = {'live', 'acoustic', 'instrumental', 'remix', 'cover', 'vip', 'slowed'}
+    cat1 = words1 & major_categories
+    cat2 = words2 & major_categories
+    if cat1 and cat2 and not (cat1 & cat2):
+        return True
+
+    # If one is just a generic modifier (e.g. 'remix') and the other is a specific one (e.g. 'skrillex remix')
+    if (words1 <= generic_keywords and words2 & generic_keywords) or (words2 <= generic_keywords and words1 & generic_keywords):
         return False
     
     from difflib import SequenceMatcher
@@ -619,6 +648,19 @@ def fuzzy_match_artist(artist1: str, artist2: str) -> float:
     
     if not norm1 or not norm2:
         return 0.0
+
+    # Multi-artist collaboration check (e.g. "Messinian & Adroa" vs "Adroa and Messinian",
+    # or "Пьеха Стас, Григорий Лепс" vs "Григорий Лепс")
+    raw1_clean = remove_featuring(artist1)
+    raw2_clean = remove_featuring(artist2)
+    sub1 = {re.sub(r'[^\w\s]', '', s.lower()).strip() for s in re.split(r'\s*[,&+]\s*|\s+(?:x|and|with)\s+', raw1_clean, flags=re.IGNORECASE) if s.strip()}
+    sub2 = {re.sub(r'[^\w\s]', '', s.lower()).strip() for s in re.split(r'\s*[,&+]\s*|\s+(?:x|and|with)\s+', raw2_clean, flags=re.IGNORECASE) if s.strip()}
+    if sub1 and sub2:
+        if sub1 == sub2:
+            return 1.0
+        # If one is a complete subset of multi-artists (e.g. collab track vs main artist)
+        if (len(sub1) > 1 or len(sub2) > 1) and (sub1 <= sub2 or sub2 <= sub1):
+            return 0.85
     
     # Exact match
     if norm1 == norm2:
