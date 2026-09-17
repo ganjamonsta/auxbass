@@ -147,6 +147,45 @@ class TestFuzzyMatch:
         score = fuzzy_match_title("Promises", "Promises (Skrillex & Nero Remix)")
         assert score >= 0.95
 
+    def test_different_remixes_rejected(self):
+        """Should NOT match different remixes of the same track"""
+        from shared.utils import titles_match
+        score1 = fuzzy_match_title(
+            "Demonic Curse (CHIBS Remix)",
+            "Demonic Curse (REVEREND X Skxlvtor Remix)"
+        )
+        assert score1 <= 0.35
+        assert titles_match("Demonic Curse (CHIBS Remix)", "Demonic Curse (REVEREND X Skxlvtor Remix)") is False
+
+        score2 = fuzzy_match_title(
+            "Demonic Curse (CHIBS Remix)",
+            "Demonic Curse (Bejalvin Remix)"
+        )
+        assert score2 <= 0.35
+        assert titles_match("Demonic Curse (CHIBS Remix)", "Demonic Curse (Bejalvin Remix)") is False
+
+        score3 = fuzzy_match_title("Track (VIP)", "Track (Acoustic Mix)")
+        assert score3 <= 0.35
+        assert titles_match("Track (VIP)", "Track (Acoustic Mix)") is False
+
+    def test_same_remix_matches(self):
+        """Should match identical or synonymous remixes"""
+        from shared.utils import titles_match
+        score_exact = fuzzy_match_title(
+            "Demonic Curse (CHIBS Remix)",
+            "Demonic Curse (CHIBS Remix)"
+        )
+        assert score_exact == 1.0
+        assert titles_match("Demonic Curse (CHIBS Remix)", "Demonic Curse (CHIBS Remix)") is True
+
+        score_synonym = fuzzy_match_title(
+            "Demonic Curse (CHIBS Remix)",
+            "Demonic Curse (CHIBS Rmx)"
+        )
+        assert score_synonym >= 0.95
+        assert titles_match("Demonic Curse (CHIBS Remix)", "Demonic Curse (CHIBS Rmx)") is True
+
+
 
 class TestArtistsMatch:
     """Tests for artists_match function"""

@@ -487,29 +487,30 @@ async def get_album(
             try:
                 tracklist_data = json.loads(album.full_tracklist)
                 
-                # Create lookup by track_number and by normalized title
+                # Create lookup by track_number and by exact title
                 tracks_by_pos = {}
-                tracks_by_title = {}
+                tracks_by_exact_title = {}
                 for track, at in rows:
                     if at.track_number and at.track_number > 0:
                         tracks_by_pos[at.track_number] = track
-                    norm_title = normalize_title(track.title or "")
-                    tracks_by_title[norm_title] = track
+                    clean_full = (track.title or "").strip().lower()
+                    if clean_full:
+                        tracks_by_exact_title[clean_full] = track
                 
                 full_tracklist = []
                 for item in tracklist_data:
                     item_title = item.get("title", "")
-                    norm_item_title = normalize_title(item_title)
+                    clean_item_title = item_title.strip().lower()
                     item_num = item.get("track_number", 0)
                     
                     matched_track = None
                     if item_num and item_num in tracks_by_pos:
                         matched_track = tracks_by_pos[item_num]
-                    elif norm_item_title in tracks_by_title:
-                        matched_track = tracks_by_title[norm_item_title]
+                    elif clean_item_title in tracks_by_exact_title:
+                        matched_track = tracks_by_exact_title[clean_item_title]
                     else:
                         best_match_score = 0.0
-                        for norm_title, track in tracks_by_title.items():
+                        for track, at in rows:
                             score = fuzzy_match_title(item_title, track.title or "")
                             if score >= 0.85 and score > best_match_score:
                                 best_match_score = score
@@ -798,15 +799,24 @@ async def find_missing_track(
     best_score = 0.0
     
     for track in all_tracks:
+        if not track.title:
+            continue
+            
         title_score = fuzzy_match_title(title, track.title or "")
         if title_score < 0.7:
             continue
+        
+        # Boost exact title match to guarantee it wins over partial/base matches
+        if track.title.strip().lower() == title.strip().lower():
+            title_score = 1.05
         
         # Check artist match if we have one
         artist_score = 1.0
         if norm_artist and track.artist:
             from shared.matching import fuzzy_match_artist
             artist_score = fuzzy_match_artist(search_artist, track.artist)
+            if artist_score < 0.5:
+                continue
         
         combined = (title_score * 0.6) + (artist_score * 0.4)
         if combined > best_score:

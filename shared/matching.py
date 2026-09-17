@@ -461,6 +461,74 @@ def jaccard_similarity(set1: set, set2: set) -> float:
     return intersection / union if union > 0 else 0.0
 
 
+VERSION_KEYWORDS = [
+    'remix', 'rmx', 'vip', 'edit', 'bootleg', 'rework', 'flip',
+    'acoustic', 'instrumental', 'orchestral', 'live', 'slowed',
+    'reverb', 'sped up', 'speed up', 'dub', 'club', 'radio',
+    'extended', 'version', 'ver', 'cover', 'mix', 'mashup'
+]
+
+
+def extract_version_info(title: str) -> Optional[str]:
+    """
+    Extract version or remix descriptor from track title.
+    
+    Examples:
+        "Demonic Curse (CHIBS Remix)" -> "chibs remix"
+        "Promises (Skrillex & Nero Remix)" -> "skrillex nero remix"
+        "Track - VIP" -> "vip"
+        "Song (feat. Artist)" -> None
+        "Track" -> None
+    """
+    if not title:
+        return None
+    
+    # 1. Check parenthetical / bracketed content
+    paren_matches = re.findall(r'[\(\[]([^\(\)\[\]]+)[\)\]]', title)
+    for m in paren_matches:
+        m_lower = m.lower().strip()
+        # Skip pure featuring / prod
+        if re.match(r'^(?:feat\.?|ft\.?|featuring|prod\.?|produced\s+by)\b', m_lower):
+            continue
+        if any(re.search(rf'\b{kw}\b', m_lower) for kw in VERSION_KEYWORDS):
+            v = re.sub(r'[^\w\s]', '', m_lower).strip()
+            return ' '.join(v.split())
+            
+    # 2. Check after hyphen: ' - VIP' or ' - Chibs Remix'
+    hyphen_match = re.search(r'\s+-\s+([^-(]+)$', title)
+    if hyphen_match:
+        cand = hyphen_match.group(1).lower().strip()
+        if any(re.search(rf'\b{kw}\b', cand) for kw in VERSION_KEYWORDS):
+            v = re.sub(r'[^\w\s]', '', cand).strip()
+            return ' '.join(v.split())
+            
+    return None
+
+
+def versions_conflict(v1: Optional[str], v2: Optional[str]) -> bool:
+    """
+    Check if two version/remix descriptors conflict (i.e. refer to different versions).
+    Returns True only if BOTH are present and distinct.
+    """
+    if not v1 or not v2:
+        return False
+    if v1 == v2:
+        return False
+    
+    # Normalize synonyms (rmx -> remix)
+    norm_v1 = re.sub(r'\brmx\b', 'remix', v1)
+    norm_v2 = re.sub(r'\brmx\b', 'remix', v2)
+    if norm_v1 == norm_v2:
+        return False
+    
+    from difflib import SequenceMatcher
+    ratio = SequenceMatcher(None, norm_v1, norm_v2).ratio()
+    if ratio >= 0.82:
+        return False
+    
+    return True
+
+
 def fuzzy_match_title(title1: str, title2: str) -> float:
     """
     Calculate similarity between two titles (0.0 to 1.0).
@@ -477,8 +545,20 @@ def fuzzy_match_title(title1: str, title2: str) -> float:
     if not norm1 or not norm2:
         return 0.0
     
+    v1 = extract_version_info(title1)
+    v2 = extract_version_info(title2)
+    
+    # If both titles specify conflicting versions/remixes,
+    # they are distinct audio works and must not match!
+    if v1 and v2 and versions_conflict(v1, v2):
+        return 0.25
+    
     # Exact match after normalization
     if norm1 == norm2:
+        # If one has a remix/version and the other is a base track without version,
+        # allow strong match for search purposes, but slightly lower than exact match (0.95)
+        if (v1 is None) != (v2 is None):
+            return 0.95
         return 1.0
     
     # Compare without spaces
@@ -486,12 +566,16 @@ def fuzzy_match_title(title1: str, title2: str) -> float:
     compact2 = norm2.replace(" ", "")
     
     if compact1 == compact2:
+        if (v1 is None) != (v2 is None):
+            return 0.95
         return 1.0
     
     # Word sets
     words1 = set(norm1.split())
     words2 = set(norm2.split())
     if words1 == words2:
+        if (v1 is None) != (v2 is None):
+            return 0.95
         return 1.0
     
     # Character-level SequenceMatcher (handles typos, slight spelling differences)
@@ -515,7 +599,11 @@ def fuzzy_match_title(title1: str, title2: str) -> float:
     if (norm1 in norm2 or norm2 in norm1) and len_ratio >= 0.88:
         score = max(score, 0.80 + (0.15 * len_ratio))
     
+    if (v1 is None) != (v2 is None):
+        score = min(score, 0.90)
+        
     return min(1.0, score)
+
 
 
 def fuzzy_match_artist(artist1: str, artist2: str) -> float:

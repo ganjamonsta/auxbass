@@ -31,12 +31,21 @@ except Exception:
     pass
 
 
+from shared.matching import (
+    normalize_title,
+    normalize_artist,
+    fuzzy_match_title,
+    fuzzy_match_artist,
+    extract_version_info,
+)
+
+
 def normalize_string(s: str) -> str:
-    """Normalize string for fuzzy comparison"""
+    """Normalize string for fuzzy comparison while preserving version/remix descriptors"""
     if not s:
         return ""
     s = s.lower().strip()
-    s = re.sub(r'[\(\[\{].*?[\)\]\}]', '', s)  # Remove bracketed info (prod, feat, etc.)
+    s = re.sub(r'[\(\[\{]\s*(?:official\s+video|official\s+audio|lyrics|hd|hq|4k|audio)\s*[\)\]\}]', '', s)
     s = re.sub(r'[^\w\s]', '', s)  # Remove punctuation
     return ' '.join(s.split())
 
@@ -306,13 +315,6 @@ def step4_resync_album_tracks_positions(con: sqlite3.Connection, dry_run: bool) 
         except Exception:
             continue
             
-        # Build lookup by normalized title
-        title_to_pos = {}
-        for item in tl:
-            norm = normalize_string(item.get('title', ''))
-            if norm:
-                title_to_pos[norm] = item.get('track_number', 0)
-                
         # Get tracks linked to this album
         ats = cur.execute("""
             SELECT at.id, at.track_id, at.track_number, t.title
@@ -322,11 +324,28 @@ def step4_resync_album_tracks_positions(con: sqlite3.Connection, dry_run: bool) 
         """, (aid,)).fetchall()
         
         for at_id, t_id, cur_pos, title in ats:
-            norm_t = normalize_string(title or '')
-            official_pos = title_to_pos.get(norm_t)
+            if not title:
+                continue
+            clean_title = title.strip().lower()
+            official_pos = None
+            best_score = 0.0
+            
+            for item in tl:
+                item_title = item.get("title", "")
+                if not item_title:
+                    continue
+                if item_title.strip().lower() == clean_title:
+                    official_pos = item.get("track_number", 0)
+                    break
+                score = fuzzy_match_title(item_title, title)
+                if score >= 0.85 and score > best_score:
+                    best_score = score
+                    official_pos = item.get("track_number", 0)
+                    
             if official_pos and official_pos > 0 and cur_pos != official_pos:
                 if not dry_run:
                     cur.execute("UPDATE album_tracks SET track_number = ? WHERE id = ?", (official_pos, at_id))
+                    cur.execute("UPDATE track_enrichments SET track_number = ? WHERE track_id = ?", (official_pos, t_id))
                     synced_count += 1
                 else:
                     synced_count += 1
@@ -338,6 +357,104 @@ def step4_resync_album_tracks_positions(con: sqlite3.Connection, dry_run: bool) 
         print(f"[DRY RUN] Would resync {synced_count} track positions in album_tracks.")
         
     return synced_count
+
+
+def step5_link_missing_album_tracks(con: sqlite3.Connection, dry_run: bool) -> int:
+    """Link unattached library tracks to albums with official full_tracklist"""
+    print("\n" + "="*60)
+    print("STEP 5: Linking missing library tracks to album tracklists")
+    print("="*60)
+    cur = con.cursor()
+    
+    albums_with_ft = cur.execute("""
+        SELECT id, name, artist, full_tracklist, deezer_album_id
+        FROM albums
+        WHERE full_tracklist IS NOT NULL
+    """).fetchall()
+    
+    linked_count = 0
+    for aid, aname, aartist, ft_raw, dz_id in albums_with_ft:
+        try:
+            tl = json.loads(ft_raw)
+            if not tl:
+                continue
+        except Exception:
+            continue
+            
+        # Get positions already occupied in this album
+        occupied_positions = set(
+            r[0] for r in cur.execute(
+                "SELECT track_number FROM album_tracks WHERE album_id = ? AND track_number > 0",
+                (aid,)
+            ).fetchall()
+        )
+        
+        # Candidate tracks: tracks by this artist or with this album_name in enrichment,
+        # that are NOT currently linked to this album
+        norm_a = normalize_artist(aartist)
+        cands = cur.execute("""
+            SELECT t.id, t.title, t.artist
+            FROM tracks t
+            LEFT JOIN track_enrichments te ON te.track_id = t.id
+            WHERE t.id NOT IN (SELECT track_id FROM album_tracks WHERE album_id = ?)
+              AND (t.normalized_artist = ? OR t.artist LIKE ? OR te.album_name LIKE ?)
+        """, (aid, norm_a, f"%{aartist}%", f"%{aname}%")).fetchall()
+        
+        if not cands:
+            continue
+            
+        already_linked_in_step = set()
+        
+        for item in tl:
+            item_num = item.get("track_number", 0)
+            item_title = item.get("title", "")
+            if not item_num or not item_title:
+                continue
+            if item_num in occupied_positions:
+                continue
+                
+            best_candidate = None
+            best_score = 0.0
+            clean_item_title = item_title.strip().lower()
+            
+            for tid, ttitle, tartist in cands:
+                if tid in already_linked_in_step:
+                    continue
+                if not ttitle:
+                    continue
+                clean_t = ttitle.strip().lower()
+                if clean_t == clean_item_title:
+                    best_candidate = tid
+                    best_score = 1.05
+                    break
+                score = fuzzy_match_title(item_title, ttitle)
+                if score >= 0.85 and score > best_score:
+                    best_score = score
+                    best_candidate = tid
+                    
+            if best_candidate and best_score >= 0.85:
+                already_linked_in_step.add(best_candidate)
+                occupied_positions.add(item_num)
+                if not dry_run:
+                    cur.execute(
+                        "INSERT OR IGNORE INTO album_tracks (album_id, track_id, track_number, added_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
+                        (aid, best_candidate, item_num)
+                    )
+                    # Update enrichment to point to the correct album and track number
+                    cur.execute("""
+                        UPDATE track_enrichments
+                        SET album_name = ?, track_number = ?, deezer_album_id = COALESCE(?, deezer_album_id)
+                        WHERE track_id = ?
+                    """, (aname, item_num, dz_id, best_candidate))
+                linked_count += 1
+                
+    if not dry_run and linked_count > 0:
+        con.commit()
+        print(f"✅ Successfully linked {linked_count} tracks to official album positions.")
+    elif dry_run:
+        print(f"[DRY RUN] Would link {linked_count} tracks to official album positions.")
+        
+    return linked_count
 
 
 def main():
@@ -358,6 +475,7 @@ def main():
     try:
         step1_fix_unavailable_tracks(con, args.dry_run)
         step3_enrich_full_tracklists(con, args.dry_run)
+        step5_link_missing_album_tracks(con, args.dry_run)
         step4_resync_album_tracks_positions(con, args.dry_run)
         step2_deduplicate_album_tracks(con, args.dry_run)
         print("\n" + "="*60)

@@ -25,6 +25,9 @@ from .matching import (
     artists_match,
     titles_match,
     jaccard_similarity,
+    extract_version_info,
+    versions_conflict,
+
     
     # Sanitization
     sanitize_input,
