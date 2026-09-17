@@ -1,12 +1,13 @@
-const CACHE_NAME = 'tg-player-v2';
-const STATIC_CACHE = 'tg-player-static-v2';
+const CACHE_NAME = 'tg-player-v3';
+const STATIC_CACHE = 'tg-player-static-v3';
 const AUDIO_CACHE = 'tg-player-audio-v2';
 
 // Статические ресурсы для кэширования
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/manifest.json'
+  '/manifest.json',
+  '/telegram-web-app.js'
 ];
 
 // Установка Service Worker
@@ -52,6 +53,9 @@ self.addEventListener('fetch', (event) => {
   // Пропускаем не-GET запросы
   if (event.request.method !== 'GET') return;
   
+  // Пропускаем внешние запросы (не к нашему origin)
+  if (url.origin !== self.location.origin) return;
+
   // Пропускаем API запросы (они должны быть свежими)
   if (url.pathname.startsWith('/api/')) return;
   
@@ -96,6 +100,9 @@ self.addEventListener('fetch', (event) => {
             });
           }
           return response;
+        }).catch((err) => {
+          console.warn('[SW] Static fetch failed for:', event.request.url, err);
+          return new Response('', { status: 408, statusText: 'Static fetch timeout or error' });
         });
       })
     );

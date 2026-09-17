@@ -291,6 +291,17 @@ if WEBAPP_DIST.exists():
         if icon_path.exists():
             return FileResponse(icon_path, media_type="image/png")
         return JSONResponse(status_code=404, content={"error": "not found"})
+    
+    @app.get("/telegram-web-app.js")
+    async def telegram_web_app():
+        js_path = WEBAPP_DIST / "telegram-web-app.js"
+        if js_path.exists():
+            return FileResponse(
+                js_path,
+                media_type="application/javascript",
+                headers={"Cache-Control": "public, max-age=604800"}
+            )
+        return JSONResponse(status_code=404, content={"error": "not found"})
 
 
 @app.get("/api/health")
@@ -346,6 +357,14 @@ async def spa_fallback(full_path: str):
     if any(pattern in lower_path for pattern in blocked_patterns):
         raise HTTPException(status_code=404, detail="Not found")
     
+    # If a static file exists in WEBAPP_DIST root, serve it directly
+    file_path = (WEBAPP_DIST / full_path).resolve()
+    try:
+        if WEBAPP_DIST.resolve() in file_path.parents and file_path.is_file():
+            return FileResponse(file_path)
+    except Exception:
+        pass
+
     index_path = WEBAPP_DIST / "index.html"
     if index_path.exists():
         # Read into memory to avoid BaseHTTPMiddleware conflict with FileResponse
