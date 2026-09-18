@@ -209,16 +209,22 @@
       </template>
     </div>
 
-    <!-- ==================== EXPLORE MODE: DYNAMIC TAGS GRID ==================== -->
+    <!-- ==================== EXPLORE MODE: CLEAN SEARCH LANDING ==================== -->
     <SearchExploreTags
       v-else
       :tagScope="tagScope"
       :loadingTags="loadingTags"
       :tags="tags"
       :displayTags="displayTags"
+      :recentSearches="recentSearches"
+      :scAccount="scAccount"
+      :spAccount="spAccount"
       @switchScope="switchScope"
       @tagClick="handleTagClick"
-      @playTagMix="handlePlayTagMix"
+      @recentClick="handleRecentClick"
+      @removeRecent="handleRemoveRecent"
+      @clearRecent="handleClearRecent"
+      @selectSource="setFilter"
     />
 
   </div>
@@ -1423,6 +1429,7 @@ const performSearch = (q) => {
     trackSearchQuery.value = query
     executeTrackSearch()
     searchArtistsAndPlaylists(query)
+    saveRecentSearch(query)
 
     // Hashtag queries search within catalog tags and should never trigger external web scraping
     if (!isTagSearch) {
@@ -1519,7 +1526,58 @@ const goToPlaylist = (id) => {
   if (id) router.push(`/playlist/${id}`)
 }
 
+// ─── Recent Searches Management ───
+const RECENT_SEARCHES_KEY = 'auxbass_recent_searches'
+const recentSearches = ref([])
+
+const loadRecentSearches = () => {
+  try {
+    const raw = localStorage.getItem(RECENT_SEARCHES_KEY)
+    if (raw) {
+      recentSearches.value = JSON.parse(raw)
+    }
+  } catch (e) {
+    console.error('Failed to load recent searches:', e)
+  }
+}
+
+const saveRecentSearch = (term) => {
+  const clean = (term || '').trim()
+  if (!clean || clean.length < 2) return
+  const current = recentSearches.value.filter(s => s.toLowerCase() !== clean.toLowerCase())
+  const updated = [clean, ...current].slice(0, 10)
+  recentSearches.value = updated
+  try {
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated))
+  } catch (e) {
+    console.error('Failed to save recent search:', e)
+  }
+}
+
+const handleRemoveRecent = (term) => {
+  recentSearches.value = recentSearches.value.filter(s => s !== term)
+  try {
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(recentSearches.value))
+  } catch (e) {
+    console.error('Failed to remove recent search:', e)
+  }
+}
+
+const handleClearRecent = () => {
+  recentSearches.value = []
+  try {
+    localStorage.removeItem(RECENT_SEARCHES_KEY)
+  } catch (e) {
+    console.error('Failed to clear recent searches:', e)
+  }
+}
+
+const handleRecentClick = (term) => {
+  setQuery(term, true)
+}
+
 const handleTagClick = (tagName) => {
+  saveRecentSearch(`#${tagName}`)
   setQuery(`#${tagName}`, true)
 }
 
@@ -1657,6 +1715,7 @@ const handleResetState = (event) => {
 }
 
 onMounted(() => {
+  loadRecentSearches()
   const hasInitialQuery = Boolean(route.query.tag || route.query.q || route.query.search)
   if (!hasInitialQuery) {
     loadTags()

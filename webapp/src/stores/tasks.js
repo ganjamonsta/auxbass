@@ -4,10 +4,12 @@ import { ingestionApi } from '@/api/client'
 import apiCache from '@/utils/apiCache'
 import { useUIStore } from './ui'
 import { useLibraryStore } from './library'
+import { useAuthStore } from './auth'
 
 export const useTasksStore = defineStore('tasks', () => {
   const uiStore = useUIStore()
   const libraryStore = useLibraryStore()
+  const authStore = useAuthStore()
 
   // Map of jobId -> job object
   const jobs = ref(new Map())
@@ -541,6 +543,7 @@ export const useTasksStore = defineStore('tasks', () => {
    * Check for any active import jobs on the server
    */
   const checkRecentJobs = async () => {
+    if (!authStore.isAuthenticated) return
     try {
       const res = await ingestionApi.getRecent()
       const recentList = res.data || []

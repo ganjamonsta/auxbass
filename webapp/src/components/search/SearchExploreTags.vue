@@ -1,82 +1,190 @@
 <template>
-  <div class="search-explore-container">
-    <div class="explore-header">
-      <div class="explore-title-row">
+  <div class="search-landing-container">
+    <!-- 1. Recent Searches (if any exist) -->
+    <section v-if="recentSearches && recentSearches.length > 0" class="landing-section recent-section">
+      <div class="section-header">
         <div class="title-with-icon">
-          <Hash :size="20" class="explore-icon" />
-          <h2 class="explore-heading">Обзор по тегам</h2>
+          <Clock :size="17" class="section-icon text-muted" />
+          <h3 class="section-heading">Недавние поиски</h3>
         </div>
-        <!-- Scope switcher -->
-        <div class="tag-scope-tabs">
+        <button class="clear-all-btn" @click="$emit('clearRecent')">
+          Очистить
+        </button>
+      </div>
+      <div class="recent-chips">
+        <div 
+          v-for="item in recentSearches" 
+          :key="item"
+          class="recent-chip"
+          @click="$emit('recentClick', item)"
+        >
+          <Clock :size="13" class="chip-clock-icon" />
+          <span class="chip-text">{{ item }}</span>
           <button 
-            class="scope-tab" 
+            class="chip-remove-btn" 
+            @click.stop="$emit('removeRecent', item)"
+            title="Удалить из истории"
+            aria-label="Удалить из истории"
+          >
+            <X :size="13" />
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. Search Sources (Quick Switchers) -->
+    <section class="landing-section sources-section">
+      <div class="section-header">
+        <div class="title-with-icon">
+          <Globe :size="17" class="section-icon text-accent" />
+          <h3 class="section-heading">Искать в источниках</h3>
+        </div>
+      </div>
+      <div class="sources-grid">
+        <!-- SoundCloud -->
+        <div class="source-card sc-card" @click="$emit('selectSource', 'soundcloud')">
+          <div class="source-icon-wrap sc-icon-wrap">
+            <Radio :size="22" />
+          </div>
+          <div class="source-info">
+            <div class="source-title-row">
+              <span class="source-name">SoundCloud</span>
+              <span v-if="scAccount?.connected" class="source-connected-badge">Подключен</span>
+            </div>
+            <p class="source-desc">
+              {{ scAccount?.connected ? 'Поиск, ваши лайки и авторские треки' : 'Поиск по миллионам треков' }}
+            </p>
+          </div>
+          <ArrowRight :size="16" class="source-arrow" />
+        </div>
+
+        <!-- Spotify -->
+        <div class="source-card sp-card" @click="$emit('selectSource', 'spotify')">
+          <div class="source-icon-wrap sp-icon-wrap">
+            <Disc3 :size="22" />
+          </div>
+          <div class="source-info">
+            <div class="source-title-row">
+              <span class="source-name">Spotify</span>
+              <span v-if="spAccount?.connected" class="source-connected-badge">Подключен</span>
+            </div>
+            <p class="source-desc">
+              {{ spAccount?.connected ? 'Поиск и перенос любимых треков' : 'Поиск и импорт треков' }}
+            </p>
+          </div>
+          <ArrowRight :size="16" class="source-arrow" />
+        </div>
+
+        <!-- YouTube Music -->
+        <div class="source-card yt-card" @click="$emit('selectSource', 'youtube')">
+          <div class="source-icon-wrap yt-icon-wrap">
+            <Play :size="20" fill="currentColor" />
+          </div>
+          <div class="source-info">
+            <div class="source-title-row">
+              <span class="source-name">YouTube Music</span>
+            </div>
+            <p class="source-desc">Поиск аудиотреков и клипов</p>
+          </div>
+          <ArrowRight :size="16" class="source-arrow" />
+        </div>
+
+        <!-- Library (Local Catalog) -->
+        <div class="source-card lib-card" @click="$emit('selectSource', 'tracks')">
+          <div class="source-icon-wrap lib-icon-wrap">
+            <Folder :size="22" />
+          </div>
+          <div class="source-info">
+            <div class="source-title-row">
+              <span class="source-name">Моя медиатека</span>
+            </div>
+            <p class="source-desc">Искать только среди сохранённых треков</p>
+          </div>
+          <ArrowRight :size="16" class="source-arrow" />
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Quick Tag Pills (Compact Row) -->
+    <section v-if="cleanDisplayTags.length > 0" class="landing-section tags-section">
+      <div class="section-header">
+        <div class="title-with-icon">
+          <Hash :size="17" class="section-icon text-accent" />
+          <h3 class="section-heading">Популярные стили</h3>
+        </div>
+        <div class="tag-scope-mini">
+          <button 
+            class="scope-mini-btn" 
             :class="{ active: tagScope === 'library' }"
             @click="$emit('switchScope', 'library')"
           >
-            Мои теги
+            Мои
           </button>
           <button 
-            class="scope-tab" 
+            class="scope-mini-btn" 
             :class="{ active: tagScope === 'global' }"
             @click="$emit('switchScope', 'global')"
           >
-            Все теги
+            Все
           </button>
         </div>
       </div>
-      <p class="explore-subheading">Нажмите на любой тег, чтобы открыть подборку музыки</p>
-    </div>
 
-    <!-- Loading tags skeleton -->
-    <div v-if="loadingTags && tags.length === 0" class="tags-loading-grid">
-      <div v-for="n in 8" :key="n" class="tag-tile-skeleton">
-        <div class="skeleton-tag-title"></div>
-        <div class="skeleton-tag-count"></div>
-      </div>
-    </div>
-
-    <!-- Tags Grid -->
-    <div v-else class="tags-grid">
-      <div 
-        v-for="tag in displayTags" 
-        :key="tag.name"
-        class="tag-tile"
-        :style="{ background: getTagGradient(tag.name) }"
-        @click="$emit('tagClick', tag.name)"
-      >
-        <div class="tag-info">
-          <span class="tag-name">#{{ tag.name }}</span>
-          <span v-if="tag.track_count > 0" class="tag-count">
-            {{ tag.track_count }} {{ formatTrackCount(tag.track_count) }}
-          </span>
-        </div>
-
-        <!-- Decorative Hash watermark -->
-        <div class="tag-watermark">
-          <Hash :size="48" stroke-width="2.5" />
-        </div>
-
-        <!-- Quick play mix button -->
+      <div class="tag-pills-row">
         <button 
-          v-if="tag.track_count > 0"
-          class="tag-play-btn"
-          @click.stop="$emit('playTagMix', tag.name)"
-          title="Слушать микс по тегу"
+          v-for="tag in cleanDisplayTags" 
+          :key="tag.name"
+          class="tag-pill-btn"
+          @click="$emit('tagClick', tag.name)"
         >
-          <Play :size="16" fill="currentColor" />
+          <span class="tag-hash">#</span>
+          <span class="tag-label">{{ tag.name }}</span>
+          <span v-if="tag.track_count > 0" class="tag-count-badge">{{ tag.track_count }}</span>
         </button>
+      </div>
+    </section>
+
+    <!-- 4. Handy Search Hints -->
+    <div class="search-hints-banner">
+      <div class="hint-item">
+        <div class="hint-icon-box">
+          <Hash :size="14" />
+        </div>
+        <div class="hint-text">
+          <strong>Поиск по тегам:</strong> начните запрос с символа <code class="hint-code">#</code> (например, <code class="hint-code">#phonk</code> или <code class="hint-code">#dubstep</code>), чтобы найти треки по стилю.
+        </div>
+      </div>
+      <div class="hint-item">
+        <div class="hint-icon-box">
+          <ExternalLink :size="14" />
+        </div>
+        <div class="hint-text">
+          <strong>Быстрый импорт:</strong> вставьте ссылку на песню или плейлист из <span class="text-white">SoundCloud</span> или <span class="text-white">Spotify</span> прямо в поисковую строку.
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { Hash, Play } from 'lucide-vue-next'
+import { computed } from 'vue'
+import { 
+  Clock, 
+  X, 
+  Globe, 
+  Radio, 
+  Disc3, 
+  Play, 
+  Folder, 
+  ArrowRight, 
+  Hash, 
+  ExternalLink 
+} from 'lucide-vue-next'
 
 const props = defineProps({
   tagScope: {
     type: String,
-    required: true
+    default: 'library'
   },
   loadingTags: {
     type: Boolean,
@@ -84,50 +192,83 @@ const props = defineProps({
   },
   tags: {
     type: Array,
-    required: true
+    default: () => []
   },
   displayTags: {
     type: Array,
-    required: true
+    default: () => []
+  },
+  recentSearches: {
+    type: Array,
+    default: () => []
+  },
+  scAccount: {
+    type: Object,
+    default: null
+  },
+  spAccount: {
+    type: Object,
+    default: null
   }
 })
 
-const emit = defineEmits(['switchScope', 'tagClick', 'playTagMix'])
+const emit = defineEmits([
+  'switchScope', 
+  'tagClick', 
+  'recentClick', 
+  'removeRecent', 
+  'clearRecent',
+  'selectSource'
+])
 
-const formatTrackCount = (count) => {
-  if (!count) return 'треков'
-  const num = count % 100
-  if (num >= 11 && num <= 19) return 'треков'
-  const last = num % 10
-  if (last === 1) return 'трек'
-  if (last >= 2 && last <= 4) return 'трека'
-  return 'треков'
-}
+// Filter out duplicate and non-musical tags (e.g. country codes, duplicates)
+const ignoredTags = new Set(['russian', 'british', 'usa', 'uk', 'american', 'german', 'japanese'])
 
-// Visual generator for tag backgrounds
-const getTagGradient = (tagName) => {
-  let hash = 0
-  for (let i = 0; i < tagName.length; i++) {
-    hash = tagName.charCodeAt(i) + ((hash << 5) - hash)
+const cleanDisplayTags = computed(() => {
+  const source = (props.tags && props.tags.length > 0) ? props.tags : props.displayTags
+  if (!source || source.length === 0) return []
+
+  const seen = new Set()
+  const result = []
+
+  for (const t of source) {
+    if (!t || !t.name) continue
+    const norm = t.name.toLowerCase().replace(/[\s\-_]+/g, '')
+    if (ignoredTags.has(norm) || seen.has(norm)) continue
+    seen.add(norm)
+    result.push(t)
+    if (result.length >= 14) break
   }
-  const h = Math.abs(hash) % 360
-  // Generate a vibrant but soft gradient using HSL
-  return `linear-gradient(135deg, hsl(${h}, 70%, 55%), hsl(${(h + 40) % 360}, 80%, 45%))`
-}
+
+  return result
+})
 </script>
 
 <style scoped>
-/* Explore: Tags Header */
-.explore-header {
-  margin-bottom: 16px;
+.search-landing-container {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 8px 0 32px;
+  animation: fadeIn 0.25s ease;
 }
 
-.explore-title-row {
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.landing-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Section Header */
+.section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
 }
 
 .title-with-icon {
@@ -136,195 +277,389 @@ const getTagGradient = (tagName) => {
   gap: 8px;
 }
 
-.explore-icon {
+.section-icon {
+  flex-shrink: 0;
+}
+
+.text-accent {
   color: var(--c-accent, #1db954);
 }
 
-.explore-heading {
-  font-size: 20px;
-  font-weight: 800;
+.text-muted {
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
+}
+
+.section-heading {
+  font-size: 15px;
+  font-weight: 700;
   color: var(--c-text-1, #fff);
   margin: 0;
   letter-spacing: -0.01em;
 }
 
-.explore-subheading {
-  font-size: 13px;
-  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
-  margin-top: 4px;
-}
-
-/* Scope tabs */
-.tag-scope-tabs {
-  display: flex;
-  background: rgba(255, 255, 255, 0.08);
-  padding: 3px;
-  border-radius: 12px;
-  gap: 2px;
-}
-
-.scope-tab {
+.clear-all-btn {
   background: transparent;
   border: none;
-  color: var(--c-text-3, rgba(255, 255, 255, 0.6));
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
   font-size: 12px;
   font-weight: 600;
-  padding: 4px 12px;
-  border-radius: 9px;
   cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
   transition: all 0.15s ease;
-  font-family: inherit;
 }
 
-.scope-tab.active {
-  background: rgba(255, 255, 255, 0.18);
+.clear-all-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* 1. Recent Searches Chips */
+.recent-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.recent-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 6px 10px 6px 12px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.recent-chip:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.recent-chip:active {
+  transform: scale(0.98);
+}
+
+.chip-clock-icon {
+  color: var(--c-text-3, rgba(255, 255, 255, 0.45));
+}
+
+.chip-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--c-text-1, #fff);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+  margin-left: 2px;
+}
+
+.chip-remove-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
   color: #fff;
 }
 
-/* Tags Grid */
-.tags-grid, .tags-loading-grid {
+/* 2. Source Cards */
+.sources-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(1, 1fr);
   gap: 10px;
 }
 
-@media (min-width: 640px) {
-  .tags-grid, .tags-loading-grid {
-    grid-template-columns: repeat(3, 1fr);
+@media (min-width: 600px) {
+  .sources-grid {
+    grid-template-columns: repeat(2, 1fr);
     gap: 12px;
   }
 }
 
 @media (min-width: 1024px) {
-  .tags-grid, .tags-loading-grid {
+  .sources-grid {
     grid-template-columns: repeat(4, 1fr);
-    gap: 14px;
+    gap: 12px;
   }
 }
 
-.tag-tile {
-  height: 96px;
+.source-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
   border-radius: 12px;
-  padding: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  user-select: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.tag-tile:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
-}
-
-.tag-tile:active {
-  transform: scale(0.97);
-}
-
-.tag-info {
-  display: flex;
-  flex-direction: column;
-  z-index: 1;
-}
-
-.tag-name {
-  font-size: 16px;
-  font-weight: 800;
-  color: #fff;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
-}
-
-.tag-count {
-  font-size: 11px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.75);
-  margin-top: 3px;
-}
-
-.tag-watermark {
+.source-card::before {
+  content: '';
   position: absolute;
-  right: -8px;
-  bottom: -8px;
-  opacity: 0.18;
-  transform: rotate(-15deg);
-  color: #fff;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.2s ease;
   pointer-events: none;
 }
 
-.tag-play-btn {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #fff;
+.sc-card::before {
+  background: radial-gradient(circle at top left, rgba(255, 85, 0, 0.15), transparent 70%);
+}
+
+.sp-card::before {
+  background: radial-gradient(circle at top left, rgba(29, 185, 84, 0.15), transparent 70%);
+}
+
+.yt-card::before {
+  background: radial-gradient(circle at top left, rgba(255, 0, 0, 0.15), transparent 70%);
+}
+
+.lib-card::before {
+  background: radial-gradient(circle at top left, rgba(99, 102, 241, 0.15), transparent 70%);
+}
+
+.source-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+.source-card:hover::before {
+  opacity: 1;
+}
+
+.source-icon-wrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  opacity: 0;
-  transform: scale(0.85);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.source-card:hover .source-icon-wrap {
+  transform: scale(1.05);
+}
+
+.sc-icon-wrap {
+  background: rgba(255, 85, 0, 0.15);
+  color: #ff5500;
+  border: 1px solid rgba(255, 85, 0, 0.25);
+}
+
+.sp-icon-wrap {
+  background: rgba(29, 185, 84, 0.15);
+  color: #1db954;
+  border: 1px solid rgba(29, 185, 84, 0.25);
+}
+
+.yt-icon-wrap {
+  background: rgba(255, 0, 0, 0.15);
+  color: #ff3333;
+  border: 1px solid rgba(255, 0, 0, 0.25);
+}
+
+.lib-icon-wrap {
+  background: rgba(99, 102, 241, 0.15);
+  color: #818cf8;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+}
+
+.source-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.source-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.source-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--c-text-1, #fff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.source-connected-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--c-accent, #1db954);
+  background: rgba(29, 185, 84, 0.15);
+  padding: 1px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(29, 185, 84, 0.25);
+  flex-shrink: 0;
+}
+
+.source-desc {
+  font-size: 11px;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
+  margin: 2px 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.source-arrow {
+  color: var(--c-text-3, rgba(255, 255, 255, 0.3));
   transition: all 0.2s ease;
-  z-index: 2;
-  backdrop-filter: blur(4px);
+  flex-shrink: 0;
 }
 
-.tag-tile:hover .tag-play-btn {
-  opacity: 1;
-  transform: scale(1);
+.source-card:hover .source-arrow {
+  color: #fff;
+  transform: translateX(3px);
 }
 
-.tag-play-btn:hover {
-  background: var(--c-accent, #1db954);
-  color: #000;
-  border-color: transparent;
-  transform: scale(1.1) !important;
-}
-
-/* Loading skeletons */
-.tag-tile-skeleton {
-  height: 96px;
-  border-radius: 12px;
+/* 3. Tag Pills */
+.tag-scope-mini {
+  display: flex;
   background: rgba(255, 255, 255, 0.06);
-  padding: 14px;
+  padding: 2px;
+  border-radius: 8px;
+  gap: 2px;
+}
+
+.scope-mini-btn {
+  background: transparent;
+  border: none;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.6));
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.scope-mini-btn.active {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.tag-pills-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 12px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--c-text-2, rgba(255, 255, 255, 0.85));
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  font-family: inherit;
+}
+
+.tag-pill-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.tag-pill-btn:active {
+  transform: scale(0.97);
+}
+
+.tag-hash {
+  color: var(--c-accent, #1db954);
+  font-weight: 700;
+}
+
+.tag-count-badge {
+  font-size: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 6px;
+  border-radius: 10px;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.6));
+  margin-left: 2px;
+}
+
+/* 4. Search Hints Banner */
+.search-hints-banner {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  box-sizing: border-box;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px dashed rgba(255, 255, 255, 0.08);
 }
 
-.skeleton-tag-title {
-  height: 16px;
-  width: 60%;
+.hint-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.hint-icon-box {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-accent, #1db954);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.hint-text {
+  font-size: 12px;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.55));
+  line-height: 1.5;
+}
+
+.hint-code {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1px 5px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.08);
-  animation: pulse 1.5s ease-in-out infinite;
+  color: var(--c-accent, #1db954);
+  font-family: monospace;
+  font-size: 11px;
 }
 
-.skeleton-tag-count {
-  height: 10px;
-  width: 35%;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.05);
-  animation: pulse 1.5s ease-in-out infinite;
-  animation-delay: 0.15s;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 0.35; }
-  50% { opacity: 0.75; }
+.text-white {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
 }
 </style>

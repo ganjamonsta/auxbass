@@ -7,6 +7,9 @@ from bot.handlers.inline import _format_playlist_card, _format_album_card
 from bot.services.delivery import get_track_player_button, get_playlist_player_button
 from bot.handlers.menu_keyboards import get_playlist_share_keyboard, get_album_share_keyboard
 from shared.models import Playlist, Album, Track, User
+from shared.config import get_settings
+
+settings = get_settings()
 
 
 class DummyUser:
@@ -46,7 +49,7 @@ def test_format_playlist_card():
     assert "Best retro beats for coding" in text
     assert "2" in text  # 2 tracks
     assert "Test DJ" in text
-    assert "TG Player" in text
+    assert settings.display_name in text
 
     # Check keyboard buttons
     buttons = [btn for row in keyboard.inline_keyboard for btn in row]

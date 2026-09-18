@@ -3,6 +3,7 @@ TG Player - Shared Configuration
 """
 import os
 import warnings
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
@@ -13,6 +14,30 @@ class Settings(BaseSettings):
     # Bot
     bot_token: str
     bot_username: str = ""  # For Telegram Login Widget
+    app_name: str = "AuxBass"
+    bot_name: str = ""
+    
+    @property
+    def display_name(self) -> str:
+        return self.bot_name or self.app_name or "AuxBass"
+    
+    @field_validator("bot_token", mode="before")
+    @classmethod
+    def clean_bot_token(cls, v: str) -> str:
+        if isinstance(v, str):
+            return v.strip()
+        return v
+        
+    @field_validator("bot_username", mode="before")
+    @classmethod
+    def clean_bot_username(cls, v: str) -> str:
+        if not v or not isinstance(v, str):
+            return ""
+        cleaned = v.strip().lstrip("@")
+        lowered = cleaned.lower()
+        if lowered in ("", "your_bot_username", "your_bot_username_here", "enter_your_bot_username", "none", "null") or lowered.startswith("your_bot") or "enter_your" in lowered:
+            return ""
+        return cleaned
     
     # Telegram Bot API URL (use local server to bypass 20MB limit)
     # Default: https://api.telegram.org (20MB download limit)

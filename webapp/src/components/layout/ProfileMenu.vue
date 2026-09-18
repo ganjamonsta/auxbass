@@ -421,7 +421,9 @@ watch(() => props.modelValue, (isOpen) => {
   if (isOpen) {
     menuOpenTimestamp = Date.now()
     backdropTouchStarted = false
-    tasksStore.checkRecentJobs()
+    if (authStore.isAuthenticated) {
+      tasksStore.checkRecentJobs()
+    }
     if (!isMobile.value) {
       nextTick(updateDesktopPosition)
     }
@@ -451,7 +453,9 @@ watch(() => tasksStore.hasActiveImports, () => {
 onMounted(() => {
   window.addEventListener('resize', handleResize)
   window.addEventListener('keydown', handleKeyDown)
-  tasksStore.checkRecentJobs()
+  if (authStore.isAuthenticated) {
+    tasksStore.checkRecentJobs()
+  }
   if (props.modelValue && !isMobile.value) {
     nextTick(updateDesktopPosition)
   }

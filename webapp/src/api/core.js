@@ -99,9 +99,12 @@ api.interceptors.response.use(
     
     // If 401 and we're using JWT, clear the token
     if (error.response?.status === 401 && !window.Telegram?.WebApp?.initData) {
+      const hadToken = !!authStorage.getToken()
       authStorage.clear()
-      // Dispatch event for UI to handle
-      window.dispatchEvent(new CustomEvent('auth:logout'))
+      // Only dispatch logout event if we actually had a session/token
+      if (hadToken) {
+        window.dispatchEvent(new CustomEvent('auth:logout'))
+      }
     }
     console.error('API Error:', error.response?.data || error.message)
     return Promise.reject(error)

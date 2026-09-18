@@ -59,7 +59,7 @@ def _format_playlist_card(playlist: Playlist, tracks: list, bot_username: str) -
     """Format HTML card and keyboard for a playlist"""
     total_sec = sum(t.duration or 0 for t in tracks)
     dur_str = format_duration(total_sec) if total_sec else "0:00"
-    owner_name = playlist.owner.display_name if playlist.owner else "TG Player"
+    owner_name = playlist.owner.display_name if playlist.owner else settings.display_name
 
     text = (
         f"🎧 <b>{playlist.name}</b>\n"
@@ -72,7 +72,7 @@ def _format_playlist_card(playlist: Playlist, tracks: list, bot_username: str) -
     text += (
         f"📊 <b>Треков:</b> {len(tracks)}  |  ⏱ <b>Длительность:</b> {dur_str}\n"
         f"👤 <b>Автор:</b> {owner_name}\n\n"
-        f"🎵 <i>TG Player — Музыкальная медиатека</i>"
+        f"🎵 <i>{settings.display_name} — Музыкальная медиатека</i>"
     )
 
     track_count_text = f" ({len(tracks)})" if tracks else ""
@@ -102,7 +102,7 @@ def _format_album_card(album: Album, tracks: list, bot_username: str) -> tuple[s
         f"💿 <b>Альбом: {album.name}</b>\n"
         f"👤 <b>Исполнитель:</b> {album.artist or 'Неизвестен'}\n"
         f"📊 <b>Треков:</b> {len(tracks)}  |  ⏱ <b>Длительность:</b> {dur_str}\n\n"
-        f"🎵 <i>TG Player</i>"
+        f"🎵 <i>{settings.display_name}</i>"
     )
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -180,7 +180,7 @@ async def handle_inline_query(query: InlineQuery, bot: Bot):
                     caption = f"🎧 <b>{track.artist or 'Неизвестен'} — {track.title or 'Без названия'}</b>"
                     if track.album:
                         caption += f"\n💿 <i>{track.album}</i>"
-                    caption += "\n\n🎵 <i>TG Player</i>"
+                    caption += f"\n\n🎵 <i>{settings.display_name}</i>"
 
                     markup = InlineKeyboardMarkup(inline_keyboard=[
                         [
@@ -260,7 +260,7 @@ async def handle_inline_query(query: InlineQuery, bot: Bot):
                     caption = f"🎧 <b>{t.artist or 'Неизвестен'} — {t.title or 'Без названия'}</b>"
                     if t.album:
                         caption += f"\n💿 <i>{t.album}</i>"
-                    caption += "\n\n🎵 <i>TG Player</i>"
+                    caption += f"\n\n🎵 <i>{settings.display_name}</i>"
 
                     markup = InlineKeyboardMarkup(inline_keyboard=[
                         [
@@ -362,7 +362,7 @@ async def handle_inline_query(query: InlineQuery, bot: Bot):
                     caption = f"🎧 <b>{t.artist or 'Неизвестен'} — {t.title or 'Без названия'}</b>"
                     if t.album:
                         caption += f"\n💿 <i>{t.album}</i>"
-                    caption += "\n\n🎵 <i>TG Player</i>"
+                    caption += f"\n\n🎵 <i>{settings.display_name}</i>"
 
                     markup = InlineKeyboardMarkup(inline_keyboard=[
                         [

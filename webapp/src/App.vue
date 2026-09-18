@@ -236,7 +236,7 @@
       </Teleport>
 
       <!-- Profile Context Menu -->
-      <ProfileMenu v-model="showProfileMenu" placement="header" />
+      <ProfileMenu v-if="authStore.isAuthenticated" v-model="showProfileMenu" placement="header" />
     </template>
 
   </div>
@@ -587,8 +587,10 @@ const handleGoToUser = (user) => {
 const handleAuthLogout = () => {
   authStore.logout()
   playerStore.stop()
-  // Force full page reload to clear all store states
-  window.location.href = '/login'
+  // Force full page reload to clear all store states only if not already on the login page
+  if (window.location.pathname !== '/login' && !window.location.pathname.startsWith('/login')) {
+    window.location.href = '/login'
+  }
 }
 
 // Apply UI scale to documentElement (root)

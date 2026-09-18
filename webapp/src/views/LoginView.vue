@@ -10,12 +10,16 @@
       <div v-if="!showCodeInput" class="auth-info">
         <p>Для входа отправьте команду <code>/code</code> боту</p>
         <a 
+          v-if="botUsername && botLink !== '#'" 
           :href="botLink" 
           target="_blank" 
           class="bot-link"
         >
-          Открыть бота
+          Открыть бота @{{ botUsername }}
         </a>
+        <div v-else class="bot-link disabled-link">
+          Открыть бота
+        </div>
         <button class="primary-btn" @click="showCodeInput = true">
           У меня есть код
         </button>
@@ -75,8 +79,14 @@ const error = ref('')
 const appName = ref('TG Player')
 const botUsername = ref('')
 
+const isCleanBotUsername = (username) => {
+  if (!username) return false
+  const lower = String(username).trim().toLowerCase()
+  return !lower.includes('your_bot') && !lower.includes('enter_') && lower !== 'tg_player_bot'
+}
+
 const botLink = computed(() => {
-  return botUsername.value ? `https://t.me/${botUsername.value}` : 'https://t.me/your_bot_username'
+  return isCleanBotUsername(botUsername.value) ? `https://t.me/${botUsername.value.trim().replace(/^@/, '')}` : '#'
 })
 
 const code = computed(() => codeDigits.value.join(''))
@@ -163,9 +173,11 @@ onMounted(async () => {
   // Load app config (bot username for display and link)
   try {
     const response = await authApi.getConfig()
-    if (response.data?.bot_username) {
-      appName.value = response.data.bot_username
-      botUsername.value = response.data.bot_username
+    const raw = response.data?.bot_username
+    if (isCleanBotUsername(raw)) {
+      const clean = raw.trim().replace(/^@/, '')
+      appName.value = clean
+      botUsername.value = clean
     }
   } catch (err) {
     console.error('Failed to load config:', err)
@@ -178,12 +190,14 @@ onMounted(async () => {
   
   // Check for code in URL (from deep link)
   const urlCode = route.query.code
-  if (urlCode && /^\d{6}$/.test(urlCode)) {
+  if (urlCode && /^\d{6,8}$/.test(urlCode)) {
     showCodeInput.value = true
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < urlCode.length && i < 8; i++) {
       codeDigits.value[i] = urlCode[i]
     }
-    nextTick(() => verifyCode())
+    if (urlCode.length === 8) {
+      nextTick(() => verifyCode())
+    }
   }
 })
 </script>
@@ -247,6 +261,11 @@ h1 {
 
 .bot-link:hover {
   background: var(--c-bg-4);
+}
+
+.bot-link.disabled-link {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .primary-btn {

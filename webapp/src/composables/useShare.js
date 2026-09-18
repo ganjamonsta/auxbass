@@ -21,10 +21,11 @@ export function useShare() {
 
   const getBotUsername = () => {
     let botUser = authStore.botUsername || authStore.appName
-    if (!botUser || botUser === 'TG Player') {
+    const lower = (botUser || '').toLowerCase()
+    if (!botUser || botUser === 'TG Player' || lower.includes('your_bot') || lower.includes('enter_')) {
       botUser = 'tg_player_bot'
     }
-    return botUser.replace(/^@/, '')
+    return botUser.replace(/^@/, '').trim()
   }
 
   const getDeepLink = (type, id) => {

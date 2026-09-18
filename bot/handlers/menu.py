@@ -194,7 +194,7 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject 
         args = command.args.strip()
         if args == "open_player":
             await message.answer(
-                "🎵 <b>TG Player</b> — твоя персональная музыкальная библиотека.\n\n"
+                f"🎵 <b>{settings.display_name}</b> — твоя персональная музыкальная библиотека.\n\n"
                 "Нажми кнопку ниже, чтобы открыть плеер:",
                 reply_markup=get_main_menu_keyboard()
             )
@@ -214,7 +214,7 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject 
                     if pl:
                         await message.answer(
                             f"👋 Привет, <b>{user.first_name}</b>!\n\n"
-                            f"🎧 Вам отправили плейлист «<b>{pl.name}</b>» в <b>TG Player</b>.\n\n"
+                            f"🎧 Вам отправили плейлист «<b>{pl.name}</b>» в <b>{settings.display_name}</b>.\n\n"
                             "Выберите действие:",
                             reply_markup=get_playlist_share_keyboard(pid),
                         )
@@ -223,7 +223,7 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject 
                 logger.error(f"Failed to show playlist preview for {args}: {e}")
             await message.answer(
                 f"👋 Привет, <b>{user.first_name}</b>!\n\n"
-                "🎧 Вам отправили плейлист в <b>TG Player</b>.\n\n"
+                f"🎧 Вам отправили плейлист в <b>{settings.display_name}</b>.\n\n"
                 "Нажмите кнопку ниже, чтобы послушать его в плеере:",
                 reply_markup=get_deep_link_keyboard(args, "🎧 Открыть плейлист"),
             )
@@ -238,7 +238,7 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject 
                 logger.error(f"Failed to send track from start arg {args}: {e}")
             await message.answer(
                 f"👋 Привет, <b>{user.first_name}</b>!\n\n"
-                "🎵 Вам отправили трек в <b>TG Player</b>.\n\n"
+                f"🎵 Вам отправили трек в <b>{settings.display_name}</b>.\n\n"
                 "Нажмите кнопку ниже, чтобы включить его в плеере:",
                 reply_markup=get_deep_link_keyboard(args, "🎵 Слушать трек"),
             )
@@ -258,7 +258,7 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject 
                     if al:
                         await message.answer(
                             f"👋 Привет, <b>{user.first_name}</b>!\n\n"
-                            f"💿 Вам отправили альбом «<b>{al.name}</b>» ({al.artist or 'Неизвестен'}) в <b>TG Player</b>.\n\n"
+                            f"💿 Вам отправили альбом «<b>{al.name}</b>» ({al.artist or 'Неизвестен'}) в <b>{settings.display_name}</b>.\n\n"
                             "Выберите действие:",
                             reply_markup=get_album_share_keyboard(aid),
                         )
@@ -267,7 +267,7 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject 
                 logger.error(f"Failed to show album preview for {args}: {e}")
             await message.answer(
                 f"👋 Привет, <b>{user.first_name}</b>!\n\n"
-                "💿 Вам отправили альбом в <b>TG Player</b>.\n\n"
+                f"💿 Вам отправили альбом в <b>{settings.display_name}</b>.\n\n"
                 "Нажмите кнопку ниже, чтобы послушать его в плеере:",
                 reply_markup=get_deep_link_keyboard(args, "💿 Слушать альбом"),
             )
@@ -275,7 +275,7 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject 
         elif args.startswith("user_"):
             await message.answer(
                 f"👋 Привет, <b>{user.first_name}</b>!\n\n"
-                "👤 Вам отправили профиль пользователя в <b>TG Player</b>.\n\n"
+                f"👤 Вам отправили профиль пользователя в <b>{settings.display_name}</b>.\n\n"
                 "Нажмите кнопку ниже, чтобы открыть его медиатеку:",
                 reply_markup=get_deep_link_keyboard(args, "👤 Открыть профиль"),
             )
@@ -283,7 +283,7 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject 
 
     await message.answer(
         f"👋 Привет, <b>{user.first_name}</b>!\n\n"
-        "🎵 <b>TG Player</b> — твоя персональная музыкальная библиотека.\n\n"
+        f"🎵 <b>{settings.display_name}</b> — твоя персональная музыкальная библиотека.\n\n"
         "• Отправляй сюда любые аудиофайлы (по одному или пачками)\n"
         "• Бот сам подтянет обложки, альбомы и авторов\n"
         "• Слушай музыку прямо в Telegram или в браузере\n\n"
@@ -297,7 +297,7 @@ async def cmd_menu(message: Message, state: FSMContext):
     """Show main menu"""
     await state.clear()
     await message.answer(
-        "🎵 <b>TG Player — Меню</b>\n\n"
+        f"🎵 <b>{settings.display_name} — Меню</b>\n\n"
         "Отправляй треки в чат для добавления в библиотеку.",
         reply_markup=get_main_menu_keyboard(),
     )

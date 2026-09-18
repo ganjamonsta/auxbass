@@ -164,6 +164,16 @@ async def lifespan(app: FastAPI):
         token=settings.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML)
     )
+    try:
+        me = await api_bot.get_me()
+        if me.username:
+            settings.bot_username = me.username
+        if me.first_name:
+            settings.bot_name = me.first_name
+        logger.info(f"🤖 Connected API bot: {settings.display_name} (@{me.username}, ID: {me.id})")
+    except Exception as e:
+        logger.warning(f"Could not fetch bot user info in API lifespan: {e}")
+        
     init_channel_service(api_bot)
     
     # Start channel service queue worker for auto-forwarding liked tracks

@@ -372,10 +372,14 @@ async def get_genres(
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get unique genres from tracks"""
+    """Get unique genres from tracks with representative cover_url"""
     if scope == "library":
         query = (
-            select(TrackEnrichment.genre, func.count(TrackEnrichment.id).label("count"))
+            select(
+                TrackEnrichment.genre, 
+                func.count(TrackEnrichment.id).label("count"),
+                func.max(TrackEnrichment.cover_url).label("cover_url")
+            )
             .join(Track, Track.id == TrackEnrichment.track_id)
             .join(UserLibrary, UserLibrary.track_id == Track.id)
             .where(UserLibrary.user_id == user.id)
@@ -386,7 +390,11 @@ async def get_genres(
         )
     else:
         query = (
-            select(TrackEnrichment.genre, func.count(TrackEnrichment.id).label("count"))
+            select(
+                TrackEnrichment.genre, 
+                func.count(TrackEnrichment.id).label("count"),
+                func.max(TrackEnrichment.cover_url).label("cover_url")
+            )
             .join(Track, Track.id == TrackEnrichment.track_id)
             .where(Track.is_public == True)
             .where(TrackEnrichment.genre.isnot(None))
@@ -398,8 +406,8 @@ async def get_genres(
     result = await db.execute(query)
     
     return [
-        {"name": genre, "track_count": count}
-        for genre, count in result.all()
+        {"name": genre, "track_count": count, "cover_url": cover_url}
+        for genre, count, cover_url in result.all()
     ]
 
 
@@ -413,9 +421,9 @@ async def get_tags(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Get unique tags from tracks with counts.
+    Get unique tags from tracks with counts and representative cover_url.
     
-    Now reads from normalized track_tags table (includes both
+    Reads from normalized track_tags table (includes both
     enrichment tags from Last.fm and user-generated tags).
     """
     from shared.models import TrackTag, TrackTagVote
@@ -426,9 +434,11 @@ async def get_tags(
                 TrackTag.tag,
                 func.count(func.distinct(TrackTag.track_id)).label("track_count"),
                 func.count(TrackTagVote.id).label("total_votes"),
+                func.max(TrackEnrichment.cover_url).label("cover_url"),
             )
             .outerjoin(TrackTagVote, TrackTagVote.track_tag_id == TrackTag.id)
             .join(Track, Track.id == TrackTag.track_id)
+            .outerjoin(TrackEnrichment, TrackEnrichment.track_id == Track.id)
             .join(UserLibrary, UserLibrary.track_id == Track.id)
             .where(UserLibrary.user_id == user.id)
             .group_by(TrackTag.tag)
@@ -441,9 +451,11 @@ async def get_tags(
                 TrackTag.tag,
                 func.count(func.distinct(TrackTag.track_id)).label("track_count"),
                 func.count(TrackTagVote.id).label("total_votes"),
+                func.max(TrackEnrichment.cover_url).label("cover_url"),
             )
             .outerjoin(TrackTagVote, TrackTagVote.track_tag_id == TrackTag.id)
             .join(Track, Track.id == TrackTag.track_id)
+            .outerjoin(TrackEnrichment, TrackEnrichment.track_id == Track.id)
             .where(Track.is_public == True)
             .group_by(TrackTag.tag)
             .order_by(desc("track_count"))
@@ -453,8 +465,8 @@ async def get_tags(
     result = await db.execute(query)
     
     return [
-        {"name": tag, "track_count": track_count, "total_votes": total_votes}
-        for tag, track_count, total_votes in result.all()
+        {"name": tag, "track_count": track_count, "total_votes": total_votes, "cover_url": cover_url}
+        for tag, track_count, total_votes, cover_url in result.all()
     ]
 
 

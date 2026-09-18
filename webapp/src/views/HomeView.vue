@@ -250,6 +250,9 @@
       </div>
     </section>
 
+    <!-- Section: Музыкальные открытия и жанры (Explore & Discovery) -->
+    <HomeExploreSection />
+
     <!-- Section: Свежее в сообществе (Recent Uploads) -->
     <!-- Skeleton when uploads are loading -->
     <section v-if="loadingUploads" class="home-section">
@@ -362,6 +365,7 @@ import {
   ChevronRight
 } from 'lucide-vue-next'
 import { useHorizontalScroll } from '@/composables/useHorizontalScroll'
+import HomeExploreSection from '@/components/home/HomeExploreSection.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()

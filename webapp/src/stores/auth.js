@@ -148,9 +148,14 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchConfig() {
     try {
       const response = await authApi.getConfig()
-      if (response.data?.bot_username) {
-        appName.value = response.data.bot_username
-        botUsername.value = response.data.bot_username
+      const raw = response.data?.bot_username
+      if (raw) {
+        const clean = String(raw).trim().replace(/^@/, '')
+        const lower = clean.toLowerCase()
+        if (clean && !lower.includes('your_bot') && !lower.includes('enter_') && lower !== 'tg_player_bot') {
+          appName.value = clean
+          botUsername.value = clean
+        }
       }
     } catch (err) {
       console.error('Failed to fetch config:', err)

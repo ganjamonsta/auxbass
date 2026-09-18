@@ -66,6 +66,16 @@ async def run_bot():
                 default=DefaultBotProperties(parse_mode=ParseMode.HTML)
             )
             
+            try:
+                me = await bot.get_me()
+                if me.username:
+                    settings.bot_username = me.username
+                if me.first_name:
+                    settings.bot_name = me.first_name
+                logger.info(f"🤖 Telegram Bot connected: {settings.display_name} (@{settings.bot_username or me.username}, ID: {me.id})")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to fetch bot info: {e}")
+            
             init_channel_service(bot)
             await start_channel_service()
             

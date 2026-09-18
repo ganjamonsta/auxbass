@@ -61,9 +61,11 @@ async def main():
     # Detect bot username if not set
     try:
         me = await bot.get_me()
-        if me.username and not settings.bot_username:
+        if me.username:
             settings.bot_username = me.username
-        logger.info(f"Bot connected: @{settings.bot_username or me.username} (ID: {me.id})")
+        if me.first_name:
+            settings.bot_name = me.first_name
+        logger.info(f"Bot connected: {settings.display_name} (@{settings.bot_username or me.username}, ID: {me.id})")
     except Exception as e:
         logger.warning(f"Failed to fetch bot user info: {e}")
     

@@ -632,8 +632,21 @@ async def get_auth_config():
     """
     Get authentication configuration for frontend.
     """
+    bot_username = settings.bot_username
+    if not bot_username:
+        try:
+            from api.main import api_bot
+            if api_bot:
+                me = await api_bot.get_me()
+                if me.username:
+                    settings.bot_username = me.username
+                    bot_username = me.username
+        except Exception:
+            pass
+
     return {
-        "bot_username": settings.bot_username,
+        "bot_username": bot_username or "",
+        "app_name": settings.display_name,
         "auth_method": "code",  # Changed from widget to code
     }
 
