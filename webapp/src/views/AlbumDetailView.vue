@@ -47,8 +47,13 @@
     <!-- Unified Actions -->
     <div class="hero-actions">
       <div class="action-buttons">
-        <button class="action-btn play-btn" @click="playAll" title="Слушать все">
-          <Play :size="20" fill="currentColor" />
+        <button 
+          class="action-btn play-btn" 
+          @click="togglePlay" 
+          :title="playButtonTitle"
+        >
+          <Pause v-if="isPlaying" :size="20" fill="currentColor" />
+          <Play v-else :size="20" fill="currentColor" />
         </button>
         <button class="action-btn shuffle-btn" @click="shufflePlay" :disabled="isShuffling" title="Перемешать">
           <Shuffle :size="18" />
@@ -212,7 +217,7 @@ import { useTrackActions, usePlaybackActions, useTrackSync } from '@/composables
 import TrackItem from '@/components/TrackItem.vue'
 import TagChips from '@/components/TagChips.vue'
 import api from '@/api/client'
-import { Disc3, Check, Music, X, Play, Shuffle, Plus, Users, Share2 } from 'lucide-vue-next'
+import { Disc3, Check, Music, X, Play, Pause, Shuffle, Plus, Users, Share2 } from 'lucide-vue-next'
 import { splitArtists, getCoverUrl, CoverSize, formatDuration } from '@/utils/formatters'
 import { useShare } from '@/composables/useShare'
 
@@ -324,7 +329,10 @@ const loadAlbum = async () => {
 }
 
 // Unified playback actions - use shufflePlayFull for lazy loading all album tracks
-const { playAll, shufflePlayFull, isShuffling, playTrack } = usePlaybackActions(playableTracks)
+const { playAll, togglePlay, isPlaying, isCurrentContext, playButtonTitle, shufflePlayFull, isShuffling, playTrack } = usePlaybackActions(
+  playableTracks,
+  () => album.value ? { type: 'album', id: album.value.id, name: album.value.name } : null
+)
 
 // Shuffle play handler using lazy loading
 const shufflePlay = () => {
@@ -335,8 +343,8 @@ const shufflePlay = () => {
 
 const playTrackItem = (item) => {
   if (item.track) {
-    const index = playableTracks.value.findIndex(t => t.id === item.track_id)
-    playerStore.playTrack(item.track, playableTracks.value, index >= 0 ? index : 0)
+    const context = album.value ? { type: 'album', id: album.value.id, name: album.value.name } : null
+    playerStore.playTrack(item.track, playableTracks.value, context)
   }
 }
 
@@ -512,7 +520,7 @@ watch(
   margin-top: 8px;
 }
 
-.play-btn svg {
+.play-btn svg.lucide-play {
   margin-left: 2px;
 }
 

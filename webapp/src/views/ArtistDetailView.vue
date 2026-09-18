@@ -53,8 +53,13 @@
     <!-- Unified Actions -->
     <div class="hero-actions" v-if="artist.track_count > 0">
       <div class="action-buttons">
-        <button class="action-btn play-btn" @click="playAll" title="Слушать все">
-          <Play :size="20" fill="currentColor" />
+        <button 
+          class="action-btn play-btn" 
+          @click="togglePlay" 
+          :title="playButtonTitle"
+        >
+          <Pause v-if="isPlaying" :size="20" fill="currentColor" />
+          <Play v-else :size="20" fill="currentColor" />
         </button>
         <button class="action-btn shuffle-btn" @click="shufflePlay" :disabled="isShuffling" title="Перемешать">
           <Shuffle :size="18" />
@@ -144,7 +149,7 @@ import { useTrackActions, usePlaybackActions } from '@/composables'
 import VirtualTrackList from '@/components/VirtualTrackList.vue'
 import TagChips from '@/components/TagChips.vue'
 import api, { playerApi } from '@/api/client'
-import { User, Disc3, Globe, Music, Play, Shuffle } from 'lucide-vue-next'
+import { User, Disc3, Globe, Music, Play, Pause, Shuffle } from 'lucide-vue-next'
 import { getCoverUrl, CoverSize, formatDuration } from '@/utils'
 
 // Universal context menu
@@ -221,7 +226,8 @@ const loadArtist = async () => {
 
 // Handle track click from VirtualTrackList
 const handleTrackClick = ({ track, index, allTracks }) => {
-  playerStore.playTrack(track, allTracks)
+  const context = artist.value ? { type: 'artist', id: artist.value.id || artistName.value, name: artistName.value } : null
+  playerStore.playTrack(track, allTracks, context)
 }
 
 // Handle track menu from VirtualTrackList
@@ -230,8 +236,9 @@ const handleTrackMenu = ({ track, index, event }) => {
 }
 
 // Unified playback actions - use shufflePlayFull for lazy loading all artist tracks
-const { playAll, shufflePlayFull, isShuffling } = usePlaybackActions(() => 
-  virtualTrackListRef.value?.getLoadedTracks() || []
+const { playAll, togglePlay, isPlaying, isCurrentContext, playButtonTitle, shufflePlayFull, isShuffling } = usePlaybackActions(
+  () => virtualTrackListRef.value?.getLoadedTracks() || [],
+  () => artist.value ? { type: 'artist', id: artist.value.id || artistName.value, name: artistName.value } : null
 )
 
 // Shuffle play handler using lazy loading
@@ -368,7 +375,7 @@ watch(
   transform: scale(1.02);
 }
 
-.play-btn svg {
+.play-btn svg.lucide-play {
   margin-left: 2px;
 }
 

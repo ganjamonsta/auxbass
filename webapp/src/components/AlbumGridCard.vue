@@ -11,7 +11,15 @@
     <div class="album-cover">
       <img v-if="album.cover_url" :src="getCoverUrl(album.cover_url, CoverSize.MEDIUM)" :alt="album.name" loading="lazy" />
       <div v-else class="cover-placeholder"><Disc3 :size="32" /></div>
-      <button class="play-btn" @click.stop="$emit('play', album)"><Play :size="20" fill="currentColor" /></button>
+      <button 
+        class="play-btn" 
+        :class="{ 'is-playing': isPlaying }"
+        @click.stop="handlePlay"
+        :title="isPlaying ? 'Пауза' : 'Слушать'"
+      >
+        <Pause v-if="isPlaying" :size="20" fill="currentColor" />
+        <Play v-else :size="20" fill="currentColor" />
+      </button>
       <!-- Progress indicator if we have total_tracks -->
       <div v-if="album.total_tracks && album.track_count < album.total_tracks" class="progress-badge">
         {{ album.track_count }}/{{ album.total_tracks }}
@@ -33,8 +41,12 @@
 </template>
 
 <script setup>
-import { Disc3, Play } from 'lucide-vue-next'
+import { Disc3, Play, Pause } from 'lucide-vue-next'
 import { getCoverUrl, CoverSize } from '@/utils'
+import { usePlayerStore } from '@/stores/player'
+import { computed } from 'vue'
+
+const playerStore = usePlayerStore()
 
 const props = defineProps({
   album: {
@@ -44,6 +56,24 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['click', 'play', 'contextmenu'])
+
+const isPlaying = computed(() => {
+  if (!playerStore.isPlaying) return false
+  const albumId = props.album?.id
+  if (!albumId) return false
+  if (playerStore.currentAlbumId === Number(albumId)) return true
+  const ctx = playerStore.playbackContext || playerStore.lazyShuffleContext
+  if (ctx?.type === 'album' && String(ctx.id) === String(albumId)) return true
+  return false
+})
+
+const handlePlay = () => {
+  if (isPlaying.value) {
+    playerStore.togglePlay()
+  } else {
+    emit('play', props.album)
+  }
+}
 
 let longPressTimer = null
 let touchMoved = false
@@ -148,9 +178,14 @@ const handleClick = (e) => {
   justify-content: center;
 }
 
-.album-card:hover .play-btn {
+.album-card:hover .play-btn,
+.play-btn.is-playing {
   opacity: 1;
   transform: translateY(0);
+}
+
+.play-btn svg.lucide-play {
+  margin-left: 2px;
 }
 
 /* Hide play button on mobile devices */

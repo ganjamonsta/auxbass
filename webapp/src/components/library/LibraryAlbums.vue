@@ -214,7 +214,7 @@ const playAlbum = async (album) => {
     }
     
     if (tracks.length) {
-      playerStore.playTrack(tracks[0], tracks)
+      playerStore.playTrack(tracks[0], tracks, { type: 'album', id: album.id, name: album.name || albumData.name })
     }
   } catch (error) {
     console.error('Failed to load album:', error)

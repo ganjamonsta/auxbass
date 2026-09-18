@@ -36,8 +36,13 @@
       <!-- Unified Actions with Expandable Search in one row -->
       <div class="hero-actions" :class="{ 'search-active': isSearchOpen }" v-if="tracks.length">
         <div class="action-buttons" v-if="!isSearchOpen">
-          <button class="action-btn play-btn" @click="playAll" title="Слушать все">
-            <Play :size="20" fill="currentColor" />
+          <button 
+            class="action-btn play-btn" 
+            @click="togglePlay" 
+            :title="playButtonTitle"
+          >
+            <Pause v-if="isPlaying" :size="20" fill="currentColor" />
+            <Play v-else :size="20" fill="currentColor" />
           </button>
           <button class="action-btn shuffle-btn" @click="shufflePlay" title="Перемешать">
             <Shuffle :size="18" />
@@ -109,7 +114,7 @@ import { useContextMenu } from '@/composables/useContextMenu'
 import { useTrackActions, usePlaybackActions, useTrackSync } from '@/composables'
 import TrackItem from '@/components/TrackItem.vue'
 import ExpandableSearch from '@/components/ui/ExpandableSearch.vue'
-import { Heart, Play, Shuffle, Search } from 'lucide-vue-next'
+import { Heart, Play, Pause, Shuffle, Search } from 'lucide-vue-next'
 
 // Universal context menu
 const { openMenu } = useContextMenu()
@@ -164,7 +169,10 @@ const sortedTracks = computed(() => {
 })
 
 // Unified playback actions
-const { playAll, shufflePlay, playTrack } = usePlaybackActions(sortedTracks)
+const { playAll, togglePlay, isPlaying, isCurrentContext, playButtonTitle, shufflePlay, playTrack } = usePlaybackActions(
+  sortedTracks,
+  () => ({ type: 'liked', name: 'Любимые треки' })
+)
 
 const unlikeTrack = async (track) => {
   try {
@@ -213,7 +221,7 @@ onMounted(async () => {
   filter: drop-shadow(0 0 10px rgba(255, 69, 100, 0.6));
 }
 
-.play-btn svg {
+.play-btn svg.lucide-play {
   margin-left: 2px;
 }
 

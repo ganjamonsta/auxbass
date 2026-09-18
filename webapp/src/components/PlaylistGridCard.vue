@@ -25,7 +25,15 @@
       <div v-else class="cover-placeholder"><Music :size="24" /></div>
       
       <!-- Play button -->
-      <button class="play-btn" @click.stop="$emit('play', playlist)"><Play :size="20" fill="currentColor" /></button>
+      <button 
+        class="play-btn" 
+        :class="{ 'is-playing': isPlaying }"
+        @click.stop="handlePlay"
+        :title="isPlaying ? 'Пауза' : 'Слушать'"
+      >
+        <Pause v-if="isPlaying" :size="20" fill="currentColor" />
+        <Play v-else :size="20" fill="currentColor" />
+      </button>
       
       <!-- Owner badge for created playlists -->
       <div v-if="playlist.is_owner" class="owner-badge creator-badge">
@@ -51,8 +59,12 @@
 </template>
 
 <script setup>
-import { Music, Globe, Crown, UserPlus, Play, Heart } from 'lucide-vue-next'
+import { Music, Globe, Crown, UserPlus, Play, Pause, Heart } from 'lucide-vue-next'
 import { getCoverUrl, CoverSize, triggerHaptic, suppressNextClick, suppressNextContextMenu } from '@/utils'
+import { usePlayerStore } from '@/stores/player'
+import { computed } from 'vue'
+
+const playerStore = usePlayerStore()
 
 const props = defineProps({
   playlist: {
@@ -62,6 +74,28 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['click', 'play', 'contextmenu'])
+
+const isPlaying = computed(() => {
+  if (!playerStore.isPlaying) return false
+  const playlistId = props.playlist?.id
+  if (!playlistId) return false
+  if (playlistId === 'liked' || props.playlist.is_liked) {
+    const ctx = playerStore.playbackContext || playerStore.lazyShuffleContext
+    return ctx?.type === 'liked' || ctx?.type === 'library'
+  }
+  if (playerStore.currentPlaylistId === Number(playlistId)) return true
+  const ctx = playerStore.playbackContext || playerStore.lazyShuffleContext
+  if (ctx?.type === 'playlist' && String(ctx.id) === String(playlistId)) return true
+  return false
+})
+
+const handlePlay = () => {
+  if (isPlaying.value) {
+    playerStore.togglePlay()
+  } else {
+    emit('play', props.playlist)
+  }
+}
 
 let longPressTimer = null
 let touchMoved = false
@@ -238,9 +272,14 @@ const handleClick = (e) => {
   z-index: 1;
 }
 
-.playlist-card:hover .play-btn {
+.playlist-card:hover .play-btn,
+.play-btn.is-playing {
   opacity: 1;
   transform: translateY(0);
+}
+
+.play-btn svg.lucide-play {
+  margin-left: 2px;
 }
 
 /* Hide play button on mobile devices */

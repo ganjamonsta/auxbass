@@ -157,9 +157,13 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   const setPlaybackContext = (ctx) => {
-    playbackContext.value = ctx || null
-    if (ctx?.type === 'playlist' && ctx.id) {
-      recordPlaylistPlayed(ctx.id)
+    if (ctx && typeof ctx === 'object' && ctx.type) {
+      playbackContext.value = ctx
+      if (ctx.type === 'playlist' && ctx.id) {
+        recordPlaylistPlayed(ctx.id)
+      }
+    } else if (ctx === null) {
+      playbackContext.value = null
     }
   }
 
@@ -171,6 +175,24 @@ export const usePlayerStore = defineStore('player', () => {
       return Number(playbackContext.value.id)
     }
     return null
+  })
+
+  const currentAlbumId = computed(() => {
+    if (lazyShuffleContext.value?.type === 'album') {
+      return Number(lazyShuffleContext.value.id)
+    }
+    if (playbackContext.value?.type === 'album') {
+      return Number(playbackContext.value.id)
+    }
+    if (!lazyShuffleContext.value && !playbackContext.value) {
+      const aId = currentTrack.value?.album_id || currentTrack.value?.album?.id
+      return aId ? Number(aId) : null
+    }
+    return null
+  })
+
+  const currentContext = computed(() => {
+    return lazyShuffleContext.value || playbackContext.value || null
   })
 
   // Private flags
@@ -617,6 +639,8 @@ export const usePlayerStore = defineStore('player', () => {
 
     if (context) {
       setPlaybackContext(context)
+    } else if (newQueue) {
+      setPlaybackContext(null)
     }
 
     // Update queue
@@ -1264,7 +1288,9 @@ export const usePlayerStore = defineStore('player', () => {
     lazyShuffleIndex,
     lazyShuffleIds,
     playbackContext,
+    currentContext,
     currentPlaylistId,
+    currentAlbumId,
     recentPlaylists,
     recordPlaylistPlayed,
     setPlaybackContext,

@@ -44,8 +44,14 @@
     <!-- Unified Actions with Expandable Search -->
     <div class="hero-actions" :class="{ 'search-active': isSearchOpen }">
       <div class="action-buttons" v-if="!isSearchOpen">
-        <button class="action-btn play-btn" @click="playAll" :disabled="!filteredTracks?.length" title="Слушать все">
-          <Play :size="20" fill="currentColor" />
+        <button 
+          class="action-btn play-btn" 
+          @click="togglePlay" 
+          :disabled="!filteredTracks?.length" 
+          :title="playButtonTitle"
+        >
+          <Pause v-if="isPlaying" :size="20" fill="currentColor" />
+          <Play v-else :size="20" fill="currentColor" />
         </button>
         <button class="action-btn shuffle-btn" @click="shufflePlay" :disabled="isShuffling || !filteredTracks?.length" title="Перемешать">
           <Shuffle :size="18" />
@@ -158,7 +164,7 @@ import EditPlaylistModal from '@/components/EditPlaylistModal.vue'
 import ExpandableSearch from '@/components/ui/ExpandableSearch.vue'
 import api, { playlistsApi } from '@/api/client'
 import apiCache from '@/utils/apiCache'
-import { Music, Check, Plus, Globe, Play, Shuffle, Edit3, Share2, Search, Pin, AlertCircle } from 'lucide-vue-next'
+import { Music, Check, Plus, Globe, Play, Pause, Shuffle, Edit3, Share2, Search, Pin, AlertCircle } from 'lucide-vue-next'
 import { getCoverUrl, CoverSize } from '@/utils'
 
 // Universal context menu
@@ -224,8 +230,8 @@ const showEditModal = ref(false)
 const subscribing = ref(false)
 
 // Unified playback actions - use shufflePlayFull for lazy loading all playlist tracks
-const { playAll, shufflePlayFull, isShuffling, playTrack } = usePlaybackActions(
-  () => playlist.value?.tracks,
+const { playAll, togglePlay, isPlaying, isCurrentContext, playButtonTitle, shufflePlayFull, isShuffling, playTrack } = usePlaybackActions(
+  () => filteredTracks.value?.length ? filteredTracks.value : playlist.value?.tracks,
   () => playlist.value ? { type: 'playlist', id: playlist.value.id, name: playlist.value.name } : null
 )
 
@@ -442,7 +448,7 @@ watch(
   justify-content: stretch;
 }
 
-.play-btn svg {
+.play-btn svg.lucide-play {
   margin-left: 2px;
 }
 

@@ -594,7 +594,7 @@ const handlePlayAlbum = async (album) => {
     const albumData = response.data
     const tracks = albumData.full_tracklist?.filter(t => t.in_library) || albumData.tracks || []
     if (tracks.length > 0) {
-      playerStore.playTrack(tracks[0], tracks, 0)
+      playerStore.playTrack(tracks[0], tracks, { type: 'album', id: album.id, name: album.name || albumData.name })
     }
   } catch (e) {
     console.error('Failed to play album:', e)
