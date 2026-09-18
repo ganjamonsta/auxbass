@@ -5,6 +5,8 @@ import apiCache from '@/utils/apiCache'
 import { useUIStore } from './ui'
 import { useLibraryStore } from './library'
 import { useAuthStore } from './auth'
+import { usePlayerStore } from './player'
+import { deleteCachedAudio, deleteCachedUrl } from './playerCache'
 
 export const useTasksStore = defineStore('tasks', () => {
   const uiStore = useUIStore()
@@ -166,6 +168,19 @@ export const useTasksStore = defineStore('tasks', () => {
       }
 
       if (trackObj) {
+        // Evict any stale preview chunk cache from IndexedDB and memory
+        await deleteCachedAudio(trackObj.id).catch(() => {})
+        deleteCachedUrl(trackObj.id)
+
+        try {
+          const playerStore = usePlayerStore()
+          playerStore.patchTrack(trackObj.id, {
+            is_chunk: false,
+            duration: trackObj.duration,
+            file_size: trackObj.file_size,
+          })
+        } catch (_) {}
+
         libraryStore.addTrackOptimistic(trackObj)
       } else {
         apiCache.invalidateRelated('track')

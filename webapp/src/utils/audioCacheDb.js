@@ -126,7 +126,8 @@ export async function getCachedTrack(trackId) {
             artist: record.artist,
             album: record.album,
             duration: record.duration,
-            cover_url: record.cover_url
+            cover_url: record.cover_url,
+            is_chunk: Boolean(record.is_chunk)
           }
         })
       }
@@ -183,6 +184,10 @@ export async function getAllCachedTracks() {
  */
 export async function saveTrackToCache(track, blob, mimeType = 'audio/mpeg') {
   if (!track || !track.id || !blob || blob.size === 0) return false
+  if (track.is_chunk) {
+    console.warn(`[AudioCache] Skipping save for preview chunk track ${track.id} ("${track.title}")`)
+    return false
+  }
 
   try {
     const db = await openCacheDb()
@@ -198,7 +203,8 @@ export async function saveTrackToCache(track, blob, mimeType = 'audio/mpeg') {
       artist: track.artist || '',
       album: track.album || '',
       duration: track.duration || 0,
-      cover_url: track.cover_url || null
+      cover_url: track.cover_url || null,
+      is_chunk: Boolean(track.is_chunk)
     }
 
     return new Promise((resolve, reject) => {

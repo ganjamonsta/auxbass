@@ -1641,7 +1641,13 @@ async def remove_from_library(
     user: TelegramUser = Depends(require_premium),
     db: AsyncSession = Depends(get_db),
 ):
-    """Remove a track from user's library and channel (channel = mirror of library)."""
+    """Remove a track from user's library and channel (channel = mirror of library).
+    If no other users have this track left in their library, delete track completely from global DB.
+    """
+    track = await db.get(Track, track_id)
+    if not track:
+        raise_not_found("Track not found")
+
     result = await db.execute(
         select(UserLibrary)
         .where(UserLibrary.track_id == track_id)
@@ -1663,7 +1669,29 @@ async def remove_from_library(
     except Exception as e:
         logger.warning(f"Failed to delete track {track_id} from channel: {e}")
     
-    return {"status": "removed", "track_id": track_id, "deleted_from_channel": deleted_from_channel}
+    # Check remaining users who have this track in their library
+    other_users_count = await db.scalar(
+        select(func.count(UserLibrary.id))
+        .where(UserLibrary.track_id == track_id)
+    )
+    
+    purged_from_global = False
+    if other_users_count == 0:
+        # No users have this track left (orphaned) -> delete track entirely to free the slot
+        await db.delete(track)
+        await db.commit()
+        purged_from_global = True
+        logger.info(
+            f"Track {track_id} ('{track.artist} - {track.title}') purged from global tracks table "
+            f"(last listener removed it from library)"
+        )
+    
+    return {
+        "status": "removed",
+        "track_id": track_id,
+        "deleted_from_channel": deleted_from_channel,
+        "purged_from_global": purged_from_global,
+    }
 
 
 # ============== Get all tracks (alias for backwards compat) ==============

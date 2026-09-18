@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { tracksApi, playlistsApi, playerApi, artistsApi } from '../api/client'
 import apiCache from '../utils/apiCache'
 import { getAllCachedTracks } from '../utils/audioCacheDb'
-import { setCachedUrl } from './playerCache'
+import { setCachedUrl, deleteCachedAudio, deleteCachedUrl } from './playerCache'
 
 export const useLibraryStore = defineStore('library', () => {
   // LocalStorage keys for instant hydration (SWR) - scoped by user ID to prevent cross-account leakage
@@ -583,10 +583,19 @@ export const useLibraryStore = defineStore('library', () => {
    * Removes track from all store arrays, player queue, and dispatches window event.
    */
   const notifyTrackRemoved = async (trackId) => {
-    // 1. Invalidate API cache
-    apiCache.invalidateRelated('trackRemoved', trackId)
+    // 1. Evict persistent audio blob and cached URL
+    deleteCachedAudio(trackId).catch(() => {})
+    deleteCachedUrl(trackId)
 
-    // 2. Remove from all local lists
+    // 2. Invalidate API cache (including search and listings)
+    apiCache.invalidateRelated('trackRemoved', trackId)
+    apiCache.invalidatePattern('/tracks')
+    apiCache.invalidatePattern('/library')
+    apiCache.invalidatePattern('/search')
+    apiCache.invalidatePattern('/artists')
+    apiCache.invalidatePattern('/albums')
+
+    // 3. Remove from all local lists
     const removeFromList = (list) => {
       const idx = list.findIndex(t => t.id === trackId)
       if (idx !== -1) list.splice(idx, 1)
@@ -901,6 +910,11 @@ export const useLibraryStore = defineStore('library', () => {
   // Delete all unavailable tracks
   const deleteUnavailableTracks = async () => {
     try {
+      const unavailable = tracks.value.filter(t => t.is_unavailable)
+      for (const t of unavailable) {
+        deleteCachedAudio(t.id).catch(() => {})
+        deleteCachedUrl(t.id)
+      }
       const result = await tracksApi.deleteAllUnavailable()
       // Remove from local state
       tracks.value = tracks.value.filter(t => !t.is_unavailable)
@@ -1040,13 +1054,20 @@ export const useLibraryStore = defineStore('library', () => {
   // Optimistically add track to library list after download/import
   const addTrackOptimistic = (trackObj) => {
     if (!trackObj || !trackObj.id) return
+    deleteCachedAudio(trackObj.id).catch(() => {})
+    deleteCachedUrl(trackObj.id)
     apiCache.invalidateRelated('track', trackObj.id)
     apiCache.invalidatePattern('/tracks')
     apiCache.invalidatePattern('/library')
     
-    if (Array.isArray(tracks.value) && !tracks.value.some(t => t?.id === trackObj.id)) {
-      tracks.value.unshift({ ...trackObj, in_library: true })
-      total.value = (total.value || 0) + 1
+    if (Array.isArray(tracks.value)) {
+      const idx = tracks.value.findIndex(t => t?.id === trackObj.id)
+      if (idx !== -1) {
+        tracks.value[idx] = { ...tracks.value[idx], ...trackObj, in_library: true, is_chunk: false }
+      } else {
+        tracks.value.unshift({ ...trackObj, in_library: true, is_chunk: false })
+        total.value = (total.value || 0) + 1
+      }
     }
     window.dispatchEvent(new CustomEvent('track:added:library', {
       detail: { trackId: trackObj.id }
@@ -1058,9 +1079,14 @@ export const useLibraryStore = defineStore('library', () => {
   const removeFromLibrary = async (trackId) => {
     try {
       await tracksApi.removeFromLibrary(trackId)
+      deleteCachedAudio(trackId).catch(() => {})
+      deleteCachedUrl(trackId)
       apiCache.invalidateRelated('track', trackId)
       apiCache.invalidatePattern('/tracks')
       apiCache.invalidatePattern('/library')
+      apiCache.invalidatePattern('/search')
+      apiCache.invalidatePattern('/artists')
+      apiCache.invalidatePattern('/albums')
       
       // Remove from library lists
       tracks.value = Array.isArray(tracks.value) ? tracks.value.filter(t => t?.id !== trackId) : []

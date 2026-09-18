@@ -12,7 +12,7 @@ from shared.models import (
     Base, User, Track, UserLibrary, LibrarySource, EnrichmentStatus
 )
 from shared.matching import normalize_artist
-from api.routers.tracks import delete_track
+from api.routers.tracks import delete_track, remove_from_library
 from api.schemas.common import TelegramUser
 
 
@@ -138,3 +138,59 @@ async def test_delete_track_force_purge_removes_from_all(deletion_test_db):
             # Track 2 is completely gone
             t = await session.get(Track, 2)
             assert t is None
+
+
+@pytest.mark.asyncio
+async def test_remove_from_library_purges_orphaned_global_track(deletion_test_db):
+    user = TelegramUser(id=100, username="user1", first_name="User")
+
+    with patch("api.routers.tracks.get_channel_service") as mock_ch:
+        mock_svc = AsyncMock()
+        mock_svc.delete_track_from_channel.return_value = True
+        mock_ch.return_value = mock_svc
+
+        async with deletion_test_db() as session:
+            # Track 1 has only user 100
+            res = await remove_from_library(track_id=1, user=user, db=session)
+            assert res["status"] == "removed"
+            assert res["purged_from_global"] is True
+
+            # Track 1 is completely purged from global DB
+            t = await session.get(Track, 1)
+            assert t is None
+
+            # UserLibrary entry is removed
+            lib = await session.execute(select(UserLibrary).where(UserLibrary.track_id == 1))
+            assert lib.scalar_one_or_none() is None
+
+
+@pytest.mark.asyncio
+async def test_remove_from_library_keeps_global_track_if_other_users_exist(deletion_test_db):
+    user = TelegramUser(id=100, username="user1", first_name="User")
+
+    with patch("api.routers.tracks.get_channel_service") as mock_ch:
+        mock_svc = AsyncMock()
+        mock_svc.delete_track_from_channel.return_value = True
+        mock_ch.return_value = mock_svc
+
+        async with deletion_test_db() as session:
+            # Track 2 has user 100 and user 200
+            res = await remove_from_library(track_id=2, user=user, db=session)
+            assert res["status"] == "removed"
+            assert res["purged_from_global"] is False
+
+            # Track 2 still exists because user 200 has it
+            t = await session.get(Track, 2)
+            assert t is not None
+
+            # User 100's library entry is gone
+            u1_lib = await session.execute(
+                select(UserLibrary).where(UserLibrary.track_id == 2, UserLibrary.user_id == 100)
+            )
+            assert u1_lib.scalar_one_or_none() is None
+
+            # User 200's library entry remains
+            u2_lib = await session.execute(
+                select(UserLibrary).where(UserLibrary.track_id == 2, UserLibrary.user_id == 200)
+            )
+            assert u2_lib.scalar_one_or_none() is not None

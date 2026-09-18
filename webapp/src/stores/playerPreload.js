@@ -210,6 +210,10 @@ const _cachingTracks = new Map()
  */
 export async function cacheTrackInBackground(track, streamUrl, maxCacheBytes = 1073741824) {
   if (!track || !track.id || !streamUrl || _cachingTracks.has(track.id)) return
+  if (track.is_chunk) {
+    console.log(`[AutoCache] Skipping background caching for preview chunk "${track.title}" (track ${track.id})`)
+    return
+  }
 
   // Check if already in IndexedDB
   const isCached = await hasCachedTrack(track.id)

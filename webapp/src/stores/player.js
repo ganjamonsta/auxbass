@@ -322,10 +322,10 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   const persistState = () => {
-    if (!currentTrack.value) { clearPlayerState(); return }
+    if (!currentTrack.value || currentTrack.value.is_chunk) { clearPlayerState(); return }
     savePlayerState({
       currentTrack: currentTrack.value,
-      queue: queue.value,
+      queue: queue.value.filter(t => !t.is_chunk),
       queueIndex: queueIndex.value,
       progress: progress.value,
       duration: duration.value,
@@ -690,7 +690,7 @@ export const usePlayerStore = defineStore('player', () => {
     updateMediaSession()
 
     try {
-      const source = await resolveAudioSource(track.id, playerApi.getStreamUrl.bind(playerApi))
+      const source = await resolveAudioSource(track, playerApi.getStreamUrl.bind(playerApi))
       await applySource(track, source)
       loading.value = false
       nextTrackPreloaded.value = null
@@ -698,8 +698,8 @@ export const usePlayerStore = defineStore('player', () => {
       startStateSaving()
       preloadNextTracks()
 
-      // Background auto-caching if enabled and playing from network
-      if (autoCacheEnabled.value && source.src && source.type !== 'blob') {
+      // Background auto-caching if enabled and playing from network (chunks are never cached)
+      if (autoCacheEnabled.value && source.src && source.type !== 'blob' && !track.is_chunk) {
         cacheTrackInBackground(track, source.src, cacheMaxBytes.value)
       }
       // Request persistent storage on playback
@@ -786,6 +786,8 @@ export const usePlayerStore = defineStore('player', () => {
         window.dispatchEvent(new CustomEvent('player:error', { detail: lastError.value }))
         setTimeout(() => next(), 300)
       } else if (statusCode === 404) {
+        deleteCachedAudio(track.id).catch(() => {})
+        deleteCachedUrl(track.id)
         lastError.value = { type: 'not_found', track, message: 'Трек не найден' }
         window.dispatchEvent(new CustomEvent('player:error', { detail: lastError.value }))
         try { await tracksApi.markUnavailable(track.id); track.is_unavailable = true } catch (_) {}
@@ -956,7 +958,7 @@ export const usePlayerStore = defineStore('player', () => {
     updateMediaSession()
 
     try {
-      const source = await resolveAudioSource(nextTrack.id, playerApi.getStreamUrl.bind(playerApi))
+      const source = await resolveAudioSource(nextTrack, playerApi.getStreamUrl.bind(playerApi))
       await applySource(nextTrack, source)
       loading.value = false
       isSkipping = false
@@ -1033,7 +1035,7 @@ export const usePlayerStore = defineStore('player', () => {
     updateMediaSession()
 
     try {
-      const source = await resolveAudioSource(prevTrack.id, playerApi.getStreamUrl.bind(playerApi))
+      const source = await resolveAudioSource(prevTrack, playerApi.getStreamUrl.bind(playerApi))
       await applySource(prevTrack, source)
       loading.value = false
       isSkipping = false
@@ -1235,7 +1237,7 @@ export const usePlayerStore = defineStore('player', () => {
     const savedProgress = progress.value
     try {
       loading.value = true
-      const source = await resolveAudioSource(currentTrack.value.id, playerApi.getStreamUrl.bind(playerApi))
+      const source = await resolveAudioSource(currentTrack.value, playerApi.getStreamUrl.bind(playerApi))
       await applySource(currentTrack.value, source)
       if (savedProgress > 0 && audio.value && savedProgress < (audio.value.duration || duration.value) - 1) {
         audio.value.currentTime = savedProgress
