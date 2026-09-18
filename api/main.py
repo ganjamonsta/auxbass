@@ -5,6 +5,7 @@ Uses new modular architecture with separated routers.
 """
 import time
 import re
+import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
 from collections import defaultdict
@@ -38,6 +39,7 @@ from api.routers.ingestion import router as ingestion_router
 from api.services.version import get_version_info
 
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 # Global bot instance for API
