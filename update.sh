@@ -49,8 +49,17 @@ fi
 
 # 2. Update Python dependencies
 if [ -f "requirements.txt" ]; then
-    echo "🐍 [2/3] Проверка зависимостей Python..."
-    pip install --no-cache-dir -r requirements.txt 2>/dev/null || pip install -r requirements.txt || true
+    REQ_HASH=$(md5sum requirements.txt 2>/dev/null | awk '{print $1}' || cksum requirements.txt 2>/dev/null || true)
+    STORED_HASH=""
+    [ -f ".requirements.hash" ] && STORED_HASH=$(cat .requirements.hash 2>/dev/null || true)
+    
+    if [ -n "$REQ_HASH" ] && [ "$REQ_HASH" = "$STORED_HASH" ]; then
+        echo "🐍 [2/3] Зависимости Python актуальны (пропуск установки)."
+    else
+        echo "🐍 [2/3] Проверка и обновление зависимостей Python..."
+        (pip install -r requirements.txt 2>/dev/null || pip install --no-cache-dir -r requirements.txt || true)
+        echo "$REQ_HASH" > .requirements.hash 2>/dev/null || true
+    fi
 fi
 
 # 3. Update WebApp Static Bundle
@@ -60,7 +69,7 @@ TEMP_TAR="/tmp/webapp-dist.tar.gz"
 
 DOWNLOADED=0
 # Download prebuilt release asset from GitHub Releases
-if curl -fsSL -L "$TAR_URL" -o "$TEMP_TAR" 2>/dev/null && [ -s "$TEMP_TAR" ]; then
+if curl -fsSL --connect-timeout 10 --max-time 60 -L "$TAR_URL" -o "$TEMP_TAR" 2>/dev/null && [ -s "$TEMP_TAR" ]; then
     echo "📦 Распаковка актуальной сборки WebApp из GitHub Releases..."
     tar -xzf "$TEMP_TAR" -C . 2>/dev/null || true
     rm -f "$TEMP_TAR"
