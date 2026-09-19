@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 
 import logging
 from pathlib import Path
-from fastapi import APIRouter, HTTPException, Header, Depends, Response, UploadFile, File
+from fastapi import APIRouter, HTTPException, Header, Depends, Response, UploadFile, File, Request
 from pydantic import BaseModel
 import jwt
 from aiogram.types import BufferedInputFile
@@ -574,16 +574,19 @@ async def generate_code_for_user(
 
 
 @router.post("/verify-code", response_model=AuthResult)
-async def verify_auth_code(data: CodeVerify, request: 'Request'):
+async def verify_auth_code(data: CodeVerify, request: Request):
     """
     Verify auth code and return JWT token.
     Used for browser authentication.
     Protected against brute-force with IP-based lockout.
     """
-    from fastapi import Request
-    
-    # Get client IP for brute-force tracking
-    client_ip = request.client.host if request.client else "unknown"
+    # Get client IP for brute-force tracking (support reverse proxy like Nginx)
+    forwarded = request.headers.get("X-Forwarded-For")
+    real_ip = request.client.host if request.client else "unknown"
+    if forwarded and real_ip in ("127.0.0.1", "::1", "localhost"):
+        client_ip = forwarded.split(",")[0].strip()
+    else:
+        client_ip = real_ip
     
     # Check brute-force lockout
     _check_brute_force(client_ip)

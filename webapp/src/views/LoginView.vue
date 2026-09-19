@@ -157,7 +157,12 @@ const verifyCode = async () => {
     const redirect = route.query.redirect || '/'
     window.location.href = redirect
   } catch (err) {
-    error.value = 'Неверный или истёкший код'
+    const serverDetail = err.response?.data?.detail
+    if (typeof serverDetail === 'string') {
+      error.value = serverDetail
+    } else {
+      error.value = 'Неверный или истёкший код'
+    }
     // Clear inputs
     codeDigits.value = ['', '', '', '', '', '', '', '']
     codeInputs.value.forEach(input => {
