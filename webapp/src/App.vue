@@ -339,54 +339,41 @@ const updateLayoutState = () => {
     return
   }
 
-  // 1. Right NowPlayingSidebar (Secondary / Companion Panel):
-  // Hierarchy Rule: On screens < 1200px, Right Sidebar hides FIRST so navigation and center tracklist remain spacious!
-  if (width < 1200) {
+  // GEOMETRIC BOUNDARY RULES (Center space NEVER drops below 600px):
+  // 1. Screens >= 1200px (Wide desktop):
+  //    Both sidebars fit comfortably (280px + >=600px center + 320px = >=1200px).
+  if (width >= 1200) {
+    const isLeftCollapsed = uiStore.userCollapsedPreference === true
+    uiStore.setSidebarCollapsed(isLeftCollapsed, false)
+
+    const isRightVisible = uiStore.userNowPlayingPreference !== false
+    uiStore.setNowPlayingSidebar(isRightVisible, false)
+  }
+  // 2. Screens 1000px - 1199px (Standard desktop / Laptop):
+  //    280px left + 320px right = 600px sidebars, which would crush center!
+  //    Therefore, Full Left Sidebar and Right Sidebar are MUTUALLY EXCLUSIVE:
+  else if (width >= 1000) {
     if (uiStore.userNowPlayingPreference === true) {
-      // User explicitly opened it on smaller screen — keep open unless screen is critically narrow (< 920px)
-      if (width < 920) {
-        uiStore.setNowPlayingSidebar(false, false)
-      } else {
-        uiStore.setNowPlayingSidebar(true, false)
-      }
-    } else {
-      // Default: hide right sidebar first
-      uiStore.setNowPlayingSidebar(false, false)
-    }
-  } else {
-    // Wide screen (>= 1200px):
-    // Show right sidebar unless user explicitly closed it (userNowPlayingPreference === false)
-    if (uiStore.userNowPlayingPreference !== false) {
+      // User explicitly wants Now Playing panel open on laptop:
+      // Left sidebar MUST yield to rail (72px) so center stays spacious (>= 608px)!
       uiStore.setNowPlayingSidebar(true, false)
+      uiStore.setSidebarCollapsed(true, false)
+      uiStore.isAutoCollapsed = true
     } else {
+      // Default: Right sidebar closes first, Left sidebar stays full (280px)!
       uiStore.setNowPlayingSidebar(false, false)
+      const isLeftCollapsed = uiStore.userCollapsedPreference === true
+      uiStore.setSidebarCollapsed(isLeftCollapsed, false)
     }
   }
-
-  // 2. Left Navigation Sidebar (Primary App Navigation):
-  // Hierarchy Rule: Left Sidebar stays full (280px) on any desktop >= 1000px!
-  // Only collapses to compact rail (72px) on screens < 1000px, or if user explicitly chose rail mode.
-  if (width >= 1000) {
-    if (uiStore.userCollapsedPreference === true) {
-      // User explicitly chose collapsed rail mode — keep collapsed
-      uiStore.isAutoCollapsed = false
-      uiStore.setSidebarCollapsed(true, false)
-    } else {
-      // Default / user preferred full sidebar
-      uiStore.isAutoCollapsed = false
-      uiStore.setSidebarCollapsed(false, false)
-    }
-  } else {
-    // Compact desktop (768px - 999px)
-    if (uiStore.userCollapsedPreference === false) {
-      // User explicitly expanded it on compact screen — keep expanded
-      uiStore.isAutoCollapsed = false
-      uiStore.setSidebarCollapsed(false, false)
-    } else {
-      // Default to compact rail mode
-      uiStore.isAutoCollapsed = true
-      uiStore.setSidebarCollapsed(true, false)
-    }
+  // 3. Screens 768px - 999px (Compact desktop / Tablet):
+  //    Right sidebar cannot fit in the grid without breaking center space.
+  //    Right sidebar is strictly closed, Left sidebar is compact rail (72px).
+  //    Center space is always >= 696px.
+  else {
+    uiStore.setNowPlayingSidebar(false, false)
+    uiStore.setSidebarCollapsed(true, false)
+    uiStore.isAutoCollapsed = true
   }
 }
 
@@ -905,7 +892,7 @@ onUnmounted(() => {
 /* Desktop Layout - CSS Grid */
 .app.desktop-layout {
   display: grid;
-  grid-template-columns: var(--sidebar-width) 1fr;
+  grid-template-columns: var(--sidebar-width) minmax(440px, 1fr);
   grid-template-rows: 1fr auto;
   grid-template-areas:
     "sidebar main"
@@ -931,7 +918,7 @@ onUnmounted(() => {
 }
 
 .app.desktop-layout.has-now-playing {
-  grid-template-columns: var(--sidebar-width) 1fr var(--now-playing-width);
+  grid-template-columns: var(--sidebar-width) minmax(440px, 1fr) var(--now-playing-width);
   grid-template-areas:
     "sidebar main nowplaying"
     "player player player";
@@ -962,6 +949,7 @@ onUnmounted(() => {
   overflow: hidden;
   height: 100%;
   min-height: 0;
+  min-width: 440px;
 }
 
 .app.desktop-layout :deep(.now-playing-sidebar) {

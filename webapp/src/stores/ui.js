@@ -73,8 +73,18 @@ export const useUIStore = defineStore('ui', () => {
   const savedSidebarPref = loadSavedBoolean(SIDEBAR_COLLAPSED_KEY)
   const savedNowPlayingPref = loadSavedBoolean(NOW_PLAYING_VISIBLE_KEY)
 
+  // Safe initial width for responsive defaults
+  const initialWidth = typeof window !== 'undefined' ? window.innerWidth : 1280
+  const initialSidebarCollapsed = savedSidebarPref !== null
+    ? savedSidebarPref === true
+    : initialWidth < 1000
+
+  const initialNowPlayingVisible = savedNowPlayingPref !== null
+    ? savedNowPlayingPref === true
+    : initialWidth >= 1200
+
   // Sidebar collapse state
-  const isSidebarCollapsed = ref(savedSidebarPref === true)
+  const isSidebarCollapsed = ref(initialSidebarCollapsed)
   const isAutoCollapsed = ref(false)
   const userCollapsedPreference = ref(savedSidebarPref) // null = auto, true/false = explicit user choice
 
@@ -94,7 +104,7 @@ export const useUIStore = defineStore('ui', () => {
   }
 
   // Right NowPlayingSidebar visibility state
-  const isNowPlayingSidebarVisible = ref(savedNowPlayingPref !== null ? savedNowPlayingPref : true)
+  const isNowPlayingSidebarVisible = ref(initialNowPlayingVisible)
   const isRightAutoHidden = ref(false)
   const userNowPlayingPreference = ref(savedNowPlayingPref) // null = auto, boolean = explicit user choice
 
