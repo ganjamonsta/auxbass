@@ -330,9 +330,8 @@ const handleLibraryTabClick = (tabId) => {
 // Responsive detection & adaptive sidebar state management
 // Desktop layout is >= 768px, Mobile layout is < 768px
 const isDesktop = ref(window.innerWidth >= 768)
-let lastRecordedWidth = window.innerWidth
 
-const updateLayoutState = (isResize = false) => {
+const updateLayoutState = () => {
   const width = window.innerWidth
   isDesktop.value = width >= 768
 
@@ -340,94 +339,65 @@ const updateLayoutState = (isResize = false) => {
     return
   }
 
-  const prevWidth = lastRecordedWidth
-  lastRecordedWidth = width
-
-  const hasNowPlaying = !!(playerStore.currentTrack && authStore.isAuthenticated && uiStore.isNowPlayingSidebarVisible)
-  const occupiedSidebars = 280 + (hasNowPlaying ? 320 : 0)
-  const centerSpace = width - occupiedSidebars
-  const isTightLeft = centerSpace < 520 || width < 1000
-
-  if (isResize) {
-    // --- ADAPTIVE BEHAVIOR ON ACTUAL WINDOW RESIZE ---
-    // 1. Right NowPlayingSidebar:
-    if (width < 1120) {
-      // Shrinking from wide (>= 1120) to narrow (< 1120), or critically narrow (< 960)
-      if (prevWidth >= 1120 || width < 960) {
-        if (uiStore.isNowPlayingSidebarVisible) {
-          uiStore.setNowPlayingSidebar(false, false)
-          uiStore.isRightAutoHidden = true
-        }
-      }
-    } else {
-      // Widening to >= 1120px:
-      // If it was auto-hidden by resize, or user hasn't explicitly closed it, restore visibility
-      if (uiStore.isRightAutoHidden || (uiStore.userNowPlayingPreference !== false && !uiStore.isNowPlayingSidebarVisible)) {
-        uiStore.setNowPlayingSidebar(true, false)
-        uiStore.isRightAutoHidden = false
-      }
-    }
-
-    // 2. Left Sidebar:
-    if (isTightLeft) {
-      // Shrinking from wide (>= 1000) to tight (< 1000), or critically cramped center space (< 400)
-      if ((prevWidth >= 1000 && width < 1000) || (centerSpace < 400 && !uiStore.isSidebarCollapsed)) {
-        // Auto-collapse into rail mode unless user explicitly expanded on this narrow screen
-        if (!uiStore.isSidebarCollapsed) {
-          uiStore.setSidebarCollapsed(true, false)
-          uiStore.isAutoCollapsed = true
-        }
-      }
-    } else {
-      // Widening into spacious desktop (!isTightLeft):
-      // Restore from auto-collapse, unless user explicitly clicked "Collapse" on wide screen
-      if (uiStore.isAutoCollapsed || (uiStore.userCollapsedPreference !== true && uiStore.isSidebarCollapsed)) {
-        uiStore.setSidebarCollapsed(false, false)
-        uiStore.isAutoCollapsed = false
-      }
-    }
-  } else {
-    // --- NON-RESIZE (INITIAL MOUNT, PLAYBACK PRESENCE CHANGE) ---
-    // Respect explicit manual preferences; do not auto-toggle sidebars when window size hasn't changed
-    if (uiStore.userCollapsedPreference === true) {
-      uiStore.setSidebarCollapsed(true, false)
-    } else if (uiStore.userCollapsedPreference === false) {
-      if (centerSpace < 380) {
-        uiStore.setSidebarCollapsed(true, false)
-        uiStore.isAutoCollapsed = true
-      } else {
-        uiStore.setSidebarCollapsed(false, false)
-      }
-    } else {
-      // No manual preference yet: follow initial responsive placement
-      uiStore.isAutoCollapsed = isTightLeft
-      uiStore.setSidebarCollapsed(isTightLeft, false)
-    }
-
-    if (uiStore.userNowPlayingPreference === false) {
-      uiStore.setNowPlayingSidebar(false, false)
-    } else if (uiStore.userNowPlayingPreference === true) {
-      if (width < 960) {
+  // 1. Right NowPlayingSidebar (Secondary / Companion Panel):
+  // Hierarchy Rule: On screens < 1200px, Right Sidebar hides FIRST so navigation and center tracklist remain spacious!
+  if (width < 1200) {
+    if (uiStore.userNowPlayingPreference === true) {
+      // User explicitly opened it on smaller screen — keep open unless screen is critically narrow (< 920px)
+      if (width < 920) {
         uiStore.setNowPlayingSidebar(false, false)
       } else {
         uiStore.setNowPlayingSidebar(true, false)
       }
     } else {
-      // No manual preference yet: hide if narrow
-      uiStore.setNowPlayingSidebar(width >= 1120, false)
+      // Default: hide right sidebar first
+      uiStore.setNowPlayingSidebar(false, false)
+    }
+  } else {
+    // Wide screen (>= 1200px):
+    // Show right sidebar unless user explicitly closed it (userNowPlayingPreference === false)
+    if (uiStore.userNowPlayingPreference !== false) {
+      uiStore.setNowPlayingSidebar(true, false)
+    } else {
+      uiStore.setNowPlayingSidebar(false, false)
+    }
+  }
+
+  // 2. Left Navigation Sidebar (Primary App Navigation):
+  // Hierarchy Rule: Left Sidebar stays full (280px) on any desktop >= 1000px!
+  // Only collapses to compact rail (72px) on screens < 1000px, or if user explicitly chose rail mode.
+  if (width >= 1000) {
+    if (uiStore.userCollapsedPreference === true) {
+      // User explicitly chose collapsed rail mode — keep collapsed
+      uiStore.isAutoCollapsed = false
+      uiStore.setSidebarCollapsed(true, false)
+    } else {
+      // Default / user preferred full sidebar
+      uiStore.isAutoCollapsed = false
+      uiStore.setSidebarCollapsed(false, false)
+    }
+  } else {
+    // Compact desktop (768px - 999px)
+    if (uiStore.userCollapsedPreference === false) {
+      // User explicitly expanded it on compact screen — keep expanded
+      uiStore.isAutoCollapsed = false
+      uiStore.setSidebarCollapsed(false, false)
+    } else {
+      // Default to compact rail mode
+      uiStore.isAutoCollapsed = true
+      uiStore.setSidebarCollapsed(true, false)
     }
   }
 }
 
 const handleWindowResize = () => {
-  updateLayoutState(true)
+  updateLayoutState()
 }
 
-// Watch track presence changes to re-evaluate center space when NowPlayingSidebar appears/disappears
-// (Using !!playerStore.currentTrack so track-to-track transitions do not trigger layout recalculations)
+// Watch track presence changes to update layout when playback starts or stops
 watch(() => !!playerStore.currentTrack, () => {
   if (isDesktop.value) {
-    updateLayoutState(false)
+    updateLayoutState()
   }
 })
 
@@ -789,7 +759,7 @@ onMounted(async () => {
   // Add resize & keyboard listeners for responsive detection and shortcuts
   window.addEventListener('resize', handleWindowResize)
   window.addEventListener('keydown', handleGlobalKeyDown)
-  updateLayoutState(false)
+  updateLayoutState()
   
   // Listen for auth:logout events from API interceptor
   window.addEventListener('auth:logout', handleAuthLogout)
