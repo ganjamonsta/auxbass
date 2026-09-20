@@ -64,20 +64,29 @@ fi
 
 # 3. Update WebApp Static Bundle
 echo "🌐 [3/3] Проверка и обновление WebApp..."
-TAR_URL="https://github.com/ganjamonsta/auxbass/releases/latest/download/webapp-dist.tar.gz"
-TEMP_TAR="/tmp/webapp-dist.tar.gz"
-
 DOWNLOADED=0
-# Download prebuilt release asset from GitHub Releases
-if curl -fsSL --connect-timeout 10 --max-time 60 -L "$TAR_URL" -o "$TEMP_TAR" 2>/dev/null && [ -s "$TEMP_TAR" ]; then
-    echo "📦 Распаковка актуальной сборки WebApp из GitHub Releases..."
-    tar -xzf "$TEMP_TAR" -C . 2>/dev/null || true
-    rm -f "$TEMP_TAR"
-    DOWNLOADED=1
-    echo "✅ WebApp успешно обновлен из GitHub Releases!"
+
+# Priority 1: Python updater (pure standard library urllib + tarfile, works in any Docker container)
+if [ -f "scripts/download_webapp.py" ]; then
+    if python scripts/download_webapp.py; then
+        DOWNLOADED=1
+    fi
 fi
 
-# Fallback: if no release tarball and dist is missing, build locally if node exists
+# Priority 2: Fallback to curl + tar if Python script was missing or failed
+if [ "$DOWNLOADED" -eq 0 ]; then
+    TAR_URL="https://github.com/ganjamonsta/auxbass/releases/latest/download/webapp-dist.tar.gz"
+    TEMP_TAR="/tmp/webapp-dist.tar.gz"
+    if curl -fsSL --connect-timeout 15 --max-time 90 -L "$TAR_URL" -o "$TEMP_TAR" && [ -s "$TEMP_TAR" ]; then
+        echo "📦 Распаковка актуальной сборки WebApp из GitHub Releases (curl)..."
+        tar -xzf "$TEMP_TAR" -C . 2>/dev/null || true
+        rm -f "$TEMP_TAR"
+        DOWNLOADED=1
+        echo "✅ WebApp успешно обновлен из GitHub Releases!"
+    fi
+fi
+
+# Priority 3: Fallback build if dist is completely missing
 if [ "$DOWNLOADED" -eq 0 ] && ([ ! -d "webapp/dist" ] || [ ! -f "webapp/dist/index.html" ]); then
     if command -v npm &> /dev/null; then
         echo "🔨 Сборка WebApp локально через npm..."
