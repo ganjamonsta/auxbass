@@ -338,16 +338,21 @@ const updateLayoutState = () => {
     return
   }
 
-  // Right sidebar (NowPlayingSidebar) auto-hiding on narrow screens:
-  // Automatically hides if window width < 1120px
+  // Right sidebar (NowPlayingSidebar) adaptive visibility:
+  // - If user explicitly hid it, KEEP IT HIDDEN (do not auto-open on track change or wide screen)
+  // - If user explicitly opened it, keep it visible unless screen is critically narrow (< 960px)
+  // - If auto (null), hide if screen width < 1120px
   const shouldHideRight = width < 1120
-  if (uiStore.userNowPlayingPreference === null) {
-    uiStore.setNowPlayingSidebar(!shouldHideRight)
-  } else {
-    // If screen becomes very narrow (< 960px), hide right sidebar to avoid crushing center
-    if (width < 960 && uiStore.isNowPlayingSidebarVisible) {
-      uiStore.setNowPlayingSidebar(false)
+  if (uiStore.userNowPlayingPreference === false) {
+    uiStore.setNowPlayingSidebar(false, false)
+  } else if (uiStore.userNowPlayingPreference === true) {
+    if (width < 960) {
+      uiStore.setNowPlayingSidebar(false, false)
+    } else {
+      uiStore.setNowPlayingSidebar(true, false)
     }
+  } else {
+    uiStore.setNowPlayingSidebar(!shouldHideRight, false)
   }
 
   // Left sidebar auto-collapsing:
@@ -357,24 +362,32 @@ const updateLayoutState = () => {
   // Tight if center space < 520px or screen width < 1000px
   const isTightLeft = centerSpace < 520 || width < 1000
 
-  uiStore.isAutoCollapsed = isTightLeft
-
-  // Auto-collapse based on available space
-  if (uiStore.userCollapsedPreference === null) {
-    uiStore.setSidebarCollapsed(isTightLeft)
-  } else {
-    // When window is stretched wide, allow it to adapt!
-    if (!isTightLeft) {
-      uiStore.userCollapsedPreference = null
-      uiStore.setSidebarCollapsed(false)
+  // Handle left sidebar state respecting user preference:
+  if (uiStore.userCollapsedPreference === true) {
+    // User explicitly chose collapsed (rail) mode — ALWAYS keep it collapsed!
+    uiStore.isAutoCollapsed = false
+    uiStore.setSidebarCollapsed(true, false)
+  } else if (uiStore.userCollapsedPreference === false) {
+    // User explicitly chose expanded mode
+    // Only temporarily collapse if screen is critically cramped (< 420px center space)
+    const isCriticallyConstrained = centerSpace < 420
+    if (isCriticallyConstrained) {
+      uiStore.isAutoCollapsed = true
+      uiStore.setSidebarCollapsed(true, false)
     } else {
-      uiStore.setSidebarCollapsed(true)
+      uiStore.isAutoCollapsed = false
+      uiStore.setSidebarCollapsed(false, false)
     }
+  } else {
+    // Automatic responsive mode (no explicit manual choice yet)
+    uiStore.isAutoCollapsed = isTightLeft
+    uiStore.setSidebarCollapsed(isTightLeft, false)
   }
 }
 
-// Watch track changes to re-evaluate center space when NowPlayingSidebar appears/disappears
-watch(() => playerStore.currentTrack, () => {
+// Watch track presence changes to re-evaluate center space when NowPlayingSidebar appears/disappears
+// (Using !!playerStore.currentTrack so track-to-track transitions do not trigger layout recalculations)
+watch(() => !!playerStore.currentTrack, () => {
   if (isDesktop.value) {
     updateLayoutState()
   }

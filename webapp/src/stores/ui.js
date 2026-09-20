@@ -55,15 +55,36 @@ export const useUIStore = defineStore('ui', () => {
     info: (title, message) => showToast({ type: 'info', title, message }),
   }
 
+  // Persistent sidebar keys
+  const SIDEBAR_COLLAPSED_KEY = 'tg_player_sidebar_collapsed'
+  const NOW_PLAYING_VISIBLE_KEY = 'tg_player_now_playing_visible'
+
+  const loadSavedBoolean = (key) => {
+    try {
+      const val = localStorage.getItem(key)
+      if (val === 'true') return true
+      if (val === 'false') return false
+      return null
+    } catch {
+      return null
+    }
+  }
+
+  const savedSidebarPref = loadSavedBoolean(SIDEBAR_COLLAPSED_KEY)
+  const savedNowPlayingPref = loadSavedBoolean(NOW_PLAYING_VISIBLE_KEY)
+
   // Sidebar collapse state
-  const isSidebarCollapsed = ref(false)
+  const isSidebarCollapsed = ref(savedSidebarPref === true)
   const isAutoCollapsed = ref(false)
-  const userCollapsedPreference = ref(null) // null = auto, true/false = explicit user choice
+  const userCollapsedPreference = ref(savedSidebarPref) // null = auto, true/false = explicit user choice
 
   const setSidebarCollapsed = (collapsed, manual = false) => {
     isSidebarCollapsed.value = collapsed
     if (manual) {
       userCollapsedPreference.value = collapsed
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed))
+      } catch (_) {}
     }
   }
 
@@ -72,30 +93,29 @@ export const useUIStore = defineStore('ui', () => {
   }
 
   // Right NowPlayingSidebar visibility state
-  const isNowPlayingSidebarVisible = ref(true)
-  const userNowPlayingPreference = ref(null) // null = auto, boolean = explicit user choice
+  const isNowPlayingSidebarVisible = ref(savedNowPlayingPref !== null ? savedNowPlayingPref : true)
+  const userNowPlayingPreference = ref(savedNowPlayingPref) // null = auto, boolean = explicit user choice
 
-  const openNowPlayingSidebar = () => {
-    isNowPlayingSidebarVisible.value = true
+  const openNowPlayingSidebar = (manual = false) => {
+    setNowPlayingSidebar(true, manual)
   }
 
   const closeNowPlayingSidebar = (manual = false) => {
-    isNowPlayingSidebarVisible.value = false
-    if (manual) {
-      userNowPlayingPreference.value = false
-    }
+    setNowPlayingSidebar(false, manual)
   }
 
   const toggleNowPlayingSidebar = () => {
     const next = !isNowPlayingSidebarVisible.value
-    isNowPlayingSidebarVisible.value = next
-    userNowPlayingPreference.value = next
+    setNowPlayingSidebar(next, true)
   }
 
   const setNowPlayingSidebar = (visible, manual = false) => {
     isNowPlayingSidebarVisible.value = visible
     if (manual) {
       userNowPlayingPreference.value = visible
+      try {
+        localStorage.setItem(NOW_PLAYING_VISIBLE_KEY, String(visible))
+      } catch (_) {}
     }
   }
 
