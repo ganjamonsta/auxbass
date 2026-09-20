@@ -1982,6 +1982,7 @@ onUnmounted(() => {
   gap: 8px;
   overflow-x: auto;
   scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
   padding-bottom: 8px;
   margin-bottom: 16px;
 }
@@ -2003,6 +2004,7 @@ onUnmounted(() => {
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
   transition: all 0.18s ease;
   font-family: inherit;
 }
@@ -2168,6 +2170,7 @@ onUnmounted(() => {
 .url-preview-actions {
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .btn-url-primary {

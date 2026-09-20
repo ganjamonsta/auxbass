@@ -383,10 +383,13 @@ const getPlaylistCoverStyle = (playlist) => {
   font-weight: 700;
   color: var(--c-text-1, #fff);
   letter-spacing: -0.01em;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .header-icon {
   color: var(--c-accent, #1db954);
+  flex-shrink: 0;
 }
 
 .result-title {
@@ -394,12 +397,17 @@ const getPlaylistCoverStyle = (playlist) => {
   font-weight: 700;
   color: var(--c-text-1, #fff);
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .result-count, .section-count {
   font-size: 12px;
   font-weight: 600;
   color: var(--c-text-3, rgba(255, 255, 255, 0.45));
+  flex-shrink: 0;
 }
 
 .section-view-all {
@@ -416,6 +424,8 @@ const getPlaylistCoverStyle = (playlist) => {
   border-radius: 6px;
   transition: all 0.2s;
   font-family: inherit;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .section-view-all:hover {

@@ -159,7 +159,7 @@
           <ExternalLink :size="14" />
         </div>
         <div class="hint-text">
-          <strong>Быстрый импорт:</strong> вставьте ссылку на песню или плейлист из <span class="text-white">SoundCloud</span> или <span class="text-white">Spotify</span> прямо в поисковую строку.
+          <strong>Быстрый импорт:</strong> вставьте ссылку на трек, альбом или плейлист из <span class="text-white">SoundCloud</span>, <span class="text-white">YouTube</span> или <span class="text-white">Spotify</span> прямо в поисковую строку.
         </div>
       </div>
     </div>
@@ -246,6 +246,8 @@ const cleanDisplayTags = computed(() => {
 
 <style scoped>
 .search-landing-container {
+  container-type: inline-size;
+  container-name: searchLanding;
   display: flex;
   flex-direction: column;
   gap: 28px;
@@ -382,18 +384,34 @@ const cleanDisplayTags = computed(() => {
 /* 2. Source Cards */
 .sources-grid {
   display: grid;
-  grid-template-columns: repeat(1, 1fr);
+  grid-template-columns: 1fr;
   gap: 10px;
 }
 
-@media (min-width: 600px) {
+/* Fallback for viewports */
+@media (min-width: 560px) {
   .sources-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
   }
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1440px) {
+  .sources-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+}
+
+/* Container queries: adapts to actual available width regardless of sidebar state */
+@container searchLanding (min-width: 440px) {
+  .sources-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+}
+
+@container searchLanding (min-width: 860px) {
   .sources-grid {
     grid-template-columns: repeat(4, 1fr);
     gap: 12px;
@@ -404,7 +422,7 @@ const cleanDisplayTags = computed(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 16px;
+  padding: 12px 14px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -412,6 +430,7 @@ const cleanDisplayTags = computed(() => {
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   overflow: hidden;
+  min-width: 0;
 }
 
 .source-card::before {
@@ -451,8 +470,8 @@ const cleanDisplayTags = computed(() => {
 }
 
 .source-icon-wrap {
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   border-radius: 10px;
   display: flex;
   align-items: center;
@@ -492,21 +511,24 @@ const cleanDisplayTags = computed(() => {
 .source-info {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 .source-title-row {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 
 .source-name {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
   color: var(--c-text-1, #fff);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .source-connected-badge {
@@ -515,9 +537,11 @@ const cleanDisplayTags = computed(() => {
   color: var(--c-accent, #1db954);
   background: rgba(29, 185, 84, 0.15);
   padding: 1px 6px;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px solid rgba(29, 185, 84, 0.25);
   flex-shrink: 0;
+  white-space: nowrap;
+  line-height: 1.4;
 }
 
 .source-desc {
@@ -538,6 +562,20 @@ const cleanDisplayTags = computed(() => {
 .source-card:hover .source-arrow {
   color: #fff;
   transform: translateX(3px);
+}
+
+@container searchLanding (max-width: 520px) {
+  .source-card {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+  .source-icon-wrap {
+    width: 36px;
+    height: 36px;
+  }
+  .source-arrow {
+    display: none;
+  }
 }
 
 /* 3. Tag Pills */
