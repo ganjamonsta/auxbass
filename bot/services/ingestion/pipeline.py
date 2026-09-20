@@ -35,9 +35,12 @@ from shared.matching import (
     fuzzy_match_artist,
     fuzzy_match_title,
     extract_version_markers,
+    is_bogus_album_name,
+    sanitize_album_name,
 )
 
 from bot.services.tracks import track_service
+from bot.services.albums import album_service
 from .base import TrackMetadata, EntityType, SourceEntity
 from .job_manager import IngestionJob, JobStatus, job_manager
 from .registry import provider_registry
@@ -377,7 +380,20 @@ class IngestionPipeline:
             if progress_callback:
                 await progress_callback(job)
 
-            # 2. If it's a playlist or album, create a playlist record in Auxbass
+            # 2. If it's an album, register Album entity in Auxbass
+            if job.entity_type == EntityType.ALBUM.value and not job.album_id:
+                try:
+                    album_artist = job.author or (tracks_meta[0].artist if tracks_meta else "Unknown Artist")
+                    job.album_id = await album_service.find_or_create_album(
+                        album_name=job.title,
+                        artist_name=album_artist,
+                        cover_url=job.cover_url,
+                        total_tracks=len(tracks_meta),
+                    )
+                except Exception as alb_err:
+                    logger.warning(f"[Ingestion] Could not find_or_create_album: {alb_err}")
+
+            # Also create a playlist record in Auxbass for user playlist browsing
             if job.entity_type in (EntityType.PLAYLIST.value, EntityType.ALBUM.value) and not job.playlist_id:
                 async with get_session() as session:
                     playlist = Playlist(
@@ -434,8 +450,13 @@ class IngestionPipeline:
                 job.current_step = "Поиск аудио 320 kbps"
                 job.download_percent = 0
                 job.updated_at = datetime.now(timezone.utc)
-                if progress_callback:
-                    await progress_callback(job)
+                # Sanitize album field: if importing a playlist or likes, do not let playlist name leak into track album
+                if job.entity_type == EntityType.ALBUM.value:
+                    if not track_meta.album or is_bogus_album_name(track_meta.album):
+                        track_meta.album = job.title
+                else:
+                    if track_meta.album and (track_meta.album == job.title or is_bogus_album_name(track_meta.album)):
+                        track_meta.album = None
 
                 try:
                     # A. Deduplication check: exists globally?
@@ -469,6 +490,17 @@ class IngestionPipeline:
                         # Add to playlist if playlist import
                         if job.playlist_id:
                             await self._add_track_to_playlist(job.playlist_id, existing.id, len(job.imported_track_ids) + 1)
+
+                        # Assign to album if album import
+                        if job.album_id:
+                            try:
+                                await album_service.assign_track_to_album(
+                                    track_id=existing.id,
+                                    album_id=job.album_id,
+                                    track_number=len(job.imported_track_ids) + 1,
+                                )
+                            except Exception as alb_err:
+                                logger.warning(f"[Ingestion] Failed assigning existing track {existing.id} to album {job.album_id}: {alb_err}")
 
                         # Auto-forward to user's Telegram backup channel if active
                         try:
@@ -527,6 +559,12 @@ class IngestionPipeline:
                         job.updated_at = datetime.now(timezone.utc)
 
                         effective_meta = downloaded.metadata or track_meta
+                        if job.entity_type == EntityType.ALBUM.value:
+                            if not effective_meta.album or is_bogus_album_name(effective_meta.album):
+                                effective_meta.album = job.title
+                        else:
+                            if effective_meta.album and (effective_meta.album == job.title or is_bogus_album_name(effective_meta.album)):
+                                effective_meta.album = None
 
                         safe_filename = f"{effective_meta.artist} - {effective_meta.title}.mp3".replace("/", "-")
                         audio_input = FSInputFile(downloaded.audio_path, filename=safe_filename)
@@ -600,6 +638,17 @@ class IngestionPipeline:
                         # E. Add to playlist
                         if job.playlist_id:
                             await self._add_track_to_playlist(job.playlist_id, save_result.track_id, len(job.imported_track_ids) + 1)
+
+                        # If album import, assign to album
+                        if job.album_id:
+                            try:
+                                await album_service.assign_track_to_album(
+                                    track_id=save_result.track_id,
+                                    album_id=job.album_id,
+                                    track_number=len(job.imported_track_ids) + 1,
+                                )
+                            except Exception as alb_err:
+                                logger.warning(f"[Ingestion] Failed assigning new track {save_result.track_id} to album {job.album_id}: {alb_err}")
 
                         # Auto-forward to user's Telegram backup channel if active
                         try:

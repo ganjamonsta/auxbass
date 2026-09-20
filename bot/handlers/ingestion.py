@@ -48,7 +48,7 @@ async def _ensure_user_exists(user_id: int, username: Optional[str], first_name:
             await session.commit()
 
 
-@router.message(F.text, F.text.regexp(r"https?://(?:(?:m|www)\.)?(?:soundcloud\.com|on\.soundcloud\.com|open\.spotify\.com|spotify\.link)/\S+"))
+@router.message(F.text, F.text.regexp(r"https?://(?:(?:m|www|music)\.)?(?:soundcloud\.com|on\.soundcloud\.com|open\.spotify\.com|spotify\.link|youtube\.com|youtu\.be)/\S+"))
 async def handle_music_url_message(message: Message):
     """Detect and process external music URLs sent to the bot."""
     match = URL_EXTRACT_PATTERN.search(message.text)
@@ -168,11 +168,15 @@ async def handle_music_url_message(message: Message):
         return
 
     # 2. Playlist / Album flow
+    is_album = (entity.entity_type == EntityType.ALBUM)
+    type_label = "Альбом" if is_album else "Плейлист"
+    type_icon = "💿" if is_album else "📁"
+
     await status_msg.edit_text(
-        f"📁 <b>{entity.title}</b>\n"
+        f"{type_icon} <b>{entity.title}</b>\n"
         f"👤 Автор: <b>{entity.author}</b>\n"
         f"🎵 Найдено треков: <b>{entity.track_count}</b>\n\n"
-        f"⏳ <i>Начинаю импорт в библиотеку Auxbass...</i>",
+        f"⏳ <i>Начинаю импорт {type_label.lower()}а в библиотеку Auxbass...</i>",
         parse_mode="HTML"
     )
 
@@ -190,7 +194,7 @@ async def handle_music_url_message(message: Message):
         cur = updated_job.current_track_title or ""
 
         text = (
-            f"📁 <b>Импорт плейлиста: {entity.title}</b>\n"
+            f"{type_icon} <b>Импорт {type_label.lower()}а: {entity.title}</b>\n"
             f"📊 Прогресс: <b>{updated_job.processed_tracks}/{updated_job.total_tracks}</b> ({pct}%)\n"
         )
         if cur:
@@ -214,11 +218,20 @@ async def handle_music_url_message(message: Message):
 
         if job.status == JobStatus.COMPLETED:
             kb_rows = []
-            if job.playlist_id:
-                bot_user = settings.bot_username or "tg_player_bot"
+            bot_user = settings.bot_username or "tg_player_bot"
+
+            if job.album_id:
                 kb_rows.append([
                     InlineKeyboardButton(
-                        text="📁 Открыть в плеере",
+                        text="💿 Открыть альбом",
+                        url=f"https://t.me/{bot_user}?startapp=album_{job.album_id}"
+                    )
+                ])
+
+            if job.playlist_id:
+                kb_rows.append([
+                    InlineKeyboardButton(
+                        text="📁 Открыть плейлист",
                         url=f"https://t.me/{bot_user}?startapp=playlist_{job.playlist_id}"
                     )
                 ])
@@ -228,14 +241,15 @@ async def handle_music_url_message(message: Message):
                         callback_data=f"download_playlist:{job.playlist_id}"
                     )
                 ])
-            else:
+            elif not job.album_id:
                 kb_rows = get_webapp_keyboard().inline_keyboard
 
             kb = InlineKeyboardMarkup(inline_keyboard=kb_rows)
             try:
                 await status_msg.edit_text(
-                    f"✅ <b>Плейлист успешно импортирован!</b>\n\n"
-                    f"📁 <b>{entity.title}</b>\n"
+                    f"✅ <b>{type_label} успешно импортирован!</b>\n\n"
+                    f"{type_icon} <b>{entity.title}</b>\n"
+                    f"👤 Автор: <b>{entity.author}</b>\n"
                     f"🎵 Добавлено треков: <b>{len(job.imported_track_ids)}</b> из {job.total_tracks}\n"
                     f"☁️ Источник: <i>{provider.name.title()}</i>",
                     reply_markup=kb,

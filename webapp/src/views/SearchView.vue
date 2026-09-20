@@ -27,6 +27,83 @@
 
     <!-- Search Results Mode -->
     <div v-if="searchQuery.trim() || activeFilter === 'soundcloud' || activeFilter === 'spotify' || activeFilter === 'youtube'" class="search-results-container">
+      <!-- Smart URL Preview Card (when search query is a music URL) -->
+      <div v-if="isMusicUrl" class="url-preview-card">
+        <!-- Resolving state -->
+        <div v-if="isResolvingUrl" class="url-preview-loading">
+          <RefreshCw class="spin-icon" :size="20" />
+          <span>Распознаю ссылку и загружаю треклист...</span>
+        </div>
+
+        <!-- Error state -->
+        <div v-else-if="urlResolveError" class="url-preview-error">
+          <span>⚠️ {{ urlResolveError }}</span>
+        </div>
+
+        <!-- Resolved preview -->
+        <div v-else-if="urlPreviewData" class="url-preview-content">
+          <div class="url-preview-header">
+            <span class="url-provider-badge" :class="urlPreviewData.provider">
+              {{ urlPreviewData.provider.toUpperCase() }}
+            </span>
+            <span class="url-type-badge">
+              {{ urlPreviewData.is_album ? '💿 Альбом' : (urlPreviewData.entity_type === 'playlist' ? '📁 Плейлист' : '🎵 Трек') }}
+            </span>
+          </div>
+
+          <div class="url-preview-body">
+            <img 
+              v-if="urlPreviewData.cover_url" 
+              :src="urlPreviewData.cover_url" 
+              class="url-preview-cover" 
+              alt="cover" 
+            />
+            <div class="url-preview-info">
+              <h3 class="url-preview-title">{{ urlPreviewData.title }}</h3>
+              <p class="url-preview-author">{{ urlPreviewData.author || 'Неизвестный исполнитель' }}</p>
+              <div class="url-preview-meta">
+                <span>{{ urlPreviewData.track_count }} {{ formatTrackCount(urlPreviewData.track_count) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="url-preview-actions">
+            <!-- Track action -->
+            <template v-if="urlPreviewData.entity_type === 'track'">
+              <button class="btn-url-primary" @click="handlePlayUrlTrack">
+                <Play :size="16" />
+                <span>Слушать</span>
+              </button>
+              <button class="btn-url-secondary" @click="handleAddUrlTrack">
+                <Plus :size="16" />
+                <span>В библиотеку</span>
+              </button>
+            </template>
+
+            <!-- Album / Playlist action -->
+            <template v-else>
+              <button 
+                class="btn-url-primary" 
+                :disabled="isStartingUrlImport || (urlImportJob && urlImportJob.status === 'in_progress')"
+                @click="handleStartUrlImport"
+              >
+                <CloudDownload :size="16" />
+                <span v-if="urlImportJob && urlImportJob.status === 'in_progress'">
+                  Импорт: {{ urlImportJob.processed_tracks }} / {{ urlImportJob.total_tracks }} ({{ urlImportJob.progress_percent }}%)
+                </span>
+                <span v-else-if="urlImportJob && urlImportJob.status === 'completed'">
+                  ✓ Успешно импортирован
+                </span>
+                <span v-else>
+                  {{ urlPreviewData.is_album ? 'Импортировать альбом' : 'Импортировать плейлист' }}
+                </span>
+              </button>
+            </template>
+          </div>
+        </div>
+      </div>
+
       <!-- Loading initial search results skeleton -->
       <div v-if="isInitialLoading" class="search-skeleton-list">
         <TrackSkeleton v-for="n in 8" :key="n" />
@@ -344,6 +421,127 @@ const playlistsResults = ref([])
 const isArtistsSearching = ref(false)
 const isAlbumsSearching = ref(false)
 const isPlaylistsSearching = ref(false)
+
+// ─── Smart URL Detection & Preview State ───
+const MUSIC_URL_REGEX = /^https?:\/\/(?:(?:m|www|music)\.)?(?:soundcloud\.com|on\.soundcloud\.com|open\.spotify\.com|spotify\.link|youtube\.com|youtu\.be)\/.+/i
+
+const isMusicUrl = computed(() => {
+  const q = (searchQuery.value || '').trim()
+  return MUSIC_URL_REGEX.test(q)
+})
+
+const urlPreviewData = ref(null)
+const isResolvingUrl = ref(false)
+const urlResolveError = ref(null)
+const isStartingUrlImport = ref(false)
+const urlImportJob = ref(null)
+
+const resolveMusicUrl = async (url) => {
+  isResolvingUrl.value = true
+  urlResolveError.value = null
+  urlPreviewData.value = null
+  urlImportJob.value = null
+  try {
+    const res = await ingestionApi.preview(url)
+    urlPreviewData.value = res.data
+  } catch (err) {
+    console.error('Failed to preview URL:', err)
+    urlResolveError.value = err.response?.data?.detail || 'Не удалось получить информацию по ссылке'
+  } finally {
+    isResolvingUrl.value = false
+  }
+}
+
+const handleStartUrlImport = async () => {
+  if (!urlPreviewData.value || isStartingUrlImport.value) return
+  const data = urlPreviewData.value
+  isStartingUrlImport.value = true
+
+  try {
+    const isContainer = data.is_album || data.entity_type === 'playlist' || data.entity_type === 'album'
+    const res = await ingestionApi.start(
+      data.url,
+      null,
+      null,
+      data.title,
+      isContainer,
+      data.title,
+      data.cover_url
+    )
+    const job = res.data
+    urlImportJob.value = job
+    if (job) {
+      tasksStore.registerJob(job, {
+        type: 'import',
+        title: `${data.is_album ? 'Альбом' : 'Плейлист'}: ${data.title}`,
+      })
+      uiStore.toast?.success('Импорт запущен', `Начался импорт «${data.title}» (${data.track_count} треков)`)
+
+      const pollInterval = setInterval(async () => {
+        try {
+          const jobRes = await ingestionApi.getJob(job.id)
+          urlImportJob.value = jobRes.data
+          if (['completed', 'failed', 'cancelled'].includes(jobRes.data.status)) {
+            clearInterval(pollInterval)
+            isStartingUrlImport.value = false
+            if (jobRes.data.status === 'completed') {
+              libraryStore.fetchTracks({ refresh: true })
+              uiStore.toast?.success('Готово', `«${data.title}» успешно добавлен в библиотеку!`)
+            }
+          }
+        } catch {
+          clearInterval(pollInterval)
+          isStartingUrlImport.value = false
+        }
+      }, 2000)
+    }
+  } catch (err) {
+    console.error('Failed to start import:', err)
+    uiStore.toast?.error('Ошибка', err.response?.data?.detail || 'Не удалось запустить импорт')
+    isStartingUrlImport.value = false
+  }
+}
+
+const handlePlayUrlTrack = async () => {
+  if (!urlPreviewData.value) return
+  const data = urlPreviewData.value
+  try {
+    const res = await ingestionApi.quickImport({
+      url: data.url,
+      title: data.title,
+      artist: data.author,
+      duration: data.tracks?.[0]?.duration,
+      cover_url: data.cover_url,
+      preview_only: true,
+    })
+    const track = res.data?.track
+    if (track) {
+      playerStore.playTrack(track, [track], 0)
+    }
+  } catch (err) {
+    uiStore.toast?.error('Ошибка', 'Не удалось воспроизвести трек')
+  }
+}
+
+const handleAddUrlTrack = async () => {
+  if (!urlPreviewData.value) return
+  const data = urlPreviewData.value
+  try {
+    await ingestionApi.quickImport({
+      url: data.url,
+      title: data.title,
+      artist: data.author,
+      duration: data.tracks?.[0]?.duration,
+      cover_url: data.cover_url,
+      add_to_library: true,
+      preview_only: false,
+    })
+    libraryStore.fetchTracks({ refresh: true })
+    uiStore.toast?.success('Добавлено', `Трек «${data.title}» добавлен в медиатеку`)
+  } catch (err) {
+    uiStore.toast?.error('Ошибка', 'Не удалось добавить трек')
+  }
+}
 
 // ─── SoundCloud External Search & Likes State ───
 const soundcloudResults = ref([])
@@ -1151,6 +1349,7 @@ const isLocalSearching = computed(() => {
 // When viewing SoundCloud or Spotify or YouTube tab, reflect external loading state.
 // Otherwise reflect local search state so search input spinner never freezes for 3-5s.
 const isLoading = computed(() => {
+  if (isResolvingUrl.value) return true
   if (activeFilter.value === 'soundcloud') return isSoundCloudSearching.value
   if (activeFilter.value === 'spotify') return isSpotifySearching.value
   if (activeFilter.value === 'youtube') return isYouTubeSearching.value
@@ -1159,6 +1358,7 @@ const isLoading = computed(() => {
 
 // Skeletons are only shown while local database search is executing and no results are shown yet
 const isInitialLoading = computed(() => {
+  if (isMusicUrl.value) return false
   return isLocalSearching.value && 
          allTracksList.value.length === 0 && 
          artistsResults.value.length === 0 && 
@@ -1425,6 +1625,22 @@ const searchArtistsAndPlaylists = async (query) => {
 const performSearch = (q) => {
   const query = (q || '').trim()
   if (query) {
+    if (MUSIC_URL_REGEX.test(query)) {
+      resolveMusicUrl(query)
+      clearTrackSearch()
+      artistsResults.value = []
+      albumsResults.value = []
+      playlistsResults.value = []
+      soundcloudResults.value = []
+      spotifyResults.value = []
+      youtubeResults.value = []
+      saveRecentSearch(query)
+      return
+    } else {
+      urlPreviewData.value = null
+      urlResolveError.value = null
+    }
+
     const isTagSearch = query.startsWith('#')
     trackSearchQuery.value = query
     executeTrackSearch()
@@ -1480,6 +1696,10 @@ watch(activeFilter, (newFilter) => {
 })
 
 const handleClear = () => {
+  urlPreviewData.value = null
+  urlResolveError.value = null
+  urlImportJob.value = null
+  isResolvingUrl.value = false
   clearSearchInput()
   clearTrackSearch()
   artistsResults.value = []
@@ -1814,5 +2034,185 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+/* ─── Smart URL Preview Card ─── */
+.url-preview-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  animation: fadeIn 0.25s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.url-preview-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+  font-size: 14px;
+  padding: 12px 4px;
+}
+
+.spin-icon {
+  animation: spin 1s linear infinite;
+  color: var(--c-accent, #1db954);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.url-preview-error {
+  color: #ff6b6b;
+  font-size: 14px;
+  padding: 8px 4px;
+}
+
+.url-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.url-provider-badge {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.url-provider-badge.spotify {
+  background: rgba(29, 185, 84, 0.2);
+  color: #1ed760;
+  border: 1px solid rgba(29, 185, 84, 0.4);
+}
+
+.url-provider-badge.soundcloud {
+  background: rgba(255, 85, 0, 0.2);
+  color: #ff5500;
+  border: 1px solid rgba(255, 85, 0, 0.4);
+}
+
+.url-provider-badge.youtube {
+  background: rgba(255, 0, 0, 0.2);
+  color: #ff4e4e;
+  border: 1px solid rgba(255, 0, 0, 0.4);
+}
+
+.url-type-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-text-2, rgba(255, 255, 255, 0.75));
+  background: rgba(255, 255, 255, 0.08);
+  padding: 3px 10px;
+  border-radius: 6px;
+}
+
+.url-preview-body {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.url-preview-cover {
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
+  object-fit: cover;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
+}
+
+.url-preview-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.url-preview-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.url-preview-author {
+  font-size: 13px;
+  color: var(--c-text-2, rgba(255, 255, 255, 0.7));
+  margin: 0 0 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.url-preview-meta {
+  font-size: 12px;
+  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
+}
+
+.url-preview-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-url-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  background: var(--c-accent, #1db954);
+  color: #000;
+  font-size: 13px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.btn-url-primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.btn-url-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-url-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.btn-url-secondary:hover {
+  background: rgba(255, 255, 255, 0.18);
 }
 </style>

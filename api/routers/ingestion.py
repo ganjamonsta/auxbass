@@ -29,6 +29,7 @@ from shared.models import (
     User, Track, UserLibrary, AlbumTrack, Playlist, PlaylistTrack, LibrarySource,
     ForwardSourceType, UserExternalAccount, UserImportFile, UserChannel, ChannelMessage, ChannelMessageStatus, utcnow
 )
+from shared.matching import is_bogus_album_name
 from api.routers.auth import get_current_user, TelegramUser
 from api.schemas.tracks import TrackResponse
 from api.utils.responses import track_to_response
@@ -53,6 +54,7 @@ class SearchItemResponse(BaseModel):
     url: str
     title: str
     artist: str
+    album: Optional[str] = None
     duration: Optional[int] = None
     cover_url: Optional[str] = None
     external_id: Optional[str] = None
@@ -68,6 +70,7 @@ class QuickImportRequest(BaseModel):
     url: str
     title: Optional[str] = None
     artist: Optional[str] = None
+    album: Optional[str] = None
     duration: Optional[int] = None
     cover_url: Optional[str] = None
     genre: Optional[str] = None
@@ -120,6 +123,7 @@ class TrackPreviewItem(BaseModel):
     url: str
     title: str
     artist: str
+    album: Optional[str] = None
     duration: Optional[int] = None
     cover_url: Optional[str] = None
     genre: Optional[str] = None
@@ -179,6 +183,7 @@ class PreviewResponse(BaseModel):
     cover_url: Optional[str] = None
     track_count: int = 1
     tracks: List[TrackPreviewItem] = []
+    is_album: bool = False
 
 
 class StartImportRequest(BaseModel):
@@ -211,6 +216,7 @@ class JobResponse(BaseModel):
     progress_percent: int
     error_message: Optional[str] = None
     playlist_id: Optional[int] = None
+    album_id: Optional[int] = None
     imported_track_ids: List[int] = []
     selected_urls: Optional[List[str]] = None
     created_at: str
@@ -266,6 +272,7 @@ async def preview_url(
         )
         user_track_ids = set(user_lib_res.scalars().all())
 
+        is_album = (entity.entity_type == EntityType.ALBUM)
         preview_tracks: List[TrackPreviewItem] = []
         for t in tracks_meta:
             existing = await _find_existing_track(t.title, t.artist, t.duration, session=db)
@@ -273,11 +280,17 @@ async def preview_url(
             in_lib = (existing.id in user_track_ids) if existing else False
             existing_id = existing.id if existing else None
 
+            # Clean album name if not album entity
+            clean_album = t.album
+            if not is_album and clean_album and (clean_album == entity.title or is_bogus_album_name(clean_album)):
+                clean_album = None
+
             preview_tracks.append(
                 TrackPreviewItem(
                     url=t.url,
                     title=t.title,
                     artist=t.artist,
+                    album=clean_album,
                     duration=t.duration,
                     cover_url=t.cover_url,
                     genre=t.extra.get("genre") if t.extra else None,
@@ -297,6 +310,7 @@ async def preview_url(
             cover_url=entity.cover_url,
             track_count=len(preview_tracks) if preview_tracks else entity.track_count,
             tracks=preview_tracks,
+            is_album=is_album,
         )
     except Exception as e:
         logger.error(f"Error resolving preview for {url}: {e}", exc_info=True)
@@ -323,6 +337,9 @@ async def start_import(
 
     await _ensure_user_in_db(user)
 
+    selected_urls = req.selected_urls
+    custom_tracks = req.tracks or None
+
     entity = None
     try:
         entity = await provider.resolve_entity(url)
@@ -343,8 +360,6 @@ async def start_import(
             track_count=len(custom_tracks),
         )
 
-    selected_urls = req.selected_urls
-    custom_tracks = req.tracks or None
     total_tracks = len(custom_tracks) if custom_tracks else (len(selected_urls) if selected_urls else entity.track_count)
     job_title = req.title or (f"SoundCloud Likes ({total_tracks})" if (selected_urls and len(selected_urls) > 1 and entity.entity_type == EntityType.TRACK) else entity.title)
 
@@ -433,15 +448,27 @@ async def search_external_tracks(
     user: TelegramUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Search external music platforms (SoundCloud) by keyword with user library status."""
-    prov = provider_registry.get_provider(provider)
-    if not prov:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Provider '{provider}' not found",
-        )
+    """Search external music platforms (SoundCloud, Spotify, YouTube) with user library status."""
+    if provider == "all":
+        results = []
+        tasks = []
+        for p_name in ["spotify", "soundcloud", "youtube"]:
+            p = provider_registry.get_provider(p_name)
+            if p:
+                tasks.append(p.search(q, limit=min(limit, 15)))
+        done = await asyncio.gather(*tasks, return_exceptions=True)
+        for d in done:
+            if isinstance(d, list):
+                results.extend(d)
+    else:
+        prov = provider_registry.get_provider(provider)
+        if not prov:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Provider '{provider}' not found",
+            )
+        results = await prov.search(q, limit=limit)
 
-    results = await prov.search(q, limit=limit)
     if not results:
         return []
 
@@ -464,6 +491,7 @@ async def search_external_tracks(
                 url=r.url,
                 title=r.title,
                 artist=r.artist,
+                album=r.album,
                 duration=r.duration,
                 cover_url=r.cover_url,
                 external_id=r.external_id,

@@ -426,6 +426,45 @@ def normalize_album(album: str) -> str:
     return album.strip()
 
 
+def is_bogus_album_name(album: Optional[str]) -> bool:
+    """
+    Check if an album string is a pseudo-album representing user likes or playlist.
+    Examples: 'meth (Likes)', 'Liked Songs', 'SoundCloud Likes', 'Spotify Likes'.
+    """
+    if not album:
+        return False
+    norm = album.strip().lower()
+    if norm in (
+        "likes",
+        "liked songs",
+        "favorites",
+        "soundcloud likes",
+        "spotify likes",
+        "youtube likes",
+        "любимые треки",
+        "понравившиеся",
+        "избранное",
+    ):
+        return True
+    if norm.endswith("(likes)") or norm.endswith("[likes]") or norm.endswith("(liked)") or norm.endswith("[liked]"):
+        return True
+    if norm.startswith("likes (") or norm.startswith("liked ("):
+        return True
+    if "(likes)" in norm or "[likes]" in norm or "(liked)" in norm:
+        return True
+    return False
+
+
+def sanitize_album_name(album: Optional[str]) -> Optional[str]:
+    """Sanitize album name. Returns None if bogus/pseudo-album."""
+    if not album:
+        return None
+    cleaned = album.strip()
+    if is_bogus_album_name(cleaned):
+        return None
+    return cleaned
+
+
 # ============== Search Query Cleaning ==============
 
 def clean_for_search(text: str) -> str:

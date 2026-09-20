@@ -12,6 +12,7 @@ from typing import Optional, List, Dict, Any, Tuple, Callable
 import yt_dlp
 from yt_dlp.utils import download_range_func
 
+from shared.config import get_settings
 from shared.matching import clean_track_metadata
 from ..base import (
     BaseMusicProvider,
@@ -102,6 +103,20 @@ class YouTubeMusicProvider(BaseMusicProvider):
 
     name: str = "youtube"
 
+    def _get_ydl_opts(self, extra: Optional[dict] = None) -> dict:
+        """Create yt-dlp options dictionary with timeouts and proxy configured."""
+        settings = get_settings()
+        opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "socket_timeout": settings.ytdlp_timeout,
+        }
+        if settings.proxy_url:
+            opts["proxy"] = settings.proxy_url.strip()
+        if extra:
+            opts.update(extra)
+        return opts
+
     def can_handle(self, url: str) -> bool:
         clean_url = url.strip()
         if not YT_URL_PATTERN.match(clean_url):
@@ -114,12 +129,10 @@ class YouTubeMusicProvider(BaseMusicProvider):
         clean_url = url.strip()
 
         def _extract():
-            ydl_opts = {
-                "quiet": True,
-                "no_warnings": True,
+            ydl_opts = self._get_ydl_opts({
                 "extract_flat": "in_playlist",
                 "skip_download": True,
-            }
+            })
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 return ydl.extract_info(clean_url, download=False)
 
@@ -142,7 +155,14 @@ class YouTubeMusicProvider(BaseMusicProvider):
                 author = author[:-8].strip()
             cover = _extract_yt_thumbnail(info, info.get("thumbnail"))
 
-            entity_type = EntityType.ALBUM if ("album" in clean_url.lower() or "album" in title.lower()) else EntityType.PLAYLIST
+            clean_lower = clean_url.lower()
+            is_album = (
+                "album" in clean_lower
+                or "list=olak5uy_" in clean_lower
+                or "browse/mpreb_" in clean_lower
+                or "album" in title.lower()
+            )
+            entity_type = EntityType.ALBUM if is_album else EntityType.PLAYLIST
 
             return SourceEntity(
                 provider_name=self.name,
@@ -204,12 +224,10 @@ class YouTubeMusicProvider(BaseMusicProvider):
 
         if not entries:
             def _extract_full():
-                ydl_opts = {
-                    "quiet": True,
-                    "no_warnings": True,
+                ydl_opts = self._get_ydl_opts({
                     "extract_flat": True,
                     "skip_download": True,
-                }
+                })
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     return ydl.extract_info(entity.url, download=False)
 
@@ -217,6 +235,7 @@ class YouTubeMusicProvider(BaseMusicProvider):
             entries = info.get("entries") or []
 
         tracks: List[TrackMetadata] = []
+        album_name_val = entity.title if entity.entity_type == EntityType.ALBUM else None
         for idx, entry in enumerate(entries, start=1):
             if not isinstance(entry, dict):
                 continue
@@ -243,7 +262,7 @@ class YouTubeMusicProvider(BaseMusicProvider):
                     url=track_url or f"{entity.url}#{idx}",
                     title=title,
                     artist=artist,
-                    album=entity.title,
+                    album=album_name_val,
                     duration=duration,
                     cover_url=cover,
                     track_number=idx,
@@ -299,7 +318,7 @@ class YouTubeMusicProvider(BaseMusicProvider):
                     pass
 
         def _download():
-            ydl_opts = {
+            ydl_opts = self._get_ydl_opts({
                 "format": "bestaudio/best",
                 "outtmpl": out_template,
                 "concurrent_fragment_downloads": 5,
@@ -312,9 +331,7 @@ class YouTubeMusicProvider(BaseMusicProvider):
                         "preferredquality": "192" if chunk_only else "320",
                     }
                 ],
-                "quiet": True,
-                "no_warnings": True,
-            }
+            })
             if chunk_only:
                 ydl_opts["download_ranges"] = download_range_func(None, [(start_sec, end_sec)])
                 ydl_opts["force_keyframes_at_cuts"] = True
@@ -338,11 +355,13 @@ class YouTubeMusicProvider(BaseMusicProvider):
 
         # Download cover artwork if present
         cover_path = None
+        settings = get_settings()
+        proxy = settings.proxy_url.strip() if settings.proxy_url else None
         if track_meta.cover_url:
             cover_path = os.path.join(temp_dir, "cover.jpg")
             try:
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(track_meta.cover_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    async with session.get(track_meta.cover_url, timeout=aiohttp.ClientTimeout(total=10), proxy=proxy) as resp:
                         if resp.status == 200:
                             content = await resp.read()
                             with open(cover_path, "wb") as f:
@@ -376,12 +395,10 @@ class YouTubeMusicProvider(BaseMusicProvider):
             return []
 
         def _search_ytm():
-            ydl_opts = {
-                "quiet": True,
-                "no_warnings": True,
+            ydl_opts = self._get_ydl_opts({
                 "extract_flat": True,
                 "skip_download": True,
-            }
+            })
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 # 1. Try YouTube Music search prefix
                 try:

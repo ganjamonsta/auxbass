@@ -39,6 +39,7 @@ class IngestionJob:
     status: JobStatus = JobStatus.PENDING
     error_message: Optional[str] = None
     playlist_id: Optional[int] = None
+    album_id: Optional[int] = None
     imported_track_ids: List[int] = field(default_factory=list)
     uploaded_chat_id: Optional[int] = None
     uploaded_message_id: Optional[int] = None
@@ -74,6 +75,7 @@ class IngestionJob:
             "progress_percent": self.progress_percent,
             "error_message": self.error_message,
             "playlist_id": self.playlist_id,
+            "album_id": self.album_id,
             "imported_track_ids": self.imported_track_ids,
             "selected_urls": self.selected_urls,
             "created_at": self.created_at.isoformat(),

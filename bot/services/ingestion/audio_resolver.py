@@ -15,6 +15,7 @@ import aiohttp
 import yt_dlp
 from yt_dlp.utils import download_range_func
 
+from shared.config import get_settings
 from shared.matching import (
     clean_track_metadata,
     fuzzy_match_artist,
@@ -36,6 +37,19 @@ class AudioResolver:
     """
 
     MAX_DURATION_DIFF_SECONDS = 15
+
+    def _get_ydl_opts(self, extra: Optional[dict] = None) -> dict:
+        settings = get_settings()
+        opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "socket_timeout": settings.ytdlp_timeout,
+        }
+        if settings.proxy_url:
+            opts["proxy"] = settings.proxy_url.strip()
+        if extra:
+            opts.update(extra)
+        return opts
 
     async def resolve_and_download(
         self,
@@ -198,12 +212,10 @@ class AudioResolver:
     async def _search_candidates(self, query: str, limit: int = 10) -> List[dict]:
         """Search SoundCloud for potential unencrypted candidate streams."""
         def _search():
-            ydl_opts = {
-                "quiet": True,
-                "no_warnings": True,
+            ydl_opts = self._get_ydl_opts({
                 "extract_flat": True,
                 "skip_download": True,
-            }
+            })
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 res = ydl.extract_info(f"scsearch{limit}:{query}", download=False)
                 return res.get("entries") or []
@@ -217,12 +229,10 @@ class AudioResolver:
     async def _search_youtube_candidates(self, query: str, limit: int = 6) -> List[dict]:
         """Search YouTube / YouTube Music for potential candidate streams."""
         def _search_yt():
-            ydl_opts = {
-                "quiet": True,
-                "no_warnings": True,
+            ydl_opts = self._get_ydl_opts({
                 "extract_flat": True,
                 "skip_download": True,
-            }
+            })
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 try:
                     res = ydl.extract_info(f"ytmsearch{limit}:{query}", download=False)
@@ -370,7 +380,7 @@ class AudioResolver:
                     pass
 
         def _dl():
-            ydl_opts = {
+            ydl_opts = self._get_ydl_opts({
                 "format": "bestaudio/best",
                 "outtmpl": out_template,
                 "concurrent_fragment_downloads": 5,
@@ -383,9 +393,7 @@ class AudioResolver:
                         "preferredquality": "192" if chunk_only else "320",
                     }
                 ],
-                "quiet": True,
-                "no_warnings": True,
-            }
+            })
             if chunk_only:
                 ydl_opts["download_ranges"] = download_range_func(None, [(start_sec, end_sec)])
                 ydl_opts["force_keyframes_at_cuts"] = True

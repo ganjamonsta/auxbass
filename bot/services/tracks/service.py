@@ -19,7 +19,7 @@ from shared.models import (
     Track, TrackEnrichment, Album, AlbumTrack, User, UserLibrary,
     EnrichmentStatus, LibrarySource, ForwardSourceType, TagSource, TrackTag, utcnow
 )
-from shared.matching import normalize_artist, clean_track_metadata
+from shared.matching import normalize_artist, clean_track_metadata, sanitize_album_name
 
 from ..enrichment import enrichment_worker, enrichment_processor
 from ..albums import album_service
@@ -144,6 +144,8 @@ class TrackService:
         Returns:
             SaveTrackResult with track_id, is_new, and was_in_library flags
         """
+        album_name = sanitize_album_name(album_name)
+
         async with get_session() as session:
             # Check for existing track by file_unique_id (globally unique)
             result = await session.execute(

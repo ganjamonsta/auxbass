@@ -65,6 +65,10 @@ class Settings(BaseSettings):
     # Last.fm API (for artist images)
     lastfm_api_key: str = ""
     
+    # Proxy & Network settings (for YouTube / SoundCloud scraping where restricted)
+    proxy_url: str = ""  # e.g. "http://user:pass@host:port" or "socks5://host:port"
+    ytdlp_timeout: int = 15  # Network socket timeout in seconds
+    
     # Scanner buffer chat ID (private group where bot forwards messages for scanning)
     # If set, scan_channel will forward to this chat instead of user's DM — no spam.
     # Create a private group, add the bot as admin, set the group's chat_id here.

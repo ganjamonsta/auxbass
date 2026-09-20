@@ -12,7 +12,7 @@ from sqlalchemy import select, func
 
 from shared.database import get_session
 from shared.models import Track, TrackEnrichment, TrackTag, TagSource, EnrichmentStatus, utcnow
-from shared.matching import clean_track_metadata, normalize_artist
+from shared.matching import clean_track_metadata, normalize_artist, is_bogus_album_name
 from .processor import enrichment_processor, EnrichmentResult
 
 logger = logging.getLogger(__name__)
@@ -171,10 +171,17 @@ class EnrichmentWorker:
                     # Update enrichment data non-destructively:
                     # 1. Album: For SoundCloud tracks, never attach unrelated Deezer albums
                     if not is_soundcloud:
-                        if result.album_name and not enrichment.album_name:
-                            enrichment.album_name = result.album_name
-                        if result.deezer_album_id and not enrichment.deezer_album_id:
+                        has_real_album = bool(enrichment.album_name and not is_bogus_album_name(enrichment.album_name))
+                        if result.album_name:
+                            if not has_real_album and not is_bogus_album_name(result.album_name):
+                                enrichment.album_name = result.album_name
+                        elif is_bogus_album_name(enrichment.album_name):
+                            enrichment.album_name = None
+
+                        if result.deezer_album_id and (not enrichment.deezer_album_id or not has_real_album):
                             enrichment.deezer_album_id = result.deezer_album_id
+                    elif is_bogus_album_name(enrichment.album_name):
+                        enrichment.album_name = None
 
                     # 2. Genre: Preserve original provider genre (e.g. from SoundCloud), fill if missing
                     if result.genre and not enrichment.genre:

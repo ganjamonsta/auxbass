@@ -13,6 +13,7 @@ from typing import Optional, List, Dict, Any, Tuple, Callable
 import yt_dlp
 from yt_dlp.utils import download_range_func
 
+from shared.config import get_settings
 from ..base import (
     BaseMusicProvider, SourceEntity, TrackMetadata, DownloadedAudio, EntityType,
     calculate_preview_range,
@@ -114,6 +115,20 @@ class SoundCloudProvider(BaseMusicProvider):
     """SoundCloud music provider powered by yt-dlp."""
     name: str = "soundcloud"
 
+    def _get_ydl_opts(self, extra: Optional[dict] = None) -> dict:
+        """Create yt-dlp options dictionary with timeouts and proxy configured."""
+        settings = get_settings()
+        opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "socket_timeout": settings.ytdlp_timeout,
+        }
+        if settings.proxy_url:
+            opts["proxy"] = settings.proxy_url.strip()
+        if extra:
+            opts.update(extra)
+        return opts
+
     def can_handle(self, url: str) -> bool:
         return bool(SC_URL_PATTERN.match(url.strip()))
 
@@ -122,12 +137,10 @@ class SoundCloudProvider(BaseMusicProvider):
         clean_url = url.strip()
 
         def _extract():
-            ydl_opts = {
-                "quiet": True,
-                "no_warnings": True,
+            ydl_opts = self._get_ydl_opts({
                 "extract_flat": "in_playlist",
                 "skip_download": True,
-            }
+            })
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 return ydl.extract_info(clean_url, download=False)
 
@@ -135,7 +148,7 @@ class SoundCloudProvider(BaseMusicProvider):
             info = await asyncio.to_thread(_extract)
         except Exception as e:
             err_str = str(e).lower()
-            if "drm protected" in err_str or "proxy" in err_str or "unable to download" in err_str:
+            if "drm protected" in err_str or "proxy" in err_str or "unable to download" in err_str or "geo restriction" in err_str:
                 logger.info(f"[SoundCloud] yt-dlp inspection failed for '{clean_url}', attempting oEmbed fallback: {e}")
                 try:
                     info = await self._resolve_drm_via_oembed(clean_url)
@@ -160,9 +173,20 @@ class SoundCloudProvider(BaseMusicProvider):
             title = info.get("title") or "SoundCloud Playlist"
             author = info.get("uploader") or info.get("channel") or "SoundCloud"
             cover = _extract_sc_thumbnail(info, info.get("thumbnail"))
+
+            set_type = str(info.get("set_type") or "").lower()
+            title_lower = title.lower()
+            is_album = (
+                set_type in ("album", "ep", "compilation")
+                or "album" in title_lower
+                or " ep" in title_lower
+                or title_lower.endswith(" ep")
+            )
+            entity_type = EntityType.ALBUM if is_album else EntityType.PLAYLIST
+
             return SourceEntity(
                 provider_name=self.name,
-                entity_type=EntityType.PLAYLIST,
+                entity_type=entity_type,
                 url=clean_url,
                 title=title,
                 author=author,
@@ -189,12 +213,17 @@ class SoundCloudProvider(BaseMusicProvider):
     async def _resolve_drm_via_oembed(self, url: str) -> dict:
         """Fetch basic track metadata from SoundCloud oEmbed API for DRM tracks."""
         import aiohttp
-        oembed_url = f"https://soundcloud.com/oembed?format=json&url={url}"
+        import urllib.parse
+        encoded_url = urllib.parse.quote(url, safe='')
+        oembed_url = f"https://soundcloud.com/oembed?format=json&url={encoded_url}"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         }
+        settings = get_settings()
+        proxy = settings.proxy_url.strip() if settings.proxy_url else None
+        timeout = aiohttp.ClientTimeout(total=settings.ytdlp_timeout)
         async with aiohttp.ClientSession(headers=headers) as session:
-            async with session.get(oembed_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            async with session.get(oembed_url, timeout=timeout, proxy=proxy) as resp:
                 if resp.status != 200:
                     raise ValueError(f"SoundCloud oEmbed failed (HTTP {resp.status})")
                 data = await resp.json()
@@ -250,12 +279,10 @@ class SoundCloudProvider(BaseMusicProvider):
         # If flat entries don't have full info, or if entries are missing, re-extract
         if not entries:
             def _extract_full():
-                ydl_opts = {
-                    "quiet": True,
-                    "no_warnings": True,
+                ydl_opts = self._get_ydl_opts({
                     "extract_flat": True,
                     "skip_download": True,
-                }
+                })
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     return ydl.extract_info(entity.url, download=False)
 
@@ -263,6 +290,7 @@ class SoundCloudProvider(BaseMusicProvider):
             entries = info.get("entries") or []
 
         tracks: List[TrackMetadata] = []
+        album_name_val = entity.title if entity.entity_type == EntityType.ALBUM else None
         for idx, entry in enumerate(entries, start=1):
             if not isinstance(entry, dict):
                 continue
@@ -284,7 +312,7 @@ class SoundCloudProvider(BaseMusicProvider):
                     url=track_url,
                     title=title,
                     artist=artist,
-                    album=entity.title,
+                    album=album_name_val,
                     duration=duration,
                     cover_url=cover,
                     track_number=idx,
@@ -1031,13 +1059,16 @@ class SoundCloudProvider(BaseMusicProvider):
                 if sc_tags:
                     extra_data["tags"] = sc_tags
 
+                is_album = playlist_info.get("set_type") in ("album", "ep", "compilation") or "album" in playlist_info.get("title", "").lower()
+                album_val = playlist_info["title"] if is_album else None
+
                 tracks.append(
                     TrackMetadata(
                         provider_name=self.name,
                         url=track_url,
                         title=title,
                         artist=artist,
-                        album=playlist_info["title"],
+                        album=album_val,
                         duration=track_duration,
                         cover_url=cover,
                         track_number=idx,
