@@ -169,6 +169,13 @@
   transform: translateY(0);
 }
 
+@media (hover: none), (max-width: 768px) {
+  .feed-card-cover .play-overlay {
+    opacity: 0.95;
+    transform: translateY(0);
+  }
+}
+
 .liked-badge {
   position: absolute;
   top: 8px;

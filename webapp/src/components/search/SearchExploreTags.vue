@@ -45,11 +45,14 @@
         <div class="source-card sc-card" @click="$emit('selectSource', 'soundcloud')">
           <div class="source-icon-wrap sc-icon-wrap">
             <Radio :size="22" />
+            <span v-if="scAccount?.connected" class="source-status-badge" title="SoundCloud подключен">
+              <Check :size="9" :stroke-width="3.5" />
+            </span>
           </div>
           <div class="source-info">
             <div class="source-title-row">
               <span class="source-name">SoundCloud</span>
-              <span v-if="scAccount?.connected" class="source-connected-badge">Подключен</span>
+              <span v-if="scAccount?.connected" class="source-connected-badge" title="Аккаунт подключен">Подключен</span>
             </div>
             <p class="source-desc">
               {{ scAccount?.connected ? 'Поиск, ваши лайки и авторские треки' : 'Поиск по миллионам треков' }}
@@ -62,11 +65,14 @@
         <div class="source-card sp-card" @click="$emit('selectSource', 'spotify')">
           <div class="source-icon-wrap sp-icon-wrap">
             <Disc3 :size="22" />
+            <span v-if="spAccount?.connected" class="source-status-badge" title="Spotify подключен">
+              <Check :size="9" :stroke-width="3.5" />
+            </span>
           </div>
           <div class="source-info">
             <div class="source-title-row">
               <span class="source-name">Spotify</span>
-              <span v-if="spAccount?.connected" class="source-connected-badge">Подключен</span>
+              <span v-if="spAccount?.connected" class="source-connected-badge" title="Аккаунт подключен">Подключен</span>
             </div>
             <p class="source-desc">
               {{ spAccount?.connected ? 'Поиск и перенос любимых треков' : 'Поиск и импорт треков' }}
@@ -178,7 +184,8 @@ import {
   Folder, 
   ArrowRight, 
   Hash, 
-  ExternalLink 
+  ExternalLink,
+  Check 
 } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -470,6 +477,7 @@ const cleanDisplayTags = computed(() => {
 }
 
 .source-icon-wrap {
+  position: relative;
   width: 40px;
   height: 40px;
   border-radius: 10px;
@@ -478,6 +486,23 @@ const cleanDisplayTags = computed(() => {
   justify-content: center;
   flex-shrink: 0;
   transition: transform 0.2s ease;
+}
+
+.source-status-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--c-accent, #1db954);
+  color: #0b0e14;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--c-bg-1, #121212);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  z-index: 2;
 }
 
 .source-card:hover .source-icon-wrap {
@@ -532,6 +557,8 @@ const cleanDisplayTags = computed(() => {
 }
 
 .source-connected-badge {
+  display: inline-flex;
+  align-items: center;
   font-size: 10px;
   font-weight: 700;
   color: var(--c-accent, #1db954);
@@ -546,9 +573,12 @@ const cleanDisplayTags = computed(() => {
 
 .source-desc {
   font-size: 11px;
+  line-height: 1.35;
   color: var(--c-text-3, rgba(255, 255, 255, 0.5));
   margin: 2px 0 0;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -564,6 +594,26 @@ const cleanDisplayTags = computed(() => {
   transform: translateX(3px);
 }
 
+/* On compact/narrow screens or containers, hide the bulky text badge so it never truncates the title */
+@container searchLanding (max-width: 680px) {
+  .source-connected-badge {
+    display: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .source-connected-badge {
+    display: none !important;
+  }
+}
+
+/* On wide containers where text badge is displayed, hide the icon badge */
+@container searchLanding (min-width: 681px) {
+  .source-status-badge {
+    display: none;
+  }
+}
+
 @container searchLanding (max-width: 520px) {
   .source-card {
     padding: 10px 12px;
@@ -572,6 +622,12 @@ const cleanDisplayTags = computed(() => {
   .source-icon-wrap {
     width: 36px;
     height: 36px;
+  }
+  .source-status-badge {
+    width: 13px;
+    height: 13px;
+    bottom: -2px;
+    right: -2px;
   }
   .source-arrow {
     display: none;

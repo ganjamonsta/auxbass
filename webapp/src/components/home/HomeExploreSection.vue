@@ -53,14 +53,15 @@
       </div>
     </div>
 
-    <!-- Genres Cards Grid -->
+      <!-- Genres Cards Grid -->
     <div v-else class="genres-grid">
       <div 
         v-for="genre in displayGenres" 
         :key="genre.name"
         class="genre-card"
+        :class="{ 'is-active-genre': isCurrentGenrePlaying(genre.name) }"
         :style="{ background: getGenreGradient(genre.name) }"
-        @click="goToGenreSearch(genre.name)"
+        @click="handlePlayGenre(genre.name)"
       >
         <!-- Card Text Info -->
         <div class="genre-info">
@@ -84,15 +85,35 @@
           </div>
         </div>
 
-        <!-- Quick Play Mix Button -->
-        <button 
-          class="genre-play-btn"
-          @click.stop="handlePlayGenre(genre.name)"
-          title="Слушать микс"
-          aria-label="Слушать микс"
-        >
-          <Play :size="18" fill="currentColor" />
-        </button>
+        <!-- Card Bottom Actions Row -->
+        <div class="genre-card-bottom">
+          <!-- Quick Play Mix Button (Visible on mobile & desktop) -->
+          <button 
+            class="genre-play-btn"
+            :class="{ 
+              'is-active': isCurrentGenrePlaying(genre.name),
+              'is-loading': loadingMixGenre === genre.name 
+            }"
+            @click.stop="handlePlayGenre(genre.name)"
+            :title="isCurrentGenrePlaying(genre.name) && playerStore.isPlaying ? 'Пауза' : 'Слушать микс'"
+            aria-label="Слушать микс"
+          >
+            <RefreshCw v-if="loadingMixGenre === genre.name" :size="16" class="spin-anim" />
+            <Pause v-else-if="isCurrentGenrePlaying(genre.name) && playerStore.isPlaying" :size="18" fill="currentColor" />
+            <Play v-else :size="18" fill="currentColor" />
+          </button>
+
+          <!-- Secondary Browse Action: Go to search / catalog if user specifically wants track list -->
+          <button 
+            class="genre-catalog-btn"
+            @click.stop="goToGenreSearch(genre.name)"
+            title="Открыть список треков в поиске"
+            aria-label="Открыть список треков"
+          >
+            <Search :size="12" />
+            <span class="catalog-btn-text">Треки</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -123,7 +144,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Compass, Music, Play, Hash } from 'lucide-vue-next'
+import { Compass, Music, Play, Pause, Hash, Search, RefreshCw } from 'lucide-vue-next'
 import { tracksApi } from '@/api/client'
 import { usePlayerStore } from '@/stores/player'
 import { useUIStore } from '@/stores/ui'
@@ -285,6 +306,22 @@ const setScope = (scope) => {
   loadExploreData()
 }
 
+// Active playback tracking
+const activePlayingGenre = ref(null)
+const loadingMixGenre = ref(null)
+
+const isCurrentGenrePlaying = (genreName) => {
+  const norm = (genreName || '').toLowerCase().trim()
+  if (activePlayingGenre.value && activePlayingGenre.value.toLowerCase() === norm) {
+    return true
+  }
+  if (playerStore.lazyShuffleContext?.search) {
+    const s = playerStore.lazyShuffleContext.search.toLowerCase()
+    if (s === `#${norm}` || s === norm) return true
+  }
+  return false
+}
+
 // Actions
 const goToGenreSearch = (genreName) => {
   router.push(`/search?q=%23${encodeURIComponent(genreName)}`)
@@ -295,24 +332,41 @@ const goToTagSearch = (tagName) => {
 }
 
 const handlePlayGenre = async (genreName) => {
+  // If already playing this genre, toggle pause/play
+  if (isCurrentGenrePlaying(genreName)) {
+    playerStore.toggle()
+    return
+  }
+
+  loadingMixGenre.value = genreName
   try {
-    // 1. Try library mix first
-    const libRes = await api.get('/library', { params: { search: `#${genreName}`, per_page: 5 } }).catch(() => null)
-    if (libRes?.data?.items?.length) {
-      await playerStore.playShuffleAll('library', null, null, { search: `#${genreName}` })
-      return
+    // 1. Try library mix first if scope is library
+    if (currentScope.value === 'library') {
+      const libRes = await api.get('/library', { params: { search: `#${genreName}`, per_page: 5 } }).catch(() => null)
+      if (libRes?.data?.items?.length) {
+        activePlayingGenre.value = genreName
+        await playerStore.playShuffleAll('library', null, `Микс: ${formatGenreTitle(genreName)}`, { search: `#${genreName}` })
+        uiStore.toast?.success('Микс', `Запущен микс: ${formatGenreTitle(genreName)}`)
+        return
+      }
     }
 
-    // 2. Otherwise play from global results for this genre
-    const globalRes = await tracksApi.getGlobal({ search: `#${genreName}`, per_page: 30 })
+    // 2. Otherwise play from global results for this genre with randomized start
+    const globalRes = await tracksApi.getGlobal({ search: `#${genreName}`, per_page: 50 })
     const items = globalRes.data?.items || []
     if (items.length > 0) {
-      playerStore.playTrack(items[0], items, 0)
+      const shuffled = [...items].sort(() => Math.random() - 0.5)
+      activePlayingGenre.value = genreName
+      playerStore.playTrack(shuffled[0], shuffled, 0)
+      uiStore.toast?.success('Микс', `Запущен поток: ${formatGenreTitle(genreName)}`)
     } else {
-      uiStore.toast?.info('Жанр', `По направлению «${genreName}» треков пока нет`)
+      uiStore.toast?.info('Жанр', `По направлению «${formatGenreTitle(genreName)}» треков пока нет`)
     }
   } catch (e) {
     console.error('Failed to play genre mix:', e)
+    uiStore.toast?.error('Ошибка', 'Не удалось запустить воспроизведение')
+  } finally {
+    loadingMixGenre.value = null
   }
 }
 
@@ -469,10 +523,15 @@ onMounted(() => {
 
 .mood-play-icon {
   color: var(--c-accent, #1db954);
-  opacity: 0;
-  transform: scale(0.6);
+  opacity: 0.8;
+  transform: scale(1);
   transition: all 0.18s ease;
   margin-left: 2px;
+}
+
+.mood-pill:hover .mood-play-icon {
+  opacity: 1;
+  transform: scale(1.15);
 }
 
 /* Genres Grid */
@@ -508,17 +567,22 @@ onMounted(() => {
 .genre-card {
   height: 125px;
   border-radius: 12px;
-  padding: 16px;
+  padding: 14px 14px 12px;
   position: relative;
   overflow: hidden;
   cursor: pointer;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.2s ease;
   user-select: none;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+}
+
+.genre-card.is-active-genre {
+  border-color: rgba(29, 185, 84, 0.7);
+  box-shadow: 0 0 16px rgba(29, 185, 84, 0.35), 0 6px 20px rgba(0, 0, 0, 0.5);
 }
 
 .genre-card:hover {
@@ -533,11 +597,11 @@ onMounted(() => {
 .genre-info {
   z-index: 2;
   position: relative;
-  max-width: 65%;
+  max-width: 68%;
 }
 
 .genre-name {
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 800;
   color: #fff;
   margin: 0;
@@ -561,8 +625,8 @@ onMounted(() => {
   position: absolute;
   right: -8px;
   bottom: -8px;
-  width: 76px;
-  height: 76px;
+  width: 72px;
+  height: 72px;
   transform: rotate(20deg);
   border-radius: 8px;
   overflow: hidden;
@@ -593,11 +657,18 @@ onMounted(() => {
   color: rgba(255, 255, 255, 0.6);
 }
 
-/* Quick Play Button */
+/* Bottom Actions Row */
+.genre-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 3;
+  position: relative;
+  margin-top: auto;
+}
+
+/* Quick Play Button - High visibility across mobile and desktop */
 .genre-play-btn {
-  position: absolute;
-  left: 14px;
-  bottom: 14px;
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -608,22 +679,80 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  opacity: 0;
-  transform: scale(0.8) translateY(6px);
+  opacity: 0.92;
+  transform: scale(1);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  z-index: 3;
+  flex-shrink: 0;
 }
 
 .genre-card:hover .genre-play-btn {
   opacity: 1;
-  transform: scale(1) translateY(0);
+  transform: scale(1.05);
 }
 
-.genre-play-btn:hover {
+.genre-play-btn:hover,
+.genre-play-btn.is-active {
   background: var(--c-accent, #1db954);
   color: #000;
   transform: scale(1.1) !important;
+  opacity: 1;
+}
+
+.genre-play-btn.is-active {
+  box-shadow: 0 0 14px rgba(29, 185, 84, 0.6);
+}
+
+/* Catalog / Tracks browse button */
+.genre-catalog-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  font-family: inherit;
+  flex-shrink: 0;
+}
+
+.genre-catalog-btn:hover {
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: translateY(-1px);
+}
+
+.catalog-btn-text {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.spin-anim {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (hover: none), (max-width: 768px) {
+  .genre-play-btn {
+    opacity: 1 !important;
+    transform: none !important;
+    pointer-events: auto !important;
+  }
+  .mood-play-icon {
+    opacity: 0.9 !important;
+    transform: scale(1) !important;
+  }
 }
 
 /* Skeletons */

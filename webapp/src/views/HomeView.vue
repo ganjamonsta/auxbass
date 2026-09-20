@@ -942,6 +942,14 @@ onUnmounted(() => {
   transform: translateY(0);
 }
 
+@media (hover: none), (max-width: 768px) {
+  .feed-card .play-overlay {
+    opacity: 0.95;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+}
+
 .feed-card-title {
   font-size: 13px;
   font-weight: 700;
