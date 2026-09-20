@@ -67,6 +67,10 @@
                   <Link2 :size="18" />
                   <span>{{ shareCopyLabel }}</span>
                 </button>
+                <button class="menu-item" @click="handleShareAction('inline')">
+                  <AtSign :size="18" />
+                  <span>Скопировать инлайн-запрос</span>
+                </button>
                 <button class="menu-item" @click="handleShareAction('telegram')">
                   <Send :size="18" />
                   <span>Отправить в чат Telegram</span>
@@ -74,11 +78,6 @@
                 <button class="menu-item" @click="handleShareAction('download')">
                   <CloudDownload :size="18" />
                   <span>Скачать в Telegram</span>
-                </button>
-                <div class="menu-divider" />
-                <button class="menu-item" @click="handleShareAction('more')">
-                  <Share2 :size="18" />
-                  <span>Ещё варианты...</span>
                 </button>
               </div>
             </template>
@@ -406,6 +405,10 @@
                 <Link2 :size="15" />
                 <span class="submenu-text">{{ shareCopyLabel }}</span>
               </button>
+              <button class="submenu-item" @click="handleShareAction('inline')">
+                <AtSign :size="15" />
+                <span class="submenu-text">Скопировать инлайн-запрос</span>
+              </button>
               <button class="submenu-item" @click="handleShareAction('telegram')">
                 <Send :size="15" />
                 <span class="submenu-text">Отправить в чат Telegram</span>
@@ -413,11 +416,6 @@
               <button class="submenu-item" @click="handleShareAction('download')">
                 <CloudDownload :size="15" />
                 <span class="submenu-text">Скачать в Telegram</span>
-              </button>
-              <div class="submenu-divider" />
-              <button class="submenu-item" @click="handleShareAction('more')">
-                <Share2 :size="15" />
-                <span class="submenu-text">Ещё...</span>
               </button>
             </template>
           </div>
@@ -505,12 +503,12 @@ import TagChips from '@/components/TagChips.vue'
 import { 
   X, User, Disc3, Play, ListMusic, Plus, Minus, Pencil, Check,
   Trash2, FolderOpen, Shuffle, Music, Mic2, ChevronRight, ChevronDown,
-  ChevronLeft, ThumbsDown, Heart, Share2, Pin, PinOff, Link2, Send, CloudDownload
+  ChevronLeft, ThumbsDown, Heart, Share2, Pin, PinOff, Link2, Send, CloudDownload, AtSign
 } from 'lucide-vue-next'
 
 const router = useRouter()
 const uiStore = useUIStore()
-const { copyLink, shareToTelegramChat, downloadToTelegram, openShare } = useShare()
+const { copyLink, copyInlineCommand, shareToTelegramChat, downloadToTelegram } = useShare()
 
 // Submenu state (Spotify-style)
 const activeSubmenu = ref(null) // 'artists' | 'share' | null (desktop flyout)
@@ -839,14 +837,14 @@ const handleShareAction = async (action) => {
     case 'copy':
       await copyLink(payload)
       break
+    case 'inline':
+      await copyInlineCommand(payload)
+      break
     case 'telegram':
       await shareToTelegramChat(payload)
       break
     case 'download':
       await downloadToTelegram(payload)
-      break
-    case 'more':
-      openShare(payload)
       break
   }
 }

@@ -123,6 +123,35 @@ export function useShare() {
   }
 
   /**
+   * Copy inline command (@bot type:id) to clipboard
+   */
+  const copyInlineCommand = async (customPayload = null) => {
+    const payload = customPayload || sharePayload.value
+    const { type, id } = payload
+    const botUser = getBotUsername()
+    const query = getInlineQuery(type, id)
+    const cmd = `@${botUser} ${query}`
+
+    if (window.Telegram?.WebApp?.HapticFeedback) {
+      window.Telegram.WebApp.HapticFeedback.notificationOccurred('success')
+    }
+
+    if (navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(cmd)
+        uiStore.toast.success('Команда скопирована', `Вставьте «${cmd}» в любой чат`)
+        closeShare()
+        return
+      } catch (e) {
+        console.warn('Clipboard write failed:', e)
+      }
+    }
+
+    prompt('Команда для инлайн-запроса:', cmd)
+    closeShare()
+  }
+
+  /**
    * Share via native OS Web Share API or Telegram share url
    */
   const shareWeb = async (customPayload = null) => {
@@ -215,6 +244,7 @@ export function useShare() {
     shareToTelegramChat,
     downloadToTelegram,
     copyLink,
+    copyInlineCommand,
     shareWeb,
     share,
   }
