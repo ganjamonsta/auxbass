@@ -162,6 +162,13 @@ def migrate_sqlite_db(db_path: str):
     conn.close()
     print("[OK] SQLite migration completed successfully!")
 
+    # Cleanup bogus albums (e.g. Likes as albums) from imports
+    try:
+        from scripts.cleanup_bogus_albums import run_cleanup
+        run_cleanup(db_path)
+    except Exception as e:
+        print(f"  [!] Note: bogus album cleanup skipped: {e}")
+
 if __name__ == "__main__":
     db_file = sys.argv[1] if len(sys.argv) > 1 else "tg_player.db"
     migrate_sqlite_db(db_file)

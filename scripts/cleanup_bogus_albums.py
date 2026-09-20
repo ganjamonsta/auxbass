@@ -17,13 +17,14 @@ from shared.matching import is_bogus_album_name
 DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "tg_player.db"))
 
 
-def run_cleanup():
-    if not os.path.exists(DB_PATH):
-        print(f"Database file not found at: {DB_PATH}")
+def run_cleanup(db_path: str = None):
+    target_db = db_path or (sys.argv[1] if len(sys.argv) > 1 else DB_PATH)
+    if not os.path.exists(target_db):
+        print(f"Database file not found at: {target_db}")
         return
 
-    print(f"Opening database: {DB_PATH}")
-    conn = sqlite3.connect(DB_PATH)
+    print(f"Opening database: {target_db}")
+    conn = sqlite3.connect(target_db)
     cursor = conn.cursor()
 
     try:
