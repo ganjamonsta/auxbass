@@ -82,6 +82,7 @@ export const useUIStore = defineStore('ui', () => {
     isSidebarCollapsed.value = collapsed
     if (manual) {
       userCollapsedPreference.value = collapsed
+      isAutoCollapsed.value = false
       try {
         localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed))
       } catch (_) {}
@@ -94,6 +95,7 @@ export const useUIStore = defineStore('ui', () => {
 
   // Right NowPlayingSidebar visibility state
   const isNowPlayingSidebarVisible = ref(savedNowPlayingPref !== null ? savedNowPlayingPref : true)
+  const isRightAutoHidden = ref(false)
   const userNowPlayingPreference = ref(savedNowPlayingPref) // null = auto, boolean = explicit user choice
 
   const openNowPlayingSidebar = (manual = false) => {
@@ -113,6 +115,7 @@ export const useUIStore = defineStore('ui', () => {
     isNowPlayingSidebarVisible.value = visible
     if (manual) {
       userNowPlayingPreference.value = visible
+      isRightAutoHidden.value = false
       try {
         localStorage.setItem(NOW_PLAYING_VISIBLE_KEY, String(visible))
       } catch (_) {}
@@ -199,6 +202,7 @@ export const useUIStore = defineStore('ui', () => {
     toggleSidebarCollapse,
     // Right NowPlaying Sidebar state
     isNowPlayingSidebarVisible,
+    isRightAutoHidden,
     userNowPlayingPreference,
     openNowPlayingSidebar,
     closeNowPlayingSidebar,
