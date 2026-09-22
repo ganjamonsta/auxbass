@@ -549,21 +549,34 @@ const goBack = () => {
 
 // === Mobile Back Gesture, Overlays & Root Double-Back Coordinator ===
 let isPoppingOverlay = false
+let popOverlayTimeout = null
+let closedViaPopstate = false
 let lastExitAttemptTime = 0
 
 // Synchronize browser history with FullPlayer sheet so Android/iOS back swipe closes it smoothly
 watch(showFullPlayer, (isOpen, wasOpen) => {
   if (isOpen && !wasOpen) {
+    closedViaPopstate = false
     if (!isPoppingOverlay) {
-      window.history.pushState({ modal: 'fullplayer' }, '', window.location.href)
+      const currentState = window.history.state || {}
+      window.history.pushState({ ...currentState, modal: 'fullplayer' }, '', window.location.href)
     }
   } else if (!isOpen && wasOpen) {
+    // If closed via browser popstate / back swipe, history entry is already popped
+    if (closedViaPopstate) {
+      closedViaPopstate = false
+      return
+    }
+    // If closed programmatically (close button or swipe down gesture), pop history entry
     if (!isPoppingOverlay && window.history.state?.modal === 'fullplayer') {
       isPoppingOverlay = true
+      if (popOverlayTimeout) clearTimeout(popOverlayTimeout)
+      popOverlayTimeout = setTimeout(() => {
+        isPoppingOverlay = false
+      }, 500)
       window.history.back()
     }
   }
-  isPoppingOverlay = false
 })
 
 // Unified dismissal of topmost overlay: returns true if an overlay was consumed
@@ -595,6 +608,7 @@ const dismissTopOverlay = () => {
   }
   // 6. Full player sheet
   if (showFullPlayer.value) {
+    closedViaPopstate = true
     showFullPlayer.value = false
     return true
   }
@@ -606,6 +620,10 @@ const handleWindowPopState = () => {
   // If we triggered history.back() programmatically when closing an overlay, ignore this popstate
   if (isPoppingOverlay) {
     isPoppingOverlay = false
+    if (popOverlayTimeout) {
+      clearTimeout(popOverlayTimeout)
+      popOverlayTimeout = null
+    }
     return
   }
 
@@ -626,7 +644,8 @@ const handleWindowPopState = () => {
     } else {
       // First gesture -> prevent closing, re-push root state and prompt
       lastExitAttemptTime = now
-      window.history.pushState({ isRootGuard: true }, '', window.location.href)
+      const currentState = window.history.state || {}
+      window.history.pushState({ ...currentState, isRootGuard: true }, '', window.location.href)
       telegram?.HapticFeedback?.notificationOccurred?.('warning')
       uiStore.toast.info('Выход', 'Свайпните назад ещё раз для выхода')
     }

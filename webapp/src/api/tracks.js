@@ -46,7 +46,7 @@ export const tracksApi = {
   getGenres: cacheable((scope = 'library') => api.get('/tracks/genres', { params: { scope } })),
   getTags: cacheable((scope = 'library', limit = 50) => api.get('/tracks/tags', { params: { scope, limit } })),
   getHistory: cacheable((limit = 50) => api.get('/tracks/history', { params: { limit } })),
-  getLiked: cacheable(() => api.get('/tracks/liked')),
+  getLiked: cacheable((options = {}) => api.get('/tracks/liked', { bypassCache: !!options.bypassCache, ...options })),
   like: nonCacheable((id) => api.post(`/tracks/${id}/like`), 'like'),
   unlike: nonCacheable((id) => api.delete(`/tracks/${id}/like`), 'like'),
   dislike: nonCacheable((id) => api.post(`/tracks/${id}/dislike`), 'like'),

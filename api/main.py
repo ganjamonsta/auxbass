@@ -118,7 +118,6 @@ class CacheControlMiddleware(BaseHTTPMiddleware):
     
     # Cache durations for different endpoints (in seconds)
     CACHE_RULES = {
-        r'/api/tracks/liked': 60,              # 1 minute - liked tracks change frequently
         r'/api/tracks/global/stats': 120,      # 2 minutes - statistics
         r'/api/library/stats': 120,            # 2 minutes - statistics  
         r'/api/tracks/genres': 1800,           # 30 minutes - genres
@@ -142,6 +141,15 @@ class CacheControlMiddleware(BaseHTTPMiddleware):
             
             # Skip cache headers for streaming and images
             if "/api/player/audio/" in path or "/api/images/" in path:
+                return response
+
+            # Skip cache headers if client explicitly requested fresh data
+            if (
+                request.query_params.get("_t")
+                or request.query_params.get("_cb")
+                or request.headers.get("cache-control") == "no-cache"
+            ):
+                response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
                 return response
             
             # Find matching cache rule

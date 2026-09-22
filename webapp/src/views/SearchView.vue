@@ -369,7 +369,7 @@ const uiStore = useUIStore()
 const tasksStore = useTasksStore()
 const externalAccountsStore = useExternalAccountsStore()
 const { openMenu } = useContextMenu()
-const { handleDirectDownload, handleHdNotice } = useTrackActions()
+const { handleDirectDownload, handleHdNotice, handleLikeTrack } = useTrackActions()
 
 // Input & Debounce
 const { 
@@ -1721,10 +1721,6 @@ const handlePlayTrack = (track, list, index) => {
   playerStore.playTrack(track, list || allTracksList.value, index >= 0 ? index : 0)
 }
 
-const handleLikeTrack = async (track) => {
-  await libraryStore.toggleLike(track.id)
-  track.is_liked = !track.is_liked
-}
 
 const handleAddToLibrary = async (track) => {
   try {

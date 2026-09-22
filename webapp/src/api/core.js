@@ -41,20 +41,26 @@ api.interceptors.request.use((config) => {
   }
   
   // Check cache for GET requests (unless explicitly bypassed)
-  if (config.method === 'get' && !config.bypassCache) {
-    const cacheKey = apiCache.generateKey(config.url, config.params)
-    const cachedResponse = apiCache.get(cacheKey)
-    
-    if (cachedResponse) {
-      // Return cached response (cancel actual request)
-      config.adapter = () => Promise.resolve({
-        data: cachedResponse,
-        status: 200,
-        statusText: 'OK (cached)',
-        headers: {},
-        config,
-        request: {}
-      })
+  if (config.method === 'get') {
+    if (config.bypassCache) {
+      config.headers = config.headers || {}
+      config.headers['Cache-Control'] = 'no-cache'
+      config.params = { ...config.params, _t: Date.now() }
+    } else {
+      const cacheKey = apiCache.generateKey(config.url, config.params)
+      const cachedResponse = apiCache.get(cacheKey)
+      
+      if (cachedResponse) {
+        // Return cached response (cancel actual request)
+        config.adapter = () => Promise.resolve({
+          data: cachedResponse,
+          status: 200,
+          statusText: 'OK (cached)',
+          headers: {},
+          config,
+          request: {}
+        })
+      }
     }
   }
   

@@ -175,8 +175,8 @@ import { Music, Shuffle, Search, RefreshCw } from 'lucide-vue-next'
 // Universal context menu
 const { openMenu } = useContextMenu()
 
-// Track actions (download, HD notice)
-const { handleDirectDownload, handleHdNotice } = useTrackActions()
+// Track actions (download, HD notice, like)
+const { handleDirectDownload, handleHdNotice, handleLikeTrack } = useTrackActions()
 
 const props = defineProps({
   searchQuery: {
@@ -482,12 +482,7 @@ watch(effectiveSearchQuery, async (newVal) => {
   }
 }, { immediate: true })
 
-// Like track
-const handleLikeTrack = async (track) => {
-  if (!track?.id) return
-  const current = track.is_liked === true
-  track.is_liked = !current
-}
+
 
 const playTrack = (track) => {
   playerStore.playTrack(track, tracks.value)

@@ -402,7 +402,7 @@ import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { useTasksStore } from '@/stores/tasks'
 import { useContextMenu } from '@/composables/useContextMenu'
-import { useDebouncedSearch } from '@/composables'
+import { useDebouncedSearch, useTrackActions } from '@/composables'
 import api from '@/api/client'
 import { getCoverUrl, CoverSize } from '@/utils'
 import LibraryTracks from '@/components/library/LibraryTracks.vue'
@@ -432,6 +432,7 @@ const libraryStore = useLibraryStore()
 const playerStore = usePlayerStore()
 const tasksStore = useTasksStore()
 const { openMenu } = useContextMenu()
+const { handleLikeTrack, handleDirectDownload, handleHdNotice } = useTrackActions()
 
 const isOverviewRefreshing = ref(false)
 
@@ -610,11 +611,6 @@ const playTrack = (track) => {
   playerStore.playTrack(track, list, idx >= 0 ? idx : 0)
 }
 
-const handleLikeTrack = async (track) => {
-  await libraryStore.toggleLike(track.id)
-  track.is_liked = !track.is_liked
-}
-
 const handleShuffleAll = async () => {
   shuffling.value = true
   try {
@@ -624,19 +620,6 @@ const handleShuffleAll = async () => {
   } finally {
     shuffling.value = false
   }
-}
-
-const handleDirectDownload = (track) => {
-  if (track?.download_url) {
-    window.open(track.download_url, '_blank')
-  }
-}
-
-const handleHdNotice = (info) => {
-  uiStore.toast.info(
-    info?.track?.title || 'HD трек', 
-    info?.message || 'HD версия доступна'
-  )
 }
 
 const handleCreatePlaylist = async () => {

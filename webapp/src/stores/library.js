@@ -231,7 +231,7 @@ export const useLibraryStore = defineStore('library', () => {
       await Promise.allSettled([
         fetchTracks({ refresh: true, bypassCache: true }),
         fetchPlaylists(true),
-        fetchLikedTracks(),
+        fetchLikedTracks(true),
         fetchHistory(20),
         fetchRecentUploads(15),
       ])
@@ -779,9 +779,9 @@ export const useLibraryStore = defineStore('library', () => {
   }
 
   // Fetch liked tracks
-  const fetchLikedTracks = async () => {
+  const fetchLikedTracks = async (force = false) => {
     try {
-      const response = await tracksApi.getLiked()
+      const response = await tracksApi.getLiked({ bypassCache: Boolean(force) })
       // API returns { items: [...], total: N }
       likedTracks.value = response.data?.items || (Array.isArray(response.data) ? response.data : [])
       saveToStorage(CACHE_KEY_LIKED, likedTracks.value.slice(0, 50))
@@ -847,6 +847,7 @@ export const useLibraryStore = defineStore('library', () => {
         await tracksApi.unlike(trackId)
         await notifyTrackChange(trackId, { is_liked: false, liked_at: null })
         likedTracks.value = likedTracks.value.filter(t => t.id !== trackId)
+        saveToStorage(CACHE_KEY_LIKED, likedTracks.value.slice(0, 50))
         return false
       } else {
         await tracksApi.like(trackId)
@@ -858,6 +859,7 @@ export const useLibraryStore = defineStore('library', () => {
           const track = findTrackInStore(trackId)
           if (track) {
             likedTracks.value.unshift({ ...track, is_liked: true, liked_at: nowIso, is_disliked: false, disliked_at: null })
+            saveToStorage(CACHE_KEY_LIKED, likedTracks.value.slice(0, 50))
           } else {
             await fetchLikedTracks()
           }
