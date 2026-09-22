@@ -11,6 +11,7 @@ from urllib.parse import parse_qsl, unquote
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 
+import os
 import logging
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Header, Depends, Response, UploadFile, File, Request
@@ -652,6 +653,53 @@ async def get_auth_config():
         "app_name": settings.display_name,
         "auth_method": "code",  # Changed from widget to code
     }
+
+
+class DevLoginRequest(BaseModel):
+    user_id: Optional[int] = None
+
+
+@router.post("/dev-login", response_model=AuthResult)
+async def dev_login(data: Optional[DevLoginRequest] = None):
+    """
+    Development-only login endpoint for local browser testing without Telegram.
+    Strictly disabled in production and containerized environments.
+    """
+    is_docker = os.path.exists("/.dockerenv") or bool(os.environ.get("DOCKER_CONTAINER"))
+    is_prod_env = (os.environ.get("ENV", "").lower() in ("production", "prod") or
+                   os.environ.get("ENVIRONMENT", "").lower() in ("production", "prod"))
+    is_public_url = "localhost" not in settings.webapp_url and "127.0.0.1" not in settings.webapp_url
+    
+    if is_docker or is_prod_env or is_public_url:
+        raise HTTPException(status_code=404, detail="Not found")
+    
+    target_id = (data.user_id if data else None) or 874295897
+    async with get_session() as session:
+        db_user = await session.get(User, target_id)
+        if not db_user:
+            result = await session.execute(select(User).limit(1))
+            db_user = result.scalar_one_or_none()
+        
+        if not db_user:
+            db_user = User(
+                id=target_id,
+                username="mc_pluck",
+                first_name="xFer",
+                last_name="Serum",
+            )
+            session.add(db_user)
+            await session.commit()
+            await session.refresh(db_user)
+        
+        user = TelegramUser(
+            id=db_user.id,
+            first_name=db_user.first_name or "xFer",
+            last_name=db_user.last_name,
+            username=db_user.username,
+            photo_url=getattr(db_user, 'photo_url', None)
+        )
+        token = create_jwt_token(user)
+        return AuthResult(valid=True, user=user, token=token)
 
 
 @router.post("/refresh", response_model=AuthResult)

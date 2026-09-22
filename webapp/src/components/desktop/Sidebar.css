@@ -548,19 +548,19 @@
 }
 
 .nav-item.active {
-  background: var(--c-bg-2);
-  border: 1px solid rgba(29, 185, 84, 0.3);
-  color: var(--c-accent);
+  background: var(--c-bg-0);
+  border: var(--border-neu);
+  color: var(--c-text-1);
   font-weight: 600;
   box-shadow: 
     inset 2px 2px 5px var(--sh-inset-dark),
-    inset -1px -1px 3px var(--sh-inset-light),
-    0 0 12px var(--c-accent-glow);
+    inset -1px -1px 3px var(--sh-inset-light);
 }
 
 .nav-item.active svg {
   color: var(--c-accent);
   opacity: 1;
+  filter: drop-shadow(0 0 6px var(--c-accent-glow));
 }
 
 /* Sidebar Subnav (Under Library) */
@@ -593,13 +593,15 @@
 }
 
 .nav-subitem.active {
-  background: rgba(29, 185, 84, 0.12);
-  color: var(--c-accent, #1db954);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--c-text-1);
   font-weight: 600;
+  box-shadow: inset 1px 1px 3px var(--sh-inset-dark);
 }
 
 .nav-subitem.active svg {
   color: var(--c-accent, #1db954);
+  filter: drop-shadow(0 0 4px var(--c-accent-glow));
 }
 
 .sub-count {
@@ -663,6 +665,7 @@
 
 .offline-highlight-item {
   margin-top: 8px;
+  position: relative;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 10px;
@@ -676,9 +679,17 @@
 }
 
 .offline-highlight-item.active {
-  background: rgba(29, 185, 84, 0.15);
-  border-color: rgba(29, 185, 84, 0.4);
-  color: var(--c-accent, #1db954);
+  background: var(--c-bg-0);
+  border-color: rgba(255, 255, 255, 0.06);
+  color: var(--c-text-1);
+  box-shadow: 
+    inset 2px 2px 4px var(--sh-inset-dark),
+    inset -1px -1px 2px var(--sh-inset-light);
+}
+
+.offline-highlight-item.active svg {
+  color: var(--c-accent);
+  filter: drop-shadow(0 0 6px var(--c-accent-glow));
 }
 
 .offline-highlight-item .offline-count {
@@ -697,9 +708,15 @@
 }
 
 .import-highlight-item.active {
-  background: rgba(29, 185, 84, 0.12);
-  color: var(--c-accent, #1db954);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--c-text-1);
   font-weight: 600;
+  box-shadow: inset 1px 1px 3px var(--sh-inset-dark);
+}
+
+.import-highlight-item.active svg {
+  color: var(--c-accent);
+  filter: drop-shadow(0 0 4px var(--c-accent-glow));
 }
 
 .file-name-subitem {

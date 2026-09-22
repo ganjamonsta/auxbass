@@ -45,18 +45,18 @@
   --c-warning: #FFA000;
   --c-error: #F44336;
   
-  /* ─── Surface Colors (Hi-Fi Charcoal / Deep Slate) ─── */
-  --c-bg-0: #0B0C10;      /* Deepest canvas */
-  --c-bg-1: #12141A;      /* Base app background */
-  --c-bg-2: #181B22;      /* Elevated surface / card */
-  --c-bg-3: #20242E;      /* Interactive / inset well */
-  --c-bg-4: #282D3A;      /* Hover / active item */
+  /* ─── Surface Colors (Pure Hi-Fi Charcoal / True Neutral Dark Gray) ─── */
+  --c-bg-0: #0D0D0D;      /* Deepest canvas */
+  --c-bg-1: #121212;      /* Base app background */
+  --c-bg-2: #1A1A1A;      /* Elevated surface / card */
+  --c-bg-3: #222222;      /* Interactive / inset well / hover */
+  --c-bg-4: #2A2A2A;      /* Active surface / highlight */
   
-  /* ─── Text Colors ─── */
+  /* ─── Text Colors (Neutral Grays — No Blue Slate) ─── */
   --c-text-1: #FFFFFF;
-  --c-text-2: #CBD5E1;    /* Refined high-contrast slate text */
-  --c-text-3: #94A3B8;    /* Readable secondary text */
-  --c-text-4: #64748B;    /* Muted label */
+  --c-text-2: #B3B3B3;    /* Pure neutral light gray */
+  --c-text-3: #808080;    /* Pure neutral secondary text */
+  --c-text-4: #555555;    /* Muted label */
   
   /* ─── Border Radius Scale ─── */
   --r-xs: 4px;
@@ -220,11 +220,11 @@
 }
 
 .neu-card.active {
+  background: var(--c-bg-1);
   box-shadow: 
     inset 3px 3px 7px var(--sh-inset-dark),
-    inset -2px -2px 4px var(--sh-inset-light),
-    0 0 14px var(--c-accent-glow);
-  border-color: rgba(29, 185, 84, 0.3);
+    inset -2px -2px 4px var(--sh-inset-light);
+  border: var(--border-neu);
 }
 
 /* Cover / Thumbnail container with soft bevel */
@@ -286,11 +286,15 @@
 
 .neu-btn-icon.active {
   color: var(--c-accent);
+  background: var(--c-bg-1);
   box-shadow: 
     inset 3px 3px 6px var(--sh-inset-dark),
-    inset -2px -2px 4px var(--sh-inset-light),
-    0 0 14px var(--c-accent-glow);
-  border-color: rgba(29, 185, 84, 0.4);
+    inset -2px -2px 4px var(--sh-inset-light);
+  border: var(--border-neu);
+}
+
+.neu-btn-icon.active svg {
+  filter: drop-shadow(0 0 6px var(--c-accent-glow));
 }
 
 /* Size variants */

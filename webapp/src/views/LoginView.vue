@@ -1,8 +1,10 @@
 <template>
   <div class="login-view">
-    <div class="login-container">
+    <div class="login-container neu-card">
       <div class="logo">
-        <Music :size="48" />
+        <div class="logo-icon-wrap neu-well">
+          <Music :size="40" class="logo-music" />
+        </div>
       </div>
       <h1>{{ appName }}</h1>
       <p class="subtitle">Музыкальный плеер с хранением в Telegram</p>
@@ -13,16 +15,27 @@
           v-if="botUsername && botLink !== '#'" 
           :href="botLink" 
           target="_blank" 
-          class="bot-link"
+          class="bot-link neu-btn-rubber"
         >
           Открыть бота @{{ botUsername }}
         </a>
-        <div v-else class="bot-link disabled-link">
+        <div v-else class="bot-link neu-btn-rubber disabled-link">
           Открыть бота
         </div>
-        <button class="primary-btn" @click="showCodeInput = true">
+        <button class="primary-btn neu-btn-primary" @click="showCodeInput = true">
           У меня есть код
         </button>
+
+        <div v-if="isDev" class="dev-section">
+          <div class="dev-divider">
+            <span>Режим разработки</span>
+          </div>
+          <button class="dev-btn neu-btn-rubber" :disabled="loading" @click="handleDevLogin">
+            <Zap :size="18" class="dev-icon" />
+            <span>{{ loading ? 'Вход...' : 'Быстрый вход (Dev Mode)' }}</span>
+          </button>
+          <div class="dev-hint">Вход как тестовый пользователь без Telegram</div>
+        </div>
       </div>
 
       <div v-else class="code-input-section">
@@ -36,7 +49,7 @@
               maxlength="1"
               pattern="[0-9]"
               inputmode="numeric"
-              class="code-digit"
+              class="code-digit neu-input"
               :value="codeDigits[i]"
               @input="onCodeInput($event, i)"
               @keydown="onCodeKeydown($event, i)"
@@ -46,7 +59,7 @@
         </div>
         <p v-if="error" class="error">{{ error }}</p>
         <button 
-          class="primary-btn" 
+          class="primary-btn neu-btn-primary" 
           @click="verifyCode" 
           :disabled="loading || code.length !== 8"
         >
@@ -55,6 +68,13 @@
         <button class="text-btn" @click="showCodeInput = false">
           Назад
         </button>
+
+        <div v-if="isDev" class="dev-section dev-section-sub">
+          <button class="dev-btn neu-btn-rubber" :disabled="loading" @click="handleDevLogin">
+            <Zap :size="16" class="dev-icon" />
+            <span>Быстрый вход (Dev Mode)</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -65,11 +85,13 @@ import { ref, computed, nextTick, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { authApi } from '@/api/client'
-import { Music } from 'lucide-vue-next'
+import { Music, Zap } from 'lucide-vue-next'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+
+const isDev = computed(() => import.meta.env.DEV)
 
 const showCodeInput = ref(false)
 const codeInputs = ref([])
@@ -174,7 +196,32 @@ const verifyCode = async () => {
   }
 }
 
+const handleDevLogin = async () => {
+  loading.value = true
+  error.value = ''
+  try {
+    await authStore.devLogin()
+    const redirect = route.query.redirect || '/'
+    window.location.href = redirect
+  } catch (err) {
+    error.value = 'Ошибка тестового входа'
+  } finally {
+    loading.value = false
+  }
+}
+
 onMounted(async () => {
+  // Check if already authenticated
+  if (authStore.isAuthenticated) {
+    router.push('/')
+    return
+  }
+
+  // Auto-login in development if ?dev=1 or ?dev=true is present
+  if (isDev.value && (route.query.dev === '1' || route.query.dev === 'true')) {
+    handleDevLogin()
+    return
+  }
   // Load app config (bot username for display and link)
   try {
     const response = await authApi.getConfig()
@@ -215,84 +262,156 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: var(--c-bg-1);
+  background: var(--c-bg-0);
 }
 
 .login-container {
   text-align: center;
-  max-width: 360px;
+  max-width: 400px;
   width: 100%;
+  padding: 36px 28px;
+  border-radius: var(--r-xl);
 }
 
 .logo {
-  font-size: 72px;
-  margin-bottom: 16px;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.logo-icon-wrap {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-accent);
+}
+
+.logo-music {
+  filter: drop-shadow(0 0 10px var(--c-accent-glow));
 }
 
 h1 {
-  font-size: 32px;
+  font-size: 28px;
   font-weight: 700;
   color: var(--c-text-1);
   margin: 0 0 8px 0;
+  letter-spacing: -0.5px;
 }
 
 .subtitle {
   color: var(--c-text-2);
-  margin: 0 0 40px 0;
+  margin: 0 0 28px 0;
+  font-size: 14px;
 }
 
 .auth-info p {
   color: var(--c-text-2);
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+  font-size: 14px;
 }
 
 .auth-info code {
-  background: var(--c-bg-3);
-  padding: 4px 8px;
-  border-radius: 4px;
+  background: var(--c-bg-1);
+  padding: 3px 8px;
+  border-radius: 6px;
   color: var(--c-accent);
+  border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .bot-link {
-  display: block;
-  padding: 14px 24px;
-  background: var(--c-bg-3);
-  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 13px 20px;
   color: var(--c-accent);
   text-decoration: none;
   font-weight: 500;
-  margin-bottom: 16px;
-}
-
-.bot-link:hover {
-  background: var(--c-bg-4);
+  font-size: 15px;
+  margin-bottom: 14px;
 }
 
 .bot-link.disabled-link {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: default;
 }
 
 .primary-btn {
   width: 100%;
-  padding: 14px 24px;
-  background: var(--c-accent);
-  border: none;
-  border-radius: 12px;
-  color: #000;
+  padding: 14px 20px;
   font-weight: 600;
-  font-size: 16px;
+  font-size: 15px;
   cursor: pointer;
 }
 
-.primary-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.dev-section {
+  margin-top: 28px;
+}
+
+.dev-section-sub {
+  margin-top: 18px;
+}
+
+.dev-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: var(--c-text-3);
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+
+.dev-divider::before,
+.dev-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.dev-divider span {
+  padding: 0 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dev-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 20px;
+  color: var(--c-secondary);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1px solid rgba(0, 188, 212, 0.25);
+  background: var(--c-bg-2);
+}
+
+.dev-btn:hover {
+  border-color: rgba(0, 188, 212, 0.5);
+  box-shadow: 0 0 14px rgba(0, 188, 212, 0.3);
+}
+
+.dev-icon {
+  color: var(--c-secondary);
+  filter: drop-shadow(0 0 6px rgba(0, 188, 212, 0.5));
+}
+
+.dev-hint {
+  font-size: 11px;
+  color: var(--c-text-3);
+  margin-top: 8px;
 }
 
 .code-input-section p {
   color: var(--c-text-2);
   margin-bottom: 24px;
+  font-size: 14px;
 }
 
 .code-inputs {
@@ -317,16 +436,7 @@ h1 {
   text-align: center;
   font-size: 20px;
   font-weight: 600;
-  background: var(--c-bg-3);
-  border: 2px solid var(--c-bg-4);
-  border-radius: 10px;
-  color: var(--c-text-1);
   padding: 0;
-}
-
-.code-digit:focus {
-  outline: none;
-  border-color: var(--c-accent);
 }
 
 @media (max-width: 400px) {
@@ -337,25 +447,26 @@ h1 {
     width: 32px;
     height: 44px;
     font-size: 18px;
-    border-radius: 8px;
   }
 }
 
 .error {
   color: var(--c-error);
   margin-bottom: 16px;
+  font-size: 14px;
 }
 
 .text-btn {
   display: block;
   width: 100%;
-  padding: 14px;
+  padding: 12px;
   background: transparent;
   border: none;
   color: var(--c-text-2);
-  font-size: 15px;
+  font-size: 14px;
   cursor: pointer;
   margin-top: 12px;
+  transition: color 0.15s ease;
 }
 
 .text-btn:hover {

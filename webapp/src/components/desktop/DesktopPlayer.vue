@@ -1348,11 +1348,15 @@ onUnmounted(() => {
 
 .ctrl-btn.mode.active {
   color: var(--c-accent);
-  border-color: rgba(29, 185, 84, 0.4);
+  background: var(--c-bg-1);
+  border: var(--border-neu);
   box-shadow: 
     inset 2px 2px 4px var(--sh-inset-dark),
-    inset -1px -1px 3px var(--sh-inset-light),
-    0 0 12px var(--c-accent-glow);
+    inset -1px -1px 3px var(--sh-inset-light);
+}
+
+.ctrl-btn.mode.active svg {
+  filter: drop-shadow(0 0 6px var(--c-accent-glow));
 }
 
 .btn-icon {

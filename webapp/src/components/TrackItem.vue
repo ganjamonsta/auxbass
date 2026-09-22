@@ -317,12 +317,11 @@ const handleTagClick = (tag) => {
 }
 
 .track-item.playing {
-  background: var(--c-bg-3);
-  border: 1px solid rgba(29, 185, 84, 0.25);
+  background: var(--c-bg-2);
+  border: var(--border-neu);
   box-shadow: 
-    inset 3px 3px 6px var(--sh-inset-dark),
-    inset -2px -2px 4px var(--sh-inset-light),
-    0 0 12px var(--c-accent-glow);
+    inset 2px 2px 5px var(--sh-inset-dark),
+    inset -1px -1px 3px var(--sh-inset-light);
 }
 
 .track-item.compact {

@@ -9,6 +9,7 @@ export const authApi = {
   verifyChannel: () => api.post('/auth/channel/verify'), // Actively check channel permissions
   getConfig: () => api.get('/auth/config'),
   verifyCode: (data) => api.post('/auth/verify-code', data),
+  devLogin: (data = {}) => api.post('/auth/dev-login', data),
   refresh: () => api.post('/auth/refresh'),
   updateProfile: nonCacheable((data) => api.put('/auth/profile', data), 'user'),
   uploadAvatar: nonCacheable((formData) => api.post('/auth/profile/avatar', formData, {

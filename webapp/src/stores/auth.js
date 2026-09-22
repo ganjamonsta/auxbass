@@ -228,6 +228,48 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function devLogin(userId = null) {
+    loading.value = true
+    error.value = null
+    try {
+      let data = null
+      try {
+        const response = await authApi.devLogin(userId ? { user_id: userId } : {})
+        data = response.data
+      } catch (e) {
+        console.warn('[Auth] Backend dev-login endpoint unavailable, using local mock session:', e)
+      }
+
+      if (!data?.token) {
+        data = {
+          token: 'dev-mock-jwt-token',
+          user: {
+            id: userId || 874295897,
+            username: 'mc_pluck',
+            first_name: 'xFer',
+            last_name: 'Serum',
+            photo_url: null,
+          }
+        }
+      }
+
+      if (data.token) {
+        authStorage.setToken(data.token)
+      }
+      if (data.user) {
+        user.value = data.user
+        authStorage.setUser(data.user)
+      }
+
+      initialized.value = true
+      fetchStatus().catch(() => {})
+      fetchConfig().catch(() => {})
+      return data
+    } finally {
+      loading.value = false
+    }
+  }
+
   function logout() {
     authStorage.clear()
     user.value = null
@@ -323,6 +365,7 @@ export const useAuthStore = defineStore('auth', () => {
     // Actions
     initialize,
     loginWithCode,
+    devLogin,
     logout,
     refreshUser,
     updateProfile,
