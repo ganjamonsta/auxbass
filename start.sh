@@ -10,6 +10,13 @@ echo "========================================================"
 # Disable interactive git prompts to prevent server hang
 export GIT_TERMINAL_PROMPT=0
 
+# Disable compiled C-extensions that cause SIGSEGV on container Python 3.11/glibc
+export PROPCACHE_NO_EXTENSIONS=1
+export YARL_NO_EXTENSIONS=1
+export MULTIDICT_NO_EXTENSIONS=1
+export FROZENLIST_NO_EXTENSIONS=1
+export AIOHTTP_NO_EXTENSIONS=1
+
 # Allow git operations in Docker container directory
 git config --global --add safe.directory "*" 2>/dev/null || true
 git config --global init.defaultBranch main 2>/dev/null || true

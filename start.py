@@ -3,9 +3,16 @@ TG Player - Unified Application Runner
 Запускает одновременно FastAPI (API + WebApp статика) и Telegram Bot (aiogram)
 в одном процессе. Идеально для Pterodactyl, Docker и одиночных контейнеров.
 """
+import os
+# Prevent SIGSEGV on Python 3.11 in container environments with incompatible precompiled C-extensions
+os.environ.setdefault("PROPCACHE_NO_EXTENSIONS", "1")
+os.environ.setdefault("YARL_NO_EXTENSIONS", "1")
+os.environ.setdefault("MULTIDICT_NO_EXTENSIONS", "1")
+os.environ.setdefault("FROZENLIST_NO_EXTENSIONS", "1")
+os.environ.setdefault("AIOHTTP_NO_EXTENSIONS", "1")
+
 import asyncio
 import logging
-import os
 import signal
 import sys
 

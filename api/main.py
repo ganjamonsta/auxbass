@@ -3,6 +3,14 @@ TG Player API v2 - Entry Point
 
 Uses new modular architecture with separated routers.
 """
+import os
+# Prevent SIGSEGV on Python 3.11 in container environments with incompatible precompiled C-extensions
+os.environ.setdefault("PROPCACHE_NO_EXTENSIONS", "1")
+os.environ.setdefault("YARL_NO_EXTENSIONS", "1")
+os.environ.setdefault("MULTIDICT_NO_EXTENSIONS", "1")
+os.environ.setdefault("FROZENLIST_NO_EXTENSIONS", "1")
+os.environ.setdefault("AIOHTTP_NO_EXTENSIONS", "1")
+
 import time
 import re
 import logging
