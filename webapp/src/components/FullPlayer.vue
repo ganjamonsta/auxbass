@@ -2,29 +2,39 @@
   <div 
     class="full-player"
     ref="playerRef"
+    :style="playerDismissStyle"
   >
-    <!-- Tap indicator to minimize -->
-    <div class="swipe-indicator" @click="$emit('close')"></div>
+    <!-- Top drag handle area for swipe-down to dismiss -->
+    <div 
+      class="player-top-drag-zone"
+      @touchstart="onPlayerDragStart"
+      @touchmove="onPlayerDragMove"
+      @touchend="onPlayerDragEnd"
+      @touchcancel="onPlayerDragEnd"
+    >
+      <!-- Tap indicator to minimize -->
+      <div class="swipe-indicator" @click="handleClose"></div>
 
-    <!-- Header -->
-    <div class="player-header">
-      <button class="close-btn" @click="$emit('close')" title="Свернуть">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
-        </svg>
-      </button>
-      <span class="player-title">Сейчас играет</span>
-      <div class="header-actions">
-        <button class="share-header-btn" @click="handleShareTrack" title="Поделиться треком">
-          <Share2 :size="18" />
-        </button>
-        <button class="menu-btn" @click="openTrackContextMenu($event)" title="Меню трека" aria-label="Меню трека">
+      <!-- Header -->
+      <div class="player-header">
+        <button class="close-btn" @click="handleClose" title="Свернуть">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="12" cy="5" r="2"/>
-            <circle cx="12" cy="12" r="2"/>
-            <circle cx="12" cy="19" r="2"/>
+            <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
           </svg>
         </button>
+        <span class="player-title">Сейчас играет</span>
+        <div class="header-actions">
+          <button class="share-header-btn" @click="handleShareTrack" title="Поделиться треком">
+            <Share2 :size="18" />
+          </button>
+          <button class="menu-btn" @click="openTrackContextMenu($event)" title="Меню трека" aria-label="Меню трека">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="5" r="2"/>
+              <circle cx="12" cy="12" r="2"/>
+              <circle cx="12" cy="19" r="2"/>
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -595,8 +605,54 @@ const onTouchEnd = () => {
   touchCurrent.value = { x: 0, y: 0 }
 }
 
-// Swipe style removed - no longer using swipe-down gesture
-// to avoid conflict with Telegram's native close gesture
+// --- Drag down to dismiss Full Player sheet ---
+const dragOffsetY = ref(0)
+const isDraggingPlayer = ref(false)
+let dragStartY = 0
+let isDraggingDown = false
+
+const onPlayerDragStart = (e) => {
+  if (e.touches.length !== 1) return
+  dragStartY = e.touches[0].clientY
+  isDraggingDown = false
+  isDraggingPlayer.value = false
+}
+
+const onPlayerDragMove = (e) => {
+  if (!e.touches.length) return
+  const currentY = e.touches[0].clientY
+  const deltaY = currentY - dragStartY
+  
+  // Only handle downward drag from top handle
+  if (deltaY > 6) {
+    isDraggingDown = true
+    isDraggingPlayer.value = true
+    // Rubberband resistance
+    dragOffsetY.value = deltaY * 0.85
+  }
+}
+
+const onPlayerDragEnd = () => {
+  if (isDraggingDown && dragOffsetY.value > 80) {
+    telegram?.HapticFeedback?.impactOccurred?.('light')
+    handleClose()
+  }
+  isDraggingPlayer.value = false
+  dragOffsetY.value = 0
+  isDraggingDown = false
+}
+
+const playerDismissStyle = computed(() => {
+  if (dragOffsetY.value <= 0) return {}
+  return {
+    transform: `translateY(${dragOffsetY.value}px)`,
+    transition: isDraggingPlayer.value ? 'none' : 'transform 0.22s cubic-bezier(0.2, 0, 0, 1)'
+  }
+})
+
+const handleClose = () => {
+  emit('close')
+}
 
 // Use shared utils for cover style
 const coverStyle = computed(() => getTrackCoverStyle(props.track))

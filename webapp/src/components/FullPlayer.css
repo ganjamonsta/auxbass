@@ -5,7 +5,7 @@
 .full-player {
   position: fixed;
   inset: 0;
-  background: radial-gradient(circle at 50% 15%, #182232 0%, #0c0e14 75%, #080a0e 100%);
+  background: radial-gradient(circle at 50% 15%, #1a1a1e 0%, #101012 75%, #09090b 100%);
   backdrop-filter: blur(40px) saturate(190%);
   -webkit-backdrop-filter: blur(40px) saturate(190%);
   display: flex;
@@ -20,10 +20,24 @@
   -ms-overflow-style: none;
   box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.85);
   border-top: 1px solid rgba(255, 255, 255, 0.12);
+  will-change: transform;
 }
 
 .full-player::-webkit-scrollbar {
   display: none;
+}
+
+/* ─── Top Drag Handle Zone ─── */
+.player-top-drag-zone {
+  width: 100%;
+  flex-shrink: 0;
+  touch-action: pan-y;
+  cursor: grab;
+  user-select: none;
+}
+
+.player-top-drag-zone:active {
+  cursor: grabbing;
 }
 
 /* ─── Swipe Indicator ─── */

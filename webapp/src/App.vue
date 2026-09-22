@@ -261,6 +261,7 @@ import { usePwaInstall } from '@/composables/usePwaInstall'
 import { initAppUpdateListeners } from '@/composables/useAppUpdate'
 import { Library } from 'lucide-vue-next'
 import { tracksApi } from '@/api/client'
+import { useContextMenu } from '@/composables/useContextMenu'
 
 // Heavy and conditional components loaded asynchronously on demand
 const FullPlayer = defineAsyncComponent(() => import('@/components/FullPlayer.vue'))
@@ -299,6 +300,7 @@ const { scrollRef, pullDistance, isPulling, isRefreshing } = usePullToRefresh(
 )
 
 const { showFullPlayer } = useModals(telegram)
+const { isOpen: isContextMenuOpen, closeMenu: closeContextMenu } = useContextMenu()
 
 // Scroll to top helper for tab clicks and resets
 const scrollToContentTop = () => {
@@ -544,12 +546,105 @@ const goBack = () => {
   }
 }
 
+// === Mobile Back Gesture, Overlays & Root Double-Back Coordinator ===
+let isPoppingOverlay = false
+let lastExitAttemptTime = 0
+
+// Synchronize browser history with FullPlayer sheet so Android/iOS back swipe closes it smoothly
+watch(showFullPlayer, (isOpen, wasOpen) => {
+  if (isOpen && !wasOpen) {
+    if (!isPoppingOverlay) {
+      window.history.pushState({ modal: 'fullplayer' }, '', window.location.href)
+    }
+  } else if (!isOpen && wasOpen) {
+    if (!isPoppingOverlay && window.history.state?.modal === 'fullplayer') {
+      isPoppingOverlay = true
+      window.history.back()
+    }
+  }
+  isPoppingOverlay = false
+})
+
+// Unified dismissal of topmost overlay: returns true if an overlay was consumed
+const dismissTopOverlay = () => {
+  // 1. Context menu
+  if (isContextMenuOpen?.value) {
+    closeContextMenu()
+    return true
+  }
+  // 2. Profile menu
+  if (showProfileMenu.value) {
+    showProfileMenu.value = false
+    return true
+  }
+  // 3. Exportify import modal
+  if (tasksStore.showExportifyModal) {
+    tasksStore.closeExportifyModal()
+    return true
+  }
+  // 4. Ingestion import modal
+  if (tasksStore.showImportModal) {
+    tasksStore.closeImportModal()
+    return true
+  }
+  // 5. Channel access modal
+  if (channelAccessModal.value?.show) {
+    channelAccessModal.value.show = false
+    return true
+  }
+  // 6. Full player sheet
+  if (showFullPlayer.value) {
+    showFullPlayer.value = false
+    return true
+  }
+  return false
+}
+
+// Window popstate listener (fired by mobile system edge-swipe back, browser back button, Android back)
+const handleWindowPopState = () => {
+  // If we triggered history.back() programmatically when closing an overlay, ignore this popstate
+  if (isPoppingOverlay) {
+    isPoppingOverlay = false
+    return
+  }
+
+  // If any overlay was open, consume the back gesture and close only that overlay
+  if (dismissTopOverlay()) {
+    return
+  }
+
+  // If on root home screen, guard against accidental exit: require double gesture
+  const isRootPage = route.name === 'home' || route.path === '/'
+  if (isRootPage) {
+    const now = Date.now()
+    if (now - lastExitAttemptTime < 2000) {
+      // Second gesture within 2s -> permit exit
+      if (telegram?.close) {
+        telegram.close()
+      }
+    } else {
+      // First gesture -> prevent closing, re-push root state and prompt
+      lastExitAttemptTime = now
+      window.history.pushState({ isRootGuard: true }, '', window.location.href)
+      telegram?.HapticFeedback?.notificationOccurred?.('warning')
+      uiStore.toast.info('Выход', 'Свайпните назад ещё раз для выхода')
+    }
+  }
+}
+
 // === Native Telegram BackButton Integration ===
 const syncTelegramBackButton = () => {
   const tgBackButton = telegram?.BackButton || window.Telegram?.WebApp?.BackButton
   if (!tgBackButton) return
 
-  if (showFullPlayer.value || showBackButton.value) {
+  const hasOverlay = showFullPlayer.value || 
+    isContextMenuOpen?.value || 
+    showProfileMenu.value || 
+    tasksStore.showExportifyModal || 
+    tasksStore.showImportModal || 
+    channelAccessModal.value?.show
+
+  if (hasOverlay || showBackButton.value) {
     try {
       tgBackButton.show()
     } catch (_) {}
@@ -560,14 +655,23 @@ const syncTelegramBackButton = () => {
   }
 }
 
-watch([showBackButton, showFullPlayer], () => {
+watch([
+  showBackButton, 
+  showFullPlayer, 
+  () => isContextMenuOpen?.value, 
+  showProfileMenu,
+  () => tasksStore.showExportifyModal,
+  () => tasksStore.showImportModal,
+  () => channelAccessModal.value?.show
+], () => {
   syncTelegramBackButton()
 }, { immediate: true })
 
 const handleTelegramBackClick = () => {
-  if (showFullPlayer.value) {
-    showFullPlayer.value = false
-  } else if (showBackButton.value) {
+  if (dismissTopOverlay()) {
+    return
+  }
+  if (showBackButton.value) {
     goBack()
   }
 }
@@ -824,6 +928,12 @@ onMounted(async () => {
       syncTelegramBackButton()
     } catch (_) {}
   }
+
+  // Hook up popstate for mobile back edge-swipe and root double-back exit
+  window.addEventListener('popstate', handleWindowPopState)
+  if (route.name === 'home' || route.path === '/') {
+    window.history.replaceState({ isRootGuard: true }, '', window.location.href)
+  }
 })
 
 const handleWindowFocus = () => {
@@ -857,6 +967,7 @@ onUnmounted(() => {
   window.removeEventListener('player:stall-recovered', handleStallRecovered)
   window.removeEventListener('player:network-recovered', handleNetworkRecovered)
   window.removeEventListener('player:channel-access-required', handleChannelAccessRequired)
+  window.removeEventListener('popstate', handleWindowPopState)
   networkMonitor.stopMonitoring()
   libraryStore.stopSyncPolling()
 
