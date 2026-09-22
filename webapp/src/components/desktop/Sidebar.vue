@@ -75,17 +75,6 @@
         </router-link>
 
         <router-link 
-          to="/downloaded" 
-          class="rail-nav-item offline-rail-item" 
-          :class="{ active: isActive('/downloaded') }"
-          title="Кэшированные и скачанные треки"
-        >
-          <FolderDown :size="20" />
-          <span v-if="cachedTracksCount > 0" class="rail-badge offline-badge">{{ formatRailCount(cachedTracksCount) }}</span>
-          <div class="rail-active-indicator"></div>
-        </router-link>
-
-        <router-link 
           to="/settings#import" 
           class="rail-nav-item" 
           :class="{ active: isImportActive }"
@@ -165,8 +154,18 @@
           <div v-if="tasksStore.hasActiveImports" class="rail-import-ring"></div>
         </div>
         <router-link 
+          to="/downloaded" 
+          class="rail-footer-btn saved-btn" 
+          :class="{ active: isActive('/downloaded') }"
+          :title="cachedTracksCount > 0 ? `Сохранённые треки (${cachedTracksCount})` : 'Сохранённые треки'"
+        >
+          <FolderDown :size="18" />
+          <span v-if="cachedTracksCount > 0" class="rail-badge offline-badge">{{ formatRailCount(cachedTracksCount) }}</span>
+          <div class="rail-active-indicator"></div>
+        </router-link>
+        <router-link 
           to="/settings#profile" 
-          class="rail-footer-btn" 
+          class="rail-footer-btn settings-btn" 
           :class="{ active: isSettingsActive }"
           @click="handleSettingsClick"
           title="Настройки"
@@ -174,9 +173,6 @@
           <Settings :size="18" />
           <div class="rail-active-indicator"></div>
         </router-link>
-        <button class="rail-footer-btn logout-btn" @click="logout" title="Выйти">
-          <LogOut :size="18" />
-        </button>
       </div>
     </div>
   </aside>
@@ -302,18 +298,6 @@
             <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
           </svg>
           <span>Подписки</span>
-        </router-link>
-
-        <!-- Offline / Cached tracks standout card -->
-        <router-link 
-          to="/downloaded" 
-          class="nav-item offline-highlight-item" 
-          :class="{ active: isActive('/downloaded') }"
-          title="Кэшированные и скачанные треки"
-        >
-          <FolderDown :size="20" class="offline-icon" />
-          <span>Offline</span>
-          <span v-if="cachedTracksCount > 0" class="nav-count offline-count">{{ cachedTracksCount }}</span>
         </router-link>
 
         <!-- Import Root Item -->
@@ -447,14 +431,15 @@
             </span>
           </div>
         </div>
-        <button 
-          v-if="!pwaInstall.isInstalled" 
-          class="footer-btn install-btn" 
-          @click="pwaInstall.promptInstall()" 
-          title="Установить приложение"
+        <router-link 
+          to="/downloaded" 
+          class="footer-btn saved-btn" 
+          :class="{ active: isActive('/downloaded') }"
+          :title="cachedTracksCount > 0 ? `Сохранённые треки (${cachedTracksCount})` : 'Сохранённые треки'"
         >
-          <Download :size="20" />
-        </button>
+          <FolderDown :size="18" />
+          <span v-if="cachedTracksCount > 0" class="footer-badge">{{ formatRailCount(cachedTracksCount) }}</span>
+        </router-link>
         <router-link 
           to="/settings#profile" 
           class="footer-btn settings-btn" 
@@ -464,9 +449,6 @@
         >
           <Settings :size="18" />
         </router-link>
-        <button class="footer-btn logout-btn" @click="logout" title="Выйти">
-          <LogOut :size="18" />
-        </button>
       </div>
     </div>
 
@@ -485,10 +467,8 @@ import { useUIStore } from '@/stores/ui'
 import { usePlayerStore } from '@/stores/player'
 import { useTasksStore } from '@/stores/tasks'
 import { useContextMenu } from '@/composables/useContextMenu'
-import { usePwaInstall } from '@/composables/usePwaInstall'
 import { getCoverUrl, CoverSize, getPlaylistCoverStyle } from '@/utils'
 import { 
-  Download, 
   FolderDown, 
   Upload, 
   Music, 
@@ -499,7 +479,6 @@ import {
   ChevronRight, 
   ChevronLeft, 
   Settings, 
-  LogOut,
   FileSpreadsheet,
   Cloud,
   Radio,
@@ -518,7 +497,6 @@ const uiStore = useUIStore()
 const playerStore = usePlayerStore()
 const tasksStore = useTasksStore()
 const externalAccountsStore = useExternalAccountsStore()
-const pwaInstall = usePwaInstall()
 const showProfileMenu = ref(false)
 const cachedTracksCount = ref(0)
 
@@ -726,14 +704,6 @@ const handleSettingsClick = (e) => {
     if (route.hash !== '#profile') {
       router.replace({ path: '/settings', hash: '#profile' })
     }
-  }
-}
-
-const logout = async () => {
-  if (confirm('Вы уверены, что хотите выйти?')) {
-    authStore.logout()
-    // Force full page reload to clear all store states
-    window.location.href = '/login'
   }
 }
 

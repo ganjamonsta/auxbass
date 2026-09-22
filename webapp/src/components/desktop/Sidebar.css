@@ -385,11 +385,6 @@
   opacity: 1;
 }
 
-.rail-footer-btn.logout-btn:hover {
-  color: #ff6b6b;
-  background: rgba(255, 107, 107, 0.12);
-}
-
 /* =========================================================
    2. Full Sidebar Mode
    ========================================================= */
@@ -934,11 +929,11 @@
 
 /* Sidebar Footer */
 .sidebar-footer {
-  padding: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 12px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   background: #0a0a0a;
   position: sticky;
   bottom: 0;
@@ -1076,35 +1071,63 @@
 }
 
 .footer-btn {
+  position: relative;
+  width: 34px;
+  height: 34px;
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.55);
   cursor: pointer;
-  padding: 8px;
-  border-radius: 4px;
-  transition: all 0.15s;
+  border-radius: 8px;
+  transition: all 0.15s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   text-decoration: none;
+  flex-shrink: 0;
 }
 
-.install-btn:hover {
+.footer-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.footer-btn:active {
+  transform: scale(0.94);
+}
+
+.footer-btn.active {
   color: var(--c-accent, #1db954);
-  background: rgba(29, 185, 84, 0.15);
+  background: rgba(29, 185, 84, 0.14);
 }
 
-.settings-btn:hover {
-  color: white;
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.settings-btn.active {
+.footer-btn.active svg {
   color: var(--c-accent, #1db954);
-  background: rgba(29, 185, 84, 0.15);
+  filter: drop-shadow(0 0 6px var(--c-accent-glow));
 }
 
-.logout-btn:hover {
-  color: #ff6b6b;
-  background: rgba(255, 107, 107, 0.1);
+.footer-btn .footer-badge {
+  position: absolute;
+  top: -1px;
+  right: -2px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  color: #000;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1.5px solid #0a0a0a;
+  border-radius: 10px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  transition: all 0.15s ease;
+}
+
+.footer-btn.active .footer-badge {
+  background: var(--c-accent, #1db954);
+  color: #000;
 }
