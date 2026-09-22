@@ -46,9 +46,9 @@
     >
       <template #empty>
         <span class="empty-icon"><User :size="48" /></span>
-        <template v-if="searchQuery || localQuery">
+        <template v-if="effectiveSearchQuery || localQuery">
           <h3>Артисты не найдены</h3>
-          <p class="empty-subtext">По запросу «{{ localQuery || searchQuery }}» среди исполнителей ничего не найдено</p>
+          <p class="empty-subtext">По запросу «{{ localQuery || effectiveSearchQuery }}» среди исполнителей ничего не найдено</p>
           <button 
             type="button" 
             class="btn-global-search" 
@@ -65,7 +65,7 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSort } from '@/composables'
 import { useContextMenu } from '@/composables/useContextMenu'
@@ -101,32 +101,48 @@ const props = defineProps({
 
 const emit = defineEmits(['back', 'update:searchQuery'])
 
+// localQuery controls the raw input value
 const localQuery = ref(props.searchQuery || '')
 const isSearchOpen = ref(Boolean(props.searchQuery?.trim()))
 
-watch(() => props.searchQuery, (val) => {
-  localQuery.value = val || ''
-  if (val) {
-    isSearchOpen.value = true
-  }
-})
+// effectiveSearchQuery is the debounced query that drives search results
+const effectiveSearchQuery = ref(props.searchQuery || '')
 
 let searchDebounceTimer = null
 const onSearchInput = () => {
   clearTimeout(searchDebounceTimer)
   searchDebounceTimer = setTimeout(() => {
-    emit('update:searchQuery', localQuery.value)
-  }, 250)
+    const trimmed = (localQuery.value || '').trim()
+    effectiveSearchQuery.value = trimmed
+    emit('update:searchQuery', trimmed)
+  }, 300)
 }
 
 const onSearchClear = () => {
   clearTimeout(searchDebounceTimer)
   localQuery.value = ''
+  effectiveSearchQuery.value = ''
   emit('update:searchQuery', '')
 }
 
+// Watch external prop updates without overwriting active user typing
+watch(() => props.searchQuery, (newVal) => {
+  const val = newVal || ''
+  if (props.hideToolbar) {
+    effectiveSearchQuery.value = val.trim()
+    return
+  }
+  if (val !== localQuery.value && val.trim() !== effectiveSearchQuery.value) {
+    localQuery.value = val
+    effectiveSearchQuery.value = val.trim()
+    if (val.trim()) {
+      isSearchOpen.value = true
+    }
+  }
+})
+
 const goToGlobalSearch = () => {
-  const q = (localQuery.value || props.searchQuery || '').trim()
+  const q = (localQuery.value || effectiveSearchQuery.value || '').trim()
   if (q) {
     router.push({ path: '/search', query: { q } })
   }
@@ -157,8 +173,8 @@ const fetchArtists = async ({ offset, limit }) => {
     sort_order: sortOrder.value
   }
   
-  if (props.searchQuery) {
-    params.search = props.searchQuery
+  if (effectiveSearchQuery.value) {
+    params.search = effectiveSearchQuery.value
   }
   
   // Use global or library endpoint based on scope
@@ -181,8 +197,15 @@ const onToggleOrder = () => {
 }
 
 // Watch search query to reload
-watch(() => props.searchQuery, () => {
+watch(effectiveSearchQuery, () => {
   virtualGridRef.value?.reset()
+})
+
+onUnmounted(() => {
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+    searchDebounceTimer = null
+  }
 })
 
 // Navigation

@@ -128,3 +128,7 @@ tg_player.db-shm
 .gitignore
 tg_player.db-wal
 webapp/src/stores/playerEnhancer.js
+
+# AI Agent skills & artifacts (stored globally in ~/.gemini/config/skills)
+.agents/
+

@@ -384,7 +384,7 @@
       <div v-else class="library-content">
         <component 
           :is="currentTabComponent" 
-          :searchQuery="debouncedQuery"
+          :searchQuery="currentTabId === 'overview' ? debouncedQuery : searchQuery"
           :hideToolbar="currentTabId === 'overview'"
           @update:searchQuery="handleSubtabSearch"
         />
@@ -551,7 +551,10 @@ const { query: searchQuery, debouncedQuery, search: debouncedSearch, clear: clea
 const isOverviewSearchOpen = ref(false)
 
 const handleSubtabSearch = (query) => {
-  setQuery(query)
+  // When a subtab updates its search query, sync searchQuery without triggering parent debounce echo
+  if (currentTabId.value !== 'overview') {
+    searchQuery.value = query || ''
+  }
 }
 
 // Overview Data State

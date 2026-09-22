@@ -48,7 +48,7 @@
     </div>
 
     <!-- Virtual track list (without search) -->
-    <div v-if="!searchQuery" class="virtual-tracks-section">
+    <div v-if="!effectiveSearchQuery" class="virtual-tracks-section">
       <VirtualTrackList
         ref="virtualTrackListRef"
         :fetchFn="fetchTracks"
@@ -126,7 +126,7 @@
               @click="goToGlobalSearch"
             >
               <Search :size="15" />
-              <span>Искать «{{ localQuery || searchQuery }}» в глобальном поиске</span>
+              <span>Искать «{{ localQuery || effectiveSearchQuery }}» в глобальном поиске</span>
             </button>
           </div>
         </template>
@@ -135,11 +135,11 @@
         <div v-else-if="!loading" class="empty-state search-empty">
           <span class="empty-icon"><Music :size="48" /></span>
           <h3>Ничего не найдено</h3>
-          <p class="empty-subtext" v-if="localQuery || searchQuery">
-            По запросу «{{ localQuery || searchQuery }}» в медиатеке нет треков
+          <p class="empty-subtext" v-if="localQuery || effectiveSearchQuery">
+            По запросу «{{ localQuery || effectiveSearchQuery }}» в медиатеке нет треков
           </p>
           <button 
-            v-if="localQuery || searchQuery" 
+            v-if="localQuery || effectiveSearchQuery" 
             type="button" 
             class="btn-global-search" 
             @click="goToGlobalSearch"
@@ -195,32 +195,48 @@ const props = defineProps({
 
 const emit = defineEmits(['back', 'update:searchQuery'])
 
+// localQuery controls the raw input value
 const localQuery = ref(props.searchQuery || '')
 const isSearchOpen = ref(Boolean(props.searchQuery?.trim()))
 
-watch(() => props.searchQuery, (val) => {
-  localQuery.value = val || ''
-  if (val) {
-    isSearchOpen.value = true
-  }
-})
+// effectiveSearchQuery is the debounced query that drives search results
+const effectiveSearchQuery = ref(props.searchQuery || '')
 
 let searchDebounceTimer = null
 const onSearchInput = () => {
   clearTimeout(searchDebounceTimer)
   searchDebounceTimer = setTimeout(() => {
-    emit('update:searchQuery', localQuery.value)
-  }, 250)
+    const trimmed = (localQuery.value || '').trim()
+    effectiveSearchQuery.value = trimmed
+    emit('update:searchQuery', trimmed)
+  }, 300)
 }
 
 const onSearchClear = () => {
   clearTimeout(searchDebounceTimer)
   localQuery.value = ''
+  effectiveSearchQuery.value = ''
   emit('update:searchQuery', '')
 }
 
+// Watch external prop updates without overwriting active user typing
+watch(() => props.searchQuery, (newVal) => {
+  const val = newVal || ''
+  if (props.hideToolbar) {
+    effectiveSearchQuery.value = val.trim()
+    return
+  }
+  if (val !== localQuery.value && val.trim() !== effectiveSearchQuery.value) {
+    localQuery.value = val
+    effectiveSearchQuery.value = val.trim()
+    if (val.trim()) {
+      isSearchOpen.value = true
+    }
+  }
+})
+
 const goToGlobalSearch = () => {
-  const q = (localQuery.value || props.searchQuery || '').trim()
+  const q = (localQuery.value || effectiveSearchQuery.value || '').trim()
   if (q) {
     router.push({ path: '/search', query: { q } })
   }
@@ -244,7 +260,7 @@ const {
 // Sort handlers
 const onNextSort = async () => {
   nextSort()
-  if (props.searchQuery) {
+  if (effectiveSearchQuery.value) {
     page.value = 1
     await loadSearchTracks()
   } else {
@@ -254,7 +270,7 @@ const onNextSort = async () => {
 
 const onToggleOrder = async () => {
   toggleOrder()
-  if (props.searchQuery) {
+  if (effectiveSearchQuery.value) {
     page.value = 1
     await loadSearchTracks()
   } else {
@@ -273,7 +289,7 @@ const tracks = ref([])
 const page = ref(1)
 const searchTotal = ref(0) // Real total from API during search
 const total = computed(() => {
-  if (props.searchQuery) {
+  if (effectiveSearchQuery.value) {
     return searchTotal.value
   }
   return virtualTotal.value
@@ -332,7 +348,7 @@ const refreshTracks = async () => {
     apiCache.invalidatePattern('/albums')
 
     // 2. Refresh search or virtual list
-    if (props.searchQuery) {
+    if (effectiveSearchQuery.value) {
       page.value = 1
       await loadSearchTracks()
     } else {
@@ -368,10 +384,11 @@ const handleVirtualMenu = ({ track, index, event }) => {
 const loadSearchTracks = async () => {
   loading.value = true
   try {
+    const q = effectiveSearchQuery.value
     await libraryStore.fetchTracks({
       page: page.value,
       per_page: perPage,
-      search: props.searchQuery || undefined,
+      search: q || undefined,
       sort_by: sortBy.value,
       sort_order: sortOrder.value,
     })
@@ -382,7 +399,7 @@ const loadSearchTracks = async () => {
     // Offline search fallback
     try {
       const cached = await getAllCachedTracks()
-      const q = (props.searchQuery || '').toLowerCase()
+      const q = (effectiveSearchQuery.value || '').toLowerCase()
       const filtered = cached.filter(t => 
         (t.title && t.title.toLowerCase().includes(q)) || 
         (t.artist && t.artist.toLowerCase().includes(q))
@@ -447,8 +464,8 @@ watch(loadTriggerRef, (el) => {
   if (el) setupObserver()
 })
 
-// Watch searchQuery prop
-watch(() => props.searchQuery, async (newVal) => {
+// Watch effectiveSearchQuery to trigger search mode
+watch(effectiveSearchQuery, async (newVal) => {
   // If query changes, reset page
   page.value = 1
   
@@ -481,7 +498,7 @@ const shuffleAll = async () => {
   if (shuffling.value) return
   shuffling.value = true
   try {
-    const trimmedQuery = props.searchQuery ? props.searchQuery.trim() : ''
+    const trimmedQuery = effectiveSearchQuery.value ? effectiveSearchQuery.value.trim() : ''
     await playerStore.playShuffleAll('library', null, null, {
       search: trimmedQuery || undefined
     })
@@ -496,6 +513,10 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+    searchDebounceTimer = null
+  }
   if (observer) observer.disconnect()
 })
 </script>
