@@ -590,3 +590,31 @@ export function getCoverSrcSet(url, baseSize = CoverSize.MEDIUM) {
   
   return `${url1x} 1x, ${url2x} 2x`
 }
+
+/**
+ * Склонение существительных по числительным для русского языка
+ * @param {number} count - Число
+ * @param {string} one - Форма для 1 (например: "трек")
+ * @param {string} few - Форма для 2-4 (например: "трека")
+ * @param {string} many - Форма для 5-0 и 11-19 (например: "треков")
+ * @returns {string} Правильная форма слова
+ */
+export function pluralize(count, one, few, many) {
+  const n = Math.abs(Number(count) || 0) % 100
+  const n1 = n % 10
+  if (n > 10 && n < 20) return many
+  if (n1 > 1 && n1 < 5) return few
+  if (n1 === 1) return one
+  return many
+}
+
+/**
+ * Форматирование количества треков с правильным склонением
+ * Пример: "1 трек", "2 трека", "5 треков", "21 трек"
+ * @param {number} count - Количество треков
+ * @returns {string} "X трек" / "X трека" / "X треков"
+ */
+export function formatTrackCount(count) {
+  const num = Number(count) || 0
+  return `${num} ${pluralize(num, 'трек', 'трека', 'треков')}`
+}

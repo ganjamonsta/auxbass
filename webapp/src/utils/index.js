@@ -19,7 +19,9 @@ export {
   getDisplayArtist,
   CoverSize,
   getCoverUrl,
-  getCoverSrcSet
+  getCoverSrcSet,
+  pluralize,
+  formatTrackCount
 } from './formatters'
 
 export {

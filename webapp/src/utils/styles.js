@@ -145,6 +145,7 @@ export function getPlaylistCoverStyle(playlist) {
   }
   const hue = Math.abs(hash % 360)
   return {
-    background: `linear-gradient(135deg, hsl(${hue}, 50%, 35%) 0%, hsl(${(hue + 35) % 360}, 40%, 25%) 100%)`
+    background: `radial-gradient(circle at 35% 35%, hsl(${hue}, 30%, 20%) 0%, hsl(${(hue + 25) % 360}, 22%, 12%) 65%, #0e0e12 100%)`,
+    boxShadow: 'inset 0 0 24px rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(255, 255, 255, 0.05)'
   }
 }

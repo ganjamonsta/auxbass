@@ -83,6 +83,7 @@ logs/
 # Node
 webapp/node_modules/
 webapp/.vite/
+webapp/vite.config.js.timestamp-*
 node_modules/
 
 # OS

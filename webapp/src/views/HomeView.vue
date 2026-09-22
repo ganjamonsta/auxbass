@@ -34,7 +34,7 @@
         </div>
         <div class="quick-card-info">
           <span class="quick-card-title">Понравившиеся</span>
-          <span class="quick-card-meta">{{ likedCount }} треков</span>
+          <span class="quick-card-meta">{{ formatTrackCount(likedCount) }}</span>
         </div>
         <button 
           v-if="likedCount > 0" 
@@ -62,11 +62,13 @@
             alt="" 
             loading="lazy"
           />
-          <Music v-else :size="22" />
+          <div v-else class="quick-vinyl-badge">
+            <Music :size="20" />
+          </div>
         </div>
         <div class="quick-card-info">
           <span class="quick-card-title">{{ playlist.name }}</span>
-          <span class="quick-card-meta">{{ playlist.track_count }} треков</span>
+          <span class="quick-card-meta">{{ formatTrackCount(playlist.track_count) }}</span>
         </div>
         <button 
           v-if="playlist.track_count > 0" 
@@ -194,7 +196,10 @@
           Ваши плейлисты
         </h2>
         <div class="section-actions">
-          <button class="section-link" @click="goToLibraryPlaylists">Все</button>
+          <button class="section-link" @click="goToLibraryPlaylists" title="Показать все плейлисты">
+            <span>Все</span>
+            <ChevronRight :size="13" />
+          </button>
           <button 
             class="scroll-arrow-btn" 
             :disabled="!playlistsScroll.canScrollLeft.value"
@@ -227,14 +232,19 @@
           @contextmenu.prevent="openMenu('playlist', pl, 'home', $event)"
           v-longpress="(e) => openMenu('playlist', pl, 'home', e)"
         >
-          <div class="feed-card-cover" :style="getPlaylistCoverStyle(pl)">
+          <div class="feed-card-cover placeholder-vinyl" :style="getPlaylistCoverStyle(pl)">
             <img 
               v-if="pl.covers?.length" 
               :src="getCoverUrl(pl.covers[0], CoverSize.MEDIUM)" 
               alt=""
               loading="lazy"
             />
-            <Music v-else :size="32" />
+            <div v-else class="vinyl-disc-placeholder">
+              <div class="vinyl-rings"></div>
+              <div class="vinyl-spindle">
+                <Music :size="20" />
+              </div>
+            </div>
             <button 
               v-if="pl.track_count > 0" 
               class="play-overlay" 
@@ -245,7 +255,7 @@
             </button>
           </div>
           <div class="feed-card-title">{{ pl.name }}</div>
-          <div class="feed-card-subtitle">{{ pl.track_count }} треков</div>
+          <div class="feed-card-subtitle">{{ formatTrackCount(pl.track_count) }}</div>
         </div>
       </div>
     </section>
@@ -353,7 +363,7 @@ import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
-import { getCoverUrl, CoverSize } from '@/utils'
+import { getCoverUrl, CoverSize, formatTrackCount } from '@/utils'
 import { 
   Heart, 
   Play, 
@@ -464,7 +474,8 @@ const getPlaylistCoverStyle = (playlist) => {
   }
   const hue = Math.abs(hash % 360)
   return {
-    background: `linear-gradient(135deg, hsl(${hue}, 55%, 35%) 0%, hsl(${(hue + 40) % 360}, 45%, 25%) 100%)`
+    background: `radial-gradient(circle at 35% 35%, hsl(${hue}, 30%, 20%) 0%, hsl(${(hue + 25) % 360}, 22%, 12%) 65%, #0e0e12 100%)`,
+    boxShadow: 'inset 0 0 24px rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(255, 255, 255, 0.05)'
   }
 }
 
@@ -571,16 +582,16 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  border-radius: 8px;
+  background: var(--c-bg-2, #1A1A1A);
+  border: 1px solid rgba(255, 255, 255, 0.035);
+  border-radius: var(--r-md, 12px);
+  box-shadow: 3px 3px 8px var(--sh-dark, rgba(0, 0, 0, 0.4)), -1px -1px 3px var(--sh-light, rgba(255, 255, 255, 0.02));
   overflow: hidden;
-  height: 56px;
+  height: 58px;
   cursor: pointer;
   position: relative;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
   user-select: none;
-  backdrop-filter: blur(12px);
 }
 
 @media (min-width: 1024px) {
@@ -590,18 +601,20 @@ onUnmounted(() => {
 }
 
 .quick-card:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--c-bg-3, #222222);
   border-color: rgba(255, 255, 255, 0.08);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 5px 6px 14px var(--sh-dark, rgba(0, 0, 0, 0.6)), -2px -2px 6px var(--sh-light, rgba(255, 255, 255, 0.03));
 }
 
 .quick-card:active {
   transform: scale(0.98);
+  box-shadow: inset 2px 2px 5px var(--sh-inset-dark, rgba(0, 0, 0, 0.5));
 }
 
 .quick-card-cover {
-  width: 56px;
-  height: 56px;
+  width: 58px;
+  height: 58px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -609,6 +622,7 @@ onUnmounted(() => {
   background: var(--c-bg-3, #222);
   color: rgba(255, 255, 255, 0.7);
   overflow: hidden;
+  position: relative;
 }
 
 @media (min-width: 1024px) {
@@ -616,6 +630,15 @@ onUnmounted(() => {
     width: 64px;
     height: 64px;
   }
+}
+
+.quick-vinyl-badge {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.75);
 }
 
 .quick-card-cover img {
@@ -759,36 +782,40 @@ onUnmounted(() => {
 }
 
 .scroll-arrow-btn {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--c-bg-2, #1A1A1A);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: 2px 2px 6px var(--sh-dark, rgba(0, 0, 0, 0.45)), -1px -1px 3px var(--sh-light, rgba(255, 255, 255, 0.02));
   color: var(--c-text-1, #fff);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  transition: all 0.18s cubic-bezier(0.2, 0, 0, 1);
   padding: 0;
   user-select: none;
 }
 
 .scroll-arrow-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: var(--c-bg-3, #222222);
+  border-color: rgba(255, 255, 255, 0.1);
   transform: scale(1.06);
+  box-shadow: 3px 3px 8px var(--sh-dark, rgba(0, 0, 0, 0.55)), -1px -1px 4px var(--sh-light, rgba(255, 255, 255, 0.03));
+  color: var(--c-accent, #1db954);
 }
 
 .scroll-arrow-btn:active:not(:disabled) {
   transform: scale(0.94);
-  background: rgba(255, 255, 255, 0.22);
+  box-shadow: inset 2px 2px 4px var(--sh-inset-dark, rgba(0, 0, 0, 0.5)), inset -1px -1px 2px var(--sh-inset-light, rgba(255, 255, 255, 0.02));
 }
 
 .scroll-arrow-btn:disabled {
   opacity: 0.2;
   cursor: default;
   pointer-events: none;
+  box-shadow: none;
 }
 
 @media (max-width: 768px) {
@@ -798,17 +825,33 @@ onUnmounted(() => {
 }
 
 .section-link {
-  background: none;
-  border: none;
-  font-size: 13px;
+  background: var(--c-bg-2, #1A1A1A);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: 2px 2px 5px var(--sh-dark, rgba(0, 0, 0, 0.45)), -1px -1px 3px var(--sh-light, rgba(255, 255, 255, 0.02));
+  border-radius: var(--r-full, 9999px);
+  padding: 4px 10px 4px 12px;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--c-text-3, rgba(255, 255, 255, 0.5));
+  color: var(--c-text-2, #B0B0B0);
   cursor: pointer;
-  transition: color 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  transition: all 0.18s cubic-bezier(0.2, 0, 0, 1);
+  user-select: none;
 }
 
 .section-link:hover {
+  background: var(--c-bg-3, #222222);
+  border-color: rgba(255, 255, 255, 0.1);
   color: var(--c-accent, #1db954);
+  transform: translateY(-1px);
+  box-shadow: 3px 3px 8px var(--sh-dark, rgba(0, 0, 0, 0.55)), -1px -1px 3px var(--sh-light, rgba(255, 255, 255, 0.03));
+}
+
+.section-link:active {
+  transform: scale(0.96);
+  box-shadow: inset 1px 1px 3px var(--sh-inset-dark, rgba(0, 0, 0, 0.4));
 }
 
 /* Horizontal Scroll */
@@ -905,6 +948,51 @@ onUnmounted(() => {
   font-size: 38px;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.25);
+}
+
+/* Vinyl placeholder disc for playlists/tracks without artwork */
+.vinyl-disc-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.vinyl-rings {
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: repeating-radial-gradient(
+    circle,
+    transparent,
+    transparent 5px,
+    rgba(255, 255, 255, 0.03) 6px,
+    rgba(255, 255, 255, 0.03) 7px
+  );
+  box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+.vinyl-spindle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, rgba(35, 35, 42, 0.95) 0%, rgba(16, 16, 20, 0.98) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-text-2, #B0B0B0);
+  z-index: 1;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.feed-card:hover .vinyl-spindle {
+  transform: scale(1.06);
+  color: var(--c-accent, #1db954);
 }
 
 .feed-card .play-overlay {
