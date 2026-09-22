@@ -547,33 +547,20 @@ const goBack = () => {
   }
 }
 
-// === Mobile Back Gesture, Overlays & Root Double-Back Coordinator ===
-let isPoppingOverlay = false
-let popOverlayTimeout = null
-let closedViaPopstate = false
-let lastExitAttemptTime = 0
+// === Mobile Back Gesture & Overlays Coordinator ===
+let isPoppingModalHistory = false
 
 // Synchronize browser history with FullPlayer sheet so Android/iOS back swipe closes it smoothly
 watch(showFullPlayer, (isOpen, wasOpen) => {
   if (isOpen && !wasOpen) {
-    closedViaPopstate = false
-    if (!isPoppingOverlay) {
+    if (!isPoppingModalHistory) {
       const currentState = window.history.state || {}
       window.history.pushState({ ...currentState, modal: 'fullplayer' }, '', window.location.href)
     }
   } else if (!isOpen && wasOpen) {
-    // If closed via browser popstate / back swipe, history entry is already popped
-    if (closedViaPopstate) {
-      closedViaPopstate = false
-      return
-    }
     // If closed programmatically (close button or swipe down gesture), pop history entry
-    if (!isPoppingOverlay && window.history.state?.modal === 'fullplayer') {
-      isPoppingOverlay = true
-      if (popOverlayTimeout) clearTimeout(popOverlayTimeout)
-      popOverlayTimeout = setTimeout(() => {
-        isPoppingOverlay = false
-      }, 500)
+    if (!isPoppingModalHistory && window.history.state?.modal === 'fullplayer') {
+      isPoppingModalHistory = true
       window.history.back()
     }
   }
@@ -608,8 +595,11 @@ const dismissTopOverlay = () => {
   }
   // 6. Full player sheet
   if (showFullPlayer.value) {
-    closedViaPopstate = true
+    isPoppingModalHistory = true
     showFullPlayer.value = false
+    nextTick(() => {
+      isPoppingModalHistory = false
+    })
     return true
   }
   return false
@@ -618,37 +608,14 @@ const dismissTopOverlay = () => {
 // Window popstate listener (fired by mobile system edge-swipe back, browser back button, Android back)
 const handleWindowPopState = () => {
   // If we triggered history.back() programmatically when closing an overlay, ignore this popstate
-  if (isPoppingOverlay) {
-    isPoppingOverlay = false
-    if (popOverlayTimeout) {
-      clearTimeout(popOverlayTimeout)
-      popOverlayTimeout = null
-    }
+  if (isPoppingModalHistory) {
+    isPoppingModalHistory = false
     return
   }
 
   // If any overlay was open, consume the back gesture and close only that overlay
   if (dismissTopOverlay()) {
     return
-  }
-
-  // If on root home screen, guard against accidental exit: require double gesture
-  const isRootPage = route.name === 'home' || route.path === '/'
-  if (isRootPage) {
-    const now = Date.now()
-    if (now - lastExitAttemptTime < 2000) {
-      // Second gesture within 2s -> permit exit
-      if (telegram?.close) {
-        telegram.close()
-      }
-    } else {
-      // First gesture -> prevent closing, re-push root state and prompt
-      lastExitAttemptTime = now
-      const currentState = window.history.state || {}
-      window.history.pushState({ ...currentState, isRootGuard: true }, '', window.location.href)
-      telegram?.HapticFeedback?.notificationOccurred?.('warning')
-      uiStore.toast.info('Выход', 'Свайпните назад ещё раз для выхода')
-    }
   }
 }
 
@@ -949,11 +916,8 @@ onMounted(async () => {
     } catch (_) {}
   }
 
-  // Hook up popstate for mobile back edge-swipe and root double-back exit
+  // Hook up popstate for mobile back edge-swipe
   window.addEventListener('popstate', handleWindowPopState)
-  if (route.name === 'home' || route.path === '/') {
-    window.history.replaceState({ isRootGuard: true }, '', window.location.href)
-  }
 })
 
 const handleWindowFocus = () => {

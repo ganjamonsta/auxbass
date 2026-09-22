@@ -449,8 +449,8 @@ const parsedArtists = computed(() => {
 // Navigate to artist page
 const goToArtist = (artistName) => {
   if (artistName) {
-    router.push(`/artist/${encodeURIComponent(artistName)}`)
     emit('close')
+    router.replace(`/artist/${encodeURIComponent(artistName)}`)
   }
 }
 
@@ -479,8 +479,8 @@ const trackAlbum = computed(() => {
 // Navigate to album page
 const goToAlbum = async () => {
   if (trackAlbum.value?.id) {
-    router.push(`/album/${trackAlbum.value.id}`)
     emit('close')
+    router.replace(`/album/${trackAlbum.value.id}`)
     return
   }
 
@@ -495,7 +495,7 @@ const goToAlbum = async () => {
         artist: t?.artist
       })
       if (res?.data?.album_id) {
-        router.push(`/album/${res.data.album_id}`)
+        router.replace(`/album/${res.data.album_id}`)
       } else {
         uiStore.toast.info('Альбом', 'Альбом не найден')
       }
@@ -511,7 +511,7 @@ const handleTagClick = (tag) => {
   if (!tag) return
   emit('close')
   const cleanTag = tag.replace(/^#/, '')
-  router.push({ path: '/search', query: { tag: cleanTag } })
+  router.replace({ path: '/search', query: { tag: cleanTag } })
 }
 
 // Open track context menu (uses unified context menu)
