@@ -386,49 +386,35 @@ const handleCancelJob = (jobId) => {
   tasksStore.cancelJob(jobId)
 }
 
-let backdropTouchStarted = false
 let menuOpenTimestamp = 0
 
 const handleBackdropTouchStart = (e) => {
-  if (e.target === e.currentTarget) {
-    backdropTouchStarted = true
-  }
+  // No-op touchstart listener for passive touch feedback
 }
 
 const handleBackdropContextMenu = (e) => {
   e.preventDefault()
-  if (!isMobile.value) {
-    close()
-  }
+  close()
 }
 
-const handleBackdropClick = () => {
-  if (!isMobile.value) {
-    close()
-    return
-  }
+const handleBackdropClick = (e) => {
+  if (e && e.target !== e.currentTarget) return
   // Ignore clicks that occur immediately after opening (synthetic click from long-press gesture)
   if (Date.now() - menuOpenTimestamp < 350) {
     return
   }
-  if (backdropTouchStarted) {
-    backdropTouchStarted = false
-    close()
-  }
+  close()
 }
 
 watch(() => props.modelValue, (isOpen) => {
   if (isOpen) {
     menuOpenTimestamp = Date.now()
-    backdropTouchStarted = false
     if (authStore.isAuthenticated) {
       tasksStore.checkRecentJobs()
     }
     if (!isMobile.value) {
       nextTick(updateDesktopPosition)
     }
-  } else {
-    backdropTouchStarted = false
   }
 })
 

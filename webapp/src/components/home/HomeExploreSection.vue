@@ -19,14 +19,16 @@
           :class="{ active: currentScope === 'library' }"
           @click="setScope('library')"
         >
-          Моя музыка
+          <Folder :size="13" />
+          <span>Моя музыка</span>
         </button>
         <button 
           class="scope-btn" 
           :class="{ active: currentScope === 'global' }"
           @click="setScope('global')"
         >
-          Каталог AuxBass
+          <Globe :size="13" />
+          <span>Каталог AuxBass</span>
         </button>
       </div>
     </div>
@@ -39,9 +41,9 @@
         class="mood-pill"
         @click="handleMoodClick(mood)"
       >
-        <span class="mood-emoji">{{ mood.emoji }}</span>
+        <component :is="mood.icon" :size="14" class="mood-icon" />
         <span class="mood-label">{{ mood.label }}</span>
-        <Play :size="12" class="mood-play-icon" fill="currentColor" />
+        <Play :size="11" class="mood-play-icon" fill="currentColor" />
       </button>
     </div>
 
@@ -144,7 +146,22 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Compass, Music, Play, Pause, Hash, Search, RefreshCw } from 'lucide-vue-next'
+import { 
+  Compass, 
+  Music, 
+  Play, 
+  Pause, 
+  Hash, 
+  Search, 
+  RefreshCw,
+  Folder,
+  Globe,
+  Zap,
+  Moon,
+  Headphones,
+  Gamepad2,
+  Flame
+} from 'lucide-vue-next'
 import { tracksApi } from '@/api/client'
 import { usePlayerStore } from '@/stores/player'
 import { useUIStore } from '@/stores/ui'
@@ -162,11 +179,11 @@ const rawTags = ref([])
 
 // Curated mood presets for quick vibes
 const moodPresets = [
-  { id: 'drive', emoji: '⚡', label: 'Драйв', tags: ['dubstep', 'phonk', 'dnb'] },
-  { id: 'night', emoji: '🌙', label: 'Ночной чилл', tags: ['ambient', 'lo-fi', 'chill'] },
-  { id: 'focus', emoji: '🎧', label: 'Фокус & Работа', tags: ['electronic', 'synthwave', 'house'] },
-  { id: 'gaming', emoji: '🎮', label: 'Gaming Bass', tags: ['trap', 'riddim', 'breakcore'] },
-  { id: 'trends', emoji: '🔥', label: 'Тренды AuxBass', tags: ['popular'] }
+  { id: 'drive', icon: Zap, label: 'Драйв', tags: ['dubstep', 'phonk', 'dnb'] },
+  { id: 'night', icon: Moon, label: 'Ночной чилл', tags: ['ambient', 'lo-fi', 'chill'] },
+  { id: 'focus', icon: Headphones, label: 'Фокус & Работа', tags: ['electronic', 'synthwave', 'house'] },
+  { id: 'gaming', icon: Gamepad2, label: 'Gaming Bass', tags: ['trap', 'riddim', 'breakcore'] },
+  { id: 'trends', icon: Flame, label: 'Тренды AuxBass', tags: ['popular'] }
 ]
 
 // Specific curated gradients for well-known genres
@@ -447,31 +464,48 @@ onMounted(() => {
   margin: 2px 0 0;
 }
 
-/* Scope Toggle */
+/* Scope Toggle (Neumorphic Hi-Fi Segmented Control) */
 .scope-toggle {
-  display: flex;
-  background: rgba(255, 255, 255, 0.06);
+  display: inline-flex;
+  align-items: center;
+  background: var(--c-bg-0, #0D0D0D);
   padding: 3px;
-  border-radius: 10px;
+  border-radius: 20px;
   gap: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: 
+    inset 2px 2px 5px var(--sh-inset-dark, rgba(0, 0, 0, 0.78)), 
+    inset -1px -1px 2px var(--sh-inset-light, rgba(255, 255, 255, 0.045));
 }
 
 .scope-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: transparent;
   border: none;
   color: var(--c-text-3, rgba(255, 255, 255, 0.6));
   font-size: 12px;
   font-weight: 600;
-  padding: 5px 12px;
-  border-radius: 8px;
+  padding: 6px 14px;
+  border-radius: 16px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
   font-family: inherit;
+  user-select: none;
+}
+
+.scope-btn:hover:not(.active) {
+  color: var(--c-text-1, #fff);
 }
 
 .scope-btn.active {
-  background: rgba(255, 255, 255, 0.15);
-  color: #fff;
+  background: var(--c-bg-3, #222222);
+  color: var(--c-accent, #1db954);
+  box-shadow: 
+    2px 2px 6px var(--sh-dark, rgba(0, 0, 0, 0.72)), 
+    -1px -1px 3px var(--sh-light, rgba(255, 255, 255, 0.055));
+  font-weight: 700;
 }
 
 /* Mood Pills Row */
@@ -517,8 +551,9 @@ onMounted(() => {
   transform: scale(1);
 }
 
-.mood-emoji {
-  font-size: 14px;
+.mood-icon {
+  color: var(--c-accent, #1db954);
+  flex-shrink: 0;
 }
 
 .mood-play-icon {

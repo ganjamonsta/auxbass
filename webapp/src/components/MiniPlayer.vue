@@ -1,5 +1,14 @@
 <template>
-  <div class="mini-player" @click="$emit('expand')" @contextmenu.prevent="openMenu('track', track, 'player', $event)">
+  <div 
+    class="mini-player" 
+    :style="playerStyle"
+    @click="handleClick" 
+    @touchstart="handleTouchStart"
+    @touchmove="handleTouchMove"
+    @touchend="handleTouchEnd"
+    @touchcancel="handleTouchCancel"
+    @contextmenu.prevent="openMenu('track', track, 'player', $event)"
+  >
     <!-- LCD Screen -->
     <div class="lcd-screen">
       <!-- Row 1: Title + Status Icons -->
@@ -10,7 +19,7 @@
             <span v-if="shouldMarquee" class="lcd-title lcd-title-clone">{{ displayText }}</span>
           </div>
         </div>
-        <div class="lcd-indicators">
+        <div class="lcd-indicators" @touchstart.stop @touchend.stop>
           <!-- Network issue indicator -->
           <span 
             v-if="networkMonitor.hasIssues.value" 
@@ -95,7 +104,7 @@
         
         <span class="lcd-time">{{ formatTime(progress) }}/{{ formatTime(duration || track.duration) }}</span>
         
-        <div class="lcd-buttons">
+        <div class="lcd-buttons" @touchstart.stop @touchend.stop>
           <button class="lcd-btn" @click.stop="$emit('toggle')" title="Воспроизведение">
             <svg v-if="loading" class="spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
               <path d="M12 2a10 10 0 0 1 10 10"/>
@@ -119,7 +128,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { getDisplayTitle, getDisplayArtist } from '@/utils'
@@ -160,7 +169,125 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['expand', 'toggle', 'next', 'toggleShuffle', 'toggleRepeat', 'like'])
+const emit = defineEmits(['expand', 'toggle', 'next', 'prev', 'toggleShuffle', 'toggleRepeat', 'like'])
+
+// --- Touch Gestures on Mobile ---
+const touchState = ref({
+  startX: 0,
+  startY: 0,
+  currentX: 0,
+  currentY: 0,
+  isSwiping: false,
+  startTime: 0
+})
+const touchOffset = ref({ x: 0, y: 0 })
+const isAnimating = ref(false)
+let lastSwipeTimestamp = 0
+
+const SWIPE_HORIZONTAL_THRESHOLD = 45
+const SWIPE_UP_THRESHOLD = 35
+
+const handleTouchStart = (e) => {
+  if (e.touches.length !== 1) return
+  const touch = e.touches[0]
+  touchState.value = {
+    startX: touch.clientX,
+    startY: touch.clientY,
+    currentX: touch.clientX,
+    currentY: touch.clientY,
+    isSwiping: true,
+    startTime: Date.now()
+  }
+  touchOffset.value = { x: 0, y: 0 }
+  isAnimating.value = false
+}
+
+const handleTouchMove = (e) => {
+  if (!touchState.value.isSwiping || e.touches.length !== 1) return
+  const touch = e.touches[0]
+  touchState.value.currentX = touch.clientX
+  touchState.value.currentY = touch.clientY
+
+  const deltaX = touch.clientX - touchState.value.startX
+  const deltaY = touch.clientY - touchState.value.startY
+
+  // Swipe UP is allowed with resistance; downward movement resists heavily
+  const clampedY = deltaY < 0 ? Math.max(-45, deltaY * 0.65) : Math.min(8, deltaY * 0.15)
+  // Horizontal translation dampened
+  const clampedX = Math.max(-70, Math.min(70, deltaX * 0.6))
+
+  touchOffset.value = { x: clampedX, y: clampedY }
+}
+
+const handleTouchEnd = () => {
+  if (!touchState.value.isSwiping) return
+
+  const deltaX = touchState.value.currentX - touchState.value.startX
+  const deltaY = touchState.value.currentY - touchState.value.startY
+  const duration = Date.now() - touchState.value.startTime
+  const absX = Math.abs(deltaX)
+  const absY = Math.abs(deltaY)
+
+  isAnimating.value = true
+  touchOffset.value = { x: 0, y: 0 }
+  touchState.value.isSwiping = false
+
+  const triggerHaptic = () => {
+    try {
+      window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.('light')
+    } catch (_) {}
+  }
+
+  // 1. Swipe UP -> expand full player
+  if (deltaY < -SWIPE_UP_THRESHOLD && absY > absX) {
+    lastSwipeTimestamp = Date.now()
+    triggerHaptic()
+    emit('expand')
+    return
+  }
+
+  // 2. Swipe LEFT -> next track
+  if (deltaX < -SWIPE_HORIZONTAL_THRESHOLD && absX > absY) {
+    lastSwipeTimestamp = Date.now()
+    triggerHaptic()
+    emit('next')
+    return
+  }
+
+  // 3. Swipe RIGHT -> previous track
+  if (deltaX > SWIPE_HORIZONTAL_THRESHOLD && absX > absY) {
+    lastSwipeTimestamp = Date.now()
+    triggerHaptic()
+    emit('prev')
+    return
+  }
+
+  // 4. Short tap (small motion) -> expand
+  if (absX < 10 && absY < 10 && duration < 350) {
+    emit('expand')
+  }
+}
+
+const handleTouchCancel = () => {
+  touchState.value.isSwiping = false
+  isAnimating.value = true
+  touchOffset.value = { x: 0, y: 0 }
+}
+
+const handleClick = () => {
+  // If a swipe gesture just finished, avoid double triggering click
+  if (Date.now() - lastSwipeTimestamp < 400) return
+  emit('expand')
+}
+
+const playerStyle = computed(() => {
+  const { x, y } = touchOffset.value
+  if (x === 0 && y === 0 && !isAnimating.value) return {}
+  return {
+    transform: `translate3d(${x}px, ${y}px, 0)`,
+    transition: isAnimating.value ? 'transform 0.24s cubic-bezier(0.2, 0.9, 0.3, 1)' : 'none'
+  }
+})
 
 const progressPercent = computed(() => {
   const dur = props.duration || props.track?.duration
@@ -243,15 +370,18 @@ const formatTime = (seconds) => {
   border-radius: var(--r-xl);
   cursor: pointer;
   overflow: visible;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
   box-shadow: 
     6px 6px 18px var(--sh-dark),
     -3px -3px 8px var(--sh-light),
     inset 0 1px 1px rgba(255, 255, 255, 0.08);
   border: var(--border-neu);
-  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s ease;
+  transition: box-shadow 0.15s ease;
 }
 
-.mini-player:active {
+.mini-player:active:not([style*="translate"]) {
   transform: scale(0.98);
   box-shadow: 
     inset 2px 2px 6px var(--sh-inset-dark),

@@ -13,6 +13,7 @@
         @expand="$emit('expand-player')"
         @toggle="$emit('toggle-play')"
         @next="$emit('next-track')"
+        @prev="$emit('prev-track')"
         @toggleShuffle="$emit('toggle-shuffle')"
         @toggleRepeat="$emit('toggle-repeat')"
         @like="$emit('like')"
@@ -99,6 +100,7 @@ const emit = defineEmits([
   'expand-player', 
   'toggle-play', 
   'next-track',
+  'prev-track',
   'toggle-shuffle',
   'toggle-repeat',
   'like',
@@ -218,12 +220,18 @@ const handleItemContextMenu = (item, event) => {
   transition: all 0.2s ease;
   background: none;
   border: none;
+  outline: none;
   cursor: pointer;
   font-family: inherit;
   -webkit-tap-highlight-color: transparent;
   border-radius: 12px;
   position: relative;
   min-width: 64px;
+}
+
+.nav-item:focus,
+.nav-item:focus-visible {
+  outline: none;
 }
 
 .nav-item.active {

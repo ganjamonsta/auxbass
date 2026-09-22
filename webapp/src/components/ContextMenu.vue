@@ -539,36 +539,24 @@ const checkDesktop = () => {
   isDesktop.value = window.innerWidth >= 768 && !('ontouchstart' in window)
 }
 
-let overlayTouchStarted = false
 let menuOpenTimestamp = 0
 
 const handleOverlayTouchStart = (e) => {
-  if (e.target === e.currentTarget) {
-    overlayTouchStarted = true
-  }
+  // Passive touch feedback
 }
 
 const handleOverlayContextMenu = (e) => {
   e.preventDefault()
-  if (isDesktop.value) {
-    closeMenu()
-  }
+  closeMenu()
 }
 
-const handleOverlayClick = () => {
-  if (isDesktop.value) {
-    closeMenu()
-    return
-  }
+const handleOverlayClick = (e) => {
+  if (e && e.target !== e.currentTarget) return
   // Ignore clicks that occur immediately after opening (e.g. synthetic click on finger release after long-press)
   if (Date.now() - menuOpenTimestamp < 350) {
     return
   }
-  // On mobile touch, only close if the touch gesture actually began on the overlay itself
-  if (overlayTouchStarted) {
-    overlayTouchStarted = false
-    closeMenu()
-  }
+  closeMenu()
 }
 
 // Handle keyboard events
@@ -659,7 +647,6 @@ watch(isOpen, (open) => {
   } else {
     activeSubmenu.value = null
     mobileSubmenu.value = null
-    overlayTouchStarted = false
     if (openSubmenuTimer) { clearTimeout(openSubmenuTimer); openSubmenuTimer = null }
     if (closeSubmenuTimer) { clearTimeout(closeSubmenuTimer); closeSubmenuTimer = null }
   }

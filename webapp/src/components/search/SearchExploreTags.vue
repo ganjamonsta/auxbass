@@ -123,15 +123,19 @@
             class="scope-mini-btn" 
             :class="{ active: tagScope === 'library' }"
             @click="$emit('switchScope', 'library')"
+            title="Стили из добавленных в медиатеку треков"
           >
-            Мои
+            <Folder :size="11" />
+            <span>В медиатеке</span>
           </button>
           <button 
             class="scope-mini-btn" 
             :class="{ active: tagScope === 'global' }"
             @click="$emit('switchScope', 'global')"
+            title="Все популярные стили каталога"
           >
-            Все
+            <Globe :size="11" />
+            <span>Каталог</span>
           </button>
         </div>
       </div>
@@ -636,28 +640,46 @@ const cleanDisplayTags = computed(() => {
 
 /* 3. Tag Pills */
 .tag-scope-mini {
-  display: flex;
-  background: rgba(255, 255, 255, 0.06);
+  display: inline-flex;
+  align-items: center;
+  background: var(--c-bg-0, #0D0D0D);
   padding: 2px;
-  border-radius: 8px;
+  border-radius: 16px;
   gap: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: 
+    inset 2px 2px 4px var(--sh-inset-dark, rgba(0, 0, 0, 0.78)), 
+    inset -1px -1px 2px var(--sh-inset-light, rgba(255, 255, 255, 0.045));
 }
 
 .scope-mini-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   background: transparent;
   border: none;
   color: var(--c-text-3, rgba(255, 255, 255, 0.6));
   font-size: 11px;
   font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 6px;
+  padding: 4px 10px;
+  border-radius: 14px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  font-family: inherit;
+  user-select: none;
+}
+
+.scope-mini-btn:hover:not(.active) {
+  color: var(--c-text-1, #fff);
 }
 
 .scope-mini-btn.active {
-  background: rgba(255, 255, 255, 0.15);
-  color: #fff;
+  background: var(--c-bg-3, #222222);
+  color: var(--c-accent, #1db954);
+  box-shadow: 
+    2px 2px 5px var(--sh-dark, rgba(0, 0, 0, 0.72)), 
+    -1px -1px 2px var(--sh-light, rgba(255, 255, 255, 0.055));
+  font-weight: 700;
 }
 
 .tag-pills-row {
