@@ -1111,11 +1111,13 @@ const getTracksWord = (count) => {
   width: 100%;
   max-width: 400px;
   max-height: 80vh;
-  background: #1a1a1a;
-  border-radius: 16px 16px 0 0;
+  background: var(--c-bg-2);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 -8px 28px var(--sh-dark);
+  border-top: var(--border-neu);
 }
 
 /* Desktop menu - floating under cursor */
@@ -1124,8 +1126,14 @@ const getTracksWord = (count) => {
   width: 280px;
   max-width: none;
   max-height: 70vh;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  border-radius: var(--r-lg);
+  background: var(--c-bg-2);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 
+    10px 10px 30px rgba(0, 0, 0, 0.85),
+    -3px -3px 8px var(--sh-light);
+  border: var(--border-neu);
 }
 
 .menu-sheet.desktop .menu-header {
@@ -1214,28 +1222,37 @@ const getTracksWord = (count) => {
   display: flex;
   align-items: center;
   gap: 12px;
-  width: 100%;
-  padding: 14px 16px;
-  background: none;
-  border: none;
-  color: white;
-  font-size: 15px;
+  width: calc(100% - 16px);
+  margin: 1px 8px;
+  padding: 10px 14px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  color: var(--c-text-1);
+  font-size: 14px;
   cursor: pointer;
   text-align: left;
+  transition: all 0.15s ease;
+}
+
+.menu-item:hover {
+  background: var(--c-bg-3);
+  color: #FFFFFF;
 }
 
 .menu-item:active {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--c-bg-4);
+  transform: scale(0.98);
 }
 
 .menu-item.danger {
-  color: #ff4444;
+  color: #ff6b6b;
 }
 
 .menu-divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.1);
-  margin: 8px 16px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 6px 14px;
 }
 
 /* Submenu styles (Spotify style) */
@@ -1256,7 +1273,7 @@ const getTracksWord = (count) => {
 }
 
 .menu-item.is-submenu-active {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--c-bg-3);
   color: white;
 }
 
@@ -1264,16 +1281,20 @@ const getTracksWord = (count) => {
 .flyout-submenu {
   position: fixed;
   width: 240px;
-  background: var(--c-bg-2, #1f1f1f);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.06);
-  padding: 5px;
+  background: var(--c-bg-2);
+  border: var(--border-neu);
+  border-radius: var(--r-md);
+  box-shadow: 
+    12px 12px 30px rgba(0, 0, 0, 0.85),
+    -3px -3px 8px var(--sh-light);
+  padding: 6px;
   z-index: calc(var(--z-contextmenu, 1100) + 20);
   max-height: 380px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .submenu-item {

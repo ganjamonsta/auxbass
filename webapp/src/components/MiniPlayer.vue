@@ -237,24 +237,25 @@ const formatTime = (seconds) => {
   align-items: center;
   margin: 4px 10px 6px;
   padding: 6px;
-  background: rgba(22, 27, 34, 0.75);
+  background: linear-gradient(180deg, rgba(24, 27, 34, 0.92) 0%, rgba(18, 20, 26, 0.96) 100%);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border-radius: var(--r-lg);
+  border-radius: var(--r-xl);
   cursor: pointer;
   overflow: visible;
   box-shadow: 
-    0 8px 24px rgba(0, 0, 0, 0.4),
-    inset 0 1px 1px rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+    6px 6px 18px var(--sh-dark),
+    -3px -3px 8px var(--sh-light),
+    inset 0 1px 1px rgba(255, 255, 255, 0.08);
+  border: var(--border-neu);
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s ease;
 }
 
 .mini-player:active {
   transform: scale(0.98);
   box-shadow: 
-    0 4px 12px rgba(0, 0, 0, 0.5),
-    inset 0 1px 1px rgba(255, 255, 255, 0.1);
+    inset 2px 2px 6px var(--sh-inset-dark),
+    inset -1px -1px 3px var(--sh-inset-light);
 }
 
 /* ─── LCD Screen - Nokia XpressMusic Style ─── */

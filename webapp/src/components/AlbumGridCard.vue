@@ -125,21 +125,39 @@ const handleClick = (e) => {
 <style scoped>
 .album-card {
   cursor: pointer;
-  transition: transform 0.2s;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  border-radius: var(--r-lg);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+}
+
+.album-card:hover {
+  background: var(--c-bg-2);
+  border: var(--border-neu);
+  box-shadow: 
+    4px 4px 12px var(--sh-dark),
+    -2px -2px 6px var(--sh-light);
+  transform: translateY(-2px);
 }
 
 .album-card:active {
-  transform: scale(0.98);
+  transform: translateY(0) scale(0.98);
 }
 
 .album-cover {
   position: relative;
   aspect-ratio: 1;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   overflow: hidden;
   background: var(--c-bg-3);
   margin-bottom: 8px;
+  box-shadow: 
+    4px 4px 10px var(--sh-dark),
+    -2px -2px 5px var(--sh-light);
+  border: var(--border-neu);
 }
 
 .album-cover img {
@@ -160,28 +178,44 @@ const handleClick = (e) => {
 
 .play-btn {
   position: absolute;
-  right: 8px;
-  bottom: 8px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--c-accent);
+  right: 10px;
+  bottom: 10px;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-full);
+  background: linear-gradient(145deg, var(--c-accent-light), var(--c-accent-dark));
   border: none;
   color: #000;
   font-size: 14px;
   cursor: pointer;
   opacity: 0;
   transform: translateY(8px);
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 2;
+  box-shadow: 
+    3px 3px 8px rgba(0, 0, 0, 0.6),
+    0 0 12px var(--c-accent-glow);
 }
 
 .album-card:hover .play-btn,
 .play-btn.is-playing {
   opacity: 1;
   transform: translateY(0);
+}
+
+.play-btn:hover {
+  transform: translateY(0) scale(1.08);
+  box-shadow: 
+    4px 4px 12px rgba(0, 0, 0, 0.7),
+    0 0 18px var(--c-accent-glow);
+}
+
+.play-btn:active {
+  transform: translateY(0) scale(0.95);
+  box-shadow: inset 2px 2px 4px rgba(0, 0, 0, 0.6);
 }
 
 .play-btn svg.lucide-play {

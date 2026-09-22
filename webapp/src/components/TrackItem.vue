@@ -290,25 +290,39 @@ const handleTagClick = (tag) => {
   align-items: center;
   gap: 10px;
   height: 64px;
-  padding: 8px 6px 8px 12px; /* Less right padding, scrollbar is there */
+  padding: 8px 10px 8px 12px; /* Less right padding, scrollbar is there */
   margin: 0 0 0 8px; /* No vertical margin, spacing handled by gap */
   border-radius: var(--r-md);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   background: transparent;
+  border: 1px solid transparent;
   box-sizing: border-box;
+}
+
+.track-item:hover {
+  background: var(--c-bg-2);
+  border: var(--border-neu);
+  box-shadow: 
+    3px 3px 8px var(--sh-dark),
+    -2px -2px 5px var(--sh-light);
 }
 
 .track-item:active {
   background: var(--c-bg-3);
   transform: scale(0.98);
+  box-shadow: 
+    inset 2px 2px 5px var(--sh-inset-dark),
+    inset -1px -1px 3px var(--sh-inset-light);
 }
 
 .track-item.playing {
   background: var(--c-bg-3);
+  border: 1px solid rgba(29, 185, 84, 0.25);
   box-shadow: 
-    inset 2px 2px 4px var(--sh-inset-dark),
-    inset -1px -1px 3px var(--sh-inset-light);
+    inset 3px 3px 6px var(--sh-inset-dark),
+    inset -2px -2px 4px var(--sh-inset-light),
+    0 0 12px var(--c-accent-glow);
 }
 
 .track-item.compact {

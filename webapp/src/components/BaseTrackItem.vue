@@ -213,19 +213,31 @@ const startTouchDrag = (event) => {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px;
-  border-radius: 8px;
-  transition: all 0.15s;
+  padding: 8px 12px;
+  border-radius: var(--r-md);
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   background: transparent;
+  border: 1px solid transparent;
   position: relative;
 }
 
 .base-track-item[draggable="true"] { user-select: none; }
-.base-track-item:hover { background: var(--c-bg-3); }
+.base-track-item:hover { 
+  background: var(--c-bg-2);
+  border: var(--border-neu);
+  box-shadow: 3px 3px 8px var(--sh-dark), -2px -2px 5px var(--sh-light);
+}
 .base-track-item.is-dragging { opacity: 0.4; transform: scale(0.98); }
 .base-track-item.is-dragging * { pointer-events: none; }
 .base-track-item.drag-over { background: var(--c-bg-4); }
-.base-track-item.is-playing { background: rgba(29, 185, 84, 0.1); }
+.base-track-item.is-playing { 
+  background: var(--c-bg-3);
+  border: 1px solid rgba(29, 185, 84, 0.25);
+  box-shadow: 
+    inset 2px 2px 5px var(--sh-inset-dark),
+    inset -1px -1px 3px var(--sh-inset-light),
+    0 0 10px var(--c-accent-glow);
+}
 .base-track-item.dimmed { opacity: 0.6; }
 
 .base-track-item.drag-over::before {
