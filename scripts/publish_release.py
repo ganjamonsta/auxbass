@@ -22,8 +22,13 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 DIST_DIR = ROOT_DIR / "webapp" / "dist"
 ARCHIVE_PATH = ROOT_DIR / "webapp-dist.tar.gz"
 ENV_PATH = ROOT_DIR / ".env"
+ENV_LOCAL_PATH = ROOT_DIR / ".env.local"
 
-load_dotenv(ENV_PATH)
+# Загружаем токен и настройки из .env.local и .env
+if ENV_LOCAL_PATH.exists():
+    load_dotenv(ENV_LOCAL_PATH)
+if ENV_PATH.exists():
+    load_dotenv(ENV_PATH)
 
 
 def get_git_repo() -> tuple[str, str]:
@@ -131,22 +136,41 @@ def upload_to_github_releases(token: str, owner: str, repo: str) -> bool:
             return False
 
 
-def save_token_to_env(token: str):
-    """Сохраняет GITHUB_TOKEN в .env файл"""
+def get_git_credential_token() -> str | None:
+    """Пытается автоматически извлечь токен GitHub из Git Credential Manager"""
     try:
-        content = ""
-        if ENV_PATH.exists():
-            content = ENV_PATH.read_text(encoding="utf-8")
-        
-        if "GITHUB_TOKEN=" in content:
-            content = re.sub(r"GITHUB_TOKEN=.*", f"GITHUB_TOKEN={token}", content)
-        else:
-            content += f"\n# GitHub Releases Token\nGITHUB_TOKEN={token}\n"
-        
-        ENV_PATH.write_text(content, encoding="utf-8")
-        print("💾 GITHUB_TOKEN сохранен в .env (больше вводить не потребуется)!")
-    except Exception as e:
-        print(f"⚠️ Не удалось сохранить токен в .env: {e}")
+        res = subprocess.run(
+            ["git", "credential", "fill"],
+            input="protocol=https\nhost=github.com\n\n",
+            text=True,
+            capture_output=True,
+            cwd=ROOT_DIR,
+            timeout=5,
+        )
+        if res.returncode == 0:
+            for line in res.stdout.splitlines():
+                if line.startswith("password="):
+                    pwd = line.split("=", 1)[1].strip()
+                    if pwd.startswith(("ghp_", "gho_", "github_pat_")):
+                        return pwd
+    except Exception:
+        pass
+    return None
+
+
+def save_token_to_env(token: str):
+    """Сохраняет GITHUB_TOKEN в .env и .env.local файлы"""
+    for target in [ENV_LOCAL_PATH, ENV_PATH]:
+        try:
+            content = target.read_text(encoding="utf-8") if target.exists() else ""
+            if "GITHUB_TOKEN=" in content:
+                content = re.sub(r"GITHUB_TOKEN=.*", f"GITHUB_TOKEN={token}", content)
+            else:
+                content += f"\n# GitHub Releases Token\nGITHUB_TOKEN={token}\n"
+            target.write_text(content, encoding="utf-8")
+            print(f"💾 GITHUB_TOKEN сохранен в {target.name} (больше вводить не потребуется)!")
+        except Exception as e:
+            print(f"⚠️ Не удалось сохранить токен в {target.name}: {e}")
 
 
 def main():
@@ -159,6 +183,14 @@ def main():
 
     owner, repo = get_git_repo()
     token = os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN") or os.getenv("GIT_TOKEN")
+
+    if not token:
+        # Пробуем автоматически достать из Git Credential Manager
+        git_token = get_git_credential_token()
+        if git_token:
+            token = git_token
+            print("🔑 Токен GitHub автоматически обнаружен в Git Credential Manager!")
+            save_token_to_env(token)
 
     if not token:
         print(f"\n🔑 Для загрузки в https://github.com/{owner}/{repo}/releases")
