@@ -27,12 +27,15 @@
       <div v-if="showBadges" class="sc-track-artist-row">
         <span class="sc-track-artist" :title="item.artist">{{ item.artist }}</span>
         <!-- Badges -->
-        <div v-if="isInLibrary || item.in_library || item.in_channel || item.is_chunk || item.already_in_tg" class="sc-track-badges">
+        <div v-if="isInLibrary || item.in_library || item.in_channel || item.is_chunk || item.already_in_tg || item.is_drm_preview" class="sc-track-badges">
           <span v-if="isInLibrary || item.in_library" class="sc-badge-pill in-lib" title="Уже в вашей медиатеке">
             <Check :size="10" /> В медиатеке
           </span>
           <span v-if="item.in_channel" class="sc-badge-pill in-chan" title="Забэкаплен в Telegram-канал">
             <CloudDownload :size="10" /> В канале
+          </span>
+          <span v-else-if="item.is_drm_preview" class="sc-badge-pill in-drm" title="Защищён DRM (SoundCloud Go+) — будет найден альтернативный источник">
+            🔒 Go+
           </span>
           <span v-else-if="item.is_chunk" class="sc-badge-pill in-chunk" title="Быстрое 30-секундное превью">
             ✂️ 30s превью
@@ -277,6 +280,12 @@ const coverError = ref(false)
   background: rgba(234, 179, 8, 0.15);
   color: #facc15;
   border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+.sc-badge-pill.in-drm {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
 .sc-badge-pill.in-tg {

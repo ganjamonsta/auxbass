@@ -378,7 +378,7 @@ class SoundCloudProvider(BaseMusicProvider):
                     {
                         "key": "FFmpegExtractAudio",
                         "preferredcodec": "mp3",
-                        "preferredquality": "192" if chunk_only else "320",
+                        "preferredquality": "192" if chunk_only else "0",
                     }
                 ],
                 "quiet": True,
@@ -494,6 +494,81 @@ class SoundCloudProvider(BaseMusicProvider):
     _search_cache: Dict[str, Tuple[float, List[TrackMetadata]]] = {}
     _SEARCH_CACHE_TTL = 300  # 5 minutes
 
+    @staticmethod
+    def _is_drm_preview_duration(raw_duration) -> bool:
+        """
+        Detect SoundCloud Go+ DRM preview snippets.
+        yt-dlp extract_flat returns duration=30.0 for DRM-protected tracks
+        (the length of the free preview), not the real track duration.
+        We check for exactly 30.0 seconds (float) which is the hallmark of a Go+ snippet.
+        """
+        if raw_duration is None:
+            return False
+        try:
+            dur = float(raw_duration)
+        except (TypeError, ValueError):
+            return False
+        return abs(dur - 30.0) < 0.5  # exactly 30s (±0.5s tolerance)
+
+    async def _resolve_real_duration(self, track_url: str) -> Optional[int]:
+        """
+        Try to get the real track duration from SoundCloud API v2 /resolve endpoint.
+        Returns duration in seconds, or None on failure.
+        """
+        try:
+            client_id = await self.get_client_id()
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Accept": "application/json",
+            }
+            import urllib.parse
+            encoded_url = urllib.parse.quote(track_url, safe='')
+            api_url = f"https://api-v2.soundcloud.com/resolve?url={encoded_url}&client_id={client_id}"
+
+            settings = get_settings()
+            proxy = settings.proxy_url.strip() if settings.proxy_url else None
+            timeout = aiohttp.ClientTimeout(total=5)
+            async with aiohttp.ClientSession(headers=headers) as session:
+                async with session.get(api_url, timeout=timeout, proxy=proxy) as resp:
+                    if resp.status != 200:
+                        return None
+                    data = await resp.json()
+
+            # SoundCloud API v2 returns full_duration in milliseconds
+            full_dur_ms = data.get("full_duration") or data.get("duration")
+            if full_dur_ms and isinstance(full_dur_ms, (int, float)) and full_dur_ms > 0:
+                return int(full_dur_ms / 1000)
+        except Exception as e:
+            logger.debug(f"[SoundCloud] Failed to resolve real duration for {track_url}: {e}")
+        return None
+
+    async def _enrich_drm_previews(self, results: List[TrackMetadata]) -> None:
+        """
+        For tracks detected as DRM previews (duration=30s), try to resolve real durations
+        via SoundCloud API v2 in parallel. Marks tracks with extra['is_drm_preview'] flag
+        and replaces the fake 30s duration with the real one when available.
+        """
+        drm_tracks = [r for r in results if self._is_drm_preview_duration(r.duration)]
+        if not drm_tracks:
+            return
+
+        # Resolve real durations concurrently (max 5 at a time to be polite)
+        semaphore = asyncio.Semaphore(5)
+
+        async def _resolve_one(track: TrackMetadata):
+            async with semaphore:
+                real_dur = await self._resolve_real_duration(track.url)
+                track.extra["is_drm_preview"] = True
+                if real_dur and real_dur > 30:
+                    track.extra["real_duration"] = real_dur
+                    track.duration = real_dur
+                    logger.debug(
+                        f"[SoundCloud] Resolved real duration for DRM track "
+                        f"'{track.artist} - {track.title}': {real_dur}s"
+                    )
+
+        await asyncio.gather(*[_resolve_one(t) for t in drm_tracks], return_exceptions=True)
+
     async def search(self, query: str, limit: int = 30) -> List[TrackMetadata]:
         """Search SoundCloud for tracks matching query."""
         clean_query = query.strip()
@@ -535,7 +610,8 @@ class SoundCloudProvider(BaseMusicProvider):
             track_url = entry.get("webpage_url") or entry.get("url") or ""
             if not track_url:
                 continue
-            duration = int(entry.get("duration") or 0) or None
+            raw_duration = entry.get("duration")
+            duration = int(raw_duration or 0) or None
             cover = _extract_sc_thumbnail(entry)
 
             sc_genre = entry.get("genre") if isinstance(entry.get("genre"), str) else None
@@ -565,6 +641,9 @@ class SoundCloudProvider(BaseMusicProvider):
                     extra=extra_data,
                 )
             )
+
+        # Enrich DRM preview tracks with real durations from SoundCloud API v2
+        await self._enrich_drm_previews(results)
 
         self._search_cache[cache_key] = (now, results)
         if len(self._search_cache) > 200:

@@ -64,6 +64,7 @@ class SearchItemResponse(BaseModel):
     in_channel: bool = False
     already_in_tg: bool = False
     track_id: Optional[int] = None
+    is_drm_preview: bool = False  # True if this is a DRM-protected preview snippet (SoundCloud Go+)
 
 
 class QuickImportRequest(BaseModel):
@@ -500,6 +501,7 @@ async def search_external_tracks(
                 in_library=in_lib,
                 already_in_tg=already_in_tg,
                 track_id=existing_id,
+                is_drm_preview=bool(r.extra.get("is_drm_preview")) if r.extra else False,
             )
         )
     return items

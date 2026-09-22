@@ -390,7 +390,7 @@ class AudioResolver:
                     {
                         "key": "FFmpegExtractAudio",
                         "preferredcodec": "mp3",
-                        "preferredquality": "192" if chunk_only else "320",
+                        "preferredquality": "192" if chunk_only else "0",
                     }
                 ],
             })
