@@ -153,7 +153,8 @@ class DiscordService:
             return None
 
         for guild in self.bot.guilds:
-            voice_state = guild.voice_states.get(num_id)
+            # Use internal _voice_states which maps member_id -> VoiceState
+            voice_state = guild._voice_states.get(num_id)
             if voice_state and voice_state.channel:
                 channel = voice_state.channel
                 return {
@@ -164,6 +165,7 @@ class DiscordService:
                     "user_count": len([m for m in channel.members if not m.bot]),
                 }
         return None
+
 
     def get_channel_members(self, channel_id: int) -> List[Dict[str, Any]]:
         """Return list of members in a voice channel with their voice states"""
