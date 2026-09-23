@@ -155,9 +155,14 @@
                       <span>Добавить в очередь</span>
                     </button>
                     <!-- Discord Party Option -->
-                    <button v-if="discordStore.hasParty" class="menu-item discord-item" @mouseenter="handleRegularItemMouseEnter" @click="handleAddToDiscord">
+                    <button 
+                      v-if="discordStore.configured && discordStore.botReady" 
+                      class="menu-item discord-item" 
+                      @mouseenter="handleRegularItemMouseEnter" 
+                      @click="handleAddToDiscord"
+                    >
                       <Radio :size="18" />
-                      <span>В тусовку Discord</span>
+                      <span>{{ discordStore.hasParty ? 'В тусовку Discord' : 'Включить в Discord' }}</span>
                     </button>
                   </template>
 
@@ -515,7 +520,34 @@ import { useDiscordStore } from '@/stores/discord'
 const router = useRouter()
 const uiStore = useUIStore()
 const discordStore = useDiscordStore()
+const authStore = useAuthStore()
 const { copyLink, copyInlineCommand, shareToTelegramChat, downloadToTelegram } = useShare()
+
+const {
+  isOpen,
+  menuType,
+  menuData,
+  menuContext,
+  menuPosition,
+  closeMenu: rawCloseMenu,
+  executeAction,
+  showPlaylistPicker,
+  showEditModal,
+  showRenameModal,
+  showCreatePlaylist,
+  editingItem,
+  renameValue,
+  newPlaylistName,
+  closePlaylistPicker,
+  onPlaylistAdded,
+  openCreatePlaylist,
+  closeCreatePlaylist,
+  confirmCreatePlaylist,
+  closeEditModal,
+  onTrackSaved,
+  closeRenameModal,
+  confirmRename,
+} = useContextMenu()
 
 // Submenu state (Spotify-style)
 const activeSubmenu = ref(null) // 'artists' | 'share' | null (desktop flyout)
@@ -528,7 +560,6 @@ let closeSubmenuTimer = null
 
 const isDisliked = computed(() => menuType.value === 'track' && !!menuData.value?.is_disliked)
 
-const authStore = useAuthStore()
 const renameInput = ref(null)
 const menuSheet = ref(null)
 const isDesktop = ref(false)
@@ -547,9 +578,10 @@ const checkDesktop = () => {
 }
 
 let menuOpenTimestamp = 0
+let overlayTouchStarted = false
 
 const handleOverlayTouchStart = (e) => {
-  // Passive touch feedback
+  overlayTouchStarted = true
 }
 
 const handleOverlayContextMenu = (e) => {
@@ -593,32 +625,6 @@ onUnmounted(() => {
   if (openSubmenuTimer) clearTimeout(openSubmenuTimer)
   if (closeSubmenuTimer) clearTimeout(closeSubmenuTimer)
 })
-
-const {
-  isOpen,
-  menuType,
-  menuData,
-  menuContext,
-  menuPosition,
-  closeMenu: rawCloseMenu,
-  executeAction,
-  showPlaylistPicker,
-  showEditModal,
-  showRenameModal,
-  showCreatePlaylist,
-  editingItem,
-  renameValue,
-  newPlaylistName,
-  closePlaylistPicker,
-  onPlaylistAdded,
-  openCreatePlaylist,
-  closeCreatePlaylist,
-  confirmCreatePlaylist,
-  closeEditModal,
-  onTrackSaved,
-  closeRenameModal,
-  confirmRename,
-} = useContextMenu()
 
 const closeMenu = () => {
   activeSubmenu.value = null
@@ -665,15 +671,24 @@ const exec = (action, extra = null) => {
 }
 
 const handleAddToDiscord = async () => {
-  if (menuData.value) {
-    try {
-      await discordStore.addToQueue(menuData.value)
-      uiStore.toast.success('Добавлено в Discord', `«${menuData.value.title}» добавлен в очередь тусовки`)
-    } catch (e) {
-      uiStore.toast.error('Ошибка', 'Не удалось добавить трек в Discord')
-    }
-  }
+  const track = menuData.value
+  if (!track) return
   closeMenu()
+  try {
+    if (discordStore.hasParty) {
+      await discordStore.addToQueue(track)
+      uiStore.toast.success('Добавлено в Discord', `«${track.title || 'Трек'}» добавлен в очередь тусовки`)
+    } else if (discordStore.detectedUserChannel) {
+      await discordStore.connectToChannel(discordStore.detectedUserChannel.channel_id)
+      await discordStore.play(track)
+      uiStore.toast.success('Играет в Discord', `Бот подключился к «${discordStore.detectedUserChannel.name}»`)
+    } else {
+      discordStore.openPartyModal()
+    }
+  } catch (err) {
+    console.error('Failed to add track to Discord:', err)
+    uiStore.toast.error('Ошибка Discord', err.message || 'Не удалось отправить трек в Discord')
+  }
 }
 
 // Go to specific artist (for multi-artist tracks or albums)

@@ -118,7 +118,7 @@ class DiscordService:
                 self._is_ready = False
                 await asyncio.sleep(10)
 
-    async def stop(self):
+    async def close(self):
         """Disconnect and stop bot on server shutdown"""
         logger.info("Stopping Discord Service...")
         try:

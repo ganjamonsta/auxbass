@@ -210,7 +210,7 @@ async def lifespan(app: FastAPI):
     
     # Cleanup
     if discord_service.is_configured:
-        await discord_service.stop()
+        await discord_service.close()
     await stop_channel_service()
     if api_bot:
         await api_bot.session.close()

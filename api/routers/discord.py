@@ -116,24 +116,35 @@ async def get_user_voice_state(
     Check if the current user is sitting in any voice channel on Discord.
     Used for 1-click 'Join My Voice Channel' magic connect.
     """
-    discord_acc = await get_user_discord_account(user.id, db)
-    if not discord_acc or not discord_acc.external_id:
+    import traceback
+    try:
+        discord_acc = await get_user_discord_account(user.id, db)
+        if not discord_acc or not discord_acc.external_id:
+            return {
+                "is_linked": False,
+                "in_voice": False,
+                "channel": None,
+            }
+
+        detected_channel = discord_service.find_user_voice_channel(discord_acc.external_id)
+        return {
+            "is_linked": True,
+            "in_voice": detected_channel is not None,
+            "channel": detected_channel,
+            "discord_id": discord_acc.external_id,
+            "discord_username": discord_acc.username,
+            "discord_display_name": discord_acc.display_name,
+            "discord_avatar_url": discord_acc.avatar_url,
+        }
+    except Exception as e:
+        logger.exception(f"Error in get_user_voice_state: {e}")
         return {
             "is_linked": False,
             "in_voice": False,
             "channel": None,
+            "error": str(e),
+            "trace": traceback.format_exc(),
         }
-
-    detected_channel = discord_service.find_user_voice_channel(discord_acc.external_id)
-    return {
-        "is_linked": True,
-        "in_voice": detected_channel is not None,
-        "channel": detected_channel,
-        "discord_id": discord_acc.external_id,
-        "discord_username": discord_acc.username,
-        "discord_display_name": discord_acc.display_name,
-        "discord_avatar_url": discord_acc.avatar_url,
-    }
 
 
 @router.get("/channels")
@@ -535,16 +546,28 @@ async def discord_oauth_callback(
   </div>
   <script>
     const data = {payload_str};
-    if (window.opener) {{
-      try {{
+    try {{
+      if (window.opener) {{
         window.opener.postMessage(data, '*');
+      }}
+    }} catch (e) {{}}
+
+    try {{
+      if (typeof BroadcastChannel !== 'undefined') {{
+        const bc = new BroadcastChannel('auxbass_discord_auth');
+        bc.postMessage(data);
+        bc.close();
+      }}
+    }} catch (e) {{}}
+
+    setTimeout(() => {{
+      try {{
+        window.close();
       }} catch (e) {{}}
-      setTimeout(() => window.close(), 1500);
-    }} else {{
       setTimeout(() => {{
         window.location.href = '{settings.webapp_url}/#/settings';
-      }}, 1800);
-    }}
+      }}, 500);
+    }}, 1200);
   </script>
 </body>
 </html>"""

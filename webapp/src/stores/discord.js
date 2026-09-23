@@ -294,36 +294,94 @@ export const useDiscordStore = defineStore('discord', () => {
 
     return new Promise((resolve, reject) => {
       let cleanup = null
+      let pollCount = 0
+      let resolved = false
+      let broadcastChannel = null
+
+      const handleSuccess = async (data = null) => {
+        if (resolved) return
+        resolved = true
+        if (cleanup) cleanup()
+
+        if (data) {
+          isLinked.value = true
+          if (data.discord_id) linkedDiscordId.value = data.discord_id
+          if (data.username) linkedDiscordUsername.value = data.username
+          if (data.display_name) linkedDiscordDisplayName.value = data.display_name
+          if (data.avatar_url) linkedDiscordAvatar.value = data.avatar_url
+        }
+
+        try {
+          await Promise.allSettled([
+            fetchAccount(),
+            fetchUserState(),
+            fetchAvailableChannels(),
+          ])
+        } catch (_) {}
+
+        try {
+          if (popup && !popup.closed) popup.close()
+        } catch (_) {}
+
+        resolve(data)
+      }
 
       const messageHandler = (event) => {
         if (event.data?.type === 'discord_oauth_success') {
-          isLinked.value = true
-          linkedDiscordId.value = event.data.discord_id || ''
-          linkedDiscordUsername.value = event.data.username || ''
-          linkedDiscordDisplayName.value = event.data.display_name || ''
-          linkedDiscordAvatar.value = event.data.avatar_url || ''
-          fetchUserState()
-          if (cleanup) cleanup()
-          resolve(event.data)
+          handleSuccess(event.data)
         } else if (event.data?.type === 'discord_oauth_error') {
+          if (resolved) return
+          resolved = true
           if (cleanup) cleanup()
+          try { if (popup && !popup.closed) popup.close() } catch (_) {}
           reject(new Error(event.data.error || 'Ошибка авторизации Discord'))
         }
       }
 
-      const pollTimer = setInterval(() => {
-        if (popup.closed) {
-          if (cleanup) cleanup()
-          fetchUserState().then(() => resolve(null))
+      // 1. Window postMessage listener
+      window.addEventListener('message', messageHandler)
+
+      // 2. BroadcastChannel listener (if supported)
+      try {
+        if (typeof BroadcastChannel !== 'undefined') {
+          broadcastChannel = new BroadcastChannel('auxbass_discord_auth')
+          broadcastChannel.onmessage = (event) => {
+            if (event.data?.type === 'discord_oauth_success') {
+              handleSuccess(event.data)
+            }
+          }
         }
-      }, 1000)
+      } catch (_) {}
+
+      // 3. Active Polling fallback: checks backend DB every 1.2s
+      // Guaranteed to detect success even across different origins or with COOP restrictions
+      const pollTimer = setInterval(async () => {
+        pollCount++
+        try {
+          const acc = await fetchAccount()
+          if (acc && acc.linked) {
+            handleSuccess(acc)
+            return
+          }
+        } catch (_) {}
+
+        if (popup.closed || pollCount >= 100) {
+          if (resolved) return
+          resolved = true
+          if (cleanup) cleanup()
+          const finalAcc = await fetchAccount()
+          await fetchUserState()
+          resolve(finalAcc)
+        }
+      }, 1200)
 
       cleanup = () => {
         window.removeEventListener('message', messageHandler)
+        if (broadcastChannel) {
+          try { broadcastChannel.close() } catch (_) {}
+        }
         clearInterval(pollTimer)
       }
-
-      window.addEventListener('message', messageHandler)
     })
   }
 
