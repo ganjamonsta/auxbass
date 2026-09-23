@@ -675,13 +675,17 @@ const handleAddToDiscord = async () => {
   if (!track) return
   closeMenu()
   try {
+    // Always refresh voice state before acting so we get fresh data
+    await discordStore.fetchUserState()
+    
     if (discordStore.hasParty) {
       await discordStore.addToQueue(track)
       uiStore.toast.success('Добавлено в Discord', `«${track.title || 'Трек'}» добавлен в очередь тусовки`)
     } else if (discordStore.detectedUserChannel) {
-      await discordStore.connectToChannel(discordStore.detectedUserChannel.channel_id)
+      const ch = discordStore.detectedUserChannel
+      await discordStore.connectToChannel(ch.channel_id)
       await discordStore.play(track)
-      uiStore.toast.success('Играет в Discord', `Бот подключился к «${discordStore.detectedUserChannel.name}»`)
+      uiStore.toast.success('Играет в Discord', `Бот подключился к «${ch.channel_name || ch.name || 'каналу'}»`)
     } else {
       discordStore.openPartyModal()
     }

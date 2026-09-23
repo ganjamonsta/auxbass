@@ -333,7 +333,8 @@ class DiscordService:
 
             # Prepare streaming token
             track_id = track_dict.get("id")
-            file_id = track_dict.get("file_id")
+            # Support both field names: file_id (internal) and telegram_file_id (API response)
+            file_id = track_dict.get("file_id") or track_dict.get("telegram_file_id")
             if not file_id:
                 raise ValueError("Трек не содержит file_id для воспроизведения")
 
@@ -419,7 +420,7 @@ class DiscordService:
 
     async def _play_track_internal(self, track_dict: Dict[str, Any]):
         """Internal playback call without altering queue index"""
-        file_id = track_dict.get("file_id")
+        file_id = track_dict.get("file_id") or track_dict.get("telegram_file_id")
         file_path = await get_telegram_file_path(file_id)
         if not file_path:
             logger.warning(f"File path unavailable for track {track_dict.get('id')}")
