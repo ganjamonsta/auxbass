@@ -7,6 +7,7 @@
     <SettingsChannel />
     <SettingsSoundCloud />
     <SettingsSpotify />
+    <SettingsDiscord />
     <SettingsPrivacy />
     <SettingsPlayback />
     <SettingsAppearance />
@@ -22,6 +23,7 @@ import { useUIStore } from '@/stores/ui'
 import SettingsChannel from './settings/SettingsChannel.vue'
 import SettingsSoundCloud from './settings/SettingsSoundCloud.vue'
 import SettingsSpotify from './settings/SettingsSpotify.vue'
+import SettingsDiscord from './settings/SettingsDiscord.vue'
 import SettingsPrivacy from './settings/SettingsPrivacy.vue'
 import SettingsPlayback from './settings/SettingsPlayback.vue'
 import SettingsAppearance from './settings/SettingsAppearance.vue'
@@ -49,7 +51,7 @@ const checkSectionFromHash = () => {
   const hash = route.hash ? route.hash.replace('#', '') : (route.query.section || '')
   if (['profile', 'stats', 'notifications', 'interface', 'playback', 'storage', 'cache', 'about'].includes(hash)) {
     uiStore.setSettingsSection('settings')
-  } else if (['channel', 'soundcloud', 'import'].includes(hash)) {
+  } else if (['channel', 'soundcloud', 'import', 'discord'].includes(hash)) {
     uiStore.setSettingsSection('import')
   }
 }

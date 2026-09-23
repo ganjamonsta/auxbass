@@ -91,6 +91,9 @@
         </div>
       </div>
 
+      <!-- Live Discord Party Card -->
+      <DiscordPartyCard />
+
       <!-- ═══ Unified Tab Navigation ═══ -->
       <div class="neu-tab-bar friends-tabs">
         <button 
@@ -443,6 +446,7 @@ import { useAuthStore } from '@/stores/auth'
 import { socialApi } from '@/api/client'
 import SocialFeed from '@/components/social/SocialFeed.vue'
 import UserSocialCard from '@/components/social/UserSocialCard.vue'
+import DiscordPartyCard from '@/components/discord/DiscordPartyCard.vue'
 import { 
   Users, 
   User, 

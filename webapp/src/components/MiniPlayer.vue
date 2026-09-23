@@ -88,6 +88,15 @@
               <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
             </svg>
           </span>
+          <!-- Discord Voice Party indicator (only if in voice channel!) -->
+          <span 
+            v-if="discordStore.isUserInVoice" 
+            class="lcd-indicator discord-indicator active" 
+            :title="`Трансляция в Discord: #${discordStore.channelName || 'Voice'}`"
+            @click.stop="discordStore.openPartyModal()"
+          >
+            <Radio :size="13" />
+          </span>
         </div>
       </div>
       
@@ -129,12 +138,15 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import { Radio } from 'lucide-vue-next'
 import { usePlayerStore } from '@/stores/player'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { getDisplayTitle, getDisplayArtist } from '@/utils'
 import { useNetworkMonitor } from '@/composables/useNetworkMonitor'
+import { useDiscordStore } from '@/stores/discord'
 
 const playerStore = usePlayerStore()
+const discordStore = useDiscordStore()
 const { openMenu } = useContextMenu()
 const networkMonitor = useNetworkMonitor()
 
@@ -512,6 +524,15 @@ const formatTime = (seconds) => {
 .lcd-indicator.hd-indicator.active {
   color: #ffd700;
   text-shadow: 0 0 8px rgba(255, 215, 0, 0.8);
+}
+
+.lcd-indicator.discord-indicator.active {
+  color: #7289da;
+  text-shadow: 0 0 8px rgba(114, 137, 218, 0.8);
+}
+
+.lcd-indicator.discord-indicator.active svg {
+  filter: drop-shadow(0 0 5px rgba(114, 137, 218, 0.9));
 }
 
 .lcd-indicator.chunk-indicator.active {

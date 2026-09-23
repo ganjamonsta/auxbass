@@ -129,6 +129,7 @@ async def main():
     logger.info(f"Домен: {settings.webapp_url}")
     logger.info(f"База данных: {settings.database_url}")
     logger.info(f"Порт: {port}")
+    logger.info(f"Discord Бот: {'Включен (активен)' if settings.is_discord_enabled else 'Не настроен (DISCORD_BOT_TOKEN не указан)'}")
     
     # Инициализация состояния приложения
     fastapi_app.state.bot_online = False

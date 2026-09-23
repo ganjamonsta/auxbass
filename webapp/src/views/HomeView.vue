@@ -8,6 +8,9 @@
       </p>
     </header>
 
+    <!-- Live Discord Party Card -->
+    <DiscordPartyCard />
+
     <!-- Top Quick-Access Grid (Spotify 2x3 / 3x2) -->
     <!-- Skeletons while loading quick access -->
     <section v-if="loadingQuickAccess" class="quick-access-grid">
@@ -376,6 +379,7 @@ import {
 } from 'lucide-vue-next'
 import { useHorizontalScroll } from '@/composables/useHorizontalScroll'
 import HomeExploreSection from '@/components/home/HomeExploreSection.vue'
+import DiscordPartyCard from '@/components/discord/DiscordPartyCard.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()

@@ -44,6 +44,8 @@ from api.utils.bot_helpers import close_bot as close_image_bot, close_http_sessi
 from api.routers.social import router as social_router
 from api.routers.tags import router as tags_router
 from api.routers.ingestion import router as ingestion_router
+from api.routers.discord import router as discord_router
+from api.services.discord_service import discord_service
 from api.services.version import get_version_info
 
 
@@ -197,9 +199,18 @@ async def lifespan(app: FastAPI):
     # Start channel service queue worker for auto-forwarding liked tracks
     await start_channel_service()
     
+    # Start Discord Bot & Voice Worker if configured
+    if discord_service.is_configured:
+        await discord_service.start()
+        logger.info("🤖 Discord Voice Service initialized")
+    else:
+        logger.info("ℹ️ Discord Bot token not provided. Discord streaming disabled.")
+    
     yield
     
     # Cleanup
+    if discord_service.is_configured:
+        await discord_service.stop()
     await stop_channel_service()
     if api_bot:
         await api_bot.session.close()
@@ -250,6 +261,7 @@ app.include_router(social_router, prefix="/api/social", tags=["Social"])
 app.include_router(social_router, prefix="/api", tags=["Social-Legacy"])
 app.include_router(tags_router, prefix="/api/tracks", tags=["Tags"])
 app.include_router(ingestion_router)
+app.include_router(discord_router, prefix="/api", tags=["Discord"])
 
 
 # ============== Static Files & SPA Fallback ==============

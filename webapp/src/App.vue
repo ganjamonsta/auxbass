@@ -210,6 +210,9 @@
       <!-- Share Modal -->
       <ShareModal />
 
+      <!-- Discord Voice Party Modal -->
+      <DiscordPartyModal />
+
       <!-- Channel Access Required Modal -->
       <Teleport to="body">
         <div v-if="channelAccessModal.show" class="channel-access-overlay" @click.self="channelAccessModal.show = false">
@@ -280,6 +283,9 @@ const ChannelBanner = defineAsyncComponent(() => import('@/components/ChannelBan
 const NetworkBanner = defineAsyncComponent(() => import('@/components/NetworkBanner.vue'))
 const ExportifyImportModal = defineAsyncComponent(() => import('@/components/ExportifyImportModal.vue'))
 const ImportModal = defineAsyncComponent(() => import('@/components/ImportModal.vue'))
+const DiscordPartyModal = defineAsyncComponent(() => import('@/components/discord/DiscordPartyModal.vue'))
+
+import { useDiscordStore } from '@/stores/discord'
 
 const route = useRoute()
 const router = useRouter()
@@ -289,6 +295,7 @@ const libraryStore = useLibraryStore()
 const uiStore = useUIStore()
 const tasksStore = useTasksStore()
 const externalAccountsStore = useExternalAccountsStore()
+const discordStore = useDiscordStore()
 const telegram = inject('telegram')
 const networkMonitor = useNetworkMonitor()
 const pwaInstall = usePwaInstall()
@@ -858,6 +865,7 @@ onMounted(async () => {
       externalAccountsStore.fetchLastSpotifyImport().catch(() => {})
       tasksStore.checkRecentJobs().catch(() => {})
       libraryStore.startSyncPolling()
+      discordStore.init().catch(() => {})
     }
   })
 

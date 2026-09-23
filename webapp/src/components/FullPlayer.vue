@@ -223,6 +223,17 @@
           @input="$emit('setVolume', Number($event.target.value) / 100)"
         />
       </div>
+      <!-- Context-sensitive Discord broadcast button (only if user is in voice channel!) -->
+      <button 
+        v-if="discordStore.isUserInVoice"
+        class="discord-toggle-btn"
+        :class="{ active: discordStore.isDiscordActive }"
+        @click="discordStore.openPartyModal()"
+        :title="`Трансляция в Discord: #${discordStore.channelName}`"
+      >
+        <Radio :size="20" />
+        <span class="discord-indicator-pulse"></span>
+      </button>
       <button 
         class="lyrics-toggle-btn" 
         :class="{ active: showLyrics }"
@@ -332,7 +343,7 @@
 <script setup>
 import { ref, computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
-import { Disc3, Share2 } from 'lucide-vue-next'
+import { Disc3, Share2, Radio } from 'lucide-vue-next'
 import { getTrackCoverStyle, getTrackInitials, splitArtists, getDisplayTitle, getDisplayArtist, getAllTrackArtists, getCoverUrl, CoverSize, suppressNextClick, suppressNextContextMenu } from '@/utils'
 import TagChips from '@/components/TagChips.vue'
 import TrackTags from '@/components/TrackTags.vue'
@@ -343,7 +354,10 @@ import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useAuthStore } from '@/stores/auth'
 import { useShare } from '@/composables/useShare'
+import { useDiscordStore } from '@/stores/discord'
 import { albumsApi } from '@/api/client'
+
+const discordStore = useDiscordStore()
 
 const props = defineProps({
   track: Object,

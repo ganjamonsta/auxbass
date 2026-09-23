@@ -74,6 +74,15 @@ class Settings(BaseSettings):
     # Create a private group, add the bot as admin, set the group's chat_id here.
     scanner_buffer_chat_id: int = 0
     
+    # Discord Bot & Voice Integration
+    discord_bot_token: str = ""
+    discord_client_id: str = ""
+    discord_client_secret: str = ""
+    
+    @property
+    def is_discord_enabled(self) -> bool:
+        return bool(self.discord_bot_token and self.discord_bot_token.strip())
+    
     class Config:
         env_file = (".env", ".env.local")
         env_file_encoding = "utf-8"

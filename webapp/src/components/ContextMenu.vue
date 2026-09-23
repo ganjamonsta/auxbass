@@ -154,6 +154,11 @@
                       <ListMusic :size="18" />
                       <span>Добавить в очередь</span>
                     </button>
+                    <!-- Discord Party Option -->
+                    <button v-if="discordStore.hasParty" class="menu-item discord-item" @mouseenter="handleRegularItemMouseEnter" @click="handleAddToDiscord">
+                      <Radio :size="18" />
+                      <span>В тусовку Discord</span>
+                    </button>
                   </template>
 
                   <button class="menu-item" @mouseenter="handleRegularItemMouseEnter" @click="exec('addToPlaylist')">
@@ -503,11 +508,13 @@ import TagChips from '@/components/TagChips.vue'
 import { 
   X, User, Disc3, Play, ListMusic, Plus, Minus, Pencil, Check,
   Trash2, FolderOpen, Shuffle, Music, Mic2, ChevronRight, ChevronDown,
-  ChevronLeft, ThumbsDown, Heart, Share2, Pin, PinOff, Link2, Send, CloudDownload, AtSign
+  ChevronLeft, ThumbsDown, Heart, Share2, Pin, PinOff, Link2, Send, CloudDownload, AtSign, Radio
 } from 'lucide-vue-next'
+import { useDiscordStore } from '@/stores/discord'
 
 const router = useRouter()
 const uiStore = useUIStore()
+const discordStore = useDiscordStore()
 const { copyLink, copyInlineCommand, shareToTelegramChat, downloadToTelegram } = useShare()
 
 // Submenu state (Spotify-style)
@@ -655,6 +662,18 @@ watch(isOpen, (open) => {
 // Execute action shorthand
 const exec = (action, extra = null) => {
   executeAction(action, extra)
+}
+
+const handleAddToDiscord = async () => {
+  if (menuData.value) {
+    try {
+      await discordStore.addToQueue(menuData.value)
+      uiStore.toast.success('Добавлено в Discord', `«${menuData.value.title}» добавлен в очередь тусовки`)
+    } catch (e) {
+      uiStore.toast.error('Ошибка', 'Не удалось добавить трек в Discord')
+    }
+  }
+  closeMenu()
 }
 
 // Go to specific artist (for multi-artist tracks or albums)
