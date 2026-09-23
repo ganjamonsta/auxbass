@@ -19,10 +19,13 @@ if not exist ".env.local" (
     exit /b 1
 )
 
-REM Копируем .env.local в .env для запуска
-copy /Y .env.local .env >nul
-
-echo [OK] Используем .env.local (скопирован в .env)
+REM Копируем .env.local в .env только если .env еще нет
+if not exist ".env" (
+    copy /Y .env.local .env >nul
+    echo [OK] Создан .env из .env.local
+) else (
+    echo [OK] Используем текущий .env
+)
 echo.
 echo Что запустить?
 echo.

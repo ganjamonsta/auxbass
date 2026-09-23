@@ -17,51 +17,88 @@ settings = get_settings()
 
 # ──────────────────────── Main Menu ────────────────────────
 
+def _is_valid_webapp_url(url: str) -> bool:
+    return bool(url and url.strip().startswith("https://"))
+
+
 def get_main_menu_keyboard() -> InlineKeyboardMarkup:
     """Main menu — sleek and minimal with prominent WebApp button"""
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(
+    rows = []
+    if _is_valid_webapp_url(settings.webapp_url):
+        rows.append([InlineKeyboardButton(
             text="🎵 Открыть плеер",
             web_app=WebAppInfo(url=settings.webapp_url),
-        )],
-        [
+        )])
+        rows.append([
             InlineKeyboardButton(text="☁️ Мой канал", callback_data="menu:channel"),
             InlineKeyboardButton(text="🌐 Вход в браузере", callback_data="lib:login"),
-        ],
-        [
-            InlineKeyboardButton(text="📊 Статистика", callback_data="menu:stats"),
-        ],
+        ])
+    else:
+        # Telegram API requires HTTPS for WebAppInfo; for local dev use direct browser login callback
+        rows.append([
+            InlineKeyboardButton(text="🌐 Вход в браузере (Dev)", callback_data="lib:login"),
+            InlineKeyboardButton(text="☁️ Мой канал", callback_data="menu:channel"),
+        ])
+    
+    rows.append([
+        InlineKeyboardButton(text="📊 Статистика", callback_data="menu:stats"),
     ])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def get_webapp_keyboard() -> InlineKeyboardMarkup:
     """Single WebApp player launch button"""
+    if _is_valid_webapp_url(settings.webapp_url):
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="🎵 Открыть плеер",
+                web_app=WebAppInfo(url=settings.webapp_url),
+            )]
+        ])
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
-            text="🎵 Открыть плеер",
-            web_app=WebAppInfo(url=settings.webapp_url),
+            text="🌐 Вход в браузере",
+            callback_data="lib:login",
         )]
     ])
 
 
 def get_track_keyboard(track_id: Optional[int] = None) -> InlineKeyboardMarkup:
     """Keyboard for single track confirmation"""
+    if _is_valid_webapp_url(settings.webapp_url):
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="🎵 Открыть плеер",
+                web_app=WebAppInfo(url=settings.webapp_url),
+            )]
+        ])
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
-            text="🎵 Открыть плеер",
-            web_app=WebAppInfo(url=settings.webapp_url),
+            text="🌐 Вход в браузере",
+            callback_data="lib:login",
         )]
     ])
 
 
 def get_deep_link_keyboard(param: str, label: str = "🎵 Открыть в плеере") -> InlineKeyboardMarkup:
     """Keyboard with deep link param into WebApp"""
-    sep = "&" if "?" in settings.webapp_url else "?"
-    url = f"{settings.webapp_url}{sep}startapp={param}"
+    if _is_valid_webapp_url(settings.webapp_url):
+        sep = "&" if "?" in settings.webapp_url else "?"
+        url = f"{settings.webapp_url}{sep}startapp={param}"
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text=label,
+                web_app=WebAppInfo(url=url),
+            )],
+            [InlineKeyboardButton(
+                text="🏠 Главное меню",
+                callback_data="menu:main",
+            )]
+        ])
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
-            text=label,
-            web_app=WebAppInfo(url=url),
+            text="🌐 Вход в браузере",
+            callback_data="lib:login",
         )],
         [InlineKeyboardButton(
             text="🏠 Главное меню",

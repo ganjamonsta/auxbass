@@ -281,12 +281,17 @@ async def cmd_start(message: Message, state: FSMContext, command: CommandObject 
             )
             return
 
+    dev_link_note = ""
+    if not (settings.webapp_url and settings.webapp_url.strip().startswith("https://")):
+        dev_link_note = "\n\n🌐 <b>Локальный веб-плеер:</b>\n👉 <a href=\"http://localhost:5173/?dev=1\">http://localhost:5173/?dev=1</a>"
+
     await message.answer(
         f"👋 Привет, <b>{user.first_name}</b>!\n\n"
         f"🎵 <b>{settings.display_name}</b> — твоя персональная музыкальная библиотека.\n\n"
         "• Отправляй сюда любые аудиофайлы (по одному или пачками)\n"
         "• Бот сам подтянет обложки, альбомы и авторов\n"
-        "• Слушай музыку прямо в Telegram или в браузере\n\n"
+        "• Слушай музыку прямо в Telegram или в браузере"
+        f"{dev_link_note}\n\n"
         "Нажми кнопку ниже, чтобы открыть плеер:",
         reply_markup=get_main_menu_keyboard(),
     )

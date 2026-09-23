@@ -90,6 +90,7 @@ async def main():
                 except Exception:
                     pass
             return True
+        logger.error(f"Telegram BadRequest: {event.exception}")
         return False
     
     # Register routers — menu_router first (handles /start, /menu, all menu callbacks)
