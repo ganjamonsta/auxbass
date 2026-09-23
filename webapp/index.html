@@ -47,18 +47,36 @@
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
     
-    <!-- Service Worker Registration -->
+    <!-- Service Worker Registration (только на проде, на localhost отключаем и чистим старый кэш) -->
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-              console.log('SW registered:', registration.scope);
-            })
-            .catch((error) => {
-              console.log('SW registration failed:', error);
+        if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+          // В локальном деве отключаем Service Worker, чтобы он не блокировал обновления HMR
+          navigator.serviceWorker.getRegistrations().then((registrations) => {
+            for (const registration of registrations) {
+              registration.unregister();
+              console.log('[Dev] Unregistered stale Service Worker:', registration.scope);
+            }
+          });
+          if ('caches' in window) {
+            caches.keys().then((names) => {
+              for (const name of names) {
+                caches.delete(name);
+                console.log('[Dev] Deleted cache:', name);
+              }
             });
-        });
+          }
+        } else {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+              .then((registration) => {
+                console.log('SW registered:', registration.scope);
+              })
+              .catch((error) => {
+                console.log('SW registration failed:', error);
+              });
+          });
+        }
       }
     </script>
   </body>
