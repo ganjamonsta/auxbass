@@ -301,6 +301,13 @@ const networkMonitor = useNetworkMonitor()
 const pwaInstall = usePwaInstall()
 const showProfileMenu = ref(false)
 
+// === Channel Access Required Modal State ===
+const channelAccessModal = ref({
+  show: false,
+  channelTitle: '',
+  botUsername: ''
+})
+
 // Pull-to-refresh — bound to .main-content via scrollRef
 const { scrollRef, pullDistance, isPulling, isRefreshing } = usePullToRefresh(
   () => libraryStore.refresh(),
@@ -764,13 +771,6 @@ const handleStallRecovered = (e) => {
 const handleNetworkRecovered = () => {
   uiStore.toast.success('Сеть восстановлена', 'Соединение восстановлено')
 }
-
-// === Channel Access Required Modal State ===
-const channelAccessModal = ref({
-  show: false,
-  channelTitle: '',
-  botUsername: ''
-})
 
 const handleChannelAccessRequired = (e) => {
   const detail = e.detail || {}

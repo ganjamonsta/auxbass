@@ -1,5 +1,9 @@
 import { createApp } from 'vue'
-import { createPinia } from 'pinia'
+import { createPinia, setActivePinia } from 'pinia'
+
+const pinia = createPinia()
+setActivePinia(pinia)
+
 import App from './App.vue'
 import router from './router'
 import './style.css'
@@ -76,7 +80,7 @@ if (tg) {
 import longpress from './directives/longpress'
 
 const app = createApp(App)
-app.use(createPinia())
+app.use(pinia)
 app.use(router)
 app.directive('longpress', longpress)
 
