@@ -30,8 +30,8 @@ echo   1. API (FastAPI backend на http://localhost:8000)
 echo   2. Bot (Telegram bot)  
 echo   3. Webapp Dev (Vite dev-сервер: http://localhost:5173/?dev=1)
 echo   4. Все вместе (API + Bot + Vite Dev в 3 окнах)
-echo   5. 📦 Собрать Webapp (npm run build -> webapp\dist)
-echo   6. 🚀 Собрать Webapp и запустить всё (Build -> API + Bot + Webapp)
+echo   5. 📦 Собрать Webapp (npm run build в webapp\dist)
+echo   6. 🚀 Собрать Webapp и запустить всё (Build ==> API + Bot + Webapp)
 echo   7. PostgreSQL (Docker)
 echo.
 set /p choice="Выбери (1-7): "
@@ -49,7 +49,7 @@ if "%choice%"=="2" (
     echo Запускаю Telegram Bot
     echo Ctrl+C для остановки
     echo.
-    python bot/main.py
+    python -m bot.main
 )
 
 if "%choice%"=="3" (
@@ -66,8 +66,8 @@ if "%choice%"=="4" (
     echo.
     echo Запускаю всё в отдельных окнах...
     start "TG Player API (:8000)" cmd /k "python -m uvicorn api.main:app --reload --port 8000"
-    start "TG Player Bot" cmd /k "python bot/main.py"
-    start "TG Player Webapp Dev (:5173)" cmd /k "cd /d \"%~dp0webapp\" && npm run dev"
+    start "TG Player Bot" cmd /k "python -m bot.main"
+    start "TG Player Webapp Dev (:5173)" /D "%~dp0webapp" cmd /k "npm run dev"
     echo.
     echo [OK] Открыто 3 окна:
     echo   - API:        http://localhost:8000
@@ -107,8 +107,8 @@ if "%choice%"=="6" (
     echo   Шаг 2: 🚀 Запуск сервисов в 3 окнах...
     echo ====================================================
     start "TG Player API (:8000)" cmd /k "python -m uvicorn api.main:app --reload --port 8000"
-    start "TG Player Bot" cmd /k "python bot/main.py"
-    start "TG Player Webapp Dev (:5173)" cmd /k "cd /d \"%~dp0webapp\" && npm run dev"
+    start "TG Player Bot" cmd /k "python -m bot.main"
+    start "TG Player Webapp Dev (:5173)" /D "%~dp0webapp" cmd /k "npm run dev"
     echo.
     echo [OK] Всё запущено со свежесобранным dist!
     echo   - FastAPI + Dist (для Telegram): http://localhost:8000/?dev=1
