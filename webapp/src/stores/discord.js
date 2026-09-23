@@ -35,7 +35,10 @@ export const useDiscordStore = defineStore('discord', () => {
   const isUserInVoice = ref(false)
   
   const isLinked = ref(false)
+  const linkedDiscordId = ref('')
   const linkedDiscordUsername = ref('')
+  const linkedDiscordDisplayName = ref('')
+  const linkedDiscordAvatar = ref('')
   const detectedUserChannel = ref(null)
   const availableChannels = ref([])
   const inviteUrl = ref('')
@@ -121,11 +124,31 @@ export const useDiscordStore = defineStore('discord', () => {
       const res = await discordApi.getUserState()
       const data = res.data
       isLinked.value = !!data.is_linked
+      linkedDiscordId.value = data.discord_id || ''
       linkedDiscordUsername.value = data.discord_username || ''
+      linkedDiscordDisplayName.value = data.discord_display_name || ''
+      linkedDiscordAvatar.value = data.discord_avatar_url || ''
       detectedUserChannel.value = data.channel || null
       return data
     } catch (e) {
       console.error('Failed to fetch user Discord state:', e)
+    }
+  }
+
+  async function fetchAccount() {
+    try {
+      const res = await discordApi.getAccount()
+      const data = res.data
+      if (data && data.linked) {
+        isLinked.value = true
+        linkedDiscordId.value = data.discord_id || ''
+        linkedDiscordUsername.value = data.username || ''
+        linkedDiscordDisplayName.value = data.display_name || ''
+        linkedDiscordAvatar.value = data.avatar_url || ''
+      }
+      return data
+    } catch (e) {
+      console.error('Failed to fetch Discord account:', e)
     }
   }
 
@@ -227,7 +250,10 @@ export const useDiscordStore = defineStore('discord', () => {
   async function linkAccount(discordId, username = '', displayName = '') {
     const res = await discordApi.linkAccount(discordId, username, displayName)
     isLinked.value = true
-    linkedDiscordUsername.value = res.data.username
+    linkedDiscordId.value = res.data.discord_id || discordId
+    linkedDiscordUsername.value = res.data.username || ''
+    linkedDiscordDisplayName.value = res.data.display_name || ''
+    linkedDiscordAvatar.value = res.data.avatar_url || ''
     await fetchUserState()
     return res.data
   }
@@ -235,8 +261,70 @@ export const useDiscordStore = defineStore('discord', () => {
   async function unlinkAccount() {
     await discordApi.unlinkAccount()
     isLinked.value = false
+    linkedDiscordId.value = ''
     linkedDiscordUsername.value = ''
+    linkedDiscordDisplayName.value = ''
+    linkedDiscordAvatar.value = ''
     detectedUserChannel.value = null
+  }
+
+  async function startOAuth() {
+    const res = await discordApi.getOAuthUrl()
+    if (!res.data || !res.data.configured || !res.data.url) {
+      throw new Error(res.data?.message || 'Discord OAuth2 не настроен на сервере')
+    }
+
+    const authUrl = res.data.url
+    const width = 500
+    const height = 750
+    const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2))
+    const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2))
+
+    const popup = window.open(
+      authUrl,
+      'discord_oauth_popup',
+      `width=${width},height=${height},left=${left},top=${top},status=0,menubar=0,toolbar=0`
+    )
+
+    if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+      // Fallback for browsers / webviews blocking popups
+      window.location.href = authUrl
+      return
+    }
+
+    return new Promise((resolve, reject) => {
+      let cleanup = null
+
+      const messageHandler = (event) => {
+        if (event.data?.type === 'discord_oauth_success') {
+          isLinked.value = true
+          linkedDiscordId.value = event.data.discord_id || ''
+          linkedDiscordUsername.value = event.data.username || ''
+          linkedDiscordDisplayName.value = event.data.display_name || ''
+          linkedDiscordAvatar.value = event.data.avatar_url || ''
+          fetchUserState()
+          if (cleanup) cleanup()
+          resolve(event.data)
+        } else if (event.data?.type === 'discord_oauth_error') {
+          if (cleanup) cleanup()
+          reject(new Error(event.data.error || 'Ошибка авторизации Discord'))
+        }
+      }
+
+      const pollTimer = setInterval(() => {
+        if (popup.closed) {
+          if (cleanup) cleanup()
+          fetchUserState().then(() => resolve(null))
+        }
+      }, 1000)
+
+      cleanup = () => {
+        window.removeEventListener('message', messageHandler)
+        clearInterval(pollTimer)
+      }
+
+      window.addEventListener('message', messageHandler)
+    })
   }
 
   function toggleListenAlong() {
@@ -339,7 +427,10 @@ export const useDiscordStore = defineStore('discord', () => {
     canControl,
     isUserInVoice,
     isLinked,
+    linkedDiscordId,
     linkedDiscordUsername,
+    linkedDiscordDisplayName,
+    linkedDiscordAvatar,
     detectedUserChannel,
     availableChannels,
     inviteUrl,
@@ -350,6 +441,7 @@ export const useDiscordStore = defineStore('discord', () => {
     init,
     fetchParty,
     fetchUserState,
+    fetchAccount,
     fetchAvailableChannels,
     fetchInvite,
     connectToChannel,
@@ -367,6 +459,7 @@ export const useDiscordStore = defineStore('discord', () => {
     transferDj,
     linkAccount,
     unlinkAccount,
+    startOAuth,
     toggleListenAlong,
     openPartyModal,
     closePartyModal,

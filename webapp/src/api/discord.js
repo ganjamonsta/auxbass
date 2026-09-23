@@ -19,6 +19,7 @@ export const discordApi = {
   setDjLock: (locked) => api.post('/discord/dj/lock', { locked }),
   transferDj: (targetUserId) => api.post('/discord/dj/transfer', { target_user_id: targetUserId }),
   getAccount: () => api.get('/discord/account'),
+  getOAuthUrl: () => api.get('/discord/oauth/url'),
   linkAccount: (discordId, username = '', displayName = '') =>
     api.post('/discord/account', { discord_id: discordId, username, display_name: displayName }),
   unlinkAccount: () => api.delete('/discord/account'),

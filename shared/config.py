@@ -78,6 +78,13 @@ class Settings(BaseSettings):
     discord_bot_token: str = ""
     discord_client_id: str = ""
     discord_client_secret: str = ""
+    discord_redirect_uri: str = ""
+    
+    @property
+    def effective_discord_redirect_uri(self) -> str:
+        if self.discord_redirect_uri and self.discord_redirect_uri.strip():
+            return self.discord_redirect_uri.strip()
+        return f"{self.api_url.rstrip('/')}/api/discord/oauth/callback"
     
     @property
     def is_discord_enabled(self) -> bool:
