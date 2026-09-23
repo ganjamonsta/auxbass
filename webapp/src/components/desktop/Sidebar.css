@@ -1131,3 +1131,47 @@
   background: var(--c-accent, #1db954);
   color: #000;
 }
+
+/* DJ Deck Rail & Nav Item Styles */
+.rail-nav-item.dj-rail-item {
+  position: relative;
+}
+
+.rail-live-dot {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--c-accent, #1db954);
+  box-shadow: 0 0 6px var(--c-accent);
+  animation: pulse-green 1.5s infinite;
+}
+
+.dj-nav-item.is-live .dj-nav-icon {
+  color: var(--c-accent, #1db954);
+}
+
+.dj-live-pill {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(29, 185, 84, 0.15);
+  color: var(--c-accent, #1db954);
+  border: 1px solid rgba(29, 185, 84, 0.3);
+  border-radius: var(--r-full, 9999px);
+  padding: 1px 7px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.dj-live-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--c-accent, #1db954);
+  animation: pulse-green 1.5s infinite;
+}

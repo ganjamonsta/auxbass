@@ -23,7 +23,7 @@
     <!-- Bottom Navigation -->
     <nav v-if="showNav" class="footer-nav">
       <button 
-        v-for="item in navItems" 
+        v-for="item in effectiveNavItems" 
         :key="item.path"
         class="nav-item" 
         :class="{ active: isActiveRoute(item.path, item.matchPaths) }"
@@ -42,9 +42,10 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MiniPlayer from '@/components/MiniPlayer.vue'
-import { Home, Search, Library, Heart } from 'lucide-vue-next'
+import { Home, Search, Library, Heart, Radio } from 'lucide-vue-next'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useLibraryStore } from '@/stores/library'
+import { useDiscordStore } from '@/stores/discord'
 
 const props = defineProps({
   // Player props
@@ -110,6 +111,15 @@ const emit = defineEmits([
 
 const route = useRoute()
 const router = useRouter()
+const discordStore = useDiscordStore()
+
+const effectiveNavItems = computed(() => {
+  const items = [...props.navItems]
+  if (discordStore.hasParty || discordStore.isUserInVoice) {
+    items.push({ path: '/dj', icon: Radio, label: 'DJ', matchPaths: ['/dj', '/party'] })
+  }
+  return items
+})
 
 const footerClasses = computed(() => ({
   'footer--has-player': props.showPlayer && props.currentTrack,

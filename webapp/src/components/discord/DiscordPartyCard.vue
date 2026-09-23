@@ -134,10 +134,12 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { Disc, Crown, Headphones, Sliders, Volume2, Radio } from 'lucide-vue-next'
 import { useDiscordStore } from '@/stores/discord'
 import { usePlayerStore } from '@/stores/player'
 
+const router = useRouter()
 const discordStore = useDiscordStore()
 const playerStore = usePlayerStore()
 
@@ -171,7 +173,7 @@ const membersLabel = computed(() => {
 })
 
 function openModal() {
-  discordStore.openPartyModal()
+  router.push('/dj')
 }
 
 async function handleSummonBot() {
@@ -183,7 +185,7 @@ async function handleSummonBot() {
     if (playerStore.currentTrack) {
       await discordStore.play(playerStore.currentTrack, playerStore.queue, playerStore.progress)
     }
-    discordStore.openPartyModal()
+    router.push('/dj')
   } catch (e) {
     console.error('Failed to summon Discord bot:', e)
   }

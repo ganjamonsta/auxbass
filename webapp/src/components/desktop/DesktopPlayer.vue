@@ -244,6 +244,18 @@
         <PanelRightClose v-if="uiStore.isNowPlayingSidebarVisible" :size="16" />
         <PanelRight v-else :size="16" />
       </button>
+
+      <!-- Discord DJ Button -->
+      <button 
+        v-if="discordStore.hasParty || discordStore.isUserInVoice"
+        class="discord-ctrl-btn"
+        :class="{ active: discordStore.isDiscordActive }"
+        @click="$router.push('/dj')"
+        :title="discordStore.hasParty ? `DJ-пульт Discord: #${discordStore.channelName} (В эфире)` : 'DJ-пульт в Discord'"
+      >
+        <Radio :size="16" />
+        <span v-if="discordStore.hasParty" class="discord-btn-pulse"></span>
+      </button>
     </div>
   </div>
 </template>
@@ -255,15 +267,17 @@ import { useLibraryStore } from '@/stores/library'
 import { useUIStore } from '@/stores/ui'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { getCoverUrl, CoverSize } from '@/utils'
-import { Play, Square, Pause, Volume2, VolumeX, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Share2, PanelRightClose, PanelRight } from 'lucide-vue-next'
+import { Play, Square, Pause, Volume2, VolumeX, SkipBack, SkipForward, Shuffle, Repeat, Repeat1, Share2, PanelRightClose, PanelRight, Radio } from 'lucide-vue-next'
 import { useNetworkMonitor } from '@/composables/useNetworkMonitor'
 import { useShare } from '@/composables/useShare'
+import { useDiscordStore } from '@/stores/discord'
 import { getAudioAnalyser } from '@/stores/playerEnhancer'
 import VfdSegmentDisplay from './VfdSegmentDisplay.vue'
 
 const playerStore = usePlayerStore()
 const libraryStore = useLibraryStore()
 const uiStore = useUIStore()
+const discordStore = useDiscordStore()
 const { openMenu } = useContextMenu()
 const { openShare } = useShare()
 const networkMonitor = useNetworkMonitor()
@@ -1518,6 +1532,41 @@ onUnmounted(() => {
 
 .sidebar-ctrl-btn.active {
   color: var(--c-accent, #1db954);
+}
+
+.discord-ctrl-btn {
+  position: relative;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.discord-ctrl-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--c-accent, #1db954);
+}
+
+.discord-ctrl-btn.active {
+  color: var(--c-accent, #1db954);
+}
+
+.discord-btn-pulse {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--c-accent, #1db954);
+  box-shadow: 0 0 6px var(--c-accent);
+  animation: pulse-green 1.5s infinite;
 }
 
 .like-btn:hover {

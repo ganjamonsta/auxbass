@@ -74,6 +74,18 @@
           <div class="rail-active-indicator"></div>
         </router-link>
 
+        <!-- DJ Rail Item -->
+        <router-link 
+          to="/dj" 
+          class="rail-nav-item dj-rail-item" 
+          :class="{ active: isActive('/dj') || isActive('/party'), 'is-live': discordStore.hasParty }"
+          :title="discordStore.hasParty ? `DJ-пульт: #${discordStore.channelName} (В эфире)` : 'DJ-пульт в Discord'"
+        >
+          <Radio :size="20" class="dj-rail-icon" />
+          <div v-if="discordStore.hasParty" class="rail-live-dot" title="Трансляция в эфире"></div>
+          <div class="rail-active-indicator"></div>
+        </router-link>
+
         <router-link 
           to="/settings#import" 
           class="rail-nav-item" 
@@ -300,6 +312,21 @@
           <span>Подписки</span>
         </router-link>
 
+        <!-- Discord DJ / Тусовка -->
+        <router-link 
+          to="/dj" 
+          class="nav-item dj-nav-item" 
+          :class="{ active: isActive('/dj') || isActive('/party'), 'is-live': discordStore.hasParty }"
+          :title="discordStore.hasParty ? `DJ-пульт: #${discordStore.channelName} (В эфире)` : 'DJ-пульт в Discord'"
+        >
+          <Radio :size="20" class="dj-nav-icon" />
+          <span>DJ-пульт</span>
+          <span v-if="discordStore.hasParty" class="dj-live-pill">
+            <span class="dj-live-dot"></span>
+            <span>LIVE</span>
+          </span>
+        </router-link>
+
         <!-- Import Root Item -->
         <router-link 
           to="/settings#import" 
@@ -487,6 +514,7 @@ import {
 } from 'lucide-vue-next'
 import { getCacheStats } from '@/utils/audioCacheDb'
 import { useExternalAccountsStore } from '@/stores/externalAccounts'
+import { useDiscordStore } from '@/stores/discord'
 import ProfileMenu from '@/components/layout/ProfileMenu.vue'
 
 const route = useRoute()
@@ -497,6 +525,7 @@ const uiStore = useUIStore()
 const playerStore = usePlayerStore()
 const tasksStore = useTasksStore()
 const externalAccountsStore = useExternalAccountsStore()
+const discordStore = useDiscordStore()
 const showProfileMenu = ref(false)
 const cachedTracksCount = ref(0)
 

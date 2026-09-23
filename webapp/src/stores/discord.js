@@ -238,6 +238,38 @@ export const useDiscordStore = defineStore('discord', () => {
     await discordApi.removeFromQueue(index)
   }
 
+  async function playQueueIndex(index) {
+    if (index >= 0 && index < queue.value.length) {
+      queueIndex.value = index
+      currentTrack.value = queue.value[index]
+    }
+    await discordApi.playQueueIndex(index)
+  }
+
+  async function moveQueueTrack(fromIndex, toIndex) {
+    if (fromIndex >= 0 && fromIndex < queue.value.length && toIndex >= 0 && toIndex < queue.value.length) {
+      // Optimistic local update
+      const item = queue.value.splice(fromIndex, 1)[0]
+      queue.value.splice(toIndex, 0, item)
+    }
+    await discordApi.moveQueueTrack(fromIndex, toIndex)
+  }
+
+  async function clearQueue(keepCurrent = true) {
+    if (keepCurrent && queueIndex.value >= 0 && queueIndex.value < queue.value.length) {
+      queue.value = [queue.value[queueIndex.value]]
+      queueIndex.value = 0
+    } else {
+      queue.value = []
+      queueIndex.value = -1
+    }
+    await discordApi.clearQueue(keepCurrent)
+  }
+
+  async function shuffleQueue() {
+    await discordApi.shuffleQueue()
+  }
+
   async function setDjLock(locked) {
     const res = await discordApi.setDjLock(locked)
     djLock.value = res.data.dj_lock
@@ -513,6 +545,10 @@ export const useDiscordStore = defineStore('discord', () => {
     setVolume,
     addToQueue,
     removeFromQueue,
+    playQueueIndex,
+    moveQueueTrack,
+    clearQueue,
+    shuffleQueue,
     setDjLock,
     transferDj,
     linkAccount,

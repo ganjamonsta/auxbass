@@ -88,12 +88,12 @@
               <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
             </svg>
           </span>
-          <!-- Discord Voice Party indicator (only if in voice channel!) -->
+          <!-- Discord Voice Party indicator -->
           <span 
-            v-if="discordStore.isUserInVoice" 
+            v-if="discordStore.hasParty || discordStore.isUserInVoice" 
             class="lcd-indicator discord-indicator active" 
             :title="`Трансляция в Discord: #${discordStore.channelName || 'Voice'}`"
-            @click.stop="discordStore.openPartyModal()"
+            @click.stop="router.push('/dj')"
           >
             <Radio :size="13" />
           </span>
@@ -138,6 +138,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { Radio } from 'lucide-vue-next'
 import { usePlayerStore } from '@/stores/player'
 import { useContextMenu } from '@/composables/useContextMenu'
@@ -145,6 +146,7 @@ import { getDisplayTitle, getDisplayArtist } from '@/utils'
 import { useNetworkMonitor } from '@/composables/useNetworkMonitor'
 import { useDiscordStore } from '@/stores/discord'
 
+const router = useRouter()
 const playerStore = usePlayerStore()
 const discordStore = useDiscordStore()
 const { openMenu } = useContextMenu()

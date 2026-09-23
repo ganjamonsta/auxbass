@@ -14,6 +14,7 @@ const LikedTracksView = () => import('@/views/LikedTracksView.vue')
 const SettingsView = () => import('@/views/SettingsView.vue')
 const LoginView = () => import('@/views/LoginView.vue')
 const UserProfileView = () => import('@/views/UserProfileView.vue')
+const DjView = () => import('@/views/DjView.vue')
 
 import { useAuthStore } from '@/stores/auth'
 
@@ -87,6 +88,16 @@ const routes = [
     name: 'settings',
     component: SettingsView,
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/dj',
+    name: 'dj',
+    component: DjView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/party',
+    redirect: '/dj'
   },
   {
     path: '/login',

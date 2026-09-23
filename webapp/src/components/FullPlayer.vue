@@ -223,13 +223,13 @@
           @input="$emit('setVolume', Number($event.target.value) / 100)"
         />
       </div>
-      <!-- Context-sensitive Discord broadcast button (only if user is in voice channel!) -->
+      <!-- Context-sensitive Discord broadcast button -->
       <button 
-        v-if="discordStore.isUserInVoice"
+        v-if="discordStore.hasParty || discordStore.isUserInVoice"
         class="discord-toggle-btn"
         :class="{ active: discordStore.isDiscordActive }"
-        @click="discordStore.openPartyModal()"
-        :title="`Трансляция в Discord: #${discordStore.channelName}`"
+        @click="goToDjDeck"
+        :title="`Трансляция в Discord: #${discordStore.channelName || 'DJ-пульт'}`"
       >
         <Radio :size="20" />
         <span class="discord-indicator-pulse"></span>
@@ -439,6 +439,11 @@ const uiStore = useUIStore()
 const authStore = useAuthStore()
 const { openMenu } = useContextMenu()
 const { openShare } = useShare()
+
+function goToDjDeck() {
+  emit('close')
+  router.push('/dj')
+}
 
 const handleShareTrack = () => {
   if (!props.track?.id) return

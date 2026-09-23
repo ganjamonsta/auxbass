@@ -44,6 +44,7 @@ class DiscordService:
         self.volume: int = 100  # 0 to 100%
         self.started_at: float = 0
         self.position_offset: float = 0
+        self._manual_stop: bool = False  # Suppress on_finished auto-advance when stop/seek is initiated manually
         
         # Collaborative Queue
         self.queue: List[Dict[str, Any]] = []
@@ -276,6 +277,7 @@ class DiscordService:
             if self.voice_client:
                 try:
                     if self.voice_client.is_playing() or self.voice_client.is_paused():
+                        self._manual_stop = True
                         self.voice_client.stop()
                     await self.voice_client.disconnect(force=True)
                 except Exception as e:
@@ -326,10 +328,14 @@ class DiscordService:
                     {**t, "added_by": t.get("added_by") or user}
                     for t in new_queue
                 ]
-                self.queue_index = next((i for i, t in enumerate(self.queue) if t.get("id") == track_dict.get("id")), 0)
-            elif track_dict not in self.queue:
-                self.queue.append({**track_dict, "added_by": user})
-                self.queue_index = len(self.queue) - 1
+                self.queue_index = next((i for i, t in enumerate(self.queue) if str(t.get("id")) == str(track_dict.get("id"))), 0)
+            else:
+                matching_idx = next((i for i, t in enumerate(self.queue) if str(t.get("id")) == str(track_dict.get("id"))), None)
+                if matching_idx is not None:
+                    self.queue_index = matching_idx
+                else:
+                    self.queue.append({**track_dict, "added_by": user})
+                    self.queue_index = len(self.queue) - 1
 
             # Prepare streaming token
             track_id = track_dict.get("id")
@@ -351,6 +357,7 @@ class DiscordService:
 
             # Stop existing playback if active
             if self.voice_client.is_playing() or self.voice_client.is_paused():
+                self._manual_stop = True
                 self.voice_client.stop()
 
             # Build FFmpeg audio source
@@ -374,6 +381,10 @@ class DiscordService:
             def on_finished(error):
                 if error:
                     logger.error(f"[Discord Playback] Error during playback: {error}")
+                if self._manual_stop:
+                    logger.info("[Discord Playback] Manual stop detected, suppressing auto-advance")
+                    self._manual_stop = False
+                    return
                 asyncio.run_coroutine_threadsafe(self._on_track_ended(), self.bot.loop)
 
             self.voice_client.play(transformer, after=on_finished)
@@ -441,6 +452,10 @@ class DiscordService:
         def on_finished(error):
             if error:
                 logger.error(f"[Discord Playback] Error: {error}")
+            if self._manual_stop:
+                logger.info("[Discord Playback] Manual stop detected in internal track play, suppressing auto-advance")
+                self._manual_stop = False
+                return
             asyncio.run_coroutine_threadsafe(self._on_track_ended(), self.bot.loop)
 
         self.voice_client.play(transformer, after=on_finished)
@@ -490,10 +505,13 @@ class DiscordService:
             raise PermissionError("Включен режим 'Только DJ'.")
 
         if self.voice_client.is_playing() or self.voice_client.is_paused():
+            self._manual_stop = True
             self.voice_client.stop()
         self.is_playing = False
         self.is_paused = False
         self.current_track = None
+        self.started_at = 0
+        self.position_offset = 0
         await self._update_presence()
         await self._broadcast_party_update()
 
@@ -504,6 +522,7 @@ class DiscordService:
         if self.dj_lock and not self._can_user_control(user):
             raise PermissionError("Включен режим 'Только DJ'.")
 
+        position = max(0.0, position)
         await self.play_track(self.current_track, user, position=position)
 
     async def skip(self, user: Dict[str, Any]):
@@ -513,8 +532,12 @@ class DiscordService:
         if self.dj_lock and not self._can_user_control(user):
             raise PermissionError("Включен режим 'Только DJ'.")
 
-        if self.voice_client and (self.voice_client.is_playing() or self.voice_client.is_paused()):
-            self.voice_client.stop()
+        if self.queue and self.queue_index + 1 < len(self.queue):
+            self.queue_index += 1
+            next_track = self.queue[self.queue_index]
+            await self.play_track(next_track, user)
+        else:
+            await self.stop(user)
 
     async def set_volume(self, volume: int, user: Dict[str, Any]):
         """Set Discord playback volume (0 to 100)"""
@@ -537,7 +560,8 @@ class DiscordService:
         }
         self.queue.append(item)
 
-        if self.is_connected and not self.is_playing and not self.is_paused:
+        # Only auto-start playback if nothing was playing AND nothing was paused AND current_track is None
+        if self.is_connected and not self.is_playing and not self.is_paused and self.current_track is None:
             self.queue_index = len(self.queue) - 1
             await self.play_track(item, user)
 
@@ -555,6 +579,69 @@ class DiscordService:
             self.queue.pop(index)
             if self.queue_index >= index:
                 self.queue_index = max(0, self.queue_index - 1)
+            await self._broadcast_party_update()
+
+    async def play_queue_index(self, index: int, user: Dict[str, Any]):
+        """Jump directly to and play track at index in queue (cueing)"""
+        if not self.is_connected or not self.voice_client:
+            raise RuntimeError("Бот не подключен к голосовому каналу.")
+        if self.dj_lock and not self._can_user_control(user):
+            raise PermissionError("Включен режим 'Только DJ'. Только хост может переключать треки.")
+        if not (0 <= index < len(self.queue)):
+            raise ValueError("Неверный номер трека в очереди.")
+
+        target_track = self.queue[index]
+        self.queue_index = index
+        await self.play_track(target_track, user)
+
+    async def reorder_queue(self, from_index: int, to_index: int, user: Dict[str, Any]):
+        """Move track from from_index to to_index in queue"""
+        if self.dj_lock and not self._can_user_control(user):
+            raise PermissionError("Включен режим 'Только DJ'. Только хост может менять порядок очереди.")
+        if not (0 <= from_index < len(self.queue)) or not (0 <= to_index < len(self.queue)):
+            raise ValueError("Индексы выходят за пределы очереди.")
+        if from_index == to_index:
+            return
+
+        current_playing_track = self.queue[self.queue_index] if 0 <= self.queue_index < len(self.queue) else None
+        item = self.queue.pop(from_index)
+        self.queue.insert(to_index, item)
+
+        # Restore / adjust queue_index so current playing track is still correctly indexed
+        if current_playing_track:
+            try:
+                self.queue_index = self.queue.index(current_playing_track)
+            except ValueError:
+                pass
+
+        await self._broadcast_party_update()
+
+    async def clear_queue(self, user: Dict[str, Any], keep_current: bool = True):
+        """Clear upcoming tracks or whole queue"""
+        if self.dj_lock and not self._can_user_control(user):
+            raise PermissionError("Включен режим 'Только DJ'. Только хост может очищать очередь.")
+
+        if keep_current and 0 <= self.queue_index < len(self.queue):
+            current = self.queue[self.queue_index]
+            self.queue = [current]
+            self.queue_index = 0
+        else:
+            self.queue = []
+            self.queue_index = -1
+
+        await self._broadcast_party_update()
+
+    async def shuffle_queue(self, user: Dict[str, Any]):
+        """Shuffle upcoming tracks in queue (from queue_index + 1 onwards)"""
+        import random
+        if self.dj_lock and not self._can_user_control(user):
+            raise PermissionError("Включен режим 'Только DJ'. Только хост может перемешивать очередь.")
+
+        start_idx = self.queue_index + 1 if self.queue_index >= 0 else 0
+        if start_idx < len(self.queue) - 1:
+            upcoming = self.queue[start_idx:]
+            random.shuffle(upcoming)
+            self.queue = self.queue[:start_idx] + upcoming
             await self._broadcast_party_update()
 
     # =========================================================================

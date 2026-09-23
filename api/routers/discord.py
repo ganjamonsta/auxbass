@@ -2,7 +2,7 @@
 TG Player API - Discord Router
 Handles Discord voice control, party state, collaborative queue, and WebSocket synchronization.
 """
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 import logging
 import time
 from datetime import datetime
@@ -33,7 +33,7 @@ router = APIRouter(prefix="/discord", tags=["discord"])
 # =============================================================================
 
 class ConnectRequest(BaseModel):
-    channel_id: int
+    channel_id: Union[int, str]
 
 class PlayRequest(BaseModel):
     track: Dict[str, Any]
@@ -42,6 +42,10 @@ class PlayRequest(BaseModel):
 
 class QueueAddRequest(BaseModel):
     track: Dict[str, Any]
+
+class QueueMoveRequest(BaseModel):
+    from_index: int = Field(..., ge=0)
+    to_index: int = Field(..., ge=0)
 
 class VolumeRequest(BaseModel):
     volume: int = Field(..., ge=0, le=100)
@@ -174,7 +178,7 @@ async def connect_voice_channel(
     discord_acc = await get_user_discord_account(user.id, db)
     user_ctx = build_user_context(user, discord_acc)
     try:
-        state = await discord_service.connect_to_channel(req.channel_id, user_ctx)
+        state = await discord_service.connect_to_channel(int(req.channel_id), user_ctx)
         return state
     except (PermissionError, ValueError, RuntimeError) as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -337,6 +341,73 @@ async def remove_track_from_queue(
     try:
         await discord_service.remove_from_queue(index, user_ctx)
         return {"status": "removed"}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+
+@router.post("/queue/{index}/play")
+async def play_queue_index_endpoint(
+    index: int,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Play track at specific index in queue (cueing)"""
+    discord_acc = await get_user_discord_account(user.id, db)
+    user_ctx = build_user_context(user, discord_acc)
+    try:
+        await discord_service.play_queue_index(index, user_ctx)
+        return {"status": "playing", "queue_index": index}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except (ValueError, RuntimeError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/queue/move")
+async def reorder_queue_endpoint(
+    req: QueueMoveRequest,
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Move track inside party queue"""
+    discord_acc = await get_user_discord_account(user.id, db)
+    user_ctx = build_user_context(user, discord_acc)
+    try:
+        await discord_service.reorder_queue(req.from_index, req.to_index, user_ctx)
+        return {"status": "reordered"}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/queue")
+async def clear_queue_endpoint(
+    keep_current: bool = Query(True, description="Whether to keep currently playing track"),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Clear party queue"""
+    discord_acc = await get_user_discord_account(user.id, db)
+    user_ctx = build_user_context(user, discord_acc)
+    try:
+        await discord_service.clear_queue(user_ctx, keep_current=keep_current)
+        return {"status": "cleared"}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+
+@router.post("/queue/shuffle")
+async def shuffle_queue_endpoint(
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Shuffle upcoming tracks in queue"""
+    discord_acc = await get_user_discord_account(user.id, db)
+    user_ctx = build_user_context(user, discord_acc)
+    try:
+        await discord_service.shuffle_queue(user_ctx)
+        return {"status": "shuffled"}
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
 
