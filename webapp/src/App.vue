@@ -1035,6 +1035,8 @@ onUnmounted(() => {
   height: 100%;
   min-height: 0;
   overflow: hidden;
+  position: relative;
+  z-index: 5;
 }
 
 .app.desktop-layout .main-content-wrapper {
@@ -1045,6 +1047,9 @@ onUnmounted(() => {
   height: 100%;
   min-height: 0;
   min-width: 440px;
+  background-color: var(--c-bg-0);
+  position: relative;
+  z-index: 1;
 }
 
 .app.desktop-layout :deep(.now-playing-sidebar) {
@@ -1052,6 +1057,8 @@ onUnmounted(() => {
   height: 100%;
   min-height: 0;
   overflow: hidden;
+  position: relative;
+  z-index: 5;
 }
 
 .app.desktop-layout :deep(.desktop-player) {
@@ -1073,6 +1080,7 @@ onUnmounted(() => {
   overflow: hidden;
   min-height: 0;
   min-width: 0;
+  background-color: var(--c-bg-0);
 }
 
 .main-content {
@@ -1084,6 +1092,7 @@ onUnmounted(() => {
   min-width: 0;
   position: relative;
   scrollbar-gutter: stable;
+  background-color: var(--c-bg-0);
 }
 
 /* Pull-to-refresh indicator */

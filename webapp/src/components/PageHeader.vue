@@ -41,7 +41,7 @@ defineEmits(['goBack'])
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  background: var(--c-bg-1);
+  background: var(--c-bg-0);
   position: sticky;
   top: 0;
   z-index: 50;

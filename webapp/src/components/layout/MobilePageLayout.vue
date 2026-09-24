@@ -134,7 +134,7 @@ defineExpose({
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  background: var(--c-bg-1);
+  background: var(--c-bg-0);
 }
 
 /* Fixed Header */
@@ -142,7 +142,7 @@ defineExpose({
   flex-shrink: 0;
   position: relative;
   z-index: var(--z-sticky, 20);
-  background: var(--c-bg-1);
+  background: var(--c-bg-0);
 }
 
 .header-primary {
@@ -196,7 +196,7 @@ defineExpose({
   flex-shrink: 0;
   position: relative;
   z-index: var(--z-sticky, 20);
-  background: var(--c-bg-1);
+  background: var(--c-bg-0);
 }
 
 /* Player adjustment */

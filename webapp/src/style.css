@@ -33,7 +33,7 @@ html, body {
 
 body {
   font-family: var(--font-sans);
-  background-color: var(--c-bg-1);
+  background-color: var(--c-bg-0);
   color: var(--c-text-1);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -47,7 +47,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background-color: var(--c-bg-1);
+  background-color: var(--c-bg-0);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -55,7 +55,7 @@ body {
    ═══════════════════════════════════════════════════════════ */
 
 body.spotify-theme {
-  --tg-theme-bg-color: var(--c-bg-1);
+  --tg-theme-bg-color: var(--c-bg-0);
   --tg-theme-secondary-bg-color: var(--c-bg-3);
   --tg-theme-text-color: var(--c-text-1);
   --tg-theme-hint-color: var(--c-text-2);

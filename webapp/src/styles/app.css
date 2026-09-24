@@ -12,7 +12,7 @@
   width: 100%;
   max-height: 100%;
   overflow: hidden;
-  background-color: var(--c-bg-1);
+  background-color: var(--c-bg-0);
   color: var(--c-text-1);
 }
 
@@ -22,6 +22,7 @@
   flex-direction: column;
   overflow: hidden;
   min-height: 0;
+  background-color: var(--c-bg-0);
 }
 
 /* ========== Desktop Layout (Grid defined in App.vue, tokens used here) ========== */
@@ -33,6 +34,7 @@
   flex-direction: column;
   overflow: hidden;
   height: 100%;
+  background-color: var(--c-bg-0);
 }
 
 .app.desktop-layout .now-playing-sidebar { grid-area: nowplaying; height: 100%; }

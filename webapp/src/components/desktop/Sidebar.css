@@ -37,8 +37,9 @@
    ========================================================= */
 .sidebar.rail-mode {
   width: var(--sidebar-collapsed-width, 72px);
-  background: var(--c-bg-0);
+  background: var(--c-bg-1);
   border-right: var(--border-neu);
+  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.45);
 }
 
 .sidebar.rail-mode .sidebar-scroll {
@@ -55,7 +56,7 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  background: #0a0a0a;
+  background: var(--c-bg-1);
   padding-top: 16px;
   padding-bottom: 8px;
 }
@@ -67,7 +68,7 @@
   right: 0;
   bottom: -12px;
   height: 12px;
-  background: linear-gradient(to bottom, #0a0a0a, transparent);
+  background: linear-gradient(to bottom, var(--c-bg-1), transparent);
   pointer-events: none;
 }
 
@@ -178,7 +179,7 @@
   line-height: 1;
   color: #000;
   background: var(--c-accent, #1db954);
-  border: 2px solid #0a0a0a;
+  border: 2px solid var(--c-bg-1);
   border-radius: 10px;
   min-width: 16px;
   height: 16px;
@@ -291,7 +292,7 @@
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   position: sticky;
   bottom: 0;
-  background: #0a0a0a;
+  background: var(--c-bg-1);
   z-index: 10;
 }
 
@@ -302,7 +303,7 @@
   right: 0;
   top: -12px;
   height: 12px;
-  background: linear-gradient(to top, #0a0a0a, transparent);
+  background: linear-gradient(to top, var(--c-bg-1), transparent);
   pointer-events: none;
 }
 
@@ -390,8 +391,9 @@
    ========================================================= */
 .sidebar.full-mode {
   width: var(--sidebar-width, 280px);
-  background: var(--c-bg-0);
+  background: var(--c-bg-1);
   border-right: var(--border-neu);
+  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.45);
 }
 
 .sidebar-logo {
@@ -402,7 +404,7 @@
   position: sticky;
   top: 0;
   z-index: 10;
-  background: var(--c-bg-0);
+  background: var(--c-bg-1);
 }
 
 .sidebar-logo::after {
@@ -412,7 +414,7 @@
   right: 0;
   bottom: -14px;
   height: 14px;
-  background: linear-gradient(to bottom, var(--c-bg-0), transparent);
+  background: linear-gradient(to bottom, var(--c-bg-1), transparent);
   pointer-events: none;
 }
 
@@ -934,7 +936,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  background: #0a0a0a;
+  background: var(--c-bg-1);
   position: sticky;
   bottom: 0;
   margin-top: auto;
@@ -948,7 +950,7 @@
   right: 0;
   top: -14px;
   height: 14px;
-  background: linear-gradient(to top, #0a0a0a, transparent);
+  background: linear-gradient(to top, var(--c-bg-1), transparent);
   pointer-events: none;
 }
 
@@ -1115,7 +1117,7 @@
   line-height: 1;
   color: #000;
   background: rgba(255, 255, 255, 0.88);
-  border: 1.5px solid #0a0a0a;
+  border: 1.5px solid var(--c-bg-1);
   border-radius: 10px;
   min-width: 14px;
   height: 14px;
