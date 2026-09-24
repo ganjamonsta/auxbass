@@ -31,6 +31,7 @@ from bot.services.lyrics import lrclib_client
 from bot.services.enrichment.cover_search import search_cover_suggestions
 from api.utils.bot_helpers import get_bot as _get_bot, get_http_session
 from api.routers.images import _is_safe_url
+from shared.images import crop_image_to_square
 
 from api.routers.auth import get_current_user, require_premium, get_optional_user
 from api.utils.responses import track_to_response, build_track_search_filter, streamable_track_filter
@@ -868,6 +869,9 @@ async def _upload_cover_bytes_to_telegram(
             break
     if not detected_ext:
         raise HTTPException(status_code=400, detail="Неверный формат изображения. Разрешены JPG, PNG, GIF, WebP.")
+
+    # Crop to 1:1 square with centering and dimension normalization
+    content, detected_ext = crop_image_to_square(content)
 
     safe_filename = f"{filename_prefix}.{detected_ext}"
     bot = _get_bot()

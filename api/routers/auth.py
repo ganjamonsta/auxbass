@@ -22,6 +22,7 @@ from aiogram.types import BufferedInputFile
 from shared.config import get_settings
 from shared.database import get_session, get_db
 from shared.models import User, UserChannel, utcnow
+from shared.images import crop_image_to_square
 from api.schemas.common import TelegramUser, UserStatusResponse
 from api.schemas.auth import (
     AuthResult,
@@ -845,6 +846,9 @@ async def upload_avatar(
 
     # Validate actual image content by magic bytes (prevents disguised files)
     ext = _validate_image_magic(content)
+
+    # Crop avatar to 1:1 square with centering and dimension normalization
+    content, ext = crop_image_to_square(content)
 
     # Sanitize filename for Telegram upload
     import os

@@ -14,6 +14,7 @@ from yt_dlp.utils import download_range_func
 
 from shared.config import get_settings
 from shared.matching import clean_track_metadata
+from shared.images import crop_image_file_to_square
 from ..base import (
     BaseMusicProvider,
     SourceEntity,
@@ -439,6 +440,9 @@ class YouTubeMusicProvider(BaseMusicProvider):
         # If no cover succeeded, ensure track_meta.cover_url is None instead of a broken link
         if not cover_path:
             track_meta.cover_url = None
+        elif os.path.exists(cover_path):
+            # Center-crop cover to 1:1 square, trimming letterbox/pillarbox borders
+            crop_image_file_to_square(cover_path)
 
         if chunk_only:
             if track_meta.duration and track_meta.duration > chunk_duration:

@@ -19,6 +19,7 @@ from sqlalchemy import select, and_, or_, func
 
 from shared.config import get_settings
 from shared.database import get_session
+from shared.images import crop_image_to_square
 from shared.models import (
     Track,
     Playlist,
@@ -766,6 +767,9 @@ class IngestionPipeline:
 
         if not content or len(content) < 12:
             return None
+
+        # Crop playlist cover to 1:1 square
+        content, detected_ext = crop_image_to_square(content)
 
         # Resolve target chat: user's backup channel if active, otherwise user PM
         user_channel = await session.scalar(

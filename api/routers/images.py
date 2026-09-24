@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
 
 from shared.config import get_settings
+from shared.images import crop_image_to_square
 from api.utils.bot_helpers import get_bot as _get_bot, close_bot as close_image_bot, get_http_session
 
 logger = logging.getLogger(__name__)
@@ -83,9 +84,14 @@ async def proxy_external_image(url: str = Query(..., description="External image
                                 async with session.get(fallback_yt_url, headers=headers, timeout=timeout) as fb_resp:
                                     if fb_resp.status == 200:
                                         content = await fb_resp.read()
+                                        try:
+                                            content, ext = crop_image_to_square(content)
+                                            fb_ct = "image/jpeg" if ext == "jpg" else "image/png"
+                                        except Exception:
+                                            fb_ct = "image/jpeg"
                                         return Response(
                                             content=content,
-                                            media_type="image/jpeg",
+                                            media_type=fb_ct,
                                             headers={"Cache-Control": "public, max-age=604800, immutable"},
                                         )
                             except Exception as fb_err:
@@ -109,6 +115,13 @@ async def proxy_external_image(url: str = Query(..., description="External image
                     content_type = "image/jpeg"
 
             content = await resp.read()
+            # Auto-crop YouTube 16:9 / 4:3 frames to 1:1 square, trimming side pillarbox / letterbox bars
+            if "i.ytimg.com" in url or "youtube.com" in url:
+                try:
+                    content, ext = crop_image_to_square(content)
+                    content_type = "image/jpeg" if ext == "jpg" else "image/png"
+                except Exception as crop_err:
+                    logger.debug(f"Failed to auto-crop YouTube thumbnail: {crop_err}")
             # Enforce max 10MB limit
             if len(content) > 10 * 1024 * 1024:
                 raise HTTPException(status_code=400, detail="Image exceeds size limit")

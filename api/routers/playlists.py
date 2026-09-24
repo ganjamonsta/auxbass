@@ -23,6 +23,7 @@ from shared.models import (
     PlaylistSubscription, TrackEnrichment, UserChannel, TrackTag, utcnow
 )
 from shared.config import get_settings
+from shared.images import crop_image_to_square
 from api.utils.bot_helpers import get_bot as _get_bot
 
 logger = logging.getLogger(__name__)
@@ -840,6 +841,9 @@ async def upload_playlist_cover(
     if not detected_ext:
         raise HTTPException(status_code=400, detail="Invalid image file. Only JPEG, PNG, GIF, WebP are allowed.")
     
+    # Crop to 1:1 square with centering and dimension normalization
+    content, detected_ext = crop_image_to_square(content)
+
     safe_filename = f"cover_{playlist_id}.{detected_ext}"
     
     bot = _get_bot()

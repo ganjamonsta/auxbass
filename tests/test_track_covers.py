@@ -243,3 +243,56 @@ async def test_cover_permission_denied_for_stranger(cover_test_db):
                 db=session,
             )
         assert exc_info.value.status_code == 403
+
+
+def test_crop_image_to_square_landscape():
+    """Verify that landscape rectangular images are centered and cropped to 1:1 square."""
+    from shared.images import crop_image_to_square
+    from PIL import Image
+
+    orig = Image.new("RGB", (1920, 1080), (200, 100, 50))
+    buf = io.BytesIO()
+    orig.save(buf, format="JPEG")
+
+    cropped_bytes, ext = crop_image_to_square(buf.getvalue(), max_dimension=1000)
+    result = Image.open(io.BytesIO(cropped_bytes))
+
+    assert result.size == (1000, 1000)
+    assert ext == "jpg"
+
+
+def test_crop_image_to_square_portrait():
+    """Verify that portrait rectangular images are centered and cropped to 1:1 square."""
+    from shared.images import crop_image_to_square
+    from PIL import Image
+
+    orig = Image.new("RGB", (600, 1200), (50, 150, 200))
+    buf = io.BytesIO()
+    orig.save(buf, format="JPEG")
+
+    cropped_bytes, ext = crop_image_to_square(buf.getvalue(), max_dimension=800)
+    result = Image.open(io.BytesIO(cropped_bytes))
+
+    assert result.size == (600, 600)
+    assert ext == "jpg"
+
+
+def test_crop_image_to_square_with_letterbox():
+    """Verify that YouTube 4:3 thumbnails with top/bottom black bars are trimmed to square content."""
+    from shared.images import crop_image_to_square
+    from PIL import Image
+
+    orig = Image.new("RGB", (480, 360), (0, 0, 0))
+    center = Image.new("RGB", (480, 270), (120, 180, 240))
+    orig.paste(center, (0, 45))
+
+    buf = io.BytesIO()
+    orig.save(buf, format="JPEG")
+
+    cropped_bytes, ext = crop_image_to_square(buf.getvalue())
+    result = Image.open(io.BytesIO(cropped_bytes))
+
+    # Center-cropped square without top/bottom 45px black letterbox
+    assert result.size[0] == result.size[1]
+    assert 260 <= result.size[0] <= 280
+
