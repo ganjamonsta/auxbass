@@ -351,32 +351,28 @@ const updateLayoutState = () => {
 
     const isRightVisible = uiStore.userNowPlayingPreference !== false
     uiStore.setNowPlayingSidebar(isRightVisible, false)
+    uiStore.isAutoCollapsed = false
+    uiStore.isRightAutoHidden = false
   }
-  // 2. Screens 1000px - 1199px (Standard desktop / Laptop):
+  // 2. Screens < 1200px (Narrow desktop / Laptop / Tablet):
   //    280px left + 320px right = 600px sidebars, which would crush center!
   //    Therefore, Full Left Sidebar and Right Sidebar are MUTUALLY EXCLUSIVE:
-  else if (width >= 1000) {
-    if (uiStore.userNowPlayingPreference === true) {
+  else {
+    if (uiStore.userNowPlayingPreference === true && uiStore.lastActiveSidebar === 'right') {
       // User explicitly wants Now Playing panel open on laptop:
-      // Left sidebar MUST yield to rail (72px) so center stays spacious (>= 608px)!
+      // Left sidebar MUST yield to rail (72px) so center stays spacious
       uiStore.setNowPlayingSidebar(true, false)
       uiStore.setSidebarCollapsed(true, false)
       uiStore.isAutoCollapsed = true
+      uiStore.isRightAutoHidden = false
     } else {
-      // Default: Right sidebar closes first, Left sidebar stays full (280px)!
+      // Default: Right sidebar closes first, Left sidebar stays full (or rail if user preferred)!
       uiStore.setNowPlayingSidebar(false, false)
+      uiStore.isRightAutoHidden = (uiStore.userNowPlayingPreference === true)
       const isLeftCollapsed = uiStore.userCollapsedPreference === true
       uiStore.setSidebarCollapsed(isLeftCollapsed, false)
+      uiStore.isAutoCollapsed = false
     }
-  }
-  // 3. Screens 768px - 999px (Compact desktop / Tablet):
-  //    Right sidebar cannot fit in the grid without breaking center space.
-  //    Right sidebar is strictly closed, Left sidebar is compact rail (72px).
-  //    Center space is always >= 696px.
-  else {
-    uiStore.setNowPlayingSidebar(false, false)
-    uiStore.setSidebarCollapsed(true, false)
-    uiStore.isAutoCollapsed = true
   }
 }
 
@@ -1028,6 +1024,15 @@ onUnmounted(() => {
   --content-max-width: 1400px;
   --card-min-width: 148px;
   --quick-grid-cols: repeat(3, 1fr);
+}
+
+@media (max-width: 850px) {
+  .app.desktop-layout.has-now-playing {
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--now-playing-width);
+  }
+  .app.desktop-layout.has-now-playing .main-content-wrapper {
+    min-width: 0;
+  }
 }
 
 .app.desktop-layout :deep(.sidebar) {

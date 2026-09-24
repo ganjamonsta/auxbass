@@ -73,20 +73,47 @@ export const useUIStore = defineStore('ui', () => {
   const savedSidebarPref = loadSavedBoolean(SIDEBAR_COLLAPSED_KEY)
   const savedNowPlayingPref = loadSavedBoolean(NOW_PLAYING_VISIBLE_KEY)
 
+  const getViewportWidth = () => {
+    if (typeof window === 'undefined') return 1280
+    return document.documentElement?.clientWidth || window.innerWidth || 1280
+  }
+
+  const isNarrowScreen = () => getViewportWidth() < 1200
+
   // Safe initial width for responsive defaults
-  const initialWidth = typeof window !== 'undefined' ? window.innerWidth : 1280
-  const initialSidebarCollapsed = savedSidebarPref !== null
+  const initialWidth = getViewportWidth()
+  const isNarrowInitial = initialWidth < 1200
+
+  let initialSidebarCollapsed = savedSidebarPref !== null
     ? savedSidebarPref === true
     : initialWidth < 1000
 
-  const initialNowPlayingVisible = savedNowPlayingPref !== null
+  let initialNowPlayingVisible = savedNowPlayingPref !== null
     ? savedNowPlayingPref === true
     : initialWidth >= 1200
 
+  let initialAutoCollapsed = false
+  let initialRightAutoHidden = false
+
+  // If initial viewport is narrow and user preferences would cause both sidebars to be open simultaneously,
+  // enforce mutual exclusion on initial load:
+  if (isNarrowInitial && !initialSidebarCollapsed && initialNowPlayingVisible) {
+    if (savedNowPlayingPref === true && savedSidebarPref !== false) {
+      initialSidebarCollapsed = true
+      initialAutoCollapsed = true
+    } else {
+      initialNowPlayingVisible = false
+      initialRightAutoHidden = true
+    }
+  }
+
   // Sidebar collapse state
   const isSidebarCollapsed = ref(initialSidebarCollapsed)
-  const isAutoCollapsed = ref(false)
+  const isAutoCollapsed = ref(initialAutoCollapsed)
   const userCollapsedPreference = ref(savedSidebarPref) // null = auto, true/false = explicit user choice
+  const lastActiveSidebar = ref(
+    savedNowPlayingPref === true && isNarrowInitial ? 'right' : 'left'
+  )
 
   const setSidebarCollapsed = (collapsed, manual = false) => {
     isSidebarCollapsed.value = collapsed
@@ -96,6 +123,25 @@ export const useUIStore = defineStore('ui', () => {
       try {
         localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed))
       } catch (_) {}
+
+      if (!collapsed) {
+        lastActiveSidebar.value = 'left'
+      }
+
+      // Narrow screen mutual exclusion / swapping:
+      // If Left sidebar is expanded on narrow screen, Right sidebar cannot coexist and must yield
+      if (!collapsed && isNarrowScreen()) {
+        if (isNowPlayingSidebarVisible.value) {
+          isNowPlayingSidebarVisible.value = false
+          isRightAutoHidden.value = true
+        }
+      } else if (collapsed && isNarrowScreen()) {
+        // If Left sidebar collapsed back to rail, and Right sidebar was auto-hidden, restore it
+        if (isRightAutoHidden.value && userNowPlayingPreference.value === true) {
+          isNowPlayingSidebarVisible.value = true
+          isRightAutoHidden.value = false
+        }
+      }
     }
   }
 
@@ -105,7 +151,7 @@ export const useUIStore = defineStore('ui', () => {
 
   // Right NowPlayingSidebar visibility state
   const isNowPlayingSidebarVisible = ref(initialNowPlayingVisible)
-  const isRightAutoHidden = ref(false)
+  const isRightAutoHidden = ref(initialRightAutoHidden)
   const userNowPlayingPreference = ref(savedNowPlayingPref) // null = auto, boolean = explicit user choice
 
   const openNowPlayingSidebar = (manual = false) => {
@@ -129,6 +175,25 @@ export const useUIStore = defineStore('ui', () => {
       try {
         localStorage.setItem(NOW_PLAYING_VISIBLE_KEY, String(visible))
       } catch (_) {}
+
+      if (visible) {
+        lastActiveSidebar.value = 'right'
+      }
+
+      // Narrow screen mutual exclusion / swapping:
+      // If Right sidebar is opened on narrow screen, Left sidebar cannot stay full and must yield to rail
+      if (visible && isNarrowScreen()) {
+        if (!isSidebarCollapsed.value) {
+          isSidebarCollapsed.value = true
+          isAutoCollapsed.value = true
+        }
+      } else if (!visible && isNarrowScreen()) {
+        // If Right sidebar closed, and Left sidebar was auto-collapsed, restore full left sidebar
+        if (isAutoCollapsed.value && userCollapsedPreference.value !== true) {
+          isSidebarCollapsed.value = false
+          isAutoCollapsed.value = false
+        }
+      }
     }
   }
 
@@ -218,6 +283,8 @@ export const useUIStore = defineStore('ui', () => {
     closeNowPlayingSidebar,
     toggleNowPlayingSidebar,
     setNowPlayingSidebar,
+    lastActiveSidebar,
+    isNarrowScreen,
     // Toast
     toasts,
     showToast,
