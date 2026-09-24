@@ -34,7 +34,7 @@
     <!-- Cover with play button -->
     <div class="cover-wrapper" @click.stop="togglePlay">
       <div class="cover">
-        <img v-if="track.cover_url" :src="getCoverUrl(track.cover_url, CoverSize.SMALL)" loading="lazy" alt="" />
+        <img v-if="track.cover_url && !imageError" :src="getCoverUrl(track.cover_url, CoverSize.SMALL)" loading="lazy" alt="" @error="imageError = true" />
         <Music v-else :size="20" />
       </div>
       <div class="play-overlay" :class="{ 'is-playing': isCurrentTrack && playerStore.isPlaying }">
@@ -75,10 +75,15 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { getCoverUrl, CoverSize } from '@/utils'
 import { Music } from 'lucide-vue-next'
+
+const imageError = ref(false)
+watch(() => props.track?.id || props.track?.cover_url, () => {
+  imageError.value = false
+})
 
 const props = defineProps({
   track: { type: Object, required: true },

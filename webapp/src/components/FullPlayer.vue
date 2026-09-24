@@ -49,8 +49,8 @@
       @contextmenu.prevent="openTrackContextMenu"
     >
       <div class="cover-image" :style="coverStyle">
-        <span v-if="!track?.cover_url" class="cover-text">{{ coverInitials }}</span>
-        <img v-else :src="getCoverUrl(track.cover_url, CoverSize.XL)" alt="Cover" class="cover-img" />
+        <span v-if="!track?.cover_url || coverError" class="cover-text">{{ coverInitials }}</span>
+        <img v-else :src="getCoverUrl(track.cover_url, CoverSize.XL)" alt="Cover" class="cover-img" @error="coverError = true" />
       </div>
 
       <!-- Loading Overlay -->
@@ -330,9 +330,14 @@
 </template>
 
 <script setup>
-import { ref, computed, inject } from 'vue'
+import { ref, computed, inject, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Disc3, Share2 } from 'lucide-vue-next'
+
+const coverError = ref(false)
+watch(() => props.track?.id || props.track?.cover_url, () => {
+  coverError.value = false
+})
 import { getTrackCoverStyle, getTrackInitials, splitArtists, getDisplayTitle, getDisplayArtist, getAllTrackArtists, getCoverUrl, CoverSize, suppressNextClick, suppressNextContextMenu } from '@/utils'
 import TagChips from '@/components/TagChips.vue'
 import TrackTags from '@/components/TrackTags.vue'

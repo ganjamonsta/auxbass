@@ -209,8 +209,10 @@ class EnrichmentWorker:
                                         source=TagSource.ENRICHMENT,
                                     ))
 
-                    # 4. Cover: Never overwrite an existing high-res cover (e.g. SoundCloud 500x500)
-                    if result.cover_url and not enrichment.cover_url:
+                    # 4. Cover: Never overwrite an existing high-res cover (e.g. SoundCloud 500x500, Telegram file_id)
+                    # BUT do replace YouTube covers (16:9 video frame / letterbox) with official square Deezer artwork (1000x1000)
+                    is_yt_cover = bool(enrichment.cover_url and ("ytimg.com" in enrichment.cover_url or "youtube.com" in enrichment.cover_url))
+                    if result.cover_url and (not enrichment.cover_url or is_yt_cover):
                         enrichment.cover_url = result.cover_url
 
                     # 5. Missing supplementary metadata

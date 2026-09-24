@@ -193,6 +193,9 @@ class AudioResolver:
                 logger.warning(f"[AudioResolver] Failed to download cover for {track_meta.title}: {e}")
                 cover_path = None
 
+        if not cover_path:
+            track_meta.cover_url = None
+
         file_size = os.path.getsize(downloaded_audio_path)
 
         if chunk_only:

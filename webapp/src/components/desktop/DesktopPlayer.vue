@@ -193,7 +193,7 @@
     <div class="player-right">
       <div class="cover-display" @click="$emit('expand')">
         <div class="cover-art" :style="coverStyle">
-          <img v-if="track?.cover_url" :src="getCoverUrl(track.cover_url, CoverSize.LARGE)" alt="" />
+          <img v-if="track?.cover_url && !playerImageError" :src="getCoverUrl(track.cover_url, CoverSize.LARGE)" alt="" @error="playerImageError = true" />
           <span v-else class="cover-text">{{ coverInitials }}</span>
         </div>
         <div class="vinyl-disc" :class="{ spinning: isPlaying }">
@@ -554,8 +554,13 @@ const stopSeek = () => {
 }
 
 // Cover
+const playerImageError = ref(false)
+watch(() => track.value?.id || track.value?.cover_url, () => {
+  playerImageError.value = false
+})
+
 const coverStyle = computed(() => {
-  if (track.value?.cover_url) return {}
+  if (track.value?.cover_url && !playerImageError.value) return {}
   const str = track.value?.title || 'Music'
   let hash = 0
   for (let i = 0; i < str.length; i++) {

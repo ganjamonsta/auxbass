@@ -33,13 +33,43 @@ YT_URL_PATTERN = re.compile(
 
 
 def _improve_yt_thumbnail(thumb_url: Optional[str]) -> Optional[str]:
-    """Upgrade YouTube thumbnail to highest resolution available."""
+    """
+    Ensure YouTube thumbnail is valid.
+    Do NOT blindly replace hqdefault with maxresdefault if query tokens or sqp signatures exist,
+    as that breaks the signature and returns 404 on YouTube's CDN.
+    """
     if not thumb_url:
         return None
-    # If standard hqdefault / mqdefault is present, try maxresdefault
-    if "hqdefault.jpg" in thumb_url or "mqdefault.jpg" in thumb_url:
-        return thumb_url.replace("hqdefault.jpg", "maxresdefault.jpg").replace("mqdefault.jpg", "maxresdefault.jpg")
     return thumb_url
+
+
+def _get_yt_thumbnail_candidates(thumb_url: Optional[str], video_id: Optional[str] = None) -> List[str]:
+    """
+    Generate ordered list of candidate thumbnail URLs for a YouTube video.
+    Starts with provided URL, then tries standard YouTube CDN formats
+    from highest quality down to guaranteed fallbacks (hqdefault, mqdefault).
+    """
+    candidates: List[str] = []
+    if thumb_url and thumb_url.startswith("http"):
+        candidates.append(thumb_url)
+
+    if not video_id and thumb_url:
+        m = re.search(r"/vi/([a-zA-Z0-9_\-]{11})/", thumb_url)
+        if m:
+            video_id = m.group(1)
+
+    if video_id:
+        standards = [
+            f"https://i.ytimg.com/vi/{video_id}/maxresdefault.jpg",
+            f"https://i.ytimg.com/vi/{video_id}/sddefault.jpg",
+            f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg",
+            f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg",
+        ]
+        for url in standards:
+            if url not in candidates:
+                candidates.append(url)
+
+    return candidates
 
 
 def _extract_yt_thumbnail(entry: Optional[dict], fallback: Optional[str] = None) -> Optional[str]:
@@ -353,24 +383,62 @@ class YouTubeMusicProvider(BaseMusicProvider):
 
         file_size = os.path.getsize(expected_audio)
 
-        # Download cover artwork if present
+        # Download cover artwork with fallback candidate chain
         cover_path = None
         settings = get_settings()
         proxy = settings.proxy_url.strip() if settings.proxy_url else None
-        if track_meta.cover_url:
-            cover_path = os.path.join(temp_dir, "cover.jpg")
+
+        video_id = str(track_meta.external_id or "") if len(str(track_meta.external_id or "")) == 11 else None
+        candidates = _get_yt_thumbnail_candidates(track_meta.cover_url, video_id=video_id)
+
+        if candidates:
+            temp_cover = os.path.join(temp_dir, "cover.jpg")
             try:
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(track_meta.cover_url, timeout=aiohttp.ClientTimeout(total=10), proxy=proxy) as resp:
-                        if resp.status == 200:
-                            content = await resp.read()
-                            with open(cover_path, "wb") as f:
-                                f.write(content)
-                        else:
-                            cover_path = None
+                    for cand_url in candidates:
+                        try:
+                            async with session.get(cand_url, timeout=aiohttp.ClientTimeout(total=8), proxy=proxy) as resp:
+                                if resp.status == 200:
+                                    content = await resp.read()
+                                    if len(content) > 1000:
+                                        with open(temp_cover, "wb") as f:
+                                            f.write(content)
+                                        cover_path = temp_cover
+                                        track_meta.cover_url = cand_url
+                                        logger.info(f"[YouTube] Downloaded cover for '{track_meta.title}' from {cand_url}")
+                                        break
+                        except Exception as cand_err:
+                            logger.debug(f"[YouTube] Candidate cover failed ({cand_url}): {cand_err}")
             except Exception as e:
                 logger.warning(f"[YouTube] Cover download failed for {track_meta.title}: {e}")
                 cover_path = None
+
+        # Fallback: if YouTube CDN didn't return an image, search official high-res artwork via cover_search
+        if not cover_path and track_meta.artist and track_meta.title:
+            try:
+                from ...enrichment.cover_search import search_cover_suggestions
+                search_q = f"{track_meta.artist} {track_meta.title}".strip()
+                suggestions = await search_cover_suggestions(search_q, limit_per_source=2)
+                if suggestions:
+                    best_art = suggestions[0].get("cover_url")
+                    if best_art:
+                        temp_cover = os.path.join(temp_dir, "cover.jpg")
+                        async with aiohttp.ClientSession() as session:
+                            async with session.get(best_art, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                                if resp.status == 200:
+                                    content = await resp.read()
+                                    if len(content) > 1000:
+                                        with open(temp_cover, "wb") as f:
+                                            f.write(content)
+                                        cover_path = temp_cover
+                                        track_meta.cover_url = best_art
+                                        logger.info(f"[YouTube] Sourced official album artwork for '{track_meta.title}' from {best_art[:60]}")
+            except Exception as sugg_err:
+                logger.debug(f"[YouTube] Fallback cover search failed: {sugg_err}")
+
+        # If no cover succeeded, ensure track_meta.cover_url is None instead of a broken link
+        if not cover_path:
+            track_meta.cover_url = None
 
         if chunk_only:
             if track_meta.duration and track_meta.duration > chunk_duration:

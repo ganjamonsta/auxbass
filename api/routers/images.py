@@ -72,6 +72,25 @@ async def proxy_external_image(url: str = Query(..., description="External image
         timeout = aiohttp.ClientTimeout(total=10, connect=5)
         async with session.get(url, headers=headers, timeout=timeout) as resp:
             if resp.status != 200:
+                # If YouTube thumbnail (e.g. maxresdefault.jpg or signed sqp URL) failed with 404, fallback to hqdefault.jpg
+                if resp.status == 404 and "i.ytimg.com" in url:
+                    m = re.search(r"/vi/([a-zA-Z0-9_\-]{11})/", url)
+                    if m:
+                        vid = m.group(1)
+                        fallback_yt_url = f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg"
+                        if fallback_yt_url != url:
+                            try:
+                                async with session.get(fallback_yt_url, headers=headers, timeout=timeout) as fb_resp:
+                                    if fb_resp.status == 200:
+                                        content = await fb_resp.read()
+                                        return Response(
+                                            content=content,
+                                            media_type="image/jpeg",
+                                            headers={"Cache-Control": "public, max-age=604800, immutable"},
+                                        )
+                            except Exception as fb_err:
+                                logger.debug(f"YouTube thumbnail fallback failed: {fb_err}")
+
                 logger.warning(f"External image proxy failed ({resp.status}) for URL {url[:60]}")
                 raise HTTPException(status_code=resp.status, detail="Failed to fetch external image")
 

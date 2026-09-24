@@ -22,11 +22,12 @@
           <!-- Center Record Label with Cover Art -->
           <div class="record-label" :style="coverStyle">
             <img 
-              v-if="track?.cover_url" 
+              v-if="track?.cover_url && !coverError" 
               :src="getCoverUrl(track.cover_url, CoverSize.MEDIUM)" 
               alt="Обложка трека" 
               class="cover-image"
               loading="eager"
+              @error="coverError = true"
             />
             <span v-else class="initials">{{ coverInitials }}</span>
             
@@ -56,13 +57,18 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { getTrackCoverStyle, getTrackInitials, getCoverUrl, CoverSize } from '@/utils'
 
 const props = defineProps({
   track: Object,
   loading: Boolean,
   isPlaying: Boolean
+})
+
+const coverError = ref(false)
+watch(() => props.track?.id || props.track?.cover_url, () => {
+  coverError.value = false
 })
 
 const coverStyle = computed(() => getTrackCoverStyle(props.track))

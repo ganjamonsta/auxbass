@@ -15,11 +15,12 @@
     <!-- Cover with generated gradient -->
     <div v-if="!hideCover" class="track-cover" :style="coverStyle">
       <img 
-        v-if="track.cover_url && !track.is_unavailable" 
+        v-if="track.cover_url && !track.is_unavailable && !imageError" 
         :src="getCoverUrl(track.cover_url, CoverSize.SMALL)" 
         alt=""
         class="cover-image"
         loading="lazy"
+        @error="imageError = true"
       />
       <span v-else class="cover-text">{{ track.is_unavailable ? '' : coverInitials }}<X v-if="track.is_unavailable" :size="16" /></span>
       
@@ -115,12 +116,17 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { formatDuration, getTrackCoverStyle, getTrackInitials, getDisplayTitle, getDisplayArtist, getCoverUrl, CoverSize, triggerHaptic, suppressNextClick, suppressNextContextMenu } from '@/utils'
 import { X, Check, ThumbsDown } from 'lucide-vue-next'
 
 const router = useRouter()
+const imageError = ref(false)
+
+watch(() => props.track?.id || props.track?.cover_url, () => {
+  imageError.value = false
+})
 
 const props = defineProps({
   track: {

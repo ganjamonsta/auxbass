@@ -18,10 +18,11 @@
       <div class="cover-wrapper" :class="{ playing: isPlaying }">
         <div class="cover-art" :style="coverStyle">
           <img 
-            v-if="track?.cover_url" 
+            v-if="track?.cover_url && !imageError" 
             :src="getCoverUrl(track.cover_url, CoverSize.XL)" 
             alt="Cover" 
             class="cover-image"
+            @error="imageError = true"
           />
           <span v-else class="cover-text">{{ coverInitials }}</span>
         </div>
@@ -250,7 +251,7 @@
 </template>
 
 <script setup>
-import { ref, computed, defineEmits } from 'vue'
+import { ref, computed, watch, defineEmits } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
@@ -303,8 +304,13 @@ const isLiked = computed(() => {
 })
 
 // Cover style
+const imageError = ref(false)
+watch(() => track.value?.id || track.value?.cover_url, () => {
+  imageError.value = false
+})
+
 const coverStyle = computed(() => {
-  if (track.value?.cover_url) return {}
+  if (track.value?.cover_url && !imageError.value) return {}
   const str = getDisplayTitle(track.value)
   let hash = 0
   for (let i = 0; i < str.length; i++) {
