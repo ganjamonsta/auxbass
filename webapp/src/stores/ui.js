@@ -58,11 +58,6 @@ export const useUIStore = defineStore('ui', () => {
   // Persistent sidebar keys
   const SIDEBAR_COLLAPSED_KEY = 'tg_player_sidebar_collapsed'
   const NOW_PLAYING_VISIBLE_KEY = 'tg_player_now_playing_visible'
-  const NARROW_WIDTH_THRESHOLD = 1200
-
-  const isNarrowScreen = () => {
-    return typeof window !== 'undefined' && window.innerWidth < NARROW_WIDTH_THRESHOLD
-  }
 
   const loadSavedBoolean = (key) => {
     try {
@@ -80,22 +75,13 @@ export const useUIStore = defineStore('ui', () => {
 
   // Safe initial width for responsive defaults
   const initialWidth = typeof window !== 'undefined' ? window.innerWidth : 1280
-  let initialSidebarCollapsed = savedSidebarPref !== null
+  const initialSidebarCollapsed = savedSidebarPref !== null
     ? savedSidebarPref === true
     : initialWidth < 1000
 
-  let initialNowPlayingVisible = savedNowPlayingPref !== null
+  const initialNowPlayingVisible = savedNowPlayingPref !== null
     ? savedNowPlayingPref === true
     : initialWidth >= 1200
-
-  // Under narrow conditions (< 1200px), prevent both sidebars from opening simultaneously on initial load
-  if (initialWidth < NARROW_WIDTH_THRESHOLD && !initialSidebarCollapsed && initialNowPlayingVisible) {
-    if (savedNowPlayingPref === true && savedSidebarPref !== false) {
-      initialSidebarCollapsed = true
-    } else {
-      initialNowPlayingVisible = false
-    }
-  }
 
   // Sidebar collapse state
   const isSidebarCollapsed = ref(initialSidebarCollapsed)
@@ -104,26 +90,6 @@ export const useUIStore = defineStore('ui', () => {
 
   const setSidebarCollapsed = (collapsed, manual = false) => {
     isSidebarCollapsed.value = collapsed
-
-    if (!collapsed) {
-      // Expanding left sidebar to full mode (280px)
-      if (isNarrowScreen()) {
-        // Under narrow conditions, Full Left and Right sidebars cannot coexist.
-        // Swap: auto-hide Right sidebar so Left sidebar can expand without pushing content out of frame.
-        if (isNowPlayingSidebarVisible.value) {
-          isNowPlayingSidebarVisible.value = false
-          isRightAutoHidden.value = true
-        }
-      }
-    } else {
-      // Collapsing left sidebar to rail mode (72px)
-      // If Right sidebar was previously auto-hidden to yield, restore it!
-      if (isRightAutoHidden.value && userNowPlayingPreference.value !== false) {
-        isNowPlayingSidebarVisible.value = true
-        isRightAutoHidden.value = false
-      }
-    }
-
     if (manual) {
       userCollapsedPreference.value = collapsed
       isAutoCollapsed.value = false
@@ -157,27 +123,6 @@ export const useUIStore = defineStore('ui', () => {
 
   const setNowPlayingSidebar = (visible, manual = false) => {
     isNowPlayingSidebarVisible.value = visible
-
-    if (visible) {
-      // Right sidebar is being opened (320px)
-      isRightAutoHidden.value = false
-      if (isNarrowScreen()) {
-        // Under narrow conditions, Full Left and Right sidebars cannot coexist.
-        // Swap: auto-collapse Left sidebar to rail (72px) so Right sidebar can open safely.
-        if (!isSidebarCollapsed.value) {
-          isSidebarCollapsed.value = true
-          isAutoCollapsed.value = true
-        }
-      }
-    } else {
-      // Right sidebar is being closed
-      // If Left sidebar was auto-collapsed to make room for Right, restore it to full mode!
-      if (isAutoCollapsed.value && userCollapsedPreference.value !== true) {
-        isSidebarCollapsed.value = false
-        isAutoCollapsed.value = false
-      }
-    }
-
     if (manual) {
       userNowPlayingPreference.value = visible
       isRightAutoHidden.value = false

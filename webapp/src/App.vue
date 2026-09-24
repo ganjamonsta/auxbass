@@ -342,38 +342,41 @@ const updateLayoutState = () => {
     return
   }
 
-  // GEOMETRIC BOUNDARY RULES (Center space NEVER drops below 600px on wide screens):
+  // GEOMETRIC BOUNDARY RULES (Center space NEVER drops below 600px):
   // 1. Screens >= 1200px (Wide desktop):
   //    Both sidebars fit comfortably (280px + >=600px center + 320px = >=1200px).
   if (width >= 1200) {
-    if (uiStore.isRightAutoHidden && uiStore.userNowPlayingPreference !== false) {
-      uiStore.setNowPlayingSidebar(true, false)
-    } else if (uiStore.userNowPlayingPreference !== null) {
-      uiStore.setNowPlayingSidebar(uiStore.userNowPlayingPreference, false)
-    }
+    const isLeftCollapsed = uiStore.userCollapsedPreference === true
+    uiStore.setSidebarCollapsed(isLeftCollapsed, false)
 
-    if (uiStore.isAutoCollapsed && uiStore.userCollapsedPreference !== true) {
-      uiStore.setSidebarCollapsed(false, false)
-    } else if (uiStore.userCollapsedPreference !== null) {
-      uiStore.setSidebarCollapsed(uiStore.userCollapsedPreference, false)
+    const isRightVisible = uiStore.userNowPlayingPreference !== false
+    uiStore.setNowPlayingSidebar(isRightVisible, false)
+  }
+  // 2. Screens 1000px - 1199px (Standard desktop / Laptop):
+  //    280px left + 320px right = 600px sidebars, which would crush center!
+  //    Therefore, Full Left Sidebar and Right Sidebar are MUTUALLY EXCLUSIVE:
+  else if (width >= 1000) {
+    if (uiStore.userNowPlayingPreference === true) {
+      // User explicitly wants Now Playing panel open on laptop:
+      // Left sidebar MUST yield to rail (72px) so center stays spacious (>= 608px)!
+      uiStore.setNowPlayingSidebar(true, false)
+      uiStore.setSidebarCollapsed(true, false)
+      uiStore.isAutoCollapsed = true
+    } else {
+      // Default: Right sidebar closes first, Left sidebar stays full (280px)!
+      uiStore.setNowPlayingSidebar(false, false)
+      const isLeftCollapsed = uiStore.userCollapsedPreference === true
+      uiStore.setSidebarCollapsed(isLeftCollapsed, false)
     }
   }
-  // 2. Screens < 1200px (Narrow desktop / Laptop / Tablet):
-  //    Full Left Sidebar (280px) and Right Sidebar (320px) cannot coexist without crushing center.
-  //    Enforce mutual exclusion / swap:
+  // 3. Screens 768px - 999px (Compact desktop / Tablet):
+  //    Right sidebar cannot fit in the grid without breaking center space.
+  //    Right sidebar is strictly closed, Left sidebar is compact rail (72px).
+  //    Center space is always >= 696px.
   else {
-    // If BOTH happen to be open, one must yield:
-    if (!uiStore.isSidebarCollapsed && uiStore.isNowPlayingSidebarVisible) {
-      if (uiStore.userNowPlayingPreference === true && uiStore.userCollapsedPreference !== false) {
-        // User explicitly wants Now Playing: Left sidebar yields to rail (72px)
-        uiStore.setSidebarCollapsed(true, false)
-        uiStore.isAutoCollapsed = true
-      } else {
-        // Default: Right sidebar yields / closes, Left sidebar stays full (280px)
-        uiStore.setNowPlayingSidebar(false, false)
-        uiStore.isRightAutoHidden = true
-      }
-    }
+    uiStore.setNowPlayingSidebar(false, false)
+    uiStore.setSidebarCollapsed(true, false)
+    uiStore.isAutoCollapsed = true
   }
 }
 
@@ -984,7 +987,7 @@ onUnmounted(() => {
 /* Desktop Layout - CSS Grid */
 .app.desktop-layout {
   display: grid;
-  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width) minmax(440px, 1fr);
   grid-template-rows: 1fr auto;
   grid-template-areas:
     "sidebar main"
@@ -1010,7 +1013,7 @@ onUnmounted(() => {
 }
 
 .app.desktop-layout.has-now-playing {
-  grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--now-playing-width);
+  grid-template-columns: var(--sidebar-width) minmax(440px, 1fr) var(--now-playing-width);
   grid-template-areas:
     "sidebar main nowplaying"
     "player player player";
@@ -1043,7 +1046,7 @@ onUnmounted(() => {
   overflow: hidden;
   height: 100%;
   min-height: 0;
-  min-width: 0;
+  min-width: 440px;
   background-color: var(--c-bg-0);
   position: relative;
   z-index: 1;
