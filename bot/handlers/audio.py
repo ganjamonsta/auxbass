@@ -137,7 +137,7 @@ async def handle_json_document(message: Message):
         f"✅ Добавлено новых треков: <b>{imported}</b>\n"
         f"⏭ Уже было в библиотеке: <b>{skipped}</b>\n"
         f"📊 Всего в файле: <b>{total}</b>\n\n"
-        "Обложки и метаданные подтягиваются в фоновом режиме.",
+        "⚡ <i>Треки мгновенно добавлены в медиатеку и готовы к прослушиванию!</i>",
         reply_markup=get_webapp_keyboard(),
     )
 

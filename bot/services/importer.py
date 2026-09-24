@@ -16,12 +16,14 @@ from sqlalchemy import select
 
 from shared.database import get_session
 from shared.models import (
-    UserChannel, ChannelMessage, ChannelMessageStatus,
+    User, UserChannel, ChannelMessage, ChannelMessageStatus,
     Track, UserLibrary, LibrarySource, ForwardSourceType, utcnow
 )
+from shared.matching import clean_track_metadata, normalize_artist
 from shared.config import get_settings
-from bot.services.tracks import track_service
+from bot.services.tracks.service import sanitize_artist
 from bot.services.channels import channel_service
+from bot.services.enrichment import enrichment_worker
 
 logger = logging.getLogger(__name__)
 
@@ -147,13 +149,9 @@ class ChannelImporter:
                 "imported": 0,
             }
 
-        settings = get_settings()
-        buffer_chat_id = settings.scanner_buffer_chat_id or user_id
-        
         total = len(audio_items)
         imported = 0
         skipped = 0
-        failed = 0
 
         # Check existing channel messages to skip already indexed tracks
         async with get_session() as session:
@@ -165,134 +163,163 @@ class ChannelImporter:
             )
             known_msg_ids = set(existing_messages.all())
 
-        delete_buffer_ids: List[int] = []
+        BATCH_SIZE = 100
+        batch_items: List[ExportAudioItem] = []
 
         for idx, item in enumerate(audio_items, start=1):
             if item.message_id in known_msg_ids:
                 skipped += 1
                 continue
 
-            if progress_callback and (idx % 5 == 0 or idx == total or idx == 1):
-                try:
-                    await progress_callback(
-                        idx, total, f"{item.performer or 'Неизвестный'} - {item.title or item.file_name or 'Аудио'}"
-                    )
-                except Exception:
-                    pass
+            batch_items.append(item)
 
-            forwarded = None
-            try:
-                # Forward single target audio message to buffer chat to read its file_id & file_unique_id
-                forwarded = await bot.forward_message(
-                    chat_id=buffer_chat_id,
-                    from_chat_id=target_channel_id,
-                    message_id=item.message_id,
-                    disable_notification=True,
-                )
-            except TelegramRetryAfter as e:
-                logger.warning(f"Rate limited during import: wait {e.retry_after}s")
-                await asyncio.sleep(e.retry_after + 1)
-                try:
-                    forwarded = await bot.forward_message(
-                        chat_id=buffer_chat_id,
-                        from_chat_id=target_channel_id,
-                        message_id=item.message_id,
-                        disable_notification=True,
-                    )
-                except Exception:
-                    failed += 1
-                    continue
-            except TelegramBadRequest as e:
-                logger.debug(f"Message {item.message_id} not accessible in channel: {e}")
-                failed += 1
-                continue
-            except TelegramForbiddenError:
-                return {
-                    "success": False,
-                    "error": "Бот потерял доступ к каналу (проверьте права администратора).",
-                    "total": total,
-                    "imported": imported,
-                }
-            except Exception as e:
-                logger.error(f"Error fetching message {item.message_id}: {e}")
-                failed += 1
-                continue
-
-            if forwarded and forwarded.audio:
-                delete_buffer_ids.append(forwarded.message_id)
-                audio = forwarded.audio
-
-                # Save track into database
-                result = await track_service.save_track(
+            if len(batch_items) >= BATCH_SIZE:
+                saved = await self._save_lazy_items_batch(
                     user_id=user_id,
-                    file_id=audio.file_id,
-                    file_unique_id=audio.file_unique_id,
-                    title=item.title or audio.title,
-                    artist=item.performer or audio.performer,
-                    duration=item.duration_seconds or audio.duration,
-                    file_size=audio.file_size,
-                    mime_type=audio.mime_type or item.mime_type,
-                    file_name=item.file_name or audio.file_name,
-                    library_source=LibrarySource.UPLOADED,
-                    forward_source_type=ForwardSourceType.CHANNEL,
-                    forward_source_id=target_channel_id,
-                    forward_source_name=user_channel.channel_title or ch_name,
-                    enrich=True,
+                    user_channel_id=user_channel.id,
+                    target_channel_id=target_channel_id,
+                    channel_title=user_channel.channel_title or ch_name,
+                    items=batch_items,
                 )
+                imported += saved
+                batch_items.clear()
 
-                # Link channel message
-                async with get_session() as session:
-                    ch_msg = await session.scalar(
-                        select(ChannelMessage).where(
-                            ChannelMessage.channel_id == user_channel.id,
-                            ChannelMessage.track_id == result.track_id,
+                if progress_callback:
+                    try:
+                        await progress_callback(
+                            idx, total, f"{item.performer or 'Неизвестный'} - {item.title or item.file_name or 'Аудио'}"
                         )
-                    )
-                    if not ch_msg:
-                        ch_msg = ChannelMessage(
-                            channel_id=user_channel.id,
-                            track_id=result.track_id,
-                            message_id=item.message_id,
-                            status=ChannelMessageStatus.SENT,
-                        )
-                        session.add(ch_msg)
-                    else:
-                        ch_msg.message_id = item.message_id
-                        ch_msg.status = ChannelMessageStatus.SENT
-                    await session.commit()
+                    except Exception:
+                        pass
+                
+                # Tiny yield to avoid blocking the event loop on huge imports
+                await asyncio.sleep(0.005)
 
-                known_msg_ids.add(item.message_id)
-                imported += 1
-            else:
-                if forwarded:
-                    delete_buffer_ids.append(forwarded.message_id)
-                failed += 1
+        # Flush remaining items
+        if batch_items:
+            saved = await self._save_lazy_items_batch(
+                user_id=user_id,
+                user_channel_id=user_channel.id,
+                target_channel_id=target_channel_id,
+                channel_title=user_channel.channel_title or ch_name,
+                items=batch_items,
+            )
+            imported += saved
+            batch_items.clear()
 
-            # Clean buffer chat periodically in batches
-            if len(delete_buffer_ids) >= 30:
-                try:
-                    await bot.delete_messages(chat_id=buffer_chat_id, message_ids=delete_buffer_ids)
-                except Exception:
-                    pass
-                delete_buffer_ids.clear()
-
-            # Small delay to keep Telegram API happy
-            await asyncio.sleep(0.3)
-
-        # Cleanup leftover buffer messages
-        if delete_buffer_ids:
+        if progress_callback:
             try:
-                await bot.delete_messages(chat_id=buffer_chat_id, message_ids=delete_buffer_ids)
+                await progress_callback(total, total, "Готово!")
             except Exception:
                 pass
+
+        logger.info(
+            f"[JSON Import] Completed lazy import for user {user_id}: "
+            f"imported={imported}, skipped={skipped}, total={total}"
+        )
 
         return {
             "success": True,
             "total": total,
             "imported": imported,
             "skipped": skipped,
-            "failed": failed,
+            "failed": 0,
         }
+
+    async def _save_lazy_items_batch(
+        self,
+        user_id: int,
+        user_channel_id: int,
+        target_channel_id: int,
+        channel_title: Optional[str],
+        items: List[ExportAudioItem],
+    ) -> int:
+        """Save a batch of audio items as lazy tracks with ChannelMessage links in a single transaction."""
+        imported_count = 0
+        async with get_session() as session:
+            # Ensure user exists
+            user = await session.get(User, user_id)
+            if not user:
+                user = User(id=user_id)
+                session.add(user)
+                await session.flush()
+
+            for item in items:
+                lazy_file_id = f"lazy:{target_channel_id}:{item.message_id}"
+                lazy_unique_id = f"lazy_{target_channel_id}_{item.message_id}"
+
+                # Check if track already exists by file_unique_id
+                existing_track = await session.scalar(
+                    select(Track).where(Track.file_unique_id == lazy_unique_id)
+                )
+
+                if existing_track:
+                    track = existing_track
+                else:
+                    clean_title, clean_artist = clean_track_metadata(item.title, item.performer, item.file_name)
+                    title = clean_title or item.file_name or "Без названия"
+                    artist = clean_artist or "Неизвестный исполнитель"
+                    sanitized = sanitize_artist(artist)
+                    normalized = normalize_artist(sanitized) if sanitized else None
+
+                    track = Track(
+                        file_id=lazy_file_id,
+                        file_unique_id=lazy_unique_id,
+                        title=title,
+                        artist=sanitized,
+                        normalized_artist=normalized,
+                        duration=item.duration_seconds,
+                        mime_type=item.mime_type or "audio/mpeg",
+                        file_name=item.file_name,
+                        uploader_id=user_id,
+                        is_public=True,
+                        forward_source_type=ForwardSourceType.CHANNEL,
+                        forward_source_id=target_channel_id,
+                        forward_source_name=channel_title,
+                    )
+                    session.add(track)
+                    await session.flush()
+
+                # Add to UserLibrary if not already present
+                lib_entry = await session.scalar(
+                    select(UserLibrary).where(
+                        UserLibrary.user_id == user_id,
+                        UserLibrary.track_id == track.id,
+                    )
+                )
+                if not lib_entry:
+                    lib_entry = UserLibrary(
+                        user_id=user_id,
+                        track_id=track.id,
+                        source=LibrarySource.UPLOADED,
+                    )
+                    session.add(lib_entry)
+
+                # Link ChannelMessage
+                ch_msg = await session.scalar(
+                    select(ChannelMessage).where(
+                        ChannelMessage.channel_id == user_channel_id,
+                        ChannelMessage.track_id == track.id,
+                    )
+                )
+                if not ch_msg:
+                    ch_msg = ChannelMessage(
+                        channel_id=user_channel_id,
+                        track_id=track.id,
+                        message_id=item.message_id,
+                        status=ChannelMessageStatus.SENT,
+                    )
+                    session.add(ch_msg)
+                else:
+                    ch_msg.message_id = item.message_id
+                    ch_msg.status = ChannelMessageStatus.SENT
+
+                imported_count += 1
+
+            await session.commit()
+            enrichment_worker.notify_new_track()
+
+        return imported_count
 
 
 channel_importer = ChannelImporter()

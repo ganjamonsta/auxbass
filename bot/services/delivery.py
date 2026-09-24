@@ -54,6 +54,21 @@ def get_playlist_player_button(playlist_id: int) -> InlineKeyboardMarkup:
     ])
 
 
+async def _ensure_deliverable_file_id(track: Track, session) -> Optional[str]:
+    """Ensure track has a valid Telegram file_id, resolving lazy references on-demand."""
+    if not track or not track.file_id:
+        return None
+    if track.file_id.startswith("lazy:") or track.file_id.startswith("pending:"):
+        from api.routers.player import refresh_file_id_from_channel
+        fresh_file_id, err, _ = await refresh_file_id_from_channel(track.id, session)
+        if fresh_file_id:
+            track.file_id = fresh_file_id
+            return fresh_file_id
+        logger.warning(f"Failed to resolve lazy file_id for track {track.id}: {err}")
+        return None
+    return track.file_id
+
+
 async def deliver_single_track(
     bot: Bot,
     chat_id: int,
@@ -68,7 +83,8 @@ async def deliver_single_track(
             .options(selectinload(Track.enrichment))
             .where(Track.id == track_id)
         )
-        if not track or not track.file_id:
+        valid_file_id = await _ensure_deliverable_file_id(track, session)
+        if not valid_file_id:
             logger.warning(f"Track {track_id} not found or missing file_id")
             await bot.send_message(chat_id=chat_id, text="❌ Трек не найден или недоступен.")
             return False
@@ -131,7 +147,14 @@ async def deliver_playlist_tracks(
             await bot.send_message(chat_id=chat_id, text="❌ Плейлист не найден.")
             return 0
 
-        tracks = [pt.track for pt in playlist.tracks if pt.track and pt.track.file_id]
+        resolved_tracks = []
+        for pt in playlist.tracks:
+            if pt.track and pt.track.file_id:
+                fid = await _ensure_deliverable_file_id(pt.track, session)
+                if fid:
+                    resolved_tracks.append(pt.track)
+        tracks = resolved_tracks
+
         if not tracks:
             await bot.send_message(
                 chat_id=chat_id,
@@ -225,7 +248,14 @@ async def deliver_album_tracks(
             await bot.send_message(chat_id=chat_id, text="❌ Альбом не найден.")
             return 0
 
-        tracks = [at.track for at in album.tracks if at.track and at.track.file_id]
+        resolved_tracks = []
+        for at in album.tracks:
+            if at.track and at.track.file_id:
+                fid = await _ensure_deliverable_file_id(at.track, session)
+                if fid:
+                    resolved_tracks.append(at.track)
+        tracks = resolved_tracks
+
         if not tracks:
             await bot.send_message(
                 chat_id=chat_id,

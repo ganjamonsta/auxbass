@@ -306,6 +306,10 @@ async def get_telegram_file_path(file_id: str) -> Optional[str]:
     Get file path from Telegram (not full URL).
     Uses global session pool for better performance.
     """
+    # Fast exit for empty or lazy placeholders (resolved on-demand from channel)
+    if not file_id or file_id.startswith("lazy:") or file_id.startswith("pending:"):
+        return None
+
     # Check cache
     if file_id in _file_path_cache:
         file_path, expires = _file_path_cache[file_id]
@@ -410,12 +414,14 @@ async def refresh_file_id_from_channel(
     # Try forwardMessage which directly returns the full message with audio
     forward_url = f"{base_url}/bot{settings.bot_token}/forwardMessage"
     delete_url = f"{base_url}/bot{settings.bot_token}/deleteMessage"
+    target_chat = settings.scanner_buffer_chat_id or user_channel.channel_id
     
     try:
         async with session.post(forward_url, json={
-            "chat_id": user_channel.channel_id,
+            "chat_id": target_chat,
             "from_chat_id": user_channel.channel_id, 
             "message_id": channel_msg.message_id,
+            "disable_notification": True,
         }) as resp:
             try:
                 data = await resp.json()
@@ -456,7 +462,7 @@ async def refresh_file_id_from_channel(
             if new_message_id:
                 try:
                     async with session.post(delete_url, json={
-                        "chat_id": user_channel.channel_id,
+                        "chat_id": target_chat,
                         "message_id": new_message_id,
                     }) as _:
                         pass
@@ -468,6 +474,20 @@ async def refresh_file_id_from_channel(
                 return None, "no_audio", user_channel.channel_title
             
             new_file_id = audio["file_id"]
+
+            # Update track record in DB with new file_id and backfilled metadata
+            track = await db.get(Track, track_id)
+            if track:
+                track.file_id = new_file_id
+                track.is_unavailable = False
+                if audio.get("file_size") and not track.file_size:
+                    track.file_size = audio.get("file_size")
+                if audio.get("duration") and not track.duration:
+                    track.duration = audio.get("duration")
+                if audio.get("mime_type") and not track.mime_type:
+                    track.mime_type = audio.get("mime_type")
+                await db.commit()
+
             logger.info(f"[Refresh FileID] Got fresh file_id for track {track_id}")
             return new_file_id, None, user_channel.channel_title
             
