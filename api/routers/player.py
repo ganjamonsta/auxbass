@@ -334,6 +334,22 @@ async def get_telegram_file_path(file_id: str) -> Optional[str]:
             
             file_path = data.get("result", {}).get("file_path")
             if not file_path:
+                # If Telegram returned ok=True but no file_path, the file may have just been uploaded
+                # and is still propagating to Telegram CDN. Try a quick retry if size <= 20MB.
+                file_size = data.get("result", {}).get("file_size", 0)
+                if file_size <= 20 * 1024 * 1024:
+                    await asyncio.sleep(0.8)
+                    try:
+                        async with session.get(api_url, params={"file_id": file_id}) as retry_resp:
+                            if retry_resp.status == 200:
+                                retry_data = await retry_resp.json()
+                                file_path = retry_data.get("result", {}).get("file_path")
+                                if file_path:
+                                    logger.info(f"Got file path on retry for {file_id[:20]}...: {file_path}")
+                    except Exception as retry_err:
+                        logger.debug(f"Retry getFile failed: {retry_err}")
+
+            if not file_path:
                 logger.error(f"No file_path in response for file_id={file_id[:20]}...")
                 return None
             
@@ -893,7 +909,7 @@ async def get_batch_stream_urls(
                 file_path = await get_telegram_file_path(new_file_id)
                 if file_path:
                     logger.info(f"[Batch] Track {track.id} file_id refreshed successfully!")
-                    return file_path, new_file_id, False, None
+                return file_path, new_file_id, False, None
             
             return None, None, False, err_code
         except Exception as e:
@@ -931,9 +947,20 @@ async def get_batch_stream_urls(
             track.is_unavailable = False
             tracks_to_update.append(track_id)
         elif not file_path and track and not track.is_unavailable and not is_hd_or_large:
-            # Mark as unavailable for tracks whose telegram path is truly gone or channel is dead
-            track.is_unavailable = True
-            tracks_to_mark_unavailable.append(track_id)
+            # Do NOT mark tracks created within the last 10 minutes as unavailable
+            # (they may be actively importing or propagating to Telegram CDN)
+            now = utcnow()
+            created = track.created_at
+            if created and created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            is_recent = bool(created and (now - created).total_seconds() < 600)
+            
+            if not is_recent:
+                # Mark as unavailable for tracks whose telegram path is truly gone or channel is dead
+                track.is_unavailable = True
+                tracks_to_mark_unavailable.append(track_id)
+            else:
+                logger.debug(f"[Batch] Skipping mark_unavailable for recently created track {track_id}")
     
     # Commit updates in bulk
     if tracks_to_update or tracks_to_mark_unavailable:
