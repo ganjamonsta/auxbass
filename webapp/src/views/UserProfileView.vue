@@ -561,15 +561,8 @@ const handlePlayUserLibrary = async () => {
 
 const handleShuffleUserLibrary = async () => {
   try {
-    const res = await socialApi.getUserLibrary(userId.value, { page: 1, per_page: 100 })
-    const tracks = res.data?.items || []
-    if (tracks.length > 0) {
-      const shuffled = [...tracks].sort(() => Math.random() - 0.5)
-      playerStore.play(shuffled[0], shuffled)
-      uiStore.toast.success('Перемешивание', `Играет медиатека ${user.value.display_name}`)
-    } else {
-      uiStore.toast.info('Пусто', 'У пользователя нет доступных треков')
-    }
+    await playerStore.playShuffleAll('user_library', userId.value, user.value?.display_name)
+    uiStore.toast.success('Перемешивание', `Играет медиатека ${user.value?.display_name || ''}`)
   } catch (e) {
     console.error('Failed to shuffle user library:', e)
   }
@@ -609,16 +602,13 @@ const fetchUserTracks = async ({ offset, limit }) => {
 }
 
 const handleTrackClick = (payload, index) => {
-  if (payload && payload.track) {
-    const queue = payload.allTracks?.length ? payload.allTracks : [payload.track]
-    playerStore.play(payload.track, queue)
-    return
-  }
-  const track = payload
-  if (overviewTracks.value?.length) {
-    playerStore.play(track, overviewTracks.value)
+  const track = payload?.track || payload
+  const allTracks = payload?.allTracks || overviewTracks.value || [track]
+  const context = { type: 'user_library', id: userId.value, name: user.value?.display_name }
+  if (playerStore.shuffle) {
+    playerStore.playShuffleAll('user_library', userId.value, user.value?.display_name, { startingTrack: track })
   } else {
-    playerStore.play(track)
+    playerStore.play(track, allTracks, context)
   }
 }
 

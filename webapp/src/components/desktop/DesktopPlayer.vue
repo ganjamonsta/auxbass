@@ -358,6 +358,9 @@ const handleVolumeWheel = (e) => {
 
 // Next track in queue for display
 const nextTrack = computed(() => {
+  if (playerStore.isLazyShuffleMode && playerStore.isLazyShuffleMode()) {
+    return playerStore.lazyUpcomingTracks?.[0] || null
+  }
   if (!playerStore.queue || playerStore.queue.length === 0) return null
   if (playerStore.shuffle) {
     const nextIdx = playerStore.shuffleOrder[playerStore.shuffleIndex + 1]

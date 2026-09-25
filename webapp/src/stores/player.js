@@ -14,7 +14,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref, watch, computed } from 'vue'
-import { playerApi, tracksApi, playlistsApi, albumsApi } from '../api/client'
+import { playerApi, tracksApi, playlistsApi, albumsApi, socialApi } from '../api/client'
 import { useNetworkMonitor } from '../composables/useNetworkMonitor'
 import { useAuthStore } from './auth'
 
@@ -126,9 +126,10 @@ export const usePlayerStore = defineStore('player', () => {
   const hdTrackInfo = ref(null)
 
   // Lazy shuffle
-  const lazyShuffleIds = ref([])
-  const lazyShuffleIndex = ref(-1)
-  const lazyShuffleContext = ref(null)
+  const lazyShuffleIds = ref(savedState?.lazyShuffleIds || [])
+  const lazyShuffleIndex = ref(savedState?.lazyShuffleIndex ?? -1)
+  const lazyShuffleContext = ref(savedState?.lazyShuffleContext || null)
+  const lazyUpcomingTracks = ref([])
 
   // Playback Context & Recent Playlists
   const RECENT_PLAYLISTS_KEY = 'tg_player_recent_playlists'
@@ -253,10 +254,38 @@ export const usePlayerStore = defineStore('player', () => {
     return null
   }
 
+  const updateLazyUpcomingTracks = async () => {
+    if (!isLazyShuffleMode()) {
+      lazyUpcomingTracks.value = []
+      return
+    }
+    const upcomingIds = []
+    const N = 5
+    for (let i = 1; i <= N; i++) {
+      let idx = lazyShuffleIndex.value + i
+      if (idx >= lazyShuffleIds.value.length) {
+        if (repeat.value === 'all') idx = idx % lazyShuffleIds.value.length
+        else break
+      }
+      upcomingIds.push(lazyShuffleIds.value[idx])
+    }
+    if (!upcomingIds.length) {
+      lazyUpcomingTracks.value = []
+      return
+    }
+    try {
+      const loaded = await Promise.all(upcomingIds.map(id => loadTrackById(id)))
+      lazyUpcomingTracks.value = loaded.filter(Boolean)
+    } catch (e) {
+      console.warn('[Lazy Upcoming] Failed to load:', e)
+    }
+  }
+
   const clearLazyShuffle = () => {
     lazyShuffleIds.value = []
     lazyShuffleIndex.value = -1
     lazyShuffleContext.value = null
+    lazyUpcomingTracks.value = []
   }
 
   const generateShuffleOrder = (startingIndex = -1) => {
@@ -330,6 +359,9 @@ export const usePlayerStore = defineStore('player', () => {
       progress: progress.value,
       duration: duration.value,
       playbackContext: playbackContext.value,
+      lazyShuffleIds: lazyShuffleIds.value,
+      lazyShuffleIndex: lazyShuffleIndex.value,
+      lazyShuffleContext: lazyShuffleContext.value,
     })
   }
 
@@ -632,6 +664,30 @@ export const usePlayerStore = defineStore('player', () => {
 
   // ===================== PLAY =====================
   const play = async (track, newQueue = null, context = null) => {
+    if (!track) return
+
+    // Auto-escalate to full collection shuffle if shuffle is ON and context supports it
+    if (newQueue && shuffle.value && context && !shuffleInProgress) {
+      if (context.type === 'library') {
+        await playShuffleAll('library', null, null, { startingTrack: track, search: context.search })
+        return
+      } else if (context.type === 'liked') {
+        await playShuffleAll('liked', null, 'Любимые треки', { startingTrack: track })
+        return
+      } else if (context.type === 'playlist' && context.id) {
+        await playShuffleAll('playlist', context.id, context.name, { startingTrack: track })
+        return
+      } else if (context.type === 'album' && context.id) {
+        await playShuffleAll('album', context.id, context.name, { startingTrack: track })
+        return
+      } else if (context.type === 'artist' && (context.id || context.name)) {
+        await playShuffleAll('artist', context.id, context.name, { startingTrack: track })
+        return
+      } else if (context.type === 'user_library' && context.id) {
+        await playShuffleAll('user_library', context.id, context.name, { startingTrack: track })
+        return
+      }
+    }
     stateRestored.value = true // Prevent late cache restoration from clobbering active playback
     initAudio()
     markUserInteraction()
@@ -817,6 +873,17 @@ export const usePlayerStore = defineStore('player', () => {
             search: options?.search || undefined 
           }); 
           break
+        case 'liked':
+          response = await tracksApi.getAllIds({
+            liked_only: true,
+            sort_by: 'random'
+          });
+          break
+        case 'user_library': {
+          if (!contextId) throw new Error('User ID required')
+          response = await socialApi.getUserTrackIds(contextId, { sort_by: 'random' })
+          break
+        }
         case 'artist': {
           const name = contextName || contextId
           if (!name) throw new Error('Artist name required')
@@ -828,8 +895,23 @@ export const usePlayerStore = defineStore('player', () => {
         default: throw new Error(`Unknown context: ${context}`)
       }
 
-      const ids = response.data?.ids || response.data
+      let ids = response.data?.ids || response.data
       if (!ids?.length) { loading.value = false; shuffleInProgress = false; return }
+
+      // Make a fresh mutable copy of IDs
+      ids = [...ids]
+
+      // Starting track priority: place starting track at the very top of shuffle queue
+      const startTrack = options?.startingTrack || null
+      const startId = startTrack?.id || options?.startingTrackId || null
+
+      if (startId) {
+        const existingIdx = ids.indexOf(startId)
+        if (existingIdx > -1) {
+          ids.splice(existingIdx, 1)
+        }
+        ids.unshift(startId)
+      }
 
       lazyShuffleIds.value = ids
       lazyShuffleIndex.value = 0
@@ -846,13 +928,20 @@ export const usePlayerStore = defineStore('player', () => {
       saveSettings({ shuffle: true, volume: volume.value, isMuted: isMuted.value, repeat: repeat.value })
       queue.value = []; queueIndex.value = -1; shuffleOrder.value = []; shuffleIndex.value = -1
 
-      const firstTrack = await loadTrackById(ids[0])
+      const firstTrack = startTrack || await loadTrackById(ids[0])
       if (!firstTrack) { clearLazyShuffle(); loading.value = false; shuffleInProgress = false; return }
 
       queue.value = [firstTrack]; queueIndex.value = 0
       duration.value = 0; currentTrack.value = null
-      await play(firstTrack)
+      await play(firstTrack, null, {
+        type: context,
+        id: contextId,
+        name: context === 'artist' ? (contextName || contextId) : contextName,
+        search: options?.search || null
+      })
       shuffleInProgress = false
+      updateLazyUpcomingTracks()
+      persistState()
     } catch (error) {
       console.error('[Lazy Shuffle] Failed:', error)
       clearLazyShuffle(); loading.value = false; shuffleInProgress = false
@@ -911,6 +1000,8 @@ export const usePlayerStore = defineStore('player', () => {
       }
       queue.value = [t]; queueIndex.value = 0; shuffleOrder.value = []; shuffleIndex.value = -1
       await play(t)
+      updateLazyUpcomingTracks()
+      persistState()
       return
     }
 
@@ -1002,6 +1093,8 @@ export const usePlayerStore = defineStore('player', () => {
       }
       queue.value = [t]; queueIndex.value = 0; shuffleOrder.value = []; shuffleIndex.value = -1
       await play(t)
+      updateLazyUpcomingTracks()
+      persistState()
       return
     }
 
@@ -1070,24 +1163,55 @@ export const usePlayerStore = defineStore('player', () => {
 
   // ===================== QUEUE MANAGEMENT =====================
   const playFromQueue = async (relativeIndex) => {
+    if (isLazyShuffleMode()) {
+      const targetIndex = lazyShuffleIndex.value + 1 + relativeIndex
+      if (targetIndex >= 0 && targetIndex < lazyShuffleIds.value.length) {
+        lazyShuffleIndex.value = targetIndex - 1
+        await next()
+      }
+      return
+    }
     const idx = queueIndex.value + 1 + relativeIndex
     if (idx >= 0 && idx < queue.value.length) { queueIndex.value = idx; await play(queue.value[idx]) }
   }
 
-  const toggleShuffle = () => {
+  const toggleShuffle = async () => {
     if (shuffle.value && isLazyShuffleMode()) {
       shuffle.value = false; shuffleOrder.value = []; shuffleIndex.value = -1
-      clearLazyShuffle(); preloadTriggered = false; preloadNextTracks(); persistSettings()
+      clearLazyShuffle(); preloadTriggered = false; preloadNextTracks(); persistSettings(); persistState()
       return
     }
     if (isLazyShuffleMode()) {
-      if (!shuffle.value) { shuffle.value = true; persistSettings() }
+      if (!shuffle.value) { shuffle.value = true; persistSettings(); persistState() }
       return
     }
     shuffle.value = !shuffle.value
-    if (shuffle.value) generateShuffleOrder(queueIndex.value)
-    else { shuffleOrder.value = []; shuffleIndex.value = -1; clearLazyShuffle() }
-    preloadTriggered = false; preloadNextTracks(); persistSettings()
+    if (shuffle.value) {
+      const ctx = playbackContext.value
+      if (ctx?.type === 'library' || (!ctx && currentTrack.value)) {
+        await playShuffleAll('library', null, null, { startingTrack: currentTrack.value, search: ctx?.search || undefined })
+        return
+      } else if (ctx?.type === 'liked') {
+        await playShuffleAll('liked', null, 'Любимые треки', { startingTrack: currentTrack.value })
+        return
+      } else if (ctx?.type === 'playlist' && ctx.id) {
+        await playShuffleAll('playlist', ctx.id, ctx.name, { startingTrack: currentTrack.value })
+        return
+      } else if (ctx?.type === 'album' && ctx.id) {
+        await playShuffleAll('album', ctx.id, ctx.name, { startingTrack: currentTrack.value })
+        return
+      } else if (ctx?.type === 'artist' && (ctx.name || ctx.id)) {
+        await playShuffleAll('artist', ctx.id, ctx.name, { startingTrack: currentTrack.value })
+        return
+      } else if (ctx?.type === 'user_library' && ctx.id) {
+        await playShuffleAll('user_library', ctx.id, ctx.name, { startingTrack: currentTrack.value })
+        return
+      }
+      generateShuffleOrder(queueIndex.value)
+    } else {
+      shuffleOrder.value = []; shuffleIndex.value = -1; clearLazyShuffle()
+    }
+    preloadTriggered = false; preloadNextTracks(); persistSettings(); persistState()
   }
 
   const toggleRepeat = () => {
@@ -1204,15 +1328,21 @@ export const usePlayerStore = defineStore('player', () => {
     stateRestored.value = true
     const maxAge = 24 * 60 * 60 * 1000
     if (savedState.savedAt && Date.now() - savedState.savedAt > maxAge) { clearPlayerState(); return false }
-    if (!savedState.currentTrack || !savedState.queue?.length) return false
+    if (!savedState.currentTrack || (!savedState.queue?.length && !savedState.lazyShuffleIds?.length)) return false
 
-    queue.value = savedState.queue
+    queue.value = savedState.queue || []
     queueIndex.value = savedState.queueIndex ?? 0
     currentTrack.value = savedState.currentTrack
     duration.value = savedState.duration ?? 0
     progress.value = savedState.progress ?? 0
     if (savedState.playbackContext) {
       playbackContext.value = savedState.playbackContext
+    }
+    if (savedState.lazyShuffleIds?.length) {
+      lazyShuffleIds.value = savedState.lazyShuffleIds
+      lazyShuffleIndex.value = savedState.lazyShuffleIndex ?? 0
+      lazyShuffleContext.value = savedState.lazyShuffleContext || null
+      updateLazyUpcomingTracks()
     }
 
     initAudio(); updateMediaSession(); startStateSaving()
@@ -1251,7 +1381,7 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
-  const hasSavedState = () => savedState && savedState.currentTrack && savedState.queue?.length > 0
+  const hasSavedState = () => savedState && savedState.currentTrack && (savedState.queue?.length > 0 || savedState.lazyShuffleIds?.length > 0)
 
   // ===================== RETURN =====================
   return {
@@ -1289,6 +1419,7 @@ export const usePlayerStore = defineStore('player', () => {
     lazyShuffleContext,
     lazyShuffleIndex,
     lazyShuffleIds,
+    lazyUpcomingTracks,
     playbackContext,
     currentContext,
     currentPlaylistId,

@@ -494,6 +494,9 @@ const userInitials = computed(() => {
 
 // Queue computeds for desktop player
 const upcomingTracks = computed(() => {
+  if (playerStore.isLazyShuffleMode && playerStore.isLazyShuffleMode()) {
+    return playerStore.lazyUpcomingTracks || []
+  }
   if (playerStore.shuffle) {
     // In shuffle mode, use shuffle order
     const currentShuffleIdx = playerStore.shuffleIndex

@@ -664,6 +664,9 @@ const coverStyle = computed(() => getTrackCoverStyle(props.track))
 const coverInitials = computed(() => getTrackInitials(props.track))
 
 const upcomingQueue = computed(() => {
+  if (props.lazyShuffleMode) {
+    return playerStore.lazyUpcomingTracks || []
+  }
   if (!props.queue.length || props.queueIndex < 0) return []
   
   // If shuffle mode with shuffleOrder, show tracks in shuffle order

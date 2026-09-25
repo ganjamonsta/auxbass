@@ -44,7 +44,7 @@
             <Pause v-if="isPlaying" :size="20" fill="currentColor" />
             <Play v-else :size="20" fill="currentColor" />
           </button>
-          <button class="action-btn shuffle-btn" @click="shufflePlay" title="Перемешать">
+          <button class="action-btn shuffle-btn" @click="handleShuffle" :disabled="isShuffling || !sortedTracks.length" title="Перемешать">
             <Shuffle :size="18" />
           </button>
         </div>
@@ -169,10 +169,14 @@ const sortedTracks = computed(() => {
 })
 
 // Unified playback actions
-const { playAll, togglePlay, isPlaying, isCurrentContext, playButtonTitle, shufflePlay, playTrack } = usePlaybackActions(
+const { playAll, togglePlay, isPlaying, isCurrentContext, playButtonTitle, shufflePlay, shufflePlayFull, isShuffling, playTrack } = usePlaybackActions(
   sortedTracks,
   () => ({ type: 'liked', name: 'Любимые треки' })
 )
+
+const handleShuffle = () => {
+  shufflePlayFull('liked')
+}
 
 const unlikeTrack = async (track) => {
   try {

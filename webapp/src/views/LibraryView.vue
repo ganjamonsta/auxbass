@@ -606,9 +606,13 @@ const handlePlayAlbum = async (album) => {
 }
 
 const playTrack = (track) => {
-  const list = overviewTracks.value
-  const idx = list.findIndex(t => t.id === track.id)
-  playerStore.playTrack(track, list, idx >= 0 ? idx : 0)
+  if (playerStore.shuffle) {
+    playerStore.playShuffleAll('library', null, null, { startingTrack: track })
+  } else {
+    const list = overviewTracks.value
+    const idx = list.findIndex(t => t.id === track.id)
+    playerStore.playTrack(track, list, { type: 'library' }, idx >= 0 ? idx : 0)
+  }
 }
 
 const handleShuffleAll = async () => {

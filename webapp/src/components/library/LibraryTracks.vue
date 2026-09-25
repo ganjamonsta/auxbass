@@ -373,7 +373,15 @@ const refreshTracks = async () => {
 
 // Handle click from VirtualTrackList
 const handleVirtualClick = ({ track, index, allTracks }) => {
-  playerStore.playTrack(track, allTracks)
+  const query = effectiveSearchQuery.value ? effectiveSearchQuery.value.trim() : undefined
+  if (playerStore.shuffle) {
+    playerStore.playShuffleAll('library', null, null, {
+      startingTrack: track,
+      search: query
+    })
+  } else {
+    playerStore.playTrack(track, allTracks, { type: 'library', search: query })
+  }
 }
 
 // Handle menu from VirtualTrackList  
@@ -485,7 +493,15 @@ watch(effectiveSearchQuery, async (newVal) => {
 
 
 const playTrack = (track) => {
-  playerStore.playTrack(track, tracks.value)
+  const query = effectiveSearchQuery.value ? effectiveSearchQuery.value.trim() : undefined
+  if (playerStore.shuffle) {
+    playerStore.playShuffleAll('library', null, null, {
+      startingTrack: track,
+      search: query
+    })
+  } else {
+    playerStore.playTrack(track, tracks.value, { type: 'library', search: query })
+  }
 }
 
 // Shuffle all library tracks using lazy loading

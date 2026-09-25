@@ -26,7 +26,7 @@ from shared.models import (
 from api.routers.auth import get_current_user, require_premium
 
 logger = logging.getLogger(__name__)
-from api.utils.responses import track_to_response, build_track_search_filter
+from api.utils.responses import track_to_response, build_track_search_filter, streamable_track_filter
 from api.schemas.common import TelegramUser, PaginatedResponse
 from api.schemas.tracks import TrackResponse
 from bot.services.ingestion.pipeline import provider_registry, _find_existing_tracks_batch
@@ -663,6 +663,40 @@ async def get_user_library(
             "username": target.username if (user.id == target.id or not getattr(target, 'hide_telegram_id', False)) else None,
         }
     }
+
+
+@router.get("/user/{user_id}/ids")
+async def get_user_track_ids(
+    user_id: int,
+    sort_by: str = Query("added_at", pattern="^(added_at|random)$"),
+    user: TelegramUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get all track IDs from a user's library for full-library shuffle.
+    """
+    target = await db.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if target.hide_profile and user_id != user.id:
+        raise HTTPException(status_code=403, detail="Пользователь скрыл свой профиль")
+    
+    query = (
+        select(Track.id)
+        .join(UserLibrary, UserLibrary.track_id == Track.id)
+        .where(UserLibrary.user_id == user_id)
+        .where(UserLibrary.is_disliked == False)
+        .where(streamable_track_filter())
+    )
+    if sort_by == "random":
+        query = query.order_by(func.random())
+    else:
+        query = query.order_by(desc(UserLibrary.added_at))
+    
+    result = await db.execute(query)
+    ids = [row[0] for row in result.all()]
+    return {"ids": ids, "total": len(ids)}
 
 
 @router.get("/user/{user_id}/albums")

@@ -8,6 +8,10 @@ export const socialApi = {
   follow: (userId) => api.post('/social/follow', { user_id: userId }),
   unfollow: (userId) => api.post('/social/unfollow', { user_id: userId }),
   getUserLibrary: (userId, params = {}) => api.get(`/social/user/${userId}/library`, { params }),
+  getUserTrackIds: (userId, params = {}) => api.get(`/social/user/${userId}/ids`, { 
+    params: params.sort_by === 'random' ? { ...params, _t: Date.now() } : params,
+    bypassCache: params.sort_by === 'random'
+  }),
   getUserAlbums: (userId, params = {}) => api.get(`/social/user/${userId}/albums`, { params }),
   getUser: (userId, params = {}, options = {}) => api.get(`/social/user/${userId}`, { params, ...options }),
   getFeed: (scope = 'following', page = 1, perPage = 30) => api.get('/social/feed', { params: { scope, page, per_page: perPage } }),

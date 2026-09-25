@@ -70,6 +70,7 @@ router = APIRouter(tags=["Tracks"])
 @router.get("/ids")
 async def get_track_ids(
     search: Optional[str] = None,
+    liked_only: bool = False,
     sort_by: str = Query("added_at", pattern="^(added_at|title|artist|duration|random)$"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     user: TelegramUser = Depends(get_current_user),
@@ -83,6 +84,7 @@ async def get_track_ids(
     
     Args:
         search: Optional search query to filter tracks
+        liked_only: If True, only return liked tracks
         sort_by: Sort field. Use 'random' for pre-shuffled order
         sort_order: asc or desc
     
@@ -96,6 +98,9 @@ async def get_track_ids(
         .where(UserLibrary.is_disliked == False)
         .where(streamable_track_filter())
     )
+    
+    if liked_only:
+        query = query.where(UserLibrary.is_liked == True)
     
     # Search filter (indexes title, artist, file_name, user tags, and enrichment tags)
     if search:
