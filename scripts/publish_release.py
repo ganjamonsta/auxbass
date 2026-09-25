@@ -10,6 +10,7 @@ import subprocess
 import tarfile
 from pathlib import Path
 import httpx
+import socket
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -72,6 +73,44 @@ def ensure_archive() -> bool:
     return True
 
 
+def detect_proxy() -> str | None:
+    """Определяет рабочий прокси (из env, реестра Windows или локальных портов v2ray/clash/etc.)"""
+    # 1. Переменные окружения
+    for key in ("HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY", "https_proxy", "http_proxy", "all_proxy"):
+        val = os.getenv(key)
+        if val:
+            return val
+
+    # 2. Реестр Windows (Internet Settings)
+    if sys.platform == "win32":
+        try:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Internet Settings") as key:
+                server, _ = winreg.QueryValueEx(key, "ProxyServer")
+                if server:
+                    addr = server.split(";")[-1].replace("http=", "").replace("https=", "").strip()
+                    if addr:
+                        host, port = addr.split(":") if ":" in addr else (addr, 80)
+                        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                            s.settimeout(0.3)
+                            if s.connect_ex((host, int(port))) == 0:
+                                return f"http://{addr}" if not addr.startswith("http") else addr
+        except Exception:
+            pass
+
+    # 3. Популярные порты локальных прокси (v2ray: 10809, clash: 7890, socks: 10808, agy: 53129)
+    for port in (10809, 7890, 10808, 53129):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(0.2)
+                if s.connect_ex(("127.0.0.1", port)) == 0:
+                    return f"http://127.0.0.1:{port}"
+        except Exception:
+            pass
+
+    return None
+
+
 def upload_to_github_releases(token: str, owner: str, repo: str) -> bool:
     """Загружает webapp-dist.tar.gz в GitHub Releases 'latest' через REST API"""
     print(f"\n🚀 Загрузка в GitHub Releases (https://github.com/{owner}/{repo}/releases)...")
@@ -81,8 +120,13 @@ def upload_to_github_releases(token: str, owner: str, repo: str) -> bool:
         "X-GitHub-Api-Version": "2022-11-28",
     }
     
-    with httpx.Client(headers=headers, timeout=60.0) as client:
+    proxy = detect_proxy()
+    if proxy:
+        print(f"🌐 Обнаружен и подключен прокси: {proxy}")
+
+    with httpx.Client(headers=headers, timeout=120.0, proxy=proxy) as client:
         # 1. Проверяем или создаем release latest
+        print("🔍 Проверка релиза 'latest'...")
         rel_resp = client.get(f"https://api.github.com/repos/{owner}/{repo}/releases/tags/latest")
         if rel_resp.status_code == 200:
             release = rel_resp.json()
@@ -116,7 +160,7 @@ def upload_to_github_releases(token: str, owner: str, repo: str) -> bool:
 
         # 3. Загружаем новый ассет
         upload_url = f"https://uploads.github.com/repos/{owner}/{repo}/releases/{release_id}/assets?name=webapp-dist.tar.gz"
-        print("⬆️ Загрузка файла webapp-dist.tar.gz на GitHub...")
+        print(f"⬆️ Загрузка файла webapp-dist.tar.gz ({ARCHIVE_PATH.stat().st_size / 1024:.1f} KB) на GitHub...")
         
         with open(ARCHIVE_PATH, "rb") as f:
             file_data = f.read()
@@ -134,6 +178,7 @@ def upload_to_github_releases(token: str, owner: str, repo: str) -> bool:
         else:
             print(f"❌ Ошибка загрузки ассета: {up_resp.status_code} {up_resp.text}")
             return False
+
 
 
 def get_git_credential_token() -> str | None:
@@ -222,8 +267,13 @@ def main():
             sys.exit(1)
     except Exception as e:
         print(f"❌ Ошибка: {e}")
+        if "10060" in str(e) or "timed out" in str(e).lower() or "connect" in str(e).lower():
+            print("\n💡 Подсказка: Таймаут или сброс соединения с GitHub.")
+            print("   Доступ к серверам GitHub Releases часто блокируется или замедляется РКН / DPI.")
+            print("   Включите VPN или локальный клиент (v2ray / Clash / WARP) и попробуйте снова.")
         sys.exit(1)
 
 
 if __name__ == "__main__":
     main()
+
